@@ -38,6 +38,18 @@ function moduleForType(type: string | null | undefined): string {
   return "Customers";
 }
 
+/* PERF (critical): the LIST query must NOT pull the heavy blob columns from
+   Postgres. Some contact rows are ~80 KB each - wechat_qr (~73 KB), business
+   card scans (~60 KB), contact_persons JSON (~40 KB) - so `select("*")` on the
+   directory made the DB read + serialize ~20 MB per request, taking 20+ seconds
+   and saturating the shared instance (which slowed the WHOLE app). Stripping
+   those fields in Node afterwards (below) fixed the response size but NOT the DB
+   cost. This explicit projection = every column the directory/search needs,
+   EXCLUDING the 26 heavy columns (kept in sync with HEAVY_FIELDS below). The
+   detail/edit view still fetches the full record via GET /api/contacts/[id]. */
+const LIST_COLUMNS =
+  "id, entity_type, full_name, company_name, display_name, photo_url, logo_url, phone, mobile, email, website, wechat_id, country, city, address_1, address_2, notes, is_active, created_at, updated_at, contact_type, title, first_name, middle_name, last_name, company, position, birthday, customer_type, phones, emails, addresses, websites, social_profiles, related_names, custom_fields, province, country_code, province_code, total_revenue, last_order_date, payment_terms, credit_limit, outstanding_balance, currency, industry, source, tags, account_manager, first_contact_date, last_contacted, follow_up_date, communication_preference, language, shipping_addresses, preferred_shipping, tax_id, incoterms, supplier_type, product_categories, brand_names, moq, lead_time, total_purchases, origin_country, origin_country_code, certifications, rating, reliability_score, quality_notes, last_quality_issue, sample_status, factory_visit_date, company_name_en, company_name_cn, additional_company_names, supplier_tel, supplier_mobile, supplier_email, supplier_website, supplier_address, division, category, payment_info, work_email, work_tel, work_mobile, management, department, job_position, job_title, manager, work_address, work_location, private_email, private_phone, employee_bank_account, legal_name, place_of_birth, gender, visa_no, work_permit, nationality, nationality_code, id_no, ssn_no, passport_no, private_address, home_work_distance, marital_status, number_of_children, certificate_level, field_of_study, market_band, commercial_role, territory, exclusivity, exclusivity_scope, exclusivity_expiry, backup_account_manager, assigned_branch, source_details, referred_by, customer_level_assigned_date, customer_level_review_date, sales_rep, credit_rating_internal, credit_rating_external, credit_limit_approved_by, credit_limit_approved_date, overdue_balance, days_sales_outstanding, credit_insurance_covered, credit_insurance_provider, credit_insurance_coverage, preferred_payment_method, max_discount_allowed, price_list_tier, special_pricing_agreement, contract_pricing_expiry, commission_rate, kyc_status, kyc_verified_date, kyc_verified_by, kyc_review_due_date, risk_score, sanctions_check_status, sanctions_check_date, pep_status, high_risk_country, aml_status, business_registration_number, registration_country, registration_date, year_established, company_type, trading_name, employee_count_range, annual_revenue_range, eori_number, duns_number, importer_exporter_code, customs_code, gst_number, cr_number, whatsapp_business, telegram_id, line_id, skype_id, sub_industry, buying_behavior, price_sensitivity, quality_sensitivity, customer_health_score, nps_score, churn_risk, vip_status, strategic_account, relationship_stage, support_tier, port_of_entry, preferred_carriers, customs_broker, freight_forwarder, shipping_marks, container_preference, certifications_required, labeling_requirements, hs_codes, internal_notes, flags, tenant_id, strategic_status, strategic_status_since, strategic_status_reason, blacklist_reason, supports_oem_branding, supports_packaging_customization, supports_spare_parts, supports_samples, sample_turnaround_days, wecom_support_available, wechat_sales_group_available, wechat_official_account, readiness_milestone, supplier_postal_code, qq_id, dingtalk_id, messenger_id, wechat_pay_id, alipay_id, messaging_channels, supplier_profile_url, supplier_address_cn, ecatalog_url, business_timezone, business_hours_start, business_hours_end, backup_supplier_name, wechat_group_name, wechat_group_members, categories, person_id";
+
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -50,7 +62,10 @@ export async function GET(req: Request) {
 
   let q = supabaseServer
     .from("contacts")
-    .select("*")
+    /* `as "*"` keeps supabase-js typing identical to the previous select("*")
+       (data stays ContactRow[]) while at runtime only the light columns are
+       fetched - so nothing downstream needs retyping and `next build` is safe. */
+    .select(LIST_COLUMNS as "*")
     .eq("tenant_id", auth.tenant_id)
     .order("first_name", { ascending: true });
 
@@ -88,7 +103,7 @@ export async function GET(req: Request) {
     typeof v === "string" && v.startsWith("data:") && v.length > 4000;
   const slim = (data ?? []).map((row) => {
     const r = row as Record<string, unknown>;
-    for (const k of HEAVY_FIELDS) if (k in r) r[k] = null;
+    for (const k of HEAVY_FIELDS) r[k] = null;
     if (isHeavyDataUrl(r.logo_url)) r.logo_url = null;
     if (isHeavyDataUrl(r.photo_url)) r.photo_url = null;
     return r;
