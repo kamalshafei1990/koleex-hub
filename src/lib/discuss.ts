@@ -37,6 +37,7 @@ import type {
   DiscussSearchResult,
   DiscussVoiceMeta,
 } from "@/types/supabase";
+import { record as perfRecord, event as perfEvent } from "@/lib/perf/client";
 
 const CHANNELS = "discuss_channels";
 /* discuss_pinned / discuss_starred / discuss_drafts are read via the gated
@@ -495,14 +496,20 @@ export async function uploadDiscussAttachment(
 type PingPayload = { channelId?: string; authorId?: string | null } | undefined;
 const broadcastSubs = new Map<
   string,
-  { channel: ReturnType<typeof supabase.channel>; listeners: Set<(p: PingPayload) => void> }
+  {
+    channel: ReturnType<typeof supabase.channel>;
+    listeners: Set<(p: PingPayload) => void>;
+    /* kx-perf: subscription lifecycle bookkeeping (join time / reconnects). */
+    t0: number;
+    joins: number;
+  }
 >();
 
 function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
   let entry = broadcastSubs.get(topic);
   if (!entry) {
     const channel = supabase.channel(topic);
-    const created = { channel, listeners: new Set<(p: PingPayload) => void>() };
+    const created = { channel, listeners: new Set<(p: PingPayload) => void>(), t0: performance.now(), joins: 0 };
     channel
       .on("broadcast", { event: "changed" }, (msg) => {
         const payload = (msg?.payload ?? undefined) as PingPayload;
@@ -510,7 +517,22 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
           try { l(payload); } catch { /* one bad listener must not break the rest */ }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        /* kx-perf: realtime connection health. `scope` is the topic FAMILY
+           (e.g. "discuss:channel") — never an id. First SUBSCRIBED = join
+           time; later ones = automatic reconnects after a drop. */
+        try {
+          const scope = topic.split(":").slice(0, 2).join(":");
+          if (status === "SUBSCRIBED") {
+            created.joins += 1;
+            if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
+            else perfEvent("rt.reconnect", { scope });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            perfEvent("rt.status", { s: status, scope });
+          }
+          perfRecord("rt.channels", broadcastSubs.size);
+        } catch { /* metrics never break realtime */ }
+      });
     broadcastSubs.set(topic, created);
     entry = created;
   }
@@ -522,6 +544,7 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
     if (e.listeners.size === 0) {
       try { supabase.removeChannel(e.channel); } catch { /* ignore */ }
       broadcastSubs.delete(topic);
+      perfRecord("rt.channels", broadcastSubs.size);
     }
   };
 }
@@ -549,6 +572,14 @@ async function getMyAccountId(): Promise<string | null> {
  *  new messages and onMessageUpdate for edited/deleted ones. Reactions are
  *  reconciled by the caller's existing focus / interval refetch (a few seconds),
  *  so their granular callbacks are no longer driven from here. */
+/* kx-perf: receiver-pipeline correlation — when the last broadcast ping for a
+   channel arrived (performance.now() clock). DiscussApp reads this to measure
+   ping -> message-visible latency. In-memory only; ids are never shipped. */
+const lastPingAt = new Map<string, number>();
+export function getLastPingAt(channelId: string): number | null {
+  return lastPingAt.get(channelId) ?? null;
+}
+
 export function subscribeToChannel(
   channelId: string,
   handlers: {
@@ -575,9 +606,12 @@ export function subscribeToChannel(
          newer than the cursor, so a new message reaches the receiver in one
          small query instead of re-pulling + diffing the whole channel. Edits /
          reactions are reconciled by the parent's 5s full poll. */
+      const kxT0 = performance.now();
       const msgs = primed
         ? await fetchChannelMessages(channelId, { currentAccountId: "", after: latest })
         : await fetchChannelMessages(channelId, { currentAccountId: "" });
+      /* kx-perf: ping -> rows-in-hand (the network+db half of delivery). */
+      if (primed) perfRecord("discuss.recv.fetch_ms", performance.now() - kxT0);
       if (closed) return;
       for (const m of msgs) {
         if (m.created_at && m.created_at > latest) latest = m.created_at;
@@ -596,6 +630,7 @@ export function subscribeToChannel(
   void refresh();
 
   const unsub = subscribeBroadcast(rtChannelTopic(channelId), () => {
+    lastPingAt.set(channelId, performance.now());
     void refresh();
   });
 

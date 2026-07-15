@@ -22,6 +22,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { stageTimer } from "@/lib/server/perf";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -103,8 +104,10 @@ async function myChannelIds(me: string): Promise<string[]> {
 }
 
 export async function GET(req: Request) {
+  const timing = stageTimer("discuss.read"); /* kx-perf */
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  timing.mark("auth");
   const me = auth.account_id;
 
   const url = new URL(req.url);
@@ -261,7 +264,9 @@ export async function GET(req: Request) {
           last_message: lastByChannel.get(ch.id) ?? null,
           has_draft: draftChannelIds.has(ch.id),
         }));
-        return NextResponse.json({ ok: true, data: out });
+        timing.mark("db");
+        const { header } = timing.done({ resource: "myChannels", channels: out.length });
+        return NextResponse.json({ ok: true, data: out }, { headers: { "Server-Timing": header } });
       }
 
       /* ---- a channel's messages (membership-gated) -------------------- */
@@ -293,7 +298,9 @@ export async function GET(req: Request) {
             reply_preview: null,
             thread: null,
           }));
-          return NextResponse.json({ ok: true, data: fresh });
+          timing.mark("db");
+          const { header } = timing.done({ resource: "channelMessages", mode: "incremental", rows: fresh.length });
+          return NextResponse.json({ ok: true, data: fresh }, { headers: { "Server-Timing": header } });
         }
 
         const limit = Math.min(Number(url.searchParams.get("limit")) || 80, 200);
@@ -357,7 +364,9 @@ export async function GET(req: Request) {
             thread: threadByParent.get(row.id) ?? null,
           }))
           .reverse();
-        return NextResponse.json({ ok: true, data: out });
+        timing.mark("db");
+        const { header } = timing.done({ resource: "channelMessages", mode: "full", rows: out.length });
+        return NextResponse.json({ ok: true, data: out }, { headers: { "Server-Timing": header } });
       }
 
       /* ---- a thread (parent + children), membership-gated ------------- */

@@ -82,6 +82,7 @@ import {
   editDiscussMessage,
   fetchChannelMembers,
   fetchChannelMessages,
+  getLastPingAt,
   fetchLinkedContact,
   fetchMyChannels,
   findOrCreateDirectChannel,
@@ -103,6 +104,8 @@ import {
   uploadDiscussVoice,
   fetchMessageableAccounts,
 } from "@/lib/discuss";
+import { record as perfRecord, event as perfEvent, count as perfCount } from "@/lib/perf/client";
+import PerfPanelGate from "@/components/perf/PerfPanelGate";
 import { TranslatableBody } from "./TranslatableBody";
 import {
   TRANSLATE_LANGS,
@@ -665,6 +668,12 @@ export default function DiscussApp() {
           ];
         });
 
+        /* kx-perf: broadcast ping -> message visible on screen. */
+        {
+          const pingAt = getLastPingAt(selectedChannelId);
+          if (pingAt) requestAnimationFrame(() => perfRecord("discuss.recv.visible_ms", performance.now() - pingAt));
+        }
+
         /* Phase D: raise a desktop notification + sound for inbound
            messages in the currently-open channel when the tab isn't
            focused. For muted / DND / "mentions-only" channels the
@@ -821,6 +830,7 @@ export default function DiscussApp() {
     /* Lightweight background tick — open channel only. */
     const refreshMessages = () => {
       if (!visible()) return;
+      perfCount("discuss.poll.tick"); /* kx-perf: fallback-poll frequency (summed per flush) */
       void loadMessages(selectedChannelId, true);
     };
 
@@ -1098,6 +1108,7 @@ export default function DiscussApp() {
       return;
     }
     setSending(true);
+    const kxT0 = performance.now(); /* kx-perf: send lifecycle starts at the press */
 
     /* Decide kind from attachments — single image → "image", any other file
        → "file", text only → "text". Keeps sidebar previews smart. */
@@ -1150,12 +1161,15 @@ export default function DiscussApp() {
       reply_preview: replyPreview,
     };
     setMessages((prev) => [...prev, optimistic]);
+    /* kx-perf: press -> optimistic bubble painted (next frame). */
+    requestAnimationFrame(() => perfRecord("discuss.send.optimistic_ms", performance.now() - kxT0));
     setComposerBody("");
     setComposerAttachments([]);
     setComposerProducts([]);
     setComposerMentions([]);
     setReplyTarget(null);
 
+    const kxReq = performance.now(); /* kx-perf: HTTP round-trip start */
     const saved = await sendDiscussMessage({
       channelId: selectedChannelId,
       authorId: accountId,
@@ -1166,6 +1180,10 @@ export default function DiscussApp() {
     });
 
     if (saved) {
+      /* kx-perf: server acknowledgement + full-lifecycle timings. */
+      perfRecord("discuss.send.ack_ms", performance.now() - kxReq);
+      perfRecord("discuss.send.total_ms", performance.now() - kxT0);
+      requestAnimationFrame(() => perfRecord("discuss.send.reconcile_ms", performance.now() - kxT0));
       /* Replace the optimistic row with the real one so its id matches
          the realtime INSERT event we'll get, and the dedupe logic
          works. */
@@ -1182,6 +1200,7 @@ export default function DiscussApp() {
          just a safety net. No spinner. */
       void loadChannels(true);
     } else {
+      perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
       /* Restore the body so the user can retry without re-typing. */
       setComposerBody(trimmed);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));

@@ -27,6 +27,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { stageTimer } from "@/lib/server/perf";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -43,8 +44,10 @@ function bad(message: string, status = 400) {
 }
 
 export async function POST(req: Request) {
+  const timing = stageTimer("discuss.mutate"); /* kx-perf: stage breakdown for hot ops */
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  timing.mark("auth");
 
   /* Identity is the session account — never the client payload. */
   const me = auth.account_id;
@@ -59,6 +62,7 @@ export async function POST(req: Request) {
   const action = body.action;
   const p = (body.payload ?? {}) as Json;
   if (!action) return bad("Missing action");
+  timing.mark("parse");
 
   /* --- membership helpers (service-role; bypasses RLS) ----------------- */
   const isMember = async (channelId: string): Promise<boolean> => {
@@ -238,6 +242,7 @@ export async function POST(req: Request) {
         const text = typeof p.body === "string" ? p.body : "";
         if (!channelId) return bad("channelId required");
         if (!(await isMember(channelId))) return bad("Not a member of this channel", 403);
+        timing.mark("membership");
         const { data, error } = await supabaseServer
           .from(MESSAGES)
           .insert({
@@ -251,8 +256,11 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) return bad(error.message, 500);
+        timing.mark("db_insert");
         const memberIds = await channelMemberIds(channelId);
+        timing.mark("member_lookup");
         await pingChannelActivity(channelId, memberIds, me);
+        timing.mark("rt_dispatch");
         /* Best-effort phone / desktop push to every OTHER member who has
            enabled notifications on a device. Never blocks or fails the send;
            sendPushToAccounts only reaches accounts with an active device. */
@@ -273,7 +281,9 @@ export async function POST(req: Request) {
             );
           }
         } catch { /* push is best-effort */ }
-        return NextResponse.json({ ok: true, data });
+        timing.mark("push_dispatch");
+        const { header } = timing.done({ action: "sendMessage" });
+        return NextResponse.json({ ok: true, data }, { headers: { "Server-Timing": header } });
       }
 
       case "editMessage": {

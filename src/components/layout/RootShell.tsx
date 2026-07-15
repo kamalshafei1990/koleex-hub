@@ -21,6 +21,7 @@ import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import UpdateWatcher from "@/components/pwa/UpdateWatcher";
 import PerfVitals from "@/components/perf/PerfVitals";
+import PerfPanelGate from "@/components/perf/PerfPanelGate";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
@@ -192,6 +193,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* kx-perf bootstrap — cold/warm nav timings, long tasks, online/offline.
           Renders nothing; see docs/performance/OBSERVABILITY_ARCHITECTURE.md. */}
       <PerfVitals />
+      {/* Dev-only floating perf panel (zero bytes in production builds). */}
+      <PerfPanelGate />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
     </QAInspectorProvider>
