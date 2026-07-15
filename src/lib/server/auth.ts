@@ -60,7 +60,11 @@ export interface ServerAuthContext extends ScopeContext {
  * if no session, malformed cookie, disabled account, or DB miss. Never
  * throws — call sites decide how to respond.
  */
-async function resolveServerAuth(): Promise<ServerAuthContext | null> {
+/* Exported for the deterministic auth-equivalence test (validate:auth-equivalence)
+   so it can compare the uncached resolver against the cache()-wrapped
+   getServerAuth under identical mocked contexts. Not used in production paths —
+   every runtime caller goes through the memoized getServerAuth below. */
+export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   /* SW-1: measure the universal auth prefix (runs on every authenticated
      request → sampled by stageTimer). Stages are code-authored names; the
      only tags are the coarse outcome status — never account ids, emails, or
