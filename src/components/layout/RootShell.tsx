@@ -120,10 +120,21 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   return (
     <QAInspectorProvider>
       <style>{`
-        :root { --kx-titlebar: 0px; }
+        :root { --kx-titlebar: 0px; --kx-safe-top: env(safe-area-inset-top, 0px); }
         html.kx-desktop { --kx-titlebar: 30px; }
+        /* iOS installed PWA (Add to Home Screen): the status bar is
+           translucent and the web view renders UNDER it, so the fixed header
+           was overlapping the clock / battery / wifi. Grow the header by the
+           safe-area inset (its dark bg fills behind the status bar) and push
+           the content down to match. env() is 0 on desktop/Android so this is
+           a no-op there. */
+        .kx-mainheader {
+          padding-top: var(--kx-safe-top) !important;
+          height: calc(3.5rem + var(--kx-safe-top)) !important;
+        }
+        .kx-shell-top { padding-top: calc(3.5rem + var(--kx-safe-top)) !important; }
         /* Push the fixed top header down below the macOS traffic lights. */
-        html.kx-desktop .kx-mainheader { top: var(--kx-titlebar) !important; }
+        html.kx-desktop .kx-mainheader { top: var(--kx-titlebar) !important; height: calc(3.5rem + var(--kx-titlebar)) !important; padding-top: 0 !important; }
         /* Match the content offset so nothing slips under the header. */
         html.kx-desktop .kx-shell-top { padding-top: calc(3.5rem + var(--kx-titlebar)) !important; }
         /* Draggable, transparent strip occupying the reserved title-bar zone. */
