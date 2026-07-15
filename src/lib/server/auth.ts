@@ -15,6 +15,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "./supabase-server";
+import { stageTimer } from "./perf";
 import {
   getSessionAccountId,
   getViewAsAccountId,
@@ -59,8 +60,15 @@ export interface ServerAuthContext extends ScopeContext {
  * throws — call sites decide how to respond.
  */
 export async function getServerAuth(): Promise<ServerAuthContext | null> {
+  /* SW-1: measure the universal auth prefix (runs on every authenticated
+     request → sampled by stageTimer). Stages are code-authored names; the
+     only tags are the coarse outcome status — never account ids, emails, or
+     any row data. Gives platform-wide `op=auth.resolve` coverage with no
+     per-route edits. */
+  const _t = stageTimer("auth.resolve");
   const realAccountId = await getSessionAccountId();
-  if (!realAccountId) return null;
+  _t.mark("session");
+  if (!realAccountId) { _t.done({ status: "anon" }); return null; }
 
   /* ── View-as resolution ──────────────────────────────────────────
      Two flavours of view-as, both SA-only:
@@ -76,6 +84,7 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   const overrideTargetRoleId = overrideTargetAccountId
     ? null
     : await getViewAsRoleId(realAccountId);
+  _t.mark("viewas");
 
   /* Two Supabase lookups are needed to build the auth context:
      - `accounts` row (with joined role)
@@ -122,6 +131,7 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
       : Promise.resolve(null),
   ]);
 
+  _t.mark("db");
   const { data, error } = accountRes;
   if (error) {
     /* Transient DB errors were previously swallowed and reported to
@@ -134,10 +144,11 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
       "accountId=",
       accountIdToLoad,
     );
+    _t.done({ status: "error" });
     return null;
   }
-  if (!data) return null;
-  if (data.status !== "active") return null;
+  if (!data) { _t.done({ status: "no_account" }); return null; }
+  if (data.status !== "active") { _t.done({ status: "inactive" }); return null; }
 
   /* If view-as was requested, validate the real session is a SA. If
      not, silently fall through (load the target row but don't flag
@@ -187,6 +198,7 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
     await runDualReadShadow({ realAccountId, legacyValid: true }).catch(() => undefined);
   }
 
+  _t.done({ status: "ok", view_as: viewingAs });
   return {
     account_id: data.id,
     tenant_id: data.tenant_id,
