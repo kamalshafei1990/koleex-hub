@@ -81,6 +81,7 @@
     "@tiptap/react": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
     "@types/papaparse": "^5.5.2",
+    "@vercel/speed-insights": "^2.0.0",
     "country-state-city": "^3.2.1",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
