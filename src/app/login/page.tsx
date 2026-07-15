@@ -21,6 +21,7 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import KoleexLogo from "@/components/layout/KoleexLogo";
 import {
   isSupabaseAuthEnabled,
   signInWithPassword,
@@ -161,23 +162,30 @@ function LoginInner() {
       <div className="w-full max-w-sm">
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-7 shadow-2xl">
           <div className="flex items-center gap-3 mb-5">
-            <div className="h-10 w-10 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center">
-              {showingMfa ? (
-                <ShieldCheckIcon className="h-5 w-5" />
-              ) : (
-                <SignInIcon className="h-5 w-5" />
-              )}
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[17px] font-bold text-[var(--text-primary)] leading-tight">
-                {showingMfa ? "Verify it's you" : "Koleex HUB"}
-              </h1>
-              <p className="text-[12px] text-[var(--text-dim)] mt-0.5">
-                {showingMfa
-                  ? "Enter the 6-digit code from your authenticator"
-                  : "Sign in to continue"}
-              </p>
-            </div>
+            {showingMfa ? (
+              <>
+                <div className="h-10 w-10 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center">
+                  <ShieldCheckIcon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-[17px] font-bold text-[var(--text-primary)] leading-tight">
+                    {"Verify it's you"}
+                  </h1>
+                  <p className="text-[12px] text-[var(--text-dim)] mt-0.5">
+                    Enter the 6-digit code from your authenticator
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="min-w-0">
+                {/* The KOLEEX brand wordmark IS the login mark. currentColor +
+                    text-primary keeps it correct in both light and dark. */}
+                <KoleexLogo className="h-6 w-auto text-[var(--text-primary)]" />
+                <p className="text-[12px] text-[var(--text-dim)] mt-2">
+                  Sign in to continue
+                </p>
+              </div>
+            )}
           </div>
 
           {!showingMfa ? (
