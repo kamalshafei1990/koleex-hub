@@ -83,7 +83,12 @@ export async function GET(req: Request) {
           .is("read_at", null)
           .is("archived_at", null);
         if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 });
+        return NextResponse.json({ ok: true, data: count ?? 0 }, {
+          // Badge counts feed the home/header; a short SWR cache collapses the
+          // repeated (realtime-triggered) refetches to one round-trip. Realtime
+          // pings still refresh them; the count can lag a few seconds at most.
+          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
+        });
       }
 
       case "unreadTasks": {
@@ -96,7 +101,12 @@ export async function GET(req: Request) {
           .is("read_at", null)
           .is("archived_at", null);
         if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 });
+        return NextResponse.json({ ok: true, data: count ?? 0 }, {
+          // Badge counts feed the home/header; a short SWR cache collapses the
+          // repeated (realtime-triggered) refetches to one round-trip. Realtime
+          // pings still refresh them; the count can lag a few seconds at most.
+          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
+        });
       }
 
       default:
