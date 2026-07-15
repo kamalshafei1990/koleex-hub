@@ -27,7 +27,10 @@ New metrics MUST be added to this dictionary in the same commit that introduces 
 | `discuss.send.failed` | A | Send failed (event; body restored to composer) | ~0 |
 | `discuss.recv.fetch_ms` | A | Broadcast ping → new rows fetched (incremental `after` query) | < 700 @P75 |
 | `discuss.recv.visible_ms` | A | Broadcast ping → message painted on screen | < 900 @P75 |
-| `discuss.poll.tick` | A | Fallback-poll executions (summed per window) — baseline ≈ 12/min while a channel is open; will DROP sharply after Phase 3 P1-2 | trend metric |
+| `discuss.poll.tick` | A | Full reconcile executions (summed per window). Was ≈12/min pre-Phase-3; now ≤2/min active, ~0.2/min quiet | trend metric |
+| `discuss.reconcile` (tags: reason=dirty/safety/fallback/recovered) | A | Why each full reconcile ran (Phase 3C state machine) | mostly dirty/safety |
+| `discuss.poll.skipped` / `discuss.poll.hidden_skip` | A | Ticks that did NO network work (healthy+clean / tab hidden) — proves the poll reduction | high is good |
+| `discuss.rt.fallback` | A | Stream-unhealthy fallback activations (fired once per outage) | rare |
 
 ## Client — realtime connection health
 
@@ -42,7 +45,8 @@ New metrics MUST be added to this dictionary in the same commit that introduces 
 
 | op | Stages | Extra tags | Meaning |
 |---|---|---|---|
-| `discuss.mutate` | auth, parse, membership, db_insert, member_lookup, rt_dispatch, push_dispatch, total_ms | action=sendMessage, region, env | Full send-path breakdown. `rt_dispatch` + `push_dispatch` are the Phase 3 P1-1 targets — expect them to move out of totals. |
+| `discuss.mutate` | auth, parse, membership, db_insert, total_ms | action=sendMessage, region, env | Sender-ack critical path (Phase 3B: ends at the durable insert). |
+| `discuss.mutate.post_ack` | member_lookup, rt_dispatch, push_dispatch, total_ms | action=sendMessage | Post-response notification work run via Next after()/waitUntil — exactly one line per send; its absence signals a reliability problem. |
 | `discuss.read` | auth, db, total_ms | resource=myChannels (channels=N) / channelMessages (mode=incremental\|full, rows=N) | Sidebar + message-page read cost. |
 
 Counts (`channels`, `rows`) are cardinalities, never content.
