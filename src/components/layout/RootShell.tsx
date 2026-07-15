@@ -19,6 +19,7 @@ import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
+import UpdateWatcher from "@/components/pwa/UpdateWatcher";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
@@ -185,6 +186,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}
       <ServiceWorkerRegistrar />
+      {/* Detects new deploys and offers a one-tap refresh (PWA cache-bust). */}
+      <UpdateWatcher />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
     </QAInspectorProvider>
