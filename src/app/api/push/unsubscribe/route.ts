@@ -11,7 +11,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 export async function POST(req: Request) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  if (!auth.is_super_admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  /* Any signed-in user may register / test their OWN device for push
+     (Discuss message alerts, mentions, etc.); every send is per-account. */
 
   let body: { endpoint?: string; id?: string };
   try {
