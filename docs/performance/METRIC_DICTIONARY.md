@@ -71,4 +71,15 @@ LCP, INP, CLS, FCP, TTFB — real users, P75, per normalized route. This is the 
 | `auth.resolve` | session, viewas, db | status (anon/ok/no_account/inactive/error), view_as | **Universal auth prefix on every authenticated request** (sampled). session+viewas are cookie-only (no DB); db = the single parallel account+employee batch. |
 | `me.bootstrap` | auth, db | status | Shell's composed per-user load. |
 
+## SW-instr additions (Phase 4 Wave 2) — targeted workflow ops
+
+| op | Stages | Tags | Meaning |
+|---|---|---|---|
+| `contacts.list` | auth, db | status, type (customer/supplier/all), rows | Customers + Suppliers + Contacts directory read (one shared route). |
+| `products.list` | auth, db | status, view (list/full), rows | Products / Product-Data catalogue read. |
+| `quotations.list` | auth, db | status, status_filter, rows | Quotations list read. |
+| `accounts.list` | auth, db | status, rows | Accounts admin list read. |
+
+`type`/`view`/`status_filter` are code-authored enum-ish query values (never ids or search terms); `rows` is a cardinality (never content). Each also emits a `Server-Timing` response header (except accounts.list, log-only). These are the first tranche; the Wave 2 roadmap lists the remaining representative workflows to instrument during implementation.
+
 **Sampling:** `[kx-server-timing]` lines are now emitted 1-in-`KX_TIMING_SAMPLE_N` (default 4), PLUS always for `total_ms ≥ KX_TIMING_SLOW_MS` (default 800) and always for error/denial outcomes. Percentiles from logs remain valid — each emitted line is still a raw sample; account for the sample rate when estimating absolute request volume (multiply non-slow counts by N).

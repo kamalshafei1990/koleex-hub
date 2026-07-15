@@ -24,11 +24,13 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { stageTimer } from "@/lib/server/perf";
 import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 
 export async function GET(req: Request) {
+  const _t = stageTimer("products.list");
   const auth = await requireAuth();
-  if (auth instanceof NextResponse) return auth;
+  if (auth instanceof NextResponse) { _t.done({ status: 401 }); return auth; }
 
   /* ?view=list → slim projection with only the columns the catalogue
      grids render/search. LIST_PRODUCT_COLUMNS is a subset of the public
@@ -42,20 +44,24 @@ export async function GET(req: Request) {
     const canSeeSecrets = await hasProductDataAccess(auth);
     cols = canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
   }
+  _t.mark("auth");
 
   const { data, error } = await supabaseServer
     .from("products")
     .select(cols)
     .eq("tenant_id", auth.tenant_id)
     .order("created_at", { ascending: false });
+  _t.mark("db");
 
   if (error) {
     console.error("[api/products GET]", error.message);
+    _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load products" }, { status: 500 });
   }
+  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: (data ?? []).length });
   return NextResponse.json(
     { products: data ?? [] },
-    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header } },
   );
 }
 

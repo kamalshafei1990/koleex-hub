@@ -27,6 +27,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { stageTimer } from "@/lib/server/perf";
 import { sanitizeContactRows } from "@/lib/server/sensitive-columns";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
 
@@ -51,14 +52,16 @@ const LIST_COLUMNS =
   "id, entity_type, full_name, company_name, display_name, photo_url, logo_url, phone, mobile, email, website, wechat_id, country, city, address_1, address_2, notes, is_active, created_at, updated_at, contact_type, title, first_name, middle_name, last_name, company, position, birthday, customer_type, phones, emails, addresses, websites, social_profiles, related_names, custom_fields, province, country_code, province_code, total_revenue, last_order_date, payment_terms, credit_limit, outstanding_balance, currency, industry, source, tags, account_manager, first_contact_date, last_contacted, follow_up_date, communication_preference, language, shipping_addresses, preferred_shipping, tax_id, incoterms, supplier_type, product_categories, brand_names, moq, lead_time, total_purchases, origin_country, origin_country_code, certifications, rating, reliability_score, quality_notes, last_quality_issue, sample_status, factory_visit_date, company_name_en, company_name_cn, additional_company_names, supplier_tel, supplier_mobile, supplier_email, supplier_website, supplier_address, division, category, payment_info, work_email, work_tel, work_mobile, management, department, job_position, job_title, manager, work_address, work_location, private_email, private_phone, employee_bank_account, legal_name, place_of_birth, gender, visa_no, work_permit, nationality, nationality_code, id_no, ssn_no, passport_no, private_address, home_work_distance, marital_status, number_of_children, certificate_level, field_of_study, market_band, commercial_role, territory, exclusivity, exclusivity_scope, exclusivity_expiry, backup_account_manager, assigned_branch, source_details, referred_by, customer_level_assigned_date, customer_level_review_date, sales_rep, credit_rating_internal, credit_rating_external, credit_limit_approved_by, credit_limit_approved_date, overdue_balance, days_sales_outstanding, credit_insurance_covered, credit_insurance_provider, credit_insurance_coverage, preferred_payment_method, max_discount_allowed, price_list_tier, special_pricing_agreement, contract_pricing_expiry, commission_rate, kyc_status, kyc_verified_date, kyc_verified_by, kyc_review_due_date, risk_score, sanctions_check_status, sanctions_check_date, pep_status, high_risk_country, aml_status, business_registration_number, registration_country, registration_date, year_established, company_type, trading_name, employee_count_range, annual_revenue_range, eori_number, duns_number, importer_exporter_code, customs_code, gst_number, cr_number, whatsapp_business, telegram_id, line_id, skype_id, sub_industry, buying_behavior, price_sensitivity, quality_sensitivity, customer_health_score, nps_score, churn_risk, vip_status, strategic_account, relationship_stage, support_tier, port_of_entry, preferred_carriers, customs_broker, freight_forwarder, shipping_marks, container_preference, certifications_required, labeling_requirements, hs_codes, internal_notes, flags, tenant_id, strategic_status, strategic_status_since, strategic_status_reason, blacklist_reason, supports_oem_branding, supports_packaging_customization, supports_spare_parts, supports_samples, sample_turnaround_days, wecom_support_available, wechat_sales_group_available, wechat_official_account, readiness_milestone, supplier_postal_code, qq_id, dingtalk_id, messenger_id, wechat_pay_id, alipay_id, messaging_channels, supplier_profile_url, supplier_address_cn, ecatalog_url, business_timezone, business_hours_start, business_hours_end, backup_supplier_name, wechat_group_name, wechat_group_members, categories, person_id";
 
 export async function GET(req: Request) {
+  const _t = stageTimer("contacts.list");
   const auth = await requireAuth();
-  if (auth instanceof NextResponse) return auth;
+  if (auth instanceof NextResponse) { _t.done({ status: 401 }); return auth; }
 
   const url = new URL(req.url);
   const typeFilter = url.searchParams.get("type");
 
   const deny = await requireModuleAccess(auth, moduleForType(typeFilter));
-  if (deny) return deny;
+  if (deny) { _t.done({ status: 403 }); return deny; }
+  _t.mark("auth");
 
   let q = supabaseServer
     .from("contacts")
@@ -72,8 +75,10 @@ export async function GET(req: Request) {
   if (typeFilter) q = q.eq("contact_type", typeFilter);
 
   const { data, error } = await q;
+  _t.mark("db");
   if (error) {
     console.error("[api/contacts] fetch:", error.message);
+    _t.done({ status: 500 });
     return NextResponse.json(
       { error: "Failed to load contacts" },
       { status: 500 },
@@ -114,8 +119,12 @@ export async function GET(req: Request) {
      user browse the directory, not the credit relationship. */
   const visible = sanitizeContactRows(auth, slim);
 
+  const { header } = _t.done({ status: 200, type: typeFilter ?? "all", rows: visible.length });
   return NextResponse.json({ contacts: visible }, {
-    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+      "Server-Timing": header,
+    },
   });
 }
 

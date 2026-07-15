@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { stageTimer } from "@/lib/server/perf";
 import { preserveQuotationDocCosts, sanitizeQuotationDoc } from "@/lib/server/sensitive-columns";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import {
@@ -88,10 +89,12 @@ async function nextQuoteNumber(
 }
 
 export async function GET(req: Request) {
+  const _t = stageTimer("quotations.list");
   const auth = await requireAuth();
-  if (auth instanceof NextResponse) return auth;
+  if (auth instanceof NextResponse) { _t.done({ status: 401 }); return auth; }
   const deny = await requireModuleAccess(auth, "Quotations");
-  if (deny) return deny;
+  if (deny) { _t.done({ status: 403 }); return deny; }
+  _t.mark("auth");
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status") ?? "all";
@@ -150,8 +153,10 @@ export async function GET(req: Request) {
   });
 
   const { data, error } = await scopedQ;
+  _t.mark("db");
   if (error) {
     console.error("[api/quotations GET]", error.message);
+    _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load quotations" }, { status: 500 });
   }
 
@@ -180,11 +185,13 @@ export async function GET(req: Request) {
     return { ...rowOut, doc: sanitizeQuotationDoc(auth, rest) };
   });
 
+  const { header } = _t.done({ status: 200, status_filter: status, rows: slim.length });
   return NextResponse.json({ quotations: slim }, {
     headers: {
       // Private + short max-age so rapid back/forward navigation
       // doesn't re-fetch, but any write invalidates quickly.
       "Cache-Control": "private, max-age=30, stale-while-revalidate=180",
+      "Server-Timing": header,
     },
   });
 }

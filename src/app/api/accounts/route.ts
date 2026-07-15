@@ -8,12 +8,15 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { hashForWrite } from "@/lib/server/password";
+import { stageTimer } from "@/lib/server/perf";
 
 export async function GET() {
+  const _t = stageTimer("accounts.list");
   const auth = await requireAuth();
-  if (auth instanceof NextResponse) return auth;
+  if (auth instanceof NextResponse) { _t.done({ status: 401 }); return auth; }
   const deny = await requireModuleAccess(auth, "Accounts");
-  if (deny) return deny;
+  if (deny) { _t.done({ status: 403 }); return deny; }
+  _t.mark("auth");
 
   const { data, error } = await supabaseServer
     .from("accounts")
@@ -28,11 +31,14 @@ export async function GET() {
     )
     .eq("tenant_id", auth.tenant_id)
     .order("created_at", { ascending: false });
+  _t.mark("db");
 
   if (error) {
     console.error("[api/accounts]", error.message);
+    _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load accounts" }, { status: 500 });
   }
+  _t.done({ status: 200, rows: (data ?? []).length });
   return NextResponse.json({ accounts: data ?? [] }, {
     headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
