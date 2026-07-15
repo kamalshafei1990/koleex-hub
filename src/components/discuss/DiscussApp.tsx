@@ -83,6 +83,7 @@ import {
   fetchChannelMembers,
   fetchChannelMessages,
   getLastPingAt,
+  isChannelStreamHealthy,
   fetchLinkedContact,
   fetchMyChannels,
   findOrCreateDirectChannel,
@@ -797,21 +798,26 @@ export default function DiscussApp() {
        drop realtime messages. */
   }, [selectedChannelId, accountId, loadMessages, loadMembers]);
 
-  /* Safety net: even with a healthy realtime stream the WebSocket can
-     stall on flaky networks, be closed by Safari's aggressive sleep
-     policy, or miss events due to Supabase queue hiccups. Realtime
-     broadcast is the primary delivery path (instant); this is purely a
-     fallback so the user never has to hit "reload":
-       · on window focus / tab-visibility change → full refresh (open
-         channel + sidebar), because the tab may have missed events while
-         backgrounded. This is the high-value, near-free case.
-       · a slow background poll (every 20s) that only re-reads the OPEN
-         channel — NOT the whole sidebar. The silent loadMessages keeps
-         the existing state reference when nothing changed, so a quiet
-         channel costs one SELECT and zero React re-renders.
-     Previously this polled every 3s AND reloaded the entire sidebar on
-     every tick, which — layered on top of realtime — flooded the network
-     and thrashed re-renders, making the app feel slow and unstable. */
+  /* Connection-aware reconciliation (Phase 3C).
+
+     Realtime broadcast pings are the PRIMARY delivery path (a ping triggers a
+     small incremental fetch in subscribeToChannel). This effect replaces the
+     old every-5s full-page refetch with a decision tick that only touches the
+     network when something justifies it:
+
+       · realtime healthy + pings arrived since the last full pass → ONE full
+         reconcile (edits / deletions / reactions, which the incremental
+         cursor can't see) at most every ~30s, jittered;
+       · realtime healthy + quiet → nothing (a 5-minute safety pass is the
+         only exception, as cheap insurance against a silently wedged stream);
+       · realtime unhealthy for >8s (real drop, not a reconnect blip) → full
+         fallback polling with backoff (10s → 20s → 40s cap, jittered);
+       · the moment health returns → immediate catch-up reconcile.
+
+     Lifecycle events (focus / visibility / browser-online) always trigger a
+     full refresh — those are the moments a backgrounded tab misses events.
+     Exactly one loop exists per open channel; the effect cleans up on channel
+     switch and unmount. */
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
     if (typeof window === "undefined") return;
@@ -820,33 +826,81 @@ export default function DiscussApp() {
     const visible = () =>
       !cancelled && document.visibilityState !== "hidden";
 
-    /* Full refresh — only when the tab (re)gains focus, where catching up
-       on anything missed while backgrounded is worth two round-trips. */
     const refreshAll = () => {
       if (!visible()) return;
       void loadMessages(selectedChannelId, true);
       void loadChannels(true);
     };
-    /* Lightweight background tick — open channel only. */
-    const refreshMessages = () => {
-      if (!visible()) return;
-      perfCount("discuss.poll.tick"); /* kx-perf: fallback-poll frequency (summed per flush) */
-      void loadMessages(selectedChannelId, true);
-    };
-
     const onFocus = () => refreshAll();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshAll();
     };
+    const onOnline = () => refreshAll();
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
 
-    const pollId = window.setInterval(refreshMessages, 5000);
+    const HEALTHY_GAP = 30_000;   // dirty reconcile cadence while healthy
+    const SAFETY_GAP = 300_000;   // quiet-stream insurance pass
+    const GRACE = 8_000;          // unhealthy blips shorter than this: no storm
+    const FB_BASE = 10_000;       // fallback poll base interval
+    const FB_MAX = 40_000;        // fallback backoff cap
+    const jitter = () => 0.8 + Math.random() * 0.4;
+
+    let lastFull = performance.now();
+    let lastFallback = 0;
+    let unhealthySince: number | null = null;
+    let wasUnhealthy = false;
+
+    const fullReconcile = (reason: string) => {
+      lastFull = performance.now();
+      perfCount("discuss.poll.tick");
+      perfEvent("discuss.reconcile", { reason });
+      void loadMessages(selectedChannelId, true);
+    };
+
+    const tick = () => {
+      if (!visible()) { perfCount("discuss.poll.hidden_skip"); return; }
+      const now = performance.now();
+      if (isChannelStreamHealthy(selectedChannelId)) {
+        if (wasUnhealthy) {
+          /* Recovery: realtime is back — catch up on anything missed. */
+          wasUnhealthy = false;
+          unhealthySince = null;
+          fullReconcile("recovered");
+          return;
+        }
+        unhealthySince = null;
+        const dirty = (getLastPingAt(selectedChannelId) ?? -1) > lastFull;
+        if (dirty && now - lastFull >= HEALTHY_GAP * jitter()) { fullReconcile("dirty"); return; }
+        if (now - lastFull >= SAFETY_GAP * jitter()) { fullReconcile("safety"); return; }
+        perfCount("discuss.poll.skipped");
+        return;
+      }
+      /* Unhealthy stream. */
+      if (unhealthySince == null) {
+        unhealthySince = now;
+        wasUnhealthy = true;
+        perfEvent("discuss.rt.fallback");
+      }
+      if (now - unhealthySince < GRACE) return;
+      const level = Math.min(2, Math.floor((now - unhealthySince) / 60_000));
+      const backoff = Math.min(FB_BASE * 2 ** level, FB_MAX);
+      if (now - lastFallback >= backoff * jitter()) {
+        lastFallback = now;
+        fullReconcile("fallback");
+      }
+    };
+
+    /* The 5s tick is a local decision only — it performs NO network work
+       unless one of the rules above fires. */
+    const pollId = window.setInterval(tick, 5_000);
 
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
       window.clearInterval(pollId);
     };
   }, [selectedChannelId, accountId, loadMessages, loadChannels]);

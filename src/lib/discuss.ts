@@ -502,6 +502,10 @@ const broadcastSubs = new Map<
     /* kx-perf: subscription lifecycle bookkeeping (join time / reconnects). */
     t0: number;
     joins: number;
+    /* Last status reported by supabase-js — "SUBSCRIBED" = healthy stream.
+       Consumers use the health helpers below to decide whether fallback
+       polling is needed at all (Phase 3C connection-aware reconciliation). */
+    status: string;
   }
 >();
 
@@ -509,7 +513,7 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
   let entry = broadcastSubs.get(topic);
   if (!entry) {
     const channel = supabase.channel(topic);
-    const created = { channel, listeners: new Set<(p: PingPayload) => void>(), t0: performance.now(), joins: 0 };
+    const created = { channel, listeners: new Set<(p: PingPayload) => void>(), t0: performance.now(), joins: 0, status: "PENDING" };
     channel
       .on("broadcast", { event: "changed" }, (msg) => {
         const payload = (msg?.payload ?? undefined) as PingPayload;
@@ -518,6 +522,7 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
         }
       })
       .subscribe((status) => {
+        created.status = status;
         /* kx-perf: realtime connection health. `scope` is the topic FAMILY
            (e.g. "discuss:channel") — never an id. First SUBSCRIBED = join
            time; later ones = automatic reconnects after a drop. */
@@ -578,6 +583,19 @@ async function getMyAccountId(): Promise<string | null> {
 const lastPingAt = new Map<string, number>();
 export function getLastPingAt(channelId: string): number | null {
   return lastPingAt.get(channelId) ?? null;
+}
+
+/** Is the live broadcast stream for this channel currently SUBSCRIBED?
+ *  Used by DiscussApp to skip fallback polling entirely while realtime is
+ *  healthy (Phase 3C). Unknown topics report unhealthy, which safely biases
+ *  toward reconciliation. */
+export function isChannelStreamHealthy(channelId: string): boolean {
+  return broadcastSubs.get(rtChannelTopic(channelId))?.status === "SUBSCRIBED";
+}
+
+/** Same, for the caller's account-level ping stream (sidebar / bell). */
+export function isAccountStreamHealthy(accountId: string): boolean {
+  return broadcastSubs.get(rtAccountTopic(accountId))?.status === "SUBSCRIBED";
 }
 
 export function subscribeToChannel(
