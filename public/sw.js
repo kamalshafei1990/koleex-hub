@@ -1,9 +1,22 @@
-/* Koleex Hub service worker — push notifications only.
+/* Koleex Hub service worker.
 
-   Intentionally has NO `fetch` handler, so it does not cache or intercept any
-   network request and cannot change existing app behavior. Its only jobs are
-   to display incoming Web Push messages (lock screen / Notification Center /
-   badge) and route taps to the right page — even when the app is closed. */
+   Two conservative jobs:
+   1. Web Push — display incoming push messages + route taps (even when closed).
+   2. App-shell cache — cache-first for Next.js's IMMUTABLE, content-hashed
+      build output under /_next/static/ ONLY. This lets the installed PWA boot
+      its own JS/CSS from cache (native-instant launch) and survives iOS
+      evicting the HTTP cache. It is deliberately narrow:
+        · same-origin GET requests only
+        · /_next/static/ only — every file there has a hash in its name, so it
+          can NEVER go stale; a new deploy just uses new hashes (cache misses
+          that fetch fresh)
+        · NEVER /api/* (data always hits the network)
+        · NEVER HTML navigations (so a new app version is always picked up)
+        · NEVER sw.js / cross-origin / non-GET
+      The respondWith promise can never reject: on any error it falls back to a
+      plain network fetch, so a cache problem can't break asset loading. */
+
+const STATIC_CACHE = "kx-static-v1";
 
 self.addEventListener("install", () => {
   // Activate immediately so the first subscribe works without a reload.
@@ -11,7 +24,56 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((k) => k.startsWith("kx-static-") && k !== STATIC_CACHE)
+            .map((k) => caches.delete(k)),
+        );
+      } catch {
+        /* Cache API unavailable — ignore; push still works. */
+      }
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  let url;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
+  // ONLY the immutable, hashed build output. Everything else is untouched.
+  if (!url.pathname.startsWith("/_next/static/")) return;
+
+  event.respondWith(
+    (async () => {
+      try {
+        const cache = await caches.open(STATIC_CACHE);
+        const hit = await cache.match(req);
+        if (hit) return hit;
+        const res = await fetch(req);
+        if (res && res.status === 200 && res.type === "basic") {
+          try {
+            await cache.put(req, res.clone());
+          } catch {
+            /* quota — ignore */
+          }
+        }
+        return res;
+      } catch {
+        return fetch(req); // last resort: never break asset loading
+      }
+    })(),
+  );
 });
 
 self.addEventListener("push", (event) => {
