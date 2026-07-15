@@ -12,7 +12,17 @@
 
 import { Suspense } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import DiscussApp from "@/components/discuss/DiscussApp";
+import dynamic from "next/dynamic";
+import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
+
+/* SW-4: code-split the 165KB Discuss app (realtime chat client) off the
+   initial route bundle. Client-only (WebSocket/presence) so ssr:false is
+   correct — nothing to SSR, no hydration mismatch. Skeleton avoids a blank
+   flash while the chunk loads. Route/deep-link state unchanged. */
+const DiscussApp = dynamic(() => import("@/components/discuss/DiscussApp"), {
+  ssr: false,
+  loading: () => <AppLoadingSkeleton label="Loading Discuss…" />,
+});
 
 export default function DiscussPage() {
   return (
