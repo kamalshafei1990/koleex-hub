@@ -2745,6 +2745,9 @@ export default function CatalogsPage() {
   // sections so "this supplier has N catalogs" is obvious. Composes with the
   // grid/list view inside each section.
   const [groupBySupplier, setGroupBySupplier] = useState(true);
+  // Mobile: collapse the filter dropdowns behind one "Filters" control so the
+  // toolbar isn't a wall of selects on a phone. Desktop still shows them inline.
+  const [showFilters, setShowFilters] = useState(false);
 
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -3253,6 +3256,21 @@ export default function CatalogsPage() {
             )}
           </div>
 
+          {/* Mobile only: one "Filters" control instead of a wall of dropdowns. */}
+          <button type="button" onClick={() => setShowFilters((v) => !v)}
+            className="md:hidden h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5 shrink-0">
+            {t("cat.filters", "Filters")}
+            {[filterSupplier, filterDivision, filterType, filterYear, filterTag].filter((v) => v && v !== "all").length > 0 && (
+              <span className="min-w-[16px] h-4 px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold inline-flex items-center justify-center tabular-nums">
+                {[filterSupplier, filterDivision, filterType, filterYear, filterTag].filter((v) => v && v !== "all").length}
+              </span>
+            )}
+            <AngleDownIcon className={`h-3 w-3 text-[var(--text-dim)] transition-transform ${showFilters ? "rotate-180" : ""}`} />
+          </button>
+          {/* md:contents => on desktop the selects flow inline EXACTLY as before;
+              on mobile they collapse into their own full-width block, revealed
+              only when Filters is open. */}
+          <div className={`${showFilters ? "flex" : "hidden"} md:contents w-full flex-wrap items-center gap-3`}>
           {catalogSuppliers.length > 0 && (
             <div className="relative">
               <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}
@@ -3317,6 +3335,7 @@ export default function CatalogsPage() {
               <option value="year">{t("cat.sortYear")}</option>
             </select>
             <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+          </div>
           </div>
 
           <div className="flex items-center h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
