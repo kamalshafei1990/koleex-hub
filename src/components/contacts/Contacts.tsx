@@ -5024,13 +5024,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
        here costs nothing and halves the network work. */
     if (!scopeCtx) return;
     /* PERF — warm start: paint the last-known directory instantly from
-       sessionStorage (same pattern as the hub bootstrap warm-start), then
+       localStorage (same pattern as the hub bootstrap warm-start), then
        refresh from the network in the background and silently replace it.
        Keyed by tenant + contact type so no cross-tenant/cross-app bleed. */
     const cacheKey = `kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`;
     let paintedFromCache = false;
     try {
-      const raw = sessionStorage.getItem(cacheKey);
+      const raw = localStorage.getItem(cacheKey);
       if (raw) {
         const cached = JSON.parse(raw) as ContactRow[];
         if (Array.isArray(cached) && cached.length) {
@@ -5069,7 +5069,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     /* Refresh the warm-start cache (skip oversized payloads — quota safety). */
     try {
       const json = JSON.stringify(slim);
-      if (json.length < 2_500_000) sessionStorage.setItem(cacheKey, json);
+      if (json.length < 2_500_000) localStorage.setItem(cacheKey, json);
     } catch { /* quota exceeded → next visit just cold-loads */ }
     /* The list endpoint drops heavy base64 avatars so the response stays under
        the function size limit. Lazy-load the real logos in small batches and
@@ -5118,7 +5118,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setContacts(merged);
     try {
       const json = JSON.stringify(slim);
-      if (json.length < 2_500_000) sessionStorage.setItem(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
+      if (json.length < 2_500_000) localStorage.setItem(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
     } catch { /* quota → next visit cold-loads */ }
     // Fetch logos only for genuinely new rows (avoids per-poll avatar churn).
     const missing = merged.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
