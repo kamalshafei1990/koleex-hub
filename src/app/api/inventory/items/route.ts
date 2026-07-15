@@ -29,20 +29,29 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   try {
-    const items = await listInventoryItems({
-      tenantId: auth.tenant_id,
-      search: url.searchParams.get("q") ?? undefined,
-      typeId: url.searchParams.get("type_id") ?? undefined,
-      status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
-      limit: Number(url.searchParams.get("limit")) || 200,
-    });
+    /* PERF: fetch the item list and the caller's cost-visibility in PARALLEL
+       (independent reads) instead of one after the other. */
+    const [items, experience] = await Promise.all([
+      listInventoryItems({
+        tenantId: auth.tenant_id,
+        search: url.searchParams.get("q") ?? undefined,
+        typeId: url.searchParams.get("type_id") ?? undefined,
+        status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
+        limit: Number(url.searchParams.get("limit")) || 200,
+      }),
+      getUserExperience(auth),
+    ]);
     /* Role-based cost masking — strip cost_price / avg_cost / inventory_value
        on the wire for roles that aren't allowed to see them. */
-    const experience = await getUserExperience(auth);
     const masked = experience.can_see_cost_data
       ? items
       : items.map((it) => ({ ...it, cost_price: null, avg_cost: 0, inventory_value: 0 }));
-    return NextResponse.json({ items: masked, can_see_cost_data: experience.can_see_cost_data });
+    /* Short browser cache so revisiting the list is instant; SWR refreshes it
+       in the background. Cost masking is per-user and the cache is `private`. */
+    return NextResponse.json(
+      { items: masked, can_see_cost_data: experience.can_see_cost_data },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=120" } },
+    );
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

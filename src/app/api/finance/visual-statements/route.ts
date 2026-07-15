@@ -29,7 +29,15 @@ export async function GET(req: Request) {
       periodEnd,
       compareEnd,
     });
-    return NextResponse.json({ snapshot });
+    /* PERF: the snapshot aggregates journal lines across several periods and
+       takes ~2s to build. Finance figures change slowly, so cache it in the
+       browser (keyed by the URL, i.e. granularity + period). max-age keeps it
+       fresh for 60s; stale-while-revalidate then serves the last snapshot
+       INSTANTLY for up to 5 min while a fresh one loads in the background — so
+       the heavy recompute never blocks a navigation after the first load. */
+    return NextResponse.json({ snapshot }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=300" },
+    });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
