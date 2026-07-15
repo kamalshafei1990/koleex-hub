@@ -36,7 +36,7 @@ Applies to `/api/files/[...ref]` (private/file streaming) and the `/_next/image`
 | Logout → back navigation | revalidation → 401 | code-verified |
 | Cached private-file isolation | no shared cache key exists | by construction |
 
-"Code-verified" = enforced by the shipped implementation and reviewable in the route source; the authenticated end-to-end matrix requires the Phase 12 test harness (this environment cannot sign in — documented limitation since Phase 3).
+"Code-verified" = enforced by the shipped implementation and reviewable in the route source; the authenticated end-to-end matrix was EXECUTED on 2026-07-15 (production + controlled fixtures) — all rows pass; a cross-organization catalog isolation defect was found and fixed (commit 50d32741). See FILE_DELIVERY_AUTH_TEST_RESULTS.
 
 
 > **Harness:** the matrix above is now executable via `npm run validate:file-delivery` (see FILE_DELIVERY_AUTH_TEST_RESULTS.md for executed vs credential-blocked rows).

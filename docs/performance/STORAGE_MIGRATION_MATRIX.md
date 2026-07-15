@@ -8,11 +8,11 @@ States: browser-direct · first-party image · first-party public file · first-
 | Employee/account/customer avatars | media (public) | **first-party image** (`66771b9e`) | 33 sites / 20 components; fallback initials preserved |
 | Discuss participant avatars (ThreadPane/CustomerChatModal) | media (public) | **first-party image** (`66771b9e`) | |
 | Product photos / VL thumbnails / catalog covers | media, product-* (public) | **first-party image** (stage 1 `760c7665` + covers `16e7308a`) | live-verified 200 first-party |
-| Catalog PDFs (32–187MB) | media (public bucket, module-gated app) | **first-party protected file** (`16e7308a`) | range transport + downloads via /api/files/catalog; unauth 401 live-verified; authenticated range tests = harness (blocked here) |
+| Catalog PDFs (32–187MB) | media (public bucket, tenant+module-gated) | **first-party protected file · TESTED** (`16e7308a`, tenant-scope fix `50d32741`) | full authenticated authz matrix executed incl. cross-org, Range 206, partial-fetch, logout, cache isolation — see FILE_DELIVERY_AUTH_TEST_RESULTS |
 | Product manuals / brochures / spec PDFs | — | **pending content** | No populated manual documents exist yet (PD population just started); category + route pattern defined; supplier catalogs (the existing brochure class) are covered above. NOT auto-classified public: each future doc type gets an access rule first (supplier/cost/QC/packing docs are NOT public regardless of bucket). |
 | Taxonomy/brand SVG icons | media (public) | **browser-direct, retained** | SVG = optimizer-incompatible by security policy; local fallbacks make CN degradation cosmetic; candidate: public-icon route category |
 | Software-center installers | media (public) | **browser-direct, retained** | large downloads; future `software` route category (module-gated) |
-| Discuss image/file attachments | media (public) | route **ready**, UI **pending gate** | migration gated on authenticated matrix execution (see FILE_DELIVERY_AUTH_TEST_RESULTS) |
+| Discuss image/file attachments | media (public) | route **TESTED** (member/non-member/deleted/index/logout all pass); UI wiring pending owner approval | security gate CLEARED — see FILE_DELIVERY_AUTH_TEST_RESULTS |
 | Discuss voice messages | discuss-voice (private) | pending resolver | signed-URL flow today |
 | Finance / project / QA files | private buckets | pending resolvers | signed-URL flows today |
 | Generated exports (xlsx/pdf) | n/a (streamed by APIs) | already first-party | no storage involved |
