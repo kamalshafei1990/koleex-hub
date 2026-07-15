@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
-import { fpAvatar } from "@/lib/cdn";
+import { fpAvatar, cdnImage } from "@/lib/cdn";
 import { useQueryClient } from "@tanstack/react-query";
 import { currentScopeKey } from "@/lib/me-bootstrap";
 import Link from "next/link";
@@ -355,6 +355,13 @@ function ensurePdfJs(): Promise<void> {
 
    Safety: any failure (no 206, wrong size, network error) falls back to the
    plain full-file path — exactly the previous behaviour. */
+/* China R3 stage 3 — first-party PDF delivery. The viewer opens catalogs via
+   the identifier-based streaming route (auth + Catalogs-module check + Range
+   passthrough server-side; see docs/performance/FIRST_PARTY_STORAGE_ARCHITECTURE.md).
+   The browser never contacts *.supabase.co for catalog PDFs, and because the
+   route is same-origin, Accept-Ranges/206 are fully visible to pdf.js. */
+const catalogFileUrl = (id: string) => `/api/files/catalog/${id}`;
+
 const PDF_RANGE_CHUNK = 524288; // 512KB
 const PDF_RANGE_MIN_SIZE = 4 * 1024 * 1024; // small files: plain load is fine
 
@@ -1899,7 +1906,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
     let objUrl: string | null = null;
     (async () => {
       try {
-        const blob = await pdfUrlFirstPageBlob(catalog.file_url, catalog.file_size);
+        const blob = await pdfUrlFirstPageBlob(catalogFileUrl(catalog.id), catalog.file_size);
         if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
         if (!alive) return;
         objUrl = URL.createObjectURL(blob);
@@ -1932,7 +1939,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   const handleDownload = () => {
     onDownload();
     const a = document.createElement("a");
-    a.href = catalog.file_url;
+    a.href = `${catalogFileUrl(catalog.id)}?download=1`;
     a.download = catalog.file_name;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
@@ -1954,7 +1961,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
       {/* Cover area */}
       <div className="relative aspect-[3/4] overflow-hidden">
         {coverUrl && !coverErr ? (
-          <img src={coverUrl} alt={catalog.title} loading="lazy" decoding="async" onError={() => setCoverErr(true)}
+          <img src={cdnImage(coverUrl, { width: 480, quality: 75, resize: "contain" })} alt={catalog.title} loading="lazy" decoding="async" onError={() => setCoverErr(true)}
             className="w-full h-full object-contain bg-white transition-transform duration-300 group-hover:scale-[1.02]" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex flex-col items-center justify-center gap-3 p-4`}>
@@ -2130,7 +2137,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
     let objUrl: string | null = null;
     (async () => {
       try {
-        const blob = await pdfUrlFirstPageBlob(catalog.file_url, catalog.file_size);
+        const blob = await pdfUrlFirstPageBlob(catalogFileUrl(catalog.id), catalog.file_size);
         if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
         if (!alive) return;
         objUrl = URL.createObjectURL(blob);
@@ -2163,7 +2170,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   const handleDownload = () => {
     onDownload();
     const a = document.createElement("a");
-    a.href = catalog.file_url;
+    a.href = `${catalogFileUrl(catalog.id)}?download=1`;
     a.download = catalog.file_name;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
@@ -2180,7 +2187,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
       </button>
       <div className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-[var(--border-subtle)]">
         {coverUrl && !coverErr ? (
-          <img src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setCoverErr(true)} className="w-full h-full object-contain bg-white" />
+          <img src={cdnImage(coverUrl, { width: 480, quality: 75, resize: "contain" })} alt="" loading="lazy" decoding="async" onError={() => setCoverErr(true)} className="w-full h-full object-contain bg-white" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex items-center justify-center`}>
             <Icon className={`h-5 w-5 ${ft.color} opacity-60`} />
@@ -2656,7 +2663,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
   const download = () => {
     onDownload(catalog.id);
     const a = document.createElement("a");
-    a.href = catalog.file_url; a.download = catalog.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.href = `${catalogFileUrl(catalog.id)}?download=1`; a.download = catalog.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -2683,7 +2690,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
       </div>
       <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {isPdf ? (
-          <PdfViewer url={catalog.file_url} fileSize={catalog.file_size} onDownload={download} />
+          <PdfViewer url={catalogFileUrl(catalog.id)} fileSize={catalog.file_size} onDownload={download} />
         ) : isImg ? (
           <img src={catalog.file_url} alt={catalog.title} style={{ transform: `scale(${zoom})` }} className="max-w-full max-h-full object-contain transition-transform duration-150 origin-center" />
         ) : (
