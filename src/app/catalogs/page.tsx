@@ -3081,7 +3081,7 @@ export default function CatalogsPage() {
         <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">{t("cat.subtitle")}</p>
 
         {/* Stats */}
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="grid grid-cols-2 gap-2 mb-5 md:flex md:flex-wrap">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             <CatalogsIcon size={12} className="text-[var(--text-dim)]" />
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{catalogs.length}</span>

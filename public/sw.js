@@ -16,7 +16,7 @@
       The respondWith promise can never reject: on any error it falls back to a
       plain network fetch, so a cache problem can't break asset loading. */
 
-const STATIC_CACHE = "kx-static-v1";
+const STATIC_CACHE = "kx-static-v2";
 
 self.addEventListener("install", () => {
   // Activate immediately so the first subscribe works without a reload.
@@ -26,17 +26,25 @@ self.addEventListener("install", () => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      let hadOld = false;
       try {
         const keys = await caches.keys();
-        await Promise.all(
-          keys
-            .filter((k) => k.startsWith("kx-static-") && k !== STATIC_CACHE)
-            .map((k) => caches.delete(k)),
-        );
+        const old = keys.filter((k) => k.startsWith("kx-static-") && k !== STATIC_CACHE);
+        hadOld = old.length > 0;
+        await Promise.all(old.map((k) => caches.delete(k)));
       } catch {
         /* Cache API unavailable — ignore; push still works. */
       }
       await self.clients.claim();
+      // If this activation REPLACED an older cache version, any open windows are
+      // running stale JS — navigate them to the fresh code. Skipped on a first
+      // install (no prior version), so we never reload a brand-new visitor.
+      if (hadOld) {
+        try {
+          const wins = await self.clients.matchAll({ type: "window" });
+          for (const w of wins) { try { w.navigate(w.url); } catch { /* ignore */ } }
+        } catch { /* ignore */ }
+      }
     })(),
   );
 });
