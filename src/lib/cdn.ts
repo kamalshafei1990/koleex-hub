@@ -41,9 +41,38 @@ export interface CdnImageOptions {
 const SUPABASE_OBJECT_PATH = "/storage/v1/object/public/";
 const SUPABASE_RENDER_PATH = "/storage/v1/render/image/public/";
 
+/* ── China remediation R3, stage 1: first-party image delivery ─────────────
+   When ON (default), Supabase public-object URLs are rewritten to our own
+   /_next/image optimizer endpoint: the browser only ever talks to
+   hub.koleexgroup.com (proven ~99% reachable from mainland China, vs ~19%
+   node failure for *.supabase.co). Vercel fetches the original server-side
+   (Tokyo<->Tokyo), resizes preserving aspect ratio (same visual result as the
+   previous resize:"contain" presets) and edge-caches the output.
+
+   KILL-SWITCH / rollback without code change: set NEXT_PUBLIC_KX_FP_IMAGES=0
+   and redeploy — every caller falls back to the previous direct Supabase
+   render URLs. Non-Supabase URLs always pass through untouched either way. */
+const FIRST_PARTY_IMAGES = process.env.NEXT_PUBLIC_KX_FP_IMAGES !== "0";
+
+/* Must mirror next.config.ts images.deviceSizes + imageSizes. The optimizer
+   rejects widths outside its allowlist, so we snap UP to the next allowed
+   size (never down — no quality loss). */
+const ALLOWED_WIDTHS = [16, 32, 48, 64, 96, 128, 160, 256, 384, 480, 640, 750, 828, 1080, 1200, 1440, 1920, 2048, 3840];
+const snapWidth = (w: number) => ALLOWED_WIDTHS.find((x) => x >= w) ?? 3840;
+const snapQuality = (q: number) => (q >= 78 ? 78 : 75); // mirrors images.qualities
+
 export function cdnImage(url: string | null | undefined, opts: CdnImageOptions = {}): string {
   if (!url) return "";
   if (!url.includes(SUPABASE_OBJECT_PATH)) return url;
+
+  if (FIRST_PARTY_IMAGES) {
+    const w = snapWidth(opts.width ?? 1200);
+    const q = snapQuality(opts.quality ?? 75);
+    /* height/resize hints are intentionally dropped in this mode: the Next
+       optimizer always preserves aspect ratio (contain semantics), which is
+       what every IMG preset asked for anyway. */
+    return `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=${q}`;
+  }
 
   const transformed = url.replace(SUPABASE_OBJECT_PATH, SUPABASE_RENDER_PATH);
   const params = new URLSearchParams();
