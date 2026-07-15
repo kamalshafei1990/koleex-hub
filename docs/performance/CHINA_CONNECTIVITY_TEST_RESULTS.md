@@ -57,3 +57,9 @@ Failures: **2 nodes** (China Mobile Hefei + Changsha; TCP connect timeout) ≈ 1
 | WSS/storage stability | inference from same-host HTTPS + public knowledge — **unverified** |
 | Google-services blocked, FCM blocked, APNs works, AMap works | public knowledge, labeled as such, no probe run |
 | Owner's device measurements | VPN (Japan exit) — **excluded from China conclusions** |
+
+
+---
+
+## Remediation-era addendum (2026-07-15, post R1–R3)
+New browser-facing paths (`/_next/image`, `/api/files/*`, `/vendor/pdfjs/*`) all live on `hub.koleexgroup.com` — mainland reachability inherited from Test 1 (~99% node success). Per-endpoint mainland re-probes are queued for the next ITDOG session (tool rate-limited after this session's two full runs). Endpoint functionality was verified live from a Japan-exit VPN network — labeled VPN evidence, not China evidence.
