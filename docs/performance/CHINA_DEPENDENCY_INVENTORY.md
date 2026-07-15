@@ -44,3 +44,13 @@ Notes: `example.com`/`x.test` hits are placeholders/tests, not dependencies. No 
 | AMap | accessible (China-native provider) | none |
 | APNs push | accessible (Apple operates in CN) — labeled public knowledge | none |
 | FCM push (Android web) | **blocked** (Google) — labeled public knowledge | document limitation; native-app push would need a CN push vendor (future) |
+
+
+---
+
+## R1/R2 remediation status (2026-07-15, commits `0ade9210` / `24a92201`)
+- pdf.js: **self-hosted** at `/public/vendor/pdfjs/3.11.174/` (was cdnjs.cloudflare.com). No cdnjs request remains.
+- Google favicons: **removed** — Contacts carrier logos render local letter monograms. No Google request remains.
+
+## Storage inventory reference (R3 Step 1)
+Full bucket-by-bucket inventory, classifications, URL-generation and authorization paths moved to `FIRST_PARTY_STORAGE_ARCHITECTURE.md` §Step 1. Summary: 4 public buckets (media 500MB-limit workhorse, product-assets, product-images, todo-attachments) + 4 private (discuss-voice, finance-documents, project-attachments, qa-screenshots); all uploads already first-party via /api/storage/*; images centrally URL-built by src/lib/cdn.ts (the R3 stage-1 switch point).
