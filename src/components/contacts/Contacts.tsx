@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
@@ -2323,7 +2324,7 @@ const TeamAvatar = React.memo(function TeamAvatar({ m, size = 24 }: { m: TeamMem
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
-        src={m.avatar_url}
+        src={fpAvatar(m.avatar_url)}
         alt=""
         width={size}
         height={size}
@@ -6078,7 +6079,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
                       {(c.photo_url || c.logo_url) ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={(c.photo_url || c.logo_url) as string} alt="" className="h-full w-full object-cover" loading="lazy" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                        <img src={fpAvatar((c.photo_url || c.logo_url) as string)} alt="" className="h-full w-full object-cover" loading="lazy" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                       ) : initials}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -6315,7 +6316,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {/* Avatar — stronger container on the active row */}
                     <div className={`w-12 h-12 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--border-color)]" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
                       {(c.photo_url || c.logo_url) ? (
-                        <img src={(c.photo_url || c.logo_url) as string} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <img src={fpAvatar((c.photo_url || c.logo_url) as string)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
                         <Building2Icon size={16} className="text-[var(--text-dim)]" />
                       ) : (
@@ -7249,7 +7250,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)] overflow-hidden">
-                    {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : (f.first_name?.[0] || "?").toUpperCase()}
+                    {f.photo_url ? <img src={fpAvatar(f.photo_url)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : (f.first_name?.[0] || "?").toUpperCase()}
                   </div>
                   <div>
                     <span className="text-xs text-blue-400 font-medium">{f.relationship}</span>
@@ -8721,7 +8722,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         >
           <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
             {form.photo_url ? (
-              <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+              <img src={fpAvatar(form.photo_url)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? (
               <Building2Icon size={32} className="text-[var(--text-ghost)]" />
             ) : (

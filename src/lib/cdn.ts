@@ -93,6 +93,16 @@ export function cdnImage(url: string | null | undefined, opts: CdnImageOptions =
  *  can clip legs/edges of the machine. With contain we always get
  *  the full image back.
  */
+/** China R3 stage 2 — identity images (avatars, contact photos, small logos).
+ *  Null-safe passthrough: falsy inputs and non-Supabase URLs (data:, blob:,
+ *  external) come back unchanged, so existing conditional-render fallbacks
+ *  and initials continue to work exactly as before. Supabase public-object
+ *  URLs become first-party /_next/image URLs (one shared 160px variant per
+ *  image, so identical avatars never trigger duplicate transformations). */
+export function fpAvatar<T extends string | null | undefined>(url: T): string | T {
+  return url ? cdnImage(url, { width: 160, quality: 75, resize: "contain" }) : url;
+}
+
 export const IMG = {
   /** Row thumbnail — list cells, brand logos. Bumped from 96 → 160
    *  because the products app routinely shows these inside ≥120px

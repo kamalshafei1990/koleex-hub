@@ -6,6 +6,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -310,7 +311,7 @@ export default function EmployeesPage() {
                   href={`/employees/${emp.id}`}
                   className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer"
                 >
-                  <Avatar src={emp.person.avatar_url} name={emp.person.full_name} size={40} />
+                  <Avatar src={fpAvatar(emp.person.avatar_url)} name={emp.person.full_name} size={40} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">{emp.person.full_name}</span>

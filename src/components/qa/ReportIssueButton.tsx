@@ -14,6 +14,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { usePathname } from "next/navigation";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
@@ -72,7 +73,7 @@ const MAX_SHOTS = 6;
 function AssigneeAvatar({ a }: { a: { name: string; avatar_url?: string | null } }) {
   return a.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={a.avatar_url} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
+    <img src={fpAvatar(a.avatar_url)} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
   ) : (
     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--bg-surface-bright)] text-[10px] font-bold text-[var(--text-secondary)]">
       {(a.name || "?").slice(0, 1).toUpperCase()}

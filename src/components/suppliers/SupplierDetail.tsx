@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -542,7 +543,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <div className="w-24 h-24 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
                 {str(s, "photo_url", "logo_url") ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={str(s, "photo_url", "logo_url")} alt={name} className="w-full h-full object-cover" />
+                  <img src={fpAvatar(str(s, "photo_url", "logo_url"))} alt={name} className="w-full h-full object-cover" />
                 ) : (
                   <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{initials(name)}</span>
                 )}

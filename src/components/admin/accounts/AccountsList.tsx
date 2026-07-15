@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -601,7 +602,7 @@ export default function AccountsList() {
                               {(person?.avatar_url || a.avatar_url) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
-                                  src={(person?.avatar_url || a.avatar_url)!}
+                                  src={fpAvatar((person?.avatar_url || a.avatar_url)!)}
                                   alt={fullName}
                                   className="h-full w-full object-cover"
                                 />
@@ -711,7 +712,7 @@ export default function AccountsList() {
                         {(person?.avatar_url || a.avatar_url) ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={(person?.avatar_url || a.avatar_url)!}
+                            src={fpAvatar((person?.avatar_url || a.avatar_url)!)}
                             alt={fullName}
                             className="h-full w-full object-cover"
                           />

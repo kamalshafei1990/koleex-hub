@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
@@ -98,7 +99,7 @@ function Avatar({ a, size = 32 }: { a: AccountInfo; size?: number }) {
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
-        src={a.avatar_url}
+        src={fpAvatar(a.avatar_url)}
         alt=""
         className="rounded-full object-cover shrink-0"
         style={{ width: size, height: size }}

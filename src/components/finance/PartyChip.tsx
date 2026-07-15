@@ -8,6 +8,7 @@
    --------------------------------------------------------------------------- */
 
 import type { FinancePartyRow } from "@/components/finance/PartyPickerModal";
+import { fpAvatar } from "@/lib/cdn";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import RrIcon from "@/components/ui/RrIcon";
@@ -67,7 +68,7 @@ export default function PartyChip({
       <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${compact ? "h-6 w-6 text-[10px]" : "h-7 w-7 text-[11px]"} font-semibold text-[var(--text-highlight)]`}>
         {party.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={party.photo_url} alt="" className="h-full w-full object-cover" />
+          <img src={fpAvatar(party.photo_url)} alt="" className="h-full w-full object-cover" />
         ) : (
           (party.name || "?").slice(0, 1).toUpperCase()
         )}

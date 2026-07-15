@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -441,7 +442,7 @@ function ContactAvatar({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={contact.avatar_url}
+          src={fpAvatar(contact.avatar_url)}
           alt={contact.display_name}
           className="w-full h-full object-cover"
         />

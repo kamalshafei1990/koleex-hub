@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
@@ -89,7 +90,7 @@ function getInitials(name: string | null, username?: string): string {
 /* ── Avatar ── */
 function MiniAvatar({ info, size = 28 }: { info: TodoAssigneeInfo; size?: number }) {
   return info.avatar_url ? (
-    <img src={info.avatar_url} alt="" className="rounded-full object-cover shrink-0"
+    <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
       style={{ width: size, height: size }} />
   ) : (
     <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"

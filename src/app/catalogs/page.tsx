@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { useQueryClient } from "@tanstack/react-query";
 import { currentScopeKey } from "@/lib/me-bootstrap";
 import Link from "next/link";
@@ -1550,7 +1551,7 @@ function CatalogModal({
               <div className="flex items-center gap-3 h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                 {selectedContact.photo_url ? (
                   <div className="shrink-0 w-6 h-6 rounded overflow-hidden bg-[var(--bg-surface-bright)]">
-                    <img src={selectedContact.photo_url} alt="" className="w-full h-full object-contain" />
+                    <img src={fpAvatar(selectedContact.photo_url)} alt="" className="w-full h-full object-contain" />
                   </div>
                 ) : (
                   <Building2Icon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
@@ -1591,7 +1592,7 @@ function CatalogModal({
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#252525] transition-colors text-left border-b border-[#2a2a2a] last:border-0">
                         <div className="shrink-0 w-8 h-8 rounded-lg bg-[#252525] border border-[#333] flex items-center justify-center overflow-hidden">
                           {c.photo_url ? (
-                            <img src={c.photo_url} alt="" className="w-full h-full object-contain" />
+                            <img src={fpAvatar(c.photo_url)} alt="" className="w-full h-full object-contain" />
                           ) : (
                             <Building2Icon className="h-3.5 w-3.5 text-zinc-500" />
                           )}
@@ -2009,7 +2010,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
               className="group/sup flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
               {catalog.contact_photo_url
-                ? <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                ? <img src={fpAvatar(catalog.contact_photo_url)} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                 : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
               <div className="flex min-w-0 flex-col">
                 <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover/sup:underline">
@@ -2023,7 +2024,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
           ) : (
             <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
               {catalog.contact_photo_url
-                ? <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                ? <img src={fpAvatar(catalog.contact_photo_url)} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                 : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
               <div className="flex min-w-0 flex-col">
                 <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
@@ -2201,7 +2202,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
                 className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px] hover:text-[var(--text-primary)] hover:underline"
               >
                 {catalog.contact_photo_url && (
-                  <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+                  <img src={fpAvatar(catalog.contact_photo_url)} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
                 )}
                 <span className="truncate">
                   {catalog.company_name_en || catalog.contact_name}
@@ -2211,7 +2212,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
             ) : (
               <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px]">
                 {catalog.contact_photo_url && (
-                  <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+                  <img src={fpAvatar(catalog.contact_photo_url)} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
                 )}
                 <span className="truncate">
                   {catalog.company_name_en || catalog.contact_name}

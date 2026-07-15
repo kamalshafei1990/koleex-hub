@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
@@ -182,7 +183,7 @@ export default function ShareDialog({
                       disabled={busyId === a.id}
                       className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors text-left disabled:opacity-50"
                     >
-                      <Avatar name={shareAccountLabel(a)} src={a.avatar_url} />
+                      <Avatar name={shareAccountLabel(a)} src={fpAvatar(a.avatar_url)} />
                       <div className="flex-1 min-w-0">
                         <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(a)}</div>
                         <div className="text-[11px] text-[var(--text-dim)] truncate">{a.login_email || a.role || ""}</div>
@@ -217,7 +218,7 @@ export default function ShareDialog({
                 {/* Owner */}
                 {data?.owner && (
                   <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
-                    <Avatar name={shareAccountLabel(data.owner.account)} src={data.owner.account?.avatar_url} />
+                    <Avatar name={shareAccountLabel(data.owner.account)} src={fpAvatar(data.owner.account?.avatar_url)} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
                         {shareAccountLabel(data.owner.account)}
@@ -235,7 +236,7 @@ export default function ShareDialog({
                 {/* Shares */}
                 {(data?.shares ?? []).map((s) => (
                   <div key={s.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
-                    <Avatar name={shareAccountLabel(s.account)} src={s.account?.avatar_url} />
+                    <Avatar name={shareAccountLabel(s.account)} src={fpAvatar(s.account?.avatar_url)} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(s.account)}</div>
                       <div className="text-[11px] text-[var(--text-dim)] truncate">{s.account?.login_email || ""}</div>

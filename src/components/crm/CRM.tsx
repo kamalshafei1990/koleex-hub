@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
+import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import {
   useCallback,
@@ -1323,7 +1324,7 @@ function OwnerAvatar({
   if (owner.avatar_url) {
     return (
       <img
-        src={owner.avatar_url}
+        src={fpAvatar(owner.avatar_url)}
         alt={owner.username}
         title={owner.full_name || owner.username}
         className="h-5 w-5 rounded-full object-cover border border-[var(--border-subtle)]"
@@ -1637,7 +1638,7 @@ function ContactComboboxField({
                       {c.photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={c.photo_url}
+                          src={fpAvatar(c.photo_url)}
                           alt=""
                           className="w-full h-full object-cover"
                         />

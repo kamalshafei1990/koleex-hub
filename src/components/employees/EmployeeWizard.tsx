@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
@@ -422,7 +423,7 @@ function Step1Personal({
           >
             {form.photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.photo_url} alt="" className="h-full w-full object-cover" />
+              <img src={fpAvatar(form.photo_url)} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className="text-center">
                 <CameraIcon className="h-5 w-5 mx-auto" style={{ color: "var(--text-dim)" }} />

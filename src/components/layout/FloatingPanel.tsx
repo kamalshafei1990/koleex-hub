@@ -19,6 +19,7 @@ import {
   useMemo,
 } from "react";
 import { usePathname } from "next/navigation";
+import { fpAvatar } from "@/lib/cdn";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
@@ -777,7 +778,7 @@ export default function FloatingPanel() {
                         {m.role === "user" ? (
                           <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center" style={{ background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
                             {account?.avatar_url || account?.person?.avatar_url ? (
-                              <img src={(account?.avatar_url || account?.person?.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                              <img src={fpAvatar((account?.avatar_url || account?.person?.avatar_url)!)} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <span className={`text-[10px] font-bold ${dk ? "text-white/50" : "text-black/50"}`}>
                                 {(account?.username || "U").charAt(0).toUpperCase()}

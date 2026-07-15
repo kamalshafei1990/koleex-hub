@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -442,7 +443,7 @@ export default function ContactsSection({
                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center">
                       {str(c, "photo_url") ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={str(c, "photo_url")} alt={str(c, "full_name")} className="h-full w-full object-cover" />
+                        <img src={fpAvatar(str(c, "photo_url"))} alt={str(c, "full_name")} className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{(str(c, "full_name").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "?").toUpperCase()}</span>
                       )}

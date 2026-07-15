@@ -29,6 +29,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -578,7 +579,7 @@ export default function AccountDetail({ accountId }: Props) {
                 {data.avatar_url || person?.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={data.avatar_url || person?.avatar_url || ""}
+                    src={fpAvatar(data.avatar_url || person?.avatar_url || "")}
                     alt={displayName}
                     className="h-full w-full object-cover"
                   />

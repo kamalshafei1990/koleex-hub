@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -1173,7 +1174,7 @@ export default function AddEmployeePage() {
                     <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
                   ) : form.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.photo_url} alt="" className="h-full w-full object-cover" />
+                    <img src={fpAvatar(form.photo_url)} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="text-center">
                       <CameraIcon size={20} className="mx-auto text-[var(--text-faint)] group-hover:text-[var(--text-dim)] transition-colors" />

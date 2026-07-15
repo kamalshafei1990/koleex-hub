@@ -28,6 +28,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { fpAvatar } from "@/lib/cdn";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -360,7 +361,7 @@ function ThreadMessage({
           {msg.author?.avatar_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={msg.author.avatar_url}
+              src={fpAvatar(msg.author.avatar_url)}
               alt={authorName}
               className="w-full h-full object-cover"
             />

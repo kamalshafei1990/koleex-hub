@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import RrIcon from "@/components/ui/RrIcon";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
@@ -173,7 +174,7 @@ export default function PartyPickerModal({
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[11px] font-semibold text-[var(--text-highlight)]">
                         {row.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={row.photo_url} alt="" className="h-full w-full object-cover" />
+                          <img src={fpAvatar(row.photo_url)} alt="" className="h-full w-full object-cover" />
                         ) : (
                           (row.display_name || row.company || "?").slice(0, 1).toUpperCase()
                         )}

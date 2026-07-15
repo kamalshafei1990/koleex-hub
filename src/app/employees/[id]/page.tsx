@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState, use } from "react";
+import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -310,7 +311,7 @@ export default function EmployeeProfilePage({
         {/* ── Header card ── */}
         <section className={`${panelCls} mb-4`}>
           <div className="flex items-start gap-5">
-            <Avatar src={person.avatar_url} name={person.full_name} size={80} />
+            <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={80} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{person.full_name}</h2>
