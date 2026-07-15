@@ -109,3 +109,5 @@ Shipped in the 2026-07 speed sweep (verified live): contacts slim projection (93
 | Sender→receiver message latency (two clients) | Needs two authenticated realtime clients | Code-path latency budget (see DISCUSS_REALTIME_AUDIT §5) | Phase 2 correlation-ID lifecycle events |
 | React render counts / long tasks | Needs authenticated profiling session | Component size + effect analysis | Phase 2 hotspot marks (`performance.mark`) on known heavy components |
 | Local production build | Repo folder is TCC-blocked for this agent; builds run on Vercel CI | Vercel build status (green) + deployed chunk inspection | unchanged — CI remains the build oracle |
+
+> **Phase 2 addendum (2026-07-15):** the measurement gaps above now have live instruments — Vercel Speed Insights (Core Web Vitals P75), `[kx-metric]` client lifecycle logs, and `[kx-server-timing]` stage logs. See `OBSERVABILITY_ARCHITECTURE.md` + `METRIC_DICTIONARY.md`. The baseline numbers in this file are unchanged and remain the official "before".
