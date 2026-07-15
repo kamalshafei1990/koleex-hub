@@ -46,6 +46,7 @@ import {
 } from "@/lib/inbox";
 import {
   fetchMyChannels,
+  isAccountStreamHealthy,
   markChannelRead,
   subscribeToMyChannels,
 } from "@/lib/discuss";
@@ -297,10 +298,20 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
      resume, so the badge updates the instant the user returns. */
   useEffect(() => {
     if (!accountId) return;
+    /* Phase 3D: realtime-first. subscribeToMyChannels already recounts on
+       every account-topic ping, so while that stream is healthy this poll
+       would only duplicate work against the most expensive read endpoint
+       (myChannels). Keep it purely as insurance: every 60s tick, it runs
+       only if the stream is unhealthy OR 5 minutes passed since the last
+       forced pass (wedged-socket insurance). Focus/visibility handlers
+       above still resync immediately on return. */
+    let lastForced = Date.now();
     async function poll() {
       if (document.visibilityState !== "visible") return;
       const aid = accountIdRef.current;
       if (!aid) return;
+      if (isAccountStreamHealthy(aid) && Date.now() - lastForced < 300_000) return;
+      lastForced = Date.now();
       try {
         const rows = await fetchMyChannels(aid);
         const newTotal = rows.reduce(
@@ -321,7 +332,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         /* Leave prior list in place. */
       }
     }
-    const id = window.setInterval(poll, 10_000);
+    const id = window.setInterval(poll, 60_000);
     return () => window.clearInterval(id);
   }, [accountId]);
 
