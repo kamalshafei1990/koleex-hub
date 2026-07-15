@@ -67,7 +67,9 @@
 - Bell badge on a wedged-but-SUBSCRIBED stream updates at worst after 5 min or next focus (previously 10 s) — accepted per realtime-first design; chime still fires from realtime and from safety passes.
 - The iad1↔Tokyo tax dominates all server timings until the region decision is made.
 
+> **UPDATE (2026-07-15, later the same day):** the region pin was approved and SHIPPED (commit `43ec03b5`). Verified in production: functions run in `hnd1`; `myChannels` **P50 3,604 ms → ~170 ms typical (~20×)**. Full evidence: `REGION_COLOCATION_RESULTS.md`. A mainland-China readiness audit was also completed — see `MAINLAND_CHINA_READINESS_AUDIT.md` (decision: Level 2 — usable with remediation).
+
 ## Recommended next steps
-1. **Approve the `hnd1` region pin** (one line; biggest single win available).
+1. ~~Approve the `hnd1` region pin~~ — **DONE, verified 20× improvement**.
 2. Let real usage accumulate 1–2 days of `[kx-metric]`/`post_ack`/Speed Insights data, then append the after-percentiles here.
 3. Phase 4 (perceived-perf polish) or Phase 5 (Discuss state machine + gated idempotency migration) per roadmap.
