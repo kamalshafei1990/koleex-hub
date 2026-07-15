@@ -10,7 +10,16 @@
 
 import { Suspense } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import CRM from "@/components/crm/CRM";
+import dynamic from "next/dynamic";
+import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
+
+/* SW-4: code-split the 158KB CRM board off the initial route bundle. It is a
+   client-only interactive board (DnD) — ssr:false avoids shipping+hydrating it
+   until the route actually renders. Skeleton prevents a blank flash. */
+const CRM = dynamic(() => import("@/components/crm/CRM"), {
+  ssr: false,
+  loading: () => <AppLoadingSkeleton label="Loading CRM…" />,
+});
 import PermissionGate from "@/components/layout/PermissionGate";
 
 export default function CrmPage() {
