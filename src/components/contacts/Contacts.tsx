@@ -3420,26 +3420,15 @@ const ToggleSwitch = React.memo(function ToggleSwitch({
    letter-monogram fallback when there's no domain or the image fails to load
    (e.g. offline / blocked). Keeps the dropdown readable either way. */
 const CarrierLogo = React.memo(function CarrierLogo({ name }: { name: string }) {
-  const domain = carrierDomain(name);
-  const [failed, setFailed] = React.useState(false);
-  if (!domain || failed) {
-    return (
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--bg-surface-active)] text-[9px] font-semibold text-[var(--text-dim)] shrink-0">
-        {carrierName(name).charAt(0)}
-      </span>
-    );
-  }
+  /* China remediation R2: always render the local letter monogram. The old
+     path fetched favicons from www.google.com/s2 — Google is blocked in
+     mainland China, so every carrier logo rendered as a broken image there.
+     No third-party favicon service replaces it; the stored "Name|domain"
+     format is preserved so a first-party logo source can be added later. */
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-      alt=""
-      width={16}
-      height={16}
-      loading="lazy"
-      className="w-4 h-4 rounded-sm object-contain shrink-0"
-      onError={() => setFailed(true)}
-    />
+    <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--bg-surface-active)] text-[9px] font-semibold text-[var(--text-dim)] shrink-0">
+      {carrierName(name).charAt(0)}
+    </span>
   );
 });
 
@@ -3518,10 +3507,8 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
             <div className="p-2.5 border-t border-[var(--border-subtle)] space-y-2">
               <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Carrier name" className="w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3" />
               <div className="flex items-center gap-2">
-                {normalizeDomain(newSite)
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={`https://www.google.com/s2/favicons?domain=${normalizeDomain(newSite)}&sz=64`} alt="" width={20} height={20} className="w-5 h-5 rounded-sm object-contain shrink-0" />
-                  : <span className="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-[var(--bg-surface-active)] text-[10px] text-[var(--text-dim)] shrink-0">{(newName.trim().charAt(0) || "?")}</span>}
+                {/* R2: local initials preview — no remote favicon fetch (Google blocked in CN). */}
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-[var(--bg-surface-active)] text-[10px] text-[var(--text-dim)] shrink-0">{(newName.trim().charAt(0) || "?")}</span>
                 <input value={newSite} onChange={e => setNewSite(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitCustom(); } }} placeholder="Website for logo (e.g. carrier.com)" className="flex-1 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3" />
               </div>
               <div className="flex items-center gap-2">
