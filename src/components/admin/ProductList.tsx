@@ -203,7 +203,25 @@ export default function ProductList() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    /* PERF warm-start: paint the last-known product list INSTANTLY from
+       localStorage (survives full reload + iOS PWA restart, unlike the
+       in-memory query cache), then refresh from the network below and
+       silently replace it. Scoped by tenant + view-as so no cross-tenant
+       bleed; try/catch means a corrupt/absent cache just falls through to
+       the normal load path. */
+    let paintedFromCache = false;
+    try {
+      const lsKey = `kx_products_list_v1:${currentScopeKey()}`;
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(lsKey) : null;
+      if (raw) {
+        const cached = JSON.parse(raw) as ProductRow[];
+        if (Array.isArray(cached) && cached.length) {
+          setProducts(cached);
+          paintedFromCache = true;
+        }
+      }
+    } catch { /* corrupt/absent cache → normal load path */ }
+    setLoading(!paintedFromCache);
     setLoadError(null);
     (async () => {
       try {
@@ -236,6 +254,11 @@ export default function ProductList() {
         const [d, c, s, ms, imgs] = await metaPromise;
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
+        /* Persist for instant paint on the next cold load / PWA restart. */
+        try {
+          const json = JSON.stringify(p);
+          if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+        } catch { /* quota / serialize guard */ }
         setProducts(p); setDivisions(d); setCategories(c);
         setSubcategories(s);
         setModelCounts(ms.counts);
