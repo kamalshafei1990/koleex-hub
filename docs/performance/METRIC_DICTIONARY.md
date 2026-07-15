@@ -62,3 +62,13 @@ LCP, INP, CLS, FCP, TTFB — real users, P75, per normalized route. This is the 
 - Metrics from users with `sendBeacon`+`fetch` both blocked (rare) are lost — acceptable.
 - Log-based percentiles require exporting/filtering Vercel logs; Speed Insights percentiles are automatic.
 - View-as sessions still report metrics: the ingest route authenticates the session but deliberately skips the view-as read-only guard, because a metric batch is a log line, not a business-data write.
+
+
+## SW-1 additions (Phase 4 Wave 1) — server-timing ops
+
+| op | Stages | Tags | Meaning |
+|---|---|---|---|
+| `auth.resolve` | session, viewas, db | status (anon/ok/no_account/inactive/error), view_as | **Universal auth prefix on every authenticated request** (sampled). session+viewas are cookie-only (no DB); db = the single parallel account+employee batch. |
+| `me.bootstrap` | auth, db | status | Shell's composed per-user load. |
+
+**Sampling:** `[kx-server-timing]` lines are now emitted 1-in-`KX_TIMING_SAMPLE_N` (default 4), PLUS always for `total_ms ≥ KX_TIMING_SLOW_MS` (default 800) and always for error/denial outcomes. Percentiles from logs remain valid — each emitted line is still a raw sample; account for the sample rate when estimating absolute request volume (multiply non-slow counts by N).

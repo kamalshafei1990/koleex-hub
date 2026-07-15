@@ -1,4 +1,5 @@
 import "server-only";
+import { stageTimer } from "@/lib/server/perf";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -22,8 +23,11 @@ import { getServerAuth } from "@/lib/server/auth";
 const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox", "Notes"];
 
 export async function GET() {
+  const timer = stageTimer("me.bootstrap");
   const auth = await getServerAuth();
+  timer.mark("auth");
   if (!auth) {
+    timer.done({ status: 401 });
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
@@ -136,6 +140,8 @@ export async function GET() {
      was previously hitting the DB, which made the mode feel sluggish.
      The 10s window is short enough that exits / re-picks (which call
      retryMeBootstrap with cache:no-store) still feel instant. */
+  timer.mark("db");
+  timer.done({ status: 200 });
   return NextResponse.json(payload, {
     headers: {
       "Cache-Control": viewingAs
