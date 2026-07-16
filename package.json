@@ -19,6 +19,8 @@
     "validate:server-list": "node --import tsx scripts/validate-server-list.mts",
     "validate:customers-gate": "node --import tsx scripts/validate-customers-gate.mts",
     "validate:customers-rollout": "NODE_OPTIONS=--conditions=react-server node --import tsx scripts/validate-customers-rollout.mts",
+    "validate:suppliers-gate": "node --import tsx scripts/validate-suppliers-gate.mts",
+    "validate:suppliers-rollout": "NODE_OPTIONS=--conditions=react-server node --import tsx scripts/validate-suppliers-rollout.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
