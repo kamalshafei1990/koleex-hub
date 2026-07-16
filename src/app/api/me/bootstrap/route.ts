@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { getServerAuth } from "@/lib/server/auth";
 import { isInCustomersServerListCohort } from "@/lib/server/customers-rollout";
+import { isInSuppliersServerListCohort } from "@/lib/server/suppliers-rollout";
 
 /* GET /api/me/bootstrap
    Consolidates the three hot per-page /api/me/* lookups (context,
@@ -136,6 +137,12 @@ export async function GET() {
        the Customers server-list UI. Keyed on the REAL logged-in account (not a
        view-as target). Empty env / customer accounts → false (legacy). */
     customersServerList: isInCustomersServerListCohort(
+      auth.real_account_id ?? auth.account_id,
+      auth.user_type,
+    ),
+    /* Wave 2A.2 controlled rollout: same trusted, server-resolved pattern for
+       the Suppliers server-list UI. Independent cohort (own env var). */
+    suppliersServerList: isInSuppliersServerListCohort(
       auth.real_account_id ?? auth.account_id,
       auth.user_type,
     ),

@@ -309,3 +309,8 @@ isolated, not a hotspot.
 
 ## Wave 2A.1 note (2026-07-16)
 No React-hotspot fixes yet (that is Wave 2C). Wave 2A.1 shipped the server-list data foundation; once the Customers UI is server-paged it will render a bounded 50-row page instead of all 120, which is the prerequisite measurement before deciding on virtualization/memoization for this list (per the mandate: measure the bounded page's React cost first).
+
+
+---
+
+**Wave 2A.2 update (2026-07-16):** Suppliers directory migrated onto the shared server-list architecture (server search/filter/sort/pagination + permission-safe global summary, replacing the full-supplier-dataset client fetch + 20s poll) on branch `wave2a2-suppliers-preview` — Preview-gated, NOT in production. Real before/after percentiles/bytes/req-counts require a measured Preview/cohort window (Vercel-log/Speed-Insights). See `PHASE_4_WAVE_2A2_RESULTS.md` + `SUPPLIERS_SERVER_LIST_PILOT.md`.

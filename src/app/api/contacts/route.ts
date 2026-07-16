@@ -30,41 +30,15 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 import { stageTimer } from "@/lib/server/perf";
 import { sanitizeContactRows } from "@/lib/server/sensitive-columns";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
-import { parseListParams, buildListResponse, type ServerListConfig } from "@/lib/server-list/types";
+import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
+import { configForType, SLIM_LIST_COLUMNS, summaryBreakdownColumn } from "@/lib/server-list/contacts-config";
 
-/* Wave 2A.1 — server-list contract for the contacts directory (Customers pilot).
-   ONLY these columns may be searched/sorted/filtered; everything else is
-   rejected server-side. No sensitive columns (credit, KYC, HR, costs) are
-   searchable or exposed here — the row is still passed through
-   sanitizeContactRows for column-level visibility. */
-const CONTACTS_LIST_CONFIG: ServerListConfig = {
-  defaultPageSize: 50,
-  maxPageSize: 100,
-  sortFields: {
-    name: "first_name",
-    company: "company_name",
-    created: "created_at",
-    updated: "updated_at",
-    revenue: "total_revenue",
-  },
-  defaultSort: { field: "name", dir: "asc" },
-  searchColumns: [
-    "full_name", "display_name", "company_name", "first_name", "last_name",
-    "company", "email", "phone", "mobile", "city", "country", "wechat_id", "customer_type",
-  ],
-  filters: {
-    status: { column: "is_active", allowed: ["true", "false"] },
-    entity: { column: "entity_type" },
-    tier: { column: "customer_type" },
-  },
-  maxQueryLength: 100,
-};
-
-/* Slim projection for the paged directory: only the fields a list card renders
-   + the sort/search columns. Far smaller than the full LIST_COLUMNS set. */
-const SLIM_LIST_COLUMNS =
-  "id, entity_type, full_name, company_name, display_name, first_name, last_name, company, photo_url, logo_url, phone, mobile, email, country, city, contact_type, is_active, customer_type, market_band, account_manager, total_revenue, outstanding_balance, credit_limit, currency, tags, created_at, updated_at, tenant_id, person_id";
+/* Server-list contracts (search/sort/filter allowlists) + slim projection live
+   in server-list/contacts-config.ts so the exact NON-SENSITIVE column set is
+   importable by deterministic security tests. Suppliers get a supplier-flavoured
+   config via configForType(); the Customers pilot + legacy Contacts are
+   unchanged. */
 
 /* Map contact_type → ERP module name. Unknown / missing types fall
    back to "Customers" which is the broadest directory view. */
@@ -113,12 +87,15 @@ export async function GET(req: Request) {
       if (typeFilter) c = c.eq("contact_type", typeFilter);
       return c;
     };
-    /* Two head-only counts + a narrow TWO-COLUMN scan (customer_type, country —
-       both already shown in the list, neither sensitive) to build tier/country
-       breakdowns. This is the aggregate SOURCE only (small, cached), never the
-       list rows. */
+    /* Two head-only counts + a narrow TWO-COLUMN scan to build the type/country
+       breakdowns. The breakdown column is type-aware and NON-SENSITIVE:
+       suppliers group by `supplier_type` (manufacturer / trader / …), everyone
+       else by `customer_type` (tier). This is the aggregate SOURCE only (small,
+       cached), never the list rows. `byTier` in the response holds whichever
+       breakdown applies; the UI labels it correctly per type. */
+    const breakdownCol = summaryBreakdownColumn(typeFilter);
     const breakdownQ = (() => {
-      let c = supabaseServer.from("contacts").select("customer_type, country").eq("tenant_id", auth.tenant_id);
+      let c = supabaseServer.from("contacts").select(`${breakdownCol}, country`).eq("tenant_id", auth.tenant_id);
       if (typeFilter) c = c.eq("contact_type", typeFilter);
       return c;
     })();
@@ -135,8 +112,9 @@ export async function GET(req: Request) {
     const active = activeRes.count ?? 0;
     const byTier: Record<string, number> = {};
     const byCountry: Record<string, number> = {};
-    for (const r of (breakdownRes.data ?? []) as Array<{ customer_type?: string | null; country?: string | null }>) {
-      if (r.customer_type) byTier[r.customer_type] = (byTier[r.customer_type] ?? 0) + 1;
+    for (const r of (breakdownRes.data ?? []) as Array<Record<string, string | null | undefined>>) {
+      const bucket = r[breakdownCol];
+      if (bucket) byTier[bucket] = (byTier[bucket] ?? 0) + 1;
       if (r.country) byCountry[r.country] = (byCountry[r.country] ?? 0) + 1;
     }
     // Top 8 countries by count (keeps the payload small).
@@ -155,7 +133,8 @@ export async function GET(req: Request) {
      sanitizeContactRows as the legacy path — only search/sort/pagination move
      to the server. */
   if (url.searchParams.get("paged") === "1") {
-    const listReq = parseListParams(url.searchParams, CONTACTS_LIST_CONFIG);
+    const listCfg = configForType(typeFilter);
+    const listReq = parseListParams(url.searchParams, listCfg);
     let pq = supabaseServer
       .from("contacts")
       // exact count is cheap for this directory (hundreds of rows) and drives
@@ -163,7 +142,7 @@ export async function GET(req: Request) {
       .select(SLIM_LIST_COLUMNS, { count: "exact" })
       .eq("tenant_id", auth.tenant_id);
     if (typeFilter) pq = pq.eq("contact_type", typeFilter);
-    pq = applyServerList(pq, listReq, CONTACTS_LIST_CONFIG);
+    pq = applyServerList(pq, listReq, listCfg);
 
     const { data, error, count } = await pq;
     _t.mark("db");

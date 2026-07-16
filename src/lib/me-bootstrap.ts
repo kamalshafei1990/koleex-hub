@@ -37,6 +37,8 @@ export interface MeBootstrapPayload {
   /* Wave 2A.1 controlled rollout: trusted server-resolved flag — true when the
      logged-in account is in the Customers server-list internal cohort. */
   customersServerList?: boolean;
+  /* Wave 2A.2: same for the Suppliers server-list internal cohort. */
+  suppliersServerList?: boolean;
   /* When a super admin is "viewing as", the server fills this with
      either the target USER's identity (kind="account") or the target
      ROLE's identity (kind="role"). The banner renders on this; the

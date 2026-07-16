@@ -86,3 +86,19 @@ are unchanged.
 because the directory is small (hundreds of rows) and pagination UI benefits.
 For a large resource, drop to no-count or an estimated count and rely on
 `hasMore` — the response envelope already supports `total: null`.
+
+## Reused by Suppliers (Wave 2A.2)
+The Suppliers migration reuses this whole foundation unchanged: `types.ts`,
+`apply.ts`, `useServerList`, `useDebouncedValue`, `sanitizeContactRows`, and the
+`/api/contacts` `?paged=1` / `?summary=1` branches. Per-resource variation is
+config-only: `configForType(type)` picks `SUPPLIERS_LIST_CONFIG` (company-first
+sort, supplier-appropriate non-sensitive search/filter columns, `supplierType`
+filter) vs the customer config, and the summary breakdown column is type-aware
+(`supplier_type` vs `customer_type`). The rollout gate decision was extracted to
+`rollout-gate.ts` (`shouldUseServerList`, re-exported by both `customers-gate`
+and `suppliers-gate`), and the cohort resolver to `rollout-cohort.ts`
+(`makeServerListCohort(envVar)`, used by both `customers-rollout` and
+`suppliers-rollout` with independent env vars). Adding the next directory
+(Contacts, Products, …) is now: a per-type `ServerListConfig`, a
+`<Resource>ServerList` adapter, an env var, and a bootstrap flag. See
+`SUPPLIERS_SERVER_LIST_PILOT.md`.
