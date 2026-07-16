@@ -50,7 +50,7 @@ check("replay returns the EXISTING canonical row", /\.eq\("client_msg_id", clien
 check("replay is scoped to the channel (key is per-channel, not global)",
   /\.eq\("channel_id", channelId\)\s*\n\s*\.eq\("client_msg_id", clientMsgId\)/.test(route));
 check("replay responds ok:true (reported as idempotent success)",
-  /\{ ok: true, data: existing, idempotent: true \}/.test(route));
+  /\{ ok: true, data: serializeDiscussMessageForClient\(existing\), idempotent: true \}/.test(route));
 
 /* ── C. Replay must not bypass authz and must not re-notify ───────────────── */
 {
@@ -64,7 +64,7 @@ check("replay responds ok:true (reported as idempotent success)",
     iMember > -1 && iConflict > -1 && iMember < iConflict);
   check("replay returns before notifyMembers is ever defined/dispatched (no duplicate realtime/push)",
     iConflict > -1 && iNotify > -1 && iConflict < iNotify
-      && /return NextResponse\.json\(\s*\{ ok: true, data: existing, idempotent: true \}/.test(send));
+      && /return NextResponse\.json\(\s*\{ ok: true, data: serializeDiscussMessageForClient\(existing\), idempotent: true \}/.test(send));
 }
 
 /* ── D. Double-send + IME protection ──────────────────────────────────────── */

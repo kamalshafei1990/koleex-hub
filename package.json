@@ -30,6 +30,7 @@
     "validate:cold-start": "node --import tsx scripts/validate-cold-start.mts",
     "validate:platform-speed": "node --import tsx scripts/validate-platform-speed.mts",
     "validate:discuss-idempotency": "node --import tsx scripts/validate-discuss-idempotency.mts",
+    "validate:discuss-attachments": "node --conditions=react-server --import tsx scripts/validate-discuss-attachments.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
