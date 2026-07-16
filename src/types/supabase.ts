@@ -1355,6 +1355,12 @@ export interface DiscussMessageRow {
   edited_at: string | null;
   deleted_at: string | null;
   created_at: string;
+  /** Client-generated idempotency key for one logical send attempt. NULL on
+      legacy rows (pre-migration) and for clients that omit it. Uniqueness is
+      enforced per-channel by the partial unique index
+      discuss_messages_channel_client_msg_id_key. See
+      docs/performance/DISCUSS_MESSAGE_LIFECYCLE.md. */
+  client_msg_id: string | null;
 }
 
 export type DiscussMessageInsert = Omit<
