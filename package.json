@@ -16,6 +16,7 @@
     "validate:password-state": "tsx scripts/validate-password-state.ts",
     "validate:session-shadow": "tsx scripts/validate-session-shadow.ts",
     "validate:auth-equivalence": "NODE_OPTIONS=--conditions=react-server node --experimental-test-module-mocks --import tsx scripts/validate-auth-equivalence.mts",
+    "validate:server-list": "node --import tsx scripts/validate-server-list.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
