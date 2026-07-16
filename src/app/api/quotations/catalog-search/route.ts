@@ -137,7 +137,10 @@ export async function GET(req: Request) {
     const productName = product.product_name ?? "";
 
     if (needle) {
-      const hay = `${modelName} ${productName}`.toLowerCase();
+      /* Match against model code + SKU + product name so a bounded server
+         search (used by the picker's debounced query) finds a SKU even when
+         model_name is present. Broadens matches only — never narrows. */
+      const hay = `${modelName} ${m.sku ?? ""} ${productName}`.toLowerCase();
       if (!hay.includes(needle)) continue;
     }
 
