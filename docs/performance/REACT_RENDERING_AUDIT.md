@@ -303,3 +303,9 @@ isolated, not a hotspot.
 8. **Context values recreated each render** in `SidebarContext.tsx:55` and product-coding
    `i18n.tsx:1249` — low blast radius today (few consumers), but a `useMemo` on the value (or
    read/write split) is the standard cheap fix.
+
+
+---
+
+## Wave 2A.1 note (2026-07-16)
+No React-hotspot fixes yet (that is Wave 2C). Wave 2A.1 shipped the server-list data foundation; once the Customers UI is server-paged it will render a bounded 50-row page instead of all 120, which is the prerequisite measurement before deciding on virtualization/memoization for this list (per the mandate: measure the bounded page's React cost first).

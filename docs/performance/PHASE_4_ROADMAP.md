@@ -49,6 +49,8 @@ Baseline + ranked scorecard: `PHASE_4_WAVE_2_BASELINE.md`. Audits:
 filter/paginate client-side (0/10 paginate, 0/10 virtualize). React Compiler is
 **off**, so missing memoization is a real cost.
 
+**Wave 2A.1 status (2026-07-16): server-list foundation + secure endpoint + tests SHIPPED; Customers UI activation prepared, gated on preview verification.** See `SERVER_LIST_ARCHITECTURE.md`, `CUSTOMERS_SERVER_LIST_PILOT.md`, `PHASE_4_WAVE_2A1_RESULTS.md`. Do NOT begin 2A.2/2B/2C without approval.
+
 **Proposed sequence (each independently reversible; security-preserving; separate commits):**
 - **Wave 2A (cross-app):** `useServerList` hook (server pagination + `q=` search +
   cancellation + cache-first + warm-start) → Customers/Suppliers/Contacts first,

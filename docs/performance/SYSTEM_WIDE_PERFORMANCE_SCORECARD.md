@@ -86,3 +86,6 @@ mounted but unused. → Wave 2A `useServerList` shared hook.
 client filter, 11.6k-line component; (2) FinanceDashboard **8-way** mount
 fan-out; (3) Quotations editor ~6 fetches with reference-list duplication;
 (4) CRM edit modal loads the whole contact book; (5) Catalogs ~6-load mount.
+
+
+> **Wave 2A.1 (2026-07-16):** shared server-list foundation + secure `/api/contacts?paged=1` endpoint + 28-assertion validation SHIPPED (opt-in; Customers UI activation gated on preview verification). The #1 liability (8/10 apps full-download+client-filter) now has its reusable fix. See `SERVER_LIST_ARCHITECTURE.md` + `PHASE_4_WAVE_2A1_RESULTS.md`.

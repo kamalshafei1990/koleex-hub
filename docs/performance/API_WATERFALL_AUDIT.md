@@ -71,3 +71,9 @@ Ranking basis for the whole scorecard: `PHASE_4_WAVE_2_BASELINE.md`.
 6. **Avatar/blob split** — Contacts strips base64 then re-fetches in N/30 batches (already a mitigation; the real fix is server pagination so fewer rows need avatars at once).
 
 Good patterns to preserve: FinanceStatements tab-gating, Executive/Operations single-snapshot, Quotations items-stripping, Catalogs pdf.js byte-range, Products AbortController + `useDeferredValue`.
+
+
+---
+
+## Wave 2A.1 update (2026-07-16)
+The #1 cross-cutting waterfall (Customers/Contacts/Suppliers full-download + 20s re-poll + client filter) now has a shipped server-side fix for the **endpoint** side: `GET /api/contacts?paged=1` does server search/sort/offset-pagination on a slim projection (120→50 rows, 87KB→37KB/page; SQL-measured). Customers UI wiring is specified in `CUSTOMERS_SERVER_LIST_PILOT.md`, gated on preview verification. Contacts/Suppliers unchanged.
