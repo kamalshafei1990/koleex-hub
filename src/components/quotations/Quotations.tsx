@@ -26,6 +26,7 @@ import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "./QuotationPreviewSkeleton";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
 import CustomerPickerModal, { type CustomerPickResult } from "./CustomerPickerModal";
+import { record, event } from "@/lib/perf/client";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
@@ -1327,6 +1328,24 @@ export default function Quotations() {
      persist it as-is. The statusHistory audit log only grows when the
      status actually changes; idle saves don't pollute it with
      duplicate "draft" rows. */
+  /* Editor first-usable timing (Phase 4 Wave 2B.3). Records mount→first-frame
+     so an operator can watch that opening the editor stays fast. Privacy-safe
+     — only a duration is emitted, never quotation content. */
+  const editorT0 = useRef(
+    typeof performance !== "undefined" ? performance.now() : 0,
+  );
+  useEffect(() => {
+    if (
+      typeof performance === "undefined" ||
+      typeof requestAnimationFrame === "undefined"
+    )
+      return;
+    const raf = requestAnimationFrame(() => {
+      record("quotations.editor.first_usable_ms", performance.now() - editorT0.current);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleSave = useCallback(
     async (status: QuoteStatus | "final") => {
       if (!current) return;
@@ -1344,9 +1363,16 @@ export default function Quotations() {
           : history,
         updatedAt: new Date().toISOString(),
       };
+      const saveT0 =
+        typeof performance !== "undefined" ? performance.now() : 0;
       try {
         const saved = await saveQuotationRemote(intent);
         if (saved) {
+          // Privacy-safe: only the round-trip duration leaves the browser —
+          // never the quotation number, customer, totals, or line contents.
+          if (typeof performance !== "undefined") {
+            record("quotations.save.ack_ms", performance.now() - saveT0);
+          }
           setCurrent(saved);
           markSaved(saved);   // clears the dirty flag — editor matches server
           // Tell anyone else viewing this quotation that it just changed.
@@ -1362,6 +1388,7 @@ export default function Quotations() {
           // saveQuotationRemote returns null when the POST returned non-OK.
           // upsertDoc swallows the error so we have no detail; surface a
           // generic message and keep the editor unchanged.
+          event("quotations.save.error");
           setSaveState("error");
           setSaveError("Save failed. Please retry — if it keeps failing, refresh the page.");
           setTimeout(() => setSaveState("idle"), 4000);
