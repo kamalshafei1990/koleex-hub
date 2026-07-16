@@ -34,6 +34,7 @@ import type { AppDef } from "@/lib/navigation";
 import { trackAppOpen } from "@/lib/app-launcher";
 import { markAppLaunch } from "@/lib/perf/client";
 import { prefetchTier, readNetworkContext, isPreloadAllowed } from "@/lib/app-prefetch";
+import { preloadAppChunk, wasChunkWarmed } from "@/lib/app-chunk-preload";
 
 export interface AppLaunchLinkProps {
   app: AppDef;
@@ -85,6 +86,10 @@ export default function AppLaunchLink({
     if (!isPreloadAllowed(readNetworkContext())) return; // Save-Data / slow / hidden / offline
     if (prefetchTier(app.id) === "C") return; // heavy/rare: no intent preload either
     preloadedRef.current = true;
+    // Warm the REAL client app chunk on intent (route prefetch only warms the
+    // RSC shell) so the first launch of a heavy app isn't a multi-second chunk
+    // download. Deduped + network-gated inside preloadAppChunk.
+    try { preloadAppChunk(app.id); } catch { /* best-effort */ }
     try { onPreload?.(app); } catch { /* warm is best-effort */ }
   }, [inactive, app, onPreload]);
 
@@ -107,7 +112,8 @@ export default function AppLaunchLink({
       if (now - lastLaunchRef.current < 400) return;
       lastLaunchRef.current = now;
       const pressMs = pressAtRef.current != null ? now - pressAtRef.current : 0;
-      markAppLaunch(app.id, pressMs);
+      // Classify cold (chunk not yet warmed → pays the download) vs warm.
+      markAppLaunch(app.id, pressMs, !wasChunkWarmed(app.id));
     },
     [inactive, app.id, onNavigate],
   );

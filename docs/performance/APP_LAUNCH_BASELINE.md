@@ -39,3 +39,17 @@ verifiable now (code + build): press feedback is CSS-synchronous; every
 representative app has an app-shaped loading boundary inside the persistent shell
 (no blank flash); route code is prefetched (viewport + intent + Tier-A idle);
 warm nav reuses the single TanStack cache and never remounts the shell.
+
+---
+
+## Cold Start subphase update (Phase 4 corrective)
+
+The baseline above measured **warm** launch (route code prefetched, shell reused).
+The corrective subphase added the missing **cold** dimension: `markAppLaunch` now
+takes a `cold` flag (`!wasChunkWarmed(appId)`) and records `app_launch.cold.*`
+(press_handler_delay / press_feedback / navigation_start / route_chunk /
+**dynamic_chunk** / loading_shell / first_data / usable). The dominant cold cost
+is `dynamic_chunk_ms` — the `next/dynamic` client app chunk, which `<Link prefetch>`
+does **not** warm. Warmed on intent + Home idle via `preloadAppChunk` (see
+FIRST_APP_LAUNCH_ARCHITECTURE.md). All ids normalized `/^[a-z0-9_-]{1,32}$/`;
+no identity/route/data in any metric.

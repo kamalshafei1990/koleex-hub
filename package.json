@@ -27,6 +27,7 @@
     "validate:crm-perf": "node --import tsx scripts/validate-crm-perf.mts",
     "validate:quotations-perf": "node --import tsx scripts/validate-quotations-perf.mts",
     "validate:quotations-pricing": "node --import tsx scripts/validate-quotations-pricing.mts",
+    "validate:cold-start": "node --import tsx scripts/validate-cold-start.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",

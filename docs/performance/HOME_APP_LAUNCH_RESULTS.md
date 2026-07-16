@@ -61,3 +61,17 @@ explicitly out of scope for the shared launch phase.
 Promote (done — merged, additive, reversible). Next: collect the launch-metric
 window, then consider Wave 2B application-specific optimization — **gated on
 explicit approval**.
+
+---
+
+## Cold Start subphase update (Phase 4 corrective)
+
+Follow-up to the owner's production report ("first launch slow, warm launch
+instant"). Root cause: `<Link prefetch>` warms route code but **not** the
+`next/dynamic` client chunk, so first launch pays a multi-second chunk download
+while every launch after is served cache-first by the SW. Fixes shipped:
+dynamic-chunk preload registry (intent + idle), Customers/Suppliers cold-entry
+de-bundling (only the gate-selected impl loads), cold-vs-warm launch telemetry,
+Home interactivity instrumentation. DNS/TLS + SW audited → correct, no change.
+Docs: COLD_START_PERFORMANCE_BASELINE / _RESULTS / FIRST_APP_LAUNCH_ARCHITECTURE.
+Tests: validate:cold-start 24/24.

@@ -179,3 +179,24 @@ totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
 deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
 change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
 Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
+
+---
+
+## Cold Start & First Application Launch (Phase 4 corrective subphase)
+
+Addresses the top field-reported liability: **cold startup + first-app launch**,
+distinct from warm nav (which already scored well). Root cause: route prefetch
+warms route/RSC code but leaves the `next/dynamic` client app chunk cold until
+navigation → first launch of Customers/Suppliers/CRM paid a multi-second chunk
+download; warm launches were instant (SW cache-first on `/_next/static/`).
+
+Shipped: (1) cold-vs-warm launch + Home-interactivity instrumentation
+(`app_launch.cold.*`, `home.interactive_ms`, `home.first_input_delay_ms`);
+(2) `app-chunk-preload` registry warming the real client chunk on intent + Home
+idle (top-2, gated); (3) Customers/Suppliers cold-entry de-bundling — both impls
+now `next/dynamic`, only the gate-selected one loads, no mount before the rollout
+gate resolves; (4) CRM core-board chunk warmed (no contact-search preload).
+Audits with no change: DNS/TLS (clean), service worker (only `/_next/static/`,
+never `/api`/HTML), region (hnd1). No schema/RLS/auth/API change. Preview-first.
+Tests: validate:cold-start 24/24 + full Phase-4 regression green; tsc + build 0.
+Docs: COLD_START_PERFORMANCE_BASELINE / _RESULTS / FIRST_APP_LAUNCH_ARCHITECTURE.

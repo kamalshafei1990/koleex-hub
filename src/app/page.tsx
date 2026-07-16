@@ -27,6 +27,8 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
+import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
+import { markHomeInteractive } from "@/lib/perf/client";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
@@ -800,6 +802,15 @@ export default function HomePage() {
     [router],
   );
 
+  /* Cold-start: record when the Home app grid's React handlers are attached
+     (mount → first frame). Emits home.interactive_ms + first-input-delay so an
+     operator can prove/disprove "Home visible but not interactive". Runs once. */
+  useEffect(() => {
+    if (typeof requestAnimationFrame === "undefined") { markHomeInteractive(); return; }
+    const raf = requestAnimationFrame(() => markHomeInteractive());
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   /* ⌘K */
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -898,12 +909,22 @@ export default function HomePage() {
     if (apps.length === 0) return;
     const run = () => {
       if (!isPreloadAllowed(readNetworkContext())) return;
+      let chunksWarmed = 0;
       for (const id of apps) {
         const a = getApp(id);
         if (!a?.active) continue;
         try { router.prefetch(a.route); } catch { /* ignore */ }
         const url = APP_DATA_PREFETCH[id];
         if (url) { try { void fetch(url, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ } }
+        /* Priority-1: warm the REAL client app chunk (not just the RSC shell)
+           for the top 1–2 authorized frequent apps once Home is idle — this is
+           what makes the FIRST launch fast (route prefetch alone leaves the
+           dynamic app chunk cold). Capped so idle preload never becomes a big
+           multi-chunk download; deduped inside preloadAppChunk. */
+        if (chunksWarmed < 2 && hasChunkPreloader(id)) {
+          preloadAppChunk(id);
+          chunksWarmed += 1;
+        }
       }
     };
     const w = window as unknown as {

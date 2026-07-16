@@ -159,3 +159,21 @@ totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
 deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
 change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
 Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
+
+---
+
+## Corrective subphase — Cold Start & First Application Launch (SHIPPED)
+
+Inserted after Wave 2B on the owner's production observation that cold Hub
+startup and first-app launch (Customers/Suppliers/CRM) feel slow while warm
+relaunch is instant. Measured as three separate workflows (A cold startup,
+B first launch, C warm) — never merged. Root cause: `<Link prefetch>` warms
+route/RSC code, not the `next/dynamic` client chunk. Fixes: cold/warm launch +
+Home-interactivity telemetry, dynamic-chunk preload (intent + idle), Customers/
+Suppliers cold-entry de-bundling, CRM board chunk warm. DNS/TLS + SW audited,
+no change. Additive, reversible, Preview-first. Tests: validate:cold-start 24/24.
+Docs: COLD_START_PERFORMANCE_BASELINE.md, COLD_START_PERFORMANCE_RESULTS.md,
+FIRST_APP_LAUNCH_ARCHITECTURE.md.
+
+**Stop here.** Do not begin Products / Product Data, Wave 2C, Contacts
+migration, Discuss, Storage, or AI in the same run.

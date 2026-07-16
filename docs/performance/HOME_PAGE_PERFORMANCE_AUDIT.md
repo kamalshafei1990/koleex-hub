@@ -37,3 +37,19 @@ tiles and native new-tab support.
 JS-transferred / hydration duration / React commit counts / CLS for the Home
 route require an authenticated production profiler + Vercel-log window (not
 reachable here). Static route/bundle proxy: `ROUTE_BUNDLE_REPORT.md`.
+
+---
+
+## Cold Start subphase update (Phase 4 corrective)
+
+`markHomeInteractive()` (fired from a rAF-deferred mount effect in `src/app/page.tsx`)
+now records the "visible but not interactive" gap the owner reported:
+`home.interactive_ms`, `home.visible_to_interactive_ms`, `home.first_input_delay_ms`
+(via `PerformanceObserver({type:"first-input"})`), `home.long_tasks_before_interactive`,
+plus bootstrap/permissions readiness correlation.
+
+**Hydration-path decision (Step 4):** the Home client boundary was **left intact**.
+An app-grid island split was assessed and **deferred** — Home is ~56 KB and the split
+is high-risk for the reward; "do not remove visual features without measured evidence."
+The idle preload now also warms the top-2 real app chunks so their first launch is not
+cold. No feature removed.

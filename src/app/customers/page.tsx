@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Contacts from "@/components/contacts/Contacts";
-import CustomersServerList from "@/components/customers/CustomersServerList";
+import dynamic from "next/dynamic";
 import PermissionGate from "@/components/layout/PermissionGate";
+import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
 import { shouldUseServerList } from "@/lib/server-list/customers-gate";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 
@@ -13,9 +13,23 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
    ?serverlist=0 → legacy · ?serverlist=1 → server · cohort → server ·
    Preview host → server · else (production) → legacy.
 
-   Renders legacy until the bootstrap flag is known, so production
-   (non-cohort) never flashes anything different. One privacy-safe mode-open
-   telemetry event is recorded per route session (no customer/search data). */
+   Cold-start correction (Phase 4 — Cold Start): the two implementations are
+   now `next/dynamic` so a cold launch downloads ONLY the selected chunk — the
+   11.6k-line legacy Contacts is no longer bundled into the /customers route
+   for server-list users, and the server-list adapter is no longer bundled for
+   legacy (production) users. We also wait for the trusted cohort flag before
+   mounting EITHER implementation, so there is no legacy→server double render
+   and no double list request. The route loading.tsx + the skeleton below cover
+   the brief bootstrap-resolve window (bootstrap is warm-started from
+   localStorage, so this is near-instant on a warm reload). */
+const Contacts = dynamic(() => import("@/components/contacts/Contacts"), {
+  loading: () => <AppLoadingSkeleton label="Loading Customers…" />,
+});
+const CustomersServerList = dynamic(
+  () => import("@/components/customers/CustomersServerList"),
+  { loading: () => <AppLoadingSkeleton label="Loading Customers…" /> },
+);
+
 function decide(inCohort: boolean): boolean {
   if (typeof window === "undefined") return false;
   return shouldUseServerList(window.location.hostname, window.location.search, inCohort);
@@ -23,14 +37,17 @@ function decide(inCohort: boolean): boolean {
 
 export default function CustomersPage() {
   const { data, loading } = useMeBootstrap();
-  const [serverList, setServerList] = useState(false); // default legacy → prod unchanged
+  /* null = undecided (bootstrap not yet resolved) → show skeleton, mount
+     NEITHER implementation. Precedence + ?serverlist=0/1 behaviour is
+     unchanged (decide() is identical). */
+  const [mode, setMode] = useState<null | "legacy" | "server">(null);
   const firedRef = useRef(false);
 
   useEffect(() => {
     if (loading) return; // wait for the trusted cohort flag before deciding/telemetry
     const inCohort = data?.customersServerList === true;
     const sl = decide(inCohort);
-    setServerList(sl);
+    setMode(sl ? "server" : "legacy");
     if (!firedRef.current) {
       firedRef.current = true;
       const eventType = sl ? "customers_server_list_open" : "customers_legacy_list_open";
@@ -47,7 +64,13 @@ export default function CustomersPage() {
 
   return (
     <PermissionGate module="Customers">
-      {serverList ? <CustomersServerList /> : <Contacts filterType="customer" />}
+      {mode === null ? (
+        <AppLoadingSkeleton label="Loading Customers…" />
+      ) : mode === "server" ? (
+        <CustomersServerList />
+      ) : (
+        <Contacts filterType="customer" />
+      )}
     </PermissionGate>
   );
 }

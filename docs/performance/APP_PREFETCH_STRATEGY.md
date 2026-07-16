@@ -45,3 +45,16 @@ role-filtered `visibleRegistry` ids; Tier C is also excluded from intent preload
 Delete the Home idle-preload `useEffect`, or empty `TIER_A_IDLE_PRELOAD`. Intent
 preload lives in `AppLaunchLink.onPreload`; remove the `onPreload` wiring to
 disable. Fully additive.
+
+---
+
+## Cold Start subphase update (Phase 4 corrective)
+
+Route prefetch (this doc) warms **route/RSC code only**. The corrective subphase
+adds a second, distinct layer — **real client-chunk preload** — in
+`src/lib/app-chunk-preload.ts` (`preloadAppChunk` / `hasChunkPreloader` /
+`wasChunkWarmed`). Registry: `crm`, `customers`, `suppliers`, `quotations`.
+Triggered on hover/focus/touch **intent** (AppLaunchLink) and on Home **idle**
+(top-2 only, network/device-gated). Deduped per session; touches no `/api`;
+authorized ids only. Business data stays on-navigation. See
+FIRST_APP_LAUNCH_ARCHITECTURE.md for the three-layer model.

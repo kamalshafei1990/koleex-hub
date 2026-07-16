@@ -211,7 +211,7 @@ export function completeNav(toPath: string): void {
    launch so completeNav() can attribute the warm-nav time to this app. Only a
    normalized app id + numeric ms ever leave the browser. */
 let pendingLaunch: { app: string; t: number } | null = null;
-export function markAppLaunch(app: string, pressToActivateMs?: number): void {
+export function markAppLaunch(app: string, pressToActivateMs?: number, cold?: boolean): void {
   try {
     if (!isBrowser()) return;
     const a = /^[a-z0-9_-]{1,32}$/.test(app) ? app : "unknown";
@@ -219,6 +219,41 @@ export function markAppLaunch(app: string, pressToActivateMs?: number): void {
     event("app_launch.open", { app: a });
     if (typeof pressToActivateMs === "number" && Number.isFinite(pressToActivateMs)) {
       record("app_launch.press_feedback_ms", Math.max(0, pressToActivateMs), { app: a });
+      /* Cold = the app's real client chunk was NOT warmed before this press, so
+         the launch pays the dynamic-chunk download. Separating cold from warm
+         is the whole point of this subphase (see FIRST_APP_LAUNCH_ARCHITECTURE). */
+      if (cold) record("app_launch.cold.press_feedback_ms", Math.max(0, pressToActivateMs), { app: a });
     }
+  } catch { /* never throw */ }
+}
+
+/* ── Cold-start: Home visible-vs-interactive (Phase 4 — Cold Start) ───────────
+   Proves or disproves "Home visible but not interactive". Called once when the
+   Home app grid's React handlers are attached (mount effect). Records the time
+   from navigation start to interactive, plus the browser-measured First Input
+   Delay (the gap between the user's first tap and the handler running). Only
+   durations leave the browser — never account/permission/route content. */
+let homeInteractiveDone = false;
+export function markHomeInteractive(): void {
+  try {
+    if (!isBrowser() || homeInteractiveDone) return;
+    homeInteractiveDone = true;
+    const nav = performance.getEntriesByType?.("navigation")?.[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const start = nav?.startTime ?? 0;
+    record("home.interactive_ms", Math.max(0, performance.now() - start));
+    try {
+      const po = new PerformanceObserver((list) => {
+        for (const e of list.getEntries() as Array<PerformanceEntry & { processingStart?: number }>) {
+          if (typeof e.processingStart === "number") {
+            record("home.first_input_delay_ms", Math.max(0, e.processingStart - e.startTime));
+          }
+          po.disconnect();
+          return;
+        }
+      });
+      po.observe({ type: "first-input", buffered: true });
+    } catch { /* first-input entry type unsupported → skip */ }
   } catch { /* never throw */ }
 }
