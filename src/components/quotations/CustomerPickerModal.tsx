@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { record } from "@/lib/perf/client";
 
 export interface CustomerPickResult {
   id: string;
@@ -41,6 +42,9 @@ export default function CustomerPickerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  /* Monotonic token so a slow older response can't overwrite a newer one
+     after a rapid type (belt-and-braces with AbortController). */
+  const seqRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -54,13 +58,16 @@ export default function CustomerPickerModal({
   useEffect(() => {
     if (!open) return;
     setLoading(true);
+    const seq = ++seqRef.current;
     const controller = new AbortController();
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
     const t = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/contacts/search-customers?q=${encodeURIComponent(query)}&limit=500`,
+          `/api/contacts/search-customers?q=${encodeURIComponent(query)}&limit=40`,
           { credentials: "include", signal: controller.signal },
         );
+        if (seq !== seqRef.current) return;
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
           setError(j.error || `Search failed (${res.status})`);
@@ -68,14 +75,18 @@ export default function CustomerPickerModal({
           return;
         }
         const json = (await res.json()) as { rows: CustomerPickResult[] };
+        if (seq !== seqRef.current) return;
         setRows(json.rows ?? []);
         setError(null);
+        if (typeof performance !== "undefined") {
+          record("quotations.picker.customer_ms", performance.now() - t0);
+        }
       } catch (e) {
-        if ((e as { name?: string })?.name !== "AbortError") {
+        if ((e as { name?: string })?.name !== "AbortError" && seq === seqRef.current) {
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
-        setLoading(false);
+        if (seq === seqRef.current) setLoading(false);
       }
     }, 200);
     return () => {

@@ -5,10 +5,9 @@
    Quotation editor's "+ From catalog" button.
 
    Performance + search quality:
-     · The catalog is fetched ONCE when the modal opens (q="" returns the
-       full tenant catalog, server-capped at 2000, and is HTTP-cached). All
-       subsequent typing filters IN THE BROWSER — zero network per keystroke,
-       so search feels instant.
+     · Bounded server search (Phase 4 Wave 2B.3): a small browse set loads on
+       open and each query hits the server's `q` filter with a low cap
+       (debounced, abortable, stale-guarded) — no whole-catalog download.
      · Smart ranking: multi-word (every word must match), matches against
        model code + SKU + product name, normalised (case/diacritics/space),
        and ranked exact → prefix → word-start → substring, with model/SKU
@@ -20,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { record } from "@/lib/perf/client";
 
 export interface PickerRow {
   product_id: string;
@@ -99,45 +99,71 @@ export default function ProductPickerModal({
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  /* Monotonic token so a slow older response can never overwrite a newer
+     one after a rapid type (in addition to AbortController). */
+  const seqRef = useRef(0);
 
-  /* Fetch the catalog ONCE per open. Reset transient UI state too so the
+  /* Reset transient UI + focus the input each time the modal opens so the
      previous session's query doesn't flash in. */
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setError(null);
     setActiveIdx(0);
-    setLoading(true);
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch(
-          "/api/quotations/catalog-search?q=&limit=2000",
-          { credentials: "include", signal: controller.signal },
-        );
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          setError(j.error || `Couldn't load the catalog (${res.status})`);
-          setAllRows([]);
-          return;
-        }
-        const json = (await res.json()) as { rows: PickerRow[] };
-        setAllRows(json.rows ?? []);
-        setError(null);
-      } catch (e) {
-        if ((e as { name?: string })?.name !== "AbortError") {
-          setError(e instanceof Error ? e.message : String(e));
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
     const t = setTimeout(() => inputRef.current?.focus(), 40);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  /* Bounded server search (Phase 4 Wave 2B.3). Previously the modal
+     downloaded the WHOLE tenant catalog (q="", limit=2000 → ~705 models +
+     image urls) on open and filtered client-side. Now each query hits the
+     server's `q` filter with a small cap: a browse set on open (empty query)
+     and a bounded search page while typing (debounced, abortable,
+     stale-guarded). The rich client ranking below still applies — now over
+     the bounded server page instead of the full catalog. */
+  useEffect(() => {
+    if (!open) return;
+    const q = query.trim();
+    const seq = ++seqRef.current;
+    const controller = new AbortController();
+    setLoading(true);
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+    const timer = setTimeout(
+      async () => {
+        try {
+          const res = await fetch(
+            `/api/quotations/catalog-search?q=${encodeURIComponent(q)}&limit=${q ? 60 : 40}`,
+            { credentials: "include", signal: controller.signal },
+          );
+          if (seq !== seqRef.current) return;
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            setError(j.error || `Couldn't load the catalog (${res.status})`);
+            setAllRows([]);
+            return;
+          }
+          const json = (await res.json()) as { rows: PickerRow[] };
+          if (seq !== seqRef.current) return;
+          setAllRows(json.rows ?? []);
+          setError(null);
+          if (typeof performance !== "undefined") {
+            record("quotations.picker.product_ms", performance.now() - t0);
+          }
+        } catch (e) {
+          if ((e as { name?: string })?.name !== "AbortError" && seq === seqRef.current) {
+            setError(e instanceof Error ? e.message : String(e));
+          }
+        } finally {
+          if (seq === seqRef.current) setLoading(false);
+        }
+      },
+      q ? 220 : 0,
+    );
     return () => {
       controller.abort();
-      clearTimeout(t);
+      clearTimeout(timer);
     };
-  }, [open]);
+  }, [open, query]);
 
   /* Instant client-side ranked filter. Empty query → the whole catalog,
      sorted A→Z, so the modal doubles as a browseable list. */
