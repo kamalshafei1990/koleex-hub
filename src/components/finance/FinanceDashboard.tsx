@@ -31,6 +31,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { record, event } from "@/lib/perf/client";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
@@ -139,6 +140,9 @@ export default function FinanceDashboard() {
   /* Phase 2.9 — treasury plans feed 4 governance signals. */
   const [treasuryPlans, setTreasuryPlans] = useState<TreasuryPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  /* Monotonic token so an out-of-order (slow, older-period) KPI response can
+     never overwrite a newer one after a rapid period switch. */
+  const kpiSeq = useRef(0);
 
   /* Restore last-used mode from localStorage on mount (client only). */
   useEffect(() => {
@@ -159,12 +163,14 @@ export default function FinanceDashboard() {
      fetched once on mount; switching the Week/Quarter/Year tab refetches
      ONLY the KPI endpoint instead of re-pulling all eight every time. */
   const loadDashboard = useCallback(async (p: DashboardPeriod) => {
+    const seq = ++kpiSeq.current;
     try {
       const dashRes = await fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" });
       const j = (await dashRes.json().catch(() => ({}))) as { kpi?: DashboardKpi };
-      setKpi(j.kpi ?? null);
+      if (seq === kpiSeq.current) setKpi(j.kpi ?? null); // ignore stale out-of-order period response
     } catch {
-      setKpi(null);
+      if (seq === kpiSeq.current) setKpi(null);
+      event("finance.dashboard.error");
     }
   }, []);
 
@@ -210,13 +216,27 @@ export default function FinanceDashboard() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+    const firstMount = !didInitialLoad.current;
     /* First mount loads everything; later period changes refetch only the
        period-scoped KPI endpoint. */
-    const tasks = didInitialLoad.current
-      ? [loadDashboard(period)]
-      : [loadDashboard(period), loadStatic()];
+    const tasks = firstMount
+      ? [loadDashboard(period), loadStatic()]
+      : [loadDashboard(period)];
     didInitialLoad.current = true;
-    void Promise.all(tasks).finally(() => { if (!cancelled) setLoading(false); });
+    void Promise.all(tasks).finally(() => {
+      if (cancelled) return;
+      setLoading(false);
+      /* Privacy-safe dashboard timing — durations only, no financial values. */
+      const ms = (typeof performance !== "undefined" ? performance.now() : 0) - t0;
+      if (firstMount) {
+        record("finance.dashboard.total_ms", ms);
+        record("finance.dashboard.full_ready_ms", ms);
+        record("finance.dashboard.request_count", 8);
+      } else {
+        record("finance.filter.settled_ms", ms);
+      }
+    });
     return () => { cancelled = true; };
   }, [period, loadDashboard, loadStatic]);
 
