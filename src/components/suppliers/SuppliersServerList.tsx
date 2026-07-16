@@ -16,14 +16,14 @@
    supplier fields (costs, payment/bank, internal notes, ratings) are shown,
    searched, or summarised here — the endpoint enforces that server-side.
    --------------------------------------------------------------------------- */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { useApiQuery } from "@/lib/query/useApiQuery";
 import { useScopeContext } from "@/lib/use-scope";
 import { useTranslation } from "@/lib/i18n";
 import { suppliersListT } from "@/lib/translations/suppliers-list";
-import { createContact, updateContact } from "@/lib/contacts-admin";
+import { createContact, updateContact, deleteContact } from "@/lib/contacts-admin";
 
 type Row = Record<string, unknown> & {
   id: string; display_name?: string; full_name?: string; company_name?: string;
@@ -46,9 +46,9 @@ export default function SuppliersServerList() {
   const scope = useScopeContext();
   const { t, lang } = useTranslation(suppliersListT);
   const rtl = lang === "ar";
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "card">("list");
   const [edit, setEdit] = useState<EditState>({ open: false, row: null });
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     try { const v = window.localStorage.getItem(VIEW_KEY); if (v === "card" || v === "list") setView(v); } catch {}
@@ -85,13 +85,26 @@ export default function SuppliersServerList() {
   }, [list.isError]);
 
   const totalPages = list.total != null ? Math.max(1, Math.ceil(list.total / PAGE_SIZE)) : null;
-  const pageIds = useMemo(() => list.rows.map((r) => r.id), [list.rows]);
-  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
-  const toggleAllOnPage = () =>
-    setSelected((prev) => { const n = new Set(prev); if (allPageSelected) pageIds.forEach((id) => n.delete(id)); else pageIds.forEach((id) => n.add(id)); return n; });
-  const toggleOne = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const afterSave = () => { setEdit({ open: false, row: null }); list.refetch(); summary.refetch(); };
+
+  /* Per-row actions — parity with the legacy Suppliers directory (which has NO
+     bulk/multi-select: only per-row edit, archive-via-is_active, and delete).
+     Both endpoints revalidate module permission + tenant scope server-side
+     (PATCH/DELETE /api/contacts/[id]); on success we invalidate the current
+     server-list query + the summary aggregate — never a full-list refetch. */
+  const runRow = async (id: string, fn: () => Promise<{ ok: boolean; error: string | null }>) => {
+    setBusyId(id);
+    const res = await fn();
+    setBusyId(null);
+    if (!res.ok) { window.alert(res.error ?? t("sl.actionFailed")); return; }
+    list.refetch(); summary.refetch();
+  };
+  const toggleArchive = (r: Row) => runRow(r.id, () => updateContact(r.id, { contact_type: "supplier", is_active: !r.is_active }));
+  const removeRow = (r: Row) => {
+    if (!window.confirm(`${t("sl.confirmDelete")} ${rowName(r)}?`)) return;
+    runRow(r.id, () => deleteContact(r.id));
+  };
 
   const cellS: React.CSSProperties = { padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", fontSize: 13, textAlign: "start" };
   const headS: React.CSSProperties = { ...cellS, fontWeight: 600, color: "var(--text-secondary)", position: "sticky", top: 0, background: "var(--bg-surface)" };
@@ -102,6 +115,14 @@ export default function SuppliersServerList() {
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: r.is_active ? "var(--color-success-bg, #e6f7ee)" : "var(--bg-surface-active)", color: r.is_active ? "var(--color-success, #00cc66)" : "var(--text-tertiary)" }}>
       {r.is_active ? t("sl.active") : t("sl.inactive")}
     </span>
+  );
+
+  const rowActions = (r: Row) => (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => setEdit({ open: true, row: r })} style={btnS} disabled={busyId === r.id}>{t("sl.edit")}</button>
+      <button onClick={() => toggleArchive(r)} style={btnS} disabled={busyId === r.id}>{busyId === r.id ? "…" : r.is_active ? t("sl.archive") : t("sl.activate")}</button>
+      <button onClick={() => removeRow(r)} style={{ ...btnS, color: "var(--color-error, #ff3333)" }} disabled={busyId === r.id}>{t("sl.delete")}</button>
+    </div>
   );
 
   const typeEntries = Object.entries(stats?.byTier ?? {}).sort((a, b) => b[1] - a[1]);
@@ -186,9 +207,7 @@ export default function SuppliersServerList() {
               </div>
               <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{r.supplier_type || "—"}</div>
               <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>{[r.city, r.country].filter(Boolean).join(", ") || "—"}</div>
-              <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
-                <button onClick={(e) => { e.stopPropagation(); setEdit({ open: true, row: r }); }} style={btnS}>{t("sl.edit")}</button>
-              </div>
+              <div style={{ marginTop: 10 }}>{rowActions(r)}</div>
             </div>
           ))}
         </div>
@@ -196,7 +215,6 @@ export default function SuppliersServerList() {
         <div style={{ overflowX: "auto", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>
-              <th style={{ ...headS, width: 36 }}><input type="checkbox" checked={allPageSelected} onChange={toggleAllOnPage} aria-label="select page" /></th>
               <th style={{ ...headS, cursor: "pointer" }} onClick={() => onSort("name")}>{t("sl.colName")}{sortMark("name")}</th>
               <th style={headS}>{t("sl.colType")}</th>
               <th style={{ ...headS, cursor: "pointer" }} onClick={() => onSort("country")}>{t("sl.colLocation")}{sortMark("country")}</th>
@@ -206,12 +224,11 @@ export default function SuppliersServerList() {
             <tbody>
               {list.rows.map((r) => (
                 <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/suppliers/${r.id}`)}>
-                  <td style={cellS} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleOne(r.id)} aria-label={`select ${rowName(r)}`} /></td>
                   <td style={{ ...cellS, fontWeight: 600 }}>{rowName(r)}</td>
                   <td style={cellS}>{r.supplier_type ? <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "var(--bg-surface-active)" }}>{r.supplier_type}</span> : "—"}</td>
                   <td style={cellS}>{[r.city, r.country].filter(Boolean).join(", ") || "—"}</td>
                   <td style={cellS}>{statusChip(r)}</td>
-                  <td style={cellS} onClick={(e) => e.stopPropagation()}><button onClick={() => setEdit({ open: true, row: r })} style={btnS}>{t("sl.edit")}</button></td>
+                  <td style={cellS}>{rowActions(r)}</td>
                 </tr>
               ))}
             </tbody>
@@ -221,7 +238,7 @@ export default function SuppliersServerList() {
 
       {/* Pagination + selection */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 12, fontSize: 13, color: "var(--text-secondary)" }}>
-        <div>{selected.size > 0 ? `${selected.size} ${t("sl.selectedPage")}` : list.total != null ? `${list.total} ${t("sl.suppliers")}` : `${list.rows.length}`}</div>
+        <div>{list.total != null ? `${list.total} ${t("sl.suppliers")}` : `${list.rows.length}`}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button disabled={list.page <= 1} onClick={() => list.setPage(list.page - 1)} style={{ ...btnS, opacity: list.page <= 1 ? 0.5 : 1 }}>{t("sl.prev")}</button>
           <span>{t("sl.page")} {list.page}{totalPages ? ` / ${totalPages}` : ""}</span>
