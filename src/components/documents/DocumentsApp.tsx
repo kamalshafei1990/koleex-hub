@@ -525,7 +525,7 @@ export default function DocumentsApp() {
           icon={<DocumentsIcon size={20} />}
         />
       </div>
-      <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto w-full space-y-8">
+      <div className="px-4 md:px-6 py-6 w-full space-y-8">
         {/* New from template */}
         <div>
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">New document</h2>
