@@ -80,3 +80,51 @@ below for activation behind a preview-deploy verification.
   background req/min) and documented in `PHASE_4_WAVE_2A1_RESULTS.md`.
 - Explicit approval (Wave 2A.2). Suppliers/Contacts then reuse the same endpoint
   config + hook.
+
+
+---
+
+## Preview activation (Wave 2A.1 UI) — 2026-07-16
+
+**Branch:** `wave2a1-customers-preview` (commits `5fda4d91`, `f0ea64b7`). NOT merged to main; production unchanged.
+**Vercel Preview:** https://koleex-hub-git-wave2a1-customers-preview-kamal-shafeis-projects.vercel.app — **built green.**
+**Access note:** the Preview is protected by **Vercel Deployment Protection (SSO)** — opening it requires being logged into the Vercel account (Kamal). Open the URL while signed into Vercel, then navigate to `/customers`. Force modes: `/customers?serverlist=1` (server-list) · `/customers?serverlist=0` (legacy).
+
+### What's wired
+- **Gate** (`customers-gate.ts`, 7/7 tests): production host → legacy ALWAYS; server-list only on preview hosts / `?serverlist=1`. `customers/page.tsx` defaults to legacy and flips only after mount on a non-prod host → production renders identically, no flash.
+- **Global summary** (`/api/contacts?summary=1`): permission-safe tenant-wide total/active/inactive via head-only counts (NO full-dataset fetch). Tier/country deferred (labelled).
+- **CustomersServerList**: server search (debounced + AbortController via `useServerList`), status filter, sortable Name/Company, offset pagination (prev/next + page count from `total`), **select-CURRENT-PAGE only** (explicitly labelled "page-only selection"), row → `/customers/[id]`, loading/empty/error/retry, summary cards sourced from the aggregate (NOT the page). **No 20 s poll** (TanStack cache-first + reconnect + manual refresh). Create/Edit-in-place **deferred to classic view** (documented limitation).
+
+### CRITICAL correctness handling (page rows vs global stats)
+Global summary cards use the server aggregate; the page's 50 rows never drive totals. Tier/country/branch/owner breakdowns are **omitted** from the preview summary (not computed from the page) until a grouped aggregate is added. Bulk-selection total is explicitly "N selected on this page (page-only)".
+
+### Authenticated validation + before/after measurement — BLOCKED (handed off, NOT fabricated)
+I could not execute the interactive behavior / permission / performance validation or the before/after browser measurements, because: (1) the Preview is behind **Vercel SSO** (I cannot reach the app), and (2) I have **no Koleex app credentials** and cannot safely mint login fixtures (bcrypt probes; the Preview shares the prod Supabase, so account creation is a gated prod-DB write). No browser measurements are estimated.
+
+**Data facts I CAN measure (SQL, 120 Koleex customers):** first-paint rows 120→50; slim bytes 88,765(all)→36,836(page). Endpoint auth-gate verified anon on production (401, no 500 on hostile params). Local: `validate:auth-equivalence` 13/13, `validate:server-list` 28/28, `validate:customers-gate` 7/7, tsc clean, **Vercel production build of the branch green**.
+
+### Behavior matrix — TO BE VERIFIED by an authenticated operator in the Preview
+| Customers feature | Legacy | Preview server mode | Result |
+|---|---|---|---|
+| List renders | full 120 rows | 50/page server-paged | ⏳ verify |
+| Search | client, full array | server `ilike` (EN/ZH/AR) | ⏳ verify |
+| Status filter | client | server `is_active` | ⏳ verify |
+| Sort Name/Company | client | server order + id tiebreak | ⏳ verify |
+| Pagination | none (all rows) | offset prev/next | ⏳ verify |
+| Global summary cards | from full array | server aggregate | ⏳ verify |
+| Select-all | (n/a) | current-page only, labelled | ⏳ verify |
+| Open customer detail | inline/route | route `/customers/[id]` | ⏳ verify |
+| Create/Edit | inline modals | deferred → classic view | ⚠ deferred |
+| 20 s background poll | present | removed | ⏳ verify |
+| Role/tenant/view-as isolation | enforced | same server gate | ⏳ verify |
+| Cache isolation on account switch | n/a | query-key scoped | ⏳ verify |
+
+### Measured comparison — pending authenticated Preview session
+| Metric | Production legacy | Preview server mode | Change | Samples |
+|---|---|---|---|---|
+| First-paint rows | 120 | 50 | −58% | SQL |
+| Slim payload bytes | 88,765 | 36,836 | −58% | SQL |
+| Initial load time | — | — | ⏳ | needs authed browser |
+| Search latency (EN/ZH/AR) | — | — | ⏳ | needs authed browser |
+| Background req/min | ~3 (20s poll) | ~0 | ⏳ confirm | needs authed browser |
+| React commit / DOM nodes | — | — | ⏳ | needs authed browser |

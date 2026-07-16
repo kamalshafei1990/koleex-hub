@@ -98,6 +98,56 @@ export async function GET(req: Request) {
   if (deny) { _t.done({ status: 403 }); return deny; }
   _t.mark("auth");
 
+  /* ── Wave 2A.1: global summary aggregate (?summary=1) ───────────────────
+     Permission-safe tenant-wide counts so the paged UI can show CORRECT
+     global statistics without fetching the full dataset. Uses head-only exact
+     counts (no rows transferred), same tenant scope + module gate. Tier /
+     country breakdowns are intentionally omitted from the preview summary
+     until a proper grouped aggregate exists (see pilot doc). */
+  if (url.searchParams.get("summary") === "1") {
+    const baseCount = () => {
+      let c = supabaseServer
+        .from("contacts")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", auth.tenant_id);
+      if (typeFilter) c = c.eq("contact_type", typeFilter);
+      return c;
+    };
+    /* Two head-only counts + a narrow TWO-COLUMN scan (customer_type, country —
+       both already shown in the list, neither sensitive) to build tier/country
+       breakdowns. This is the aggregate SOURCE only (small, cached), never the
+       list rows. */
+    const breakdownQ = (() => {
+      let c = supabaseServer.from("contacts").select("customer_type, country").eq("tenant_id", auth.tenant_id);
+      if (typeFilter) c = c.eq("contact_type", typeFilter);
+      return c;
+    })();
+    const [totalRes, activeRes, breakdownRes] = await Promise.all([
+      baseCount(), baseCount().eq("is_active", true), breakdownQ,
+    ]);
+    _t.mark("db");
+    if (totalRes.error || activeRes.error || breakdownRes.error) {
+      console.error("[api/contacts summary]", totalRes.error?.message ?? activeRes.error?.message ?? breakdownRes.error?.message);
+      _t.done({ status: 500, summary: 1 });
+      return NextResponse.json({ error: "Failed to load summary" }, { status: 500 });
+    }
+    const total = totalRes.count ?? 0;
+    const active = activeRes.count ?? 0;
+    const byTier: Record<string, number> = {};
+    const byCountry: Record<string, number> = {};
+    for (const r of (breakdownRes.data ?? []) as Array<{ customer_type?: string | null; country?: string | null }>) {
+      if (r.customer_type) byTier[r.customer_type] = (byTier[r.customer_type] ?? 0) + 1;
+      if (r.country) byCountry[r.country] = (byCountry[r.country] ?? 0) + 1;
+    }
+    // Top 8 countries by count (keeps the payload small).
+    const topCountry = Object.fromEntries(Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 8));
+    const { header } = _t.done({ status: 200, type: typeFilter ?? "all", summary: 1 });
+    return NextResponse.json(
+      { summary: { total, active, inactive: total - active, byTier, byCountry: topCountry } },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header } },
+    );
+  }
+
   /* ── Wave 2A.1: opt-in server-list mode (?paged=1) ──────────────────────
      Server-driven search / sort / pagination for the Customers pilot. Legacy
      callers (no `paged`) fall through to the unchanged full-list path below,
