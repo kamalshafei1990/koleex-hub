@@ -105,6 +105,19 @@ import {
   uploadDiscussVoice,
   fetchMessageableAccounts,
 } from "@/lib/discuss";
+import { discussAttachmentUrl } from "@/lib/discuss-attachments";
+import {
+  createPreviewUrl,
+  previewUrlsFor,
+  rekeyPreviewUrls,
+  releasePreviewUrls,
+  releaseAllPreviewUrls,
+} from "@/lib/discuss-object-urls";
+import {
+  DISCUSS_ACCEPT_ATTR,
+  DISCUSS_MEDIA_MAX_BYTES,
+  mb,
+} from "@/lib/discuss-upload-policy";
 import { record as perfRecord, event as perfEvent, count as perfCount } from "@/lib/perf/client";
 import PerfPanelGate from "@/components/perf/PerfPanelGate";
 import { TranslatableBody } from "./TranslatableBody";
@@ -138,6 +151,7 @@ import type {
   DiscussMention,
   DiscussMessageKind,
   DiscussMessageMetadata,
+  DiscussMediaPublic,
   DiscussMessageRow,
   DiscussMessageWithAuthor,
   DiscussNotificationPref,
@@ -361,6 +375,21 @@ export default function DiscussApp() {
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /* Composer draft key: owns preview object URLs for files attached BEFORE a
+     send exists. Handed to the message's clientMsgId at send (rekeyPreviewUrls)
+     so one key owns the previews for the whole pending lifetime. Created lazily
+     in an event handler, never during render. */
+  const pendingKeyRef = useRef<string | null>(null);
+  const ensurePendingKey = useCallback(() => {
+    if (!pendingKeyRef.current) pendingKeyRef.current = crypto.randomUUID();
+    return pendingKeyRef.current;
+  }, []);
+
+  /* Unmount / logout / account switch: release EVERY tracked object URL.
+     On those transitions no pending message may survive, so holding a Blob
+     would keep one user's bytes alive across a session boundary. Safe to call
+     repeatedly — releaseAllPreviewUrls() is idempotent. */
+  useEffect(() => releaseAllPreviewUrls, []);
 
   /* ── Mobile column swap ───────────────────────────────────────── */
   const [mobileView, setMobileView] = useState<"list" | "thread" | "details">(
@@ -1088,6 +1117,10 @@ export default function DiscussApp() {
   }, []);
 
   const handleSelectChannel = useCallback((channelId: string) => {
+    /* Switching conversations tears down every pending bubble in the old one,
+       so their previews have no reader left. Releasing here is what stops
+       object URLs accumulating for the whole session as the user browses. */
+    releaseAllPreviewUrls();
     setSelectedChannelId(channelId);
     setMobileView("thread");
     setProductPickerOpen(false);
@@ -1147,16 +1180,42 @@ export default function DiscussApp() {
       if (!files || files.length === 0) return;
       setUploading(true);
       const uploaded: DiscussAttachment[] = [];
+      /* Unit 2: uploads can now be REFUSED (unsupported type / over 50MB) by
+         the client preflight, the API, or the bucket itself. The old code did
+         `if (rec) uploaded.push(rec)` — a rejected file just disappeared with
+         no explanation. Surface the first reason instead; the filename is
+         deliberately not echoed into the toast. */
+      let rejection: "type" | "size" | "failed" | null = null;
+      const previewKey = ensurePendingKey();
       for (const f of Array.from(files)) {
-        const rec = await uploadDiscussAttachment(f);
-        if (rec) uploaded.push(rec);
+        const res = await uploadDiscussAttachment(f);
+        if (res.ok) {
+          /* Bind a sender-local preview to the slot this file will occupy in
+             the canonical media list. `composerAttachments.length + uploaded
+             .length` is that slot: the composer holds attachments only, so
+             they map to indexes 0..n-1 exactly like discussMediaList(). The
+             URL lives ONLY in the manager — it is never put on the attachment
+             record, so it cannot reach the API payload or another user. */
+          const slot = composerAttachments.length + uploaded.length;
+          createPreviewUrl(previewKey, slot, f);
+          uploaded.push(res.attachment);
+        } else if (!rejection) rejection = res.reason;
       }
-      setComposerAttachments((prev) => [...prev, ...uploaded]);
+      if (uploaded.length) setComposerAttachments((prev) => [...prev, ...uploaded]);
+      if (rejection === "type") showToast(t("upload.rejectedType", "That file type isn't supported"));
+      else if (rejection === "size")
+        showToast(
+          t("upload.rejectedSize", "File is too large (max {max}MB)").replace(
+            "{max}",
+            mb(DISCUSS_MEDIA_MAX_BYTES),
+          ),
+        );
+      else if (rejection === "failed") showToast(t("upload.failed", "Upload failed. Please try again"));
       setUploading(false);
       /* Reset the input so the same file can be re-picked. */
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
-    [],
+    [showToast, t, composerAttachments.length, ensurePendingKey],
   );
 
   const handleSend = useCallback(async () => {
@@ -1183,10 +1242,26 @@ export default function DiscussApp() {
       kind = "file";
     }
 
+    /* WIRE payload — what the server persists. `attachments` carries the
+       private file_path so the row can locate its objects. This shape goes UP
+       only; it is never what we render. */
     const metadata: DiscussMessageMetadata = {};
     if (composerAttachments.length > 0) metadata.attachments = composerAttachments;
     if (composerProducts.length > 0) metadata.products = composerProducts;
     if (composerMentions.length > 0) metadata.mentions = composerMentions;
+
+    /* DISPLAY payload — what the optimistic bubble renders. Built to the SAME
+       client-safe contract the server returns (metadata.media, canonical
+       indexes), so the renderer has exactly one media shape to understand and
+       never parses a storage shape. Indexes mirror discussMediaList(): the
+       composer holds attachments only, so they occupy 0..n-1. */
+    const optimisticMedia = composerAttachments.map((a, index) => ({
+      index,
+      name: a.name,
+      type: a.type,
+      size: a.size,
+      kind: "attachment" as const,
+    }));
 
     /* Optimistic append — the realtime subscription will dedupe this
        once the server round-trip finishes. Keeps the thread feeling
@@ -1198,6 +1273,12 @@ export default function DiscussApp() {
        previously collided for two sends inside the same millisecond. */
     const clientMsgId = crypto.randomUUID();
     const tempId = `temp_${clientMsgId}`;
+    /* Hand the composer's previews to this send. From here the clientMsgId is
+       the sole owner, so reconcile/discard release exactly what they created. */
+    if (pendingKeyRef.current) {
+      rekeyPreviewUrls(pendingKeyRef.current, clientMsgId);
+      pendingKeyRef.current = null;
+    }
     const replyToId = replyTarget?.id ?? null;
     const replyPreview = replyTarget
       ? {
@@ -1217,7 +1298,11 @@ export default function DiscussApp() {
       kind,
       body: trimmed || null,
       body_html: null,
-      metadata,
+      /* Render from the safe contract, not the wire payload: the optimistic
+         bubble gets `media` (display fields + canonical index) exactly like a
+         server-returned row. The wire `metadata` above is passed separately to
+         sendDiscussMessage(). */
+      metadata: { media: optimisticMedia },
       edited_at: null,
       deleted_at: null,
       created_at: new Date().toISOString(),
@@ -1265,10 +1350,24 @@ export default function DiscussApp() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === tempId
-            ? { ...m, id: saved.id, created_at: saved.created_at }
+            ? {
+                ...m,
+                id: saved.id,
+                created_at: saved.created_at,
+                /* Adopt the SERVER's media projection. The optimistic bubble
+                   was rendering locally-derived media against a temp id, which
+                   discussAttachmentUrl() refuses; once reconciled the message
+                   has a canonical id, so its media must come from the canonical
+                   response for the first-party URLs to resolve. */
+                metadata: saved.metadata ?? m.metadata,
+              }
             : m,
         ),
       );
+      /* Canonical media is now live, so the local previews have no reader.
+         Releasing here — and only here — frees the Blobs at the exact moment
+         they stop being displayed. */
+      releasePreviewUrls(clientMsgId);
       void clearDraft(accountId, selectedChannelId);
       /* Silent refresh so the sidebar reflects the new last_message_at
          — the realtime handler will also patch it in place, this is
@@ -1279,6 +1378,11 @@ export default function DiscussApp() {
       /* Restore the body so the user can retry without re-typing. */
       setComposerBody(trimmed);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      /* Today a failed send DISCARDS the optimistic bubble, so nothing renders
+         its previews any more and holding the Blobs would leak. Unit 3 will
+         keep the bubble in a failed-pending state for retry/discard; when it
+         does, this release moves to the discard branch only. */
+      releasePreviewUrls(clientMsgId);
     }
     sendingRef.current = false;
     setSending(false);
@@ -2153,10 +2257,15 @@ export default function DiscussApp() {
                 composerRef={composerRef}
                 t={t}
               />
+              {/* `accept` is UX only — it steers the OS picker toward supported
+                  types. The real gates are /api/storage/upload and the private
+                  bucket's own MIME allowlist, which a bypassed picker cannot
+                  evade. See src/lib/discuss-upload-policy.ts. */}
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
+                accept={DISCUSS_ACCEPT_ATTR}
                 className="hidden"
                 onChange={(e) => void handleFilePick(e.target.files)}
               />
@@ -2695,6 +2804,20 @@ function MessageBubble({
   const time = formatFullTime(msg.created_at);
   const isDeleted = !!msg.deleted_at;
   const meta = msg.metadata ?? {};
+  /* THE client-side media contract: one array, canonical indexes, display
+     fields only. The server guarantees it (serializeDiscussMessageForClient);
+     the optimistic bubble builds the same shape locally. There is deliberately
+     no fallback to metadata.attachments / metadata.voice — those keys no
+     longer reach the browser, and re-adding a fallback would resurrect the
+     legacy storage shape the client must not understand. */
+  const media: DiscussMediaPublic[] = Array.isArray(meta.media) ? meta.media : [];
+  /* Sender-local previews for a message that has no canonical id yet. Owned by
+     discuss-object-urls and keyed by the same clientMsgId used for idempotency;
+     an empty map for every received message, since a recipient must never be
+     handed an object: URL. */
+  const localPreviews = previewUrlsFor(msg.client_msg_id);
+  const attachmentMedia = media.filter((m) => m.kind === "attachment");
+  const voiceMedia = media.find((m) => m.kind === "voice") ?? null;
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   return (
@@ -2782,14 +2905,17 @@ function MessageBubble({
           </div>
         ) : (
           <>
-            {msg.kind === "voice" && meta.voice ? (
+            {msg.kind === "voice" && voiceMedia ? (
               <div className="mt-1">
+                {/* The server already decided this item's canonical index; the
+                    client does not recompute it. No url/bucket/path exists in
+                    the payload — the audio element fetches the authorized
+                    first-party route, which re-checks membership on every Range
+                    request while seeking. */}
                 <VoicePlaybackBubble
-                  url={meta.voice.url}
-                  bucket={meta.voice.bucket}
-                  path={meta.voice.path}
-                  durationMs={meta.voice.duration_ms}
-                  waveform={meta.voice.waveform ?? []}
+                  src={discussAttachmentUrl(msg.id, voiceMedia.index)}
+                  durationMs={voiceMedia.duration_ms ?? 0}
+                  waveform={voiceMedia.waveform ?? []}
                 />
               </div>
             ) : (
@@ -2805,11 +2931,19 @@ function MessageBubble({
               )
             )}
 
-            {/* Attachments */}
-            {meta.attachments && meta.attachments.length > 0 && (
+            {/* Attachments — driven by the server's canonical media list.
+                `m.index` is the authority (voice may share the list), so we
+                pass it through rather than the array position. */}
+            {attachmentMedia.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-2">
-                {meta.attachments.map((a, i) => (
-                  <AttachmentChip key={`${msg.id}-a-${i}`} attachment={a} />
+                {attachmentMedia.map((m) => (
+                  <AttachmentChip
+                    key={`${msg.id}-a-${m.index}`}
+                    attachment={m}
+                    messageId={msg.id}
+                    index={m.index}
+                    localPreviewUrl={localPreviews?.[m.index] ?? null}
+                  />
                 ))}
               </div>
             )}
@@ -3018,32 +3152,60 @@ function ReplyPreviewPill({
   );
 }
 
-function AttachmentChip({ attachment }: { attachment: DiscussAttachment }) {
+/* Attachments are delivered ONLY through the authorized first-party route —
+   never from the public Supabase URL in `attachment.url`. The URL is derived
+   from (messageId, index) by discussAttachmentUrl(); the server re-checks auth
+   + active channel membership on every request, so access dies the moment the
+   user is removed from the channel or signs out.
+
+   `localPreviewUrl` is a sender-only object: URL for a message that has not been
+   acknowledged yet (no canonical id ⇒ the protected route cannot resolve it).
+   It is never persisted and never reaches another user. When neither URL is
+   available the chip renders non-interactive rather than falling back to the
+   public URL. (Discuss Stabilization Unit 2 — P0.) */
+function AttachmentChip({
+  attachment,
+  messageId,
+  index,
+  localPreviewUrl,
+}: {
+  /** Client-safe media item — display fields + canonical index. Never a
+   *  storage record: it has no url, no path and no bucket to leak. */
+  attachment: DiscussMediaPublic;
+  messageId: string;
+  index: number;
+  localPreviewUrl?: string | null;
+}) {
   const isImage = attachment.type.startsWith("image/");
+  const href = discussAttachmentUrl(messageId, index);
+  const downloadHref = discussAttachmentUrl(messageId, index, { download: true });
+  const imgSrc = href ?? localPreviewUrl ?? null;
+
   if (isImage) {
+    const img = (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={imgSrc ?? undefined}
+        alt={attachment.name}
+        className="w-full h-auto max-h-[260px] object-cover"
+      />
+    );
+    const cls =
+      "block max-w-[320px] rounded-lg overflow-hidden border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors";
+    /* Pending (local preview only): show the image but do not link — the
+       protected URL does not exist yet and we will not link to the public one. */
+    if (!href) return <div className={cls}>{imgSrc ? img : null}</div>;
     return (
-      <a
-        href={attachment.url}
-        target="_blank"
-        rel="noreferrer"
-        className="block max-w-[320px] rounded-lg overflow-hidden border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={attachment.url}
-          alt={attachment.name}
-          className="w-full h-auto max-h-[260px] object-cover"
-        />
+      <a href={href} target="_blank" rel="noreferrer" className={cls}>
+        {img}
       </a>
     );
   }
-  return (
-    <a
-      href={attachment.url}
-      target="_blank"
-      rel="noreferrer"
-      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors max-w-[280px]"
-    >
+
+  const fileCls =
+    "flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors max-w-[280px]";
+  const inner = (
+    <>
       <div className="h-8 w-8 shrink-0 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center">
         <DocumentIcon className="h-4 w-4 text-[var(--text-muted)]" />
       </div>
@@ -3055,6 +3217,18 @@ function AttachmentChip({ attachment }: { attachment: DiscussAttachment }) {
           {formatBytes(attachment.size)}
         </div>
       </div>
+    </>
+  );
+  if (!downloadHref) return <div className={fileCls}>{inner}</div>;
+  return (
+    <a
+      href={downloadHref}
+      target="_blank"
+      rel="noreferrer"
+      download={attachment.name}
+      className={fileCls}
+    >
+      {inner}
     </a>
   );
 }
