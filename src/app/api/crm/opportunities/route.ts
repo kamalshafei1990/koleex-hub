@@ -29,12 +29,27 @@ export async function GET(req: Request) {
   const stage = url.searchParams.get("stage");
   const contact = url.searchParams.get("contact");
   const search = url.searchParams.get("search");
+  const view = url.searchParams.get("view");
   const limit = Number(url.searchParams.get("limit") ?? "500");
 
-  // Main opportunity query, tenant-scoped.
+  /* Board slim projection (Phase 4 Wave 2B.2). The resting kanban only needs
+     the card + column fields; the free-text `description` is fetched lazily
+     when a deal is opened (GET /api/crm/opportunities/[id]). Everything else
+     (including the short `lost_reason`) is retained so the edit modal never
+     nulls a field it can't see on save. Legacy callers (no view) keep `*`. */
+  const BOARD_COLUMNS =
+    "id, name, stage_id, contact_id, company_name, contact_name, email, phone, " +
+    "expected_revenue, probability, expected_close_date, priority, source, tags, " +
+    "color, owner_account_id, lost_reason, won_at, lost_at, archived_at, " +
+    "created_at, updated_at, tenant_id";
+  const projection = view === "board" ? BOARD_COLUMNS : "*";
+
+  // Main opportunity query, tenant-scoped. The projection is a runtime string
+  // (board slim vs full); cast to the "*" overload so supabase-js keeps the
+  // proper Row typing — the board columns are a strict subset of the full row.
   let q = supabaseServer
     .from("crm_opportunities")
-    .select("*")
+    .select(projection as "*")
     .eq("tenant_id", auth.tenant_id)
     .order("updated_at", { ascending: false })
     .limit(limit);

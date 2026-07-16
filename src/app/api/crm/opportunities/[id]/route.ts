@@ -4,10 +4,35 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
-/* PATCH  /api/crm/opportunities/[id]  — partial update
+/* GET    /api/crm/opportunities/[id]  — full single row (incl. description)
+   PATCH  /api/crm/opportunities/[id]  — partial update
    DELETE /api/crm/opportunities/[id]  — remove
    Tenant-scoped; per-record owner scope is applied by scope helpers at
    fetch time. Write permission = "CRM" module access. */
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "CRM");
+  if (deny) return deny;
+
+  let q = supabaseServer.from("crm_opportunities").select("*").eq("id", id);
+  if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+  const { data, error } = await q.maybeSingle();
+  if (error) {
+    console.error("[api/crm/opportunities/[id] GET]", error.message);
+    return NextResponse.json({ error: "Failed to load" }, { status: 500 });
+  }
+  if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(
+    { opportunity: data },
+    { headers: { "Cache-Control": "private, max-age=10" } },
+  );
+}
 
 async function existsInTenant(
   id: string,
