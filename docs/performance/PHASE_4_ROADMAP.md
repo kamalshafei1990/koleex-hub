@@ -122,3 +122,21 @@ NOT begin Contacts / Wave 2B / 2C without explicit approval.
 ---
 
 **Phase 4 Wave 2B.1 — Finance Dashboard Performance (2026-07-16):** CONFIRMED the "~8 fan-out" is `/finance/intelligence` (FinanceDashboard.tsx, 1 KPI + 7 already-concurrent feeds), NOT `/finance` (which is already a single `visual-statements` aggregate). Shipped smallest-safe wins: `/finance` first-load section skeleton (was blank below controls until ~2s aggregate), `/finance/intelligence` stale-response guard (kpiSeq), privacy-safe `finance.dashboard.*` metrics, dead-import cleanup. NO accounting-route refactor / mega-endpoint (rejected on evidence: already parallel, unrelated workflows, low traffic). Tests: `validate:finance-perf` 42/42; tsc+build green. Docs: FINANCE_PERFORMANCE_BASELINE.md, FINANCE_PERFORMANCE_RESULTS.md.
+
+
+---
+
+## Phase 4 Wave 2B.2 — CRM Performance (shipped)
+
+CRM board / deal modal / drag optimized. Confirmed volume: **2 deals**, **259
+contacts / 6 tenants** — so pagination/virtualization were **not** introduced
+(unjustified at this volume). Shipped: contact picker → bounded, debounced,
+abortable, stale-guarded **server search** (`GET /api/crm/contacts/search`,
+CRM-gated + tenant-scoped + slim fields) replacing the whole-directory
+`fetchContacts()` download (payload + field-exposure win); `?view=board` slim
+projection (no free-text `description`; modal hydrates via `GET
+/api/crm/opportunities/[id]`); memoised `OpportunityCard`; drag **rollback** on
+server failure; **soft** post-mutation reload (board no longer blanks);
+privacy-safe `crm.*` metrics. No schema/permission/tenant change. Details:
+CRM_PERFORMANCE_BASELINE.md + CRM_PERFORMANCE_RESULTS.md. Tests:
+`validate:crm-perf` 51/51.

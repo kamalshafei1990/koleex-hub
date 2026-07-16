@@ -106,3 +106,21 @@ All are `"use client"` and **statically** imported into a route `page.tsx` (NOT 
 ---
 
 **Phase 4 — Home & App Launch Performance (2026-07-16):** shared `AppLaunchLink` primitive (Link-based: modifier keys, viewport prefetch, CSS pressed feedback, keyboard, dup-guard, intent preload, unified privacy-safe launch telemetry) adopted on Home cards + sidebar + launcher; evidence-based prefetch tiers (`src/lib/app-prefetch.ts`, Save-Data/slow/hidden/authorization-gated); 15 new app-shaped `loading.tsx` boundaries (+5 shared skeletons) → blank-flash eliminated; bootstrap primed at shell top (shell confirmed already persistent, single TanStack cache, no remount). `app_launch.*` metrics via the perf client (percentiles pending a Vercel-log window). Tests: `validate:app-launch` 51/51; tsc + build green. Docs: HOME_APP_LAUNCH_RESULTS.md, APP_NAVIGATION_ARCHITECTURE.md, APP_PREFETCH_STRATEGY.md, APP_USAGE_AND_PRELOAD_RANKING.md, PERSISTENT_SHELL_AUDIT.md, APP_LOADING_BOUNDARIES.md, APP_LAUNCH_BASELINE.md, HOME_PAGE_PERFORMANCE_AUDIT.md.
+
+
+---
+
+## Phase 4 Wave 2B.2 — CRM Performance (shipped)
+
+CRM board / deal modal / drag optimized. Confirmed volume: **2 deals**, **259
+contacts / 6 tenants** — so pagination/virtualization were **not** introduced
+(unjustified at this volume). Shipped: contact picker → bounded, debounced,
+abortable, stale-guarded **server search** (`GET /api/crm/contacts/search`,
+CRM-gated + tenant-scoped + slim fields) replacing the whole-directory
+`fetchContacts()` download (payload + field-exposure win); `?view=board` slim
+projection (no free-text `description`; modal hydrates via `GET
+/api/crm/opportunities/[id]`); memoised `OpportunityCard`; drag **rollback** on
+server failure; **soft** post-mutation reload (board no longer blanks);
+privacy-safe `crm.*` metrics. No schema/permission/tenant change. Details:
+CRM_PERFORMANCE_BASELINE.md + CRM_PERFORMANCE_RESULTS.md. Tests:
+`validate:crm-perf` 51/51.
