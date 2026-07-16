@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
+import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   SIDEBAR_GROUPS,
@@ -84,10 +84,10 @@ function AppLink({
   const hoverBg = dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.05]";
 
   return (
-    <Link
-      href={app.route}
+    <AppLaunchLink
+      app={app}
       aria-current={isActive ? "page" : undefined}
-      onClick={onNavigate}
+      onNavigate={onNavigate}
       /* Active state: a soft rounded background + the 2px left-edge accent
          rail + full-opacity ink, so the current row is easy to spot. */
       className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
@@ -110,7 +110,7 @@ function AppLink({
       <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
         {label}
       </span>
-    </Link>
+    </AppLaunchLink>
   );
 }
 
