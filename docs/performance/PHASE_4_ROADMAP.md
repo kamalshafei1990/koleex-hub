@@ -140,3 +140,22 @@ server failure; **soft** post-mutation reload (board no longer blanks);
 privacy-safe `crm.*` metrics. No schema/permission/tenant change. Details:
 CRM_PERFORMANCE_BASELINE.md + CRM_PERFORMANCE_RESULTS.md. Tests:
 `validate:crm-perf` 51/51.
+
+
+---
+
+## Phase 4 Wave 2B.3 — Quotations Performance (shipped)
+
+Quotations editor / pickers / pricing optimized. Confirmed volume: **12
+quotations**, **706 products / 705 models**, 120 customers. So NO editor
+bootstrap composition (localStorage-first, no startup fan-out), NO list
+server-list migration (12 rows). Shipped: product picker → bounded, debounced,
+abortable, stale-guarded **server search** (`catalog-search?q=&limit=60`,
+CRM... Quotations-gated + SKU match; **no supplier/cost fields**) replacing the
+whole-catalog download (705 models) on open; customer picker stale-guard +
+tighter cap; privacy-safe `quotations.*` metrics; **pricing regression lock**
+(43 assertions — RMB→USD FX, ladder, margins, landed cost, line/subtotal/grand
+totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
+deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
+change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
+Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
