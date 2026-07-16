@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
+import { serializeDiscussMessageForClient } from "@/lib/server/discuss-serialize";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -291,7 +292,7 @@ export async function GET(req: Request) {
             .limit(60);
           const fresh = ((incr ?? []) as Array<
             Record<string, unknown> & { id: string; author: AuthorJoin; reply_to_message_id: string | null }
-          >).map((row) => ({
+          >).map((row) => serializeDiscussMessageForClient({
             ...row,
             author: flattenAuthor(row.author),
             reactions: [],
@@ -357,12 +358,14 @@ export async function GET(req: Request) {
         }
 
         const out = rows
-          .map((row) => ({
-            ...row,
-            reactions: reactionMap.get(row.id) ?? [],
-            reply_preview: row.reply_to_message_id ? replyPreviewById.get(row.reply_to_message_id) ?? null : null,
-            thread: threadByParent.get(row.id) ?? null,
-          }))
+          .map((row) =>
+            serializeDiscussMessageForClient({
+              ...row,
+              reactions: reactionMap.get(row.id) ?? [],
+              reply_preview: row.reply_to_message_id ? replyPreviewById.get(row.reply_to_message_id) ?? null : null,
+              thread: threadByParent.get(row.id) ?? null,
+            }),
+          )
           .reverse();
         timing.mark("db");
         const { header } = timing.done({ resource: "channelMessages", mode: "full", rows: out.length });
@@ -391,10 +394,11 @@ export async function GET(req: Request) {
           const { data: rxRows } = await supabaseServer.from(REACTIONS).select("*").in("message_id", ids);
           reactionMap = buildReactionMap((rxRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>, me);
         }
-        const out = (all as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>).map((row) => ({
-          ...row, author: flattenAuthor(row.author),
-          reactions: reactionMap.get(row.id) ?? [], reply_preview: null, thread: null,
-        }));
+        const out = (all as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>).map((row) =>
+          serializeDiscussMessageForClient({
+            ...row, author: flattenAuthor(row.author),
+            reactions: reactionMap.get(row.id) ?? [], reply_preview: null, thread: null,
+          }));
         return NextResponse.json({ ok: true, data: out });
       }
 

@@ -25,6 +25,10 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import {
+  serializeDiscussMessageForClient,
+  sanitizeDraftMetadataForStorage,
+} from "@/lib/server/discuss-serialize";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { stageTimer } from "@/lib/server/perf";
@@ -289,7 +293,7 @@ export async function POST(req: Request) {
               timing.mark("idempotent_replay");
               const { header } = timing.done({ action: "sendMessage" });
               return NextResponse.json(
-                { ok: true, data: existing, idempotent: true },
+                { ok: true, data: serializeDiscussMessageForClient(existing), idempotent: true },
                 { headers: { "Server-Timing": header } },
               );
             }
@@ -351,7 +355,10 @@ export async function POST(req: Request) {
           after(notifyMembers);
         }
         const { header } = timing.done({ action: "sendMessage" });
-        return NextResponse.json({ ok: true, data }, { headers: { "Server-Timing": header } });
+        return NextResponse.json(
+          { ok: true, data: serializeDiscussMessageForClient(data) },
+          { headers: { "Server-Timing": header } },
+        );
       }
 
       case "editMessage": {
@@ -477,7 +484,10 @@ export async function POST(req: Request) {
             account_id: me,
             channel_id: channelId,
             body: typeof p.body === "string" ? p.body : "",
-            metadata: (p.metadata as Json) ?? {},
+            /* Drafts must never carry a storage reference. Media keys are
+               stripped here so a crafted request cannot seed a private path
+               into a draft row and read it back through any future echo. */
+            metadata: sanitizeDraftMetadataForStorage(p.metadata) as Json,
           },
           { onConflict: "account_id,channel_id" },
         );
