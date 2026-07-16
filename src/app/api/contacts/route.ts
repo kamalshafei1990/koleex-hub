@@ -30,79 +30,15 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 import { stageTimer } from "@/lib/server/perf";
 import { sanitizeContactRows } from "@/lib/server/sensitive-columns";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
-import { parseListParams, buildListResponse, type ServerListConfig } from "@/lib/server-list/types";
+import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
+import { configForType, SLIM_LIST_COLUMNS, summaryBreakdownColumn } from "@/lib/server-list/contacts-config";
 
-/* Wave 2A.1 — server-list contract for the contacts directory (Customers pilot).
-   ONLY these columns may be searched/sorted/filtered; everything else is
-   rejected server-side. No sensitive columns (credit, KYC, HR, costs) are
-   searchable or exposed here — the row is still passed through
-   sanitizeContactRows for column-level visibility. */
-const CONTACTS_LIST_CONFIG: ServerListConfig = {
-  defaultPageSize: 50,
-  maxPageSize: 100,
-  sortFields: {
-    name: "first_name",
-    company: "company_name",
-    created: "created_at",
-    updated: "updated_at",
-    revenue: "total_revenue",
-  },
-  defaultSort: { field: "name", dir: "asc" },
-  searchColumns: [
-    "full_name", "display_name", "company_name", "first_name", "last_name",
-    "company", "email", "phone", "mobile", "city", "country", "wechat_id", "customer_type",
-  ],
-  filters: {
-    status: { column: "is_active", allowed: ["true", "false"] },
-    entity: { column: "entity_type" },
-    tier: { column: "customer_type" },
-  },
-  maxQueryLength: 100,
-};
-
-/* Wave 2A.2 — Suppliers server-list contract. Suppliers are companies, so the
-   primary sort/name is company_name, and the searchable/filterable columns are
-   the supplier-appropriate NON-SENSITIVE ones (name variants incl. EN/CN,
-   country/city, contact handles, supplier_type). Deliberately EXCLUDES every
-   sensitive supplier field — no costs, payment_info, bank details, internal
-   notes, ratings, or commercial terms are searchable/sortable/filterable here.
-   The row is still passed through sanitizeContactRows for column-level policy. */
-const SUPPLIERS_LIST_CONFIG: ServerListConfig = {
-  defaultPageSize: 50,
-  maxPageSize: 100,
-  sortFields: {
-    name: "company_name",
-    company: "company_name",
-    country: "country",
-    created: "created_at",
-    updated: "updated_at",
-  },
-  defaultSort: { field: "name", dir: "asc" },
-  searchColumns: [
-    "company_name", "company_name_en", "company_name_cn", "display_name",
-    "full_name", "first_name", "last_name", "company",
-    "email", "phone", "mobile", "city", "country", "wechat_id", "supplier_type",
-  ],
-  filters: {
-    status: { column: "is_active", allowed: ["true", "false"] },
-    entity: { column: "entity_type" },
-    supplierType: { column: "supplier_type" },
-  },
-  maxQueryLength: 100,
-};
-
-/* Pick the server-list contract for the requested directory type. Suppliers
-   get the supplier-flavoured config; everything else keeps the customer/contacts
-   config (unchanged), so the Customers pilot and legacy Contacts are untouched. */
-function configForType(type: string | null | undefined): ServerListConfig {
-  return type === "supplier" ? SUPPLIERS_LIST_CONFIG : CONTACTS_LIST_CONFIG;
-}
-
-/* Slim projection for the paged directory: only the fields a list card renders
-   + the sort/search columns. Far smaller than the full LIST_COLUMNS set. */
-const SLIM_LIST_COLUMNS =
-  "id, entity_type, full_name, company_name, company_name_en, company_name_cn, display_name, first_name, last_name, company, photo_url, logo_url, phone, mobile, email, country, city, contact_type, is_active, customer_type, supplier_type, market_band, account_manager, total_revenue, outstanding_balance, credit_limit, currency, tags, created_at, updated_at, tenant_id, person_id";
+/* Server-list contracts (search/sort/filter allowlists) + slim projection live
+   in server-list/contacts-config.ts so the exact NON-SENSITIVE column set is
+   importable by deterministic security tests. Suppliers get a supplier-flavoured
+   config via configForType(); the Customers pilot + legacy Contacts are
+   unchanged. */
 
 /* Map contact_type → ERP module name. Unknown / missing types fall
    back to "Customers" which is the broadest directory view. */
@@ -157,7 +93,7 @@ export async function GET(req: Request) {
        else by `customer_type` (tier). This is the aggregate SOURCE only (small,
        cached), never the list rows. `byTier` in the response holds whichever
        breakdown applies; the UI labels it correctly per type. */
-    const breakdownCol = typeFilter === "supplier" ? "supplier_type" : "customer_type";
+    const breakdownCol = summaryBreakdownColumn(typeFilter);
     const breakdownQ = (() => {
       let c = supabaseServer.from("contacts").select(`${breakdownCol}, country`).eq("tenant_id", auth.tenant_id);
       if (typeFilter) c = c.eq("contact_type", typeFilter);
