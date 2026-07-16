@@ -16,6 +16,11 @@ const ALLOWED_EVENTS = new Set([
   "session_end",
   "idle",
   "active",
+  // Wave 2A.1 Customers rollout — privacy-safe mode telemetry (one per route
+  // session; no customer/search data). The mode is encoded in the event name.
+  "customers_server_list_open",
+  "customers_legacy_list_open",
+  "customers_server_list_error",
 ]);
 
 export async function POST(req: Request) {

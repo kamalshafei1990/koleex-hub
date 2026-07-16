@@ -12,7 +12,7 @@
    + zh/ar/en i18n, + list-state persistence (returning from detail keeps the
    page/search/filter/sort).
    --------------------------------------------------------------------------- */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { useApiQuery } from "@/lib/query/useApiQuery";
@@ -65,6 +65,18 @@ export default function CustomersServerList() {
     scope ? "/api/contacts?type=customer&summary=1" : null,
   );
   const stats = summary.data?.summary;
+
+  /* Privacy-safe error telemetry — one event per session on a list load error. */
+  const errFiredRef = useRef(false);
+  useEffect(() => {
+    if (list.isError && !errFiredRef.current) {
+      errFiredRef.current = true;
+      try {
+        const body = JSON.stringify({ eventType: "customers_server_list_error", route: "/customers" });
+        navigator.sendBeacon?.("/api/activity/track", new Blob([body], { type: "application/json" }));
+      } catch { /* best-effort */ }
+    }
+  }, [list.isError]);
 
   const totalPages = list.total != null ? Math.max(1, Math.ceil(list.total / PAGE_SIZE)) : null;
   const pageIds = useMemo(() => list.rows.map((r) => r.id), [list.rows]);
