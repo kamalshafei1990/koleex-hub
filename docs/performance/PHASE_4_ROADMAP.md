@@ -117,3 +117,8 @@ NOT begin Contacts / Wave 2B / 2C without explicit approval.
 ---
 
 **Phase 4 — Home & App Launch Performance (2026-07-16):** shared `AppLaunchLink` primitive (Link-based: modifier keys, viewport prefetch, CSS pressed feedback, keyboard, dup-guard, intent preload, unified privacy-safe launch telemetry) adopted on Home cards + sidebar + launcher; evidence-based prefetch tiers (`src/lib/app-prefetch.ts`, Save-Data/slow/hidden/authorization-gated); 15 new app-shaped `loading.tsx` boundaries (+5 shared skeletons) → blank-flash eliminated; bootstrap primed at shell top (shell confirmed already persistent, single TanStack cache, no remount). `app_launch.*` metrics via the perf client (percentiles pending a Vercel-log window). Tests: `validate:app-launch` 51/51; tsc + build green. Docs: HOME_APP_LAUNCH_RESULTS.md, APP_NAVIGATION_ARCHITECTURE.md, APP_PREFETCH_STRATEGY.md, APP_USAGE_AND_PRELOAD_RANKING.md, PERSISTENT_SHELL_AUDIT.md, APP_LOADING_BOUNDARIES.md, APP_LAUNCH_BASELINE.md, HOME_PAGE_PERFORMANCE_AUDIT.md.
+
+
+---
+
+**Phase 4 Wave 2B.1 — Finance Dashboard Performance (2026-07-16):** CONFIRMED the "~8 fan-out" is `/finance/intelligence` (FinanceDashboard.tsx, 1 KPI + 7 already-concurrent feeds), NOT `/finance` (which is already a single `visual-statements` aggregate). Shipped smallest-safe wins: `/finance` first-load section skeleton (was blank below controls until ~2s aggregate), `/finance/intelligence` stale-response guard (kpiSeq), privacy-safe `finance.dashboard.*` metrics, dead-import cleanup. NO accounting-route refactor / mega-endpoint (rejected on evidence: already parallel, unrelated workflows, low traffic). Tests: `validate:finance-perf` 42/42; tsc+build green. Docs: FINANCE_PERFORMANCE_BASELINE.md, FINANCE_PERFORMANCE_RESULTS.md.

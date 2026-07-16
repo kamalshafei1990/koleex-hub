@@ -82,3 +82,8 @@ The #1 cross-cutting waterfall (Customers/Contacts/Suppliers full-download + 20s
 ---
 
 **Wave 2A.2 update (2026-07-16):** Suppliers directory migrated onto the shared server-list architecture (server search/filter/sort/pagination + permission-safe global summary, replacing the full-supplier-dataset client fetch + 20s poll) on branch `wave2a2-suppliers-preview` — Preview-gated, NOT in production. Real before/after percentiles/bytes/req-counts require a measured Preview/cohort window (Vercel-log/Speed-Insights). See `PHASE_4_WAVE_2A2_RESULTS.md` + `SUPPLIERS_SERVER_LIST_PILOT.md`.
+
+
+---
+
+**Phase 4 Wave 2B.1 — Finance Dashboard Performance (2026-07-16):** CONFIRMED the "~8 fan-out" is `/finance/intelligence` (FinanceDashboard.tsx, 1 KPI + 7 already-concurrent feeds), NOT `/finance` (which is already a single `visual-statements` aggregate). Shipped smallest-safe wins: `/finance` first-load section skeleton (was blank below controls until ~2s aggregate), `/finance/intelligence` stale-response guard (kpiSeq), privacy-safe `finance.dashboard.*` metrics, dead-import cleanup. NO accounting-route refactor / mega-endpoint (rejected on evidence: already parallel, unrelated workflows, low traffic). Tests: `validate:finance-perf` 42/42; tsc+build green. Docs: FINANCE_PERFORMANCE_BASELINE.md, FINANCE_PERFORMANCE_RESULTS.md.
