@@ -18,6 +18,7 @@
     "validate:auth-equivalence": "NODE_OPTIONS=--conditions=react-server node --experimental-test-module-mocks --import tsx scripts/validate-auth-equivalence.mts",
     "validate:server-list": "node --import tsx scripts/validate-server-list.mts",
     "validate:customers-gate": "node --import tsx scripts/validate-customers-gate.mts",
+    "validate:customers-rollout": "NODE_OPTIONS=--conditions=react-server node --import tsx scripts/validate-customers-rollout.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
