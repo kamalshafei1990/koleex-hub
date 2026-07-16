@@ -71,7 +71,12 @@
     "validate:quotation-fix": "NODE_OPTIONS=--conditions=react-server tsx scripts/quotation-fix.ts",
     "validate:finance-ux-maturity": "NODE_OPTIONS=--conditions=react-server tsx scripts/finance-ux-maturity.ts",
     "validate:first-party": "node scripts/validate-first-party-assets.mjs",
-    "validate:file-delivery": "node scripts/validate-file-delivery.mjs"
+    "validate:file-delivery": "node scripts/validate-file-delivery.mjs",
+    "staging:preflight": "node --import tsx scripts/assert-staging-environment.mts",
+    "staging:seed-discuss-run-b": "node --import tsx scripts/staging-discuss-run-b.mts report",
+    "staging:cleanup-discuss-run-b": "node --import tsx scripts/staging-discuss-run-b.mts cleanup",
+    "staging:verify-clean": "node --import tsx scripts/staging-discuss-run-b.mts verify-clean",
+    "staging:reset": "node --import tsx scripts/staging-discuss-run-b.mts reset"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
