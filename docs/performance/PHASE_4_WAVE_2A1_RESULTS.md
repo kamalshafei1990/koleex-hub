@@ -120,3 +120,21 @@ I could not execute the interactive behavior / permission / performance validati
 | Search latency (EN/ZH/AR) | — | — | ⏳ | needs authed browser |
 | Background req/min | ~3 (20s poll) | ~0 | ⏳ confirm | needs authed browser |
 | React commit / DOM nodes | — | — | ⏳ | needs authed browser |
+
+---
+
+## Preview revision after feedback — 2026-07-16 (commit `50a99eaa`)
+
+Preview rebuilt green (same URL). Feedback → response:
+| Feedback item | Response |
+|---|---|
+| Search / Pagination / Counts | ✅ passed — unchanged |
+| Create/edit **missing** | ✅ added quick create/edit modal (reuses `createContact`/`updateContact`); full profile via `/customers/[id]` |
+| Arabic translation **missing** | ✅ added (`customers-list.ts` en/zh/ar via `useTranslation`) |
+| Chinese translation **missing** | ✅ added |
+| Card view **missing** | ✅ added List/Card toggle (persisted) |
+| Returning from detail loses page state | ✅ fixed — `useServerList` `persistKey` restores page/search/filter/sort from sessionStorage |
+| Faster/slower than legacy | ⏳ still needs a real authenticated measurement (SQL shows 120→50 rows, 87→37 KB/page; browser timing pending) |
+| Production promotion | ❌ NOT approved — stays on branch |
+
+**Still deferred / limitations:** quick-create/edit covers core fields only (full field set = `/customers/[id]`); tier/country summary breakdowns omitted; RTL layout relies on the app's global dir handling (verify Arabic visually). Contacts + Suppliers remain on the legacy path.
