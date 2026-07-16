@@ -17,7 +17,7 @@
    logout/reload drops it.
    --------------------------------------------------------------------------- */
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchJson } from "@/lib/query/useApiQuery";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { ServerListResponse, SortDir } from "@/lib/server-list/types";
@@ -35,15 +35,34 @@ export interface UseServerListOptions {
   initialSort?: { field: string; dir: SortDir };
   enabled?: boolean;
   searchDebounceMs?: number;
+  /** When set, page/query/sort/dir/filters persist in sessionStorage under this
+      key and restore on remount — so returning from a detail page keeps the
+      list position/search/filter/sort intact. */
+  persistKey?: string;
+}
+
+type PersistedState = { page: number; query: string; sort: string; dir: SortDir; filters: Record<string, string> };
+function loadPersisted(key?: string): Partial<PersistedState> | null {
+  if (!key || typeof window === "undefined") return null;
+  try { const s = window.sessionStorage.getItem(key); return s ? (JSON.parse(s) as PersistedState) : null; } catch { return null; }
 }
 
 export function useServerList<T>(opts: UseServerListOptions) {
-  const [page, setPage] = useState(1);
-  const [rawQuery, setRawQuery] = useState("");
+  const [restored] = useState(() => loadPersisted(opts.persistKey));
+  const [page, setPage] = useState<number>(() => restored?.page ?? 1);
+  const [rawQuery, setRawQuery] = useState<string>(() => restored?.query ?? "");
   const debouncedQuery = useDebouncedValue(rawQuery.trim(), opts.searchDebounceMs ?? 300);
-  const [sort, setSort] = useState(opts.initialSort?.field ?? "");
-  const [dir, setDir] = useState<SortDir>(opts.initialSort?.dir ?? "asc");
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<string>(() => restored?.sort ?? opts.initialSort?.field ?? "");
+  const [dir, setDir] = useState<SortDir>(() => restored?.dir ?? opts.initialSort?.dir ?? "asc");
+  const [filters, setFilters] = useState<Record<string, string>>(() => restored?.filters ?? {});
+
+  // Persist list state so back-navigation from a detail page restores it.
+  useEffect(() => {
+    if (!opts.persistKey || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(opts.persistKey, JSON.stringify({ page, query: rawQuery, sort, dir, filters }));
+    } catch { /* storage full / disabled — non-fatal */ }
+  }, [opts.persistKey, page, rawQuery, sort, dir, filters]);
 
   /* Any change to query/filter/sort resets to page 1 (so you never land on an
      out-of-range page of a smaller result set). */
