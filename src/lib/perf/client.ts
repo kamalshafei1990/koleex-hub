@@ -191,7 +191,34 @@ export function completeNav(toPath: string): void {
     if (!navStart) return;
     const dt = performance.now() - navStart.t;
     /* Ignore stale marks (user clicked but nav never happened). */
-    if (dt < 60_000) record("nav.warm_ms", dt, { from: navStart.from, to: normalizeRoute(toPath) });
+    if (dt < 60_000) {
+      record("nav.warm_ms", dt, { from: navStart.from, to: normalizeRoute(toPath) });
+      /* If this navigation was an explicit app launch (AppLaunchLink), also
+         emit an app-keyed launch-to-usable-shell timing so the launch journey
+         is measurable per app. `app` is a normalized app id — never PII. */
+      if (pendingLaunch && performance.now() - pendingLaunch.t < 60_000) {
+        record("app_launch.nav_ms", dt, { app: pendingLaunch.app });
+      }
+    }
     navStart = null;
+    pendingLaunch = null;
   } catch { /* ignore */ }
+}
+
+/* ── App-launch journey timing (Home / sidebar / launcher) ───────────────────
+   The launch surface calls markAppLaunch(appId) on activation. It records the
+   press→activate feedback delay (should be ~0 with CSS :active) and marks the
+   launch so completeNav() can attribute the warm-nav time to this app. Only a
+   normalized app id + numeric ms ever leave the browser. */
+let pendingLaunch: { app: string; t: number } | null = null;
+export function markAppLaunch(app: string, pressToActivateMs?: number): void {
+  try {
+    if (!isBrowser()) return;
+    const a = /^[a-z0-9_-]{1,32}$/.test(app) ? app : "unknown";
+    pendingLaunch = { app: a, t: performance.now() };
+    event("app_launch.open", { app: a });
+    if (typeof pressToActivateMs === "number" && Number.isFinite(pressToActivateMs)) {
+      record("app_launch.press_feedback_ms", Math.max(0, pressToActivateMs), { app: a });
+    }
+  } catch { /* never throw */ }
 }
