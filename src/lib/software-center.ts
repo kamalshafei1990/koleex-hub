@@ -21,23 +21,48 @@ export const LATEST_DESKTOP_VERSION = "1.0.2";
 export const KOLEEX_APP_ICON = "/icon-512.png";
 
 /* ── Platform logos (Database → "Operation Systems" collection) ─────────── */
-const MEDIA = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
-const BIZ = `${MEDIA}visual-library/business/`;
+/* The base URL is DERIVED from the build environment, never hardcoded.
+   It previously held a literal production Supabase URL, which meant every
+   build — including Preview builds pointed at a different Supabase project —
+   compiled the production host into the bundle. No env var could override it,
+   so a Preview could not be proven isolated from production.
+
+   Falling back to production when the variable is missing is exactly the bug:
+   a misconfigured Preview would silently read production Storage. Instead we
+   fail closed to a local placeholder — a missing logo is a visible, harmless
+   defect; a silent production dependency is not.
+
+   Software Center assets are NOT part of the Discuss-scoped staging data set
+   (docs/infrastructure/DISCUSS_SCOPED_STAGING_ARCHITECTURE.md): staging has no
+   `media` bucket objects, so these logos resolve to the placeholder there. That
+   is intended — Software Center is out of scope for Discuss Unit 2 Run B. */
+const SUPABASE_PUBLIC_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+/** Local placeholder used when the asset host is unknown or the object is
+ *  absent (e.g. staging). Never resolves to production Storage. */
+const MISSING_ASSET = "/icon-512.png";
+
+/** Build a public `media` bucket URL, or the local placeholder when the
+ *  Supabase host is not configured for this environment. */
+function mediaAsset(path: string): string {
+  if (!SUPABASE_PUBLIC_BASE) return MISSING_ASSET;
+  return `${SUPABASE_PUBLIC_BASE}/storage/v1/object/public/media/${path}`;
+}
+const biz = (file: string) => mediaAsset(`visual-library/business/${file}`);
 export const OS_LOGOS = {
-  apple: `${BIZ}apple-logo.svg`,
+  apple: biz("apple-logo.svg"),
   // Colorful brand SVGs served from /public (uploaded by Kamal).
   windows: "/os-logos/windows.svg",
   linux: "/os-logos/linux.svg",
   appStore: "/os-logos/app-store.svg",
   googlePlay: "/os-logos/google-play.svg",
-  apk: `${MEDIA}visual-library/files/apk-jf5ar6.svg`,
-  huaweiGallery: `${BIZ}huawei-app-gallery-m8du3b.svg`,
-  huawei: `${BIZ}huawei-4yiva1.svg`,
-  xiaomi: `${BIZ}xiaomi-hq7rvo.svg`,
-  getApps: `${BIZ}get-apps-m9970t.svg`,
-  oppo: `${BIZ}oppo-z98wzx.svg`,
-  vivo: `${BIZ}vivo-1y8br4.svg`,
-  tencent: `${BIZ}tencent-yi4ahb.svg`,
+  apk: mediaAsset("visual-library/files/apk-jf5ar6.svg"),
+  huaweiGallery: biz("huawei-app-gallery-m8du3b.svg"),
+  huawei: biz("huawei-4yiva1.svg"),
+  xiaomi: biz("xiaomi-hq7rvo.svg"),
+  getApps: biz("get-apps-m9970t.svg"),
+  oppo: biz("oppo-z98wzx.svg"),
+  vivo: biz("vivo-1y8br4.svg"),
+  tencent: biz("tencent-yi4ahb.svg"),
 } as const;
 
 /* ── Types ──────────────────────────────────────────────────────────────── */

@@ -1,10 +1,29 @@
 import type { NextConfig } from "next";
 
 /* China R3: the exact Supabase project host, derived from the build env so
-   previews keep working. Only PUBLIC storage paths are ever allowed below. */
+   previews keep working. Only PUBLIC storage paths are ever allowed below.
+
+   This previously defaulted to the production host when NEXT_PUBLIC_SUPABASE_URL
+   was absent or unparseable. That silently allowed the image optimizer to proxy
+   PRODUCTION storage from a Preview build pointed at a different Supabase
+   project — the environment leak this whole staging split exists to prevent, and
+   invisible because the fallback made it look like it worked.
+
+   Fail closed instead: a build without the variable is misconfigured, and a
+   loud build failure is the correct outcome. */
 const SUPABASE_HOST = (() => {
-  try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://yxyizbnfjrwrnmwhkvme.supabase.co").hostname; }
-  catch { return "yxyizbnfjrwrnmwhkvme.supabase.co"; }
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!raw) {
+    throw new Error(
+      "NEXT_PUBLIC_SUPABASE_URL is required at build time (image remotePatterns). " +
+        "Set it for this environment — it must never default to production.",
+    );
+  }
+  try {
+    return new URL(raw).hostname;
+  } catch {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not a valid URL.");
+  }
 })();
 
 const nextConfig: NextConfig = {
