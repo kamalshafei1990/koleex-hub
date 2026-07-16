@@ -361,3 +361,9 @@ totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
 deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
 change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
 Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
+
+---
+
+## Platform Speed Max-Out update (WS1/WS7)
+
+Home: decorative quote typing + unread-badge state now initialize after first idle rather than during hydration. Super-admin/activity: the 1s graph sampler no longer re-renders the SVG while the tab is hidden (visibility-guarded), and the 8s/15s DB pollers stop ticking when hidden. Reduces render/effect churn during the interactivity-critical window and in backgrounded tabs.

@@ -24,6 +24,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearSessionScopedCaches } from "@/lib/session-caches";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import SignOutIcon from "@/components/icons/ui/SignOutIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
@@ -86,6 +88,7 @@ function subLineFor(identity: Identity): string {
 export default function UserMenu({ dk }: { dk: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [identity, setIdentity] = useState<Identity>(() =>
     isSupabaseAuthEnabled()
@@ -206,6 +209,15 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
   const handleSignOut = useCallback(async () => {
     setOpen(false);
+    /* WS3 (safe cache strategy): a session boundary is being crossed. Wipe every
+       tenant/account-scoped client cache so the NEXT session — including a
+       different user on a shared device — can never paint the previous user's
+       identity, permitted modules, or tenant data. The Supabase path does a SOFT
+       nav (router.replace) so the long-lived QueryClient + warm-start stores
+       would otherwise survive; the legacy path hard-reloads (drops the
+       QueryClient) but localStorage survives a reload, so both paths need this. */
+    try { queryClient.clear(); } catch { /* ignore */ }
+    clearSessionScopedCaches();
     if (identity.mode === "supabase") {
       await supabaseSignOut();
       setIdentity({ mode: "supabase", signedIn: false });
@@ -225,7 +237,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     setIdentity({ mode: "legacy", signedIn: false });
     /* Hard reload so the AuthGate re-mounts and shows the login form. */
     window.location.href = "/";
-  }, [identity, router]);
+  }, [identity, router, queryClient]);
 
   const avatarLabel = initialsFor(identity);
   const displayName = profile?.fullName ?? displayNameFor(identity);

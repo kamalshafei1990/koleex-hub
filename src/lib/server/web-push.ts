@@ -12,33 +12,43 @@ import "server-only";
    NEXT_PUBLIC_VAPID_PUBLIC_KEY. If unset, push is a no-op (in-app still works).
    --------------------------------------------------------------------------- */
 
-import webpush from "web-push";
+/* Cold-start note (Phase 4 — Platform Speed Max-Out, Workstream 2):
+   `web-push` (+ its https/crypto/asn1 transitive tree) is loaded LAZILY inside
+   the send path via dynamic import — NOT at module scope. This module is pulled
+   in (transitively, for a rarely-taken notify branch) by the Discuss mutate
+   route, the activity heartbeat, signin, and every audit-instrumented mutation
+   route; keeping `web-push` off their module graph removes it from those
+   routes' serverless cold start. `isPushConfigured()` stays a pure env check so
+   callers can gate cheaply without loading the package. */
+import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
+
+/** Are the VAPID keys present? Pure env check — does NOT load `web-push`. */
+export function isPushConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+}
 
 let configured: boolean | null = null;
 
-function ensureConfigured(): boolean {
-  if (configured !== null) return configured;
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+/** Lazily import `web-push`, configure VAPID once, and return the module — or
+    null if keys are missing / setup fails. The dynamic import is what keeps the
+    package off the cold-start graph of every route that transitively imports
+    this file for a notify path it may never take. */
+async function loadConfiguredWebPush(): Promise<typeof WebPush | null> {
+  if (!isPushConfigured()) return null;
+  const webpush = (await import("web-push")).default;
+  if (configured === true) return webpush;
+  if (configured === false) return null;
   const subject = process.env.VAPID_SUBJECT || "mailto:admin@koleexgroup.com";
-  if (!publicKey || !privateKey) {
-    configured = false;
-    return false;
-  }
   try {
-    webpush.setVapidDetails(subject, publicKey, privateKey);
+    webpush.setVapidDetails(subject, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
     configured = true;
+    return webpush;
   } catch (e) {
     console.error("[web-push] setVapidDetails failed:", e instanceof Error ? e.message : e);
     configured = false;
+    return null;
   }
-  return configured;
-}
-
-/** Is server-side Web Push usable (keys present)? */
-export function isPushConfigured(): boolean {
-  return ensureConfigured();
 }
 
 export interface PushPayload {
@@ -68,7 +78,8 @@ export async function sendPushToAccounts(
   const ids = Array.from(new Set(accountIds.filter(Boolean)));
   if (ids.length === 0) return result;
 
-  if (!ensureConfigured()) {
+  const webpush = await loadConfiguredWebPush();
+  if (!webpush) {
     // Keys not set — record as skipped so the SA panel shows why.
     await logPush(ids[0], opts?.actorAccountId, payload, "skipped", "vapid_not_configured", null).catch(
       () => undefined,

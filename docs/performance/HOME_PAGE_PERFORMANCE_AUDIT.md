@@ -53,3 +53,9 @@ An app-grid island split was assessed and **deferred** — Home is ~56 KB and th
 is high-risk for the reward; "do not remove visual features without measured evidence."
 The idle preload now also warms the top-2 real app chunks so their first launch is not
 cold. No feature removed.
+
+---
+
+## Platform Speed Max-Out update (WS1)
+
+Two decorative loads moved off the Home hydration-critical path: (1) `DAILY_QUOTES` (~120 localized strings) extracted to `src/lib/home/daily-quotes.ts` and dynamic-imported by AIGreeter; (2) the discuss + todo unread-badge effects (each a fetch + realtime subscription) gated behind `useAfterInteractive()` (first requestIdleCallback). App grid interactivity now precedes decorative badge/quote init. Home client boundary still intact (island split remains deferred). Guarded by `validate:platform-speed`.

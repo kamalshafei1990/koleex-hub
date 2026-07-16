@@ -143,3 +143,9 @@ totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
 deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
 change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
 Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
+
+---
+
+## Platform Speed Max-Out update (WS1)
+
+Home route: `DAILY_QUOTES` (~120 localized strings) removed from the Home client bundle into a separately-chunked lazy module. Structural reduction of the Home critical bundle (Turbopack build here does not emit per-route First-Load-JS byte columns, so the delta is tracked by the dynamic-import boundary, not a fabricated byte count). Guarded by `validate:platform-speed`.

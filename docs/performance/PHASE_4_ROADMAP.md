@@ -177,3 +177,9 @@ FIRST_APP_LAUNCH_ARCHITECTURE.md.
 
 **Stop here.** Do not begin Products / Product Data, Wave 2C, Contacts
 migration, Discuss, Storage, or AI in the same run.
+
+---
+
+## Platform Speed Max-Out (SHIPPED)
+
+Shared-platform speed pass after the Cold-Start subphase. WS1 Home hydration (lazy quotes + deferred badges), WS2 serverless cold-start (web-push + argon2 lazy), WS3 sign-out cache-clear (cross-session leak fix), WS7 super-admin poller hidden-tab guards. `validate:platform-speed` 16/16 + full regression + tsc + build green. Additive, reversible, Preview-first. Docs: PLATFORM_SPEED_MAXOUT_BASELINE/_RESULTS + PLATFORM_CACHE_STRATEGY + SERVERLESS_COLD_START_AUDIT + BACKGROUND_ACTIVITY_AUDIT + PERFORMANCE_BUDGETS + PERSONALIZED_PRELOAD_STRATEGY. Deferred (gated follow-up): kx:sup:* tenant-scoping, contacts view-as warm-start scoping, WS6 progressive-rendering expansion, Contacts delta endpoint. **Stop — do not begin Products/Product Data or Wave 2C in the same run.**

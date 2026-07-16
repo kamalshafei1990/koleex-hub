@@ -7,7 +7,6 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
-import { hashForWrite } from "@/lib/server/password";
 import { stageTimer } from "@/lib/server/perf";
 
 export async function GET() {
@@ -78,7 +77,11 @@ export async function POST(req: Request) {
   // Hash the chosen password server-side (Argon2id via hashForWrite). The
   // server is the ONLY place password_algo is computed — never trusted from
   // the request body. No hash → null (sign-in disabled), algo stays 'legacy'.
-  const hashed = trimmedTmp ? await hashForWrite(trimmedTmp) : null;
+  // WS2 cold-start: the native @node-rs/argon2 addon is dynamically imported
+  // only on this POST write path, so GET /api/accounts (list) never loads it.
+  const hashed = trimmedTmp
+    ? await (await import("@/lib/server/password")).hashForWrite(trimmedTmp)
+    : null;
 
   const payload = {
     ...rest,

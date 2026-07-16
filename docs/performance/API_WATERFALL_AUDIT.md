@@ -124,3 +124,9 @@ totals). A4 preview is WYSIWYG (editor==preview) so deferral is inapplicable;
 deep row-memoization deferred (9,391 lines, 12 quotes). No calc/schema/permission
 change. Docs: QUOTATIONS_PERFORMANCE_BASELINE.md + QUOTATIONS_PERFORMANCE_RESULTS.md.
 Tests: validate:quotations-perf 21/21 + validate:quotations-pricing 43/43.
+
+---
+
+## Platform Speed Max-Out update (WS2)
+
+Serverless module-graph audit (SERVERLESS_COLD_START_AUDIT.md): the platform is largely cold-start-clean (lazy service-role supabase singleton; PDF/Excel/OCR already dynamic-imported). Shipped: `web-push` lazy-imported (off the cold start of Discuss-write / heartbeat / signin / 7 audit routes); argon2 deferred off `GET /api/accounts`. No new waterfalls introduced.

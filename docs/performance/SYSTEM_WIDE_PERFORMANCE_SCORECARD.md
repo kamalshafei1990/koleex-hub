@@ -200,3 +200,9 @@ Audits with no change: DNS/TLS (clean), service worker (only `/_next/static/`,
 never `/api`/HTML), region (hnd1). No schema/RLS/auth/API change. Preview-first.
 Tests: validate:cold-start 24/24 + full Phase-4 regression green; tsc + build 0.
 Docs: COLD_START_PERFORMANCE_BASELINE / _RESULTS / FIRST_APP_LAUNCH_ARCHITECTURE.
+
+---
+
+## Platform Speed Max-Out (Phase 4)
+
+Shared-platform speed + cache-safety pass. Shipped: WS1 Home hydration (lazy quote chunk + `useAfterInteractive`-deferred unread badges), WS2 serverless cold-start (`web-push` lazy-import removes it from Discuss-write/heartbeat/signin/7-audit-route cold starts; argon2 deferred off `GET /api/accounts`), WS3 **sign-out cache-clear** (QueryClient + `kx_`/`kx:`/`koleex.sa.` storage + bootstrap — closes a cross-user/tenant same-tab paint leak), WS7 super-admin/activity pollers hidden-tab-guarded. Guard: `validate:platform-speed` 16/16. Audits confirmed the platform is otherwise cold-start-clean (lazy supabase singleton, dynamic PDF/Excel libs, SW static-only) and poller-healthy (realtime-first + visible-guarded). Docs: PLATFORM_SPEED_MAXOUT_BASELINE/_RESULTS, PLATFORM_CACHE_STRATEGY, SERVERLESS_COLD_START_AUDIT, BACKGROUND_ACTIVITY_AUDIT, PERFORMANCE_BUDGETS, PERSONALIZED_PRELOAD_STRATEGY.

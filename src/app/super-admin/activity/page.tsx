@@ -194,8 +194,14 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
       });
     };
     tick();
-    const t = window.setInterval(tick, GRAPH_SAMPLE_MS);
-    return () => window.clearInterval(t);
+    /* WS7: don't re-sample + re-render the SVG once per second while the tab is
+       hidden; a single tick on return refreshes the trace. */
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") tick();
+    }, GRAPH_SAMPLE_MS);
+    const onVis = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, []);
 
   const W = 1000;
@@ -410,19 +416,31 @@ export default function SuperAdminActivityPage() {
     }
   }, [feedQuery]);
 
+  /* WS7 (background activity): these DB-backed pollers now skip their tick while
+     the tab is hidden (matching every other poller in the app) and snap fresh
+     the moment the operator returns via a visibilitychange resync — no more
+     8s/15s DB reads against a backgrounded monitor tab. */
   useEffect(() => {
     if (!isSA) return;
     void loadMonitor();
-    const t = window.setInterval(loadMonitor, MONITOR_MS);
-    return () => window.clearInterval(t);
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadMonitor();
+    }, MONITOR_MS);
+    const onVis = () => { if (document.visibilityState === "visible") void loadMonitor(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, [isSA, loadMonitor]);
 
   useEffect(() => {
     if (!isSA) return;
     setLoadingFeed(true);
     void loadFeed();
-    const t = window.setInterval(loadFeed, FEED_MS);
-    return () => window.clearInterval(t);
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadFeed();
+    }, FEED_MS);
+    const onVis = () => { if (document.visibilityState === "visible") void loadFeed(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, [isSA, loadFeed]);
 
   const visibleOnline = useMemo(

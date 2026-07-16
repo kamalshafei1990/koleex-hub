@@ -58,3 +58,9 @@ Triggered on hover/focus/touch **intent** (AppLaunchLink) and on Home **idle**
 (top-2 only, network/device-gated). Deduped per session; touches no `/api`;
 authorized ids only. Business data stays on-navigation. See
 FIRST_APP_LAUNCH_ARCHITECTURE.md for the three-layer model.
+
+---
+
+## Platform Speed Max-Out update (WS4/WS5)
+
+Reviewed: the P0→P3 idle preload (route + top-2 real client chunks + small authorized list GETs) already satisfies personalized warm-up and is Save-Data/slow/offline/hidden gated, authorized-only, deduped. No expansion (avoid over-preload). WS1's deferral of Home's decorative on-mount work means the idle preload window is no longer contended by hydration. See PERSONALIZED_PRELOAD_STRATEGY.md.
