@@ -70,3 +70,22 @@ Supabase custom-domain experiment.
 **Measurement gaps to close during Wave 2:** real-user P50–P99 from a Vercel-log
 window (instrument now deployed); authenticated lazy-loading + React Profiler
 sessions; Mainland-China samples.
+
+
+---
+
+## Controlled internal cohort rollout (2026-07-16)
+Replaced the passive `?serverlist=1`-only rollout with a trusted server-side
+cohort. Mechanism + precedence + telemetry + sample gate + rollback + default-
+promotion criteria: **`CUSTOMERS_INTERNAL_ROLLOUT.md`**.
+- Cohort = env allowlist `KX_CUSTOMERS_SERVER_LIST_ACCOUNT_IDS` (opaque ids,
+  server-only, exact match, customer accounts excluded), surfaced as the trusted
+  `customersServerList` flag in bootstrap. Precedence: `?serverlist=0` legacy ·
+  `=1` server · cohort → server · Preview → server · production → legacy.
+- Ships **inert** — nobody in cohort until the env var is set → zero production
+  change; `?serverlist=1` still works.
+- In-DB telemetry: `customers_{server_list,legacy}_list_open` +
+  `customers_server_list_error` in `activity_events` (mode split, no PII).
+- Tests: `validate:customers-rollout` (16), `validate:customers-gate` (10).
+- Rollback: clear the env var (config) → whole cohort to legacy; `?serverlist=0`
+  per-user. Build + deploy green.

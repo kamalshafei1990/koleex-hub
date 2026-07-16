@@ -176,3 +176,22 @@ First-paint rows 120→50; slim bytes 88,765(all)→36,836(page); summary via pe
 
 ### What an operator with Vercel access should collect (real window)
 Filter Vercel function logs for `[kx-server-timing]` `op` in {`contacts.list` (tag `paged:1` vs legacy), summary} and `[kx-metric]` from `?serverlist=1` sessions; compute per-op P50/P75/P95/P99 (report sample size), bytes, rows, 4xx/5xx, aborted/duplicate, and background req/min; watch for any `fetchContactsByType` calls co-occurring with paged (should be zero). Separate real-user vs synthetic, cold vs warm, Mainland-China vs other.
+
+
+---
+
+## Controlled internal cohort rollout (2026-07-16)
+Replaced the passive `?serverlist=1`-only rollout with a trusted server-side
+cohort. Mechanism + precedence + telemetry + sample gate + rollback + default-
+promotion criteria: **`CUSTOMERS_INTERNAL_ROLLOUT.md`**.
+- Cohort = env allowlist `KX_CUSTOMERS_SERVER_LIST_ACCOUNT_IDS` (opaque ids,
+  server-only, exact match, customer accounts excluded), surfaced as the trusted
+  `customersServerList` flag in bootstrap. Precedence: `?serverlist=0` legacy ·
+  `=1` server · cohort → server · Preview → server · production → legacy.
+- Ships **inert** — nobody in cohort until the env var is set → zero production
+  change; `?serverlist=1` still works.
+- In-DB telemetry: `customers_{server_list,legacy}_list_open` +
+  `customers_server_list_error` in `activity_events` (mode split, no PII).
+- Tests: `validate:customers-rollout` (16), `validate:customers-gate` (10).
+- Rollback: clear the env var (config) → whole cohort to legacy; `?serverlist=0`
+  per-user. Build + deploy green.
