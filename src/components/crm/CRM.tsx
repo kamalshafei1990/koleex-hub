@@ -26,6 +26,7 @@ import Link from "next/link";
 import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -33,6 +34,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import { record, event } from "@/lib/perf/client";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -78,16 +80,18 @@ import {
   fetchActivities,
   fetchActivityFeed,
   fetchOpportunities,
+  fetchOpportunity,
   fetchStages,
   generateLeads,
   markOpportunityLost,
   moveOpportunityToStage,
   reopenActivity,
+  searchCrmContacts,
   updateOpportunity,
   updateStage,
   type ActivityFeedRow,
+  type CrmContactPick,
 } from "@/lib/crm";
-import { fetchContacts, type ContactRow } from "@/lib/contacts-admin";
 import { useScopeContext } from "@/lib/use-scope";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
@@ -210,22 +214,67 @@ export default function CRM() {
   // leak Koleex's opportunities to a customer-tenant account.
   const scopeCtx = useScopeContext();
 
+  /* First-mount flag so board timing is only recorded for the cold load,
+     and so post-mutation reloads can run "soft" (keep the board visible
+     instead of blanking to a spinner). */
+  const firstLoadRef = useRef(true);
+
   /* Initial load. Stages + opportunities in parallel because they're
-     independent queries; we only block UI on the slower of the two. */
-  const reload = useCallback(async () => {
-    setLoading(true);
-    const [s, o] = await Promise.all([
-      fetchStages(scopeCtx),
-      fetchOpportunities({ ctx: scopeCtx }),
-    ]);
-    setStages(s);
-    setOpps(o);
-    setLoading(false);
-  }, [scopeCtx]);
+     independent queries; we only block UI on the slower of the two. The
+     board requests the slim `view=board` projection (no free-text
+     description). A `soft` reload after a mutation keeps the current board
+     on screen (no spinner blank) while the fresh data lands. */
+  const reload = useCallback(
+    async (opts?: { soft?: boolean }) => {
+      const soft = opts?.soft ?? false;
+      const first = firstLoadRef.current;
+      if (!soft) setLoading(true);
+      const t0 =
+        typeof performance !== "undefined" ? performance.now() : 0;
+      const [s, o] = await Promise.all([
+        fetchStages(scopeCtx),
+        fetchOpportunities({ ctx: scopeCtx, view: "board" }),
+      ]);
+      setStages(s);
+      setOpps(o);
+      if (!soft) setLoading(false);
+      if (first) {
+        firstLoadRef.current = false;
+        if (typeof performance !== "undefined") {
+          const ms = performance.now() - t0;
+          // All columns paint together once both fetches settle, so the
+          // first column and the fully-usable board land at the same time.
+          record("crm.board.total_ms", ms);
+          record("crm.board.first_column_ms", ms);
+          record("crm.board.full_ready_ms", ms);
+          record("crm.board.request_count", 2);
+        }
+      }
+    },
+    [scopeCtx],
+  );
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  /* Filter responsiveness (Phase 4 Wave 2B.2). Board filters are pure
+     client-side (no network) — we record the change→next-frame time so an
+     operator can confirm filters stay responsive. Skips the initial mount. */
+  const filterMountRef = useRef(true);
+  useEffect(() => {
+    if (filterMountRef.current) {
+      filterMountRef.current = false;
+      return;
+    }
+    if (typeof performance === "undefined" || typeof requestAnimationFrame === "undefined")
+      return;
+    const t0 = performance.now();
+    const raf = requestAnimationFrame(() => {
+      record("crm.filter.settled_ms", performance.now() - t0);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [search, myOnly, filterStageId, filterPriority]);
 
   /* ── Deep-link handlers ───────────────────────────────────────────────
        /crm?opportunity=<id>   → open the full edit modal for that deal
@@ -302,7 +351,21 @@ export default function CRM() {
   }, [filteredOpps, stages]);
 
   /* ── Drag and drop ──────────────────────────────────────────────── */
-  const handleDragStart = (id: string) => setDraggingId(id);
+  /* Board render counter — bumped after every commit so a drop can report
+     how many board re-renders it triggered (crm.board.rerender_count). */
+  const renderCountRef = useRef(0);
+  useEffect(() => {
+    renderCountRef.current += 1;
+  });
+  const dragStartTsRef = useRef(0);
+  const dragStartRenderRef = useRef(0);
+
+  const now = () => (typeof performance !== "undefined" ? performance.now() : 0);
+  const handleDragStart = (id: string) => {
+    dragStartTsRef.current = now();
+    dragStartRenderRef.current = renderCountRef.current;
+    setDraggingId(id);
+  };
   const handleDragEnd = () => {
     setDraggingId(null);
     setHoverStageId(null);
@@ -320,9 +383,21 @@ export default function CRM() {
     const opp = opps.find((o) => o.id === id);
     if (!opp || opp.stage_id === stageId) return;
     const stage = stages.find((s) => s.id === stageId);
+
+    /* Snapshot the fields we mutate so we can roll back if the server
+       rejects the move (no rollback previously — a failed move left the
+       card stranded in the wrong column). */
+    const prev = {
+      stage_id: opp.stage_id,
+      stage: opp.stage,
+      won_at: opp.won_at,
+      probability: opp.probability,
+    };
+
     /* Optimistic local update so the card jumps immediately. */
-    setOpps((prev) =>
-      prev.map((o) =>
+    const dropT0 = now();
+    setOpps((list) =>
+      list.map((o) =>
         o.id === id
           ? {
               ...o,
@@ -334,18 +409,37 @@ export default function CRM() {
           : o,
       ),
     );
-    await moveOpportunityToStage({
+    record("crm.drag.drop_ack_ms", now() - dropT0);
+
+    const ok = await moveOpportunityToStage({
       opportunityId: id,
       stageId,
       isWonStage: stage?.is_won ?? false,
     });
+
+    if (!ok) {
+      /* Roll the optimistic move back to the pre-drag stage. */
+      setOpps((list) =>
+        list.map((o) => (o.id === id ? { ...o, ...prev } : o)),
+      );
+      event("crm.drag.rollback");
+      event("crm.mutation.error");
+    } else {
+      record("crm.drag.reconcile_ms", now() - dropT0);
+    }
+    record(
+      "crm.board.rerender_count",
+      renderCountRef.current - dragStartRenderRef.current,
+    );
   };
 
   /* ── Modal save handler ─────────────────────────────────────────── */
   const handleClose = () => setEditingId(null);
   const handleSaved = async () => {
     setEditingId(null);
-    await reload();
+    // Soft reload — the board stays visible (no spinner blank) while the
+    // updated row lands. Filters + scroll are preserved.
+    await reload({ soft: true });
   };
 
   /* ── Quick inline add on a kanban column ────────────────────────── */
@@ -378,7 +472,8 @@ export default function CRM() {
         lost_at: null,
         archived_at: null,
       });
-      if (res.ok) await reload();
+      if (res.ok) await reload({ soft: true });
+      else event("crm.mutation.error");
       return res;
     },
     [accountId, reload],
@@ -388,7 +483,8 @@ export default function CRM() {
   const handleToggleFoldStage = useCallback(
     async (stage: CrmStageRow) => {
       const ok = await updateStage(stage.id, { fold: !stage.fold });
-      if (ok) await reload();
+      if (ok) await reload({ soft: true });
+      else event("crm.mutation.error");
     },
     [reload],
   );
@@ -396,7 +492,8 @@ export default function CRM() {
     async (stage: CrmStageRow) => {
       if (!confirm(t("stage.edit.deleteConfirm"))) return;
       const ok = await deleteStage(stage.id);
-      if (ok) await reload();
+      if (ok) await reload({ soft: true });
+      else event("crm.mutation.error");
     },
     [reload, t],
   );
@@ -414,7 +511,8 @@ export default function CRM() {
         ownerAccountId: accountId,
         source: options.source,
       });
-      if (res.ok) await reload();
+      if (res.ok) await reload({ soft: true });
+      else event("crm.mutation.error");
       return res;
     },
     [accountId, reload],
@@ -708,7 +806,7 @@ export default function CRM() {
           onClose={() => setEditingStageId(null)}
           onSaved={async () => {
             setEditingStageId(null);
-            await reload();
+            await reload({ soft: true });
           }}
           t={t}
         />
@@ -1180,21 +1278,27 @@ function PipelineColumn({
    Opportunity card (kanban tile)
    ════════════════════════════════════════════════════════════════════════ */
 
-function OpportunityCard({
-  opportunity,
-  isDragging,
-  onDragStart,
-  onDragEnd,
-  onClick,
-  t,
-}: {
-  opportunity: CrmOpportunityWithRelations;
-  isDragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onClick: () => void;
-  t: (key: string) => string;
-}) {
+/* Memoised so a drag-over (which flips top-level hoverStageId) or an
+   unrelated single-card update no longer re-renders every card. Only the
+   card whose `opportunity` object identity or `isDragging` flag changed
+   re-renders; the callbacks + `t` are treated as stable (a stale closure
+   still carries the correct captured id, so ignoring them is safe). */
+const OpportunityCard = memo(
+  function OpportunityCard({
+    opportunity,
+    isDragging,
+    onDragStart,
+    onDragEnd,
+    onClick,
+    t,
+  }: {
+    opportunity: CrmOpportunityWithRelations;
+    isDragging: boolean;
+    onDragStart: () => void;
+    onDragEnd: () => void;
+    onClick: () => void;
+    t: (key: string) => string;
+  }) {
   const o = opportunity;
   const due = relativeDate(o.expected_close_date);
   const swatch = SWATCH_COLORS[o.color] ?? SWATCH_COLORS[0];
@@ -1298,7 +1402,10 @@ function OpportunityCard({
       </div>
     </div>
   );
-}
+  },
+  (a, b) =>
+    a.opportunity === b.opportunity && a.isDragging === b.isDragging,
+);
 
 function OwnerAvatar({
   owner,
@@ -1467,7 +1574,6 @@ function ContactComboboxField({
   value,
   onChange,
   onPickContact,
-  contacts,
   filter,
   placeholder,
   t,
@@ -1475,8 +1581,7 @@ function ContactComboboxField({
   label: string;
   value: string;
   onChange: (s: string) => void;
-  onPickContact: (c: ContactRow | null) => void;
-  contacts: ContactRow[];
+  onPickContact: (c: CrmContactPick | null) => void;
   filter: "company" | "person";
   placeholder?: string;
   t: (key: string) => string;
@@ -1484,6 +1589,18 @@ function ContactComboboxField({
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /* ── Bounded server search (Phase 4 Wave 2B.2) ───────────────────────────
+     Replaces the old "whole directory in memory, filter client-side" model.
+     `results` holds at most ~20 slim rows for the current query. Each
+     keystroke debounces 250ms, aborts the prior request, and is stale-guarded
+     by a monotonic seq so an older response can never overwrite a newer one.
+     IME composition (Chinese/Japanese) is respected — we don't fire until the
+     candidate is committed. */
+  const [results, setResults] = useState<CrmContactPick[]>([]);
+  const [composing, setComposing] = useState(false);
+  const seqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Close on outside click
   useEffect(() => {
@@ -1499,19 +1616,58 @@ function ContactComboboxField({
     return () => document.removeEventListener("mousedown", handle);
   }, []);
 
-  const isOrg = (c: ContactRow) =>
+  useEffect(() => {
+    const q = value.trim();
+    // Below the minimum (or while an IME candidate is open, or the dropdown is
+    // closed) we show nothing — the selected value stays visible in the input
+    // and we never stream the directory.
+    if (!open || composing || q.length < 2) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const seq = ++seqRef.current;
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const t0 =
+        typeof performance !== "undefined" ? performance.now() : 0;
+      void searchCrmContacts(q, {
+        kind: filter,
+        limit: 20,
+        signal: ctrl.signal,
+      }).then((rows) => {
+        if (seq !== seqRef.current) {
+          // A newer keystroke superseded this response — drop it.
+          event("crm.picker.cancelled");
+          return;
+        }
+        setResults(rows);
+        if (typeof performance !== "undefined") {
+          record("crm.picker.search_ms", performance.now() - t0);
+        }
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [value, open, composing, filter]);
+
+  // Abort any in-flight request on unmount.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const isOrg = (c: CrmContactPick) =>
     c.entity_type === "company" ||
     c.contact_type === "company" ||
     c.contact_type === "supplier";
 
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return [] as ContactRow[];
-    return contacts
+    if (!q) return [] as CrmContactPick[];
+    // The server already bounds + (for "person") kind-narrows the set; we
+    // re-apply the exact company/person predicate on the small result page so
+    // the dropdown semantics match the legacy behaviour precisely.
+    return results
       .filter((c) => {
         if (filter === "company") {
-          // Match either company-type contacts by their display name OR
-          // any contact whose `company` column hits the query.
           if (isOrg(c)) {
             const hay = [c.display_name, c.company]
               .filter(Boolean)
@@ -1521,7 +1677,6 @@ function ContactComboboxField({
           }
           return (c.company || "").toLowerCase().includes(q);
         }
-        // person filter — exclude orgs, search across name + email
         if (isOrg(c)) return false;
         const hay = [
           c.display_name,
@@ -1536,7 +1691,7 @@ function ContactComboboxField({
         return hay.includes(q);
       })
       .slice(0, 6);
-  }, [value, contacts, filter]);
+  }, [value, results, filter]);
 
   const trimmed = value.trim();
   const exactMatch = matches.some((c) => {
@@ -1549,7 +1704,7 @@ function ContactComboboxField({
   const showAddNew = trimmed.length > 0 && !exactMatch;
 
   type Item =
-    | { kind: "contact"; contact: ContactRow }
+    | { kind: "contact"; contact: CrmContactPick }
     | { kind: "add"; text: string };
 
   const items: Item[] = useMemo(() => {
@@ -1581,6 +1736,8 @@ function ContactComboboxField({
             setOpen(true);
             setHi(0);
           }}
+          onCompositionStart={() => setComposing(true)}
+          onCompositionEnd={() => setComposing(false)}
           onFocus={() => {
             if (value.trim().length > 0) setOpen(true);
           }}
@@ -1730,19 +1887,26 @@ function OpportunityModal({
   const [email, setEmail] = useState(opportunity?.email ?? "");
   const [phone, setPhone] = useState(opportunity?.phone ?? "");
 
-  /* Saved contacts — loaded once when the modal opens, used to power the
-     Company / Contact Name autocomplete dropdowns. */
-  const [contactBook, setContactBook] = useState<ContactRow[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const rows = await fetchContacts();
-      if (!cancelled) setContactBook(rows);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  /* The currently-linked contact, seeded from the board row's enriched
+     `contact` (if any). Used only to decide whether a manual edit to the
+     Company / Contact field should break the FK link — no directory is
+     downloaded. The two combobox fields drive their own bounded search. */
+  const [linkedContact, setLinkedContact] = useState<CrmContactPick | null>(
+    opportunity?.contact
+      ? {
+          id: opportunity.contact.id,
+          display_name: opportunity.contact.display_name ?? "",
+          company: opportunity.contact.company ?? "",
+          full_name: "",
+          first_name: "",
+          last_name: "",
+          email: "",
+          entity_type: "",
+          contact_type: "",
+          photo_url: null,
+        }
+      : null,
+  );
   const [expectedRevenue, setExpectedRevenue] = useState(
     String(opportunity?.expected_revenue ?? 0),
   );
@@ -1782,6 +1946,41 @@ function OpportunityModal({
   useEffect(() => {
     void reloadActivities();
   }, [reloadActivities]);
+
+  /* Modal-open latency (Phase 4 Wave 2B.2). The modal paints instantly from
+     the in-memory board row; we record the mount→first-frame time so an
+     operator can watch that "opening a deal feels immediate" holds. */
+  const openT0 = useRef(
+    typeof performance !== "undefined" ? performance.now() : 0,
+  );
+  useEffect(() => {
+    if (typeof performance === "undefined" || typeof requestAnimationFrame === "undefined")
+      return;
+    const raf = requestAnimationFrame(() => {
+      record("crm.modal.open_ms", performance.now() - openT0.current);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  /* Description hydrate-on-open. The board projection is slim (no free-text
+     `description` / `lost_reason`), so for an existing deal we lazily fetch
+     the full row and fill the textarea — but only if the operator hasn't
+     already started typing (descDirty). Instant paint is never blocked. */
+  const descDirty = useRef(false);
+  useEffect(() => {
+    if (isNew || !opportunity) return;
+    let cancelled = false;
+    void (async () => {
+      const full = await fetchOpportunity(opportunity.id);
+      if (cancelled || descDirty.current || !full) return;
+      if (typeof full.description === "string" && full.description.length > 0) {
+        setDescription(full.description);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew, opportunity]);
 
   /* Close on ESC. */
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -1991,19 +2190,20 @@ function OpportunityModal({
                   label={t("form.company")}
                   placeholder={t("form.companyPh")}
                   value={companyName}
-                  contacts={contactBook}
                   filter="company"
                   onChange={(v) => {
                     setCompanyName(v);
-                    // Typing manually breaks the FK link unless it
-                    // exactly matches the previously linked contact.
+                    // Typing manually breaks the FK link unless it still
+                    // matches the last-linked contact (kept in linkedContact,
+                    // no directory download).
                     setContactId((prev) => {
                       if (!prev) return null;
-                      const linked = contactBook.find((c) => c.id === prev);
                       const stillMatches =
-                        linked &&
-                        ((linked.company || linked.display_name || "")
-                          .toLowerCase() === v.toLowerCase());
+                        linkedContact &&
+                        linkedContact.id === prev &&
+                        (linkedContact.company || linkedContact.display_name || "")
+                          .toLowerCase() === v.toLowerCase();
+                      if (!stillMatches) setLinkedContact(null);
                       return stillMatches ? prev : null;
                     });
                   }}
@@ -2011,23 +2211,24 @@ function OpportunityModal({
                     if (!c) return;
                     setCompanyName(c.company || c.display_name || "");
                     setContactId(c.id);
+                    setLinkedContact(c);
                   }}
                   t={t}
                 />
                 <ContactComboboxField
                   label={t("form.contactName")}
                   value={contactName}
-                  contacts={contactBook}
                   filter="person"
                   onChange={(v) => {
                     setContactName(v);
                     setContactId((prev) => {
                       if (!prev) return null;
-                      const linked = contactBook.find((c) => c.id === prev);
                       const stillMatches =
-                        linked &&
-                        ((linked.display_name || linked.full_name || "")
-                          .toLowerCase() === v.toLowerCase());
+                        linkedContact &&
+                        linkedContact.id === prev &&
+                        (linkedContact.display_name || linkedContact.full_name || "")
+                          .toLowerCase() === v.toLowerCase();
+                      if (!stillMatches) setLinkedContact(null);
                       return stillMatches ? prev : null;
                     });
                   }}
@@ -2035,9 +2236,9 @@ function OpportunityModal({
                     if (!c) return;
                     setContactName(c.display_name || c.full_name || "");
                     setContactId(c.id);
+                    setLinkedContact(c);
                     if (!companyName && c.company) setCompanyName(c.company);
                     if (!email && c.email) setEmail(c.email);
-                    if (!phone && c.phone) setPhone(c.phone);
                   }}
                   t={t}
                 />
@@ -2178,7 +2379,10 @@ function OpportunityModal({
               <Field label={t("form.description")}>
                 <textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    descDirty.current = true;
+                    setDescription(e.target.value);
+                  }}
                   rows={3}
                   placeholder={t("form.descriptionPh")}
                   className="w-full px-3 py-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none"
