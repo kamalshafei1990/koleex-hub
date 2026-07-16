@@ -89,3 +89,21 @@ promotion criteria: **`CUSTOMERS_INTERNAL_ROLLOUT.md`**.
 - Tests: `validate:customers-rollout` (16), `validate:customers-gate` (10).
 - Rollback: clear the env var (config) → whole cohort to legacy; `?serverlist=0`
   per-user. Build + deploy green.
+
+---
+
+## Wave 2A.2 — Suppliers server-list migration (2026-07-16)
+**Status: implemented on branch `wave2a2-suppliers-preview` + prepared for
+Preview. Production `/suppliers` stays LEGACY. NOT merged to `main`.**
+Reuses the Wave 2A.1 foundation (framework + endpoint + gate/cohort/telemetry
+pattern) — only a thin Suppliers UI adapter, its i18n, a supplier list-config,
+and the `KX_SUPPLIERS_SERVER_LIST_ACCOUNT_IDS` env var are new. Generalized the
+cohort resolver (`makeServerListCohort`) and gate (`shouldUseServerList`) into
+shared modules; Customers now delegates to both with no behaviour change
+(regressions green). No sensitive supplier field is searchable/shown. Tests:
+`validate:suppliers-rollout` 19, `validate:suppliers-gate` 10; tsc + `next build`
+green. Docs: `SUPPLIERS_SERVER_LIST_PILOT.md` (reuse map),
+`SUPPLIERS_INTERNAL_ROLLOUT.md`, `PHASE_4_WAVE_2A2_RESULTS.md`,
+`SERVER_LIST_ARCHITECTURE.md`. Recommendation: revise-then-promote (authenticated
+Preview matrix + real before/after measurement + bulk-action parity pending). Do
+NOT begin Contacts / Wave 2B / 2C without explicit approval.

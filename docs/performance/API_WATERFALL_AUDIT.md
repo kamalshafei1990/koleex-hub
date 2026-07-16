@@ -77,3 +77,8 @@ Good patterns to preserve: FinanceStatements tab-gating, Executive/Operations si
 
 ## Wave 2A.1 update (2026-07-16)
 The #1 cross-cutting waterfall (Customers/Contacts/Suppliers full-download + 20s re-poll + client filter) now has a shipped server-side fix for the **endpoint** side: `GET /api/contacts?paged=1` does server search/sort/offset-pagination on a slim projection (120→50 rows, 87KB→37KB/page; SQL-measured). Customers UI wiring is specified in `CUSTOMERS_SERVER_LIST_PILOT.md`, gated on preview verification. Contacts/Suppliers unchanged.
+
+
+---
+
+**Wave 2A.2 update (2026-07-16):** Suppliers directory migrated onto the shared server-list architecture (server search/filter/sort/pagination + permission-safe global summary, replacing the full-supplier-dataset client fetch + 20s poll) on branch `wave2a2-suppliers-preview` — Preview-gated, NOT in production. Real before/after percentiles/bytes/req-counts require a measured Preview/cohort window (Vercel-log/Speed-Insights). See `PHASE_4_WAVE_2A2_RESULTS.md` + `SUPPLIERS_SERVER_LIST_PILOT.md`.

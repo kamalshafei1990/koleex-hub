@@ -127,3 +127,8 @@ First-paint rows 120→50; slim bytes 88,765(all)→36,836(page); summary via pe
 
 ### What an operator with Vercel access should collect (real window)
 Filter Vercel function logs for `[kx-server-timing]` `op` in {`contacts.list` (tag `paged:1` vs legacy), summary} and `[kx-metric]` from `?serverlist=1` sessions; compute per-op P50/P75/P95/P99 (report sample size), bytes, rows, 4xx/5xx, aborted/duplicate, and background req/min; watch for any `fetchContactsByType` calls co-occurring with paged (should be zero). Separate real-user vs synthetic, cold vs warm, Mainland-China vs other.
+
+
+---
+
+**Wave 2A.2 update (2026-07-16):** Suppliers directory migrated onto the shared server-list architecture (server search/filter/sort/pagination + permission-safe global summary, replacing the full-supplier-dataset client fetch + 20s poll) on branch `wave2a2-suppliers-preview` — Preview-gated, NOT in production. Real before/after percentiles/bytes/req-counts require a measured Preview/cohort window (Vercel-log/Speed-Insights). See `PHASE_4_WAVE_2A2_RESULTS.md` + `SUPPLIERS_SERVER_LIST_PILOT.md`.
