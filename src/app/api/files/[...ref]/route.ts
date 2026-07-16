@@ -32,6 +32,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { stageTimer } from "@/lib/server/perf";
+import { discussMediaList } from "@/lib/server/discuss-media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,10 +43,19 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const MAX_BYTES = 200 * 1024 * 1024; // 413 above this
 const UPSTREAM_TIMEOUT_MS = 50_000;
 
-/** Buckets each category may serve from — anything else is rejected. */
+/** Buckets each category may serve from — anything else is rejected.
+ *
+ *  `discuss` spans three during the Unit-2 migration window:
+ *    · discuss-media  — private, ALL new images/documents
+ *    · discuss-voice  — private, ALL new voice notes
+ *    · media          — public, LEGACY READ ONLY. Six pre-Unit-2 objects still
+ *                       live here. Nothing writes Discuss media to it any more.
+ *                       Removed from this list once those six are migrated and
+ *                       revoked (Run C) — validate:discuss-attachments then
+ *                       asserts it cannot come back. */
 const CATEGORY_BUCKETS: Record<string, string[]> = {
   catalog: ["media"],
-  discuss: ["media"],
+  discuss: ["discuss-media", "discuss-voice", "media"],
 };
 
 /** MIME types allowed to render inline. Everything else (incl. SVG/HTML/XML,
@@ -112,29 +122,53 @@ async function resolveCatalog(auth: ServerAuthContext, id: string): Promise<Reso
   return { bucket: "media", path, filename: data.file_name ?? "file" };
 }
 
-async function resolveDiscuss(accountId: string, messageId: string, index: number): Promise<Resolved | null> {
+/* Authorization chain (Discuss Stabilization Unit 2):
+     1. authenticated active account            (caller: requireAuth)
+     2. message exists and is not deleted
+     3. message's channel belongs to THIS tenant  ← scoped in the query itself
+     4. account has ACTIVE membership in that channel
+     5. attachment index resolves to a real object
+   Every failure returns null → uniform 404 upstream (no existence oracle).
+
+   Tenant scoping is defence-in-depth: membership already implies the channel,
+   but we refuse to even fetch a row from another tenant rather than fetch
+   broadly and compare afterwards. The `!inner` join + eq makes Postgres do it.
+   Fail-closed: a channel with a NULL tenant_id will not match and its media is
+   denied. Verified safe at rollout — 2 legacy NULL-tenant channels exist and
+   hold 0 attachment/voice messages. */
+async function resolveDiscuss(
+  auth: ServerAuthContext,
+  messageId: string,
+  index: number,
+): Promise<Resolved | null> {
   const { data: msg } = await supabaseServer
     .from("discuss_messages")
-    .select("channel_id, metadata, deleted_at")
+    .select("channel_id, metadata, deleted_at, discuss_channels!inner(tenant_id)")
     .eq("id", messageId)
+    .eq("discuss_channels.tenant_id", auth.tenant_id)
     .maybeSingle();
   if (!msg || msg.deleted_at) return null;
   /* Record-level authorization: active membership in the message's channel.
-     A user removed from the channel (left_at set) loses access immediately. */
+     A user removed from the channel (left_at set) loses access immediately —
+     this is what makes an old URL stop working, unlike a signed URL that stays
+     valid until it expires. */
   const { data: member } = await supabaseServer
     .from("discuss_members")
     .select("id")
     .eq("channel_id", msg.channel_id)
-    .eq("account_id", accountId)
+    .eq("account_id", auth.account_id)
     .is("left_at", null)
     .maybeSingle();
   if (!member) return null;
-  const atts = (msg.metadata as { attachments?: Array<{ name?: string; url?: string; file_path?: string }> } | null)?.attachments;
-  const att = Array.isArray(atts) ? atts[index] : undefined;
-  if (!att) return null;
-  const path = toObjectPath(att.file_path ?? att.url, "media");
-  if (!path) return null;
-  return { bucket: "media", path, filename: att.name ?? "attachment" };
+
+  /* Bucket AND path come from the server-normalized metadata — never from the
+     client, never hardcoded. discussMediaList() is the single place that reads
+     the raw location fields and tolerates the legacy public-URL shape; it
+     returns an empty path for anything it cannot resolve, which fails closed
+     here (uniform 404) WITHOUT shifting the index of any other item. */
+  const src = discussMediaList(msg.metadata)[index];
+  if (!src || !src.path) return null;
+  return { bucket: src.bucket, path: src.path, filename: src.name };
 }
 
 export async function GET(
@@ -157,7 +191,7 @@ export async function GET(
   } else if (category === "discuss") {
     const idx = Number(indexRaw ?? "0");
     if (!Number.isInteger(idx) || idx < 0 || idx > 50) return deny();
-    resolved = await resolveDiscuss(auth.account_id, id, idx);
+    resolved = await resolveDiscuss(auth, id, idx);
   }
   if (!resolved || !CATEGORY_BUCKETS[category].includes(resolved.bucket)) return deny();
   timing.mark("authorize");
@@ -204,11 +238,15 @@ export async function GET(
     if (v) headers.set(h, v);
   }
 
-  const { total } = timing.done({ category, id, status: upstream.status, bytes: size });
+  const { total } = timing.done({ category, status: upstream.status, bytes: size });
   headers.set("Server-Timing", `total;dur=${total}`);
-  /* Privacy-safe access line: category/id/bucket/status/bytes — never paths,
-     filenames, or user identifiers. */
-  console.warn(`[kx-file] ${JSON.stringify({ category, id, bucket: resolved.bucket, status: upstream.status, bytes: size })}`);
+  /* Privacy-safe access line (Discuss Stabilization Unit 2 hardening): the
+     resource id is NOT logged. For `discuss` the id IS the message id, and a
+     message id in logs is a conversation-linkable identifier. We keep only
+     non-identifying shape — category / bucket / status / bytes / range — which
+     is enough to debug delivery without telling anyone WHICH message was read.
+     Never log paths, filenames, accounts, channels, or content. */
+  console.warn(`[kx-file] ${JSON.stringify({ category, bucket: resolved.bucket, status: upstream.status, bytes: size, range: range ? 1 : 0 })}`);
 
   /* Stream the body through — the function never holds the whole file. */
   return new NextResponse(upstream.body, { status: upstream.status, headers });
