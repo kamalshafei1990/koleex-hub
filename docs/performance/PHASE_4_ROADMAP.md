@@ -93,8 +93,13 @@ promotion criteria: **`CUSTOMERS_INTERNAL_ROLLOUT.md`**.
 ---
 
 ## Wave 2A.2 — Suppliers server-list migration (2026-07-16)
-**Status: implemented on branch `wave2a2-suppliers-preview` + prepared for
-Preview. Production `/suppliers` stays LEGACY. NOT merged to `main`.**
+**Status: COMPLETE — merged to `main` behind the controlled model (production
+`/suppliers` defaults to LEGACY; `?serverlist=1` opt-in; cohort inert until
+`KX_SUPPLIERS_SERVER_LIST_ACCOUNT_IDS` is set). Reversible.**
+Legacy bulk-action audit: none exist → per-row parity (edit/archive/delete,
+permission+tenant gated) closed in the adapter. Security: `validate:suppliers-security`
+45 (field stripping by role, config non-sensitivity, static no-legacy-loader /
+no-poll guards).
 Reuses the Wave 2A.1 foundation (framework + endpoint + gate/cohort/telemetry
 pattern) — only a thin Suppliers UI adapter, its i18n, a supplier list-config,
 and the `KX_SUPPLIERS_SERVER_LIST_ACCOUNT_IDS` env var are new. Generalized the

@@ -87,16 +87,41 @@ RTL (`dir="rtl"`). Selection is **page-only** and labelled as such. List state
 persists (`persistKey`) so returning from a supplier detail restores
 page/search/filter/sort.
 
-## 6. Known limitations (first Preview)
+## 6. Legacy bulk-action audit + parity (Wave 2A.2 close-out)
 
-- **Destructive bulk actions** (archive/delete/bulk-edit) are NOT in the
-  server-list adapter yet — use the **Full profile** route or the legacy view
-  (`?serverlist=0`). Selection is display-only + page-scoped. To be added before
-  promotion if required.
-- Complex supplier sub-forms (factory, negotiation, risk, catalogs, banking)
-  remain on the legacy Full-profile route by design.
-- `supplier_type` filter options are sourced from the global summary; suppliers
-  with a null `supplier_type` are simply not offered as a filter value.
+**Finding: the legacy Suppliers directory (`Contacts.tsx`, `filterType="supplier"`)
+has NO multi-select and NO bulk actions.** There is no list-level selection state
+(`grep` for `selectedIds` / `Set<string>` / `toggleSelect` → none), the CSV export
+button is gated `filterType === "customer"` (not shown for suppliers), and delete
+is a **single-row** confirm action. Archive/activate is done per-record via the
+edit form's `is_active` field. So "bulk parity" requires porting nothing.
+
+| Bulk action | Exists in legacy | Permission required | Destructive | Needed for parity |
+|---|---|---|---|---|
+| activate / deactivate (archive) | No (per-record via edit form) | Suppliers edit | No (reversible) | No — covered per-row |
+| archive / restore | No (same is_active toggle) | Suppliers edit | No | No |
+| delete | No (single-row confirm only) | Suppliers delete | Yes | No — covered per-row |
+| export CSV | No (customer-only button) | — | No | No |
+| assign owner | No | — | — | No |
+| change supplier type | No | Suppliers edit | No | No |
+| add/remove tags | No | Suppliers edit | No | No |
+| approval status | No | — | — | No |
+| any purchasing bulk action | No | — | — | No |
+
+**Per-row parity closed in the server-list adapter** (not bulk — matching legacy):
+`Edit` (quick modal), `Archive`/`Activate` (one-click `is_active` toggle via
+PATCH `/api/contacts/[id]`), and `Delete` (confirm → DELETE `/api/contacts/[id]`).
+Both endpoints revalidate module permission (`requireModuleAction` edit/delete)
++ tenant scope (`fetchExisting(id, auth.tenant_id)`) server-side; on success the
+adapter invalidates the current server-list query + summary aggregate — never a
+full-list refetch. No multi-select is shown (legacy has none → no ambiguity).
+
+**Deferred by design** (documented, reachable): the complex supplier sub-forms
+(factory, negotiation, risk, catalogs, banking) live on the legacy **Full
+profile** route `/suppliers/[id]`; the whole legacy directory is one
+`?serverlist=0` away. `supplier_type` filter options come from the global
+summary, so suppliers with a null `supplier_type` are simply not offered as a
+filter value.
 
 ## 7. Rollout + rollback
 
