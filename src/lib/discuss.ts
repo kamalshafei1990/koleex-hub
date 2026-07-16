@@ -18,6 +18,7 @@
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
+import { checkDiscussUpload } from "./discuss-upload-policy";
 import { isTransientFetch } from "./util/transient-fetch";
 import type {
   DiscussAttachment,
@@ -25,7 +26,7 @@ import type {
   DiscussChannelKind,
   DiscussChannelRow,
   DiscussChannelWithState,
-  DiscussDraftRow,
+  DiscussDraftPublic,
   DiscussLinkedContact,
   DiscussMemberRow,
   DiscussMessageKind,
@@ -44,7 +45,11 @@ const CHANNELS = "discuss_channels";
    /api/discuss/state route and written via /api/discuss/mutate, so their table
    names live server-side only (RLS: service_role). */
 const CONTACTS = "contacts";
-const BUCKET = "media";
+/* No storage-bucket constant here by design (Unit 2): Discuss uploads name
+   their PRIVATE bucket at the call site — `discuss-media` for images and
+   documents, `discuss-voice` for audio. The old shared public `media` bucket
+   is no longer written to by Discuss at all; it survives only as a read
+   source for six pre-Unit-2 objects, and only inside the server resolver. */
 
 /* Broadcast ping topics — MUST match src/lib/server/realtime-broadcast.ts. */
 const rtChannelTopic = (channelId: string) => `discuss:channel:${channelId}`;
@@ -432,10 +437,12 @@ export async function saveDraft(input: {
 export async function fetchDraft(
   accountId: string,
   channelId: string,
-): Promise<DiscussDraftRow | null> {
+): Promise<DiscussDraftPublic | null> {
   void accountId; // identity comes from the session server-side
-  const { data } = await discussState<DiscussDraftRow | null>("draft", { channelId });
-  return (data as DiscussDraftRow) ?? null;
+  /* DiscussDraftPublic, not the DB row: the response carries no `metadata`,
+     so no storage path can reach this client. */
+  const { data } = await discussState<DiscussDraftPublic | null>("draft", { channelId });
+  return (data as DiscussDraftPublic) ?? null;
 }
 
 export async function clearDraft(
@@ -450,28 +457,48 @@ export async function clearDraft(
    Attachments
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Upload a file to the shared `media` bucket under the
- *  `discuss-attachments/` prefix. Returns the structured record ready
- *  to embed in `discuss_messages.metadata.attachments`. Same shape and
- *  file-path pattern as the inbox uploader so storage can be shared. */
+/** Upload a Discuss image/document to the PRIVATE `discuss-media` bucket.
+ *
+ *  Unit 2: this used to write to the shared PUBLIC `media` bucket and persist
+ *  `publicUrl` into message metadata — a world-readable, permanent URL that
+ *  survived losing channel access. Now only the object PATH is persisted; the
+ *  browser reads via /api/files/discuss/<messageId>/<index>, which re-checks
+ *  authorization on every request. Nothing here returns a fetchable URL.
+ *
+ *  The object name is randomized rather than derived from the user's filename:
+ *  a private bucket makes the path unguessable-by-default, and the display
+ *  name is carried in metadata where it belongs. Returns a typed rejection so
+ *  the composer can show WHY (localized) instead of a bare failure. */
 export async function uploadDiscussAttachment(
   file: File,
-): Promise<DiscussAttachment | null> {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filePath = `discuss-attachments/${Date.now()}_${safeName}`;
-  const result = await uploadToStorage(BUCKET, filePath, file, {
+): Promise<
+  | { ok: true; attachment: DiscussAttachment }
+  | { ok: false; reason: "type" | "size" | "failed" }
+> {
+  /* Client-side preflight: UX only — /api/storage/upload enforces the same
+     policy authoritatively, and the bucket refuses violations a third time. */
+  const verdict = checkDiscussUpload("discuss-media", file);
+  if (!verdict.ok) return { ok: false, reason: verdict.reason };
+
+  const ext = (file.name.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1] ?? "bin").toLowerCase();
+  const filePath = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const result = await uploadToStorage("discuss-media", filePath, file, {
     cacheControl: "3600",
+    contentType: file.type || "application/octet-stream",
   });
   if (!result.ok) {
-    console.error("[Discuss] Attachment upload:", result.error);
-    return null;
+    // Never log the filename or path — this is conversation-linkable.
+    console.error("[Discuss] Attachment upload failed");
+    return { ok: false, reason: "failed" };
   }
   return {
-    name: file.name,
-    url: result.data.publicUrl,
-    file_path: result.data.path,
-    size: file.size,
-    type: file.type || "application/octet-stream",
+    ok: true,
+    attachment: {
+      name: file.name,
+      file_path: result.data.path,
+      size: file.size,
+      type: file.type || "application/octet-stream",
+    },
   };
 }
 
@@ -883,11 +910,11 @@ export async function searchDiscussMessages(input: {
  *  UI can render a pill per draft without a second fetch. */
 export async function fetchAllDrafts(
   accountId: string,
-): Promise<Array<DiscussDraftRow & { channel: DiscussChannelRow | null }>> {
+): Promise<DiscussDraftPublic[]> {
   void accountId; // identity comes from the session server-side
-  const { data } = await discussState<
-    Array<DiscussDraftRow & { channel: DiscussChannelRow | null }>
-  >("allDrafts");
+  /* DiscussDraftPublic, not the DB row: `allDrafts` serializes server-side, so
+     no `metadata` — and therefore no storage path — reaches this client. */
+  const { data } = await discussState<DiscussDraftPublic[]>("allDrafts");
   return data ?? [];
 }
 
@@ -979,11 +1006,21 @@ export async function uploadDiscussVoice(input: {
   durationMs: number;
   waveform: number[];
 }): Promise<DiscussVoiceMeta | null> {
-  // Voice notes go to the PRIVATE 'discuss-voice' bucket. Playback in
-  // the UI requests a short-lived signed URL via /api/storage/signed-url,
-  // so leaked message payloads don't expose the audio indefinitely.
+  /* Voice notes go to the PRIVATE 'discuss-voice' bucket.
+     Unit 2: playback no longer requests a signed URL. A signed URL is better
+     than a public one but still bakes authorization into a bearer string that
+     stays valid until it expires — a user removed from the channel keeps
+     access for the lifetime of the token, and the URL is copyable. Playback
+     now goes through /api/files/discuss/<messageId>/<index>, which re-checks
+     membership on every request (and every Range request). Nothing fetchable
+     is persisted: no url, no bucket-qualified link, no token. */
   const mime =
     input.blob.type && input.blob.type.length > 0 ? input.blob.type : "audio/webm";
+  const verdict = checkDiscussUpload("discuss-voice", { size: input.blob.size, type: mime });
+  if (!verdict.ok) {
+    console.error("[Discuss] Voice rejected by policy:", verdict.reason);
+    return null;
+  }
   const ext = pickVoiceExtension(mime);
   const filePath = `${Date.now()}_${Math.random()
     .toString(36)
@@ -1000,11 +1037,12 @@ export async function uploadDiscussVoice(input: {
     return null;
   }
   return {
-    // Leave url empty — the playback component fetches a signed URL
-    // on demand using path + bucket.
-    url: "",
+    /* No `url` at all — not even empty-string. The resolver locates the object
+       from bucket+path; the player addresses it by (messageId, index). */
     bucket: "discuss-voice",
     path: result.data.path,
+    type: mime,
+    size: input.blob.size,
     duration_ms: input.durationMs,
     waveform: input.waveform,
   };
