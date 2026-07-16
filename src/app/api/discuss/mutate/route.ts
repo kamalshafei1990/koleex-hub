@@ -241,8 +241,22 @@ export async function POST(req: Request) {
         const channelId = str(p.channelId);
         const text = typeof p.body === "string" ? p.body : "";
         if (!channelId) return bad("channelId required");
+        /* Membership is checked BEFORE any read or write — including before an
+           idempotent replay can return an existing row. A non-member (or a
+           cross-tenant caller) can never reach the conflict path below. */
         if (!(await isMember(channelId))) return bad("Not a member of this channel", 403);
         timing.mark("membership");
+
+        /* ------------------------------------------------------------------
+           Idempotency (Discuss stabilization, Phase 3).
+           The client generates one UUID per logical send and REUSES it for
+           every retry of that same pending message. A partial unique index —
+           discuss_messages (channel_id, client_msg_id) WHERE client_msg_id
+           IS NOT NULL — makes a duplicate insert impossible at the database,
+           so "send timed out but actually committed" + retry is safe.
+           NULL is allowed and unconstrained, so legacy rows and any client
+           that omits the key keep working exactly as before. */
+        const clientMsgId = str(p.clientMsgId);
         const { data, error } = await supabaseServer
           .from(MESSAGES)
           .insert({
@@ -252,10 +266,36 @@ export async function POST(req: Request) {
             kind: str(p.kind) ?? "text",
             reply_to_message_id: str(p.replyToMessageId),
             metadata: (p.metadata as Json) ?? {},
+            client_msg_id: clientMsgId,
           })
           .select("*")
           .single();
-        if (error) return bad(error.message, 500);
+
+        /* 23505 = unique_violation → this exact send already committed (the
+           first attempt won; this is a retry). That is SUCCESS, not an error:
+           return the canonical row so the sender reconciles onto the one true
+           message. Critically we do NOT re-run notifyMembers() — the winning
+           insert already pinged realtime and sent push, so a replay must not
+           chime, badge, or push a second time. */
+        if (error) {
+          if (error.code === "23505" && clientMsgId) {
+            const { data: existing } = await supabaseServer
+              .from(MESSAGES)
+              .select("*")
+              .eq("channel_id", channelId)
+              .eq("client_msg_id", clientMsgId)
+              .single();
+            if (existing) {
+              timing.mark("idempotent_replay");
+              const { header } = timing.done({ action: "sendMessage" });
+              return NextResponse.json(
+                { ok: true, data: existing, idempotent: true },
+                { headers: { "Server-Timing": header } },
+              );
+            }
+          }
+          return bad(error.message, 500);
+        }
         timing.mark("db_insert");
         /* ------------------------------------------------------------------
            Phase 3B — acknowledge as soon as the message is DURABLE.
