@@ -51,6 +51,57 @@ function isMissingTable(message: string): boolean {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   Contact picker search (Phase 4 Wave 2B.2)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Slim contact shape returned by the bounded picker endpoint. Mirrors the
+ *  server `CrmContactPick` — only the fields the combobox renders. */
+export interface CrmContactPick {
+  id: string;
+  display_name: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  company: string;
+  email: string;
+  entity_type: string;
+  contact_type: string;
+  photo_url: string | null;
+}
+
+/** Bounded, cancellable contact search for the CRM deal modal. Replaces the
+ *  old "download the whole directory, filter client-side" pattern. Returns
+ *  at most `limit` slim rows; queries shorter than 2 chars resolve to [] on
+ *  the server so we never stream the book. Pass an AbortSignal so a newer
+ *  keystroke cancels an in-flight request. */
+export async function searchCrmContacts(
+  q: string,
+  opts?: { kind?: "company" | "person"; limit?: number; signal?: AbortSignal },
+): Promise<CrmContactPick[]> {
+  const needle = q.trim();
+  if (needle.length < 2) return [];
+  const params = new URLSearchParams({ q: needle });
+  if (opts?.kind) params.set("kind", opts.kind);
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  try {
+    const res = await fetch(`/api/crm/contacts/search?${params.toString()}`, {
+      credentials: "include",
+      signal: opts?.signal,
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { rows?: CrmContactPick[] };
+    return json.rows ?? [];
+  } catch (e) {
+    // AbortError is expected when a newer keystroke supersedes this one —
+    // swallow it silently; anything else is a transient network blip.
+    if ((e as { name?: string } | null)?.name !== "AbortError") {
+      console.error("[CRM] searchCrmContacts failed:", e);
+    }
+    return [];
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    Stages
    ════════════════════════════════════════════════════════════════════════ */
 
@@ -192,6 +243,10 @@ interface FetchOpportunitiesOptions {
   /** Maximum rows. Defaults to 500 (the kanban handles fewer than that
    *  comfortably; the list view paginates client-side). */
   limit?: number;
+  /** "board" requests the slim projection (no free-text `description`) for
+   *  the resting kanban; the modal hydrates the full row on open. Omit for
+   *  the full projection (default, backward-compatible). */
+  view?: "board" | "full";
 }
 
 /** Fetch all opportunities with the joined data the kanban needs.
@@ -217,6 +272,7 @@ export async function fetchOpportunities(
     search = null,
     limit = 500,
     ctx = null,
+    view = null,
   } = options;
 
   // API-first: the /api/crm/opportunities route returns the same enriched
@@ -230,6 +286,7 @@ export async function fetchOpportunities(
     if (contactId) params.set("contact", contactId);
     if (search) params.set("search", search);
     if (limit !== 500) params.set("limit", String(limit));
+    if (view === "board") params.set("view", "board");
     const qs = params.toString();
     const res = await fetch(
       "/api/crm/opportunities" + (qs ? "?" + qs : ""),
@@ -415,6 +472,25 @@ export async function fetchOpportunities(
 export async function fetchOpportunity(
   id: string,
 ): Promise<CrmOpportunityWithRelations | null> {
+  /* Single-row full fetch (incl. the free-text `description` that the board
+     projection omits). Used to hydrate the edit modal on open. Falls back to
+     scanning the full list only if the dedicated route is unreachable. */
+  try {
+    const res = await fetch(`/api/crm/opportunities/${id}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        opportunity?: CrmOpportunityWithRelations;
+      };
+      if (json.opportunity) return json.opportunity;
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      return null;
+    }
+  } catch {
+    /* fall through to the legacy list scan */
+  }
   const list = await fetchOpportunities({ includeArchived: true });
   return list.find((o) => o.id === id) ?? null;
 }
