@@ -4,6 +4,7 @@ import { stageTimer } from "@/lib/server/perf";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { getServerAuth } from "@/lib/server/auth";
+import { isInCustomersServerListCohort } from "@/lib/server/customers-rollout";
 
 /* GET /api/me/bootstrap
    Consolidates the three hot per-page /api/me/* lookups (context,
@@ -131,6 +132,13 @@ export async function GET() {
     permittedModules: Array.from(allowed),
     isSuperAdmin: auth.is_super_admin,
     viewingAs,
+    /* Wave 2A.1 controlled rollout: trusted, server-resolved cohort flag for
+       the Customers server-list UI. Keyed on the REAL logged-in account (not a
+       view-as target). Empty env / customer accounts → false (legacy). */
+    customersServerList: isInCustomersServerListCohort(
+      auth.real_account_id ?? auth.account_id,
+      auth.user_type,
+    ),
   };
 
   /* Cache aggressively when NOT viewing-as — payload barely changes
