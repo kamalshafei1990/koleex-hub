@@ -21,6 +21,10 @@ const ALLOWED_EVENTS = new Set([
   "customers_server_list_open",
   "customers_legacy_list_open",
   "customers_server_list_error",
+  // Wave 2A.2 Suppliers rollout — same privacy-safe mode telemetry.
+  "suppliers_server_list_open",
+  "suppliers_legacy_list_open",
+  "suppliers_server_list_error",
 ]);
 
 export async function POST(req: Request) {
