@@ -132,3 +132,8 @@ Filter Vercel function logs for `[kx-server-timing]` `op` in {`contacts.list` (t
 ---
 
 **Wave 2A.2 update (2026-07-16):** Suppliers directory migrated onto the shared server-list architecture (server search/filter/sort/pagination + permission-safe global summary, replacing the full-supplier-dataset client fetch + 20s poll) on branch `wave2a2-suppliers-preview` — Preview-gated, NOT in production. Real before/after percentiles/bytes/req-counts require a measured Preview/cohort window (Vercel-log/Speed-Insights). See `PHASE_4_WAVE_2A2_RESULTS.md` + `SUPPLIERS_SERVER_LIST_PILOT.md`.
+
+
+---
+
+**Phase 4 — Home & App Launch Performance (2026-07-16):** shared `AppLaunchLink` primitive (Link-based: modifier keys, viewport prefetch, CSS pressed feedback, keyboard, dup-guard, intent preload, unified privacy-safe launch telemetry) adopted on Home cards + sidebar + launcher; evidence-based prefetch tiers (`src/lib/app-prefetch.ts`, Save-Data/slow/hidden/authorization-gated); 15 new app-shaped `loading.tsx` boundaries (+5 shared skeletons) → blank-flash eliminated; bootstrap primed at shell top (shell confirmed already persistent, single TanStack cache, no remount). `app_launch.*` metrics via the perf client (percentiles pending a Vercel-log window). Tests: `validate:app-launch` 51/51; tsc + build green. Docs: HOME_APP_LAUNCH_RESULTS.md, APP_NAVIGATION_ARCHITECTURE.md, APP_PREFETCH_STRATEGY.md, APP_USAGE_AND_PRELOAD_RANKING.md, PERSISTENT_SHELL_AUDIT.md, APP_LOADING_BOUNDARIES.md, APP_LAUNCH_BASELINE.md, HOME_PAGE_PERFORMANCE_AUDIT.md.
