@@ -29,7 +29,8 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { record, event } from "@/lib/perf/client";
 import Link from "next/link";
 import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
@@ -176,6 +177,42 @@ function isAtOrAfterToday(iso: string, g: Granularity): boolean {
 
 /* ── Chromeless body — used by FinanceHome (/finance) ────────────────── */
 
+/* First-load section skeletons (Phase 4 Wave 2B.1). Shown ONLY on the very
+   first load while the aggregate is in flight — previously the dashboard was
+   blank below the control bar until the ~2s snapshot landed. On later refetches
+   the previous snapshot stays visible (faded), so this never replaces real
+   data. Pure CSS pulse, reduced-motion-safe, matches the hero + table layout. */
+function HeroSkeleton() {
+  return (
+    <ErpPanel className="px-5 py-6 sm:px-8 sm:py-8" aria-busy>
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 animate-pulse motion-reduce:animate-none">
+        {[0, 1].map((i) => (
+          <div key={i} className="space-y-3">
+            <div className="h-3 w-28 rounded bg-[var(--bg-surface-active)]" />
+            <div className="h-9 w-40 rounded bg-[var(--bg-surface-active)]" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 h-24 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] animate-pulse motion-reduce:animate-none" />
+    </ErpPanel>
+  );
+}
+function BodySkeleton() {
+  return (
+    <ErpPanel className="px-5 py-6 sm:px-8 animate-pulse motion-reduce:animate-none" aria-busy>
+      <div className="h-5 w-44 rounded bg-[var(--bg-surface-active)] mb-4" />
+      <div className="space-y-2.5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4">
+            <div className="h-4 rounded bg-[var(--bg-surface-active)]" style={{ width: `${40 + (i % 3) * 12}%` }} />
+            <div className="h-4 w-20 rounded bg-[var(--bg-surface-active)]" />
+          </div>
+        ))}
+      </div>
+    </ErpPanel>
+  );
+}
+
 export function StatementsDashboard() {
   const { t, lang } = useTranslation(financeT);
   const [tab, setTab] = useState<Tab>("income");
@@ -186,8 +223,15 @@ export function StatementsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
+  /* Privacy-safe dashboard timing: mount → first content, and per-refresh
+     settle time. Only durations (ms) + the metric name are ever recorded —
+     never balances, revenue, currency, filters, or record ids. */
+  const mountT0 = useRef(typeof performance !== "undefined" ? performance.now() : 0);
+  const firstReadyRef = useRef(false);
+
   const fetchSnap = useCallback(async () => {
     setLoading(true); setError(null);
+    const callT0 = typeof performance !== "undefined" ? performance.now() : 0;
     try {
       const qs = new URLSearchParams({ granularity, period_end: periodEnd });
       if (compareEnd) qs.set("compare_end", compareEnd);
@@ -195,8 +239,18 @@ export function StatementsDashboard() {
       const j = await r.json();
       if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       setSnap(j.snapshot);
+      if (!firstReadyRef.current) {
+        firstReadyRef.current = true;
+        const ms = (typeof performance !== "undefined" ? performance.now() : 0) - mountT0.current;
+        record("finance.dashboard.first_card_ms", ms);
+        record("finance.dashboard.full_ready_ms", ms);
+        record("finance.dashboard.request_count", 1);
+      } else {
+        record("finance.filter.settled_ms", (typeof performance !== "undefined" ? performance.now() : 0) - callT0);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      event("finance.dashboard.error");
     } finally { setLoading(false); }
   }, [granularity, periodEnd, compareEnd]);
 
@@ -264,6 +318,7 @@ export function StatementsDashboard() {
           <TrendChart trend={snap.trend} />
         </ErpPanel>
       )}
+      {!snap && !error && <HeroSkeleton />}
 
       {/* ── Control bar — all toggles + period nav in ONE panel ─────
            Two visually-grouped rows inside a single ErpPanel-style
@@ -363,6 +418,7 @@ export function StatementsDashboard() {
             {t("visual.loading", "Loading statements…")}
           </div>
         )}
+        {!snap && !error && <BodySkeleton />}
         {snap && (
         <ErpPanel className={`px-5 py-6 sm:px-8 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
           {tab === "income"   && (

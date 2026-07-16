@@ -19,7 +19,6 @@ import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { StatementsDashboard } from "@/components/finance/VisualStatements";
 import RrIcon from "@/components/ui/RrIcon";
-import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
