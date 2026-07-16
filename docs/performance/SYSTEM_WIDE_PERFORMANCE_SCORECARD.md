@@ -89,3 +89,41 @@ fan-out; (3) Quotations editor ~6 fetches with reference-list duplication;
 
 
 > **Wave 2A.1 (2026-07-16):** shared server-list foundation + secure `/api/contacts?paged=1` endpoint + 28-assertion validation SHIPPED (opt-in; Customers UI activation gated on preview verification). The #1 liability (8/10 apps full-download+client-filter) now has its reusable fix. See `SERVER_LIST_ARCHITECTURE.md` + `PHASE_4_WAVE_2A1_RESULTS.md`.
+
+
+---
+
+## Monitored rollout — observation window #1 (2026-07-16)
+
+**Scope:** Customers server-list production rollout only (`?serverlist=1`); default `/customers` stays legacy.
+
+### Honest telemetry-access limits (read first)
+- **Performance metrics (P50/P75/P95/P99 for `contacts.list`, response bytes, rows, search/pagination/summary latency, 4xx/5xx, aborted, duplicate, background req/min, fallback rate) live in Vercel runtime logs (`[kx-server-timing]`, `[kx-metric]`) and Speed Insights.** This environment has **no Vercel API access** (only GitHub + Supabase), so those cannot be pulled here. **None are estimated or fabricated.**
+- **The rollout is minutes old and opt-in** — so there is **no accrued real-usage window** for server-list yet.
+
+### Real production signal available in-DB (activity_events)
+| Metric | Value | Source |
+|---|---|---|
+| `/customers` route events, last 7 days (all tenants) | **35** (~5/day) | `activity_events` (real users) |
+| `?serverlist=1` real sessions | **~0** | rollout minutes old; `activity_events` records pathname, not the query flag |
+- **Implication:** `/customers` is a **low-traffic route** (~5 visits/day). Meaningful server-list P95/P99 will need **weeks** of opt-in traffic (or a deliberate internal-usage push) — a few days will not produce a statistically sound tail.
+
+### Performance metrics — NOT collectable here (require Vercel logs, real window)
+Request volume · P50/P75/P95/P99 `contacts.list` · bytes · rows · search/pagination/summary latency · create/edit error rate · 4xx/5xx · aborted · duplicate · background req/min · fallback rate → **all pending a Vercel-log window.** The instrument is deployed (`op=contacts.list` + summary/paged variants, with `Server-Timing` headers) so they are computable once traffic accrues.
+
+### Security & correctness invariants — VERIFIED (code/DB/tests, no Vercel logs needed)
+| Invariant | Result | Evidence |
+|---|---|---|
+| Tenant isolation intact | ✅ | paged + summary both `.eq("tenant_id", auth.tenant_id)` (`route.ts`) + `validate:auth-equivalence` cross-tenant 13/13 |
+| Role visibility unchanged | ✅ | same `requireModuleAccess` gate + `sanitizeContactRows` as legacy |
+| No sensitive fields exposed | ✅ | slim projection (no credit/kyc/hr/ssn) + sanitize; summary = counts + `customer_type`/`country` only |
+| Global summary NOT from page rows | ✅ | separate `?summary=1` aggregate endpoint |
+| No legacy full-list request alongside paged | ✅ | `CustomersServerList` calls only `useServerList` + summary; **no `fetchContactsByType`** |
+| No 20s full-list poll in server-list mode | ✅ | no `setInterval`/silent-refresh in `CustomersServerList`; the legacy `Contacts.tsx` poll isn't rendered in server-list mode |
+| Account switch / logout no cached rows | ✅ | query key scoped by `(resource, tenantId, accountId, params)`; logout reload drops cache |
+
+### Data facts (SQL, unchanged from pilot)
+First-paint rows 120→50; slim bytes 88,765(all)→36,836(page); summary via permission-safe 2-col aggregate.
+
+### What an operator with Vercel access should collect (real window)
+Filter Vercel function logs for `[kx-server-timing]` `op` in {`contacts.list` (tag `paged:1` vs legacy), summary} and `[kx-metric]` from `?serverlist=1` sessions; compute per-op P50/P75/P95/P99 (report sample size), bytes, rows, 4xx/5xx, aborted/duplicate, and background req/min; watch for any `fetchContactsByType` calls co-occurring with paged (should be zero). Separate real-user vs synthetic, cold vs warm, Mainland-China vs other.
