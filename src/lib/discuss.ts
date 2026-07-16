@@ -329,6 +329,12 @@ export async function sendDiscussMessage(input: {
   kind?: DiscussMessageKind;
   replyToMessageId?: string | null;
   metadata?: DiscussMessageMetadata;
+  /** Idempotency key for ONE logical send. Reuse the identical value for every
+      retry of the same pending message; use a fresh UUID for a new message.
+      The server upserts on (channel_id, client_msg_id), so a retry after a
+      committed-but-timed-out send returns the original row instead of
+      duplicating it. Omitted → legacy (non-idempotent) behavior. */
+  clientMsgId?: string;
 }): Promise<DiscussMessageRow | null> {
   const res = await discussMutate<DiscussMessageRow>("sendMessage", {
     channelId: input.channelId,
@@ -336,6 +342,7 @@ export async function sendDiscussMessage(input: {
     kind: input.kind ?? "text",
     replyToMessageId: input.replyToMessageId ?? null,
     metadata: input.metadata ?? {},
+    clientMsgId: input.clientMsgId ?? null,
   });
   return res.ok ? (res.data ?? null) : null;
 }

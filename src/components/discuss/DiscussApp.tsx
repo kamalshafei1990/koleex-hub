@@ -353,6 +353,10 @@ export default function DiscussApp() {
   );
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
+  /* Synchronous mirror of `sending`. React state updates are async, so two
+     Enter presses in one tick would both see `sending === false`; a ref flips
+     immediately and is the real double-send guard. (Discuss stabilization P1.) */
+  const sendingRef = useRef(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -1157,10 +1161,16 @@ export default function DiscussApp() {
 
   const handleSend = useCallback(async () => {
     if (!accountId || !selectedChannelId) return;
+    /* Re-entrancy guard: the button is disabled while sending, but the Enter
+       key path bypasses the button entirely. Without this, two Enters inside
+       one render tick both read the stale composer closure and insert two
+       rows. (Discuss stabilization P1.) */
+    if (sendingRef.current) return;
     const trimmed = composerBody.trim();
     if (!trimmed && composerAttachments.length === 0 && composerProducts.length === 0) {
       return;
     }
+    sendingRef.current = true;
     setSending(true);
     const kxT0 = performance.now(); /* kx-perf: send lifecycle starts at the press */
 
@@ -1181,7 +1191,13 @@ export default function DiscussApp() {
     /* Optimistic append — the realtime subscription will dedupe this
        once the server round-trip finishes. Keeps the thread feeling
        instant even on slow connections. */
-    const tempId = `temp_${Date.now()}`;
+    /* One UUID per logical send. It is BOTH the optimistic bubble's local id
+       and the server-side idempotency key, so a retry of this same pending
+       message can never create a second row (unique index on
+       discuss_messages(channel_id, client_msg_id)). `temp_${Date.now()}`
+       previously collided for two sends inside the same millisecond. */
+    const clientMsgId = crypto.randomUUID();
+    const tempId = `temp_${clientMsgId}`;
     const replyToId = replyTarget?.id ?? null;
     const replyPreview = replyTarget
       ? {
@@ -1205,6 +1221,10 @@ export default function DiscussApp() {
       edited_at: null,
       deleted_at: null,
       created_at: new Date().toISOString(),
+      /* The optimistic bubble carries the same key it will be persisted with,
+         so it can be matched to the canonical row by client_msg_id rather than
+         by temp id alone. */
+      client_msg_id: clientMsgId,
       author: {
         id: accountId,
         username: accountUsername,
@@ -1231,6 +1251,7 @@ export default function DiscussApp() {
       kind,
       metadata,
       replyToMessageId: replyToId,
+      clientMsgId,
     });
 
     if (saved) {
@@ -1259,6 +1280,7 @@ export default function DiscussApp() {
       setComposerBody(trimmed);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
+    sendingRef.current = false;
     setSending(false);
     composerRef.current?.focus();
   }, [
@@ -1277,6 +1299,12 @@ export default function DiscussApp() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      /* IME guard (Discuss stabilization P1): while a Chinese/Japanese/Korean
+         input method is composing, Enter CONFIRMS the candidate — it does not
+         mean "send". Sending here would fire a half-composed buffer and make
+         the composer unusable for CJK. `isComposing` is the standard signal;
+         keyCode 229 is the legacy fallback some IMEs still report. */
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         void handleSend();
