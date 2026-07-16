@@ -24,6 +24,7 @@
     "validate:suppliers-security": "NODE_OPTIONS=--conditions=react-server node --import tsx scripts/validate-suppliers-security.mts",
     "validate:app-launch": "node --import tsx scripts/validate-app-launch.mts",
     "validate:finance-perf": "node --import tsx scripts/validate-finance-perf.mts",
+    "validate:crm-perf": "node --import tsx scripts/validate-crm-perf.mts",
     "validate:session-validate-shadow": "tsx scripts/validate-session-validate-shadow.ts",
     "validate:product-access": "tsx scripts/validate-product-access.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
