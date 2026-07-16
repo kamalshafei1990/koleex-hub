@@ -27,7 +27,7 @@ type Row = Record<string, unknown> & {
   city?: string; customer_type?: string; is_active?: boolean; email?: string;
   phone?: string; mobile?: string; account_manager?: string;
 };
-type Summary = { summary: { total: number; active: number; inactive: number } };
+type Summary = { summary: { total: number; active: number; inactive: number; byTier?: Record<string, number>; byCountry?: Record<string, number> } };
 type EditState = { open: boolean; row: Row | null };
 
 const PAGE_SIZE = 50;
@@ -38,7 +38,8 @@ const rowName = (r: Row) =>
 export default function CustomersServerList() {
   const router = useRouter();
   const scope = useScopeContext();
-  const { t } = useTranslation(customersListT);
+  const { t, lang } = useTranslation(customersListT);
+  const rtl = lang === "ar";
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "card">("list");
   const [edit, setEdit] = useState<EditState>({ open: false, row: null });
@@ -85,8 +86,11 @@ export default function CustomersServerList() {
     </span>
   );
 
+  const tierEntries = Object.entries(stats?.byTier ?? {}).sort((a, b) => b[1] - a[1]);
+  const countryEntries = Object.entries(stats?.byCountry ?? {}).sort((a, b) => b[1] - a[1]);
+
   return (
-    <div style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
+    <div dir={rtl ? "rtl" : "ltr"} style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t("cl.title")}</h1>
         <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "var(--bg-surface-active)", color: "var(--text-secondary)" }}>{t("cl.preview")}</span>
@@ -101,6 +105,22 @@ export default function CustomersServerList() {
           </div>
         ))}
       </div>
+
+      {/* Tier + country breakdowns (global aggregate, not the page) */}
+      {(tierEntries.length > 0 || countryEntries.length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginBottom: 16 }}>
+          {[{ h: t("cl.byTier"), rows: tierEntries }, { h: t("cl.byCountry"), rows: countryEntries }].map((b) => (
+            <div key={b.h} style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "10px 12px", background: "var(--bg-surface)" }}>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>{b.h} · {t("cl.allSuffix")}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {b.rows.length === 0 ? <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{t("cl.noBreakdown")}</span> : b.rows.map(([k, n]) => (
+                  <span key={k} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 6, background: "var(--bg-surface-active)" }}>{k} <b>{n}</b></span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Controls */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>

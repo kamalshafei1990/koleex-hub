@@ -45,4 +45,7 @@ export const customersListT: Translations = {
   "cl.fCountry": { en: "Country", zh: "国家", ar: "الدولة" },
   "cl.fStatus": { en: "Status", zh: "状态", ar: "الحالة" },
   "cl.nameOrCompanyReq": { en: "Enter a name or company.", zh: "请输入名称或公司。", ar: "أدخل اسمًا أو شركة." },
+  "cl.byTier": { en: "By tier", zh: "按等级", ar: "حسب المستوى" },
+  "cl.byCountry": { en: "By country", zh: "按国家", ar: "حسب الدولة" },
+  "cl.noBreakdown": { en: "—", zh: "—", ar: "—" },
 };

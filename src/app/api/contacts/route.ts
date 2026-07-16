@@ -113,18 +113,37 @@ export async function GET(req: Request) {
       if (typeFilter) c = c.eq("contact_type", typeFilter);
       return c;
     };
-    const [totalRes, activeRes] = await Promise.all([baseCount(), baseCount().eq("is_active", true)]);
+    /* Two head-only counts + a narrow TWO-COLUMN scan (customer_type, country —
+       both already shown in the list, neither sensitive) to build tier/country
+       breakdowns. This is the aggregate SOURCE only (small, cached), never the
+       list rows. */
+    const breakdownQ = (() => {
+      let c = supabaseServer.from("contacts").select("customer_type, country").eq("tenant_id", auth.tenant_id);
+      if (typeFilter) c = c.eq("contact_type", typeFilter);
+      return c;
+    })();
+    const [totalRes, activeRes, breakdownRes] = await Promise.all([
+      baseCount(), baseCount().eq("is_active", true), breakdownQ,
+    ]);
     _t.mark("db");
-    if (totalRes.error || activeRes.error) {
-      console.error("[api/contacts summary]", totalRes.error?.message ?? activeRes.error?.message);
+    if (totalRes.error || activeRes.error || breakdownRes.error) {
+      console.error("[api/contacts summary]", totalRes.error?.message ?? activeRes.error?.message ?? breakdownRes.error?.message);
       _t.done({ status: 500, summary: 1 });
       return NextResponse.json({ error: "Failed to load summary" }, { status: 500 });
     }
     const total = totalRes.count ?? 0;
     const active = activeRes.count ?? 0;
+    const byTier: Record<string, number> = {};
+    const byCountry: Record<string, number> = {};
+    for (const r of (breakdownRes.data ?? []) as Array<{ customer_type?: string | null; country?: string | null }>) {
+      if (r.customer_type) byTier[r.customer_type] = (byTier[r.customer_type] ?? 0) + 1;
+      if (r.country) byCountry[r.country] = (byCountry[r.country] ?? 0) + 1;
+    }
+    // Top 8 countries by count (keeps the payload small).
+    const topCountry = Object.fromEntries(Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 8));
     const { header } = _t.done({ status: 200, type: typeFilter ?? "all", summary: 1 });
     return NextResponse.json(
-      { summary: { total, active, inactive: total - active } },
+      { summary: { total, active, inactive: total - active, byTier, byCountry: topCountry } },
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header } },
     );
   }
