@@ -96,6 +96,12 @@ function isBypassed(pathname: string | null): boolean {
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const pathname = usePathname();
+  /* Prime the shared per-user bootstrap once at the top of the authenticated
+     shell, so the single GET /api/me/bootstrap starts deterministically here
+     instead of depending on which child (header / sidebar / page) mounts first.
+     Every consumer shares the same in-flight promise + 60s cache, so this adds
+     no extra request — it just fixes the trigger point (was a dead import). */
+  useMeBootstrap();
   /* The home launcher already lists every app grouped by category, so the
      persistent sidebar rail there is pure duplication. Hide it on "/" and
      reclaim the horizontal space (full-width launcher). Every inner route
