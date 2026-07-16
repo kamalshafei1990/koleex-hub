@@ -21,10 +21,12 @@ import {
   getAppCategory,
   getActiveAppId,
   getAppBadge,
+  getApp,
   type AppDef,
 } from "@/lib/navigation";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
-import { trackAppOpen } from "@/lib/app-launcher";
+import AppLaunchLink from "@/components/layout/AppLaunchLink";
+import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
@@ -306,7 +308,6 @@ const AppCard = memo(function AppCard({
   appUnread,
   appUnreadNoun,
   dk,
-  onAppClick,
   onPrefetch,
 }: {
   app: AppDef;
@@ -315,7 +316,6 @@ const AppCard = memo(function AppCard({
   appUnread: number;
   appUnreadNoun: string;
   dk: boolean;
-  onAppClick: (app: AppDef) => void;
   onPrefetch: (app: AppDef) => void;
 }) {
   const Icon = app.icon;
@@ -324,14 +324,10 @@ const AppCard = memo(function AppCard({
   const badge = getAppBadge(app);
 
   return (
-    <div
-      role="button"
-      tabIndex={app.active ? 0 : -1}
-      onClick={() => onAppClick(app)}
-      onKeyDown={(e) => { if (e.key === "Enter") onAppClick(app); }}
-      onPointerEnter={() => onPrefetch(app)}
-      onTouchStart={() => onPrefetch(app)}
-      onFocus={() => onPrefetch(app)}
+    <AppLaunchLink
+      app={app}
+      onPreload={onPrefetch}
+      aria-label={label}
       className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none outline-none focus-visible:ring-2 ${
         dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
       } ${
@@ -410,7 +406,7 @@ const AppCard = memo(function AppCard({
       }`}>
         {label}
       </span>
-    </div>
+    </AppLaunchLink>
   );
 });
 
@@ -781,22 +777,9 @@ export default function HomePage() {
     };
   }, [account?.id]);
 
-  /* ── Handlers ── */
-  const handleAppClick = useCallback(
-    (app: AppDef) => {
-      if (!app.active) return;
-      const id = accountIdRef.current;
-      // trackAppOpen writes to the server async; the next time the user
-      // lands on / the dashboard will re-fetch the updated recent list.
-      // We intentionally do NOT call setRecentIds here — doing so causes
-      // the "Recent" row to appear/grow on the current page, shifting
-      // the click target down right before router.push navigates away,
-      // which looks like the page auto-scrolls.
-      if (id) trackAppOpen(id, app.id);
-      router.push(app.route);
-    },
-    [router],
-  );
+  /* App launch (navigation + telemetry + pressed feedback + modifier keys) is
+     handled by the shared <AppLaunchLink> primitive that AppCard renders. This
+     page only supplies the intent-preload warm callback below. */
 
   /* Warm a route's JS chunk + RSC payload BEFORE the user clicks, so opening
      an app is near-instant instead of cold-loading on tap. Guarded so each
@@ -902,6 +885,38 @@ export default function HomePage() {
   const activeCount = filteredApps.filter((a) => a.active).length;
   const totalCount = filteredApps.length;
 
+  /* Tier-A idle preload (evidence-based). Once the permitted set is known and
+     the network/device permits, warm the few most-launched apps the user is
+     AUTHORIZED for (route code + cacheable list GET) during idle time. Never
+     preloads unauthorized, Tier-C/heavy apps, or on Save-Data / slow / hidden /
+     offline. See docs/performance/APP_PREFETCH_STRATEGY.md. */
+  useEffect(() => {
+    if (permLoading && permittedModules.size === 0) return;
+    if (typeof window === "undefined") return;
+    const authorized = new Set(visibleRegistry.map((a) => a.id));
+    const apps = idlePreloadApps(authorized);
+    if (apps.length === 0) return;
+    const run = () => {
+      if (!isPreloadAllowed(readNetworkContext())) return;
+      for (const id of apps) {
+        const a = getApp(id);
+        if (!a?.active) continue;
+        try { router.prefetch(a.route); } catch { /* ignore */ }
+        const url = APP_DATA_PREFETCH[id];
+        if (url) { try { void fetch(url, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ } }
+      }
+    };
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (h: number) => void;
+    };
+    const handle = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 2500 }) : window.setTimeout(run, 1200);
+    return () => {
+      if (w.requestIdleCallback && w.cancelIdleCallback) w.cancelIdleCallback(handle);
+      else window.clearTimeout(handle as number);
+    };
+  }, [permLoading, permittedModules, visibleRegistry, router]);
+
 
 
 
@@ -1004,7 +1019,6 @@ export default function HomePage() {
                 appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
                 appUnreadNoun={app.id === "todo" ? "task" : "message"}
                 dk={dk}
-                onAppClick={handleAppClick}
                 onPrefetch={prefetchApp}
               />
             ))}
@@ -1030,7 +1044,6 @@ export default function HomePage() {
                       appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
                       appUnreadNoun={app.id === "todo" ? "task" : "message"}
                       dk={dk}
-                      onAppClick={handleAppClick}
                       onPrefetch={prefetchApp}
                     />
                   ))}
