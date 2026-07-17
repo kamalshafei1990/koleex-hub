@@ -36,6 +36,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import BellOffIcon from "@/components/icons/ui/BellOffIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
@@ -2111,9 +2112,7 @@ export default function DiscussApp() {
               {/* Message list */}
               <div
                 ref={threadScrollRef}
-                /* pb-9 leaves room under the newest message so its hover action
-                   bar (which now sits below the bubble) is never clipped. */
-                className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-9"
+                className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
               >
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center">
@@ -2822,11 +2821,83 @@ function MessageBubble({
   const time = formatFullTime(msg.created_at);
   const isDeleted = !!msg.deleted_at;
   const meta = msg.metadata ?? {};
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+
+  /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
+     opens an actions menu next to the message instead of a hover bar that
+     covered the neighbouring message. Rendered in a portal so it's never
+     clipped by the thread's scroll box, and auto-flips upward near the bottom
+     edge. Closes on outside click / Escape / scroll. */
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const longPressRef = useRef<number | null>(null);
+  const closeMenu = useCallback(() => setMenuPos(null), []);
+  const openMenu = useCallback(
+    (x: number, y: number) => {
+      if (isDeleted) return;
+      setMenuPos({ x, y });
+    },
+    [isDeleted],
+  );
+  useEffect(() => {
+    if (!menuPos) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [menuPos, closeMenu]);
+
+  const menuStyle: React.CSSProperties | undefined = menuPos
+    ? (() => {
+        const W = 200;
+        const EST_H = 340;
+        const M = 8;
+        const left = Math.max(M, Math.min(menuPos.x, window.innerWidth - W - M));
+        const openUp = menuPos.y + EST_H > window.innerHeight;
+        return openUp
+          ? { left, bottom: Math.max(M, window.innerHeight - menuPos.y) }
+          : { left, top: menuPos.y };
+      })()
+    : undefined;
 
   return (
     <div
       id={`msg-${msg.id}`}
+      onContextMenu={(e) => {
+        if (isDeleted) return;
+        e.preventDefault();
+        openMenu(e.clientX, e.clientY);
+      }}
+      onTouchStart={(e) => {
+        if (isDeleted) return;
+        const touch = e.touches[0];
+        const { clientX, clientY } = touch;
+        longPressRef.current = window.setTimeout(
+          () => openMenu(clientX, clientY),
+          450,
+        );
+      }}
+      onTouchEnd={() => {
+        if (longPressRef.current) {
+          clearTimeout(longPressRef.current);
+          longPressRef.current = null;
+        }
+      }}
+      onTouchMove={() => {
+        if (longPressRef.current) {
+          clearTimeout(longPressRef.current);
+          longPressRef.current = null;
+        }
+      }}
       className={`group relative flex gap-2 px-2 -mx-2 rounded-lg ${
         isSelf ? "flex-row-reverse" : ""
       } ${showAuthor ? "mt-3" : "mt-0.5"}`}
@@ -2986,7 +3057,7 @@ function MessageBubble({
                 ))}
                 <button
                   type="button"
-                  onClick={() => setReactionPickerOpen(true)}
+                  onClick={(e) => openMenu(e.clientX, e.clientY)}
                   className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 >
                   <SmileIcon className="h-3 w-3" />
@@ -3015,124 +3086,131 @@ function MessageBubble({
         </MessageSurface>
       </div>
 
-      {/* Hover action bar — sits just UNDER the bubble, on the bubble's own
-          side (right for your messages, left for incoming, clearing the 40px
-          avatar gutter). The old -top-3 floated it above the bubble, which got
-          clipped for the topmost message. top-full keeps it below and it never
-          overlaps the header; z-20 floats it over the following row. */}
-      {!isDeleted && !isEditing && (
-        <div
-          className={`absolute top-full -mt-1 ${
-            isSelf ? "end-2" : "start-10"
-          } opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity z-20`}
-        >
-          <div className="flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg">
-            {reactionPickerOpen ? (
-              <div
-                className="flex items-center"
-                onMouseLeave={() => setReactionPickerOpen(false)}
-              >
+      {/* Right-click / long-press context menu (WeChat-style). Portaled to
+          <body> and positioned at the pointer so it never covers the next
+          message or gets clipped by the scroll box. */}
+      {menuPos &&
+        !isDeleted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={menuStyle}
+            className="fixed z-[100] min-w-[200px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5"
+          >
+            {/* Quick reactions row */}
+            {!isEditing && (
+              <div className="flex items-center gap-1 px-1 pb-1.5 mb-1 border-b border-[var(--border-subtle)]">
                 {QUICK_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}
                     type="button"
                     onClick={() => {
                       onToggleReaction(msg.id, emoji);
-                      setReactionPickerOpen(false);
+                      closeMenu();
                     }}
-                    className="h-7 w-7 rounded-md text-[14px] hover:bg-[var(--bg-primary)] transition-colors"
+                    className="h-8 w-8 rounded-lg text-[16px] hover:bg-[var(--bg-surface)] transition-colors"
                   >
                     {emoji}
                   </button>
                 ))}
               </div>
-            ) : (
+            )}
+            <MessageMenuItem
+              icon={<ReplyIcon className="h-4 w-4" />}
+              label={t("msg.reply", "Reply")}
+              onClick={() => {
+                onReply(msg);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<MessageSquareIcon className="h-4 w-4" />}
+              label={t("msg.replyInThread", "Reply in thread")}
+              onClick={() => {
+                onOpenThread(msg);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<StarIcon className="h-4 w-4" />}
+              label={t("msg.star", "Save for later")}
+              onClick={() => {
+                onStar(msg.id);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<PinIcon className="h-4 w-4" />}
+              label={t("msg.pin", "Pin")}
+              onClick={() => {
+                onPin(msg.id);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<LinkIcon className="h-4 w-4" />}
+              label={t("msg.copyLink", "Copy link")}
+              onClick={() => {
+                onCopyLink(msg.id);
+                closeMenu();
+              }}
+            />
+            {isSelf && (
               <>
-                <HoverAction
-                  title={t("msg.react", "Add reaction")}
-                  onClick={() => setReactionPickerOpen(true)}
-                >
-                  <SmileIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.replyInThread", "Reply in thread")}
-                  onClick={() => onOpenThread(msg)}
-                >
-                  <ReplyIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.reply", "Reply")}
-                  onClick={() => onReply(msg)}
-                >
-                  <ReplyIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.star", "Save for later")}
-                  onClick={() => onStar(msg.id)}
-                >
-                  <StarIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.pin", "Pin")}
-                  onClick={() => onPin(msg.id)}
-                >
-                  <PinIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.copyLink", "Copy link")}
-                  onClick={() => onCopyLink(msg.id)}
-                >
-                  <LinkIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                {isSelf && (
-                  <>
-                    <HoverAction
-                      title={t("msg.edit", "Edit")}
-                      onClick={() => onStartEdit(msg)}
-                    >
-                      <Edit3Icon className="h-3.5 w-3.5" />
-                    </HoverAction>
-                    <HoverAction
-                      title={t("msg.delete", "Delete")}
-                      onClick={() => onDelete(msg.id)}
-                      danger
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </HoverAction>
-                  </>
-                )}
+                <MessageMenuItem
+                  icon={<Edit3Icon className="h-4 w-4" />}
+                  label={t("msg.edit", "Edit")}
+                  onClick={() => {
+                    onStartEdit(msg);
+                    closeMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={<TrashIcon className="h-4 w-4" />}
+                  label={t("msg.delete", "Delete")}
+                  danger
+                  onClick={() => {
+                    onDelete(msg.id);
+                    closeMenu();
+                  }}
+                />
               </>
             )}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
-function HoverAction({
-  title,
+function MessageMenuItem({
+  icon,
+  label,
   onClick,
-  children,
   danger = false,
 }: {
-  title: string;
+  icon: React.ReactNode;
+  label: string;
   onClick: () => void;
-  children: React.ReactNode;
   danger?: boolean;
 }) {
   return (
     <button
       type="button"
-      title={title}
+      role="menuitem"
       onClick={onClick}
-      className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors ${
         danger
-          ? "text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10"
-          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+          ? "text-red-400 hover:bg-red-500/10"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
       }`}
     >
-      {children}
+      <span className={danger ? "text-red-400" : "text-[var(--text-dim)]"}>
+        {icon}
+      </span>
+      {label}
     </button>
   );
 }
