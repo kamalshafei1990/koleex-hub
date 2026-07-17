@@ -49,7 +49,7 @@ import {
   subscribeToTodos,
 } from "@/lib/todo-admin";
 import type {
-  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata,
+  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
@@ -144,6 +144,56 @@ function DeleteModal({ open, deleting, onConfirm, onClose }: {
         </div>
       </div>
     </ScrollLockOverlay>
+  );
+}
+
+/* ── Checklist / subtasks editor (stored in metadata.checklist) ── */
+function ChecklistField({ items, onChange }: {
+  items: TodoChecklistItem[];
+  onChange: (next: TodoChecklistItem[]) => void;
+}) {
+  const [text, setText] = useState("");
+  const add = () => {
+    const v = text.trim();
+    if (!v) return;
+    onChange([...items, { id: crypto.randomUUID(), text: v, done: false }]);
+    setText("");
+  };
+  const done = items.filter((i) => i.done).length;
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
+        Checklist{items.length > 0 && <span className="ml-1.5 text-[var(--text-muted)] normal-case">{done}/{items.length}</span>}
+      </label>
+      {items.length > 0 && (
+        <div className="space-y-1 mb-2">
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-2 group">
+              <button type="button" onClick={() => onChange(items.map((x) => x.id === it.id ? { ...x, done: !x.done } : x))} className="shrink-0">
+                {it.done
+                  ? <CheckCircleIcon size={16} className="text-[var(--text-primary)]" />
+                  : <CircleIcon size={16} className="text-[var(--text-ghost)]" />}
+              </button>
+              <span className={`flex-1 text-[12.5px] ${it.done ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{it.text}</span>
+              <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))}
+                className="shrink-0 text-[var(--text-dim)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <CrossIcon size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder="Add a subtask…"
+          className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all" />
+        <button type="button" onClick={add} disabled={!text.trim()}
+          className="h-9 w-9 shrink-0 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-30">
+          <PlusIcon size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -469,6 +519,14 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           <div className="h-px bg-[var(--border-subtle)]" />
 
+          {/* Checklist / subtasks */}
+          <ChecklistField
+            items={Array.isArray(extras.checklist) ? extras.checklist : []}
+            onChange={(checklist) => setExtras({ ...extras, checklist })}
+          />
+
+          <div className="h-px bg-[var(--border-subtle)]" />
+
           {/* Attachments · Mentions · Products — collapsed by default so the core
              form stays short; expands on demand (or auto-opens when editing a
              task that already has extras). */}
@@ -560,6 +618,8 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
   const { t } = useTranslation(todoT);
   const priorityConfig = PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
   const overdue = !task.completed && isOverdue(task.due_date);
+  const checklist = Array.isArray(task.metadata?.checklist) ? task.metadata.checklist : [];
+  const checkDone = checklist.filter((c) => c.done).length;
   const [expanded, setExpanded] = useState(false);
   const [noteText, setNoteText] = useState("");
 
@@ -618,6 +678,13 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
             {task.assigner && (
               <span className="inline-flex items-center gap-1 text-[10px] text-[var(--text-faint)]">
                 from {task.assigner.full_name || task.assigner.username}
+              </span>
+            )}
+            {checklist.length > 0 && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                checkDone === checklist.length ? "text-[var(--text-primary)] bg-[var(--bg-surface-active)]" : "text-[var(--text-faint)] bg-[var(--bg-surface)]"
+              }`}>
+                <CheckSquareIcon size={9} /> {checkDone}/{checklist.length}
               </span>
             )}
           </div>

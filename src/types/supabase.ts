@@ -1894,10 +1894,17 @@ export interface TodoProductRef {
   name: string;
   code?: string | null;
 }
+/** A single checklist/subtask item on a task. */
+export interface TodoChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 export interface TodoMetadata {
   attachments?: TodoAttachment[];
   mentions?: TodoMention[];
   products?: TodoProductRef[];
+  checklist?: TodoChecklistItem[];
   [key: string]: unknown;
 }
 export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;

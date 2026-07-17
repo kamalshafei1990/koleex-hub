@@ -315,6 +315,29 @@ export async function POST(req: Request) {
     }
   }
 
+  // Notify @mentioned people (metadata.mentions) — excluding self and anyone
+  // already notified as an assignee, so nobody gets a double ping.
+  const mentionIds = Array.isArray((body.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions)
+    ? ((body.metadata as { mentions: Array<{ account_id?: string }> }).mentions)
+        .map((m) => m.account_id)
+        .filter(Boolean) as string[]
+    : [];
+  const alreadyNotified = new Set<string>([auth.account_id, ...assigneeIds]);
+  const mentionRecipients = Array.from(new Set(mentionIds)).filter((id) => !alreadyNotified.has(id));
+  if (mentionRecipients.length > 0) {
+    await supabaseServer.from("inbox_messages").insert(
+      mentionRecipients.map((recipientId) => ({
+        recipient_account_id: recipientId,
+        sender_account_id: auth.account_id,
+        category: "task",
+        subject: `You were mentioned: ${body.title}`,
+        body: body.description || body.title,
+        link: `/todo?task=${(todo as { id: string }).id}`,
+        metadata: { type: "todo_mention", todo_id: (todo as { id: string }).id },
+      })),
+    );
+  }
+
   return NextResponse.json({ todo });
 }
 
