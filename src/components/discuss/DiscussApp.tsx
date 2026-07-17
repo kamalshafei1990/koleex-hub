@@ -264,7 +264,7 @@ function previewMessage(
   if (!preview) return "";
   if (preview.kind === "image") return "📷 Photo";
   if (preview.kind === "file") return "📎 File";
-  if (preview.kind === "voice") return "🎤 Voice message";
+  if (preview.kind === "voice") return "Voice message";
   if (preview.kind === "system") return preview.body ?? "";
   return (preview.body ?? "").replace(/\s+/g, " ").slice(0, 80);
 }
@@ -2646,9 +2646,7 @@ function ChannelRow({
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 {channel.pinned && (
-                  <PinIcon
-                    className={`h-3 w-3 ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}
-                  />
+                  <PinIcon className="h-3 w-3 text-amber-400" aria-label="Pinned" />
                 )}
                 {time && (
                   <span className={`text-[10px] tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
@@ -2667,6 +2665,9 @@ function ChannelRow({
                     : "text-[var(--text-dim)]"
                 }`}
               >
+                {channel.last_message?.kind === "voice" && (
+                  <MicIcon className="inline-block h-3 w-3 me-1 -mt-px align-text-bottom" />
+                )}
                 {channel.last_message?.author_username && !isDm ? (
                   <>
                     <span className={selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-muted)]"}>
@@ -2694,10 +2695,7 @@ function ChannelRow({
                 />
               ) : null}
               {channel.muted && (
-                <BellOffIcon
-                  className={`h-3 w-3 shrink-0 ${selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}
-                  aria-label="Muted"
-                />
+                <BellOffIcon className="h-3 w-3 shrink-0 text-red-500" aria-label="Muted" />
               )}
             </div>
           </div>
