@@ -3006,13 +3006,17 @@ type MessageBubbleProps = {
    by position. Right-aligning own messages would be a bubble layout, which is
    out of scope by decision, and the Koleex grid wants one alignment, not two.
 
-   The surface is --bg-surface-bright, not --bg-surface, and that is deliberate.
-   Every wash in this palette was built for hover states, so none of them reach
-   the 3:1 a boundary needs: measured against --bg-primary they run 1.10 (surface)
-   → 1.77 (bright) in dark, 1.09 → 1.45 in light. Bright is the strongest the
-   token set offers, paired with --border-color rather than --border-subtle so the
-   hard edge carries what the wash cannot. Do not weaken either back to "subtle" —
-   at 1.10:1 the panel is invisible and the whole treatment silently does nothing.
+   Mine (isSelf) uses a SOLID elevated tone, not one of the palette washes. Every
+   wash here was built for hover states and tops out at ~1.77:1 over --bg-primary
+   in dark (1.45 in light) — enough to hint, not enough to read as a distinct
+   "my messages" colour. So own bubbles are `color-mix(--bg-primary + a slice of
+   --text-primary)`: an OPAQUE colour (a real light-gray-in-dark / dark-gray-in-
+   light), the strongest monochrome way to separate mine from incoming without
+   inverting the bubble (which would force every inner token — translate pill,
+   reactions, thread chip, edited label — to flip too). Incoming stays on the
+   faint --bg-surface wash so the asymmetry itself reads as direction. Keep the
+   inner text on --text-primary: the mix is deliberately kept dark-in-dark /
+   light-in-light so it stays readable.
 
    text-[13px] is NOT styling and must not be "cleaned up": `ch` resolves against
    the element's own font-size, so a 62ch cap on a container inheriting 16px
@@ -3032,10 +3036,10 @@ function MessageSurface({
         "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
         "rounded-2xl border " +
         (isSelf
-          /* Mine: brightest surface the palette offers + a squared corner on the
-             side the bubble grows from — the WeChat/WhatsApp tail, done with
-             radius instead of an SVG so it costs nothing to render. */
-          ? "bg-[var(--bg-surface-bright)] border-[var(--border-color)] rounded-ee-md"
+          /* Mine: solid elevated tone (color-mix, theme-aware) + a squared corner
+             on the side the bubble grows from — the WeChat/WhatsApp tail, done
+             with radius instead of an SVG so it costs nothing to render. */
+          ? "bg-[color-mix(in_srgb,var(--bg-primary)_82%,var(--text-primary))] border-[var(--border-subtle)] rounded-ee-md"
           : "bg-[var(--bg-surface)] border-[var(--border-subtle)] rounded-es-md")
       }
     >
