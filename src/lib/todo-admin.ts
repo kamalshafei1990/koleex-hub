@@ -613,35 +613,48 @@ export function subscribeToTodos(
   onChange: (row: TodoRow) => void,
   onDelete: (oldRow: { id: string }) => void,
 ): () => void {
-  const topic = `todos-live-${Date.now()}`;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  let disposed = false;
 
-  const channel = supabase
-    .channel(topic)
-    .on(
-      "postgres_changes" as never,
-      { event: "INSERT", schema: "public", table: "koleex_todos" },
-      (payload: { new: TodoRow }) => onInsert(payload.new),
-    )
-    .on(
-      "postgres_changes" as never,
-      { event: "UPDATE", schema: "public", table: "koleex_todos" },
-      (payload: { new: TodoRow }) => onChange(payload.new),
-    )
-    .on(
-      "postgres_changes" as never,
-      { event: "DELETE", schema: "public", table: "koleex_todos" },
-      (payload: { old: { id: string } }) => onDelete(payload.old),
-    )
-    .subscribe((status: string) => {
-      if (status === "CHANNEL_ERROR") {
-        setTimeout(() => {
-          channel.unsubscribe();
-          supabase.channel(topic).subscribe();
-        }, 3000);
-      }
-    });
+  /* Build a fully-wired channel. On CHANNEL_ERROR the previous code created a
+     bare `supabase.channel(topic).subscribe()` with NO handlers (and never
+     reassigned it) — so after any transient error, live updates stopped and
+     the dead channel leaked. Rebuild the whole subscription instead. */
+  const build = () => {
+    if (disposed) return;
+    const topic = `todos-live-${Date.now()}`;
+    channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes" as never,
+        { event: "INSERT", schema: "public", table: "koleex_todos" },
+        (payload: { new: TodoRow }) => onInsert(payload.new),
+      )
+      .on(
+        "postgres_changes" as never,
+        { event: "UPDATE", schema: "public", table: "koleex_todos" },
+        (payload: { new: TodoRow }) => onChange(payload.new),
+      )
+      .on(
+        "postgres_changes" as never,
+        { event: "DELETE", schema: "public", table: "koleex_todos" },
+        (payload: { old: { id: string } }) => onDelete(payload.old),
+      )
+      .subscribe((status: string) => {
+        if (status === "CHANNEL_ERROR" && !disposed) {
+          setTimeout(() => {
+            if (disposed || !channel) return;
+            void supabase.removeChannel(channel);
+            build();
+          }, 3000);
+        }
+      });
+  };
+
+  build();
 
   return () => {
-    channel.unsubscribe();
+    disposed = true;
+    if (channel) void supabase.removeChannel(channel);
   };
 }

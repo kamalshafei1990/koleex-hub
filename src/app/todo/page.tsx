@@ -26,6 +26,9 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import FileIcon from "@/components/icons/ui/FileIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -121,21 +124,22 @@ function Section({ title, count, color, children }: {
 function DeleteModal({ open, deleting, onConfirm, onClose }: {
   open: boolean; deleting: boolean; onConfirm: () => void; onClose: () => void;
 }) {
+  const { t } = useTranslation(todoT);
   if (!open) return null;
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Task</h3>
-        <p className="text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">{t("modal.delete")}</h3>
+        <p className="text-sm text-[var(--text-muted)]">{t("modal.deleteConfirm")}</p>
         <div className="flex items-center justify-end gap-2 pt-2">
           <button onClick={onClose}
             className="h-9 px-4 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-            Cancel
+            {t("modal.cancel")}
           </button>
           <button onClick={onConfirm} disabled={deleting}
             className="h-9 px-4 rounded-lg bg-red-500/90 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500 transition-colors disabled:opacity-50">
             {deleting && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
-            Delete
+            {t("modal.delete")}
           </button>
         </div>
       </div>
@@ -293,7 +297,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           <div className="flex items-center gap-2.5">
             <ListTodoIcon size={18} className="text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
-              {editEntry ? "Edit Task" : "New Task"}
+              {editEntry ? t("modal.edit") : t("modal.add")}
             </h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
@@ -311,7 +315,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           {/* Title */}
           <div>
-            <label className={lbl}>Title *</label>
+            <label className={lbl}>{t("f.title")} *</label>
             <input ref={inputRef} value={title} onChange={(e) => setTitle(e.target.value)}
               placeholder={t("f.title.placeholder")} className={inp}
               onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) handleSave(); }} />
@@ -319,14 +323,14 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           {/* Description */}
           <div>
-            <label className={lbl}>Description <span className="font-normal normal-case">(optional)</span></label>
+            <label className={lbl}>{t("f.description")} <span className="font-normal normal-case">(optional)</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder={t("f.description.placeholder")} rows={2} className={inp + " h-auto py-3 resize-none"} />
           </div>
 
           {/* Assign To */}
           <div>
-            <label className={lbl}>Assign To</label>
+            <label className={lbl}>{t("f.assignTo")}</label>
 
             {/* Department pills + All */}
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -397,7 +401,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           {/* Priority + Due Date — stack on mobile so the date picker gets full width */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Priority</label>
+              <label className={lbl}>{t("f.priority")}</label>
               <div className="flex gap-1.5">
                 {PRIORITIES.map((p) => (
                   <button key={p.value} onClick={() => setPriority(p.value)}
@@ -414,14 +418,14 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               </div>
             </div>
             <div>
-              <label className={lbl}>Due Date</label>
+              <label className={lbl}>{t("f.dueDate")}</label>
               <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select date" />
             </div>
           </div>
 
           {/* Label */}
           <div>
-            <label className={lbl}>Label</label>
+            <label className={lbl}>{t("f.label")}</label>
             <div className="flex flex-wrap gap-1.5">
               {labels.map((l) => (
                 <button key={l.id} onClick={() => setLabel(label === l.name ? "" : l.name)}
@@ -461,16 +465,62 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         <div className="shrink-0 flex items-center justify-end gap-2 px-4 md:px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose}
             className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-            Cancel
+            {t("modal.cancel")}
           </button>
           <button onClick={handleSave} disabled={saving || !title.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
-            {saving ? "Saving..." : editEntry ? "Save Changes" : "Create Task"}
+            {saving ? t("modal.saving") : editEntry ? t("modal.save") : t("modal.add")}
           </button>
         </div>
       </div>
     </ScrollLockOverlay>
+  );
+}
+
+/* ── Extras strip — attachments · products · mentions.
+   These are captured in the Task modal (TaskExtras) and saved on
+   koleex_todos.metadata, but were never rendered anywhere in the list, so the
+   whole feature was write-only. This shows them compactly on each row. ── */
+function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefined }) {
+  const meta = metadata && typeof metadata === "object" ? metadata : {};
+  const atts = Array.isArray(meta.attachments) ? meta.attachments : [];
+  const prods = Array.isArray(meta.products) ? meta.products : [];
+  const mentions = Array.isArray(meta.mentions) ? meta.mentions : [];
+  if (atts.length === 0 && prods.length === 0 && mentions.length === 0) return null;
+
+  const chip =
+    "inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] max-w-[150px]";
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {atts.map((a) =>
+        a.type?.startsWith("image/") ? (
+          <a key={a.path} href={a.url} target="_blank" rel="noreferrer" onClick={stop}
+            className="block h-9 w-9 rounded-md overflow-hidden border border-[var(--border-subtle)] shrink-0">
+            <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+          </a>
+        ) : (
+          <a key={a.path} href={a.url} target="_blank" rel="noreferrer" onClick={stop} className={chip + " hover:text-[var(--text-primary)]"}>
+            <FileIcon className="h-2.5 w-2.5 shrink-0" />
+            <span className="truncate">{a.name}</span>
+          </a>
+        ),
+      )}
+      {prods.map((p) => (
+        <span key={p.id} className={chip}>
+          <PackageIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
+          <span className="truncate">{p.code || p.name}</span>
+        </span>
+      ))}
+      {mentions.map((m) => (
+        <span key={m.account_id} className={chip}>
+          <AtSignIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
+          <span className="truncate">{m.full_name || m.username}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -566,6 +616,9 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
               )}
             </div>
           )}
+
+          {/* Attachments · linked products · mentions */}
+          <TaskExtrasStrip metadata={task.metadata} />
         </div>
 
         {/* Actions — always visible on mobile (no hover), fade-in on desktop */}
@@ -734,6 +787,7 @@ export default function TodoPage() {
   const [labels, setLabels] = useState<TodoLabelRow[]>([]);
   const accountId = getCurrentAccountIdSync();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
+  const deepLinkHandledRef = useRef(false);
 
   // Load scope context once per session so fetchTodos knows which filter
   // (own / department / all + SA bypass) to apply. Non-blocking — if this
@@ -756,6 +810,25 @@ export default function TodoPage() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  /* Deep link: inbox "New task" notifications point at /todo?task=<id>. Open
+     that task once the list has loaded, then strip the param so a refresh
+     doesn't reopen it. (The link was previously dead — the page ignored it.) */
+  useEffect(() => {
+    if (loading || deepLinkHandledRef.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const taskId = params.get("task");
+    if (!taskId) { deepLinkHandledRef.current = true; return; }
+    const found = todos.find((t) => t.id === taskId);
+    if (!found) return; // still resolving — wait for the next todos update
+    deepLinkHandledRef.current = true;
+    params.delete("task");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    // Defer opening so we don't setState synchronously inside the effect.
+    const id = setTimeout(() => setModal({ open: true, entry: found }), 0);
+    return () => clearTimeout(id);
+  }, [loading, todos]);
+
   /* ── Realtime: auto-refresh when any todo is created/updated/deleted ── */
   useEffect(() => {
     return subscribeToTodos(
@@ -768,8 +841,14 @@ export default function TodoPage() {
   }, [loadAll]);
 
   const handleToggle = async (id: string) => {
+    const before = todos.find((t) => t.id === id);
     setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed, completed_at: !t.completed ? new Date().toISOString() : null } : t));
-    await toggleTodo(id);
+    const ok = await toggleTodo(id);
+    if (!ok && before) {
+      // Server rejected the toggle — restore the prior state so the checkbox
+      // never lies. (Previously the optimistic flip stuck even on failure.)
+      setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: before.completed, completed_at: before.completed_at } : t));
+    }
   };
 
   const handleDelete = async () => {
