@@ -174,6 +174,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [showNewLabel, setShowNewLabel] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
   const [extras, setExtras] = useState<TodoMetadata>({});
+  const [showExtras, setShowExtras] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const accountId = getCurrentAccountIdSync();
 
@@ -188,11 +189,16 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         setSelectedAssignees(editEntry.assignees.map((a) => a.account_id));
         setSelectedDept(editEntry.assigned_department || "");
         setAssignAll(editEntry.assign_to_all);
-        setExtras(editEntry.metadata && typeof editEntry.metadata === "object" ? editEntry.metadata : {});
+        {
+          const m = editEntry.metadata && typeof editEntry.metadata === "object" ? editEntry.metadata : {};
+          setExtras(m);
+          // Auto-expand the attachments section only when the task already has some.
+          setShowExtras(!!(m.attachments?.length || m.mentions?.length || m.products?.length));
+        }
       } else {
         setTitle(""); setDescription(""); setPriority("medium"); setLabel(""); setDueDate("");
         setSelectedAssignees([]); setSelectedDept(""); setAssignAll(false);
-        setExtras({});
+        setExtras({}); setShowExtras(false);
       }
       setError(""); setEmpSearch(""); setNewLabelName(""); setShowNewLabel(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -328,6 +334,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               placeholder={t("f.description.placeholder")} rows={2} className={inp + " h-auto py-3 resize-none"} />
           </div>
 
+          <div className="h-px bg-[var(--border-subtle)]" />
+
           {/* Assign To */}
           <div>
             <label className={lbl}>{t("f.assignTo")}</label>
@@ -398,6 +406,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             )}
           </div>
 
+          <div className="h-px bg-[var(--border-subtle)]" />
+
           {/* Priority + Due Date — stack on mobile so the date picker gets full width */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -457,8 +467,19 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             </div>
           </div>
 
-          {/* Attachments · Mentions · Products */}
-          <TaskExtras value={extras} onChange={setExtras} employees={employees} />
+          <div className="h-px bg-[var(--border-subtle)]" />
+
+          {/* Attachments · Mentions · Products — collapsed by default so the core
+             form stays short; expands on demand (or auto-opens when editing a
+             task that already has extras). */}
+          {showExtras ? (
+            <TaskExtras value={extras} onChange={setExtras} employees={employees} />
+          ) : (
+            <button type="button" onClick={() => setShowExtras(true)}
+              className="w-full h-10 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center gap-1.5">
+              <PlusIcon size={12} /> Attachments, mentions &amp; products
+            </button>
+          )}
         </div>
 
         {/* Footer */}
