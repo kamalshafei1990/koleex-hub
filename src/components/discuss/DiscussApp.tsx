@@ -600,6 +600,70 @@ export default function DiscussApp() {
     setMembers(rows);
   }, []);
 
+  /* ── Prefetch: the deep fix for "still loading when I swipe to another
+     conversation". The per-channel snapshot cache only helps on RE-open; the
+     first open of a chat still hit the network. Now we warm the cache ahead of
+     the tap: (1) a throttled background sweep loads every conversation's recent
+     messages shortly after the list appears, and (2) hovering / pressing a row
+     kicks that channel's fetch immediately. By the time the row is tapped its
+     messages are already in the cache, so the switch effect paints instantly
+     with no spinner. fetchChannelMessages returns newest-last, so a 50-message
+     prefetch is plenty for the first paint; opening then refreshes to the full
+     120 silently. */
+  const prefetchingRef = useRef<Set<string>>(new Set());
+  const prefetchChannel = useCallback(
+    async (channelId: string) => {
+      if (!accountId) return;
+      if (messagesCacheRef.current.has(channelId)) return; // already warm
+      if (prefetchingRef.current.has(channelId)) return; // already in flight
+      prefetchingRef.current.add(channelId);
+      try {
+        const rows = await fetchChannelMessages(channelId, {
+          currentAccountId: accountId,
+          limit: 50,
+        });
+        if (rows.length > 0 && !messagesCacheRef.current.has(channelId)) {
+          messagesCacheRef.current.set(channelId, rows);
+        }
+      } catch {
+        /* Prefetch is best-effort — a failure just means the real open fetches. */
+      } finally {
+        prefetchingRef.current.delete(channelId);
+      }
+    },
+    [accountId],
+  );
+
+  /* Background sweep — warm every conversation once, shortly after the sidebar
+     loads, throttled to a few concurrent fetches so it never competes with the
+     open channel or janks the UI. Runs on idle time. */
+  const bulkPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (!accountId || channels.length === 0 || bulkPrefetchedRef.current) return;
+    bulkPrefetchedRef.current = true;
+
+    const ids = channels
+      .map((c) => c.id)
+      .filter((id) => id !== selectedChannelIdRef.current);
+    let cursor = 0;
+    const CONCURRENCY = 3;
+    const pump = () => {
+      if (cursor >= ids.length) return;
+      const id = ids[cursor++];
+      void prefetchChannel(id).finally(pump);
+    };
+    const start = () => {
+      for (let k = 0; k < CONCURRENCY; k++) pump();
+    };
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    if (ric) ric(start, { timeout: 1500 });
+    else window.setTimeout(start, 300);
+  }, [accountId, channels, prefetchChannel]);
+
   /* Initial loads. */
   useEffect(() => {
     if (!accountLoading) void loadChannels();
@@ -1847,6 +1911,7 @@ export default function DiscussApp() {
                           channel={c}
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
+                          onPrefetch={() => void prefetchChannel(c.id)}
                         />
                       ))}
                     </ul>
@@ -1878,6 +1943,7 @@ export default function DiscussApp() {
                           channel={c}
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
+                          onPrefetch={() => void prefetchChannel(c.id)}
                         />
                       ))}
                     </ul>
@@ -2258,10 +2324,13 @@ function ChannelRow({
   channel,
   selected,
   onSelect,
+  onPrefetch,
 }: {
   channel: DiscussChannelWithState;
   selected: boolean;
   onSelect: () => void;
+  /** Warm this conversation's messages on hover/press so the open is instant. */
+  onPrefetch?: () => void;
 }) {
   const name = displayNameFor(channel);
   const preview = previewMessage(channel.last_message);
@@ -2275,6 +2344,9 @@ function ChannelRow({
       <button
         type="button"
         onClick={onSelect}
+        onMouseEnter={onPrefetch}
+        onPointerDown={onPrefetch}
+        onFocus={onPrefetch}
         className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 rounded-xl transition-colors ${
           /* Selected row = SOLID --bg-inverted fill (real white in dark, real
              black in light) so the open chat is unmistakable — a translucent
