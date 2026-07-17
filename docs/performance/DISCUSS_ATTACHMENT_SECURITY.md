@@ -197,8 +197,12 @@ plus a first-party draft route becomes required — and
 
 ## KNOWN GAPS — Run A does not close Unit 2
 
-1. **Authenticated fixture matrix** (Run B) not executed — no live
-   200/206/404/401 evidence yet. Everything above is static + unit-level proof.
+1. ~~**Authenticated fixture matrix** (Run B) not executed~~ — **Run B EXECUTED
+   AND PASSED** against a live Preview pointed at the Discuss-scoped staging
+   project. Live 200/206/404/401 evidence, Range re-authorization, and the
+   client-safe payload contract are all demonstrated with real HTTP. Fixtures
+   removed afterwards with zero residue verified directly against the database.
+   See [DISCUSS_RUN_B_RESULTS.md](./DISCUSS_RUN_B_RESULTS.md).
 2. **Six legacy objects remain publicly reachable** (Run C).
 3. **VoiceRecorder** owns its own review-before-send object URL outside the
    manager. Contained (never keyed to a message, revoked on discard/unmount),
