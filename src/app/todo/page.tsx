@@ -49,7 +49,7 @@ import {
   subscribeToTodos,
 } from "@/lib/todo-admin";
 import type {
-  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem,
+  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
@@ -60,6 +60,28 @@ const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [
   { value: "medium", label: "Medium", color: "text-yellow-400" },
   { value: "low", label: "Low", color: "text-blue-400" },
 ];
+
+/* ── Status (workflow stage) config ── */
+const STATUSES: { value: TodoStatus; label: string; dot: string }[] = [
+  { value: "todo", label: "To do", dot: "bg-[var(--text-dim)]" },
+  { value: "in_progress", label: "In progress", dot: "bg-blue-400" },
+  { value: "blocked", label: "Blocked", dot: "bg-red-400" },
+  { value: "done", label: "Done", dot: "bg-green-400" },
+];
+
+/* datetime-local <-> ISO helpers for the reminder field. */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function localInputToIso(v: string): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 /* ── Helpers ── */
 function formatDate(iso: string | null): string {
@@ -218,6 +240,9 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [assignAll, setAssignAll] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [remindAt, setRemindAt] = useState("");
+  const [status, setStatus] = useState<TodoStatus>("todo");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [newLabelName, setNewLabelName] = useState("");
@@ -236,6 +261,9 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         setPriority(editEntry.priority);
         setLabel(editEntry.label || "");
         setDueDate(editEntry.due_date ? editEntry.due_date.split("T")[0] : "");
+        setStartDate(editEntry.start_date ? editEntry.start_date.split("T")[0] : "");
+        setRemindAt(isoToLocalInput(editEntry.remind_at));
+        setStatus(editEntry.status ?? "todo");
         setSelectedAssignees(editEntry.assignees.map((a) => a.account_id));
         setSelectedDept(editEntry.assigned_department || "");
         setAssignAll(editEntry.assign_to_all);
@@ -247,6 +275,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         }
       } else {
         setTitle(""); setDescription(""); setPriority("medium"); setLabel(""); setDueDate("");
+        setStartDate(""); setRemindAt(""); setStatus("todo");
         setSelectedAssignees([]); setSelectedDept(""); setAssignAll(false);
         setExtras({}); setShowExtras(false);
       }
@@ -296,6 +325,9 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           priority,
           label: label || null,
           due_date: dueDate || null,
+          start_date: startDate || null,
+          remind_at: localInputToIso(remindAt),
+          status,
           assigned_department: selectedDept || null,
           assign_to_all: assignAll,
           metadata: extras,
@@ -307,6 +339,9 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           priority,
           label: label || null,
           due_date: dueDate || null,
+          start_date: startDate || null,
+          remind_at: localInputToIso(remindAt),
+          status,
           created_by_account_id: accountId || null,
           assigned_by_account_id: accountId || null,
           assignee_account_ids: selectedAssignees,
@@ -458,28 +493,66 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           <div className="h-px bg-[var(--border-subtle)]" />
 
-          {/* Priority + Due Date — stack on mobile so the date picker gets full width */}
+          {/* Priority */}
+          <div>
+            <label className={lbl}>{t("f.priority")}</label>
+            <div className="flex gap-1.5">
+              {PRIORITIES.map((p) => (
+                <button key={p.value} onClick={() => setPriority(p.value)}
+                  className={`flex-1 h-9 rounded-lg text-[11px] font-semibold transition-all border ${
+                    priority === p.value
+                      ? p.value === "high" ? "bg-red-500/15 border-red-500/30 text-red-400"
+                        : p.value === "medium" ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400"
+                        : "bg-blue-500/15 border-blue-500/30 text-blue-400"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Status (workflow stage) */}
+          <div>
+            <label className={lbl}>Status</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {STATUSES.map((s) => (
+                <button key={s.value} onClick={() => setStatus(s.value)}
+                  className={`h-9 rounded-lg text-[11px] font-semibold transition-all border flex items-center justify-center gap-1.5 ${
+                    status === s.value
+                      ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                  }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} /> {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Start + Due date — stack on mobile so each picker gets full width */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>{t("f.priority")}</label>
-              <div className="flex gap-1.5">
-                {PRIORITIES.map((p) => (
-                  <button key={p.value} onClick={() => setPriority(p.value)}
-                    className={`flex-1 h-9 rounded-lg text-[11px] font-semibold transition-all border ${
-                      priority === p.value
-                        ? p.value === "high" ? "bg-red-500/15 border-red-500/30 text-red-400"
-                          : p.value === "medium" ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400"
-                          : "bg-blue-500/15 border-blue-500/30 text-blue-400"
-                        : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                    }`}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <label className={lbl}>Start Date</label>
+              <DatePicker value={startDate} onChange={setStartDate} placeholder="Select date" />
             </div>
             <div>
               <label className={lbl}>{t("f.dueDate")}</label>
               <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select date" />
+            </div>
+          </div>
+
+          {/* Reminder */}
+          <div>
+            <label className={lbl}>Reminder <span className="font-normal normal-case">(optional)</span></label>
+            <div className="flex items-center gap-2">
+              <input type="datetime-local" value={remindAt} onChange={(e) => setRemindAt(e.target.value)}
+                className="flex-1 h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" />
+              {remindAt && (
+                <button type="button" onClick={() => setRemindAt("")}
+                  className="h-10 px-3 rounded-xl text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                  Clear
+                </button>
+              )}
             </div>
           </div>
 
@@ -657,6 +730,13 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
             <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityConfig.color}`}>
               <FlagIcon size={10} /> {priorityConfig.label}
             </span>
+            {(task.status === "in_progress" || task.status === "blocked") && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                task.status === "blocked" ? "text-red-400 bg-red-500/10" : "text-blue-400 bg-blue-500/10"
+              }`}>
+                {task.status === "blocked" ? "Blocked" : "In progress"}
+              </span>
+            )}
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
                 <TagsIcon size={9} /> {task.label}
@@ -859,6 +939,7 @@ export default function TodoPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
@@ -1012,6 +1093,7 @@ export default function TodoPage() {
     if (filter === "active") list = list.filter((t) => !t.completed);
     if (filter === "completed") list = list.filter((t) => t.completed);
     if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
+    if (statusFilter) list = list.filter((t) => t.status === statusFilter);
     if (labelFilter) list = list.filter((t) => t.label === labelFilter);
     if (deptFilter) list = list.filter((t) =>
       t.assigned_department === deptFilter ||
@@ -1042,7 +1124,7 @@ export default function TodoPage() {
     }
 
     return list;
-  }, [todos, search, filter, priorityFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [todos, search, filter, priorityFilter, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
     total: todos.length,
@@ -1074,7 +1156,7 @@ export default function TodoPage() {
     return [...new Set(todos.map((t) => t.label).filter(Boolean) as string[])];
   }, [todos]);
 
-  const hasActiveFilters = labelFilter || deptFilter || assigneeFilter || dateFrom || dateTo;
+  const hasActiveFilters = statusFilter || labelFilter || deptFilter || assigneeFilter || dateFrom || dateTo;
 
   return (
     <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -1161,6 +1243,13 @@ export default function TodoPage() {
           {showFilters && (
             <div className="pb-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
+                {/* Status filter */}
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
+                  <option value="">All Statuses</option>
+                  {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+
                 {/* Department filter */}
                 <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
@@ -1202,7 +1291,7 @@ export default function TodoPage() {
                 </div>
 
                 {hasActiveFilters && (
-                  <button onClick={() => { setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); setDateFrom(""); setDateTo(""); }}
+                  <button onClick={() => { setStatusFilter(""); setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); setDateFrom(""); setDateTo(""); }}
                     className="h-8 px-3 rounded-lg text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
                     <CrossIcon size={12} /> Clear Filters
                   </button>

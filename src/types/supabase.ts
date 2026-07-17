@@ -1853,6 +1853,8 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
 export type TodoSource = "manual" | "crm" | "calendar";
 export type TodoPriority = "high" | "medium" | "low";
 
+/** Workflow stage for a task (Phase 2). */
+export type TodoStatus = "todo" | "in_progress" | "blocked" | "done";
 export interface TodoRow {
   id: string;
   title: string;
@@ -1861,6 +1863,12 @@ export interface TodoRow {
   priority: TodoPriority;
   label: string | null;
   due_date: string | null;
+  /** Phase 2: when work should begin. */
+  start_date: string | null;
+  /** Phase 2: when to fire a reminder (ISO timestamptz). */
+  remind_at: string | null;
+  /** Phase 2: workflow stage; kept in sync with `completed`. */
+  status: TodoStatus;
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
   source: TodoSource;

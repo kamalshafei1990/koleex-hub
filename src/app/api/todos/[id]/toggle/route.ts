@@ -62,6 +62,8 @@ export async function POST(
     .update({
       completed: !t.completed,
       completed_at: !t.completed ? now : null,
+      // Keep the workflow stage in sync with the checkbox.
+      status: !t.completed ? "done" : "todo",
       updated_at: now,
     })
     .eq("id", id);

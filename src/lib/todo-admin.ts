@@ -219,6 +219,9 @@ export async function createTodo(input: {
   priority?: "high" | "medium" | "low";
   label?: string | null;
   due_date?: string | null;
+  start_date?: string | null;
+  remind_at?: string | null;
+  status?: "todo" | "in_progress" | "blocked" | "done";
   created_by_account_id?: string | null;
   assigned_by_account_id?: string | null;
   source?: "manual" | "crm" | "calendar";
@@ -240,6 +243,9 @@ export async function createTodo(input: {
         priority: input.priority,
         label: input.label,
         due_date: input.due_date,
+        start_date: input.start_date,
+        remind_at: input.remind_at,
+        status: input.status,
         source: input.source,
         source_id: input.source_id,
         assignee_account_ids: input.assignee_account_ids,

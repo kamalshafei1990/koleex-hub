@@ -222,6 +222,9 @@ export async function POST(req: Request) {
     priority?: "high" | "medium" | "low";
     label?: string | null;
     due_date?: string | null;
+    start_date?: string | null;
+    remind_at?: string | null;
+    status?: "todo" | "in_progress" | "blocked" | "done";
     source?: "manual" | "crm" | "calendar";
     source_id?: string | null;
     assignee_account_ids?: string[];
@@ -231,16 +234,22 @@ export async function POST(req: Request) {
     metadata?: Record<string, unknown>;
   };
 
+  const status = body.status ?? "todo";
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
       title: body.title,
       metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
       description: body.description ?? null,
-      completed: false,
+      // Keep completed in lockstep with the workflow stage.
+      completed: status === "done",
+      completed_at: status === "done" ? new Date().toISOString() : null,
+      status,
       priority: body.priority ?? "medium",
       label: body.label ?? null,
       due_date: body.due_date ?? null,
+      start_date: body.start_date ?? null,
+      remind_at: body.remind_at ?? null,
       created_by_account_id: auth.account_id,
       assigned_by_account_id: auth.account_id,
       source: body.source ?? "manual",

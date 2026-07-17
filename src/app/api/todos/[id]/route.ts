@@ -70,6 +70,13 @@ export async function PATCH(
   delete updates.created_at;
   updates.updated_at = new Date().toISOString();
 
+  // Keep completed/completed_at in lockstep with an explicit status change.
+  if (typeof updates.status === "string") {
+    const done = updates.status === "done";
+    updates.completed = done;
+    updates.completed_at = done ? new Date().toISOString() : null;
+  }
+
   /* Mention-notify: if this edit sets metadata.mentions, capture the prior set
      first so we only ping people newly added (not on every save). */
   const nextMentions = (updates.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions;
