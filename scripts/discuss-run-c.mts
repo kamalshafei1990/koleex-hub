@@ -271,6 +271,31 @@ async function migrate() {
   if (manifest.project_ref !== PRODUCTION_REF) die("manifest was built for a different project.");
   if (manifest.items.length !== EXPECTED_ITEMS) die(`manifest holds ${manifest.items.length} items, expected exactly ${EXPECTED_ITEMS}.`);
 
+  /* ── resumability protection ──────────────────────────────────────────
+     Checked HERE — before any client is built and before Production is
+     contacted at all. It is a purely local question ("did a previous run stop
+     half-way?"), so gating it behind a network call would be both slower and
+     wrong: a half-migrated state must stop the run before we touch anything.
+
+     A previous run that copied bytes but did not finish its metadata update
+     left Production half-migrated. Silently continuing is how a half-state
+     becomes a corrupt one — the operator no longer knows which copy is
+     authoritative. So a partial state HARD STOPS and requires the operator to
+     name the specific item they reviewed. There is no --resume-all, on purpose. */
+  const partial = manifest.items.filter((m) => m.copied && !m.metadata_updated);
+  if (partial.length) {
+    const ack = process.env.KX_RUN_C_RESUME_ACK ?? "";
+    const unacked = partial.filter((m) => m.migration_id !== ack);
+    if (unacked.length) {
+      console.error(`\n  PARTIAL STATE from a previous run — ${partial.length} item(s) copied but not metadata-updated:`);
+      for (const m of partial) console.error(`      ${m.migration_id}  (${m.kind})`);
+      console.error(`\n  Nothing was resumed and Production was not contacted. Review each item,`);
+      console.error(`  then re-run naming exactly one:  KX_RUN_C_RESUME_ACK=<migration_id>\n`);
+      process.exit(1);
+    }
+    console.log(`  resume acknowledged for ${ack} — continuing that item only.`);
+  }
+
   const client = db();
 
   /* Re-derive the inventory and require it to match the manifest EXACTLY. A
@@ -382,6 +407,111 @@ function proveClean() {
 
 /* ── entry ───────────────────────────────────────────────────────────────── */
 
+/* ── verify (read-only, post-metadata / pre-deletion) ────────────────────── */
+
+/**
+ * Everything that can be proven WITHOUT a production user session:
+ *   · the private destination object exists and its bytes still match
+ *   · the message metadata no longer carries any public URL
+ *   · the first-party route refuses an UNAUTHENTICATED caller (401)
+ *
+ * What this cannot prove, and why: an "active member → 200" check needs a real
+ * Production session cookie, which needs a real Production password. We do not
+ * have one and must not create one. That leg of the matrix was proven in Run B
+ * against byte-identical code on staging, across the full persona set. The
+ * residual risk here is not the authorization logic (unchanged) but whether THIS
+ * object resolves — which is exactly what the byte + metadata checks below
+ * establish. The single operator eyeball in the printed checklist closes it.
+ */
+async function verify() {
+  baseGuards();
+  if (!existsSync(MANIFEST_PATH)) die(`no manifest at ${MANIFEST_PATH} — run 'plan' first.`);
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as Manifest;
+  const client = db();
+  const site = process.env.KX_RUN_C_SITE_URL ?? "https://hub.koleexgroup.com";
+  let ok = 0;
+
+  for (const m of manifest.items) {
+    if (!m.metadata_updated) { console.log(`  ${m.migration_id}: metadata not yet updated — skipping`); continue; }
+
+    const down = await client.storage.from(m.dest_bucket).download(m.dest_path);
+    if (down.error) die(`${m.migration_id}: private copy unreadable — DO NOT delete the source`);
+    const back = Buffer.from(await down.data.arrayBuffer());
+    if (back.byteLength !== m.source_bytes || sha256(back) !== m.source_sha256) {
+      die(`${m.migration_id}: private copy no longer matches the source — DO NOT delete the source`);
+    }
+
+    const { data: row } = await client.from("discuss_messages").select("metadata").eq("id", m.message_id).single();
+    const blob = JSON.stringify(row?.metadata ?? {});
+    if (blob.includes("/storage/v1/object/public/")) die(`${m.migration_id}: metadata still carries a public URL`);
+    if (blob.includes("/storage/v1/object/sign/")) die(`${m.migration_id}: metadata carries a signed URL`);
+
+    const res = await fetch(`${site}/api/files/discuss/${m.message_id}/${m.index}`, { redirect: "manual" });
+    if (res.status !== 401) die(`${m.migration_id}: unauthenticated route returned ${res.status}, expected 401`);
+    const cc = res.headers.get("cache-control") ?? "";
+    if (!cc.includes("private")) die(`${m.migration_id}: 401 cache-control is not private (${cc})`);
+
+    m.authorized_route_verified = true; ok++;
+    console.log(`  ${m.migration_id}: private copy byte-identical · metadata clean · unauth 401 (private cache)`);
+  }
+  writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+  console.log(`\n  ${ok}/${manifest.items.length} verified.`);
+  console.log(`\n  OPERATOR CHECK before 'revoke' (the one leg a script cannot do):`);
+  console.log(`    open Discuss in Production as a member of the affected channels and`);
+  console.log(`    confirm each migrated image/voice note still renders. Then re-run with`);
+  console.log(`    mode 'revoke' and KX_RUN_C_AUTHZ_CONFIRMED=true.\n`);
+}
+
+/* ── revoke (DESTRUCTIVE — one exact object at a time) ───────────────────── */
+
+async function revoke() {
+  baseGuards();
+  if (process.env.KX_RUN_C_AUTHZ_CONFIRMED !== "true") {
+    die("KX_RUN_C_AUTHZ_CONFIRMED must be exactly 'true' — the authorization matrix must pass before any source is deleted.");
+  }
+  if (!existsSync(MANIFEST_PATH)) die(`no manifest at ${MANIFEST_PATH}.`);
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as Manifest;
+  if (manifest.items.length !== EXPECTED_ITEMS) die(`manifest holds ${manifest.items.length} items, expected exactly ${EXPECTED_ITEMS}.`);
+  const client = db();
+  const save = () => writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+
+  for (const m of manifest.items) {
+    if (m.source_deleted) { console.log(`  ${m.migration_id}: already revoked — skipping`); continue; }
+    // Every precondition, re-checked. Deletion is the only irreversible step.
+    if (!m.copied || !m.byte_verified || !m.metadata_updated || !m.authorized_route_verified) {
+      die(`${m.migration_id}: preconditions incomplete — refusing to delete the only surviving copy.`);
+    }
+    // Exactly one path. Never a prefix, never a query, never a list().
+    const del = await client.storage.from(m.source_bucket).remove([m.source_path]);
+    if (del.error) {
+      console.error(`  ${m.migration_id}: source deletion FAILED — private copy retained. State is duplicated, not lost.`);
+      die(`stopping. Do not attempt broad cleanup; investigate this one object.`);
+    }
+    const pub = await fetch(`${PRODUCTION_URL}/storage/v1/object/public/${m.source_bucket}/${encodeURI(m.source_path)}`);
+    if (pub.ok) die(`${m.migration_id}: public URL still serves after deletion — investigate before continuing.`);
+    m.source_deleted = true; save();
+    console.log(`  ${m.migration_id}: source revoked · old public URL now HTTP ${pub.status}`);
+  }
+  console.log(`\n  revocation complete. Run mode 'audit' for the final proof.\n`);
+}
+
+/* ── audit (read-only final proof) ───────────────────────────────────────── */
+
+async function audit() {
+  baseGuards();
+  const client = db();
+  const live = await readInventory(client);
+  const { count: media } = await client.schema("storage").from("objects")
+    .select("*", { count: "exact", head: true }).eq("bucket_id", "media");
+
+  console.log(`\n  ── RUN C FINAL AUDIT ──────────────────────────────────────`);
+  console.log(`  Discuss items still referencing public '${SOURCE_BUCKET}' : ${live.length}   (target 0)`);
+  console.log(`  objects remaining in '${SOURCE_BUCKET}' (ALL modules)      : ${media}   (non-Discuss — must be untouched)`);
+  if (live.length !== 0) { console.error(`\n  NOT CLEAN: ${live.length} Discuss item(s) still resolve into the public bucket.\n`); process.exit(1); }
+  console.log(`\n  clean: zero Discuss-referenced objects remain in the public bucket.`);
+  console.log(`  Next (separate, Preview-first change): drop 'media' from CATEGORY_BUCKETS.discuss.\n`);
+}
+
 /* ── self-test ───────────────────────────────────────────────────────────── */
 
 /**
@@ -423,9 +553,12 @@ const mode = process.argv[2] ?? "";
 switch (mode) {
   case "plan":        await plan(); break;
   case "migrate":     await migrate(); break;
+  case "verify":      await verify(); break;
+  case "revoke":      await revoke(); break;
+  case "audit":       await audit(); break;
   case "prove-clean": proveClean(); break;
   case "self-test":   selfTest(); break;
   default:
-    console.error(`\n  usage: discuss-run-c.mts <plan|migrate|prove-clean|self-test>\n`);
+    console.error(`\n  usage: discuss-run-c.mts <plan|migrate|verify|revoke|audit|prove-clean|self-test>\n`);
     process.exit(1);
 }
