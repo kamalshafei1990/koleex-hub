@@ -498,7 +498,13 @@ export default function FloatingPanel() {
      bottom-40 (160 px) clears the composer with breathing room.
      Desktop keeps bottom-28 — the composer there sits inside a
      constrained max-w-[820px] block with more chrome below it. */
-  const fabBottomClass = isAiApp
+  /* Discuss needs the identical lift for the identical reason as the AI app:
+     its composer is also anchored to the bottom of the viewport, and its Send
+     button sits at the composer's bottom-END corner — exactly where an end-6
+     bottom-6 FAB lands. The FAB was covering Send. This condition read isAiApp
+     alone while isDiscussApp was already computed above and used only to hide
+     the Discuss tab; the offset never learned about Discuss. */
+  const fabBottomClass = isAiApp || isDiscussApp
     ? "bottom-40 md:bottom-28"
     : "bottom-6";
 
