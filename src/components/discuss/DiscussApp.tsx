@@ -3777,8 +3777,25 @@ function ModalShell({
   width?: number;
 }) {
   useScrollLock();
+  /* Dismiss with Escape, and by clicking the dimmed backdrop (target ===
+     currentTarget means the click landed on the overlay itself, not the panel
+     or its contents). Previously the only way out was picking a person or
+     finding the small X — clicking outside did nothing. */
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      role="presentation"
+    >
       <div
         className="w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
         style={{ maxWidth: width }}
