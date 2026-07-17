@@ -77,7 +77,11 @@
     "staging:cleanup-discuss-run-b": "node --import tsx scripts/staging-discuss-run-b.mts cleanup",
     "staging:verify-clean": "node --import tsx scripts/staging-discuss-run-b.mts verify-clean",
     "staging:reset": "node --import tsx scripts/staging-discuss-run-b.mts reset",
-    "audit:discuss-media-hygiene": "node --import tsx scripts/audit-discuss-media-hygiene.mts"
+    "audit:discuss-media-hygiene": "node --import tsx scripts/audit-discuss-media-hygiene.mts",
+    "runc:plan": "node --import tsx scripts/discuss-run-c.mts plan",
+    "runc:migrate": "node --import tsx scripts/discuss-run-c.mts migrate",
+    "runc:prove-clean": "node --import tsx scripts/discuss-run-c.mts prove-clean",
+    "runc:self-test": "node --import tsx scripts/discuss-run-c.mts self-test"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
