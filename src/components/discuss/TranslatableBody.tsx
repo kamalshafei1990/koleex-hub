@@ -30,7 +30,8 @@ export function TranslatableBody({
   autoTranslate,
   targetLang,
   t,
-  className = "text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words",
+  inverted = false,
+  className,
 }: {
   body: string;
   messageId: string;
@@ -38,8 +39,16 @@ export function TranslatableBody({
   autoTranslate: boolean;
   targetLang: string;
   t: (key: string, fallback?: string) => string;
+  /** Own messages sit on the solid --bg-inverted bubble, so the body text and
+   *  the Translate pill flip to --text-inverted to stay readable. */
+  inverted?: boolean;
   className?: string;
 }) {
+  const resolvedClassName =
+    className ??
+    `text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
+      inverted ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
+    }`;
   /* undefined = not translated yet; string = translated text (may equal body
      when source == target or the provider is unavailable). */
   const [translated, setTranslated] = useState<string | undefined>(() =>
@@ -81,19 +90,26 @@ export function TranslatableBody({
      disappears — the user can always re-trigger it. */
   const canToggle = translated !== undefined && changed;
 
-  /* Shared pill style — a small, always-visible button under the message. */
-  const pill =
-    "inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10.5px] font-medium " +
-    "border border-[var(--border-subtle)] text-[var(--text-dim)] " +
-    "hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors " +
-    "select-none";
+  /* Shared pill style — a small, always-visible button under the message.
+     Own messages (inverted) flip the pill to the --text-inverted family so it
+     reads on the solid bubble. */
+  const pill = inverted
+    ? "inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10.5px] font-medium " +
+      "border border-[var(--text-inverted)]/25 text-[var(--text-inverted)]/70 " +
+      "hover:text-[var(--text-inverted)] hover:bg-[var(--text-inverted)]/10 transition-colors " +
+      "select-none"
+    : "inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10.5px] font-medium " +
+      "border border-[var(--border-subtle)] text-[var(--text-dim)] " +
+      "hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors " +
+      "select-none";
+  const metaText = inverted ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]";
 
   return (
-    <div className={className}>
+    <div className={resolvedClassName}>
       {renderDiscussMarkdown(displayText, mentions, `mb-${messageId}`)}
       <div className="mt-1 flex items-center gap-2 not-italic whitespace-normal">
         {loading ? (
-          <span className="inline-flex items-center gap-1 h-6 px-2 text-[10.5px] text-[var(--text-dim)]">
+          <span className={`inline-flex items-center gap-1 h-6 px-2 text-[10.5px] ${metaText}`}>
             <SpinnerIcon className="h-3 w-3 animate-spin" />
             {t("translate.working", "Translating…")}
           </span>
@@ -119,7 +135,7 @@ export function TranslatableBody({
           </button>
         )}
         {canToggle && !showOriginal && (
-          <span className="text-[9.5px] text-[var(--text-dim)] uppercase tracking-wide">
+          <span className={`text-[9.5px] uppercase tracking-wide ${metaText}`}>
             {translateLangLabel(targetLang)}
           </span>
         )}
