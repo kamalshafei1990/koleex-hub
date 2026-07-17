@@ -3036,10 +3036,12 @@ function MessageSurface({
         "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
         "rounded-2xl border " +
         (isSelf
-          /* Mine: solid elevated tone (color-mix, theme-aware) + a squared corner
-             on the side the bubble grows from — the WeChat/WhatsApp tail, done
-             with radius instead of an SVG so it costs nothing to render. */
-          ? "bg-[color-mix(in_srgb,var(--bg-primary)_82%,var(--text-primary))] border-[var(--border-color)] rounded-ee-md"
+          /* Mine: a clean Apple-style card — white in light / neutral elevated
+             gray in dark (--discuss-bubble-self) — that lifts off the canvas via
+             the hub border + a soft shadow, with a squared corner on the side the
+             bubble grows from (the WeChat/WhatsApp tail, done with radius instead
+             of an SVG so it costs nothing to render). */
+          ? "bg-[var(--discuss-bubble-self)] border-[var(--border-color)] rounded-ee-md shadow-sm"
           /* Theirs: a real card — bg-secondary differs from the thread canvas
              (bg-primary) in BOTH themes, and a crisp --border-color edge, so it
              reads like every other card in the hub instead of washing into the
