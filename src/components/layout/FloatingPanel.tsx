@@ -529,6 +529,10 @@ export default function FloatingPanel() {
      keep the same end-6 offset so the visual anchor doesn't jump.
      Sized 32 px on mobile (thumb-friendly tap target) and 28 px on
      desktop where a precise cursor doesn't need the extra surface. */
+  /* Discuss now hosts "Koleex AI" as a pinned conversation in its own list, so
+     the floating orb would be a redundant second entry point there. Hide it on
+     /discuss entirely (placed after all hooks to respect rules-of-hooks). */
+  if (isDiscussApp) return null;
   if (minimized) {
     return (
       <button

@@ -53,6 +53,8 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
+import KoleexOrb from "@/components/ai/KoleexOrb";
+import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -351,6 +353,15 @@ export default function DiscussApp() {
   const [mobileView, setMobileView] = useState<"list" | "thread" | "details">(
     "list",
   );
+  /* "Koleex AI" is a pinned pseudo-conversation at the top of the list. When
+     open it takes over the thread column and renders <DiscussAiChat>; it is
+     mutually exclusive with a real selected channel. */
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const openAiChat = useCallback(() => {
+    setAiChatOpen(true);
+    setSelectedChannelId(null);
+    setMobileView("thread");
+  }, []);
 
   /* ── Modals ───────────────────────────────────────────────────── */
   const [newChannelOpen, setNewChannelOpen] = useState(false);
@@ -1044,6 +1055,7 @@ export default function DiscussApp() {
   }, []);
 
   const handleSelectChannel = useCallback((channelId: string) => {
+    setAiChatOpen(false);
     setSelectedChannelId(channelId);
     setMobileView("thread");
     setProductPickerOpen(false);
@@ -1707,6 +1719,37 @@ export default function DiscussApp() {
 
           {/* Channel list */}
           <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* Pinned "Koleex AI" conversation — always at the very top, above
+                loading/empty states, so the assistant is reachable like a DM. */}
+            <button
+              type="button"
+              onClick={openAiChat}
+              className={`relative w-full text-left px-3 py-2.5 flex items-center gap-3 border-b border-[var(--border-subtle)] transition-colors ${
+                aiChatOpen
+                  ? "bg-[var(--bg-inverted)]"
+                  : "hover:bg-[var(--bg-surface-hover)]"
+              }`}
+            >
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center">
+                <KoleexOrb state="idle" size={36} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className={`text-[13px] font-semibold truncate ${
+                    aiChatOpen ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  {t("ai.title", "Koleex AI")}
+                </div>
+                <div
+                  className={`text-[11.5px] truncate ${
+                    aiChatOpen ? "text-[var(--text-inverted)]/70" : "text-[var(--text-dim)]"
+                  }`}
+                >
+                  {t("ai.subtitle", "Ask me anything")}
+                </div>
+              </div>
+            </button>
             {loadingChannels ? (
               <div className="h-full flex items-center justify-center">
                 <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
@@ -1811,7 +1854,20 @@ export default function DiscussApp() {
             mobileView === "thread" ? "flex w-full" : "hidden md:flex"
           }`}
         >
-          {!selectedChannel ? (
+          {aiChatOpen ? (
+            <DiscussAiChat
+              onBack={() => {
+                setAiChatOpen(false);
+                setMobileView("list");
+              }}
+              labels={{
+                title: t("ai.title", "Koleex AI"),
+                subtitle: t("ai.subtitle", "Your assistant · always here"),
+                placeholder: t("ai.placeholder", "Ask Koleex AI anything…"),
+                empty: t("ai.empty", "Ask me anything — I can help across the Hub."),
+              }}
+            />
+          ) : !selectedChannel ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                 <DiscussIcon size={24} className="text-[var(--text-ghost)]" />
