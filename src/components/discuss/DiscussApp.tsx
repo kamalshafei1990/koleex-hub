@@ -208,15 +208,18 @@ function formatDaySeparator(iso: string, todayText: string, yesterdayText: strin
   });
 }
 
+/* Monochrome-first brand: fallback avatars are grayscale, told apart by
+   initials + name rather than colour. Eight neutral steps (light → dark) give
+   just enough separation between adjacent rows without introducing any hue. */
 const AVATAR_GRADIENTS = [
-  "from-sky-500 to-blue-600",
-  "from-violet-500 to-fuchsia-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
-  "from-rose-500 to-pink-600",
-  "from-indigo-500 to-purple-600",
-  "from-cyan-500 to-sky-600",
-  "from-lime-500 to-emerald-600",
+  "from-neutral-400 to-neutral-500",
+  "from-neutral-500 to-neutral-600",
+  "from-neutral-600 to-neutral-700",
+  "from-neutral-300 to-neutral-500",
+  "from-neutral-500 to-neutral-700",
+  "from-neutral-400 to-neutral-600",
+  "from-neutral-600 to-neutral-800",
+  "from-neutral-300 to-neutral-600",
 ];
 
 function gradientFor(seed: string): string {
@@ -1556,7 +1559,7 @@ export default function DiscussApp() {
         </p>
         <Link
           href="/"
-          className="text-[12px] font-semibold text-[var(--accent)] hover:text-[var(--accent)]"
+          className="text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
         >
           {t("back")}
         </Link>
@@ -1689,7 +1692,7 @@ export default function DiscussApp() {
                   onClick={() => setSidebarFilter(f)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
                     sidebarFilter === f
-                      ? "bg-[var(--accent)]/15 text-[var(--accent)]"
+                      ? "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]"
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                   }`}
                 >
@@ -1723,7 +1726,7 @@ export default function DiscussApp() {
                   <button
                     type="button"
                     onClick={() => setNewChannelOpen(true)}
-                    className="h-8 px-3 rounded-lg bg-[var(--accent)]/15 text-[var(--accent)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--accent)]/25 transition-colors"
+                    className="h-8 px-3 rounded-lg bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-surface-hover)] transition-colors"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {t("sidebar.newChannel")}
@@ -2168,12 +2171,12 @@ function ChannelRow({
         type="button"
         onClick={onSelect}
         className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
-          selected ? "bg-[var(--accent)]/10" : "hover:bg-white/[0.03]"
+          selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-white/[0.03]"
         }`}
       >
         {selected && (
           <span
-            className="absolute inset-y-0 start-0 w-[3px] bg-[var(--accent)]"
+            className="absolute inset-y-0 start-0 w-[3px] bg-[var(--text-primary)]"
             aria-hidden
           />
         )}
@@ -2226,7 +2229,7 @@ function ChannelRow({
                 )}
               </span>
               {channel.unread_count > 0 && (
-                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-[var(--accent)] text-white text-[10.5px] font-bold tabular-nums flex items-center justify-center">
+                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums flex items-center justify-center">
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
               )}
@@ -2438,7 +2441,7 @@ function TranslateControl({
         onClick={() => onOpenChange(!open)}
         className={`h-8 px-2 rounded-md flex items-center gap-1.5 transition-colors ${
           prefs.auto
-            ? "text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15"
+            ? "text-[var(--text-secondary)] bg-[var(--bg-surface-active)] hover:bg-[var(--bg-surface-active)]"
             : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
         }`}
         title={t("translate.title", "Translation")}
@@ -2468,7 +2471,7 @@ function TranslateControl({
               aria-checked={prefs.auto}
               onClick={() => onChange({ auto: !prefs.auto })}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                prefs.auto ? "bg-[var(--accent)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+                prefs.auto ? "bg-[var(--bg-inverted)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
               }`}
             >
               <span
@@ -2690,7 +2693,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={onSaveEdit}
-                className="h-6 px-2 rounded-md bg-[var(--accent)] text-white text-[10.5px] font-semibold hover:bg-[var(--accent-hover)]"
+                className="h-6 px-2 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-semibold hover:bg-[var(--bg-inverted-hover)]"
               >
                 {t("edit.save", "Save")}
               </button>
@@ -2755,7 +2758,7 @@ function MessageBubble({
                     onClick={() => onToggleReaction(msg.id, rx.emoji)}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
                       rx.reacted_by_me
-                        ? "bg-[var(--accent)]/15 border-[var(--accent)]/30 text-[var(--accent)]"
+                        ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)]"
                         : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                     }`}
                   >
@@ -2778,7 +2781,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={() => onOpenThread(msg)}
-                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[10.5px] font-semibold hover:bg-[var(--accent)]/15 transition-colors"
+                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[var(--bg-surface-active)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[10.5px] font-semibold hover:bg-[var(--bg-surface-active)] transition-colors"
               >
                 <MessageSquareIcon className="h-3 w-3" />
                 {msg.thread.reply_count === 1
@@ -2922,9 +2925,9 @@ function ReplyPreviewPill({
     : (preview.body ?? "").slice(0, 120);
   return (
     <div className="mb-1 flex items-stretch gap-2 max-w-[480px]">
-      <div className="w-[3px] rounded-full bg-[var(--accent)]/50 shrink-0" />
+      <div className="w-[3px] rounded-full bg-[var(--text-dim)] shrink-0" />
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold text-[var(--accent)]">
+        <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
           {t("reply.replyingTo", "Replying to")} {author}
         </div>
         <div className="text-[11px] text-[var(--text-dim)] truncate italic">
@@ -2998,7 +3001,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
           {product.name}
         </div>
-        <div className="text-[10.5px] text-[var(--accent)] truncate">
+        <div className="text-[10.5px] text-[var(--text-secondary)] truncate">
           {product.slug}
         </div>
       </div>
@@ -3127,10 +3130,10 @@ function Composer({
     >
       {/* Reply-to banner */}
       {replyTarget && (
-        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30">
-          <div className="w-[3px] self-stretch rounded-full bg-[var(--accent)] shrink-0" />
+        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]">
+          <div className="w-[3px] self-stretch rounded-full bg-[var(--text-primary)] shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold text-[var(--accent)]">
+            <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
               {t("reply.replyingTo", "Replying to")}{" "}
               {replyTarget.author?.full_name ||
                 replyTarget.author?.username ||
@@ -3206,9 +3209,9 @@ function Composer({
           {products.map((p, i) => (
             <div
               key={`cp-${i}`}
-              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30"
+              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]"
             >
-              <PackageIcon className="h-3.5 w-3.5 text-[var(--accent)]" />
+              <PackageIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
               <span className="text-[11.5px] text-[var(--text-primary)] max-w-[180px] truncate font-medium">
                 {p.name}
               </span>
@@ -3268,7 +3271,7 @@ function Composer({
             type="button"
             onClick={onSend}
             disabled={!canSend}
-            className="h-8 px-3 rounded-lg bg-[var(--accent)] text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {sending ? (
               <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -3448,7 +3451,7 @@ function DetailsPane({
                     <div className="text-[10px] text-[var(--text-dim)] truncate">
                       @{m.author.username}
                       {m.role !== "member" && (
-                        <span className="ms-1.5 text-[var(--accent)] font-semibold uppercase tracking-wider">
+                        <span className="ms-1.5 text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                           {m.role}
                         </span>
                       )}
@@ -3504,16 +3507,16 @@ function NotifPrefRow({
       onClick={onClick}
       className={`h-9 px-3 flex items-center gap-2 text-[12px] font-medium transition-colors text-start ${
         active
-          ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+          ? "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]"
           : "text-[var(--text-muted)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
       }`}
     >
       <span
         className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
-          active ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"
+          active ? "border-[var(--border-strong)]" : "border-[var(--border-subtle)]"
         }`}
       >
-        {active && <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
+        {active && <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />}
       </span>
       <span className="flex-1">{label}</span>
     </button>
@@ -3631,7 +3634,7 @@ function NewChannelModal({
             onClick={() => setKind("channel")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "channel"
-                ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
+                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3648,7 +3651,7 @@ function NewChannelModal({
             onClick={() => setKind("group")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "group"
-                ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
+                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3720,7 +3723,7 @@ function NewChannelModal({
                       })
                     }
                     className={`w-full px-3 py-2 flex items-center gap-2.5 text-start transition-colors ${
-                      isOn ? "bg-[var(--accent)]/10" : "hover:bg-[var(--bg-primary)]"
+                      isOn ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-primary)]"
                     }`}
                   >
                     <Avatar
@@ -3739,7 +3742,7 @@ function NewChannelModal({
                         )}
                       </div>
                     </div>
-                    {isOn && <CheckIcon className="h-4 w-4 text-[var(--accent)]" />}
+                    {isOn && <CheckIcon className="h-4 w-4 text-[var(--text-secondary)]" />}
                   </button>
                 );
               })}
@@ -3772,7 +3775,7 @@ function NewChannelModal({
               memberIds: Array.from(selected),
             })
           }
-          className="h-8 px-3 rounded-lg bg-[var(--accent)] text-white text-[11.5px] font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
           {t("new.channel.create")}
         </button>
