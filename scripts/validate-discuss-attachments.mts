@@ -161,7 +161,13 @@ check("resolver: tenant eq filter", /\.eq\("discuss_channels\.tenant_id", auth\.
 check("resolver: active membership required", /\.is\("left_at", null\)/.test(resolver));
 check("resolver: deleted message denied", /msg\.deleted_at/.test(resolver));
 check("resolver: empty path fails closed", /!src\.path/.test(resolver));
-check("resolver: private cache header", /"Cache-Control",\s*"private, max-age=0, must-revalidate"/.test(resolver));
+/* The literal used to be inline on the success path. It now lives in the
+   CACHE_PRIVATE constant that EVERY response (success and denial) is stamped
+   with — same value, wider coverage. Assert the value and its use, not the
+   old inline form. See the CACHE HEADERS block below. */
+check("resolver: private cache header",
+  /const CACHE_PRIVATE = "private, max-age=0, must-revalidate"/.test(resolver) &&
+  /headers\.set\("Cache-Control", CACHE_PRIVATE\)/.test(resolver));
 check("resolver: nosniff", /"X-Content-Type-Options",\s*"nosniff"/.test(resolver));
 check("resolver: no redirect to storage", !/NextResponse\.redirect/.test(resolver));
 check("resolver: forwards Range", /upstreamHeaders\.Range = range/.test(resolver));
@@ -329,6 +335,66 @@ check("route: saveDraft strips media before persist",
     saveDraftBlock.length > 0 && !/metadata: \(p\.metadata as Json\)/.test(saveDraftBlock));
   check("route: saveDraft block strips media before persist",
     /sanitizeDraftMetadataForStorage\(p\.metadata\)/.test(saveDraftBlock));
+}
+
+/* ── CACHE HEADERS ─────────────────────────────────────────────────────────
+   Every response the file route can emit must carry
+   `private, max-age=0, must-revalidate` — never `public`.
+
+   Run B proved the success path was already `private` and the 401 was not: the
+   failure paths set no header, so Next.js supplied its default `public, …`.
+   Nothing was served stale and no user data sits in a denial body, but `public`
+   on an authorization decision tells shared caches the response is not
+   user-specific, when that is exactly what it is.
+
+   These assertions are written against the mechanism (one constant, one
+   stamping helper, applied at every construction site) rather than against
+   response text, so adding a new early-return without the helper fails here. */
+{
+  check("cache: single private cache constant is defined",
+    /const CACHE_PRIVATE = "private, max-age=0, must-revalidate"/.test(resolver));
+
+  check("cache: withPrivateCache helper sets Cache-Control from that constant",
+    /function withPrivateCache[\s\S]{0,200}?headers\.set\("Cache-Control", CACHE_PRIVATE\)/.test(resolver));
+
+  check("cache: 404 deny() is wrapped",
+    /const deny = \(\) =>\s*withPrivateCache\(/.test(resolver));
+
+  check("cache: 401 from requireAuth is re-stamped (not returned raw)",
+    /if \(auth instanceof NextResponse\) return withPrivateCache\(auth\)/.test(resolver));
+  check("cache: 401 is NOT returned unwrapped",
+    !/if \(auth instanceof NextResponse\) return auth;/.test(resolver));
+
+  check("cache: 405 handler exists and is wrapped",
+    /const methodNotAllowed = \(\) =>\s*withPrivateCache\(/.test(resolver));
+  check("cache: 405 declared for every non-GET method (no framework-default 405)",
+    ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"].every((m) =>
+      new RegExp(`export const ${m} = methodNotAllowed;`).test(resolver)));
+  check("cache: 405 advertises Allow",
+    /status: 405, headers: \{ Allow: "GET, HEAD" \}/.test(resolver));
+
+  check("cache: 200/206 success path uses the same constant",
+    /headers\.set\("Cache-Control", CACHE_PRIVATE\)/.test(resolver));
+
+  check("cache: 416 partial-range rejection is wrapped",
+    /upstream\.status === 416\) return withPrivateCache\(/.test(resolver));
+  check("cache: 413 too-large is wrapped",
+    /"File too large"[\s\S]{0,40}?\)\)/.test(resolver) &&
+    /withPrivateCache\(NextResponse\.json\(\{ error: "File too large"/.test(resolver));
+  check("cache: 503 storage-unavailable is wrapped",
+    /withPrivateCache\(NextResponse\.json\(\{ error: "Storage unavailable"/.test(resolver));
+  check("cache: 504 upstream-timeout is wrapped",
+    /withPrivateCache\(NextResponse\.json\(\{ error: "Upstream timeout"/.test(resolver));
+
+  /* The catch-all: no response may be constructed in this route without the
+     helper. Counts raw NextResponse constructions that are NOT wrapped and NOT
+     the streaming success path (which sets the header on its own headers obj). */
+  const rawUnwrapped = (resolver.match(/return NextResponse\.json\(/g) ?? []).length;
+  check("cache: zero unwrapped NextResponse.json returns remain",
+    rawUnwrapped === 0);
+
+  check("cache: route never emits a public cache directive",
+    !/"public, max-age/.test(resolver) && !/Cache-Control", "public/.test(resolver));
 }
 
 /* ── REPORT ────────────────────────────────────────────────────────────── */

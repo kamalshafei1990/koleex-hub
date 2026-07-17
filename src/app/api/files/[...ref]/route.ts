@@ -62,7 +62,45 @@ const CATEGORY_BUCKETS: Record<string, string[]> = {
  *  which could execute in our origin) is forced to download. */
 const INLINE_MIME = /^(image\/(png|jpe?g|gif|webp|avif)|application\/pdf|audio\/|video\/)/i;
 
-const deny = () => NextResponse.json({ error: "Not found" }, { status: 404 });
+/* ---------------------------------------------------------------------------
+   Cache policy — ONE value, applied to EVERY response this route can emit.
+
+   The success path always set `private`. The FAILURE paths did not set anything,
+   so Next.js applied its default `public, max-age=0, must-revalidate`. Nothing
+   was ever served stale (max-age=0 + must-revalidate), and no user data is in a
+   denial body — but `public` on an authorization decision is wrong on its face:
+   it tells every shared cache on the path that the response is not
+   user-specific, when the whole point of a 401/404 here is that it IS.
+
+   The rule is therefore expressed once, and no response is constructed without
+   it. That includes the 401 handed back by requireAuth(), which this route does
+   not build itself and so cannot be trusted to carry the right header. */
+const CACHE_PRIVATE = "private, max-age=0, must-revalidate";
+
+/** Stamp the cache policy onto any response, including ones built elsewhere
+ *  (requireAuth's 401). Always overwrites — a caller that already set a weaker
+ *  value is exactly the bug this exists to prevent. */
+function withPrivateCache<T extends Response>(res: T): T {
+  res.headers.set("Cache-Control", CACHE_PRIVATE);
+  return res;
+}
+
+const deny = () =>
+  withPrivateCache(NextResponse.json({ error: "Not found" }, { status: 404 }));
+
+/** 405 for every non-GET method. Next.js would synthesise its own 405 for a
+ *  missing export, but that response is outside our control and would carry the
+ *  framework default header — so the methods are declared explicitly. */
+const methodNotAllowed = () =>
+  withPrivateCache(
+    NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "GET, HEAD" } }),
+  );
+
+export const POST = methodNotAllowed;
+export const PUT = methodNotAllowed;
+export const PATCH = methodNotAllowed;
+export const DELETE = methodNotAllowed;
+export const OPTIONS = methodNotAllowed;
 
 /** Reject traversal / injection shapes even though paths come from our DB. */
 function unsafePath(p: string): boolean {
@@ -177,7 +215,10 @@ export async function GET(
 ) {
   const timing = stageTimer("files.stream");
   const auth = await requireAuth();
-  if (auth instanceof NextResponse) return auth; // 401 — auth precedes everything
+  /* 401 — auth precedes everything. requireAuth() builds this response, so it
+     carries the framework's default cache header; re-stamp it here rather than
+     trusting a shared helper we don't own to know this route's policy. */
+  if (auth instanceof NextResponse) return withPrivateCache(auth);
   timing.mark("auth");
 
   const { ref } = await params;
@@ -196,7 +237,7 @@ export async function GET(
   if (!resolved || !CATEGORY_BUCKETS[category].includes(resolved.bucket)) return deny();
   timing.mark("authorize");
 
-  if (!SUPABASE_URL || !SERVICE_KEY) return NextResponse.json({ error: "Storage unavailable" }, { status: 503 });
+  if (!SUPABASE_URL || !SERVICE_KEY) return withPrivateCache(NextResponse.json({ error: "Storage unavailable" }, { status: 503 }));
 
   /* Fetch with the service key (server-only; never exposed, never redirected
      to). Range is forwarded verbatim so partial PDF loading keeps working. */
@@ -214,15 +255,15 @@ export async function GET(
       { headers: upstreamHeaders, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) },
     );
   } catch {
-    return NextResponse.json({ error: "Upstream timeout" }, { status: 504 });
+    return withPrivateCache(NextResponse.json({ error: "Upstream timeout" }, { status: 504 }));
   }
   timing.mark("upstream");
 
-  if (upstream.status === 416) return new NextResponse(null, { status: 416 });
+  if (upstream.status === 416) return withPrivateCache(new NextResponse(null, { status: 416 }));
   if (!upstream.ok) return deny();
 
   const size = Number(upstream.headers.get("content-length") ?? "0");
-  if (size > MAX_BYTES) return NextResponse.json({ error: "File too large" }, { status: 413 });
+  if (size > MAX_BYTES) return withPrivateCache(NextResponse.json({ error: "File too large" }, { status: 413 }));
 
   const mime = upstream.headers.get("content-type") ?? "application/octet-stream";
   const inline = INLINE_MIME.test(mime);
@@ -232,7 +273,7 @@ export async function GET(
   headers.set("Content-Type", inline ? mime : "application/octet-stream");
   headers.set("Content-Disposition", `${inline && !req.url.includes("download=1") ? "inline" : "attachment"}; filename="${safeName}"`);
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Cache-Control", "private, max-age=0, must-revalidate");
+  headers.set("Cache-Control", CACHE_PRIVATE);
   for (const h of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
     const v = upstream.headers.get(h);
     if (v) headers.set(h, v);
