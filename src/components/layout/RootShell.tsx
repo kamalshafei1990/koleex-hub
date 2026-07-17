@@ -11,6 +11,7 @@
 import { usePathname } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
+import { AppHeaderProvider } from "./AppHeaderSlot";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
@@ -190,7 +191,13 @@ export default function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate title="Koleex Hub" subtitle="Sign in to access the platform">
       <SidebarProvider>
-        <ShellContent>{children}</ShellContent>
+        {/* Lets a route hand its own context (title/avatar/actions) up to
+            MainHeader so it renders ONE header instead of stacking its own
+            band under the global one. Routes that never register keep the
+            standard header — see AppHeaderSlot. */}
+        <AppHeaderProvider>
+          <ShellContent>{children}</ShellContent>
+        </AppHeaderProvider>
       </SidebarProvider>
     </AuthGate>
   );

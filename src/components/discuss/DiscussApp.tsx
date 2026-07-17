@@ -120,6 +120,7 @@ import { ThreadPane } from "./ThreadPane";
 import { SearchPanel } from "./SearchPanel";
 import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
 import { initialsOf } from "@/lib/discuss/initials";
+import { useAppHeaderSlot } from "@/components/layout/AppHeaderSlot";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { discussT } from "@/lib/translations/discuss";
@@ -1463,6 +1464,112 @@ export default function DiscussApp() {
         : t("notif.unmuted", "Channel unmuted"),
     );
   }, [selectedChannelId, accountId, channels, showToast, t]);
+  /* ── Unified header ───────────────────────────────────────────────────────
+     Discuss hands its conversation context UP to the global MainHeader instead
+     of rendering its own 56px band beneath it — two identical bands stacked is
+     what made the app feel heavy. MainHeader stays generic: it receives a
+     title, a subtitle and opaque nodes, and knows nothing about channels.
+
+     Memoised on the real inputs (id/name/description/muted/members/translate
+     prefs/mobile view). Without that, the nodes below are new objects every
+     render and the effect would re-register the slot on every keystroke. */
+  const headerActions = useMemo(() => {
+    if (!selectedChannel) return null;
+    return (
+      <>
+        <TranslateControl
+          prefs={translatePrefs}
+          open={translateMenuOpen}
+          onOpenChange={setTranslateMenuOpen}
+          onChange={updateTranslatePrefs}
+          t={t}
+        />
+        <button
+          type="button"
+          onClick={() => void handleToggleMute()}
+          className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
+            selectedChannel.muted
+              ? "text-red-300 hover:bg-red-500/10"
+              : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          }`}
+          /* Explicitly "this conversation" — the global bell sits a few pixels
+             away and the two must not read as the same control. */
+          aria-label={
+            selectedChannel.muted
+              ? t("header.unmute", "Unmute this conversation")
+              : t("header.mute", "Mute this conversation")
+          }
+          title={
+            selectedChannel.muted
+              ? t("header.unmute", "Unmute this conversation")
+              : t("header.mute", "Mute this conversation")
+          }
+        >
+          {selectedChannel.muted ? (
+            <BellOffIcon className="h-4 w-4" />
+          ) : (
+            <BellIcon className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDetailsOpen((v) => !v);
+            setMobileView("details");
+          }}
+          className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+          aria-label={t("header.details")}
+          title={t("header.details")}
+        >
+          <InfoIcon className="h-4 w-4" />
+        </button>
+      </>
+    );
+  }, [selectedChannel, translatePrefs, translateMenuOpen, updateTranslatePrefs, handleToggleMute, t]);
+
+  const headerAvatar = useMemo(() => {
+    if (!selectedChannel) return null;
+    return selectedChannel.kind === "direct" ? (
+      <Avatar
+        name={displayNameFor(selectedChannel)}
+        url={selectedChannel.other?.avatar_url}
+        size={28}
+      />
+    ) : (
+      <div className="h-7 w-7 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+        {selectedChannel.kind === "channel" ? (
+          <HashtagIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+        ) : (
+          <UsersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+        )}
+      </div>
+    );
+  }, [selectedChannel]);
+
+  const handleHeaderBack = useCallback(() => setMobileView("list"), []);
+
+  const headerSlot = useMemo(() => {
+    /* No conversation, or the operator is on the mobile list — show the plain
+       "Koleex | Discuss" identity rather than a stale conversation title. */
+    if (!selectedChannel || mobileView === "list") return null;
+    return {
+      title: displayNameFor(selectedChannel),
+      subtitle:
+        selectedChannel.kind === "direct"
+          ? selectedChannel.other?.username
+            ? `@${selectedChannel.other.username}`
+            : undefined
+          : selectedChannel.description ||
+            t("header.memberCount").replace("{count}", String(members.length)),
+      avatar: headerAvatar,
+      onBack: handleHeaderBack,
+      backLabel: t("mobile.list"),
+      actions: headerActions,
+    };
+  }, [selectedChannel, mobileView, members.length, headerAvatar, headerActions, handleHeaderBack, t]);
+
+  useAppHeaderSlot(headerSlot);
+
 
   const handleSetNotificationPref = useCallback(
     async (pref: DiscussNotificationPref) => {
@@ -1825,87 +1932,6 @@ export default function DiscussApp() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-                {/* Mobile back to the conversation list. This is the ONLY place
-                    it now lives — the app bar that used to host it is gone. */}
-                <button
-                  type="button"
-                  onClick={() => setMobileView("list")}
-                  className="md:hidden -ms-2 h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-                  aria-label={t("mobile.list")}
-                >
-                  <ArrowLeftIcon className="h-5 w-5" />
-                </button>
-                {selectedChannel.kind === "direct" ? (
-                  <Avatar
-                    name={displayNameFor(selectedChannel)}
-                    url={selectedChannel.other?.avatar_url}
-                    size={34}
-                  />
-                ) : (
-                  <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    {selectedChannel.kind === "channel" ? (
-                      <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
-                    ) : (
-                      <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
-                    )}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-                    {displayNameFor(selectedChannel)}
-                  </div>
-                  <div className="text-[11px] text-[var(--text-dim)] truncate">
-                    {selectedChannel.kind === "direct"
-                      ? selectedChannel.other?.username
-                        ? `@${selectedChannel.other.username}`
-                        : ""
-                      : selectedChannel.description ||
-                        t("header.memberCount").replace(
-                          "{count}",
-                          String(members.length),
-                        )}
-                  </div>
-                </div>
-                <TranslateControl
-                  prefs={translatePrefs}
-                  open={translateMenuOpen}
-                  onOpenChange={setTranslateMenuOpen}
-                  onChange={updateTranslatePrefs}
-                  t={t}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleToggleMute()}
-                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
-                    selectedChannel.muted
-                      ? "text-red-300 hover:bg-red-500/10"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                  }`}
-                  title={
-                    selectedChannel.muted
-                      ? t("header.unmute", "Unmute")
-                      : t("header.mute", "Mute")
-                  }
-                >
-                  {selectedChannel.muted ? (
-                    <BellOffIcon className="h-4 w-4" />
-                  ) : (
-                    <BellIcon className="h-4 w-4" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDetailsOpen((v) => !v);
-                    setMobileView("details");
-                  }}
-                  className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-                  title={t("header.details")}
-                >
-                  <InfoIcon className="h-4 w-4" />
-                </button>
-              </div>
 
               {/* Message list */}
               <div
