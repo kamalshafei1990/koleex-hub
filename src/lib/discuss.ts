@@ -562,19 +562,28 @@ export function subscribeToChannel(
   void handlers.onReactionDelete;
   let closed = false;
   let refreshing = false;
+  let again = false; // a ping landed while a refresh was in flight
   let primed = false;
   let latest = "1970-01-01T00:00:00+00:00"; // max created_at seen — incremental cursor
   const seen = new Set<string>();
 
   const refresh = async () => {
-    if (closed || refreshing) return;
+    if (closed) return;
+    if (refreshing) {
+      /* CRITICAL: never swallow a ping. A second message arriving while the
+         first one's fetch is in flight used to be dropped here, so the
+         receiver didn't see it until the slow reconcile poll. Queue exactly
+         one trailing re-run instead. */
+      again = true;
+      return;
+    }
     refreshing = true;
     try {
       /* Prime once with a full fetch (no callbacks — don't replay history),
          then every ping does a lightweight incremental fetch of ONLY messages
          newer than the cursor, so a new message reaches the receiver in one
          small query instead of re-pulling + diffing the whole channel. Edits /
-         reactions are reconciled by the parent's 5s full poll. */
+         reactions are reconciled by the parent's reconcile poll. */
       const msgs = primed
         ? await fetchChannelMessages(channelId, { currentAccountId: "", after: latest })
         : await fetchChannelMessages(channelId, { currentAccountId: "" });
@@ -589,6 +598,10 @@ export function subscribeToChannel(
       primed = true;
     } finally {
       refreshing = false;
+      if (again && !closed) {
+        again = false;
+        void refresh();
+      }
     }
   };
 

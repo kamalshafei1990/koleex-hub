@@ -698,7 +698,15 @@ export default function HomePage() {
       try {
         const rows = await fetchMyChannels(id);
         if (cancelled) return;
-        setDiscussUnread(rows.reduce((acc, c) => acc + (c.unread_count ?? 0), 0));
+        /* A manually "marked as unread" chat (WeChat-style dot, no count)
+           counts as 1 so the home badge lights up for it too. */
+        setDiscussUnread(
+          rows.reduce(
+            (acc, c) =>
+              acc + (c.unread_count ?? 0) + (c.marked_unread && !c.unread_count ? 1 : 0),
+            0,
+          ),
+        );
       } catch {
         /* keep prior count on transient failure */
       }

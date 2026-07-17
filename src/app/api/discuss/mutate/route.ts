@@ -22,7 +22,7 @@ import "server-only";
    keeps delivering.
    --------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
@@ -323,15 +323,18 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) return bad(error.message, 500);
-        const members = await channelMemberIds(channelId);
-        await pingChannelActivity(channelId, members, me);
-        /* Mobile push to the OTHER members (installed PWA / phone). Best-effort:
-           if VAPID isn't configured, or a member hasn't enabled notifications
-           (no push_subscriptions row), it's a silent no-op. Awaited so it isn't
-           torn down after the response, but the sends run in parallel. */
-        try {
-          const recipients = members.filter((id) => id !== me);
-          if (recipients.length > 0) {
+        /* The sender's ack must NOT wait on notification fan-out. Everything
+           below (member lookup → realtime ping → web-push to FCM/APNs) runs
+           AFTER the response is flushed via next/server's after(), which keeps
+           the serverless function alive until the work completes. Previously
+           this was all awaited inline and every send carried push-provider
+           latency (hundreds of ms to seconds). */
+        after(async () => {
+          try {
+            const members = await channelMemberIds(channelId);
+            await pingChannelActivity(channelId, members, me);
+            const recipients = members.filter((id) => id !== me);
+            if (recipients.length === 0) return;
             const [{ data: sender }, { data: ch }] = await Promise.all([
               supabaseServer
                 .from("accounts")
@@ -366,10 +369,10 @@ export async function POST(req: Request) {
               },
               { actorAccountId: me },
             );
+          } catch {
+            /* ping/push are best-effort — never fail the send over them */
           }
-        } catch {
-          /* push is best-effort — never fail the send over a notification */
-        }
+        });
         return NextResponse.json({ ok: true, data });
       }
 

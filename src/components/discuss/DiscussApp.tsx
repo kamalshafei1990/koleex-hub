@@ -738,17 +738,25 @@ export default function DiscussApp() {
             return prev;
           }
           const existing = prev[idx];
+          /* The realtime ping is a minimal synthetic row (ids only, body null
+             — content never travels over broadcast). Overwriting the preview
+             with it used to blank the row ("—") until the debounced refetch
+             landed. Keep the previous preview text and just bump the clock /
+             unread; the silent refetch brings the real snippet ~1s later. */
           const next: DiscussChannelWithState = {
             ...existing,
             last_message_at: msg.created_at,
-            last_message: {
-              id: msg.id,
-              body: msg.body,
-              kind: msg.kind,
-              author_username:
-                existing.last_message?.author_username ?? null,
-              created_at: msg.created_at,
-            },
+            last_message:
+              msg.body === null && existing.last_message
+                ? { ...existing.last_message, created_at: msg.created_at }
+                : {
+                    id: msg.id,
+                    body: msg.body,
+                    kind: msg.kind,
+                    author_username:
+                      existing.last_message?.author_username ?? null,
+                    created_at: msg.created_at,
+                  },
             unread_count:
               isSelected || isMine
                 ? existing.unread_count
@@ -1702,6 +1710,8 @@ export default function DiscussApp() {
           prev.map((c) => (c.id === ch.id ? { ...c, marked_unread: true } : c)),
         );
         await markChannelUnread(ch.id);
+        /* Light up the home-tile badge + bell immediately, same as mark-read. */
+        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
       }
       void loadChannels(true);
     },

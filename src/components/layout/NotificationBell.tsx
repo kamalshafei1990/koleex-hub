@@ -167,7 +167,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   /* Discuss unread is derived from the channel list so it stays in
      sync with the dropdown rows the user actually sees. */
   const discussUnread = discussChannels.reduce(
-    (acc, c) => acc + (c.unread_count ?? 0),
+    (acc, c) =>
+      acc +
+      (c.unread_count ?? 0) +
+      /* Manually "marked as unread" (WeChat-style dot, no count) counts as 1
+         so the bell stays in lock-step with the home-tile badge. */
+      (c.marked_unread && !c.unread_count ? 1 : 0),
     0,
   );
   const totalUnread = discussUnread + inboxUnread;
