@@ -2557,9 +2557,14 @@ function MessageSurface({
   return (
     <div
       className={
-        isSelf
-          ? "max-w-[62ch] text-[13px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-bright)] px-3 py-2.5"
-          : "max-w-[62ch] text-[13px]"
+        "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
+        "rounded-2xl border " +
+        (isSelf
+          /* Mine: brightest surface the palette offers + a squared corner on the
+             side the bubble grows from — the WeChat/WhatsApp tail, done with
+             radius instead of an SVG so it costs nothing to render. */
+          ? "bg-[var(--bg-surface-bright)] border-[var(--border-color)] rounded-ee-md"
+          : "bg-[var(--bg-surface)] border-[var(--border-subtle)] rounded-es-md")
       }
     >
       {children}
@@ -2601,27 +2606,35 @@ function MessageBubble({
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`group relative flex gap-3 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] ${showAuthor ? "mt-3" : ""}`}
+      className={`group relative flex gap-2 px-2 -mx-2 rounded-lg ${
+        isSelf ? "flex-row-reverse" : ""
+      } ${showAuthor ? "mt-3" : "mt-0.5"}`}
     >
       {showAuthor ? (
         <Avatar
           name={authorName}
           url={author?.avatar_url ?? null}
-          size={36}
+          size={32}
         />
       ) : (
-        <div className="w-9 shrink-0 flex items-start justify-center pt-1">
+        <div className="w-8 shrink-0 flex items-start justify-center pt-1">
           <span className="text-[9px] text-transparent group-hover:text-[var(--text-dim)] tabular-nums transition-colors">
             {time}
           </span>
         </div>
       )}
-      <div className="flex-1 min-w-0">
+      {/* min-w-0 keeps long words wrapping; the flex column aligns the bubble
+          to the correct edge so mine hug the right like WeChat. */}
+      <div className={`flex-1 min-w-0 flex flex-col ${isSelf ? "items-end" : "items-start"}`}>
         {showAuthor && (
-          <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="text-[13px] font-semibold text-[var(--text-primary)]">
-              {authorName}
-            </span>
+          <div className={`flex items-baseline gap-2 mb-1 px-0.5 ${isSelf ? "flex-row-reverse" : ""}`}>
+            {/* My own name is noise — the bubble side already says it's mine.
+                WeChat shows no name on your own messages either. */}
+            {!isSelf && (
+              <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">
+                {authorName}
+              </span>
+            )}
             <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
               {time}
             </span>
