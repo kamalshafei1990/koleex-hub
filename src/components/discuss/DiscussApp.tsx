@@ -1724,7 +1724,7 @@ export default function DiscussApp() {
             <button
               type="button"
               onClick={openAiChat}
-              className={`relative w-full text-left px-3 py-2.5 flex items-center gap-3 border-b border-[var(--border-subtle)] transition-colors ${
+              className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 flex items-center gap-3 rounded-xl transition-colors ${
                 aiChatOpen
                   ? "bg-[var(--bg-inverted)]"
                   : "hover:bg-[var(--bg-surface-hover)]"
@@ -2226,13 +2226,13 @@ function ChannelRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
+        className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 rounded-xl transition-colors ${
           /* Selected row = SOLID --bg-inverted fill (real white in dark, real
              black in light) so the open chat is unmistakable — a translucent
              wash over near-black only ever reads as gray. Every text token below
              flips to --text-inverted / its opacity steps so nothing goes
-             white-on-white. This is the "solid primary" brand pattern applied to
-             selection; the left rail is dropped because the fill is the emphasis. */
+             white-on-white. Inset + rounded-xl (no full-bleed, no divider) makes
+             the selection/hover read as a soft pill rather than a sharp band. */
           selected
             ? "bg-[var(--bg-inverted)]"
             : "hover:bg-[var(--bg-surface-hover)]"
