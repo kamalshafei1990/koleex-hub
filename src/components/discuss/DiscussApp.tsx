@@ -510,6 +510,13 @@ export default function DiscussApp() {
   const accountRef = useRef(account);
   const selectedChannelIdRef = useRef<string | null>(selectedChannelId);
   const tRef = useRef(t);
+  /* Live mirror of `messages` (for reading the current thread inside effect
+     cleanups) + a per-channel snapshot cache so re-opening a conversation
+     paints instantly instead of blanking to a spinner while it refetches. */
+  const messagesRef = useRef<DiscussMessageWithAuthor[]>(messages);
+  const messagesCacheRef = useRef<Map<string, DiscussMessageWithAuthor[]>>(
+    new Map(),
+  );
 
   useEffect(() => {
     channelsRef.current = channels;
@@ -529,6 +536,9 @@ export default function DiscussApp() {
   useEffect(() => {
     tRef.current = t;
   }, [t]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      DATA LOADING
@@ -669,7 +679,19 @@ export default function DiscussApp() {
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
 
-    void loadMessages(selectedChannelId);
+    /* Instant switch: if we have a snapshot of this conversation from a prior
+       visit, paint it immediately and refresh silently in the background — no
+       spinner, no blank thread. Only a never-opened channel shows the loading
+       state. This is what makes swiping between chats feel instant. */
+    const cached = messagesCacheRef.current.get(selectedChannelId);
+    if (cached && cached.length > 0) {
+      setMessages(cached);
+      setLoadingMessages(false);
+      void loadMessages(selectedChannelId, true);
+    } else {
+      setMessages([]);
+      void loadMessages(selectedChannelId);
+    }
     void loadMembers(selectedChannelId);
 
     const unsubChannel = subscribeToChannel(selectedChannelId, {
@@ -825,6 +847,10 @@ export default function DiscussApp() {
     });
 
     return () => {
+      /* Snapshot this channel's thread (including realtime messages received
+         while it was open) so re-opening it paints instantly from cache.
+         selectedChannelId here is the channel being left. */
+      messagesCacheRef.current.set(selectedChannelId, messagesRef.current);
       unsubChannel();
     };
     /* Critical: only depend on the two things that actually mean
