@@ -2171,30 +2171,30 @@ function ChannelRow({
         type="button"
         onClick={onSelect}
         className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
-          /* Selected row reads as a crisp white-tinted panel with a solid white
-             rail, so the open chat pops the way WhatsApp's does — white as the
-             single point of emphasis, not a bubble fill. --bg-surface-bright is
-             the strongest wash the palette offers (0.20 white in dark). */
+          /* Selected row = SOLID --bg-inverted fill (real white in dark, real
+             black in light) so the open chat is unmistakable — a translucent
+             wash over near-black only ever reads as gray. Every text token below
+             flips to --text-inverted / its opacity steps so nothing goes
+             white-on-white. This is the "solid primary" brand pattern applied to
+             selection; the left rail is dropped because the fill is the emphasis. */
           selected
-            ? "bg-[var(--bg-surface-bright)]"
+            ? "bg-[var(--bg-inverted)]"
             : "hover:bg-[var(--bg-surface-hover)]"
         }`}
       >
-        {selected && (
-          <span
-            className="absolute inset-y-0 start-0 w-[3px] bg-[var(--text-primary)]"
-            aria-hidden
-          />
-        )}
         <div className="flex items-start gap-3 min-w-0">
           {isDm ? (
             <Avatar name={name} url={channel.other?.avatar_url} size={40} />
           ) : (
-            <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+            <div className={`h-10 w-10 shrink-0 rounded-full border flex items-center justify-center ${
+              selected
+                ? "bg-[var(--text-inverted)]/10 border-[var(--text-inverted)]/15"
+                : "bg-[var(--bg-surface)] border-[var(--border-subtle)]"
+            }`}>
               {channel.kind === "channel" ? (
-                <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <HashtagIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               ) : (
-                <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <UsersIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               )}
             </div>
           )}
@@ -2202,7 +2202,9 @@ function ChannelRow({
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-[13px] truncate ${
-                  channel.unread_count > 0
+                  selected
+                    ? "font-semibold text-[var(--text-inverted)]"
+                    : channel.unread_count > 0
                     ? "font-semibold text-[var(--text-primary)]"
                     : "font-medium text-[var(--text-muted)]"
                 }`}
@@ -2210,7 +2212,7 @@ function ChannelRow({
                 {name}
               </span>
               {time && (
-                <span className="text-[10px] text-[var(--text-dim)] shrink-0 tabular-nums">
+                <span className={`text-[10px] shrink-0 tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
                   {time}
                 </span>
               )}
@@ -2218,14 +2220,16 @@ function ChannelRow({
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className={`text-[11.5px] truncate flex-1 ${
-                  channel.unread_count > 0
+                  selected
+                    ? "text-[var(--text-inverted)]/75"
+                    : channel.unread_count > 0
                     ? "text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-dim)]"
                 }`}
               >
                 {channel.last_message?.author_username && !isDm ? (
                   <>
-                    <span className="text-[var(--text-muted)]">
+                    <span className={selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-muted)]"}>
                       {channel.last_message.author_username}:{" "}
                     </span>
                     {preview}
@@ -2235,7 +2239,9 @@ function ChannelRow({
                 )}
               </span>
               {channel.unread_count > 0 && (
-                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums flex items-center justify-center">
+                <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
+                  selected ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                }`}>
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
               )}
