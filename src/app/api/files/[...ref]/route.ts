@@ -48,14 +48,19 @@ const UPSTREAM_TIMEOUT_MS = 50_000;
  *  `discuss` spans three during the Unit-2 migration window:
  *    · discuss-media  — private, ALL new images/documents
  *    · discuss-voice  — private, ALL new voice notes
- *    · media          — public, LEGACY READ ONLY. Six pre-Unit-2 objects still
- *                       live here. Nothing writes Discuss media to it any more.
- *                       Removed from this list once those six are migrated and
- *                       revoked (Run C) — validate:discuss-attachments then
- *                       asserts it cannot come back. */
+ *    · media          — NO LONGER a Discuss bucket (Unit 3). It was a read-only
+ *                       tolerance for six pre-Unit-2 objects; Run C migrated
+ *                       those six to the private buckets and deleted the public
+ *                       originals, so the tolerance had nothing left to serve.
+ *                       validate:discuss-attachments asserts it cannot return.
+ *
+ *  `catalog` still maps to `media` and MUST keep doing so — Catalogs genuinely
+ *  live in that bucket. Unit 3 removed Discuss's claim on `media`, not the
+ *  bucket, which is shared with Products, Visual Library, Notes, Suppliers,
+ *  Employees and Quotations. */
 const CATEGORY_BUCKETS: Record<string, string[]> = {
   catalog: ["media"],
-  discuss: ["discuss-media", "discuss-voice", "media"],
+  discuss: ["discuss-media", "discuss-voice"],
 };
 
 /** MIME types allowed to render inline. Everything else (incl. SVG/HTML/XML,

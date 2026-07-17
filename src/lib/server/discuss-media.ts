@@ -66,11 +66,21 @@ function supabaseHost(): string | null {
   }
 }
 
-/** Buckets Discuss media may EVER live in. `media` is public and legacy-only:
- *  it stays readable until the legacy objects are migrated to the private
- *  buckets, then it is removed from this list (Unit 2, Run C). New uploads
- *  never target it. */
-export const DISCUSS_BUCKETS = ["discuss-media", "discuss-voice", "media"] as const;
+/** Buckets Discuss media may EVER live in — both private.
+ *
+ *  The public `media` bucket used to be listed here as a read-only tolerance
+ *  for six pre-Unit-2 objects. Run C migrated those six to the private buckets
+ *  and deleted the public originals (measured: 6694 → 6688 objects, exactly six
+ *  removed), so the tolerance has no rows left to serve and is gone (Unit 3).
+ *
+ *  This constant is the single gate. Because fromStorageUrl() checks it too, a
+ *  legacy `url` pointing into `media` is now rejected rather than fetched —
+ *  Discuss cannot serve a byte from a public bucket by any path.
+ *
+ *  `media` itself is untouched and still public: Products, Catalogs, Visual
+ *  Library, Notes, Suppliers, Employees and Quotations all live there. Unit 3
+ *  removes Discuss's claim on it, not the bucket. */
+export const DISCUSS_BUCKETS = ["discuss-media", "discuss-voice"] as const;
 export type DiscussBucket = (typeof DISCUSS_BUCKETS)[number];
 
 function isDiscussBucket(b: string): b is DiscussBucket {

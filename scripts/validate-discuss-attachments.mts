@@ -38,6 +38,10 @@ const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "u
 const resolver = read("src/app/api/files/[...ref]/route.ts");
 const uploadRoute = read("src/app/api/storage/upload/route.ts");
 const discussLib = read("src/lib/discuss.ts");
+/* The canonical media model. Read as SOURCE (not just imported) so the bucket
+   allowlist can be asserted as written text — an import proves the value, but
+   the point here is that the literal cannot be edited back. */
+const mediaModel = read("src/lib/server/discuss-media.ts");
 const app = read("src/components/discuss/DiscussApp.tsx");
 const voice = read("src/components/discuss/VoiceRecorder.tsx");
 const sw = read("public/sw.js");
@@ -68,11 +72,26 @@ check("index: voice-only resolves path", vn[0].path === "v.webm");
    path (silently unplayable) and duration was dropped. */
 check("index: voice duration_ms is carried", vn[0].duration_ms === 1200);
 
-// voice-only, LEGACY shape (public url only, no path/bucket)
+/* voice-only, LEGACY shape (public url only, no path/bucket).
+   INVERTED at Unit 3. Under Unit 2 this asserted the url resolved INTO public
+   `media` — a deliberate read tolerance for six pre-existing rows. Run C
+   migrated those six and deleted the originals, so the tolerance has no rows to
+   serve; Unit 3 dropped `media` from DISCUSS_BUCKETS.
+
+   The item is still LISTED (index stability is the contract — dropping it would
+   shift every later index), but it must no longer RESOLVE: an unresolvable item
+   carries an empty path, which the route treats as a uniform 404. Fail closed,
+   not fail public. */
 const voiceLegacy = { voice: { url: PUB("media", "leg.webm"), duration_ms: 900, waveform: [] } };
 const vl = discussMediaList(voiceLegacy);
-check("index: legacy voice url → media bucket", vl[0].bucket === "media");
-check("index: legacy voice url → object path", vl[0].path === "leg.webm");
+check("index: legacy media url no longer resolves to a bucket",
+  vl[0].bucket !== ("media" as string));
+check("index: legacy media url resolves to nothing (empty path → 404)",
+  vl[0].path === "");
+check("index: legacy media item is still listed (index stability preserved)",
+  vl.length === 1 && vl[0].kind === "voice");
+check("index: legacy media url does not leak into the private bucket either",
+  vl[0].bucket === "discuss-voice" && vl[0].path === "");
 
 // BOTH shapes — no production rows today; the case the model exists for.
 const both = {
@@ -150,8 +169,25 @@ check("policy: iOS audio/mp4 accepted", checkDiscussUpload("discuss-voice", { si
 check("policy: image rejected on voice bucket", !checkDiscussUpload("discuss-voice", { size: 1, type: "image/png" }).ok);
 
 /* ── 5. RESOLVER (static) ──────────────────────────────────────────────── */
-check("resolver: discuss allowlist includes private buckets",
-  /discuss:\s*\["discuss-media",\s*"discuss-voice",\s*"media"\]/.test(resolver));
+/* ── Unit 3: `media` is not a Discuss bucket ───────────────────────────
+   These four are the regression lock. The public bucket is shared with seven
+   other modules and is 500MB / any-MIME / world-readable, so a single careless
+   re-add would silently reopen public delivery for Discuss — the exact hole
+   Unit 2 and Run C closed. Asserted from BOTH ends: the allowlist must not
+   contain it, and `catalog` must still contain it (deleting `media` outright
+   would break Catalogs, which is the plausible over-correction). */
+check("resolver: discuss allowlist is exactly the two private buckets",
+  /discuss:\s*\["discuss-media",\s*"discuss-voice"\]/.test(resolver));
+check("resolver: discuss allowlist does NOT contain the public media bucket",
+  !/discuss:\s*\[[^\]]*"media"[^\]]*\]/.test(resolver));
+check("resolver: catalog allowlist STILL contains media (must not regress)",
+  /catalog:\s*\["media"\]/.test(resolver));
+check("model: DISCUSS_BUCKETS is exactly the two private buckets",
+  /DISCUSS_BUCKETS = \["discuss-media",\s*"discuss-voice"\] as const/.test(mediaModel));
+check("model: DISCUSS_BUCKETS does NOT contain the public media bucket",
+  !/DISCUSS_BUCKETS = \[[^\]]*"media"[^\]]*\]/.test(mediaModel));
+check("model: fromStorageUrl is still gated by the bucket allowlist",
+  /if \(!isDiscussBucket\(bucket\) \|\| unsafePath\(path\)\) return null/.test(mediaModel));
 check("resolver: bucket comes from normalized metadata, not a literal",
   /return \{ bucket: src\.bucket, path: src\.path/.test(resolver));
 check("resolver: no hardcoded media bucket for discuss",

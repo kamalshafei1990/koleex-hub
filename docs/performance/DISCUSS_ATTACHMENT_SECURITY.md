@@ -52,24 +52,58 @@ computes an index at all: the server ships each item's canonical `index` in
 
 | kind | era | fields |
 |---|---|---|
-| attachment | legacy + current | `url` (public), `file_path` |
-| voice | legacy (5 rows) | `url` (public), `duration_ms` — **no path/bucket** |
+| attachment | current | `file_path` (private bucket) |
 | voice | current uploader | `bucket`, `path`, `duration_ms` — **`url` empty** |
+| ~~attachment / voice~~ | ~~legacy~~ | ~~`url` (public `media`)~~ — **no rows remain** (Run C) |
 
 A model reading only `file_path`/`url` resolves current-era voice to nothing.
 An earlier draft of this module did exactly that; it is now a regression test.
 
-## Buckets
+## Buckets — Discuss is private-only (Unit 3)
 
 | bucket | visibility | use |
 |---|---|---|
-| `discuss-media` | private, 50MB, 13 MIME | ALL new images/documents |
-| `discuss-voice` | private, 25MB, audio | ALL new voice notes |
-| `media` | **public** | LEGACY READ ONLY — 6 pre-Unit-2 objects |
+| `discuss-media` | private, 50MB, 13 MIME | ALL images/documents |
+| `discuss-voice` | private, 25MB, audio | ALL voice notes |
+| `media` | **public** | **NOT a Discuss bucket** — other modules only |
 
-`media` stays public: it holds 6,694 objects for Products, Catalogs, Todos and
-Visual Library. Unit 2 changes **Discuss delivery only**. It is removed from the
-Discuss resolver allowlist once the six legacy objects are migrated (Run C).
+Unit 2 routed Discuss through an authorized route while tolerating six legacy
+objects in public `media`. Run C migrated those six and deleted the public
+originals (6694 → 6688 objects, exactly six removed). **Unit 3 removed `media`
+from the Discuss allowlist**, so Discuss can no longer serve a byte from a
+public bucket by any path: the allowlist gates both the resolver and
+`fromStorageUrl()`, so even a legacy `url` pointing into `media` is now
+rejected. The item stays *listed* (index stability is the contract) but resolves
+to an empty path, which the route serves as a uniform 404 — fail closed, not
+fail public.
+
+`media` itself is untouched and still public: it holds ~6,688 objects for
+Products, Catalogs, Visual Library, Notes, Suppliers, Employees and Quotations,
+and `CATEGORY_BUCKETS.catalog` still maps to it. Unit 3 removed Discuss's claim
+on the bucket, not the bucket. Deleting `media` outright would break Catalogs —
+that over-correction is itself a regression test.
+
+That the bucket remains public, 500MB, with no MIME restrictions is a real
+posture question for those seven modules. It is **out of scope** for Discuss and
+needs its own audit.
+
+## Ongoing verification — a pre-promotion gate, not CI
+
+`npm run audit:discuss-media-hygiene` is read-only and checks the DATA, not the
+code: metadata is data, so a restored backup or a hand-edited row can reintroduce
+a public URL with no code change and no test noticing.
+
+It is deliberately **not** wired into CI. It can only tell the truth against
+**production**, which needs `SUPABASE_SERVICE_ROLE_KEY` — and parking a
+production service-role key in CI secrets would create exactly the persistent,
+widely-readable credential that Run C was structured to avoid. Pointing it at
+staging instead would pass while proving nothing about production: a green check
+that verifies the wrong database is worse than no check, because it is believed.
+
+So it runs as a **pre-promotion gate**: before promoting any Discuss change to
+Production, run it locally against production with a short-lived credential and
+require exit 0. Expected output today: 6 messages, 6 media items, clean on all
+8 rules.
 
 ## Upload policy — three layers
 
