@@ -27,6 +27,7 @@
 
 import { useScrollLock } from "@/hooks/useScrollLock";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -306,6 +307,16 @@ function Avatar({
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Memoised list + bubble. MessageList and MessageBubble are function
+   declarations (hoisted), so wrapping them here is safe. This is the big
+   smoothness win: composer typing lives in DiscussApp state, so without memo
+   every keystroke re-rendered the entire thread. With MessageList memoised the
+   list is skipped while typing (its props are all stable / useCallback), and
+   with MessageBubble memoised a new or changed message only re-renders its own
+   bubble instead of every bubble. */
+const MemoMessageList = memo(MessageList);
+const MemoMessageBubble = memo(MessageBubble);
 
 export default function DiscussApp() {
   const { t } = useTranslation(discussT);
@@ -943,13 +954,25 @@ export default function DiscussApp() {
     if (!belongsToChannel) return;
 
     if (initialScrolledChannelRef.current !== selectedChannelId) {
-      /* First render of this channel's messages → snap to the newest. Wait a
-         frame so the list has painted and scrollHeight is final. */
+      /* First render of this channel's messages → snap to the newest. A single
+         rAF measured scrollHeight BEFORE avatars / images / dynamic bubble
+         content finished laying out, so it landed in the middle of the thread
+         and the user had to scroll down. Snap now and again over the next few
+         frames until the height has settled, instantly (no animation) so the
+         chat opens already pinned to the latest message like WhatsApp. */
       initialScrolledChannelRef.current = selectedChannelId;
-      requestAnimationFrame(() => {
+      const snap = () => {
         const e = threadScrollRef.current;
-        if (e) e.scrollTo({ top: e.scrollHeight, behavior: "auto" });
+        if (e) e.scrollTop = e.scrollHeight;
+      };
+      snap();
+      requestAnimationFrame(() => {
+        snap();
+        requestAnimationFrame(snap);
       });
+      window.setTimeout(snap, 80);
+      window.setTimeout(snap, 200);
+      window.setTimeout(snap, 400);
       return;
     }
     const nearBottom =
@@ -1981,7 +2004,7 @@ export default function DiscussApp() {
                     t={t}
                   />
                 ) : (
-                  <MessageList
+                  <MemoMessageList
                     messages={messages}
                     currentAccountId={accountId}
                     channelKind={selectedChannel.kind}
@@ -2442,7 +2465,7 @@ function MessageList(props: MessageListProps) {
           );
         }
         return (
-          <MessageBubble
+          <MemoMessageBubble
             key={row.key}
             msg={row.msg}
             showAuthor={row.showAuthor}
