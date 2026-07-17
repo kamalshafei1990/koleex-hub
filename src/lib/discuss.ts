@@ -881,6 +881,35 @@ export async function setChannelMuted(
   return (await discussMutate("setChannelMuted", { channelId, muted })).ok;
 }
 
+/* ─── WeChat-style per-user conversation state (sidebar right-click menu) ─── */
+
+/** Pin ("Sticky on top") or unpin a conversation for the current user.
+ *  Pinned chats float to the top of their group in the sidebar. */
+export async function setChannelPinned(
+  channelId: string,
+  pinned: boolean,
+): Promise<boolean> {
+  return (await discussMutate("setChannelPinned", { channelId, pinned })).ok;
+}
+
+/** Hide ("remove from list") a conversation for the current user. It stays
+ *  hidden until a newer message arrives, then re-surfaces — like WeChat. */
+export async function hideChannel(channelId: string): Promise<boolean> {
+  return (await discussMutate("setChannelHidden", { channelId })).ok;
+}
+
+/** Manually mark a conversation as unread (shows a dot even with no new
+ *  messages). Cleared automatically the next time the user opens it. */
+export async function markChannelUnread(channelId: string): Promise<boolean> {
+  return (await discussMutate("markChannelUnread", { channelId })).ok;
+}
+
+/** Delete a conversation from the current user's list only. History is
+ *  preserved server-side; the chat re-surfaces if they re-open the DM. */
+export async function deleteConversation(channelId: string): Promise<boolean> {
+  return (await discussMutate("deleteConversation", { channelId })).ok;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Phase D — Voice notes
    ═══════════════════════════════════════════════════════════════════════ */

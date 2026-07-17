@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -119,6 +120,19 @@ export async function POST(req: Request) {
           { p_account_a: me, p_account_b: otherId },
         );
         if (error) return bad(error.message, 500);
+        /* Re-opening a DM I previously deleted/hid must bring it back into my
+           list — clear my soft-leave and hidden flags for this channel. */
+        const resurfacedId =
+          typeof data === "string"
+            ? data
+            : ((data as { id?: string } | null)?.id ?? null);
+        if (resurfacedId) {
+          await supabaseServer
+            .from(MEMBERS)
+            .update({ left_at: null, hidden_at: null })
+            .eq("channel_id", resurfacedId)
+            .eq("account_id", me);
+        }
         return NextResponse.json({ ok: true, data });
       }
 
@@ -222,12 +236,71 @@ export async function POST(req: Request) {
       case "markRead": {
         const channelId = str(p.channelId);
         if (!channelId) return bad("channelId required");
+        /* Reading a conversation also clears a manual "mark as unread" flag —
+           otherwise the dot would linger after the user opened it. */
         const { error } = await supabaseServer
           .from(MEMBERS)
-          .update({ last_read_at: new Date().toISOString() })
+          .update({ last_read_at: new Date().toISOString(), marked_unread: false })
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      /* ---- Per-user conversation state (WeChat-style) ------------------ */
+      case "setChannelPinned": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ pinned_at: p.pinned === true ? new Date().toISOString() : null })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "setChannelHidden": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        /* Hide = remove from MY list until a newer message arrives. Also
+           un-pin (a hidden chat shouldn't hold a pinned slot). */
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ hidden_at: new Date().toISOString(), pinned_at: null })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "markChannelUnread": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ marked_unread: true })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "deleteConversation": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        /* Delete = remove this conversation from MY list only. Message history
+           is preserved server-side (never hard-deleted) for audit and for the
+           other participants. Implemented as a soft-leave; the conversation
+           re-surfaces if I open a new DM with the same person (see
+           directChannel, which clears left_at/hidden_at). */
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ left_at: new Date().toISOString(), pinned_at: null, marked_unread: false })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.account(me) }]);
         return NextResponse.json({ ok: true });
       }
 
@@ -250,7 +323,53 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) return bad(error.message, 500);
-        await pingChannelActivity(channelId, await channelMemberIds(channelId), me);
+        const members = await channelMemberIds(channelId);
+        await pingChannelActivity(channelId, members, me);
+        /* Mobile push to the OTHER members (installed PWA / phone). Best-effort:
+           if VAPID isn't configured, or a member hasn't enabled notifications
+           (no push_subscriptions row), it's a silent no-op. Awaited so it isn't
+           torn down after the response, but the sends run in parallel. */
+        try {
+          const recipients = members.filter((id) => id !== me);
+          if (recipients.length > 0) {
+            const [{ data: sender }, { data: ch }] = await Promise.all([
+              supabaseServer
+                .from("accounts")
+                .select("username, person:people ( full_name )")
+                .eq("id", me)
+                .maybeSingle(),
+              supabaseServer
+                .from("discuss_channels")
+                .select("name, kind")
+                .eq("id", channelId)
+                .maybeSingle(),
+            ]);
+            const sPerson = (sender as { person?: { full_name?: string } | { full_name?: string }[] } | null)?.person;
+            const senderName =
+              (Array.isArray(sPerson) ? sPerson[0]?.full_name : sPerson?.full_name) ||
+              (sender as { username?: string } | null)?.username ||
+              "New message";
+            const isDirect = (ch as { kind?: string } | null)?.kind === "direct";
+            const chName = (ch as { name?: string } | null)?.name;
+            const preview = text.trim()
+              ? text.length > 140
+                ? `${text.slice(0, 140)}…`
+                : text
+              : "Sent a message";
+            await sendPushToAccounts(
+              recipients,
+              {
+                title: isDirect || !chName ? senderName : `${senderName} · #${chName}`,
+                body: preview,
+                url: "/discuss",
+                tag: `discuss:${channelId}`,
+              },
+              { actorAccountId: me },
+            );
+          }
+        } catch {
+          /* push is best-effort — never fail the send over a notification */
+        }
         return NextResponse.json({ ok: true, data });
       }
 

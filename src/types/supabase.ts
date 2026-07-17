@@ -1479,6 +1479,12 @@ export interface DiscussChannelWithState extends DiscussChannelRow {
   last_read_at: string | null;
   muted: boolean;
   notification_pref: DiscussNotificationPref;
+  /** WeChat-style per-user conversation state (sidebar right-click menu).
+   *  `pinned` floats the row to the top of its group; `marked_unread` shows
+   *  an unread dot even when there are no new messages. */
+  pinned?: boolean;
+  pinned_at?: string | null;
+  marked_unread?: boolean;
   /** For direct channels, the OTHER account (not the current user).
    *  Null for group/channel kinds. */
   other: DiscussAuthor | null;

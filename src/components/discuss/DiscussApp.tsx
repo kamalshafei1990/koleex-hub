@@ -43,6 +43,8 @@ import FileIcon from "@/components/icons/ui/FileIcon";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import PinOffIcon from "@/components/icons/ui/PinOffIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
 import ReplyIcon from "@/components/icons/ui/ReplyIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
@@ -87,6 +89,10 @@ import {
   fetchMyChannels,
   findOrCreateDirectChannel,
   markChannelRead,
+  setChannelPinned,
+  hideChannel,
+  markChannelUnread,
+  deleteConversation,
   openPresenceChannel,
   pinMessage,
   saveDraft,
@@ -1172,6 +1178,13 @@ export default function DiscussApp() {
       if (c.kind === "direct") dms.push(c);
       else groups.push(c);
     }
+    /* Pinned conversations float to the top of their group so an optimistic
+       pin reorders instantly (the server also sorts pinned-first). Stable:
+       non-pinned keep their existing last-message order. */
+    const pinnedFirst = (a: DiscussChannelWithState, b: DiscussChannelWithState) =>
+      a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1;
+    dms.sort(pinnedFirst);
+    groups.sort(pinnedFirst);
     return { dms, groups };
   }, [filteredChannels]);
 
@@ -1633,6 +1646,116 @@ export default function DiscussApp() {
     [selectedChannelId, accountId],
   );
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     Conversation row context menu (WeChat-style: right-click / long-press).
+     Every action is optimistic on the sidebar, then persisted + silently
+     re-synced so the badge/order match the server.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const [convMenu, setConvMenu] = useState<{
+    channel: DiscussChannelWithState;
+    x: number;
+    y: number;
+  } | null>(null);
+  const closeConvMenu = useCallback(() => setConvMenu(null), []);
+
+  const handleToggleConvPin = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      const next = !ch.pinned;
+      const stamp = new Date().toISOString();
+      setChannels((prev) =>
+        prev.map((c) =>
+          c.id === ch.id ? { ...c, pinned: next, pinned_at: next ? stamp : null } : c,
+        ),
+      );
+      await setChannelPinned(ch.id, next);
+      void loadChannels(true);
+      showToast(next ? t("conv.pinned", "Pinned to top") : t("conv.unpinned", "Unpinned"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  const handleSetConvMuted = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (!accountId) return;
+      const next = !ch.muted;
+      setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: next } : c)));
+      await setChannelMuted(ch.id, accountId, next);
+      showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
+    },
+    [accountId, showToast, t],
+  );
+
+  const handleToggleConvUnread = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (!accountId) return;
+      const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+      if (isUnread) {
+        setChannels((prev) =>
+          prev.map((c) =>
+            c.id === ch.id ? { ...c, unread_count: 0, marked_unread: false } : c,
+          ),
+        );
+        await markChannelRead(ch.id, accountId);
+        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+      } else {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === ch.id ? { ...c, marked_unread: true } : c)),
+        );
+        await markChannelUnread(ch.id);
+      }
+      void loadChannels(true);
+    },
+    [accountId, loadChannels],
+  );
+
+  const handleHideConversation = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
+      await hideChannel(ch.id);
+      void loadChannels(true);
+      showToast(t("conv.hidden", "Removed from list"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (
+        !window.confirm(
+          t("conv.deleteConfirm", "Delete this conversation? It will be removed from your list."),
+        )
+      )
+        return;
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
+      await deleteConversation(ch.id);
+      void loadChannels(true);
+      showToast(t("conv.deleted", "Conversation deleted"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  /* Close the conversation menu on outside-click / Escape / scroll. */
+  useEffect(() => {
+    if (!convMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const el = document.getElementById("kx-conv-menu");
+      if (el && !el.contains(e.target as Node)) closeConvMenu();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") closeConvMenu();
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", closeConvMenu, true);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", closeConvMenu, true);
+    };
+  }, [convMenu, closeConvMenu]);
+
   const handleSendVoice = useCallback(
     async (input: { blob: Blob; durationMs: number; waveform: number[] }) => {
       if (!accountId || !selectedChannelId) return;
@@ -1940,6 +2063,7 @@ export default function DiscussApp() {
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
+                          onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
                         />
                       ))}
                     </ul>
@@ -1972,6 +2096,7 @@ export default function DiscussApp() {
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
+                          onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
                         />
                       ))}
                     </ul>
@@ -2299,6 +2424,76 @@ export default function DiscussApp() {
         </div>
       )}
 
+      {/* ═══ Conversation context menu (WeChat-style right-click / long-press) ═══ */}
+      {convMenu &&
+        typeof document !== "undefined" &&
+        createPortal(
+          (() => {
+            const W = 220;
+            const EST_H = 250;
+            const M = 8;
+            const left = Math.max(M, Math.min(convMenu.x, window.innerWidth - W - M));
+            const openUp = convMenu.y + EST_H > window.innerHeight;
+            const style: React.CSSProperties = openUp
+              ? { left, bottom: Math.max(M, window.innerHeight - convMenu.y) }
+              : { left, top: convMenu.y };
+            const ch = convMenu.channel;
+            const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+            return (
+              <div
+                id="kx-conv-menu"
+                role="menu"
+                style={style}
+                className="fixed z-[100] min-w-[220px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5"
+              >
+                <MessageMenuItem
+                  icon={ch.pinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
+                  label={ch.pinned ? t("conv.unpin", "Unpin") : t("conv.pin", "Sticky on top")}
+                  onClick={() => {
+                    void handleToggleConvPin(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={isUnread ? <CheckCheckIcon className="h-4 w-4" /> : <CircleDotIcon className="h-4 w-4" />}
+                  label={isUnread ? t("conv.markRead", "Mark as read") : t("conv.markUnread", "Mark as unread")}
+                  onClick={() => {
+                    void handleToggleConvUnread(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={ch.muted ? <BellIcon className="h-4 w-4" /> : <BellOffIcon className="h-4 w-4" />}
+                  label={ch.muted ? t("conv.unmute", "Unmute notifications") : t("conv.mute", "Mute notifications")}
+                  onClick={() => {
+                    void handleSetConvMuted(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={<EyeOffIcon className="h-4 w-4" />}
+                  label={t("conv.hide", "Remove from list")}
+                  onClick={() => {
+                    void handleHideConversation(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <div className="my-1 border-t border-[var(--border-subtle)]" />
+                <MessageMenuItem
+                  icon={<TrashIcon className="h-4 w-4" />}
+                  label={t("conv.delete", "Delete")}
+                  danger
+                  onClick={() => {
+                    void handleDeleteConversation(ch);
+                    closeConvMenu();
+                  }}
+                />
+              </div>
+            );
+          })(),
+          document.body,
+        )}
+
       {/* ═══ Modals / pickers ═══ */}
       {newChannelOpen && (
         <NewChannelModal
@@ -2353,12 +2548,16 @@ function ChannelRow({
   selected,
   onSelect,
   onPrefetch,
+  onMenu,
 }: {
   channel: DiscussChannelWithState;
   selected: boolean;
   onSelect: () => void;
   /** Warm this conversation's messages on hover/press so the open is instant. */
   onPrefetch?: () => void;
+  /** Open the WeChat-style conversation menu at the given viewport point
+   *  (right-click on desktop, ~450ms long-press on touch). */
+  onMenu?: (x: number, y: number) => void;
 }) {
   const name = displayNameFor(channel);
   const preview = previewMessage(channel.last_message);
@@ -2366,6 +2565,14 @@ function ChannelRow({
     ? formatSidebarTime(channel.last_message.created_at)
     : "";
   const isDm = channel.kind === "direct";
+  const showUnreadDot = channel.unread_count === 0 && channel.marked_unread === true;
+  const longPressRef = useRef<number | null>(null);
+  const clearLongPress = () => {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
 
   return (
     <li>
@@ -2375,6 +2582,27 @@ function ChannelRow({
         onMouseEnter={onPrefetch}
         onPointerDown={onPrefetch}
         onFocus={onPrefetch}
+        onContextMenu={
+          onMenu
+            ? (e) => {
+                e.preventDefault();
+                onMenu(e.clientX, e.clientY);
+              }
+            : undefined
+        }
+        onTouchStart={
+          onMenu
+            ? (e) => {
+                const t0 = e.touches[0];
+                if (!t0) return;
+                const { clientX, clientY } = t0;
+                clearLongPress();
+                longPressRef.current = window.setTimeout(() => onMenu(clientX, clientY), 450);
+              }
+            : undefined
+        }
+        onTouchEnd={onMenu ? clearLongPress : undefined}
+        onTouchMove={onMenu ? clearLongPress : undefined}
         className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 rounded-xl transition-colors ${
           /* Selected row = SOLID --bg-inverted fill (real white in dark, real
              black in light) so the open chat is unmistakable — a translucent
@@ -2416,11 +2644,18 @@ function ChannelRow({
               >
                 {name}
               </span>
-              {time && (
-                <span className={`text-[10px] shrink-0 tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
-                  {time}
-                </span>
-              )}
+              <span className="flex items-center gap-1 shrink-0">
+                {channel.pinned && (
+                  <PinIcon
+                    className={`h-3 w-3 ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}
+                  />
+                )}
+                {time && (
+                  <span className={`text-[10px] tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
+                    {time}
+                  </span>
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span
@@ -2443,13 +2678,21 @@ function ChannelRow({
                   preview || "—"
                 )}
               </span>
-              {channel.unread_count > 0 && (
+              {channel.unread_count > 0 ? (
                 <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
                   selected ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                 }`}>
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
-              )}
+              ) : showUnreadDot ? (
+                /* Manually "marked as unread" — a WeChat-style dot with no count. */
+                <span
+                  title="Unread"
+                  className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                    selected ? "bg-[var(--text-inverted)]" : "bg-[var(--bg-inverted)]"
+                  }`}
+                />
+              ) : null}
               {channel.muted && (
                 <span className="text-[var(--text-dim)]" title="Muted">
                   🔕
