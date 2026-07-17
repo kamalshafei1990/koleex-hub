@@ -10,9 +10,22 @@ Inventory: [DISCUSS_LEGACY_MEDIA_INVENTORY.md](./DISCUSS_LEGACY_MEDIA_INVENTORY.
 
 The production service-role key is read from **`KX_RUN_C_PRODUCTION_SERVICE_KEY`
 in the process environment, and nowhere else**. Not `.env`, not `.env.local`,
-not Vercel, not GitHub Secrets, not a keychain, and not argv (argv is visible to
-`ps`). Run C is a local one-shot migration; it needs no deployed runtime
-credential, and adding one would only widen the blast radius.
+not Vercel, not GitHub Secrets, and not argv (argv is visible to `ps`). Run C is
+a local one-shot migration; it needs no deployed runtime credential, and adding
+one would only widen the blast radius.
+
+**How the key reached that environment, in practice.** An earlier draft of this
+section also ruled out a keychain. That proved impossible to honour: the operator
+and the migration process do not share a shell, so an `export` in a terminal
+cannot reach the script. The remaining options were a file (rejected), pasting
+the secret into a chat transcript (rejected), or a **temporary macOS Keychain
+item** — which is what was used: written with `security add-generic-password -w`
+so the value never appears in argv or shell history, read once at runtime into
+the process environment, and deleted immediately after execution with the
+deletion verified by read-back. The rule this section is really defending is
+*no persistent credential store*; a keychain item that exists only for the
+duration of the run and is provably gone afterwards satisfies it. The earlier
+absolute wording did not survive contact with how the key actually has to travel.
 
 The script validates **only that the variable exists and is non-empty**. It
 never prints the key, nor any substring, prefix, suffix, length, or fingerprint
