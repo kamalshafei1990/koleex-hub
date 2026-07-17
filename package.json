@@ -81,7 +81,11 @@
     "runc:plan": "node --import tsx scripts/discuss-run-c.mts plan",
     "runc:migrate": "node --import tsx scripts/discuss-run-c.mts migrate",
     "runc:prove-clean": "node --import tsx scripts/discuss-run-c.mts prove-clean",
-    "runc:self-test": "node --import tsx scripts/discuss-run-c.mts self-test"
+    "runc:self-test": "node --import tsx scripts/discuss-run-c.mts self-test",
+    "runc:verify": "node --import tsx scripts/discuss-run-c.mts verify",
+    "runc:revoke": "node --import tsx scripts/discuss-run-c.mts revoke",
+    "runc:audit": "node --import tsx scripts/discuss-run-c.mts audit",
+    "validate:discuss-read-parallel": "node --import tsx scripts/validate-discuss-read-parallel.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

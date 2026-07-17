@@ -94,6 +94,17 @@ function buildReactionMap(
   return map;
 }
 
+/* Time ONE enrichment query without altering its result or its failure mode.
+   A null query (guard unmet) reports 0 and is never awaited — the distinction
+   between "ran in 0ms" and "never ran" is carried by the companion count tag,
+   not by the duration. */
+async function timedQuery<T>(q: PromiseLike<T> | null): Promise<{ res: T | null; ms: number }> {
+  if (!q) return { res: null, ms: 0 };
+  const t = performance.now();
+  const res = await q;
+  return { res, ms: Math.round((performance.now() - t) * 10) / 10 };
+}
+
 /** The caller's active channel ids (single source of truth for gating). */
 async function myChannelIds(me: string): Promise<string[]> {
   const { data } = await supabaseServer
@@ -274,6 +285,7 @@ export async function GET(req: Request) {
       case "channelMessages": {
         if (!channelId) return NextResponse.json({ error: "channelId required" }, { status: 400 });
         const scope = await myChannelIds(me);
+        timing.mark("scope");
         if (!scope.includes(channelId)) return NextResponse.json({ ok: true, data: [] });
 
         /* Fast incremental path — used by the realtime refresh to fetch ONLY
@@ -313,50 +325,91 @@ export async function GET(req: Request) {
           .limit(limit);
         if (before) q = q.lt("created_at", before);
         const { data } = await q;
+        timing.mark("base");
         const rows = ((data ?? []) as Array<Record<string, unknown> & { id: string; author: AuthorJoin; reply_to_message_id: string | null }>).map(
           (row) => ({ ...row, author: flattenAuthor(row.author) }),
         );
         const messageIds = rows.map((r) => r.id);
 
-        let reactionMap = new Map<string, unknown>();
-        if (messageIds.length > 0) {
-          const { data: rxRows } = await supabaseServer.from(REACTIONS).select("*").in("message_id", messageIds);
-          reactionMap = buildReactionMap((rxRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>, me);
-        }
+        /* ── enrichment: three INDEPENDENT queries, run concurrently ──────
+           reactions, reply previews and thread aggregation each depend only on
+           ids already derived from `rows`. None depends on another's result and
+           none mutates state, so awaiting them in sequence spent three round
+           trips to do one round trip's work. Traced from the code, not inferred
+           from elapsed time.
 
-        /* Reply previews. */
+           This reduces WALL-CLOCK only. The database still executes the same
+           three queries and does the same total work — the requests simply
+           overlap instead of queueing.
+
+           Failure semantics are UNCHANGED and deliberately so: each call already
+           destructured `data` and ignored `error`, so a failed enrichment
+           yielded `undefined` → `?? []` → an empty map, i.e. the page rendered
+           without reactions rather than 500ing. supabase-js resolves (never
+           rejects) on a query error, so Promise.all cannot introduce a new
+           rejection path. Silent partial enrichment is pre-existing behaviour;
+           changing it is a separate decision, not a side effect of this one. */
         const replyTargetIds = Array.from(new Set(rows.map((r) => r.reply_to_message_id).filter(Boolean) as string[]));
+
+        const reactionsQuery = messageIds.length > 0
+          ? supabaseServer.from(REACTIONS).select("*").in("message_id", messageIds)
+          : null;
+
+        /* Preserved: no reply targets → no query issued at all. */
+        const replyPreviewQuery = replyTargetIds.length > 0
+          ? supabaseServer
+              .from(MESSAGES)
+              .select(`id, body, kind, deleted_at, author:accounts!discuss_messages_author_account_id_fkey ( username, person:people ( full_name ) )`)
+              .in("id", replyTargetIds)
+          : null;
+
+        const threadQuery = messageIds.length > 0
+          ? supabaseServer
+              .from(MESSAGES).select("reply_to_message_id, author_account_id, created_at")
+              .in("reply_to_message_id", messageIds).is("deleted_at", null)
+          : null;
+
+        /* Each query is timed individually INSIDE the same Promise.all, so the
+           three still overlap; timedQuery only brackets an await that already
+           happened. `enrichMs` is the wall-clock of the overlapped set and
+           `enrichSumMs` the sum of the individual durations — reporting both is
+           the whole point: the gap between them is the only thing this change
+           buys. Total database WORK is unchanged. */
+        const enrichStart = performance.now();
+        const [rx, parent, child] = await Promise.all([
+          timedQuery(reactionsQuery),
+          timedQuery(replyPreviewQuery),
+          timedQuery(threadQuery),
+        ]);
+        const enrichMs = Math.round((performance.now() - enrichStart) * 10) / 10;
+        const enrichSumMs = Math.round((rx.ms + parent.ms + child.ms) * 10) / 10;
+        const rxRes = rx.res, parentRes = parent.res, childRes = child.res;
+
+        let reactionMap = new Map<string, unknown>();
+        if (rxRes) {
+          reactionMap = buildReactionMap((rxRes.data ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>, me);
+        }
+
         const replyPreviewById = new Map<string, unknown>();
-        if (replyTargetIds.length > 0) {
-          const { data: parents } = await supabaseServer
-            .from(MESSAGES)
-            .select(`id, body, kind, deleted_at, author:accounts!discuss_messages_author_account_id_fkey ( username, person:people ( full_name ) )`)
-            .in("id", replyTargetIds);
-          for (const p of (parents ?? []) as Array<{ id: string; body: string | null; kind: string; deleted_at: string | null; author: AuthorJoin }>) {
-            const a = Array.isArray(p.author) ? p.author[0] ?? null : p.author;
-            const person = a && (Array.isArray(a.person) ? a.person[0] ?? null : a.person);
-            replyPreviewById.set(p.id, {
-              id: p.id, body: p.body, kind: p.kind, deleted_at: p.deleted_at,
-              author_username: a?.username ?? null, author_full_name: person?.full_name ?? null,
-            });
-          }
+        for (const p of ((parentRes?.data ?? []) as Array<{ id: string; body: string | null; kind: string; deleted_at: string | null; author: AuthorJoin }>)) {
+          const a = Array.isArray(p.author) ? p.author[0] ?? null : p.author;
+          const person = a && (Array.isArray(a.person) ? a.person[0] ?? null : a.person);
+          replyPreviewById.set(p.id, {
+            id: p.id, body: p.body, kind: p.kind, deleted_at: p.deleted_at,
+            author_username: a?.username ?? null, author_full_name: person?.full_name ?? null,
+          });
         }
 
-        /* Thread aggregation. */
         const threadByParent = new Map<string, { reply_count: number; last_reply_at: string | null; participant_ids: string[] }>();
-        if (messageIds.length > 0) {
-          const { data: childRows } = await supabaseServer
-            .from(MESSAGES).select("reply_to_message_id, author_account_id, created_at")
-            .in("reply_to_message_id", messageIds).is("deleted_at", null);
-          for (const row of (childRows ?? []) as Array<{ reply_to_message_id: string; author_account_id: string | null; created_at: string }>) {
-            const entry = threadByParent.get(row.reply_to_message_id) ?? { reply_count: 0, last_reply_at: null as string | null, participant_ids: [] as string[] };
-            entry.reply_count += 1;
-            if (!entry.last_reply_at || row.created_at > entry.last_reply_at) entry.last_reply_at = row.created_at;
-            if (row.author_account_id && !entry.participant_ids.includes(row.author_account_id)) entry.participant_ids.push(row.author_account_id);
-            threadByParent.set(row.reply_to_message_id, entry);
-          }
+        for (const row of ((childRes?.data ?? []) as Array<{ reply_to_message_id: string; author_account_id: string | null; created_at: string }>)) {
+          const entry = threadByParent.get(row.reply_to_message_id) ?? { reply_count: 0, last_reply_at: null as string | null, participant_ids: [] as string[] };
+          entry.reply_count += 1;
+          if (!entry.last_reply_at || row.created_at > entry.last_reply_at) entry.last_reply_at = row.created_at;
+          if (row.author_account_id && !entry.participant_ids.includes(row.author_account_id)) entry.participant_ids.push(row.author_account_id);
+          threadByParent.set(row.reply_to_message_id, entry);
         }
 
+        timing.mark("enrich");
         const out = rows
           .map((row) =>
             serializeDiscussMessageForClient({
@@ -367,8 +420,17 @@ export async function GET(req: Request) {
             }),
           )
           .reverse();
-        timing.mark("db");
-        const { header } = timing.done({ resource: "channelMessages", mode: "full", rows: out.length });
+        timing.mark("serialize");
+        const { header } = timing.done({
+          resource: "channelMessages", mode: "full", rows: out.length,
+          /* db_* = individual query durations. Their SUM is what the sequential
+             version paid; enrich_ms is what the parallel version actually costs. */
+          db_reactions_ms: rx.ms, db_reply_preview_ms: parent.ms, db_thread_ms: child.ms,
+          enrich_sum_ms: enrichSumMs, enrich_ms: enrichMs,
+          /* Counts disambiguate a 0ms duration: skipped vs instant. */
+          reply_targets: replyTargetIds.length,
+          queries_issued: [reactionsQuery, replyPreviewQuery, threadQuery].filter(Boolean).length,
+        });
         return NextResponse.json({ ok: true, data: out }, { headers: { "Server-Timing": header } });
       }
 
