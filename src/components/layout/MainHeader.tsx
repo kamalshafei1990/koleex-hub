@@ -11,8 +11,6 @@ import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import { useAppHeader } from "./AppHeaderSlot";
 import TenantPicker from "./TenantPicker";
 import ViewAsPicker from "./ViewAsPicker";
 import KoleexLogo from "./KoleexLogo";
@@ -114,12 +112,6 @@ export default function MainHeader() {
     : null;
   const appName = routeKey ? t(routeKey) : null;
 
-  /* A route may hand its own context up to this header (see AppHeaderSlot) so
-     it does not have to stack a second 56px band under this one. Null for every
-     route that does not register — which is all of them except Discuss — so the
-     standard header below is completely unaffected. */
-  const slot = useAppHeader();
-
   const btnCls = `flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border shrink-0 transition-all ${
     dk
       ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
@@ -153,65 +145,22 @@ export default function MainHeader() {
         >
           <KoleexLogo className="w-auto h-4 md:h-[18px]" />
         </Link>
-        {slot ? (
+        {appName && (
           <>
-            {/* Route-owned context replaces the app-name breadcrumb — showing
-                both would print the app name twice. */}
-            {slot.onBack && (
-              <button
-                type="button"
-                onClick={slot.onBack}
-                aria-label={slot.backLabel ?? "Back"}
-                title={slot.backLabel ?? "Back"}
-                className={`md:hidden ${btnCls}`}
-              >
-                <ArrowLeftIcon size={16} />
-              </button>
-            )}
             <span
               aria-hidden
               className={`hidden md:inline-block w-px h-4 ${
                 dk ? "bg-white/[0.14]" : "bg-black/[0.14]"
               }`}
             />
-            {slot.avatar}
-            <div className="min-w-0 flex flex-col justify-center leading-tight">
-              <span
-                className={`text-[13px] font-semibold truncate max-w-[180px] md:max-w-[280px] tracking-tight ${
-                  dk ? "text-white/90" : "text-black/90"
-                }`}
-              >
-                {slot.title}
-              </span>
-              {slot.subtitle && (
-                <span
-                  className={`hidden md:block text-[11px] truncate max-w-[280px] ${
-                    dk ? "text-white/45" : "text-black/45"
-                  }`}
-                >
-                  {slot.subtitle}
-                </span>
-              )}
-            </div>
+            <span
+              className={`text-[13px] font-semibold hidden md:inline truncate max-w-[260px] tracking-tight ${
+                dk ? "text-white/80" : "text-black/80"
+              }`}
+            >
+              {appName}
+            </span>
           </>
-        ) : (
-          appName && (
-            <>
-              <span
-                aria-hidden
-                className={`hidden md:inline-block w-px h-4 ${
-                  dk ? "bg-white/[0.14]" : "bg-black/[0.14]"
-                }`}
-              />
-              <span
-                className={`text-[13px] font-semibold hidden md:inline truncate max-w-[260px] tracking-tight ${
-                  dk ? "text-white/80" : "text-black/80"
-                }`}
-              >
-                {appName}
-              </span>
-            </>
-          )
         )}
       </div>
 
@@ -319,10 +268,6 @@ export default function MainHeader() {
             picker disappears once view-as is active; the persistent
             banner is the only way to exit. */}
         <ViewAsPicker dk={dk} />
-
-        {/* Route-owned actions, before the global controls so the bell and
-            account stay in their usual place. */}
-        {slot?.actions}
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}
