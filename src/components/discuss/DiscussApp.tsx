@@ -64,7 +64,7 @@ import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
-import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
+import MicIcon from "@/components/icons/ui/MicIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
@@ -2694,9 +2694,10 @@ function ChannelRow({
                 />
               ) : null}
               {channel.muted && (
-                <span className="text-[var(--text-dim)]" title="Muted">
-                  🔕
-                </span>
+                <BellOffIcon
+                  className={`h-3 w-3 shrink-0 ${selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}
+                  aria-label="Muted"
+                />
               )}
             </div>
           </div>
@@ -3805,7 +3806,7 @@ function Composer({
             title={t("voice.record", "Record voice")}
             onClick={onOpenVoice}
           >
-            <MicrophoneIcon className="h-4 w-4" />
+            <MicIcon className="h-4 w-4" />
           </ComposerIconButton>
 
           <div className="flex-1" />

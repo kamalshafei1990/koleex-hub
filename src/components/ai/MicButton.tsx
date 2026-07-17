@@ -38,7 +38,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
+import MicIcon from "@/components/icons/ui/MicIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
 
@@ -309,7 +309,7 @@ export default function MicButton({
     ) : computedState === "listening" ? (
       <StopIcon size={14} />
     ) : (
-      <MicrophoneIcon size={18} />
+      <MicIcon size={18} />
     );
 
   /* Idle styling matches the other ghost buttons in the composer —
