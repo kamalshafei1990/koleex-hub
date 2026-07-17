@@ -2951,7 +2951,10 @@ function ReplyPreviewPill({
 }
 
 function AttachmentChip({ attachment }: { attachment: DiscussAttachment }) {
-  const isImage = attachment.type.startsWith("image/");
+  /* Guard the url too: an image attachment whose url is an empty string would
+     render <img src="">, which React flags and which makes the browser re-request
+     the whole page. An empty url falls through to the file-chip rendering below. */
+  const isImage = attachment.type.startsWith("image/") && !!attachment.url;
   if (isImage) {
     return (
       <a
