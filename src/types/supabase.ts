@@ -1280,10 +1280,23 @@ export type DiscussMessageKind = "text" | "image" | "file" | "voice" | "system";
  *  Mirrors InboxAttachment shape so we can share picker UI components. */
 export interface DiscussAttachment {
   name: string;
-  url: string;
+  /** @deprecated LEGACY ONLY — a PUBLIC Supabase Storage URL written before
+   *  Unit 2. Present on old rows; NEVER written by new uploads. It MUST NOT be
+   *  rendered, linked, or fetched: the ONLY consumer is the server-side
+   *  resolver (src/lib/server/discuss-media.ts), which maps it back to an
+   *  object path. Delivery goes through the authorized first-party route built
+   *  by discussAttachmentUrl(messageId, index).
+   *  Optional so new uploads can simply omit it. */
+  url?: string;
+  /** Bucket-relative object path in the private `discuss-media` bucket. */
   file_path: string;
   size: number;
   type: string;
+  /** Client-only, never persisted and never sent to another user: an
+   *  object: URL for the SENDER's local preview while a message is still
+   *  pending (no canonical id yet ⇒ no protected URL yet). Revoked on
+   *  reconcile/unmount. */
+  local_preview_url?: string | null;
 }
 
 /** Product reference stored in `discuss_messages.metadata.products`.
@@ -1314,9 +1327,17 @@ export interface DiscussMention {
  *  uploaded to the PRIVATE `discuss-voice` bucket and carry
  *  `bucket` + `path` instead — playback mints a signed URL on demand. */
 export interface DiscussVoiceMeta {
-  url: string;
+  /** @deprecated LEGACY ONLY — a PUBLIC Supabase Storage URL on pre-Unit-2
+   *  rows. Never written by new uploads; read ONLY by the server-side resolver
+   *  to recover the object path. Must never be rendered or fetched. */
+  url?: string;
+  /** Storage bucket — `discuss-voice` (private) for everything new. */
   bucket?: string;
+  /** Bucket-relative object path. */
   path?: string;
+  /** MIME type as recorded (iOS Safari yields audio/mp4, Chrome audio/webm). */
+  type?: string;
+  size?: number;
   duration_ms: number;
   waveform: number[];
 }
@@ -1334,12 +1355,33 @@ export interface DiscussLinkPreview {
  *  optional because any given message will only carry the subset
  *  relevant to its kind — a text message never has `voice`, an image
  *  message might not have `products`, etc. */
+/** Client-safe media item — the ONLY media shape the browser ever sees.
+ *  Produced by sanitizeDiscussMedia() server-side. Carries display fields and
+ *  a canonical index; deliberately has no url / path / bucket, so it cannot
+ *  locate an object. Access goes through discussAttachmentUrl(id, index). */
+export interface DiscussMediaPublic {
+  index: number;
+  name: string;
+  type: string;
+  size: number;
+  kind: "attachment" | "voice";
+  duration_ms?: number;
+  waveform?: number[];
+}
+
 export interface DiscussMessageMetadata {
+  /** WIRE-UP ONLY: the shape the CLIENT SENDS when posting a message (carries
+   *  the private file_path so the server can locate the object). It is never
+   *  present on a message the server returns — read `media` instead. */
   attachments?: DiscussAttachment[];
   products?: DiscussProductRef[];
   mentions?: DiscussMention[];
+  /** WIRE-UP ONLY, same as `attachments`. Never returned to the browser. */
   voice?: DiscussVoiceMeta;
   link_preview?: DiscussLinkPreview;
+  /** CLIENT-SAFE media, canonical order. Present on every message returned by
+   *  the server and on optimistic bubbles the client builds itself. */
+  media?: DiscussMediaPublic[];
   [key: string]: unknown;
 }
 
@@ -1404,6 +1446,9 @@ export interface DiscussStarredRow {
 
 export type DiscussStarredInsert = Omit<DiscussStarredRow, "id" | "starred_at">;
 
+/** The DB row. SERVER-SIDE ONLY — `metadata` is where a storage reference
+ *  would live, so this shape must never be returned to a browser. Read paths
+ *  return DiscussDraftPublic via serializeDiscussDraftForClient(). */
 export interface DiscussDraftRow {
   id: string;
   account_id: string;
@@ -1411,6 +1456,18 @@ export interface DiscussDraftRow {
   body: string;
   metadata: DiscussMessageMetadata;
   updated_at: string;
+}
+
+/** What `state/draft` and `allDrafts` actually return. No id/account_id (the
+ *  draft is identified by (session account, channel)), and no `metadata`.
+ *  `media` is always [] today — drafts store text only — and exists so the
+ *  composer has a stable shape if draft attachments are ever added. */
+export interface DiscussDraftPublic {
+  channel_id: string;
+  body: string;
+  updated_at: string;
+  media: DiscussMediaPublic[];
+  channel?: DiscussChannelRow | null;
 }
 
 export type DiscussDraftInsert = Omit<DiscussDraftRow, "id" | "updated_at">;

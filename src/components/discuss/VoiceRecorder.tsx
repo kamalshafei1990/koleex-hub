@@ -440,58 +440,39 @@ export default function VoiceRecorder({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   VOICE PLAYBACK BUBBLE — used to render received voice messages inline in
-   the thread. Stateless; takes the upload URL + waveform + duration.
+   VOICE PLAYBACK BUBBLE — renders a received voice message inline.
+
+   Unit 2: this used to resolve playback in one of two unsafe ways —
+     · legacy rows  → a PUBLIC `media` URL, permanently world-readable;
+     · newer rows   → POST /api/storage/signed-url to mint a 1-hour token.
+   Both bake authorization into a string. A signed URL is an improvement on a
+   public one, but it is still a copyable bearer credential that keeps working
+   for its whole lifetime even after the user is removed from the channel —
+   and the component happily fell back to the public URL when signing failed.
+
+   Now the caller passes `src`, the first-party route
+   /api/files/discuss/<messageId>/<index>, which re-checks authentication,
+   tenant, membership and message state on EVERY request — including every
+   Range request the <audio> element makes while seeking. There is deliberately
+   no fallback: if `src` is null the bubble renders disabled rather than
+   reaching for a public URL.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function VoicePlaybackBubble({
-  url,
-  bucket,
-  path,
+  src,
   durationMs,
   waveform,
 }: {
-  /** Legacy URL (for voice notes uploaded to the public media bucket). */
-  url?: string;
-  /** New voice notes: private bucket id (e.g. "discuss-voice"). */
-  bucket?: string;
-  /** Object path in the private bucket. Playback mints a signed URL. */
-  path?: string;
+  /** First-party authorized URL from discussAttachmentUrl(); null while a
+   *  message is still pending (no canonical id ⇒ nothing to authorize yet). */
+  src: string | null;
   durationMs: number;
   waveform: number[];
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentMs, setCurrentMs] = useState(0);
-  const [resolvedUrl, setResolvedUrl] = useState<string>(url ?? "");
-
-  // New-style private voice: resolve a signed URL on mount / when path
-  // changes. Legacy voice notes (just a public `url`) short-circuit.
-  useEffect(() => {
-    let cancelled = false;
-    if (bucket && path) {
-      (async () => {
-        try {
-          const res = await fetch("/api/storage/signed-url", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bucket, path, expiresIn: 3600 }),
-          });
-          if (!res.ok) return;
-          const json = (await res.json()) as { signedUrl: string };
-          if (!cancelled) setResolvedUrl(json.signedUrl);
-        } catch (e) {
-          console.error("[VoicePlayback] signed URL failed:", e);
-        }
-      })();
-    } else if (url && url !== resolvedUrl) {
-      setResolvedUrl(url);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [bucket, path, url, resolvedUrl]);
+  const resolvedUrl = src ?? "";
 
   useEffect(() => {
     const el = audioRef.current;

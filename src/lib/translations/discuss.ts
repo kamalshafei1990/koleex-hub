@@ -22,6 +22,23 @@ export const discussT: Translations = {
   "empty":                  { en: "Nothing here yet",      zh: "这里还没有内容",          ar: "لا يوجد شيء هنا بعد" },
 
   /* ═══════════════════════════════════════════════════════════════════════════
+     ATTACHMENT VALIDATION (Unit 2)
+     Shown when a file is refused BEFORE it is uploaded. The server and the
+     storage bucket enforce the same rules; these strings exist so the user is
+     told WHY instead of watching a file silently vanish (the old behaviour).
+     {max} is substituted with the limit in whole megabytes.
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "upload.rejectedType":    { en: "That file type isn't supported",
+                              zh: "不支持该文件类型",
+                              ar: "نوع الملف هذا غير مدعوم" },
+  "upload.rejectedSize":    { en: "File is too large (max {max}MB)",
+                              zh: "文件过大（上限 {max}MB）",
+                              ar: "الملف كبير جدًا (الحد الأقصى {max} ميغابايت)" },
+  "upload.failed":          { en: "Upload failed. Please try again",
+                              zh: "上传失败，请重试",
+                              ar: "فشل الرفع. حاول مرة أخرى" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
      SIDEBAR — channel list, filters, controls
      ═══════════════════════════════════════════════════════════════════════════ */
   "sidebar.search":         { en: "Search Discuss",        zh: "搜索讨论",              ar: "ابحث في المحادثات" },

@@ -24,6 +24,11 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import {
+  serializeDiscussMessageForClient,
+  serializeDiscussDraftForClient,
+  serializeDiscussDraftsForClient,
+} from "@/lib/server/discuss-serialize";
 import { requireAuth } from "@/lib/server/auth";
 
 const CHANNELS = "discuss_channels";
@@ -93,7 +98,12 @@ export async function GET(req: Request) {
           .eq("channel_id", channelId)
           .maybeSingle();
         if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: data ?? null });
+        /* Never ship the raw row: `select("*")` includes `metadata`, which is
+           where a storage path would live if a draft ever carried media. */
+        return NextResponse.json({
+          ok: true,
+          data: data ? serializeDiscussDraftForClient(data) : null,
+        });
       }
 
       /* ---- every non-empty draft the caller owns (+channel) ------------- */
@@ -120,7 +130,9 @@ export async function GET(req: Request) {
               (typeof row.body === "string" && row.body.trim().length > 0) ||
               !!row.metadata?.attachments?.length,
           );
-        return NextResponse.json({ ok: true, data: rows });
+        /* The filter above reads metadata SERVER-SIDE only (to decide whether a
+           draft is non-empty); the serializer then drops it before the response. */
+        return NextResponse.json({ ok: true, data: serializeDiscussDraftsForClient(rows) });
       }
 
       /* ---- channel ids where the caller has a non-empty draft --------- */
@@ -189,13 +201,14 @@ export async function GET(req: Request) {
         }
 
         const out = ((msgs ?? []) as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>).map(
-          (row) => ({
-            ...row,
-            author: flattenAuthor(row.author),
-            reactions: reactionsByMessage.get(row.id) ?? [],
-            reply_preview: null,
-            thread: null,
-          }),
+          (row) =>
+            serializeDiscussMessageForClient({
+              ...row,
+              author: flattenAuthor(row.author),
+              reactions: reactionsByMessage.get(row.id) ?? [],
+              reply_preview: null,
+              thread: null,
+            }),
         );
         return NextResponse.json({ ok: true, data: out });
       }
@@ -218,13 +231,14 @@ export async function GET(req: Request) {
           .in("id", ids)
           .is("deleted_at", null);
 
-        const out = ((msgs ?? []) as Array<Record<string, unknown> & { author: AuthorJoin }>).map((row) => ({
-          ...row,
-          author: flattenAuthor(row.author),
-          reactions: [],
-          reply_preview: null,
-          thread: null,
-        }));
+        const out = ((msgs ?? []) as Array<Record<string, unknown> & { author: AuthorJoin }>).map((row) =>
+          serializeDiscussMessageForClient({
+            ...row,
+            author: flattenAuthor(row.author),
+            reactions: [],
+            reply_preview: null,
+            thread: null,
+          }));
         return NextResponse.json({ ok: true, data: out });
       }
 
