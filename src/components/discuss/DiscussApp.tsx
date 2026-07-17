@@ -1556,7 +1556,7 @@ export default function DiscussApp() {
         </p>
         <Link
           href="/"
-          className="text-[12px] font-semibold text-blue-400 hover:text-blue-300"
+          className="text-[12px] font-semibold text-[var(--accent)] hover:text-[var(--accent)]"
         >
           {t("back")}
         </Link>
@@ -1689,7 +1689,7 @@ export default function DiscussApp() {
                   onClick={() => setSidebarFilter(f)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
                     sidebarFilter === f
-                      ? "bg-blue-500/15 text-blue-300"
+                      ? "bg-[var(--accent)]/15 text-[var(--accent)]"
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                   }`}
                 >
@@ -1723,7 +1723,7 @@ export default function DiscussApp() {
                   <button
                     type="button"
                     onClick={() => setNewChannelOpen(true)}
-                    className="h-8 px-3 rounded-lg bg-blue-500/15 text-blue-300 text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-500/25 transition-colors"
+                    className="h-8 px-3 rounded-lg bg-[var(--accent)]/15 text-[var(--accent)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--accent)]/25 transition-colors"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {t("sidebar.newChannel")}
@@ -2168,12 +2168,12 @@ function ChannelRow({
         type="button"
         onClick={onSelect}
         className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
-          selected ? "bg-blue-500/10" : "hover:bg-white/[0.03]"
+          selected ? "bg-[var(--accent)]/10" : "hover:bg-white/[0.03]"
         }`}
       >
         {selected && (
           <span
-            className="absolute inset-y-0 start-0 w-[3px] bg-blue-500"
+            className="absolute inset-y-0 start-0 w-[3px] bg-[var(--accent)]"
             aria-hidden
           />
         )}
@@ -2226,7 +2226,7 @@ function ChannelRow({
                 )}
               </span>
               {channel.unread_count > 0 && (
-                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-blue-500 text-white text-[10.5px] font-bold tabular-nums flex items-center justify-center">
+                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-[var(--accent)] text-white text-[10.5px] font-bold tabular-nums flex items-center justify-center">
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
               )}
@@ -2438,7 +2438,7 @@ function TranslateControl({
         onClick={() => onOpenChange(!open)}
         className={`h-8 px-2 rounded-md flex items-center gap-1.5 transition-colors ${
           prefs.auto
-            ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/15"
+            ? "text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15"
             : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
         }`}
         title={t("translate.title", "Translation")}
@@ -2468,7 +2468,7 @@ function TranslateControl({
               aria-checked={prefs.auto}
               onClick={() => onChange({ auto: !prefs.auto })}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                prefs.auto ? "bg-blue-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+                prefs.auto ? "bg-[var(--accent)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
               }`}
             >
               <span
@@ -2690,7 +2690,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={onSaveEdit}
-                className="h-6 px-2 rounded-md bg-blue-500 text-white text-[10.5px] font-semibold hover:bg-blue-600"
+                className="h-6 px-2 rounded-md bg-[var(--accent)] text-white text-[10.5px] font-semibold hover:bg-[var(--accent-hover)]"
               >
                 {t("edit.save", "Save")}
               </button>
@@ -2755,7 +2755,7 @@ function MessageBubble({
                     onClick={() => onToggleReaction(msg.id, rx.emoji)}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
                       rx.reacted_by_me
-                        ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
+                        ? "bg-[var(--accent)]/15 border-[var(--accent)]/30 text-[var(--accent)]"
                         : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                     }`}
                   >
@@ -2778,7 +2778,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={() => onOpenThread(msg)}
-                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10.5px] font-semibold hover:bg-blue-500/15 transition-colors"
+                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[10.5px] font-semibold hover:bg-[var(--accent)]/15 transition-colors"
               >
                 <MessageSquareIcon className="h-3 w-3" />
                 {msg.thread.reply_count === 1
@@ -2922,9 +2922,9 @@ function ReplyPreviewPill({
     : (preview.body ?? "").slice(0, 120);
   return (
     <div className="mb-1 flex items-stretch gap-2 max-w-[480px]">
-      <div className="w-[3px] rounded-full bg-blue-500/50 shrink-0" />
+      <div className="w-[3px] rounded-full bg-[var(--accent)]/50 shrink-0" />
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold text-blue-300">
+        <div className="text-[10px] font-semibold text-[var(--accent)]">
           {t("reply.replyingTo", "Replying to")} {author}
         </div>
         <div className="text-[11px] text-[var(--text-dim)] truncate italic">
@@ -2980,7 +2980,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-gradient-to-br from-blue-500/10 to-violet-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-colors max-w-[280px]"
+      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-color)] transition-colors max-w-[280px]"
     >
       <div className="h-8 w-8 shrink-0 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
         {product.image ? (
@@ -2998,7 +2998,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
           {product.name}
         </div>
-        <div className="text-[10.5px] text-blue-300 truncate">
+        <div className="text-[10.5px] text-[var(--accent)] truncate">
           {product.slug}
         </div>
       </div>
@@ -3127,10 +3127,10 @@ function Composer({
     >
       {/* Reply-to banner */}
       {replyTarget && (
-        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/8 border border-blue-500/25">
-          <div className="w-[3px] self-stretch rounded-full bg-blue-500 shrink-0" />
+        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30">
+          <div className="w-[3px] self-stretch rounded-full bg-[var(--accent)] shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold text-blue-300">
+            <div className="text-[10px] font-semibold text-[var(--accent)]">
               {t("reply.replyingTo", "Replying to")}{" "}
               {replyTarget.author?.full_name ||
                 replyTarget.author?.username ||
@@ -3206,9 +3206,9 @@ function Composer({
           {products.map((p, i) => (
             <div
               key={`cp-${i}`}
-              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-blue-500/10 border border-blue-500/30"
+              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30"
             >
-              <PackageIcon className="h-3.5 w-3.5 text-blue-300" />
+              <PackageIcon className="h-3.5 w-3.5 text-[var(--accent)]" />
               <span className="text-[11.5px] text-[var(--text-primary)] max-w-[180px] truncate font-medium">
                 {p.name}
               </span>
@@ -3268,7 +3268,7 @@ function Composer({
             type="button"
             onClick={onSend}
             disabled={!canSend}
-            className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="h-8 px-3 rounded-lg bg-[var(--accent)] text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {sending ? (
               <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -3448,7 +3448,7 @@ function DetailsPane({
                     <div className="text-[10px] text-[var(--text-dim)] truncate">
                       @{m.author.username}
                       {m.role !== "member" && (
-                        <span className="ms-1.5 text-blue-300 font-semibold uppercase tracking-wider">
+                        <span className="ms-1.5 text-[var(--accent)] font-semibold uppercase tracking-wider">
                           {m.role}
                         </span>
                       )}
@@ -3504,16 +3504,16 @@ function NotifPrefRow({
       onClick={onClick}
       className={`h-9 px-3 flex items-center gap-2 text-[12px] font-medium transition-colors text-start ${
         active
-          ? "bg-blue-500/10 text-blue-300"
+          ? "bg-[var(--accent)]/10 text-[var(--accent)]"
           : "text-[var(--text-muted)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
       }`}
     >
       <span
         className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
-          active ? "border-blue-400" : "border-[var(--border-subtle)]"
+          active ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"
         }`}
       >
-        {active && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
+        {active && <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
       </span>
       <span className="flex-1">{label}</span>
     </button>
@@ -3631,7 +3631,7 @@ function NewChannelModal({
             onClick={() => setKind("channel")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "channel"
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3648,7 +3648,7 @@ function NewChannelModal({
             onClick={() => setKind("group")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "group"
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3720,7 +3720,7 @@ function NewChannelModal({
                       })
                     }
                     className={`w-full px-3 py-2 flex items-center gap-2.5 text-start transition-colors ${
-                      isOn ? "bg-blue-500/10" : "hover:bg-[var(--bg-primary)]"
+                      isOn ? "bg-[var(--accent)]/10" : "hover:bg-[var(--bg-primary)]"
                     }`}
                   >
                     <Avatar
@@ -3739,7 +3739,7 @@ function NewChannelModal({
                         )}
                       </div>
                     </div>
-                    {isOn && <CheckIcon className="h-4 w-4 text-blue-400" />}
+                    {isOn && <CheckIcon className="h-4 w-4 text-[var(--accent)]" />}
                   </button>
                 );
               })}
@@ -3772,7 +3772,7 @@ function NewChannelModal({
               memberIds: Array.from(selected),
             })
           }
-          className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          className="h-8 px-3 rounded-lg bg-[var(--accent)] text-white text-[11.5px] font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
           {t("new.channel.create")}
         </button>
