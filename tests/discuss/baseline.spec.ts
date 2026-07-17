@@ -17,6 +17,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { signIn, startTracing } from "./auth";
+import { cleanupFixture, EXACT_COUNT } from "./fixture";
 import { assertSafe, STAGING_REF } from "./guards";
 
 const CHANNEL_ID = "1581bdf2-c922-4ab2-bc3f-66a391732a3a";
@@ -220,19 +221,17 @@ test.describe("Discuss client baseline (5,000-message fixture)", () => {
       all_ms: latencies,
     };
 
-    /* Clean up: the probe messages are ours and must not distort the 5,000-row
-       fixture that later runs depend on. Delete by exact body, fixture channel
-       only — never a blanket delete. */
-    assertSafe(process.env, baseURL!);
-    const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-    if (!process.env.SUPABASE_URL!.includes(STAGING_REF)) throw new Error("refusing cleanup: not staging");
-    const { error } = await db.from("discuss_messages").delete().eq("channel_id", CHANNEL_ID).in("body", sent);
-    const { count } = await db.from("discuss_messages").select("id", { count: "exact", head: true }).eq("channel_id", CHANNEL_ID);
-    results.fixture_integrity = { cleanup_error: error?.message ?? null, messages_after_cleanup: count, expected: 5000 };
+    /* Cleanup goes through the ONE converging helper. The previous inline
+       version here raced in-flight sends and treated a failed SELECT as
+       "nothing to clean" — it leaked probe rows into the fixture three times.
+       cleanupFixture() settles, then delete-and-recounts until the channel is
+       provably back to exactly 5000, and throws if it never converges. */
+    const { count } = await cleanupFixture();
+    results.fixture_integrity = { messages_after_cleanup: count, expected: EXACT_COUNT };
 
     await sender.context.close();
     await receiver.context.close();
     save(info.project.name);
-    expect(count, "fixture must be restored to exactly 5000 messages").toBe(5000);
+    expect(count, "fixture must be restored to exactly 5000 messages").toBe(EXACT_COUNT);
   });
 });

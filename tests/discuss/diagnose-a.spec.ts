@@ -1,3 +1,10 @@
+/* CLOSED DIAGNOSTIC — skipped by default.
+   This spec answered its question (see the investigation report) and is kept
+   for reproducibility only. Its cleanup is the OLD inline path that leaked
+   probe rows three times; tests/discuss/fixture.ts is now the single
+   converging cleanup. Do not un-skip this without porting it to
+   cleanupFixture() first, or it will pollute the 5,000-message fixture.
+   Run deliberately with: KXPERF_RUN_CLOSED_DIAGNOSTICS=1 */
 /* kxperf — DIAGNOSTIC A (rerun). Closes the send→receive timeline.
    ────────────────────────────────────────────────────────────────────────────
    Fixes three defects in my previous attempt:
