@@ -2171,7 +2171,13 @@ function ChannelRow({
         type="button"
         onClick={onSelect}
         className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
-          selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-white/[0.03]"
+          /* Selected row reads as a crisp white-tinted panel with a solid white
+             rail, so the open chat pops the way WhatsApp's does — white as the
+             single point of emphasis, not a bubble fill. --bg-surface-bright is
+             the strongest wash the palette offers (0.20 white in dark). */
+          selected
+            ? "bg-[var(--bg-surface-bright)]"
+            : "hover:bg-[var(--bg-surface-hover)]"
         }`}
       >
         {selected && (
