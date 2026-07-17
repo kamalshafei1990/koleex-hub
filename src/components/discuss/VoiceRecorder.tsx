@@ -558,7 +558,9 @@ export function VoicePlaybackBubble({
         {Math.floor(durationMs / 60000)}:
         {(Math.floor(durationMs / 1000) % 60).toString().padStart(2, "0")}
       </div>
-      <audio ref={audioRef} src={resolvedUrl} preload="metadata" className="hidden" />
+      {/* src="" makes the browser re-request the page URL (React warns per
+          bubble). While the signed URL is still resolving, omit src entirely. */}
+      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" className="hidden" />
     </div>
   );
 }

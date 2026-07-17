@@ -571,6 +571,22 @@ export default function DiscussApp() {
         currentAccountId: accountId,
         limit: 120,
       });
+
+      /* ── Stale-response guard (the "wrong conversation flashes" bug) ──
+         setMessages used to run whenever the network answered, even if the
+         user had ALREADY switched to another chat. With quick switches, a slow
+         response for chat A landed after chat B was opened and overwrote B's
+         thread with A's messages — the UI visibly flip-flopped between
+         conversations with no user action, and the leave-snapshot could then
+         cache A's messages under B's key (poisoning the cache so the wrong
+         thread kept coming back). A response may only touch the UI if its
+         channel is STILL the selected one; otherwise it just refreshes that
+         channel's snapshot cache so the fetch isn't wasted. */
+      if (selectedChannelIdRef.current !== channelId) {
+        if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
+        return;
+      }
+
       setMessages((prev) => {
         /* Silent refreshes should never blow away in-flight optimistic
            state: only replace if the server returned a *newer* set than
@@ -590,6 +606,8 @@ export default function DiscussApp() {
         if (lastNew !== lastOld) return rows;
         return prev;
       });
+      /* Keep the snapshot cache in sync with the freshest server truth. */
+      if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
       if (!silent) setLoadingMessages(false);
     },
     [accountId],
@@ -913,8 +931,17 @@ export default function DiscussApp() {
     return () => {
       /* Snapshot this channel's thread (including realtime messages received
          while it was open) so re-opening it paints instantly from cache.
-         selectedChannelId here is the channel being left. */
-      messagesCacheRef.current.set(selectedChannelId, messagesRef.current);
+         selectedChannelId here is the channel being left. Verify the rows
+         actually belong to it before writing — during a fast switch the state
+         can briefly hold another chat's messages, and snapshotting those here
+         would poison the cache with the wrong conversation. */
+      const leaving = messagesRef.current;
+      const last = leaving[leaving.length - 1] as
+        | { channel_id?: string }
+        | undefined;
+      if (last && last.channel_id === selectedChannelId) {
+        messagesCacheRef.current.set(selectedChannelId, leaving);
+      }
       unsubChannel();
     };
     /* Critical: only depend on the two things that actually mean
