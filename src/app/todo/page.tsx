@@ -174,6 +174,7 @@ function ChecklistField({ items, onChange }: {
   items: TodoChecklistItem[];
   onChange: (next: TodoChecklistItem[]) => void;
 }) {
+  const { t } = useTranslation(todoT);
   const [text, setText] = useState("");
   const add = () => {
     const v = text.trim();
@@ -185,7 +186,7 @@ function ChecklistField({ items, onChange }: {
   return (
     <div>
       <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-        Checklist{items.length > 0 && <span className="ml-1.5 text-[var(--text-muted)] normal-case">{done}/{items.length}</span>}
+        {t("checklist.title")}{items.length > 0 && <span className="ml-1.5 text-[var(--text-muted)] normal-case">{done}/{items.length}</span>}
       </label>
       {items.length > 0 && (
         <div className="space-y-1 mb-2">
@@ -208,7 +209,7 @@ function ChecklistField({ items, onChange }: {
       <div className="flex items-center gap-2">
         <input value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder="Add a subtask…"
+          placeholder={t("checklist.placeholder")}
           className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all" />
         <button type="button" onClick={add} disabled={!text.trim()}
           className="h-9 w-9 shrink-0 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-30">
@@ -315,7 +316,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { setError("Title is required."); return; }
+    if (!title.trim()) { setError(t("err.titleRequired")); return; }
     setSaving(true); setError("");
     try {
       if (editEntry) {
@@ -352,7 +353,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
       }
       onSave(); onClose();
     } catch {
-      setError("Something went wrong.");
+      setError(t("err.generic"));
     } finally {
       setSaving(false);
     }
@@ -480,13 +481,13 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               })}
               {filteredEmployees.length === 0 && (
                 <div className="col-span-full text-center py-4 text-[12px] text-[var(--text-dim)]">
-                  No employees found
+                  {t("assign.none")}
                 </div>
               )}
             </div>
             {selectedAssignees.length > 0 && (
               <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
-                {selectedAssignees.length} employee{selectedAssignees.length !== 1 ? "s" : ""} selected
+                {selectedAssignees.length} {t("assign.selectedWord")}
               </p>
             )}
           </div>
@@ -506,7 +507,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                         : "bg-blue-500/15 border-blue-500/30 text-blue-400"
                       : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                   }`}>
-                  {p.label}
+                  {t("p." + p.value)}
                 </button>
               ))}
             </div>
@@ -514,7 +515,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           {/* Status (workflow stage) */}
           <div>
-            <label className={lbl}>Status</label>
+            <label className={lbl}>{t("f.status")}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {STATUSES.map((s) => (
                 <button key={s.value} onClick={() => setStatus(s.value)}
@@ -523,7 +524,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                       ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
                       : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                   }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} /> {s.label}
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} /> {t("st." + s.value)}
                 </button>
               ))}
             </div>
@@ -532,18 +533,18 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           {/* Start + Due date — stack on mobile so each picker gets full width */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Start Date</label>
-              <DatePicker value={startDate} onChange={setStartDate} placeholder="Select date" />
+              <label className={lbl}>{t("f.startDate")}</label>
+              <DatePicker value={startDate} onChange={setStartDate} placeholder={t("f.selectDate")} />
             </div>
             <div>
               <label className={lbl}>{t("f.dueDate")}</label>
-              <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select date" />
+              <DatePicker value={dueDate} onChange={setDueDate} placeholder={t("f.selectDate")} />
             </div>
           </div>
 
           {/* Reminder */}
           <div>
-            <label className={lbl}>Reminder <span className="font-normal normal-case">(optional)</span></label>
+            <label className={lbl}>{t("f.reminder")} <span className="font-normal normal-case">{t("common.optional")}</span></label>
             <div className="flex items-center gap-2">
               <input type="datetime-local" value={remindAt} onChange={(e) => setRemindAt(e.target.value)}
                 className="flex-1 h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" />
@@ -575,16 +576,16 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               {showNewLabel ? (
                 <div className="flex items-center gap-1">
                   <input type="text" value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)}
-                    placeholder="Label name" autoFocus
+                    placeholder={t("f.label.placeholder")} autoFocus
                     className="h-7 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none w-24"
                     onKeyDown={(e) => { if (e.key === "Enter") handleNewLabel(); if (e.key === "Escape") setShowNewLabel(false); }} />
-                  <button onClick={handleNewLabel} className="h-7 px-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">Add</button>
+                  <button onClick={handleNewLabel} className="h-7 px-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">{t("common.add")}</button>
                   <button onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)]"><CrossIcon size={12} /></button>
                 </div>
               ) : (
                 <button onClick={() => setShowNewLabel(true)}
                   className="h-7 px-3 rounded-full text-[11px] font-medium border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-all flex items-center gap-1">
-                  <PlusIcon size={10} /> New
+                  <PlusIcon size={10} /> {t("common.new")}
                 </button>
               )}
             </div>
@@ -608,7 +609,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           ) : (
             <button type="button" onClick={() => setShowExtras(true)}
               className="w-full h-10 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center gap-1.5">
-              <PlusIcon size={12} /> Attachments, mentions &amp; products
+              <PlusIcon size={12} /> {t("extras.toggle")}
             </button>
           )}
         </div>
@@ -728,13 +729,13 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           {/* Meta badges */}
           <div className="flex items-center gap-1.5 md:gap-2 mt-1.5 flex-wrap min-w-0">
             <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityConfig.color}`}>
-              <FlagIcon size={10} /> {priorityConfig.label}
+              <FlagIcon size={10} /> {t("p." + task.priority)}
             </span>
             {(task.status === "in_progress" || task.status === "blocked") && (
               <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                 task.status === "blocked" ? "text-red-400 bg-red-500/10" : "text-blue-400 bg-blue-500/10"
               }`}>
-                {task.status === "blocked" ? "Blocked" : "In progress"}
+                {task.status === "blocked" ? t("st.blocked") : t("st.in_progress")}
               </span>
             )}
             {task.label && (
@@ -752,12 +753,12 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
             )}
             {task.source !== "manual" && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded">
-                {task.source === "crm" ? "CRM" : "Calendar"}
+                {task.source === "crm" ? t("src.crm") : t("src.calendar")}
               </span>
             )}
             {task.assigner && (
               <span className="inline-flex items-center gap-1 text-[10px] text-[var(--text-faint)]">
-                from {task.assigner.full_name || task.assigner.username}
+                {t("row.from")} {task.assigner.full_name || task.assigner.username}
               </span>
             )}
             {checklist.length > 0 && (
@@ -791,7 +792,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
 
         {/* Actions — always visible on mobile (no hover), fade-in on desktop */}
         <div className="shrink-0 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-          <button onClick={() => setExpanded(!expanded)} title="Notes"
+          <button onClick={() => setExpanded(!expanded)} title={t("common.notes")}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             <MessageSquareIcon size={14} />
             {task.notes.length > 0 && (
@@ -876,13 +877,13 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
   const doneThisWeek = todos.filter((t) => t.completed_at && new Date(t.completed_at) >= weekAgo).length;
 
   const cards = [
-    { label: "Total Tasks", value: total, icon: ListTodoIcon, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-    { label: "Active", value: active, icon: TargetIcon, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-    { label: "Completed", value: completed, icon: CheckCircleIcon, color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
-    { label: "Overdue", value: overdue, icon: ExclamationIcon, color: "text-red-400", bg: overdue > 0 ? "bg-red-500/10 border-red-500/20" : "bg-[var(--bg-surface)] border-[var(--border-subtle)]" },
-    { label: "High Priority", value: high, icon: FlagIcon, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
-    { label: "Done This Week", value: doneThisWeek, icon: TrendingUpIcon, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
-    { label: "Completion", value: `${completionRate}%`, icon: BarChart3Icon, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
+    { label: t("kpi.totalTasks"), value: total, icon: ListTodoIcon, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+    { label: t("kpi.active"), value: active, icon: TargetIcon, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+    { label: t("kpi.completed"), value: completed, icon: CheckCircleIcon, color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
+    { label: t("kpi.overdue"), value: overdue, icon: ExclamationIcon, color: "text-red-400", bg: overdue > 0 ? "bg-red-500/10 border-red-500/20" : "bg-[var(--bg-surface)] border-[var(--border-subtle)]" },
+    { label: t("kpi.highPriority"), value: high, icon: FlagIcon, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
+    { label: t("kpi.doneThisWeek"), value: doneThisWeek, icon: TrendingUpIcon, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
+    { label: t("kpi.completion"), value: `${completionRate}%`, icon: BarChart3Icon, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
   ];
 
   return (
@@ -918,7 +919,7 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{p.info.full_name || p.info.username}</p>
-                  <p className="text-[10px] text-[var(--text-dim)]">{p.count} completed</p>
+                  <p className="text-[10px] text-[var(--text-dim)]">{p.count} {t("kpi.completedWord")}</p>
                 </div>
               </div>
             ))}
@@ -1179,7 +1180,7 @@ export default function TodoPage() {
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
-            Task management &middot; {stats.total} tasks
+            {t("app.subtitle")} &middot; {stats.total}
           </p>
 
           {/* Search + Add */}
@@ -1202,7 +1203,7 @@ export default function TodoPage() {
                   : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               }`}>
               <FilterIcon size={14} />
-              <span className="hidden md:inline">Filters</span>
+              <span className="hidden md:inline">{t("filters")}</span>
               {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
             </button>
             <button onClick={() => setModal({ open: true, entry: null })}
@@ -1221,7 +1222,7 @@ export default function TodoPage() {
                     ? "bg-white/10 border-white/20 text-[var(--text-primary)]"
                     : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
-                {f === "all" ? `All (${stats.total})` : f === "active" ? `Active (${stats.active})` : `Done (${stats.completed})`}
+                {f === "all" ? `${t("pill.all")} (${stats.total})` : f === "active" ? `${t("pill.active")} (${stats.active})` : `${t("pill.done")} (${stats.completed})`}
               </button>
             ))}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
@@ -1234,7 +1235,7 @@ export default function TodoPage() {
                       : "bg-blue-500/15 border-blue-500/30 text-blue-400"
                     : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
-                <FlagIcon size={10} /> {p.label}
+                <FlagIcon size={10} /> {t("p." + p.value)}
               </button>
             ))}
           </div>
@@ -1246,21 +1247,21 @@ export default function TodoPage() {
                 {/* Status filter */}
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">All Statuses</option>
-                  {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  <option value="">{t("filters.allStatuses")}</option>
+                  {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("st." + s.value)}</option>)}
                 </select>
 
                 {/* Department filter */}
                 <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">All Departments</option>
+                  <option value="">{t("filters.allDepts")}</option>
                   {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
 
                 {/* Assignee filter */}
                 <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">All Assignees</option>
+                  <option value="">{t("filters.allAssignees")}</option>
                   {uniqueAssignees.map((a) => (
                     <option key={a.account_id} value={a.account_id}>{a.full_name || a.username}</option>
                   ))}
@@ -1269,7 +1270,7 @@ export default function TodoPage() {
                 {/* Label filter */}
                 <select value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">All Labels</option>
+                  <option value="">{t("filters.allLabels")}</option>
                   {usedLabels.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
 
@@ -1293,7 +1294,7 @@ export default function TodoPage() {
                 {hasActiveFilters && (
                   <button onClick={() => { setStatusFilter(""); setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); setDateFrom(""); setDateTo(""); }}
                     className="h-8 px-3 rounded-lg text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                    <CrossIcon size={12} /> Clear Filters
+                    <CrossIcon size={12} /> {t("filters.clearBtn")}
                   </button>
                 )}
               </div>
@@ -1320,12 +1321,12 @@ export default function TodoPage() {
               <TodoIcon size={24} className="text-[var(--text-ghost)]" />
             </div>
             <p className="text-[var(--text-faint)] text-sm font-medium">
-              {search ? "No tasks match your search" : filter === "completed" ? "No completed tasks" : "No tasks yet"}
+              {search ? t("empty.noSearch") : filter === "completed" ? t("empty.noCompleted") : t("empty.title")}
             </p>
             {!search && filter === "all" && (
               <button onClick={() => setModal({ open: true, entry: null })}
                 className="text-[12px] text-blue-400 hover:text-blue-300 font-medium transition-colors">
-                Create your first task
+                {t("empty.createFirst")}
               </button>
             )}
           </div>

@@ -85,4 +85,87 @@ export const todoT: Translations = {
   "toast.updated":     { en: "Task updated",              zh: "任务已更新",             ar: "تم تحديث المهمة" },
   "toast.deleted":     { en: "Task deleted",              zh: "任务已删除",             ar: "تم حذف المهمة" },
   "toast.marked":      { en: "Marked as done",            zh: "已标记完成",             ar: "تم تمييزها كمنجزة" },
+
+  /* App chrome + filter pills */
+  "app.subtitle":      { en: "Task management",            zh: "任务管理",               ar: "إدارة المهام" },
+  "pill.all":          { en: "All",                        zh: "全部",                   ar: "الكل" },
+  "pill.active":       { en: "Active",                     zh: "进行中",                 ar: "نشِطة" },
+  "pill.done":         { en: "Done",                       zh: "已完成",                 ar: "منجزة" },
+
+  /* Priority (medium was missing) */
+  "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },
+
+  /* Status stages */
+  "st.todo":           { en: "To do",                      zh: "待办",                   ar: "قيد الانتظار" },
+  "st.in_progress":    { en: "In progress",                zh: "进行中",                 ar: "قيد التنفيذ" },
+  "st.blocked":        { en: "Blocked",                    zh: "受阻",                   ar: "متوقفة" },
+  "st.done":           { en: "Done",                       zh: "已完成",                 ar: "منجزة" },
+
+  /* KPI cards */
+  "kpi.totalTasks":    { en: "Total Tasks",                zh: "任务总数",               ar: "إجمالي المهام" },
+  "kpi.highPriority":  { en: "High Priority",              zh: "高优先级",               ar: "أولوية عالية" },
+  "kpi.doneThisWeek":  { en: "Done This Week",             zh: "本周完成",               ar: "أُنجزت هذا الأسبوع" },
+  "kpi.completion":    { en: "Completion",                 zh: "完成率",                 ar: "نسبة الإنجاز" },
+  "kpi.completedWord": { en: "completed",                  zh: "个已完成",               ar: "منجزة" },
+
+  /* Task fields (added) */
+  "f.status":          { en: "Status",                     zh: "状态",                   ar: "الحالة" },
+  "f.startDate":       { en: "Start Date",                 zh: "开始日期",               ar: "تاريخ البدء" },
+  "f.reminder":        { en: "Reminder",                   zh: "提醒",                   ar: "تذكير" },
+  "f.selectDate":      { en: "Select date",                zh: "选择日期",               ar: "اختر تاريخًا" },
+
+  /* Filters (added) */
+  "filters.allStatuses": { en: "All Statuses",             zh: "所有状态",               ar: "كل الحالات" },
+  "filters.clearBtn":  { en: "Clear Filters",              zh: "清除筛选",               ar: "مسح المرشحات" },
+
+  /* Assign */
+  "assign.selectedWord": { en: "selected",                 zh: "人已选",                 ar: "مختار" },
+  "assign.none":       { en: "No employees found",         zh: "未找到员工",             ar: "لا يوجد موظفون" },
+
+  /* Checklist */
+  "checklist.title":   { en: "Checklist",                  zh: "清单",                   ar: "قائمة المهام" },
+  "checklist.placeholder": { en: "Add a subtask…",         zh: "添加子任务…",            ar: "أضف مهمة فرعية…" },
+
+  /* Empty states (added) */
+  "empty.noSearch":    { en: "No tasks match your search", zh: "没有匹配搜索的任务",     ar: "لا توجد مهام مطابقة لبحثك" },
+  "empty.noCompleted": { en: "No completed tasks",         zh: "暂无已完成任务",         ar: "لا توجد مهام منجزة" },
+  "empty.createFirst": { en: "Create your first task",     zh: "创建你的第一个任务",     ar: "أنشئ أول مهمة لك" },
+
+  /* Task row */
+  "row.from":          { en: "from",                       zh: "来自",                   ar: "من" },
+  "src.crm":           { en: "CRM",                        zh: "CRM",                    ar: "CRM" },
+  "src.calendar":      { en: "Calendar",                   zh: "日历",                   ar: "التقويم" },
+
+  /* Common words */
+  "common.optional":   { en: "(optional)",                 zh: "（可选）",               ar: "(اختياري)" },
+  "common.add":        { en: "Add",                        zh: "添加",                   ar: "إضافة" },
+  "common.new":        { en: "New",                        zh: "新建",                   ar: "جديد" },
+  "common.done":       { en: "Done",                       zh: "完成",                   ar: "تم" },
+  "common.remove":     { en: "Remove",                     zh: "移除",                   ar: "إزالة" },
+  "common.notes":      { en: "Notes",                      zh: "笔记",                   ar: "الملاحظات" },
+
+  /* Extras (attachments / mentions / products) */
+  "extras.toggle":     { en: "Attachments, mentions & products", zh: "附件、提及和产品", ar: "المرفقات والإشارات والمنتجات" },
+  "extras.attachments": { en: "Attachments",               zh: "附件",                   ar: "المرفقات" },
+  "extras.attachFile": { en: "Attach file",                zh: "添加文件",               ar: "إرفاق ملف" },
+  "extras.captureScreen": { en: "Capture screen",          zh: "截屏",                   ar: "التقاط الشاشة" },
+  "extras.pasteHint":  { en: "or paste an image (⌘/Ctrl+V)", zh: "或粘贴图片 (⌘/Ctrl+V)", ar: "أو الصق صورة (⌘/Ctrl+V)" },
+  "extras.mention":    { en: "Mention people",             zh: "提及成员",               ar: "الإشارة إلى أشخاص" },
+  "extras.mentionSearch": { en: "Search to mention…",      zh: "搜索以提及…",            ar: "ابحث للإشارة…" },
+  "extras.linkProducts": { en: "Link products",            zh: "关联产品",               ar: "ربط المنتجات" },
+  "extras.browseProducts": { en: "Browse products",        zh: "浏览产品",               ar: "تصفح المنتجات" },
+  "extras.uploadFailed": { en: "Upload failed",            zh: "上传失败",               ar: "فشل الرفع" },
+  "extras.captureUnsupported": { en: "Screen capture isn't supported in this browser.", zh: "此浏览器不支持屏幕截图。", ar: "التقاط الشاشة غير مدعوم في هذا المتصفح." },
+
+  /* Product picker */
+  "picker.search":     { en: "Search by name or code…",    zh: "按名称或编号搜索…",      ar: "ابحث بالاسم أو الرمز…" },
+  "picker.allDivisions": { en: "All divisions",            zh: "所有分区",               ar: "كل الأقسام" },
+  "picker.allCategories": { en: "All categories",          zh: "所有类别",               ar: "كل الفئات" },
+  "picker.noMatch":    { en: "No products match.",         zh: "没有匹配的产品。",       ar: "لا توجد منتجات مطابقة." },
+  "picker.selectedWord": { en: "selected",                 zh: "个已选",                 ar: "مختار" },
+  "picker.productsWord": { en: "products",                 zh: "个产品",                 ar: "منتجات" },
+
+  /* Errors */
+  "err.titleRequired": { en: "Title is required.",         zh: "标题为必填项。",         ar: "العنوان مطلوب." },
+  "err.generic":       { en: "Something went wrong.",      zh: "出了点问题。",           ar: "حدث خطأ ما." },
 };
