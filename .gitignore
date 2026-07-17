@@ -64,3 +64,6 @@ ui-ux-pro-max-skill-main/
 # OCR language packs — fetched at build time, not committed
 tessdata/
 .local/
+.kxperf/
+playwright-report/
+test-results/
