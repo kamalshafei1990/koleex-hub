@@ -2111,7 +2111,9 @@ export default function DiscussApp() {
               {/* Message list */}
               <div
                 ref={threadScrollRef}
-                className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
+                /* pb-9 leaves room under the newest message so its hover action
+                   bar (which now sits below the bubble) is never clipped. */
+                className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-9"
               >
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center">
@@ -3013,9 +3015,17 @@ function MessageBubble({
         </MessageSurface>
       </div>
 
-      {/* Hover action bar */}
+      {/* Hover action bar — sits just UNDER the bubble, on the bubble's own
+          side (right for your messages, left for incoming, clearing the 40px
+          avatar gutter). The old -top-3 floated it above the bubble, which got
+          clipped for the topmost message. top-full keeps it below and it never
+          overlaps the header; z-20 floats it over the following row. */}
       {!isDeleted && !isEditing && (
-        <div className="absolute -top-3 end-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div
+          className={`absolute top-full -mt-1 ${
+            isSelf ? "end-2" : "start-10"
+          } opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity z-20`}
+        >
           <div className="flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg">
             {reactionPickerOpen ? (
               <div
