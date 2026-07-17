@@ -122,6 +122,7 @@ import {
 import { ThreadPane } from "./ThreadPane";
 import { SearchPanel } from "./SearchPanel";
 import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
+import { initialsOf } from "@/lib/discuss/initials";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { discussT } from "@/lib/translations/discuss";
@@ -208,14 +209,6 @@ function formatDaySeparator(iso: string, todayText: string, yesterdayText: strin
     day: "numeric",
     year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
   });
-}
-
-function initialsOf(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 const AVATAR_GRADIENTS = [
@@ -443,6 +436,36 @@ export default function DiscussApp() {
   /* ── Refs for auto-scroll + focus ─────────────────────────────── */
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /* Focus the composer when a conversation opens: opening one is a statement of
+     intent to type. Written to yield rather than win — it stands down while any
+     modal/picker owns focus, and when the operator is already in a text control.
+     A channel row is a plain button, so the ordinary path still focuses.
+     Precise pointers only: on touch this would raise the virtual keyboard over
+     the conversation just opened. Focus after SENDING is handled in handleSend. */
+  useEffect(() => {
+    if (!selectedChannelId) return;
+    if (
+      newChannelOpen || newDmOpen || productPickerOpen ||
+      mentionPickerOpen || emojiPickerOpen || voiceOpen
+    ) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+
+    const el = composerRef.current;
+    if (!el) return;
+    const active = document.activeElement as HTMLElement | null;
+    if (
+      active && active !== el &&
+      active.closest(
+        'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]',
+      )
+    ) return;
+    el.focus();
+  }, [
+    selectedChannelId, newChannelOpen, newDmOpen,
+    productPickerOpen, mentionPickerOpen, emojiPickerOpen, voiceOpen,
+  ]);
 
   /* ── Latest-value refs ────────────────────────────────────────────
      The realtime subscribe effect used to list `channels`, `members`,
@@ -2565,6 +2588,48 @@ type MessageBubbleProps = {
   t: (key: string, fallback?: string) => string;
 };
 
+/* Presentation-only shell for a message body. Renders `children` unchanged and
+   adds exactly two things: the 62ch reading measure (both directions), and the
+   T2 surface panel (own messages only). No state, no handlers, no data.
+
+   Alignment is deliberately a single shared left rail: own and other sit on the
+   same baseline and the same measure, and "mine" is carried by the surface, not
+   by position. Right-aligning own messages would be a bubble layout, which is
+   out of scope by decision, and the Koleex grid wants one alignment, not two.
+
+   The surface is --bg-surface-bright, not --bg-surface, and that is deliberate.
+   Every wash in this palette was built for hover states, so none of them reach
+   the 3:1 a boundary needs: measured against --bg-primary they run 1.10 (surface)
+   → 1.77 (bright) in dark, 1.09 → 1.45 in light. Bright is the strongest the
+   token set offers, paired with --border-color rather than --border-subtle so the
+   hard edge carries what the wash cannot. Do not weaken either back to "subtle" —
+   at 1.10:1 the panel is invisible and the whole treatment silently does nothing.
+
+   text-[13px] is NOT styling and must not be "cleaned up": `ch` resolves against
+   the element's own font-size, so a 62ch cap on a container inheriting 16px
+   silently yields ~76 characters of 13px body text. Pinning the shell to the body
+   size is what makes 62ch mean 62 characters; it matches the body size already in
+   use, so inheritance is a no-op for children. */
+function MessageSurface({
+  isSelf,
+  children,
+}: {
+  isSelf: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={
+        isSelf
+          ? "max-w-[62ch] text-[13px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-bright)] px-3 py-2.5"
+          : "max-w-[62ch] text-[13px]"
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 function MessageBubble({
   msg,
   showAuthor,
@@ -2599,7 +2664,7 @@ function MessageBubble({
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`group relative flex gap-3 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] ${showAuthor ? "mt-2" : ""}`}
+      className={`group relative flex gap-3 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] ${showAuthor ? "mt-3" : ""}`}
     >
       {showAuthor ? (
         <Avatar
@@ -2623,14 +2688,16 @@ function MessageBubble({
             <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
               {time}
             </span>
-            {isSelf && (
-              <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wider">
-                You
-              </span>
-            )}
+            {/* The "You" badge is gone: the author name already says who wrote
+                this, and the surface panel below now carries "mine" without
+                colour. At 4.10:1 in dark theme it was also the lowest-contrast
+                element carrying the outgoing signal alone. */}
           </div>
         )}
 
+        {/* T2 surface — own messages only. The author header stays OUTSIDE it:
+            the panel marks the utterance, not the attribution. */}
+        <MessageSurface isSelf={isSelf}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
           <ReplyPreviewPill preview={msg.reply_preview} t={t} />
@@ -2774,6 +2841,7 @@ function MessageBubble({
             )}
           </>
         )}
+        </MessageSurface>
       </div>
 
       {/* Hover action bar */}
@@ -3261,7 +3329,9 @@ function Composer({
           </button>
         </div>
       </div>
-      <div className="mt-1 px-1 text-[10px] text-[var(--text-dim)]">
+      {/* Desktop-only: the hint names Enter and Shift+Enter, neither of which
+          exists on a touch keyboard. */}
+      <div className="mt-1 px-1 text-[10px] text-[var(--text-dim)] hidden md:block">
         {hintText}
       </div>
     </div>
