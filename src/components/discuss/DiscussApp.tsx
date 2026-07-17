@@ -3036,13 +3036,10 @@ function MessageSurface({
         "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
         "rounded-2xl border " +
         (isSelf
-          /* Mine: solid INVERTED fill (white-in-dark / black-in-light) — the
-             iMessage/WeChat "my messages pop" bubble. Border is transparent (a
-             solid fill carries its own edge) and a squared corner marks the side
-             the bubble grows from (the tail, done with radius, costs nothing).
-             Every inner element below flips to --text-inverted when isSelf so
-             nothing goes dark-on-white. */
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent rounded-ee-md"
+          /* Mine: solid elevated tone (color-mix, theme-aware) + a squared corner
+             on the side the bubble grows from — the WeChat/WhatsApp tail, done
+             with radius instead of an SVG so it costs nothing to render. */
+          ? "bg-[color-mix(in_srgb,var(--bg-primary)_82%,var(--text-primary))] border-[var(--border-subtle)] rounded-ee-md"
           : "bg-[var(--bg-surface)] border-[var(--border-subtle)] rounded-es-md")
       }
     >
@@ -3201,17 +3198,15 @@ function MessageBubble({
         <MessageSurface isSelf={isSelf}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
-          <ReplyPreviewPill preview={msg.reply_preview} t={t} inverted={isSelf} />
+          <ReplyPreviewPill preview={msg.reply_preview} t={t} />
         )}
 
         {isDeleted ? (
-          <div className={`text-[12.5px] italic ${isSelf ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}>
+          <div className="text-[12.5px] italic text-[var(--text-dim)]">
             {deletedText}
           </div>
         ) : isEditing ? (
-          /* Editing sits on the solid own bubble → give the editor a solid dark
-             panel so its --text-primary textarea stays readable. */
-          <div className={`mt-1 rounded-lg border border-[var(--border-focus)] ${isSelf ? "bg-[var(--bg-primary)]" : "bg-[var(--bg-surface)]"}`}>
+          <div className="mt-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-focus)]">
             <textarea
               autoFocus
               value={editingDraft}
@@ -3270,7 +3265,6 @@ function MessageBubble({
                   autoTranslate={autoTranslate && !isSelf}
                   targetLang={targetLang}
                   t={t}
-                  inverted={isSelf}
                 />
               )
             )}
@@ -3294,7 +3288,7 @@ function MessageBubble({
             )}
 
             {msg.edited_at && !isDeleted && (
-              <div className={`text-[10px] mt-0.5 italic ${isSelf ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
+              <div className="text-[10px] text-[var(--text-dim)] mt-0.5 italic">
                 ({editedText})
               </div>
             )}
@@ -3308,11 +3302,7 @@ function MessageBubble({
                     type="button"
                     onClick={() => onToggleReaction(msg.id, rx.emoji)}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
-                      isSelf
-                        ? rx.reacted_by_me
-                          ? "bg-[var(--text-inverted)]/20 border-[var(--text-inverted)]/25 text-[var(--text-inverted)]"
-                          : "bg-[var(--text-inverted)]/10 border-[var(--text-inverted)]/15 text-[var(--text-inverted)]/80 hover:bg-[var(--text-inverted)]/15"
-                        : rx.reacted_by_me
+                      rx.reacted_by_me
                         ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)]"
                         : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                     }`}
@@ -3324,11 +3314,7 @@ function MessageBubble({
                 <button
                   type="button"
                   onClick={(e) => openMenu(e.clientX, e.clientY)}
-                  className={`inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed ${
-                    isSelf
-                      ? "border-[var(--text-inverted)]/25 text-[var(--text-inverted)]/60 hover:text-[var(--text-inverted)] hover:bg-[var(--text-inverted)]/10"
-                      : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                  }`}
+                  className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 >
                   <SmileIcon className="h-3 w-3" />
                 </button>
@@ -3340,11 +3326,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={() => onOpenThread(msg)}
-                className={`mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full border text-[10.5px] font-semibold transition-colors ${
-                  isSelf
-                    ? "bg-[var(--text-inverted)]/10 border-[var(--text-inverted)]/20 text-[var(--text-inverted)]/85 hover:bg-[var(--text-inverted)]/15"
-                    : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-active)]"
-                }`}
+                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[var(--bg-surface-active)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[10.5px] font-semibold hover:bg-[var(--bg-surface-active)] transition-colors"
               >
                 <MessageSquareIcon className="h-3 w-3" />
                 {msg.thread.reply_count === 1
@@ -3492,12 +3474,9 @@ function MessageMenuItem({
 function ReplyPreviewPill({
   preview,
   t,
-  inverted = false,
 }: {
   preview: NonNullable<DiscussMessageWithAuthor["reply_preview"]>;
   t: (key: string, fallback?: string) => string;
-  /** On an own (inverted) bubble, flip the bar + text to the inverted family. */
-  inverted?: boolean;
 }) {
   const author =
     preview.author_full_name || preview.author_username || "Unknown";
@@ -3506,12 +3485,12 @@ function ReplyPreviewPill({
     : (preview.body ?? "").slice(0, 120);
   return (
     <div className="mb-1 flex items-stretch gap-2 max-w-[480px]">
-      <div className={`w-[3px] rounded-full shrink-0 ${inverted ? "bg-[var(--text-inverted)]/50" : "bg-[var(--text-dim)]"}`} />
+      <div className="w-[3px] rounded-full bg-[var(--text-dim)] shrink-0" />
       <div className="min-w-0">
-        <div className={`text-[10px] font-semibold ${inverted ? "text-[var(--text-inverted)]/80" : "text-[var(--text-secondary)]"}`}>
+        <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
           {t("reply.replyingTo", "Replying to")} {author}
         </div>
-        <div className={`text-[11px] truncate italic ${inverted ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}>
+        <div className="text-[11px] text-[var(--text-dim)] truncate italic">
           {body}
         </div>
       </div>
