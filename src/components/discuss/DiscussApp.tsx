@@ -1692,7 +1692,7 @@ export default function DiscussApp() {
                   onClick={() => setSidebarFilter(f)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
                     sidebarFilter === f
-                      ? "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]"
+                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                   }`}
                 >
