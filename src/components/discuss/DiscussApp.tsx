@@ -3790,14 +3790,16 @@ function ModalShell({
   }, [onCancel]);
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex overflow-y-auto p-4 bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
       role="presentation"
     >
+      {/* m-auto centres the panel both axes AND keeps it scrollable if it is
+          ever taller than the viewport (items-center would clip the top). */}
       <div
-        className="w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
+        className="m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
         style={{ maxWidth: width }}
       >
         <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
