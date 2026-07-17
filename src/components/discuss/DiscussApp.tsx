@@ -1882,7 +1882,7 @@ export default function DiscussApp() {
       <div className="flex-1 min-h-0 flex">
         {/* ── Column 1: Channels + DMs list ────────────────────────── */}
         <aside
-          className={`shrink-0 md:w-[300px] md:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
+          className={`shrink-0 md:w-[300px] md:border-e border-[var(--border-color)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
             mobileView === "list" ? "flex w-full" : "hidden md:flex"
           }`}
         >
@@ -2162,7 +2162,7 @@ export default function DiscussApp() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
                 {/* Mobile back to the conversation list. This is the ONLY place
                     it now lives — the app bar that used to host it is gone. */}
                 <button
@@ -2363,7 +2363,7 @@ export default function DiscussApp() {
         {/* ── Column 3: Details (closed when Thread pane is open) ─── */}
         {detailsOpen && selectedChannel && !threadTarget && (
           <aside
-            className={`shrink-0 md:w-[320px] md:border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
+            className={`shrink-0 md:w-[320px] md:border-s border-[var(--border-color)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
               mobileView === "details" ? "flex flex-col w-full" : "hidden md:flex md:flex-col"
             }`}
           >
@@ -3039,8 +3039,12 @@ function MessageSurface({
           /* Mine: solid elevated tone (color-mix, theme-aware) + a squared corner
              on the side the bubble grows from — the WeChat/WhatsApp tail, done
              with radius instead of an SVG so it costs nothing to render. */
-          ? "bg-[color-mix(in_srgb,var(--bg-primary)_82%,var(--text-primary))] border-[var(--border-subtle)] rounded-ee-md"
-          : "bg-[var(--bg-surface)] border-[var(--border-subtle)] rounded-es-md")
+          ? "bg-[color-mix(in_srgb,var(--bg-primary)_82%,var(--text-primary))] border-[var(--border-color)] rounded-ee-md"
+          /* Theirs: a real card — bg-secondary differs from the thread canvas
+             (bg-primary) in BOTH themes, and a crisp --border-color edge, so it
+             reads like every other card in the hub instead of washing into the
+             white thread in light mode. */
+          : "bg-[var(--bg-secondary)] border-[var(--border-color)] rounded-es-md")
       }
     >
       {children}
@@ -3682,7 +3686,7 @@ function Composer({
 
   return (
     <div
-      className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3"
+      className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] p-3"
       style={{
         /* Respect the iPhone home-indicator so the composer sits above
            the rounded bottom edge instead of being partially hidden. */
