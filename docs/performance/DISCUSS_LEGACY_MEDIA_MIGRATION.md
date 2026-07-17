@@ -98,10 +98,32 @@ dynamically discovered object is ever migrated). Then per object:
    historical URL cannot be replayed against the private bucket;
 3. **download the destination back** and compare bytes — not "the API returned
    ok";
-4. only then metadata: re-read the row and update with an optimistic guard on
-   the value read, so a concurrent edit cannot be clobbered. Sets the private
-   shape, drops the legacy `url`, preserves filename/MIME/size/kind/duration/
-   waveform and canonical index order, and touches nothing else on the row.
+4. only then metadata: re-read the row and update with an optimistic guard, so a
+   concurrent edit cannot be clobbered. Sets the private shape, drops the legacy
+   `url`, preserves filename/MIME/size/kind/duration/waveform and canonical index
+   order, and touches nothing else on the row.
+
+### The concurrency guard must be a scalar
+
+The guard filters on the **exact legacy url at the exact index being replaced**
+(`metadata->attachments->N->>url`, or `metadata->voice->>url`) — not on the
+metadata blob as a whole.
+
+That is not a stylistic choice. postgrest-js builds filters as `` `eq.${value}` ``,
+so handing it the jsonb object serializes to the literal string
+`[object Object]`; Postgres then rejects it with `22P02 invalid input syntax for
+type json`. The guard would be **inert** — and, worse, it fails *after* the
+upload, which is the one place a failure leaves a half-migrated object. This was
+verified against live PostgREST on staging, not reasoned about: the blob form
+errors, a wrong scalar matches 0 rows, and the correct scalar matches exactly 1.
+
+The scalar form is also the stronger precondition. It asserts the specific thing
+that must still be true, and it is self-idempotent: once the url is gone, a
+replay matches nothing, so the same item cannot be written twice.
+
+`validate:discuss-attachments` pins this (and the deletion, upsert, guard-flag
+and credential-hygiene invariants) so it cannot regress. Those assertions are
+mutation-tested — each was proven to fail against a deliberately broken copy.
 
 Any mismatch aborts that object with the source untouched and no metadata
 written. There is **no automatic resume** after a partial failure.

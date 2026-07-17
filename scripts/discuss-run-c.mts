@@ -170,10 +170,18 @@ async function readInventory(client: SupabaseClient) {
     "metadata_updated" | "source_deleted" | "authorized_route_verified"> & { deleted: boolean };
   const out: Cand[] = [];
 
-  for (const row of (data ?? []) as any[]) {
-    const meta = (row.metadata ?? {}) as { attachments?: unknown[]; voice?: any };
+  /* The shape we actually rely on. Everything unknown stays `unknown` so a
+     surprise field cannot be read without a deliberate narrowing. */
+  interface MediaRaw { url?: unknown; type?: unknown }
+  interface MsgRow {
+    id: string; channel_id: string; deleted_at: string | null;
+    metadata: { attachments?: unknown[]; voice?: MediaRaw } | null;
+    discuss_channels?: { tenant_id: string | null } | null;
+  }
+  for (const row of (data ?? []) as unknown as MsgRow[]) {
+    const meta = row.metadata ?? {};
     const tenant = row.discuss_channels?.tenant_id ?? null;
-    const push = (kind: "attachment" | "voice", idx: number, raw: any) => {
+    const push = (kind: "attachment" | "voice", idx: number, raw: MediaRaw) => {
       const url = typeof raw?.url === "string" ? raw.url.trim() : "";
       if (!url) return;                       // already migrated / no legacy url
       const loc = parsePublicUrl(url);
@@ -183,13 +191,22 @@ async function readInventory(client: SupabaseClient) {
         message_id: row.id, channel_id: row.channel_id, tenant_id: tenant,
         index: idx, kind,
         source_bucket: loc.bucket, source_path: loc.path,
-        mime: raw?.type || (kind === "voice" ? "audio/webm" : "application/octet-stream"),
+        /* Narrow rather than trust: `type` comes from metadata, which is the
+           very field this migration exists to distrust. A non-string (or an
+           absent one, as on every legacy voice row) falls back by kind. */
+        mime: typeof raw.type === "string" && raw.type.trim()
+          ? raw.type.trim()
+          : (kind === "voice" ? "audio/webm" : "application/octet-stream"),
         dest_bucket: kind === "voice" ? "discuss-voice" : "discuss-media",
         deleted: row.deleted_at !== null,
       });
     };
-    if (Array.isArray(meta.attachments)) meta.attachments.forEach((a, i) => push("attachment", i, a));
-    if (meta.voice && typeof meta.voice === "object") push("voice", Array.isArray(meta.attachments) ? meta.attachments.length : 0, meta.voice);
+    if (Array.isArray(meta.attachments)) {
+      meta.attachments.forEach((a, i) => push("attachment", i, (a ?? {}) as MediaRaw));
+    }
+    if (meta.voice && typeof meta.voice === "object") {
+      push("voice", Array.isArray(meta.attachments) ? meta.attachments.length : 0, meta.voice);
+    }
   }
   return out;
 }
@@ -356,16 +373,47 @@ async function migrate() {
     //     clobbered, and write with an optimistic guard on the value we read.
     const cur = await client.from("discuss_messages").select("metadata").eq("id", m.message_id).single();
     if (cur.error) die(`${m.migration_id}: could not re-read message: ${cur.error.message}`);
-    const meta = structuredClone(cur.data.metadata) as any;
+    /* Writable view of just the two media keys we touch. Every other key is
+       carried through untouched by structuredClone. */
+    interface WritableMeta {
+      attachments?: Array<{ file_path?: string; url?: string }>;
+      voice?: { bucket?: string; path?: string; url?: string };
+    }
+    const meta = structuredClone(cur.data.metadata) as WritableMeta;
+
+    /* Optimistic concurrency guard.
+       It must be a SCALAR: postgrest-js builds filters as `eq.${value}`, so
+       handing it the whole jsonb object serializes to the literal string
+       "[object Object]" and Postgres rejects it (22P02) — an inert guard that
+       fails only AFTER the upload, i.e. in the worst possible place. Verified
+       against live PostgREST on staging.
+
+       So guard on the exact legacy url at the exact index we are replacing.
+       That is a stricter precondition than blob equality and it is naturally
+       idempotent: once the url is gone, the filter matches nothing, so a replay
+       cannot double-write. */
+    if (!Number.isInteger(m.index) || m.index < 0) die(`${m.migration_id}: non-integral media index — refusing`);
+    let guardColumn: string;
+    let guardValue: string;
 
     if (m.kind === "attachment") {
       const a = meta?.attachments?.[m.index];
       if (!a) die(`${m.migration_id}: attachment index vanished — refusing`);
+      if (typeof a.url !== "string" || !a.url) {
+        die(`${m.migration_id}: attachment no longer carries the legacy url — edited or already migrated; refusing`);
+      }
+      guardColumn = `metadata->attachments->${m.index}->>url`;
+      guardValue = a.url;
       a.file_path = m.dest_path;   // now resolves against discuss-media
       delete a.url;                // legacy public URL removed
     } else {
       const v = meta?.voice;
       if (!v) die(`${m.migration_id}: voice object vanished — refusing`);
+      if (typeof v.url !== "string" || !v.url) {
+        die(`${m.migration_id}: voice no longer carries the legacy url — edited or already migrated; refusing`);
+      }
+      guardColumn = "metadata->voice->>url";
+      guardValue = v.url;
       v.bucket = m.dest_bucket;
       v.path = m.dest_path;
       delete v.url;
@@ -373,7 +421,7 @@ async function migrate() {
     const upd = await client.from("discuss_messages")
       .update({ metadata: meta })
       .eq("id", m.message_id)
-      .eq("metadata", cur.data.metadata as any)   // optimistic concurrency
+      .eq(guardColumn, guardValue)
       .select("id");
     if (upd.error) die(`${m.migration_id}: metadata update failed: ${upd.error.message}`);
     if (!upd.data?.length) die(`${m.migration_id}: message changed concurrently — metadata NOT written, source untouched`);

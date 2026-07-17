@@ -397,6 +397,82 @@ check("route: saveDraft strips media before persist",
     !/"public, max-age/.test(resolver) && !/Cache-Control", "public/.test(resolver));
 }
 
+/* ── RUN C: the production migration script ────────────────────────────────
+   discuss-run-c.mts WRITES TO PRODUCTION and deletes the only public copy of
+   real user media, yet nothing pinned its safety properties — which is exactly
+   how an inert optimistic-concurrency guard survived review: it passed tsc
+   (behind an `as unknown as string` cast), passed lint, and would have failed
+   only at runtime, mid-migration, after the upload.
+
+   Comments are stripped first: this script DISCUSSES every pattern forbidden
+   below, so grepping the raw text would trip on its own prose. */
+{
+  const runC = read("scripts/discuss-run-c.mts")
+    .replace(/\/\*[\s\S]*?\*\//g, "")   // block comments
+    .replace(/(^|[^:])\/\/.*$/gm, "$1"); // line comments (not URL "//")
+
+  /* The bug this section exists for. postgrest-js builds `eq.${value}`, so a
+     non-scalar filter value stringifies to "[object Object]" and Postgres
+     rejects it. The guard must be a scalar JSON-path filter. */
+  check("run-c: concurrency guard never passes the jsonb blob to .eq",
+    !/\.eq\(\s*"metadata"\s*,/.test(runC));
+  check("run-c: concurrency guard is a scalar JSON-path filter on the legacy url",
+    /metadata->attachments->\$\{m\.index\}->>url/.test(runC) &&
+    /metadata->voice->>url/.test(runC));
+  check("run-c: no cast is used to smuggle a non-scalar into a filter",
+    !/as unknown as string/.test(runC));
+  check("run-c: metadata update is still bounded to one message id",
+    /\.update\(\{ metadata: meta \}\)[\s\S]{0,80}?\.eq\("id", m\.message_id\)/.test(runC));
+  check("run-c: a zero-row update aborts instead of proceeding",
+    /if \(!upd\.data\?\.length\) die\(/.test(runC));
+
+  /* Deletion is the irreversible step. It must name exactly one path — never a
+     prefix, a list(), or a query. */
+  const removeCalls = runC.match(/\.remove\(\[[^\]]*\]\)/g) ?? [];
+  check("run-c: exactly one remove() call exists",
+    removeCalls.length === 1);
+  check("run-c: remove() targets one exact source path",
+    removeCalls[0] === ".remove([m.source_path])");
+  check("run-c: deletion is gated on the authorization matrix",
+    /KX_RUN_C_AUTHZ_CONFIRMED !== "true"/.test(runC));
+  check("run-c: deletion re-checks every precondition per object",
+    /!m\.copied \|\| !m\.byte_verified \|\| !m\.metadata_updated \|\| !m\.authorized_route_verified/.test(runC));
+
+  /* Guards. The production ref is an ALLOWLIST here (inverted vs staging). */
+  check("run-c: production ref is hard-locked",
+    /const PRODUCTION_REF = "yxyizbnfjrwrnmwhkvme"/.test(runC));
+  check("run-c: item count is hard-locked to six",
+    /const EXPECTED_ITEMS = 6/.test(runC));
+  check("run-c: a separate execute flag gates the first mutation",
+    /KX_RUN_C_EXECUTE !== "true"/.test(runC));
+  check("run-c: uploads never overwrite an existing destination",
+    /upsert: false/.test(runC) && !/upsert: true/.test(runC));
+  /* Scoped to migrate(): `const client = db()` appears in five functions, so a
+     whole-file indexOf finds plan()'s copy and proves nothing. */
+  const migrateBody = runC.slice(
+    runC.indexOf("async function migrate()"),
+    runC.indexOf("function proveClean()"));
+  const partialIdx = migrateBody.indexOf("m.copied && !m.metadata_updated");
+  const clientIdx = migrateBody.indexOf("const client = db()");
+  check("run-c: partial state is detected before any client is constructed",
+    partialIdx >= 0 && clientIdx >= 0 && partialIdx < clientIdx);
+  check("run-c: there is no bulk resume",
+    !/RESUME_ALL|resume-all/.test(runC));
+
+  /* Credential hygiene: existence check only, never a fingerprint. */
+  check("run-c: credential is read only from the process environment",
+    /process\.env\.KX_RUN_C_PRODUCTION_SERVICE_KEY/.test(runC));
+  /* What matters is never EMITTING a fingerprint. `KEY.length > 0` inside the
+     self-test merely compares a length and prints nothing, so a bare
+     /KEY\.length/ would fail on safe code. Assert on the printing sites. */
+  check("run-c: no credential fingerprint is ever printed",
+    !/console\.\w+\([^)]*KEY\.(length|slice|substring|startsWith|charAt)/.test(runC) &&
+    !/die\([^)]*KEY\.(length|slice|substring)/.test(runC) &&
+    !/sha256\(KEY\)|shortHash\(KEY\)/.test(runC));
+  check("run-c: console is wrapped by the scrubber",
+    /console\[m\] = \(\.\.\.args: unknown\[\]\) => orig\(args\.map\(scrub\)/.test(runC));
+}
+
 /* ── REPORT ────────────────────────────────────────────────────────────── */
 console.log(`\nvalidate:discuss-attachments — ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
