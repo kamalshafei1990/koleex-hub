@@ -387,7 +387,7 @@ export default function VoiceRecorder({
           if (el.paused) void el.play();
           else el.pause();
         }}
-        className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors"
+        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-colors"
       >
         {isPlaying ? (
           <PauseIcon className="h-4 w-4 fill-current" />
@@ -399,7 +399,7 @@ export default function VoiceRecorder({
         {waveform.map((v, i) => (
           <span
             key={i}
-            className="flex-1 bg-blue-300 rounded-full"
+            className="flex-1 bg-[var(--text-primary)] rounded-full"
             style={{
               height: `${Math.max(8, v * 100)}%`,
               opacity: 0.35 + v * 0.65,
@@ -426,7 +426,7 @@ export default function VoiceRecorder({
         type="button"
         onClick={handleSend}
         disabled={state === "sending"}
-        className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+        className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
       >
         {state === "sending" ? (
           <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -532,7 +532,7 @@ export function VoicePlaybackBubble({
           if (el.paused) void el.play();
           else el.pause();
         }}
-        className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0"
+        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-colors shrink-0"
       >
         {isPlaying ? (
           <PauseIcon className="h-4 w-4 fill-current" />
@@ -547,7 +547,7 @@ export function VoicePlaybackBubble({
             <span
               key={i}
               className={`flex-1 rounded-full transition-colors ${
-                filled ? "bg-blue-300" : "bg-[var(--border-subtle)]"
+                filled ? "bg-[var(--text-primary)]" : "bg-[var(--border-subtle)]"
               }`}
               style={{
                 height: `${Math.max(10, v * 100)}%`,
