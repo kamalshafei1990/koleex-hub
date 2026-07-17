@@ -471,6 +471,55 @@ check("route: saveDraft strips media before persist",
     !/sha256\(KEY\)|shortHash\(KEY\)/.test(runC));
   check("run-c: console is wrapped by the scrubber",
     /console\[m\] = \(\.\.\.args: unknown\[\]\) => orig\(args\.map\(scrub\)/.test(runC));
+
+  /* ── audit counts must FAIL CLOSED ────────────────────────────────────
+     The audit is the document that certifies "6 objects deleted, nothing
+     else touched". A count it did not actually measure is worse than no
+     count at all — it launders a failure into a reassuring number.
+
+     The original bug: db.schema("storage") returns 406 PGRST106 on this
+     project (only `public` and `graphql_public` are exposed), supabase-js
+     surfaces that as count:null, and the report interpolated null as if it
+     were a number. */
+  check("run-c: no PostgREST storage-schema count (unsupported → always null)",
+    !/\.schema\("storage"\)/.test(runC));
+  check("run-c: object counts come from the supported Storage list API",
+    /\.storage\.from\(bucket\)\.list\(prefix/.test(runC));
+  /* Scoped to the two function bodies. Asserting that a die() STRING exists
+     proves nothing — an early `return []` in front of it leaves the string
+     intact while making the abort unreachable. Likewise a coercion check
+     pinned to the identifier `count` misses `after ?? 0`. Both of those
+     mutations survived an earlier version of these assertions. */
+  const countBody = runC.slice(
+    runC.indexOf("async function countBucketObjects"),
+    runC.indexOf("/* ── inventory"));
+  const auditBody = runC.slice(
+    runC.indexOf("async function audit()"),
+    runC.indexOf("/* ── self-test"));
+
+  check("run-c: an unmeasurable count aborts instead of returning a number",
+    /die\(`could not enumerate/.test(countBody) &&
+    !/return\s*\[\s*\]/.test(countBody) &&      // no early empty-page return
+    !/as never/.test(countBody) &&              // no abort-bypass cast
+    !/return\s+0\b/.test(countBody));           // never yields a fabricated zero
+  check("run-c: a count is never coerced from null/undefined/error to a number",
+    !/\?\?\s*0\b/.test(countBody) && !/\|\|\s*0\b/.test(countBody) &&
+    !/\?\?\s*0\b/.test(auditBody) && !/\|\|\s*0\b/.test(auditBody) &&
+    !/as\s+number/.test(auditBody) && !/Number\([a-z]/.test(auditBody));
+  check("run-c: the count is type-checked before it is trusted",
+    /Number\.isInteger\(total\)/.test(runC));
+  check("run-c: the audit asserts exactly six objects vanished from the bucket",
+    /removed === EXPECTED_ITEMS/.test(runC));
+  check("run-c: the audit compares against a baseline measured at plan time",
+    /source_bucket_objects_before/.test(runC));
+  check("run-c: a missing/implausible baseline aborts the audit",
+    /!Number\.isInteger\(before\) \|\| before < EXPECTED_ITEMS/.test(runC));
+  /* Stale-output guard: the audit must measure live, never re-print numbers
+     from a previously written report. (A stale temp file is exactly how an
+     earlier probe in this workstream reported a number that was not real.) */
+  check("run-c: the audit never sources counts from a cached/report file",
+    !/readFileSync\((?:MANIFEST_PATH\s*,\s*"utf8"\)\s*\)\s*\.\s*)?["'`][^"'`]*runc-report/.test(runC) &&
+    !/readFileSync\([^)]*report[^)]*\)/i.test(runC));
 }
 
 /* ── REPORT ────────────────────────────────────────────────────────────── */

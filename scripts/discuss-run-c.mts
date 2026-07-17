@@ -117,7 +117,16 @@ interface ManifestItem {
   source_deleted: boolean;
   authorized_route_verified: boolean;
 }
-interface Manifest { created_at: string; project_ref: string; items: ManifestItem[] }
+interface Manifest {
+  created_at: string;
+  project_ref: string;
+  /** Authoritative count of ALL objects in the public source bucket at plan
+   *  time (every module, not just Discuss). The final audit requires the after
+   *  count to be exactly this minus 6 — which is what proves the migration
+   *  removed the six approved objects and touched nothing else. */
+  source_bucket_objects_before: number;
+  items: ManifestItem[];
+}
 
 /* ── guards ──────────────────────────────────────────────────────────────── */
 
@@ -149,6 +158,67 @@ function baseGuards(): void {
 }
 
 const db = (): SupabaseClient => createClient(PRODUCTION_URL, KEY, { auth: { persistSession: false } });
+
+/* ── authoritative object counting ───────────────────────────────────────────
+   NOT via PostgREST. `db.schema("storage")` returns 406 PGRST106 on this
+   project ("Only the following schemas are exposed: public, graphql_public"),
+   and supabase-js surfaces that as `count: null` — which an earlier version of
+   audit() printed straight into the report as though it were a number. A wrong
+   count in a report that certifies a deletion is worse than no count.
+
+   So: the supported Storage list API, walked recursively (list is folder-
+   emulating and non-recursive; a folder entry has id === null).
+
+   FAIL CLOSED. Every failure path — network error, non-200, missing body, a
+   non-numeric or negative result — aborts. This function returns a trustworthy
+   number or it does not return. It must never coerce null/undefined/an error
+   into 0, because "0 objects remain" is exactly the sentence a broken count
+   would fabricate. */
+const LIST_PAGE = 1000;
+const NET_TRIES = 5;
+
+async function countBucketObjects(client: SupabaseClient, bucket: string): Promise<number> {
+  let total = 0;
+
+  const listPage = async (prefix: string, offset: number) => {
+    let lastErr = "";
+    // Transient ECONNRESET/TLS resets are common against this host; retry them.
+    // A retry budget is not a fallback — exhausting it still aborts.
+    for (let i = 0; i < NET_TRIES; i++) {
+      try {
+        const { data, error } = await client.storage.from(bucket).list(prefix, {
+          limit: LIST_PAGE, offset, sortBy: { column: "name", order: "asc" },
+        });
+        if (error) { lastErr = error.message; }
+        else if (!Array.isArray(data)) { lastErr = "list returned a non-array body"; }
+        else return data;
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+      }
+      if (i < NET_TRIES - 1) await new Promise((s) => setTimeout(s, 700 * (i + 1)));
+    }
+    die(`could not enumerate '${bucket}' (prefix depth ${prefix.split("/").length}) after ${NET_TRIES} attempts: ${lastErr}. ` +
+        `Refusing to report a count that was not actually measured.`);
+  };
+
+  const walk = async (prefix: string) => {
+    for (let offset = 0; ; offset += LIST_PAGE) {
+      const page = await listPage(prefix, offset);
+      for (const entry of page) {
+        // Supabase marks a synthetic folder with a null id.
+        if (entry.id === null) await walk(prefix ? `${prefix}/${entry.name}` : entry.name);
+        else total++;
+      }
+      if (page.length < LIST_PAGE) break;
+    }
+  };
+  await walk("");
+
+  if (!Number.isInteger(total) || total < 0) {
+    die(`object count for '${bucket}' is not a valid non-negative integer — refusing to report it.`);
+  }
+  return total;
+}
 
 /* ── inventory (read-only) ───────────────────────────────────────────────── */
 
@@ -229,7 +299,16 @@ async function plan() {
   const paths = new Set(items.map((i) => `${i.source_bucket}/${i.source_path}`));
   if (paths.size !== items.length) die("two items reference the same source object — ambiguous, refusing");
 
-  const manifest: Manifest = { created_at: new Date().toISOString(), project_ref: PRODUCTION_REF, items: [] };
+  // Measured now, asserted after revocation. Fail-closed: if it cannot be
+  // measured the run stops here, while everything is still read-only.
+  const before = await countBucketObjects(client, SOURCE_BUCKET);
+
+  const manifest: Manifest = {
+    created_at: new Date().toISOString(),
+    project_ref: PRODUCTION_REF,
+    source_bucket_objects_before: before,
+    items: [],
+  };
 
   for (const it of items) {
     // `media` is public, so the source reads without the key. Byte length and
@@ -547,16 +626,47 @@ async function revoke() {
 
 async function audit() {
   baseGuards();
+  if (!existsSync(MANIFEST_PATH)) die(`no manifest at ${MANIFEST_PATH} — the audit compares against the plan's measured baseline.`);
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as Manifest;
+  if (manifest.project_ref !== PRODUCTION_REF) die("manifest was built for a different project.");
+
+  const before = manifest.source_bucket_objects_before;
+  if (!Number.isInteger(before) || before < EXPECTED_ITEMS) {
+    die(`manifest baseline count is missing or implausible — re-run 'plan'. An audit ` +
+        `without a measured baseline cannot prove that only the 6 approved objects were removed.`);
+  }
+
   const client = db();
   const live = await readInventory(client);
-  const { count: media } = await client.schema("storage").from("objects")
-    .select("*", { count: "exact", head: true }).eq("bucket_id", "media");
+
+  // Fail-closed by construction: countBucketObjects() aborts rather than return
+  // a number it did not measure.
+  const after = await countBucketObjects(client, SOURCE_BUCKET);
+  const dm = await countBucketObjects(client, "discuss-media");
+  const dv = await countBucketObjects(client, "discuss-voice");
+
+  const removed = before - after;
+  const sourcesGone = manifest.items.filter((m) => m.source_deleted).length;
 
   console.log(`\n  ── RUN C FINAL AUDIT ──────────────────────────────────────`);
   console.log(`  Discuss items still referencing public '${SOURCE_BUCKET}' : ${live.length}   (target 0)`);
-  console.log(`  objects remaining in '${SOURCE_BUCKET}' (ALL modules)      : ${media}   (non-Discuss — must be untouched)`);
-  if (live.length !== 0) { console.error(`\n  NOT CLEAN: ${live.length} Discuss item(s) still resolve into the public bucket.\n`); process.exit(1); }
-  console.log(`\n  clean: zero Discuss-referenced objects remain in the public bucket.`);
+  console.log(`  '${SOURCE_BUCKET}' objects  before ${before} → after ${after}   (removed ${removed}, expected ${EXPECTED_ITEMS})`);
+  console.log(`  private buckets: discuss-media ${dm} · discuss-voice ${dv}   (expected 6 across both)`);
+  console.log(`  manifest items marked source_deleted                      : ${sourcesGone}/${EXPECTED_ITEMS}`);
+
+  let bad = 0;
+  const must = (cond: boolean, msg: string) => { if (!cond) { console.error(`  NOT CLEAN: ${msg}`); bad++; } };
+
+  must(live.length === 0, `${live.length} Discuss item(s) still resolve into the public bucket.`);
+  must(removed === EXPECTED_ITEMS,
+       `${removed} object(s) disappeared from '${SOURCE_BUCKET}', expected exactly ${EXPECTED_ITEMS}. ` +
+       `Anything other than 6 means a non-Discuss object was affected — investigate before proceeding.`);
+  must(dm + dv === EXPECTED_ITEMS, `private buckets hold ${dm + dv} objects, expected ${EXPECTED_ITEMS}.`);
+  must(sourcesGone === EXPECTED_ITEMS, `only ${sourcesGone} source(s) recorded as deleted.`);
+
+  if (bad) { console.error(`\n  AUDIT FAILED (${bad} condition(s)).\n`); process.exit(1); }
+  console.log(`\n  clean: zero Discuss-referenced objects remain in the public bucket, exactly`);
+  console.log(`  ${EXPECTED_ITEMS} objects were removed, and all ${EXPECTED_ITEMS} now live in private buckets.`);
   console.log(`  Next (separate, Preview-first change): drop 'media' from CATEGORY_BUCKETS.discuss.\n`);
 }
 

@@ -42,8 +42,8 @@ The authoritative figure is **6**, computed structurally.
   (50 MB, `image/png` allowed).
 - The 5 voice items carry no `type`/`size` in metadata (legacy shape); the
   resolver defaults them, and they are within `discuss-voice` policy.
-- All 4 voice items and 1 attachment sit in a single channel; the attachment is
-  in a different channel.
+- All 5 voice items sit in a single channel; the 1 attachment is in a different
+  channel.
 
 ## The finding that matters
 
