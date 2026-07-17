@@ -608,16 +608,45 @@ async function revoke() {
     if (!m.copied || !m.byte_verified || !m.metadata_updated || !m.authorized_route_verified) {
       die(`${m.migration_id}: preconditions incomplete — refusing to delete the only surviving copy.`);
     }
+    /* Idempotent by design. A previous run may have deleted the object and
+       aborted before recording it (which is exactly what happened once: the
+       post-delete check raced the CDN and killed the run after the delete had
+       already landed). Re-deleting is then a no-op, but the flag must still be
+       reconciled — otherwise the manifest disagrees with reality forever. */
+    const pre = await client.storage.from(m.source_bucket).download(m.source_path);
+    if (pre.error) {
+      m.source_deleted = true; save();
+      console.log(`  ${m.migration_id}: source already absent at origin — reconciled as revoked.`);
+      continue;
+    }
+
     // Exactly one path. Never a prefix, never a query, never a list().
     const del = await client.storage.from(m.source_bucket).remove([m.source_path]);
     if (del.error) {
       console.error(`  ${m.migration_id}: source deletion FAILED — private copy retained. State is duplicated, not lost.`);
       die(`stopping. Do not attempt broad cleanup; investigate this one object.`);
     }
-    const pub = await fetch(`${PRODUCTION_URL}/storage/v1/object/public/${m.source_bucket}/${encodeURI(m.source_path)}`);
-    if (pub.ok) die(`${m.migration_id}: public URL still serves after deletion — investigate before continuing.`);
+
+    /* Confirm against the ORIGIN, not the public URL.
+       The public URL is CDN-fronted: immediately after a delete it can still
+       serve a cached 200, which says nothing about whether the object exists.
+       An earlier version asserted on that and aborted a run whose delete had
+       actually succeeded — a cache reported as a fact. The storage API answers
+       from origin, so it is the only honest post-delete check. */
+    const gone = await client.storage.from(m.source_bucket).download(m.source_path);
+    if (!gone.error) {
+      die(`${m.migration_id}: object still present at origin after delete — investigate before continuing.`);
+    }
     m.source_deleted = true; save();
-    console.log(`  ${m.migration_id}: source revoked · old public URL now HTTP ${pub.status}`);
+
+    /* The CDN may still serve the old bytes until its TTL expires. Origin
+       deletion is the durable fact and is already done, so this is reported,
+       not fatal — aborting here would only strand the run. Cache-busted so the
+       reading is the CDN's edge state, not our own earlier hit. */
+    const pub = await fetch(
+      `${PRODUCTION_URL}/storage/v1/object/public/${m.source_bucket}/${encodeURI(m.source_path)}?cb=${randomUUID()}`);
+    console.log(`  ${m.migration_id}: source revoked at origin · old public URL now HTTP ${pub.status}` +
+                (pub.ok ? "  (still edge-cached; expires with TTL)" : ""));
   }
   console.log(`\n  revocation complete. Run mode 'audit' for the final proof.\n`);
 }

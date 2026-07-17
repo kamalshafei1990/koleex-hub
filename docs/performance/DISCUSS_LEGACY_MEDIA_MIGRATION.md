@@ -1,7 +1,7 @@
 # Discuss legacy media migration (Run C) — procedure and status
 
-Status: **Tooling ready. NOT executed. Awaiting explicit go.**
-No production object or metadata has been touched. Unit 2 is **not** closed.
+Status: **EXECUTED AND CLOSED.** All 6 legacy objects migrated to private
+buckets and revoked from the public bucket. Final audit green.
 
 Inventory: [DISCUSS_LEGACY_MEDIA_INVENTORY.md](./DISCUSS_LEGACY_MEDIA_INVENTORY.md)
 — **6** legacy items (1 attachment + 5 voice), 6 distinct source objects.
@@ -162,3 +162,49 @@ unset KX_RUN_C_PRODUCTION_SERVICE_KEY
 ```
 
 Nothing else needs revoking, because nothing was persisted anywhere.
+
+## Execution result
+
+Ran end to end against Production with operator approval. Six items, six
+distinct objects: 1 attachment (image/png) + 5 voice (audio/webm), 987,709
+bytes total.
+
+| proof | result |
+|---|---|
+| public `media` objects | 6694 → **6688** (exactly 6 removed) |
+| private copies | discuss-media 1 · discuss-voice 5 |
+| private bytes | 6/6 byte-identical to approved hashes |
+| metadata | 6/6 resolve via private paths; 0 carry any public URL |
+| legacy sources | 6/6 gone at origin; 6/6 old public URLs unavailable |
+| unauthenticated route | 6/6 → 401 with `private` cache headers |
+| collateral | 0 unrelated objects or metadata rows changed |
+| hygiene audit | clean on all 8 rules |
+
+The one legacy attachment was **already broken before Run C** — it carried a
+`file_path` that post-Unit-2 resolved against `discuss-media`, where the object
+did not exist, so the authorized route 404'd while the bytes stayed publicly
+reachable. Run C fixed the reachability and closed the exposure together.
+
+### What the run taught us: the CDN is not the origin
+
+Revocation aborted on the first object with "public URL still serves after
+deletion". The delete had in fact succeeded (6694 → 6693) — the check fetched
+the **CDN-fronted** public URL and read a cached 200. A cache was reported as a
+fact, and it killed a run that had done nothing wrong.
+
+Worse, the abort fired *before* recording `source_deleted`, so the manifest and
+reality disagreed: a re-run would have tried to delete an object already gone.
+
+Both are fixed. The post-delete check now asks the **origin** via the storage
+API, which is the only honest answer to "does this object exist". The public URL
+is still probed — cache-busted — but reported, never fatal: origin deletion is
+the durable fact and is already irreversible by then, so aborting would only
+strand the run. And deletion is now idempotent: an object already absent at
+origin reconciles its flag instead of failing forever.
+
+### Credential
+
+Delivered via a temporary macOS Keychain item (`kx-runc-prod`), read at runtime
+only, never written to any file, never printed. Deleted after execution and
+verified unreadable; `runc:prove-clean` confirms no child process retains it;
+Vercel holds 0 `KX_RUN_C` records.
