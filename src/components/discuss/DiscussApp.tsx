@@ -3247,15 +3247,13 @@ function MessageBubble({
         ) : (
           <>
             {msg.kind === "voice" && meta.voice ? (
-              <div className="mt-1">
-                <VoicePlaybackBubble
-                  url={meta.voice.url}
-                  bucket={meta.voice.bucket}
-                  path={meta.voice.path}
-                  durationMs={meta.voice.duration_ms}
-                  waveform={meta.voice.waveform ?? []}
-                />
-              </div>
+              <VoicePlaybackBubble
+                url={meta.voice.url}
+                bucket={meta.voice.bucket}
+                path={meta.voice.path}
+                durationMs={meta.voice.duration_ms}
+                waveform={meta.voice.waveform ?? []}
+              />
             ) : (
               msg.body && (
                 <TranslatableBody

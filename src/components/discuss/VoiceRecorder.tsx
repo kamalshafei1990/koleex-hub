@@ -520,7 +520,10 @@ export function VoicePlaybackBubble({
     waveform && waveform.length > 0 ? waveform : new Array(48).fill(0.25);
 
   return (
-    <div className="mt-1 flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] max-w-[320px]">
+    /* No own surface/border/padding: this always renders INSIDE a message
+       bubble (MessageSurface), which already supplies the box. A second box
+       here read as a bubble-inside-a-bubble. Just the player controls now. */
+    <div className="flex items-center gap-3 min-w-[200px] max-w-[320px]">
       <button
         type="button"
         onClick={() => {
