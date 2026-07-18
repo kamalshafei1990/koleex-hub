@@ -128,6 +128,19 @@ export async function POST(req: Request) {
           { p_account_a: me, p_account_b: otherId },
         );
         if (error) return bad(error.message, 500);
+        /* Re-opening a DM I previously deleted/hid must bring it back into my
+           list — clear my soft-leave and hidden flags for this channel. */
+        const resurfacedId =
+          typeof data === "string"
+            ? data
+            : ((data as { id?: string } | null)?.id ?? null);
+        if (resurfacedId) {
+          await supabaseServer
+            .from(MEMBERS)
+            .update({ left_at: null, hidden_at: null })
+            .eq("channel_id", resurfacedId)
+            .eq("account_id", me);
+        }
         return NextResponse.json({ ok: true, data });
       }
 
@@ -231,12 +244,71 @@ export async function POST(req: Request) {
       case "markRead": {
         const channelId = str(p.channelId);
         if (!channelId) return bad("channelId required");
+        /* Reading a conversation also clears a manual "mark as unread" flag —
+           otherwise the dot would linger after the user opened it. */
         const { error } = await supabaseServer
           .from(MEMBERS)
-          .update({ last_read_at: new Date().toISOString() })
+          .update({ last_read_at: new Date().toISOString(), marked_unread: false })
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      /* ---- Per-user conversation state (WeChat-style) ------------------ */
+      case "setChannelPinned": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ pinned_at: p.pinned === true ? new Date().toISOString() : null })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "setChannelHidden": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        /* Hide = remove from MY list until a newer message arrives. Also
+           un-pin (a hidden chat shouldn't hold a pinned slot). */
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ hidden_at: new Date().toISOString(), pinned_at: null })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "markChannelUnread": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ marked_unread: true })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "deleteConversation": {
+        const channelId = str(p.channelId);
+        if (!channelId) return bad("channelId required");
+        /* Delete = remove this conversation from MY list only. Message history
+           is preserved server-side (never hard-deleted) for audit and for the
+           other participants. Implemented as a soft-leave; the conversation
+           re-surfaces if I open a new DM with the same person (see
+           directChannel, which clears left_at/hidden_at). */
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ left_at: new Date().toISOString(), pinned_at: null, marked_unread: false })
+          .eq("channel_id", channelId)
+          .eq("account_id", me);
+        if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.account(me) }]);
         return NextResponse.json({ ok: true });
       }
 

@@ -132,14 +132,20 @@ export async function GET(req: Request) {
       case "myChannels": {
         const { data: memberships } = await supabaseServer
           .from(MEMBERS)
-          .select("channel_id, last_read_at, muted, notification_pref")
+          .select(
+            "channel_id, last_read_at, muted, notification_pref, joined_at, pinned_at, hidden_at, marked_unread",
+          )
           .eq("account_id", me)
           .is("left_at", null);
         const memRows = (memberships ?? []) as Array<{
           channel_id: string;
-          last_read_at: string;
+          last_read_at: string | null;
           muted: boolean;
           notification_pref: string;
+          joined_at: string | null;
+          pinned_at: string | null;
+          hidden_at: string | null;
+          marked_unread: boolean | null;
         }>;
         if (memRows.length === 0) return NextResponse.json({ ok: true, data: [] });
 
@@ -148,9 +154,17 @@ export async function GET(req: Request) {
           memRows.map((m) => [
             m.channel_id,
             {
-              last_read_at: m.last_read_at,
+              /* Unread cursor: where the user last read. If they've never
+                 opened the channel, fall back to when they joined — so a
+                 channel full of messages they've never seen counts as unread
+                 (previously it showed 0, hiding the badge). */
+              last_read_at: m.last_read_at ?? m.joined_at,
               muted: m.muted,
               notification_pref: m.notification_pref ?? "all",
+              /* WeChat-style per-user conversation state. */
+              pinned_at: m.pinned_at,
+              hidden_at: m.hidden_at,
+              marked_unread: m.marked_unread === true,
             },
           ]),
         );

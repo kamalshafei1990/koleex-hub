@@ -59,7 +59,11 @@ export default function RootLayout({
     /* data-scroll-behavior: our smooth scrolling (globals.css) is intentional —
        this silences Next.js's route-transition advisory warning hub-wide. */
     <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden flex flex-col bg-[#0A0A0A] text-white font-sans">
+      {/* Theme tokens (not hardcoded dark) so the base flips with light/dark —
+          otherwise light mode showed a black body base behind gaps and any
+          un-themed text inherited white → white-on-white. Dark mode is
+          unchanged (--bg-primary #0A0A0A / --text-primary #fff). */}
+      <body className="h-full overflow-hidden flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans">
         <Providers>
           <RootShell>{children}</RootShell>
           {/* Global themed replacement for window.confirm/alert/prompt.

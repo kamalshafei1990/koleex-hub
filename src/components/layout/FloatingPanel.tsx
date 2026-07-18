@@ -499,9 +499,30 @@ export default function FloatingPanel() {
      bottom-40 (160 px) clears the composer with breathing room.
      Desktop keeps bottom-28 — the composer there sits inside a
      constrained max-w-[820px] block with more chrome below it. */
-  const fabBottomClass = isAiApp
+  /* Discuss needs the identical lift for the identical reason as the AI app:
+     its composer is also anchored to the bottom of the viewport, and its Send
+     button sits at the composer's bottom-END corner — exactly where an end-6
+     bottom-6 FAB lands. The FAB was covering Send. This condition read isAiApp
+     alone while isDiscussApp was already computed above and used only to hide
+     the Discuss tab; the offset never learned about Discuss. */
+  const fabBottomClass = isAiApp || isDiscussApp
     ? "bottom-40 md:bottom-28"
     : "bottom-6";
+
+  /* ── Discuss placement ──
+     Discuss is a chat app: the composer + Send own the bottom-end corner and
+     the Translate / Mute / Info cluster owns the top-end of the conversation
+     header. A bottom-end FAB (even lifted) hovers over the messages right above
+     Send — the spot Kamal flagged. So on Discuss we dock the AI orb to the
+     RIGHT EDGE, vertically centred: it reads as a resting side-assistant, stays
+     clear of both the composer and the header controls, and is reachable with
+     or without a conversation open. Centring is done with top-[calc(50vh-…)]
+     rather than a -translate-y transform, because .fab-root's scroll-hide rule
+     already owns `transform` (translateY) and the two would fight. The panel
+     (which lives inside fab-root) may keep its own transform. */
+  const fabPosClass = isDiscussApp
+    ? "end-3 top-[calc(50vh-24px)]"
+    : `${fabBottomClass} end-6`;
 
   /* ── Minimised handle ──
      When the operator collapses the FAB, render only a small chevron
@@ -509,6 +530,10 @@ export default function FloatingPanel() {
      keep the same end-6 offset so the visual anchor doesn't jump.
      Sized 32 px on mobile (thumb-friendly tap target) and 28 px on
      desktop where a precise cursor doesn't need the extra surface. */
+  /* Discuss now hosts "Koleex AI" as a pinned conversation in its own list, so
+     the floating orb would be a redundant second entry point there. Hide it on
+     /discuss entirely (placed after all hooks to respect rules-of-hooks). */
+  if (isDiscussApp) return null;
   if (minimized) {
     return (
       <button
@@ -516,7 +541,7 @@ export default function FloatingPanel() {
         onClick={() => setMinimized(false)}
         aria-label="Show AI / Discuss"
         title="Show AI / Discuss"
-        className={`fixed ${fabBottomClass} end-6 z-[90] flex h-8 w-8 md:h-7 md:w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
+        className={`fixed ${fabPosClass} z-[90] flex h-8 w-8 md:h-7 md:w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
         style={{
           boxShadow: dk
             ? "0 4px 14px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)"
@@ -540,14 +565,14 @@ export default function FloatingPanel() {
   return (
     <div
       ref={panelRef}
-      className={`fab-root fixed ${fabBottomClass} end-6 z-[90]`}
+      className={`fab-root fixed ${fabPosClass} z-[90]`}
       data-idle={!open ? "true" : "false"}
       data-scrollhidden={scrollHidden && !open ? "true" : "false"}
     >
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
-          className={`absolute bottom-[56px] end-0 w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
+          className={`absolute ${isDiscussApp ? "end-[52px] top-1/2" : "bottom-[56px] end-0"} w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
           style={{
             /* Calm enterprise shadow — same regardless of tab so the
                Copilot panel reads as a Hub surface, not a chatbot
@@ -558,7 +583,12 @@ export default function FloatingPanel() {
               : "0 12px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)",
             transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
             opacity: closing ? 0 : 1,
-            transform: closing ? "translateY(8px) scale(0.97)" : "translateY(0) scale(1)",
+            /* Discuss docks the panel vertically-centred on the right-edge orb
+               (top-1/2), so the resting transform must carry the -50% Y itself —
+               the inline transform wins over any Tailwind -translate-y class. */
+            transform: isDiscussApp
+              ? closing ? "translateY(calc(-50% + 8px)) scale(0.97)" : "translateY(-50%) scale(1)"
+              : closing ? "translateY(8px) scale(0.97)" : "translateY(0) scale(1)",
           }}
         >
           {/* ── Header ── */}

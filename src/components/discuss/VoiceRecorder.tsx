@@ -387,7 +387,7 @@ export default function VoiceRecorder({
           if (el.paused) void el.play();
           else el.pause();
         }}
-        className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors"
+        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-colors"
       >
         {isPlaying ? (
           <PauseIcon className="h-4 w-4 fill-current" />
@@ -399,7 +399,7 @@ export default function VoiceRecorder({
         {waveform.map((v, i) => (
           <span
             key={i}
-            className="flex-1 bg-blue-300 rounded-full"
+            className="flex-1 bg-[var(--text-primary)] rounded-full"
             style={{
               height: `${Math.max(8, v * 100)}%`,
               opacity: 0.35 + v * 0.65,
@@ -426,7 +426,7 @@ export default function VoiceRecorder({
         type="button"
         onClick={handleSend}
         disabled={state === "sending"}
-        className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+        className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
       >
         {state === "sending" ? (
           <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -501,7 +501,10 @@ export function VoicePlaybackBubble({
     waveform && waveform.length > 0 ? waveform : new Array(48).fill(0.25);
 
   return (
-    <div className="mt-1 flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] max-w-[320px]">
+    /* No own surface/border/padding: this always renders INSIDE a message
+       bubble (MessageSurface), which already supplies the box. A second box
+       here read as a bubble-inside-a-bubble. Just the player controls now. */
+    <div className="flex items-center gap-3 min-w-[200px] max-w-[320px]">
       <button
         type="button"
         onClick={() => {
@@ -510,7 +513,7 @@ export function VoicePlaybackBubble({
           if (el.paused) void el.play();
           else el.pause();
         }}
-        className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0"
+        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-colors shrink-0"
       >
         {isPlaying ? (
           <PauseIcon className="h-4 w-4 fill-current" />
@@ -525,7 +528,7 @@ export function VoicePlaybackBubble({
             <span
               key={i}
               className={`flex-1 rounded-full transition-colors ${
-                filled ? "bg-blue-300" : "bg-[var(--border-subtle)]"
+                filled ? "bg-[var(--text-primary)]" : "bg-[var(--border-subtle)]"
               }`}
               style={{
                 height: `${Math.max(10, v * 100)}%`,
@@ -539,7 +542,9 @@ export function VoicePlaybackBubble({
         {Math.floor(durationMs / 60000)}:
         {(Math.floor(durationMs / 1000) % 60).toString().padStart(2, "0")}
       </div>
-      <audio ref={audioRef} src={resolvedUrl} preload="metadata" className="hidden" />
+      {/* src="" makes the browser re-request the page URL (React warns per
+          bubble). While the signed URL is still resolving, omit src entirely. */}
+      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" className="hidden" />
     </div>
   );
 }

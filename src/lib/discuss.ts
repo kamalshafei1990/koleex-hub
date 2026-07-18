@@ -645,12 +645,21 @@ export function subscribeToChannel(
   void handlers.onReactionDelete;
   let closed = false;
   let refreshing = false;
+  let again = false; // a ping landed while a refresh was in flight
   let primed = false;
   let latest = "1970-01-01T00:00:00+00:00"; // max created_at seen — incremental cursor
   const seen = new Set<string>();
 
   const refresh = async () => {
-    if (closed || refreshing) return;
+    if (closed) return;
+    if (refreshing) {
+      /* CRITICAL: never swallow a ping. A second message arriving while the
+         first one's fetch is in flight used to be dropped here, so the
+         receiver didn't see it until the slow reconcile poll. Queue exactly
+         one trailing re-run instead. */
+      again = true;
+      return;
+    }
     refreshing = true;
     try {
       /* Prime once with a full fetch (no callbacks — don't replay history),
@@ -675,6 +684,10 @@ export function subscribeToChannel(
       primed = true;
     } finally {
       refreshing = false;
+      if (again && !closed) {
+        again = false;
+        void refresh();
+      }
     }
   };
 
@@ -966,6 +979,35 @@ export async function setChannelMuted(
 ): Promise<boolean> {
   void accountId; // identity comes from the session server-side
   return (await discussMutate("setChannelMuted", { channelId, muted })).ok;
+}
+
+/* ─── WeChat-style per-user conversation state (sidebar right-click menu) ─── */
+
+/** Pin ("Sticky on top") or unpin a conversation for the current user.
+ *  Pinned chats float to the top of their group in the sidebar. */
+export async function setChannelPinned(
+  channelId: string,
+  pinned: boolean,
+): Promise<boolean> {
+  return (await discussMutate("setChannelPinned", { channelId, pinned })).ok;
+}
+
+/** Hide ("remove from list") a conversation for the current user. It stays
+ *  hidden until a newer message arrives, then re-surfaces — like WeChat. */
+export async function hideChannel(channelId: string): Promise<boolean> {
+  return (await discussMutate("setChannelHidden", { channelId })).ok;
+}
+
+/** Manually mark a conversation as unread (shows a dot even with no new
+ *  messages). Cleared automatically the next time the user opens it. */
+export async function markChannelUnread(channelId: string): Promise<boolean> {
+  return (await discussMutate("markChannelUnread", { channelId })).ok;
+}
+
+/** Delete a conversation from the current user's list only. History is
+ *  preserved server-side; the chat re-surfaces if they re-open the DM. */
+export async function deleteConversation(channelId: string): Promise<boolean> {
+  return (await discussMutate("deleteConversation", { channelId })).ok;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

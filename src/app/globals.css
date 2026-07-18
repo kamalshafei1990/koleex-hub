@@ -23,6 +23,12 @@
   --bg-elevated: var(--bg-surface-hover);
   --bg-surface-strong: var(--bg-surface-active);
 
+  /* Discuss — own/sent message bubble. Apple-inspired: a clean elevated surface
+     that lifts above the thread canvas. Dark = a neutral elevated gray (lighter
+     than the #0A0A0A canvas and the #111 received bubble); light override below
+     makes it pure white. */
+  --discuss-bubble-self: #2C2C2E;
+
   /* Borders */
   --border-color: #222222;
   --border-strong: #333333;
@@ -78,6 +84,10 @@
   /* Hover/elevated aliases — see dark mode comment. */
   --bg-elevated: var(--bg-surface-hover);
   --bg-surface-strong: var(--bg-surface-active);
+
+  /* Own/sent bubble in light = pure white (Apple clean card); it lifts off the
+     off-white received bubble + subtle canvas via border + shadow. */
+  --discuss-bubble-self: #FFFFFF;
 
   /* Borders */
   --border-color: #E5E5E5;

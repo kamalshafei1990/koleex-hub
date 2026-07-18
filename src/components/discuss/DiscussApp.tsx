@@ -27,6 +27,7 @@
 
 import { useScrollLock } from "@/hooks/useScrollLock";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -35,15 +36,16 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import BellOffIcon from "@/components/icons/ui/BellOffIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
-import MoonStarIcon from "@/components/icons/ui/MoonStarIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import PinOffIcon from "@/components/icons/ui/PinOffIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
 import ReplyIcon from "@/components/icons/ui/ReplyIcon";
-import VolumeXIcon from "@/components/icons/ui/VolumeXIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
@@ -55,12 +57,14 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
+import KoleexOrb from "@/components/ai/KoleexOrb";
+import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
-import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
+import MicIcon from "@/components/icons/ui/MicIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
@@ -72,7 +76,6 @@ import StarIcon from "@/components/icons/ui/StarIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
@@ -88,6 +91,10 @@ import {
   fetchMyChannels,
   findOrCreateDirectChannel,
   markChannelRead,
+  setChannelPinned,
+  hideChannel,
+  markChannelUnread,
+  deleteConversation,
   openPresenceChannel,
   pinMessage,
   saveDraft,
@@ -139,6 +146,7 @@ import {
 import { ThreadPane } from "./ThreadPane";
 import { SearchPanel } from "./SearchPanel";
 import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
+import { initialsOf } from "@/lib/discuss/initials";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { discussT } from "@/lib/translations/discuss";
@@ -228,23 +236,18 @@ function formatDaySeparator(iso: string, todayText: string, yesterdayText: strin
   });
 }
 
-function initialsOf(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
+/* Monochrome-first brand: fallback avatars are grayscale, told apart by
+   initials + name rather than colour. Eight neutral steps (light → dark) give
+   just enough separation between adjacent rows without introducing any hue. */
 const AVATAR_GRADIENTS = [
-  "from-sky-500 to-blue-600",
-  "from-violet-500 to-fuchsia-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
-  "from-rose-500 to-pink-600",
-  "from-indigo-500 to-purple-600",
-  "from-cyan-500 to-sky-600",
-  "from-lime-500 to-emerald-600",
+  "from-neutral-400 to-neutral-500",
+  "from-neutral-500 to-neutral-600",
+  "from-neutral-600 to-neutral-700",
+  "from-neutral-300 to-neutral-500",
+  "from-neutral-500 to-neutral-700",
+  "from-neutral-400 to-neutral-600",
+  "from-neutral-600 to-neutral-800",
+  "from-neutral-300 to-neutral-600",
 ];
 
 function gradientFor(seed: string): string {
@@ -279,7 +282,7 @@ function previewMessage(
   if (!preview) return "";
   if (preview.kind === "image") return "📷 Photo";
   if (preview.kind === "file") return "📎 File";
-  if (preview.kind === "voice") return "🎤 Voice message";
+  if (preview.kind === "voice") return "Voice message";
   if (preview.kind === "system") return preview.body ?? "";
   return (preview.body ?? "").replace(/\s+/g, " ").slice(0, 80);
 }
@@ -329,6 +332,16 @@ function Avatar({
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Memoised list + bubble. MessageList and MessageBubble are function
+   declarations (hoisted), so wrapping them here is safe. This is the big
+   smoothness win: composer typing lives in DiscussApp state, so without memo
+   every keystroke re-rendered the entire thread. With MessageList memoised the
+   list is skipped while typing (its props are all stable / useCallback), and
+   with MessageBubble memoised a new or changed message only re-renders its own
+   bubble instead of every bubble. */
+const MemoMessageList = memo(MessageList);
+const MemoMessageBubble = memo(MessageBubble);
 
 export default function DiscussApp() {
   const { t } = useTranslation(discussT);
@@ -395,9 +408,19 @@ export default function DiscussApp() {
   const [mobileView, setMobileView] = useState<"list" | "thread" | "details">(
     "list",
   );
+  /* "Koleex AI" is a pinned pseudo-conversation at the top of the list. When
+     open it takes over the thread column and renders <DiscussAiChat>; it is
+     mutually exclusive with a real selected channel. */
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const openAiChat = useCallback(() => {
+    setAiChatOpen(true);
+    setSelectedChannelId(null);
+    setMobileView("thread");
+  }, []);
 
   /* ── Modals ───────────────────────────────────────────────────── */
   const [newChannelOpen, setNewChannelOpen] = useState(false);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [customerChatOpen, setCustomerChatOpen] = useState(false);
@@ -481,6 +504,36 @@ export default function DiscussApp() {
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
+  /* Focus the composer when a conversation opens: opening one is a statement of
+     intent to type. Written to yield rather than win — it stands down while any
+     modal/picker owns focus, and when the operator is already in a text control.
+     A channel row is a plain button, so the ordinary path still focuses.
+     Precise pointers only: on touch this would raise the virtual keyboard over
+     the conversation just opened. Focus after SENDING is handled in handleSend. */
+  useEffect(() => {
+    if (!selectedChannelId) return;
+    if (
+      newChannelOpen || newDmOpen || productPickerOpen ||
+      mentionPickerOpen || emojiPickerOpen || voiceOpen
+    ) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+
+    const el = composerRef.current;
+    if (!el) return;
+    const active = document.activeElement as HTMLElement | null;
+    if (
+      active && active !== el &&
+      active.closest(
+        'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]',
+      )
+    ) return;
+    el.focus();
+  }, [
+    selectedChannelId, newChannelOpen, newDmOpen,
+    productPickerOpen, mentionPickerOpen, emojiPickerOpen, voiceOpen,
+  ]);
+
   /* ── Latest-value refs ────────────────────────────────────────────
      The realtime subscribe effect used to list `channels`, `members`,
      `notifApi`, `t`, `accountUsername`, `accountDisplayName` in its
@@ -501,6 +554,13 @@ export default function DiscussApp() {
   const accountRef = useRef(account);
   const selectedChannelIdRef = useRef<string | null>(selectedChannelId);
   const tRef = useRef(t);
+  /* Live mirror of `messages` (for reading the current thread inside effect
+     cleanups) + a per-channel snapshot cache so re-opening a conversation
+     paints instantly instead of blanking to a spinner while it refetches. */
+  const messagesRef = useRef<DiscussMessageWithAuthor[]>(messages);
+  const messagesCacheRef = useRef<Map<string, DiscussMessageWithAuthor[]>>(
+    new Map(),
+  );
 
   useEffect(() => {
     channelsRef.current = channels;
@@ -520,6 +580,9 @@ export default function DiscussApp() {
   useEffect(() => {
     tRef.current = t;
   }, [t]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      DATA LOADING
@@ -552,6 +615,22 @@ export default function DiscussApp() {
         currentAccountId: accountId,
         limit: 120,
       });
+
+      /* ── Stale-response guard (the "wrong conversation flashes" bug) ──
+         setMessages used to run whenever the network answered, even if the
+         user had ALREADY switched to another chat. With quick switches, a slow
+         response for chat A landed after chat B was opened and overwrote B's
+         thread with A's messages — the UI visibly flip-flopped between
+         conversations with no user action, and the leave-snapshot could then
+         cache A's messages under B's key (poisoning the cache so the wrong
+         thread kept coming back). A response may only touch the UI if its
+         channel is STILL the selected one; otherwise it just refreshes that
+         channel's snapshot cache so the fetch isn't wasted. */
+      if (selectedChannelIdRef.current !== channelId) {
+        if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
+        return;
+      }
+
       setMessages((prev) => {
         /* Silent refreshes should never blow away in-flight optimistic
            state: only replace if the server returned a *newer* set than
@@ -571,6 +650,8 @@ export default function DiscussApp() {
         if (lastNew !== lastOld) return rows;
         return prev;
       });
+      /* Keep the snapshot cache in sync with the freshest server truth. */
+      if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
       if (!silent) setLoadingMessages(false);
     },
     [accountId],
@@ -580,6 +661,70 @@ export default function DiscussApp() {
     const rows = await fetchChannelMembers(channelId);
     setMembers(rows);
   }, []);
+
+  /* ── Prefetch: the deep fix for "still loading when I swipe to another
+     conversation". The per-channel snapshot cache only helps on RE-open; the
+     first open of a chat still hit the network. Now we warm the cache ahead of
+     the tap: (1) a throttled background sweep loads every conversation's recent
+     messages shortly after the list appears, and (2) hovering / pressing a row
+     kicks that channel's fetch immediately. By the time the row is tapped its
+     messages are already in the cache, so the switch effect paints instantly
+     with no spinner. fetchChannelMessages returns newest-last, so a 50-message
+     prefetch is plenty for the first paint; opening then refreshes to the full
+     120 silently. */
+  const prefetchingRef = useRef<Set<string>>(new Set());
+  const prefetchChannel = useCallback(
+    async (channelId: string) => {
+      if (!accountId) return;
+      if (messagesCacheRef.current.has(channelId)) return; // already warm
+      if (prefetchingRef.current.has(channelId)) return; // already in flight
+      prefetchingRef.current.add(channelId);
+      try {
+        const rows = await fetchChannelMessages(channelId, {
+          currentAccountId: accountId,
+          limit: 50,
+        });
+        if (rows.length > 0 && !messagesCacheRef.current.has(channelId)) {
+          messagesCacheRef.current.set(channelId, rows);
+        }
+      } catch {
+        /* Prefetch is best-effort — a failure just means the real open fetches. */
+      } finally {
+        prefetchingRef.current.delete(channelId);
+      }
+    },
+    [accountId],
+  );
+
+  /* Background sweep — warm every conversation once, shortly after the sidebar
+     loads, throttled to a few concurrent fetches so it never competes with the
+     open channel or janks the UI. Runs on idle time. */
+  const bulkPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (!accountId || channels.length === 0 || bulkPrefetchedRef.current) return;
+    bulkPrefetchedRef.current = true;
+
+    const ids = channels
+      .map((c) => c.id)
+      .filter((id) => id !== selectedChannelIdRef.current);
+    let cursor = 0;
+    const CONCURRENCY = 3;
+    const pump = () => {
+      if (cursor >= ids.length) return;
+      const id = ids[cursor++];
+      void prefetchChannel(id).finally(pump);
+    };
+    const start = () => {
+      for (let k = 0; k < CONCURRENCY; k++) pump();
+    };
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    if (ric) ric(start, { timeout: 1500 });
+    else window.setTimeout(start, 300);
+  }, [accountId, channels, prefetchChannel]);
 
   /* Initial loads. */
   useEffect(() => {
@@ -630,17 +775,25 @@ export default function DiscussApp() {
             return prev;
           }
           const existing = prev[idx];
+          /* The realtime ping is a minimal synthetic row (ids only, body null
+             — content never travels over broadcast). Overwriting the preview
+             with it used to blank the row ("—") until the debounced refetch
+             landed. Keep the previous preview text and just bump the clock /
+             unread; the silent refetch brings the real snippet ~1s later. */
           const next: DiscussChannelWithState = {
             ...existing,
             last_message_at: msg.created_at,
-            last_message: {
-              id: msg.id,
-              body: msg.body,
-              kind: msg.kind,
-              author_username:
-                existing.last_message?.author_username ?? null,
-              created_at: msg.created_at,
-            },
+            last_message:
+              msg.body === null && existing.last_message
+                ? { ...existing.last_message, created_at: msg.created_at }
+                : {
+                    id: msg.id,
+                    body: msg.body,
+                    kind: msg.kind,
+                    author_username:
+                      existing.last_message?.author_username ?? null,
+                    created_at: msg.created_at,
+                  },
             unread_count:
               isSelected || isMine
                 ? existing.unread_count
@@ -660,7 +813,19 @@ export default function DiscussApp() {
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
 
-    void loadMessages(selectedChannelId);
+    /* Instant switch: if we have a snapshot of this conversation from a prior
+       visit, paint it immediately and refresh silently in the background — no
+       spinner, no blank thread. Only a never-opened channel shows the loading
+       state. This is what makes swiping between chats feel instant. */
+    const cached = messagesCacheRef.current.get(selectedChannelId);
+    if (cached && cached.length > 0) {
+      setMessages(cached);
+      setLoadingMessages(false);
+      void loadMessages(selectedChannelId, true);
+    } else {
+      setMessages([]);
+      void loadMessages(selectedChannelId);
+    }
     void loadMembers(selectedChannelId);
 
     const unsubChannel = subscribeToChannel(selectedChannelId, {
@@ -822,6 +987,19 @@ export default function DiscussApp() {
     });
 
     return () => {
+      /* Snapshot this channel's thread (including realtime messages received
+         while it was open) so re-opening it paints instantly from cache.
+         selectedChannelId here is the channel being left. Verify the rows
+         actually belong to it before writing — during a fast switch the state
+         can briefly hold another chat's messages, and snapshotting those here
+         would poison the cache with the wrong conversation. */
+      const leaving = messagesRef.current;
+      const last = leaving[leaving.length - 1] as
+        | { channel_id?: string }
+        | undefined;
+      if (last && last.channel_id === selectedChannelId) {
+        messagesCacheRef.current.set(selectedChannelId, leaving);
+      }
       unsubChannel();
     };
     /* Critical: only depend on the two things that actually mean
@@ -1005,13 +1183,25 @@ export default function DiscussApp() {
     if (!belongsToChannel) return;
 
     if (initialScrolledChannelRef.current !== selectedChannelId) {
-      /* First render of this channel's messages → snap to the newest. Wait a
-         frame so the list has painted and scrollHeight is final. */
+      /* First render of this channel's messages → snap to the newest. A single
+         rAF measured scrollHeight BEFORE avatars / images / dynamic bubble
+         content finished laying out, so it landed in the middle of the thread
+         and the user had to scroll down. Snap now and again over the next few
+         frames until the height has settled, instantly (no animation) so the
+         chat opens already pinned to the latest message like WhatsApp. */
       initialScrolledChannelRef.current = selectedChannelId;
-      requestAnimationFrame(() => {
+      const snap = () => {
         const e = threadScrollRef.current;
-        if (e) e.scrollTo({ top: e.scrollHeight, behavior: "auto" });
+        if (e) e.scrollTop = e.scrollHeight;
+      };
+      snap();
+      requestAnimationFrame(() => {
+        snap();
+        requestAnimationFrame(snap);
       });
+      window.setTimeout(snap, 80);
+      window.setTimeout(snap, 200);
+      window.setTimeout(snap, 400);
       return;
     }
     const nearBottom =
@@ -1093,6 +1283,13 @@ export default function DiscussApp() {
       if (c.kind === "direct") dms.push(c);
       else groups.push(c);
     }
+    /* Pinned conversations float to the top of their group so an optimistic
+       pin reorders instantly (the server also sorts pinned-first). Stable:
+       non-pinned keep their existing last-message order. */
+    const pinnedFirst = (a: DiscussChannelWithState, b: DiscussChannelWithState) =>
+      a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1;
+    dms.sort(pinnedFirst);
+    groups.sort(pinnedFirst);
     return { dms, groups };
   }, [filteredChannels]);
 
@@ -1121,6 +1318,7 @@ export default function DiscussApp() {
        so their previews have no reader left. Releasing here is what stops
        object URLs accumulating for the whole session as the user browses. */
     releaseAllPreviewUrls();
+    setAiChatOpen(false); // redesign: close the AI panel when changing chats
     setSelectedChannelId(channelId);
     setMobileView("thread");
     setProductPickerOpen(false);
@@ -1661,6 +1859,118 @@ export default function DiscussApp() {
     [selectedChannelId, accountId],
   );
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     Conversation row context menu (WeChat-style: right-click / long-press).
+     Every action is optimistic on the sidebar, then persisted + silently
+     re-synced so the badge/order match the server.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const [convMenu, setConvMenu] = useState<{
+    channel: DiscussChannelWithState;
+    x: number;
+    y: number;
+  } | null>(null);
+  const closeConvMenu = useCallback(() => setConvMenu(null), []);
+
+  const handleToggleConvPin = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      const next = !ch.pinned;
+      const stamp = new Date().toISOString();
+      setChannels((prev) =>
+        prev.map((c) =>
+          c.id === ch.id ? { ...c, pinned: next, pinned_at: next ? stamp : null } : c,
+        ),
+      );
+      await setChannelPinned(ch.id, next);
+      void loadChannels(true);
+      showToast(next ? t("conv.pinned", "Pinned to top") : t("conv.unpinned", "Unpinned"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  const handleSetConvMuted = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (!accountId) return;
+      const next = !ch.muted;
+      setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: next } : c)));
+      await setChannelMuted(ch.id, accountId, next);
+      showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
+    },
+    [accountId, showToast, t],
+  );
+
+  const handleToggleConvUnread = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (!accountId) return;
+      const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+      if (isUnread) {
+        setChannels((prev) =>
+          prev.map((c) =>
+            c.id === ch.id ? { ...c, unread_count: 0, marked_unread: false } : c,
+          ),
+        );
+        await markChannelRead(ch.id, accountId);
+        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+      } else {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === ch.id ? { ...c, marked_unread: true } : c)),
+        );
+        await markChannelUnread(ch.id);
+        /* Light up the home-tile badge + bell immediately, same as mark-read. */
+        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+      }
+      void loadChannels(true);
+    },
+    [accountId, loadChannels],
+  );
+
+  const handleHideConversation = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
+      await hideChannel(ch.id);
+      void loadChannels(true);
+      showToast(t("conv.hidden", "Removed from list"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (ch: DiscussChannelWithState) => {
+      if (
+        !window.confirm(
+          t("conv.deleteConfirm", "Delete this conversation? It will be removed from your list."),
+        )
+      )
+        return;
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
+      await deleteConversation(ch.id);
+      void loadChannels(true);
+      showToast(t("conv.deleted", "Conversation deleted"));
+    },
+    [loadChannels, showToast, t],
+  );
+
+  /* Close the conversation menu on outside-click / Escape / scroll. */
+  useEffect(() => {
+    if (!convMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const el = document.getElementById("kx-conv-menu");
+      if (el && !el.contains(e.target as Node)) closeConvMenu();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") closeConvMenu();
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", closeConvMenu, true);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", closeConvMenu, true);
+    };
+  }, [convMenu, closeConvMenu]);
+
   const handleSendVoice = useCallback(
     async (input: { blob: Blob; durationMs: number; waveform: number[] }) => {
       if (!accountId || !selectedChannelId) return;
@@ -1740,7 +2050,7 @@ export default function DiscussApp() {
         </p>
         <Link
           href="/"
-          className="text-[12px] font-semibold text-blue-400 hover:text-blue-300"
+          className="text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
         >
           {t("back")}
         </Link>
@@ -1772,151 +2082,80 @@ export default function DiscussApp() {
           name]" header once the user opens a chat (mobileView !==
           "list"). In list mode it still shows "Discuss". On desktop
           we always show the full bar.                               */}
-      <header className="shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-        <Link
-          href="/"
-          className={`h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
-            mobileView === "list" ? "flex" : "hidden md:flex"
-          }`}
-          aria-label={t("back")}
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-        </Link>
-        {mobileView !== "list" && (
-          <button
-            type="button"
-            onClick={() => setMobileView("list")}
-            className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-            aria-label={t("mobile.list")}
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-          </button>
-        )}
-        <div
-          className={`items-center gap-2 min-w-0 ${
-            mobileView === "list" ? "flex" : "hidden md:flex"
-          }`}
-        >
-          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <DiscussIcon size={16} />
-          </div>
-          <h1 className="text-[15px] md:text-[18px] font-bold tracking-tight truncate">
-            {t("title")}
-          </h1>
-          {totalUnread > 0 && (
-            <span className="hidden md:inline-flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-blue-500 text-white text-[10.5px] font-bold tabular-nums">
-              {totalUnread > 99 ? "99+" : totalUnread}
-            </span>
-          )}
-        </div>
-        {/* Mobile-only channel title when inside a chat. */}
-        {mobileView !== "list" && selectedChannel && (
-          <div className="md:hidden flex-1 min-w-0 flex items-center gap-2">
-            {selectedChannel.kind === "direct" ? (
-              <Avatar
-                name={displayNameFor(selectedChannel)}
-                url={selectedChannel.other?.avatar_url}
-                size={30}
-              />
-            ) : (
-              <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                {selectedChannel.kind === "channel" ? (
-                  <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
-                ) : (
-                  <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
-                )}
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="text-[14px] font-semibold truncate">
-                {displayNameFor(selectedChannel)}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="flex-1" />
-        {/* Global search */}
-        <button
-          type="button"
-          onClick={() => setSearchOpen(true)}
-          className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-          title={t("header.search", "Search")}
-        >
-          <SearchIcon className="h-3.5 w-3.5" />
-        </button>
-        {/* DND toggle */}
-        <button
-          type="button"
-          onClick={() => notifApi.setDndEnabled(!notifApi.dndEnabled)}
-          className={`hidden md:flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-            notifApi.dndEnabled
-              ? "bg-red-500/15 text-red-300"
-              : "hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-          }`}
-          title={
-            notifApi.dndEnabled
-              ? t("notif.dnd.on", "Do Not Disturb on")
-              : t("notif.dnd.off", "Do Not Disturb off")
-          }
-        >
-          <MoonStarIcon className="h-3.5 w-3.5" />
-        </button>
-        {/* Sound toggle */}
-        <button
-          type="button"
-          onClick={() => notifApi.setSoundEnabled(!notifApi.soundEnabled)}
-          className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-          title={
-            notifApi.soundEnabled
-              ? t("notif.sound.on", "Sound on")
-              : t("notif.sound.off", "Sound off")
-          }
-        >
-          {notifApi.soundEnabled ? (
-            <Volume2Icon className="h-3.5 w-3.5" />
-          ) : (
-            <VolumeXIcon className="h-3.5 w-3.5" />
-          )}
-        </button>
-        {/* Start customer chat */}
-        <button
-          type="button"
-          onClick={() => setCustomerChatOpen(true)}
-          className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5"
-          title={t("customer.newChat", "Start customer chat")}
-        >
-          <UserPlusIcon className="h-3.5 w-3.5" />
-          {t("customer.newChat", "Customer chat")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setNewDmOpen(true)}
-          className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5"
-          title={t("sidebar.newDirect")}
-        >
-          <AtSignIcon className="h-3.5 w-3.5" />
-          {t("sidebar.newDirect")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setNewChannelOpen(true)}
-          className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all"
-        >
-          <MessageSquarePlusIcon className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">{t("sidebar.newChannel")}</span>
-        </button>
-      </header>
 
       {/* ═══ Three-column body ═══ */}
       <div className="flex-1 min-h-0 flex">
         {/* ── Column 1: Channels + DMs list ────────────────────────── */}
         <aside
-          className={`shrink-0 md:w-[300px] md:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
+          className={`shrink-0 md:w-[300px] md:border-e border-[var(--border-color)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
             mobileView === "list" ? "flex w-full" : "hidden md:flex"
           }`}
         >
           {/* Search + filter */}
           <div className="shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border-subtle)]">
+            {/* Back to Hub + the single New action. These are the only two
+                controls the old app bar contributed that belong on this screen
+                permanently; everything else moved into the conversation header
+                or its overflow. */}
+            <div className="flex items-center gap-2 mb-2">
+              <Link
+                href="/"
+                className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                aria-label={t("back")}
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </Link>
+              <div className="flex-1" />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setNewMenuOpen((v) => !v)}
+                  className="h-8 px-2.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+                  aria-haspopup="menu"
+                  aria-expanded={newMenuOpen}
+                >
+                  <MessageSquarePlusIcon className="h-3.5 w-3.5" />
+                  <span>{t("sidebar.new", "New")}</span>
+                </button>
+                {newMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setNewMenuOpen(false)} />
+                    <div
+                      role="menu"
+                      className="absolute end-0 top-9 z-30 w-52 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setNewMenuOpen(false); setNewChannelOpen(true); }}
+                        className="w-full flex items-center gap-2 px-3 h-9 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                      >
+                        <MessageSquarePlusIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                        {t("sidebar.newChannel")}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setNewMenuOpen(false); setNewDmOpen(true); }}
+                        className="w-full flex items-center gap-2 px-3 h-9 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                      >
+                        <AtSignIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                        {t("sidebar.newDirect")}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setNewMenuOpen(false); setCustomerChatOpen(true); }}
+                        className="w-full flex items-center gap-2 px-3 h-9 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                      >
+                        <UserPlusIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                        {t("customer.newChat", "Start customer chat")}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors mb-2">
               <SearchIcon size={14} className="text-[var(--text-dim)] shrink-0" />
               <input
@@ -1944,7 +2183,7 @@ export default function DiscussApp() {
                   onClick={() => setSidebarFilter(f)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
                     sidebarFilter === f
-                      ? "bg-blue-500/15 text-blue-300"
+                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                   }`}
                 >
@@ -1959,6 +2198,37 @@ export default function DiscussApp() {
 
           {/* Channel list */}
           <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* Pinned "Koleex AI" conversation — always at the very top, above
+                loading/empty states, so the assistant is reachable like a DM. */}
+            <button
+              type="button"
+              onClick={openAiChat}
+              className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 flex items-center gap-3 rounded-xl transition-colors ${
+                aiChatOpen
+                  ? "bg-[var(--bg-inverted)]"
+                  : "hover:bg-[var(--bg-surface-hover)]"
+              }`}
+            >
+              <div className="h-10 w-10 shrink-0 flex items-center justify-center">
+                <KoleexOrb state="idle" size={36} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className={`text-[13px] font-semibold truncate ${
+                    aiChatOpen ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  {t("ai.title", "Koleex AI")}
+                </div>
+                <div
+                  className={`text-[11.5px] truncate ${
+                    aiChatOpen ? "text-[var(--text-inverted)]/70" : "text-[var(--text-dim)]"
+                  }`}
+                >
+                  {t("ai.subtitle", "Ask me anything")}
+                </div>
+              </div>
+            </button>
             {loadingChannels ? (
               <div className="h-full flex items-center justify-center">
                 <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
@@ -1978,7 +2248,7 @@ export default function DiscussApp() {
                   <button
                     type="button"
                     onClick={() => setNewChannelOpen(true)}
-                    className="h-8 px-3 rounded-lg bg-blue-500/15 text-blue-300 text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-500/25 transition-colors"
+                    className="h-8 px-3 rounded-lg bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-surface-hover)] transition-colors"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {t("sidebar.newChannel")}
@@ -2007,6 +2277,8 @@ export default function DiscussApp() {
                           channel={c}
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
+                          onPrefetch={() => void prefetchChannel(c.id)}
+                          onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
                         />
                       ))}
                     </ul>
@@ -2038,6 +2310,8 @@ export default function DiscussApp() {
                           channel={c}
                           selected={c.id === selectedChannelId}
                           onSelect={() => handleSelectChannel(c.id)}
+                          onPrefetch={() => void prefetchChannel(c.id)}
+                          onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
                         />
                       ))}
                     </ul>
@@ -2063,7 +2337,20 @@ export default function DiscussApp() {
             mobileView === "thread" ? "flex w-full" : "hidden md:flex"
           }`}
         >
-          {!selectedChannel ? (
+          {aiChatOpen ? (
+            <DiscussAiChat
+              onBack={() => {
+                setAiChatOpen(false);
+                setMobileView("list");
+              }}
+              labels={{
+                title: t("ai.title", "Koleex AI"),
+                subtitle: t("ai.subtitle", "Your assistant · always here"),
+                placeholder: t("ai.placeholder", "Ask Koleex AI anything…"),
+                empty: t("ai.empty", "Ask me anything — I can help across the Hub."),
+              }}
+            />
+          ) : !selectedChannel ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                 <DiscussIcon size={24} className="text-[var(--text-ghost)]" />
@@ -2080,7 +2367,17 @@ export default function DiscussApp() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
+                {/* Mobile back to the conversation list. This is the ONLY place
+                    it now lives — the app bar that used to host it is gone. */}
+                <button
+                  type="button"
+                  onClick={() => setMobileView("list")}
+                  className="md:hidden -ms-2 h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  aria-label={t("mobile.list")}
+                >
+                  <ArrowLeftIcon className="h-5 w-5" />
+                </button>
                 {selectedChannel.kind === "direct" ? (
                   <Avatar
                     name={displayNameFor(selectedChannel)}
@@ -2167,7 +2464,7 @@ export default function DiscussApp() {
                     t={t}
                   />
                 ) : (
-                  <MessageList
+                  <MemoMessageList
                     messages={messages}
                     currentAccountId={accountId}
                     channelKind={selectedChannel.kind}
@@ -2276,7 +2573,7 @@ export default function DiscussApp() {
         {/* ── Column 3: Details (closed when Thread pane is open) ─── */}
         {detailsOpen && selectedChannel && !threadTarget && (
           <aside
-            className={`shrink-0 md:w-[320px] md:border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
+            className={`shrink-0 md:w-[320px] md:border-s border-[var(--border-color)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
               mobileView === "details" ? "flex flex-col w-full" : "hidden md:flex md:flex-col"
             }`}
           >
@@ -2347,6 +2644,76 @@ export default function DiscussApp() {
         </div>
       )}
 
+      {/* ═══ Conversation context menu (WeChat-style right-click / long-press) ═══ */}
+      {convMenu &&
+        typeof document !== "undefined" &&
+        createPortal(
+          (() => {
+            const W = 220;
+            const EST_H = 250;
+            const M = 8;
+            const left = Math.max(M, Math.min(convMenu.x, window.innerWidth - W - M));
+            const openUp = convMenu.y + EST_H > window.innerHeight;
+            const style: React.CSSProperties = openUp
+              ? { left, bottom: Math.max(M, window.innerHeight - convMenu.y) }
+              : { left, top: convMenu.y };
+            const ch = convMenu.channel;
+            const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+            return (
+              <div
+                id="kx-conv-menu"
+                role="menu"
+                style={style}
+                className="fixed z-[100] min-w-[220px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5"
+              >
+                <MessageMenuItem
+                  icon={ch.pinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
+                  label={ch.pinned ? t("conv.unpin", "Unpin") : t("conv.pin", "Sticky on top")}
+                  onClick={() => {
+                    void handleToggleConvPin(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={isUnread ? <CheckCheckIcon className="h-4 w-4" /> : <CircleDotIcon className="h-4 w-4" />}
+                  label={isUnread ? t("conv.markRead", "Mark as read") : t("conv.markUnread", "Mark as unread")}
+                  onClick={() => {
+                    void handleToggleConvUnread(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={ch.muted ? <BellIcon className="h-4 w-4" /> : <BellOffIcon className="h-4 w-4" />}
+                  label={ch.muted ? t("conv.unmute", "Unmute notifications") : t("conv.mute", "Mute notifications")}
+                  onClick={() => {
+                    void handleSetConvMuted(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={<EyeOffIcon className="h-4 w-4" />}
+                  label={t("conv.hide", "Remove from list")}
+                  onClick={() => {
+                    void handleHideConversation(ch);
+                    closeConvMenu();
+                  }}
+                />
+                <div className="my-1 border-t border-[var(--border-subtle)]" />
+                <MessageMenuItem
+                  icon={<TrashIcon className="h-4 w-4" />}
+                  label={t("conv.delete", "Delete")}
+                  danger
+                  onClick={() => {
+                    void handleDeleteConversation(ch);
+                    closeConvMenu();
+                  }}
+                />
+              </div>
+            );
+          })(),
+          document.body,
+        )}
+
       {/* ═══ Modals / pickers ═══ */}
       {newChannelOpen && (
         <NewChannelModal
@@ -2400,10 +2767,17 @@ function ChannelRow({
   channel,
   selected,
   onSelect,
+  onPrefetch,
+  onMenu,
 }: {
   channel: DiscussChannelWithState;
   selected: boolean;
   onSelect: () => void;
+  /** Warm this conversation's messages on hover/press so the open is instant. */
+  onPrefetch?: () => void;
+  /** Open the WeChat-style conversation menu at the given viewport point
+   *  (right-click on desktop, ~450ms long-press on touch). */
+  onMenu?: (x: number, y: number) => void;
 }) {
   const name = displayNameFor(channel);
   const preview = previewMessage(channel.last_message);
@@ -2411,31 +2785,69 @@ function ChannelRow({
     ? formatSidebarTime(channel.last_message.created_at)
     : "";
   const isDm = channel.kind === "direct";
+  const showUnreadDot = channel.unread_count === 0 && channel.marked_unread === true;
+  const longPressRef = useRef<number | null>(null);
+  const clearLongPress = () => {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
 
   return (
     <li>
       <button
         type="button"
         onClick={onSelect}
-        className={`relative w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-subtle)]/50 ${
-          selected ? "bg-blue-500/10" : "hover:bg-white/[0.03]"
+        onMouseEnter={onPrefetch}
+        onPointerDown={onPrefetch}
+        onFocus={onPrefetch}
+        onContextMenu={
+          onMenu
+            ? (e) => {
+                e.preventDefault();
+                onMenu(e.clientX, e.clientY);
+              }
+            : undefined
+        }
+        onTouchStart={
+          onMenu
+            ? (e) => {
+                const t0 = e.touches[0];
+                if (!t0) return;
+                const { clientX, clientY } = t0;
+                clearLongPress();
+                longPressRef.current = window.setTimeout(() => onMenu(clientX, clientY), 450);
+              }
+            : undefined
+        }
+        onTouchEnd={onMenu ? clearLongPress : undefined}
+        onTouchMove={onMenu ? clearLongPress : undefined}
+        className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 rounded-xl transition-colors ${
+          /* Selected row = SOLID --bg-inverted fill (real white in dark, real
+             black in light) so the open chat is unmistakable — a translucent
+             wash over near-black only ever reads as gray. Every text token below
+             flips to --text-inverted / its opacity steps so nothing goes
+             white-on-white. Inset + rounded-xl (no full-bleed, no divider) makes
+             the selection/hover read as a soft pill rather than a sharp band. */
+          selected
+            ? "bg-[var(--bg-inverted)]"
+            : "hover:bg-[var(--bg-surface-hover)]"
         }`}
       >
-        {selected && (
-          <span
-            className="absolute inset-y-0 start-0 w-[3px] bg-blue-500"
-            aria-hidden
-          />
-        )}
         <div className="flex items-start gap-3 min-w-0">
           {isDm ? (
             <Avatar name={name} url={channel.other?.avatar_url} size={40} />
           ) : (
-            <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+            <div className={`h-10 w-10 shrink-0 rounded-full border flex items-center justify-center ${
+              selected
+                ? "bg-[var(--text-inverted)]/10 border-[var(--text-inverted)]/15"
+                : "bg-[var(--bg-surface)] border-[var(--border-subtle)]"
+            }`}>
               {channel.kind === "channel" ? (
-                <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <HashtagIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               ) : (
-                <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <UsersIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               )}
             </div>
           )}
@@ -2443,30 +2855,42 @@ function ChannelRow({
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-[13px] truncate ${
-                  channel.unread_count > 0
+                  selected
+                    ? "font-semibold text-[var(--text-inverted)]"
+                    : channel.unread_count > 0
                     ? "font-semibold text-[var(--text-primary)]"
                     : "font-medium text-[var(--text-muted)]"
                 }`}
               >
                 {name}
               </span>
-              {time && (
-                <span className="text-[10px] text-[var(--text-dim)] shrink-0 tabular-nums">
-                  {time}
-                </span>
-              )}
+              <span className="flex items-center gap-1 shrink-0">
+                {channel.pinned && (
+                  <PinIcon className="h-3 w-3 text-amber-400" aria-label="Pinned" />
+                )}
+                {time && (
+                  <span className={`text-[10px] tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
+                    {time}
+                  </span>
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className={`text-[11.5px] truncate flex-1 ${
-                  channel.unread_count > 0
+                  selected
+                    ? "text-[var(--text-inverted)]/75"
+                    : channel.unread_count > 0
                     ? "text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-dim)]"
                 }`}
               >
+                {channel.last_message?.kind === "voice" && (
+                  <MicIcon className="inline-block h-3 w-3 me-1 -mt-px align-text-bottom" />
+                )}
                 {channel.last_message?.author_username && !isDm ? (
                   <>
-                    <span className="text-[var(--text-muted)]">
+                    <span className={selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-muted)]"}>
                       {channel.last_message.author_username}:{" "}
                     </span>
                     {preview}
@@ -2475,15 +2899,23 @@ function ChannelRow({
                   preview || "—"
                 )}
               </span>
-              {channel.unread_count > 0 && (
-                <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-blue-500 text-white text-[10.5px] font-bold tabular-nums flex items-center justify-center">
+              {channel.unread_count > 0 ? (
+                <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
+                  selected ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                }`}>
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
-              )}
+              ) : showUnreadDot ? (
+                /* Manually "marked as unread" — a WeChat-style dot with no count. */
+                <span
+                  title="Unread"
+                  className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                    selected ? "bg-[var(--text-inverted)]" : "bg-[var(--bg-inverted)]"
+                  }`}
+                />
+              ) : null}
               {channel.muted && (
-                <span className="text-[var(--text-dim)]" title="Muted">
-                  🔕
-                </span>
+                <BellOffIcon className="h-3 w-3 shrink-0 text-red-500" aria-label="Muted" />
               )}
             </div>
           </div>
@@ -2621,7 +3053,7 @@ function MessageList(props: MessageListProps) {
           );
         }
         return (
-          <MessageBubble
+          <MemoMessageBubble
             key={row.key}
             msg={row.msg}
             showAuthor={row.showAuthor}
@@ -2688,7 +3120,7 @@ function TranslateControl({
         onClick={() => onOpenChange(!open)}
         className={`h-8 px-2 rounded-md flex items-center gap-1.5 transition-colors ${
           prefs.auto
-            ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/15"
+            ? "text-[var(--text-secondary)] bg-[var(--bg-surface-active)] hover:bg-[var(--bg-surface-active)]"
             : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
         }`}
         title={t("translate.title", "Translation")}
@@ -2718,7 +3150,7 @@ function TranslateControl({
               aria-checked={prefs.auto}
               onClick={() => onChange({ auto: !prefs.auto })}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                prefs.auto ? "bg-blue-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+                prefs.auto ? "bg-[var(--bg-inverted)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
               }`}
             >
               <span
@@ -2775,6 +3207,63 @@ type MessageBubbleProps = {
   t: (key: string, fallback?: string) => string;
 };
 
+/* Presentation-only shell for a message body. Renders `children` unchanged and
+   adds exactly two things: the 62ch reading measure (both directions), and the
+   T2 surface panel (own messages only). No state, no handlers, no data.
+
+   Alignment is deliberately a single shared left rail: own and other sit on the
+   same baseline and the same measure, and "mine" is carried by the surface, not
+   by position. Right-aligning own messages would be a bubble layout, which is
+   out of scope by decision, and the Koleex grid wants one alignment, not two.
+
+   Mine (isSelf) uses a SOLID elevated tone, not one of the palette washes. Every
+   wash here was built for hover states and tops out at ~1.77:1 over --bg-primary
+   in dark (1.45 in light) — enough to hint, not enough to read as a distinct
+   "my messages" colour. So own bubbles are `color-mix(--bg-primary + a slice of
+   --text-primary)`: an OPAQUE colour (a real light-gray-in-dark / dark-gray-in-
+   light), the strongest monochrome way to separate mine from incoming without
+   inverting the bubble (which would force every inner token — translate pill,
+   reactions, thread chip, edited label — to flip too). Incoming stays on the
+   faint --bg-surface wash so the asymmetry itself reads as direction. Keep the
+   inner text on --text-primary: the mix is deliberately kept dark-in-dark /
+   light-in-light so it stays readable.
+
+   text-[13px] is NOT styling and must not be "cleaned up": `ch` resolves against
+   the element's own font-size, so a 62ch cap on a container inheriting 16px
+   silently yields ~76 characters of 13px body text. Pinning the shell to the body
+   size is what makes 62ch mean 62 characters; it matches the body size already in
+   use, so inheritance is a no-op for children. */
+function MessageSurface({
+  isSelf,
+  children,
+}: {
+  isSelf: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={
+        "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
+        "rounded-2xl border " +
+        (isSelf
+          /* Mine: a clean Apple-style card — white in light / neutral elevated
+             gray in dark (--discuss-bubble-self) — that lifts off the canvas via
+             the hub border + a soft shadow, with a squared corner on the side the
+             bubble grows from (the WeChat/WhatsApp tail, done with radius instead
+             of an SVG so it costs nothing to render). */
+          ? "bg-[var(--discuss-bubble-self)] border-[var(--border-color)] rounded-ee-md shadow-sm"
+          /* Theirs: a real card — bg-secondary differs from the thread canvas
+             (bg-primary) in BOTH themes, and a crisp --border-color edge, so it
+             reads like every other card in the hub instead of washing into the
+             white thread in light mode. */
+          : "bg-[var(--bg-secondary)] border-[var(--border-color)] rounded-es-md")
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 function MessageBubble({
   msg,
   showAuthor,
@@ -2820,41 +3309,124 @@ function MessageBubble({
   const voiceMedia = media.find((m) => m.kind === "voice") ?? null;
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
+  /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
+     opens an actions menu next to the message instead of a hover bar that
+     covered the neighbouring message. Rendered in a portal so it's never
+     clipped by the thread's scroll box, and auto-flips upward near the bottom
+     edge. Closes on outside click / Escape / scroll. */
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const longPressRef = useRef<number | null>(null);
+  const closeMenu = useCallback(() => setMenuPos(null), []);
+  const openMenu = useCallback(
+    (x: number, y: number) => {
+      if (isDeleted) return;
+      setMenuPos({ x, y });
+    },
+    [isDeleted],
+  );
+  useEffect(() => {
+    if (!menuPos) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [menuPos, closeMenu]);
+
+  const menuStyle: React.CSSProperties | undefined = menuPos
+    ? (() => {
+        const W = 200;
+        const EST_H = 340;
+        const M = 8;
+        const left = Math.max(M, Math.min(menuPos.x, window.innerWidth - W - M));
+        const openUp = menuPos.y + EST_H > window.innerHeight;
+        return openUp
+          ? { left, bottom: Math.max(M, window.innerHeight - menuPos.y) }
+          : { left, top: menuPos.y };
+      })()
+    : undefined;
+
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`group relative flex gap-3 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] ${showAuthor ? "mt-2" : ""}`}
+      onContextMenu={(e) => {
+        if (isDeleted) return;
+        e.preventDefault();
+        openMenu(e.clientX, e.clientY);
+      }}
+      onTouchStart={(e) => {
+        if (isDeleted) return;
+        const touch = e.touches[0];
+        const { clientX, clientY } = touch;
+        longPressRef.current = window.setTimeout(
+          () => openMenu(clientX, clientY),
+          450,
+        );
+      }}
+      onTouchEnd={() => {
+        if (longPressRef.current) {
+          clearTimeout(longPressRef.current);
+          longPressRef.current = null;
+        }
+      }}
+      onTouchMove={() => {
+        if (longPressRef.current) {
+          clearTimeout(longPressRef.current);
+          longPressRef.current = null;
+        }
+      }}
+      className={`group relative flex gap-2 px-2 -mx-2 rounded-lg ${
+        isSelf ? "flex-row-reverse" : ""
+      } ${showAuthor ? "mt-3" : "mt-0.5"}`}
     >
       {showAuthor ? (
         <Avatar
           name={authorName}
           url={author?.avatar_url ?? null}
-          size={36}
+          size={32}
         />
       ) : (
-        <div className="w-9 shrink-0 flex items-start justify-center pt-1">
+        <div className="w-8 shrink-0 flex items-start justify-center pt-1">
           <span className="text-[9px] text-transparent group-hover:text-[var(--text-dim)] tabular-nums transition-colors">
             {time}
           </span>
         </div>
       )}
-      <div className="flex-1 min-w-0">
+      {/* min-w-0 keeps long words wrapping; the flex column aligns the bubble
+          to the correct edge so mine hug the right like WeChat. */}
+      <div className={`flex-1 min-w-0 flex flex-col ${isSelf ? "items-end" : "items-start"}`}>
         {showAuthor && (
-          <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="text-[13px] font-semibold text-[var(--text-primary)]">
-              {authorName}
-            </span>
+          <div className={`flex items-baseline gap-2 mb-1 px-0.5 ${isSelf ? "flex-row-reverse" : ""}`}>
+            {/* My own name is noise — the bubble side already says it's mine.
+                WeChat shows no name on your own messages either. */}
+            {!isSelf && (
+              <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">
+                {authorName}
+              </span>
+            )}
             <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
               {time}
             </span>
-            {isSelf && (
-              <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wider">
-                You
-              </span>
-            )}
+            {/* The "You" badge is gone: the author name already says who wrote
+                this, and the surface panel below now carries "mine" without
+                colour. At 4.10:1 in dark theme it was also the lowest-contrast
+                element carrying the outgoing signal alone. */}
           </div>
         )}
 
+        {/* T2 surface — own messages only. The author header stays OUTSIDE it:
+            the panel marks the utterance, not the attribution. */}
+        <MessageSurface isSelf={isSelf}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
           <ReplyPreviewPill preview={msg.reply_preview} t={t} />
@@ -2897,7 +3469,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={onSaveEdit}
-                className="h-6 px-2 rounded-md bg-blue-500 text-white text-[10.5px] font-semibold hover:bg-blue-600"
+                className="h-6 px-2 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-semibold hover:bg-[var(--bg-inverted-hover)]"
               >
                 {t("edit.save", "Save")}
               </button>
@@ -2973,7 +3545,7 @@ function MessageBubble({
                     onClick={() => onToggleReaction(msg.id, rx.emoji)}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
                       rx.reacted_by_me
-                        ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
+                        ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)]"
                         : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                     }`}
                   >
@@ -2983,7 +3555,7 @@ function MessageBubble({
                 ))}
                 <button
                   type="button"
-                  onClick={() => setReactionPickerOpen(true)}
+                  onClick={(e) => openMenu(e.clientX, e.clientY)}
                   className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 >
                   <SmileIcon className="h-3 w-3" />
@@ -2996,7 +3568,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={() => onOpenThread(msg)}
-                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10.5px] font-semibold hover:bg-blue-500/15 transition-colors"
+                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[var(--bg-surface-active)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[10.5px] font-semibold hover:bg-[var(--bg-surface-active)] transition-colors"
               >
                 <MessageSquareIcon className="h-3 w-3" />
                 {msg.thread.reply_count === 1
@@ -3009,118 +3581,134 @@ function MessageBubble({
             )}
           </>
         )}
+        </MessageSurface>
       </div>
 
-      {/* Hover action bar */}
-      {!isDeleted && !isEditing && (
-        <div className="absolute -top-3 end-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <div className="flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg">
-            {reactionPickerOpen ? (
-              <div
-                className="flex items-center"
-                onMouseLeave={() => setReactionPickerOpen(false)}
-              >
+      {/* Right-click / long-press context menu (WeChat-style). Portaled to
+          <body> and positioned at the pointer so it never covers the next
+          message or gets clipped by the scroll box. */}
+      {menuPos &&
+        !isDeleted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={menuStyle}
+            className="fixed z-[100] min-w-[200px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5"
+          >
+            {/* Quick reactions row */}
+            {!isEditing && (
+              <div className="flex items-center gap-1 px-1 pb-1.5 mb-1 border-b border-[var(--border-subtle)]">
                 {QUICK_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}
                     type="button"
                     onClick={() => {
                       onToggleReaction(msg.id, emoji);
-                      setReactionPickerOpen(false);
+                      closeMenu();
                     }}
-                    className="h-7 w-7 rounded-md text-[14px] hover:bg-[var(--bg-primary)] transition-colors"
+                    className="h-8 w-8 rounded-lg text-[16px] hover:bg-[var(--bg-surface)] transition-colors"
                   >
                     {emoji}
                   </button>
                 ))}
               </div>
-            ) : (
+            )}
+            <MessageMenuItem
+              icon={<ReplyIcon className="h-4 w-4" />}
+              label={t("msg.reply", "Reply")}
+              onClick={() => {
+                onReply(msg);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<MessageSquareIcon className="h-4 w-4" />}
+              label={t("msg.replyInThread", "Reply in thread")}
+              onClick={() => {
+                onOpenThread(msg);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<StarIcon className="h-4 w-4" />}
+              label={t("msg.star", "Save for later")}
+              onClick={() => {
+                onStar(msg.id);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<PinIcon className="h-4 w-4" />}
+              label={t("msg.pin", "Pin")}
+              onClick={() => {
+                onPin(msg.id);
+                closeMenu();
+              }}
+            />
+            <MessageMenuItem
+              icon={<LinkIcon className="h-4 w-4" />}
+              label={t("msg.copyLink", "Copy link")}
+              onClick={() => {
+                onCopyLink(msg.id);
+                closeMenu();
+              }}
+            />
+            {isSelf && (
               <>
-                <HoverAction
-                  title={t("msg.react", "Add reaction")}
-                  onClick={() => setReactionPickerOpen(true)}
-                >
-                  <SmileIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.replyInThread", "Reply in thread")}
-                  onClick={() => onOpenThread(msg)}
-                >
-                  <ReplyIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.reply", "Reply")}
-                  onClick={() => onReply(msg)}
-                >
-                  <ReplyIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.star", "Save for later")}
-                  onClick={() => onStar(msg.id)}
-                >
-                  <StarIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.pin", "Pin")}
-                  onClick={() => onPin(msg.id)}
-                >
-                  <PinIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                <HoverAction
-                  title={t("msg.copyLink", "Copy link")}
-                  onClick={() => onCopyLink(msg.id)}
-                >
-                  <LinkIcon className="h-3.5 w-3.5" />
-                </HoverAction>
-                {isSelf && (
-                  <>
-                    <HoverAction
-                      title={t("msg.edit", "Edit")}
-                      onClick={() => onStartEdit(msg)}
-                    >
-                      <Edit3Icon className="h-3.5 w-3.5" />
-                    </HoverAction>
-                    <HoverAction
-                      title={t("msg.delete", "Delete")}
-                      onClick={() => onDelete(msg.id)}
-                      danger
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </HoverAction>
-                  </>
-                )}
+                <MessageMenuItem
+                  icon={<Edit3Icon className="h-4 w-4" />}
+                  label={t("msg.edit", "Edit")}
+                  onClick={() => {
+                    onStartEdit(msg);
+                    closeMenu();
+                  }}
+                />
+                <MessageMenuItem
+                  icon={<TrashIcon className="h-4 w-4" />}
+                  label={t("msg.delete", "Delete")}
+                  danger
+                  onClick={() => {
+                    onDelete(msg.id);
+                    closeMenu();
+                  }}
+                />
               </>
             )}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
-function HoverAction({
-  title,
+function MessageMenuItem({
+  icon,
+  label,
   onClick,
-  children,
   danger = false,
 }: {
-  title: string;
+  icon: React.ReactNode;
+  label: string;
   onClick: () => void;
-  children: React.ReactNode;
   danger?: boolean;
 }) {
   return (
     <button
       type="button"
-      title={title}
+      role="menuitem"
       onClick={onClick}
-      className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors ${
         danger
-          ? "text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10"
-          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+          ? "text-red-400 hover:bg-red-500/10"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
       }`}
     >
-      {children}
+      <span className={danger ? "text-red-400" : "text-[var(--text-dim)]"}>
+        {icon}
+      </span>
+      {label}
     </button>
   );
 }
@@ -3139,9 +3727,9 @@ function ReplyPreviewPill({
     : (preview.body ?? "").slice(0, 120);
   return (
     <div className="mb-1 flex items-stretch gap-2 max-w-[480px]">
-      <div className="w-[3px] rounded-full bg-blue-500/50 shrink-0" />
+      <div className="w-[3px] rounded-full bg-[var(--text-dim)] shrink-0" />
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold text-blue-300">
+        <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
           {t("reply.replyingTo", "Replying to")} {author}
         </div>
         <div className="text-[11px] text-[var(--text-dim)] truncate italic">
@@ -3237,7 +3825,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-gradient-to-br from-blue-500/10 to-violet-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-colors max-w-[280px]"
+      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-color)] transition-colors max-w-[280px]"
     >
       <div className="h-8 w-8 shrink-0 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
         {product.image ? (
@@ -3255,7 +3843,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
           {product.name}
         </div>
-        <div className="text-[10.5px] text-blue-300 truncate">
+        <div className="text-[10.5px] text-[var(--text-secondary)] truncate">
           {product.slug}
         </div>
       </div>
@@ -3375,7 +3963,7 @@ function Composer({
 
   return (
     <div
-      className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3"
+      className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] p-3"
       style={{
         /* Respect the iPhone home-indicator so the composer sits above
            the rounded bottom edge instead of being partially hidden. */
@@ -3384,10 +3972,10 @@ function Composer({
     >
       {/* Reply-to banner */}
       {replyTarget && (
-        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/8 border border-blue-500/25">
-          <div className="w-[3px] self-stretch rounded-full bg-blue-500 shrink-0" />
+        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]">
+          <div className="w-[3px] self-stretch rounded-full bg-[var(--text-primary)] shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold text-blue-300">
+            <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
               {t("reply.replyingTo", "Replying to")}{" "}
               {replyTarget.author?.full_name ||
                 replyTarget.author?.username ||
@@ -3463,9 +4051,9 @@ function Composer({
           {products.map((p, i) => (
             <div
               key={`cp-${i}`}
-              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-blue-500/10 border border-blue-500/30"
+              className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]"
             >
-              <PackageIcon className="h-3.5 w-3.5 text-blue-300" />
+              <PackageIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
               <span className="text-[11.5px] text-[var(--text-primary)] max-w-[180px] truncate font-medium">
                 {p.name}
               </span>
@@ -3509,7 +4097,7 @@ function Composer({
             title={t("voice.record", "Record voice")}
             onClick={onOpenVoice}
           >
-            <MicrophoneIcon className="h-4 w-4" />
+            <MicIcon className="h-4 w-4" />
           </ComposerIconButton>
 
           <div className="flex-1" />
@@ -3525,7 +4113,7 @@ function Composer({
             type="button"
             onClick={onSend}
             disabled={!canSend}
-            className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {sending ? (
               <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -3536,7 +4124,9 @@ function Composer({
           </button>
         </div>
       </div>
-      <div className="mt-1 px-1 text-[10px] text-[var(--text-dim)]">
+      {/* Desktop-only: the hint names Enter and Shift+Enter, neither of which
+          exists on a touch keyboard. */}
+      <div className="mt-1 px-1 text-[10px] text-[var(--text-dim)] hidden md:block">
         {hintText}
       </div>
     </div>
@@ -3703,7 +4293,7 @@ function DetailsPane({
                     <div className="text-[10px] text-[var(--text-dim)] truncate">
                       @{m.author.username}
                       {m.role !== "member" && (
-                        <span className="ms-1.5 text-blue-300 font-semibold uppercase tracking-wider">
+                        <span className="ms-1.5 text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                           {m.role}
                         </span>
                       )}
@@ -3759,16 +4349,16 @@ function NotifPrefRow({
       onClick={onClick}
       className={`h-9 px-3 flex items-center gap-2 text-[12px] font-medium transition-colors text-start ${
         active
-          ? "bg-blue-500/10 text-blue-300"
+          ? "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]"
           : "text-[var(--text-muted)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
       }`}
     >
       <span
         className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
-          active ? "border-blue-400" : "border-[var(--border-subtle)]"
+          active ? "border-[var(--border-strong)]" : "border-[var(--border-subtle)]"
         }`}
       >
-        {active && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
+        {active && <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />}
       </span>
       <span className="flex-1">{label}</span>
     </button>
@@ -3810,10 +4400,29 @@ function ModalShell({
   width?: number;
 }) {
   useScrollLock();
+  /* Dismiss with Escape, and by clicking the dimmed backdrop (target ===
+     currentTarget means the click landed on the overlay itself, not the panel
+     or its contents). Previously the only way out was picking a person or
+     finding the small X — clicking outside did nothing. */
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex overflow-y-auto p-4 bg-black/60 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      role="presentation"
+    >
+      {/* m-auto centres the panel both axes AND keeps it scrollable if it is
+          ever taller than the viewport (items-center would clip the top). */}
       <div
-        className="w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
+        className="m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
         style={{ maxWidth: width }}
       >
         <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
@@ -3886,7 +4495,7 @@ function NewChannelModal({
             onClick={() => setKind("channel")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "channel"
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3903,7 +4512,7 @@ function NewChannelModal({
             onClick={() => setKind("group")}
             className={`p-3 rounded-lg border text-start transition-colors ${
               kind === "group"
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
                 : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -3975,7 +4584,7 @@ function NewChannelModal({
                       })
                     }
                     className={`w-full px-3 py-2 flex items-center gap-2.5 text-start transition-colors ${
-                      isOn ? "bg-blue-500/10" : "hover:bg-[var(--bg-primary)]"
+                      isOn ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-primary)]"
                     }`}
                   >
                     <Avatar
@@ -3994,7 +4603,7 @@ function NewChannelModal({
                         )}
                       </div>
                     </div>
-                    {isOn && <CheckIcon className="h-4 w-4 text-blue-400" />}
+                    {isOn && <CheckIcon className="h-4 w-4 text-[var(--text-secondary)]" />}
                   </button>
                 );
               })}
@@ -4027,7 +4636,7 @@ function NewChannelModal({
               memberIds: Array.from(selected),
             })
           }
-          className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
           {t("new.channel.create")}
         </button>
