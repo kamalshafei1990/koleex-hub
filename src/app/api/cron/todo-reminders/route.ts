@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { spawnDueRecurringTodos } from "@/lib/server/todo-recurrence";
+import { escalateOverdueTodos } from "@/lib/server/todo-escalation";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,15 @@ export async function GET(req: Request) {
     console.error("[cron/todo-reminders] recurrence:", e);
   }
 
+  // Overdue escalation: ping the manager on any delegated task that has slipped
+  // past its due date and is still open (once per task).
+  let escalated = 0;
+  try {
+    escalated = await escalateOverdueTodos(new Date(nowIso));
+  } catch (e) {
+    console.error("[cron/todo-reminders] escalation:", e);
+  }
+
   // Due = remind_at reached and task still open. The "not already reminded for
   // THIS remind_at" check is done in JS below — PostgREST can't compare one
   // column against another inside an .or() filter (it would parse the column
@@ -63,7 +73,7 @@ export async function GET(req: Request) {
   const due = ((rows ?? []) as DueTodo[]).filter(
     (t) => !t.reminded_at || t.reminded_at < t.remind_at,
   );
-  if (due.length === 0) return NextResponse.json({ ok: true, fired: 0, spawned });
+  if (due.length === 0) return NextResponse.json({ ok: true, fired: 0, spawned, escalated });
 
   const ids = due.map((t) => t.id);
 
@@ -109,5 +119,5 @@ export async function GET(req: Request) {
     fired += 1;
   }
 
-  return NextResponse.json({ ok: true, fired, spawned });
+  return NextResponse.json({ ok: true, fired, spawned, escalated });
 }
