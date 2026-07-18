@@ -38,6 +38,7 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
@@ -820,9 +821,12 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
                 {task.source === "crm" ? t("src.crm") : t("src.calendar")}
               </span>
             )}
-            {task.assigner && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-[var(--text-faint)]">
-                {t("row.from")} {task.assigner.full_name || task.assigner.username}
+            {/* Only flag tasks a DIFFERENT person assigned — a badge that reads
+                "assigned by X" so delegated work is distinct from own to-dos.
+                Own tasks (assigner === me) carry no badge. */}
+            {task.assigner && task.assigner.account_id !== currentAccountId && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface-active)] px-1.5 py-0.5 rounded">
+                <UserCheckIcon size={9} /> {t("row.assignedBy")} {task.assigner.full_name || task.assigner.username}
               </span>
             )}
             {checklist.length > 0 && (
@@ -1009,7 +1013,9 @@ export default function TodoPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [assignedToMe, setAssignedToMe] = useState(false);
+  // Source lens: separate a user's own to-dos from what a manager/other
+  // assigned them. "mine" = self-authored; "assigned" = given by someone else.
+  const [sourceFilter, setSourceFilter] = useState<"all" | "mine" | "assigned">("all");
   // Phase C: cadence lens — "all" | "day" | "week" | "month". Filters the list
   // to tasks due within today / this week / this month, matching how a user
   // keeps a daily/weekly/monthly to-do.
@@ -1168,7 +1174,13 @@ export default function TodoPage() {
     if (filter === "active") list = list.filter((t) => !t.completed);
     if (filter === "completed") list = list.filter((t) => t.completed);
     // "Assigned to me" = someone else (an admin/manager) assigned it and it reached me.
-    if (assignedToMe) list = list.filter((t) => !!t.assigned_by_account_id && t.assigned_by_account_id !== accountId);
+    // A task is "assigned to me" when someone ELSE assigned it; otherwise it's
+    // my own. This cleanly splits the personal list from delegated work.
+    if (sourceFilter !== "all") {
+      const isAssigned = (t: TodoWithRelations) =>
+        !!t.assigned_by_account_id && t.assigned_by_account_id !== accountId;
+      list = list.filter((t) => (sourceFilter === "assigned" ? isAssigned(t) : !isAssigned(t)));
+    }
     if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
     if (statusFilter) list = list.filter((t) => t.status === statusFilter);
     if (labelFilter) list = list.filter((t) => t.label === labelFilter);
@@ -1225,7 +1237,7 @@ export default function TodoPage() {
     }
 
     return list;
-  }, [todos, search, filter, priorityFilter, assignedToMe, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [todos, search, filter, priorityFilter, sourceFilter, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
     total: todos.length,
@@ -1345,15 +1357,21 @@ export default function TodoPage() {
               </button>
             ))}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
-            {/* "Assigned to me" — tasks an admin/manager gave the user */}
-            <button onClick={() => setAssignedToMe((v) => !v)}
-              className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 whitespace-nowrap ${
-                assignedToMe
-                  ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
-                  : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-              }`}>
-              <UserCheckIcon size={11} /> {t("pill.assignedToMe")}
-            </button>
+            {/* Source separator: my own to-dos vs. tasks a manager/other gave me */}
+            {([
+              { v: "all", key: "src.all" },
+              { v: "mine", key: "src.mine", icon: <UserIcon size={11} /> },
+              { v: "assigned", key: "pill.assignedToMe", icon: <UserCheckIcon size={11} /> },
+            ] as const).map((s) => (
+              <button key={s.v} onClick={() => setSourceFilter(s.v)}
+                className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 whitespace-nowrap ${
+                  sourceFilter === s.v
+                    ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                    : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                }`}>
+                {"icon" in s ? s.icon : null} {t(s.key)}
+              </button>
+            ))}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
             {/* Cadence lens — daily / weekly / monthly to-do horizon */}
             {(["all", "day", "week", "month"] as const).map((c) => (

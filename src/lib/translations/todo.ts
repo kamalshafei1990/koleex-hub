@@ -89,6 +89,9 @@ export const todoT: Translations = {
   /* App chrome + filter pills */
   "app.subtitle":      { en: "Task management",            zh: "任务管理",               ar: "إدارة المهام" },
   "pill.assignedToMe": { en: "Assigned to me",             zh: "分配给我",               ar: "مُسندة إليّ" },
+  "src.all":           { en: "All",                        zh: "全部",                   ar: "الكل" },
+  "src.mine":          { en: "My tasks",                   zh: "我的任务",               ar: "مهامي" },
+  "row.assignedBy":    { en: "assigned by",                zh: "分配自",                 ar: "أسندها" },
   "row.onTime":        { en: "On time",                    zh: "按时",                   ar: "في الوقت" },
   "row.late":          { en: "Late",                       zh: "逾期完成",               ar: "متأخر" },
   "pill.all":          { en: "All",                        zh: "全部",                   ar: "الكل" },
