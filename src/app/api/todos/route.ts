@@ -225,6 +225,8 @@ export async function POST(req: Request) {
     start_date?: string | null;
     remind_at?: string | null;
     status?: "todo" | "in_progress" | "blocked" | "done";
+    recurrence?: "daily" | "weekly" | "monthly" | null;
+    recurrence_until?: string | null;
     source?: "manual" | "crm" | "calendar";
     source_id?: string | null;
     assignee_account_ids?: string[];
@@ -235,6 +237,10 @@ export async function POST(req: Request) {
   };
 
   const status = body.status ?? "todo";
+  const recurrence =
+    body.recurrence === "daily" || body.recurrence === "weekly" || body.recurrence === "monthly"
+      ? body.recurrence
+      : null;
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
@@ -250,6 +256,10 @@ export async function POST(req: Request) {
       due_date: body.due_date ?? null,
       start_date: body.start_date ?? null,
       remind_at: body.remind_at ?? null,
+      // Phase C: this row becomes the recurring template. Instances are
+      // spawned by the cron and carry recurrence=null.
+      recurrence,
+      recurrence_until: recurrence ? body.recurrence_until ?? null : null,
       created_by_account_id: auth.account_id,
       assigned_by_account_id: auth.account_id,
       source: body.source ?? "manual",

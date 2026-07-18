@@ -95,6 +95,20 @@ export const todoT: Translations = {
   "pill.active":       { en: "Active",                     zh: "进行中",                 ar: "نشِطة" },
   "pill.done":         { en: "Done",                       zh: "已完成",                 ar: "منجزة" },
 
+  /* Cadence lens + recurrence (Phase C) */
+  "cadence.all":       { en: "All",                        zh: "全部",                   ar: "الكل" },
+  "cadence.day":       { en: "Today",                      zh: "今天",                   ar: "اليوم" },
+  "cadence.week":      { en: "This week",                  zh: "本周",                   ar: "هذا الأسبوع" },
+  "cadence.month":     { en: "This month",                 zh: "本月",                   ar: "هذا الشهر" },
+  "rec.once":          { en: "Once",                       zh: "一次",                   ar: "مرة واحدة" },
+  "rec.daily":         { en: "Daily",                      zh: "每日",                   ar: "يومي" },
+  "rec.weekly":        { en: "Weekly",                     zh: "每周",                   ar: "أسبوعي" },
+  "rec.monthly":       { en: "Monthly",                    zh: "每月",                   ar: "شهري" },
+  "f.recurrence":      { en: "Repeat",                     zh: "重复",                   ar: "التكرار" },
+  "f.recurrenceUntil": { en: "Until",                      zh: "截止",                   ar: "حتى" },
+  "f.recurrenceForever": { en: "No end date",              zh: "无截止日期",             ar: "بدون تاريخ انتهاء" },
+  "common.clear":      { en: "Clear",                      zh: "清除",                   ar: "مسح" },
+
   /* Priority (medium was missing) */
   "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },
 

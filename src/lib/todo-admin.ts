@@ -222,6 +222,8 @@ export async function createTodo(input: {
   start_date?: string | null;
   remind_at?: string | null;
   status?: "todo" | "in_progress" | "blocked" | "done";
+  recurrence?: "daily" | "weekly" | "monthly" | null;
+  recurrence_until?: string | null;
   created_by_account_id?: string | null;
   assigned_by_account_id?: string | null;
   source?: "manual" | "crm" | "calendar";
@@ -246,6 +248,8 @@ export async function createTodo(input: {
         start_date: input.start_date,
         remind_at: input.remind_at,
         status: input.status,
+        recurrence: input.recurrence,
+        recurrence_until: input.recurrence_until,
         source: input.source,
         source_id: input.source_id,
         assignee_account_ids: input.assignee_account_ids,

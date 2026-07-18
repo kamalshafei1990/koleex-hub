@@ -38,6 +38,7 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
@@ -49,7 +50,7 @@ import {
   subscribeToTodos,
 } from "@/lib/todo-admin";
 import type {
-  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus,
+  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
@@ -67,6 +68,14 @@ const STATUSES: { value: TodoStatus; label: string; dot: string }[] = [
   { value: "in_progress", label: "In progress", dot: "bg-blue-400" },
   { value: "blocked", label: "Blocked", dot: "bg-red-400" },
   { value: "done", label: "Done", dot: "bg-green-400" },
+];
+
+/* ── Recurrence config (Phase C). value=null → one-off task. ── */
+const RECURRENCES: { value: TodoRecurrence; key: string }[] = [
+  { value: null, key: "rec.once" },
+  { value: "daily", key: "rec.daily" },
+  { value: "weekly", key: "rec.weekly" },
+  { value: "monthly", key: "rec.monthly" },
 ];
 
 /* datetime-local <-> ISO helpers for the reminder field. */
@@ -244,6 +253,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [startDate, setStartDate] = useState("");
   const [remindAt, setRemindAt] = useState("");
   const [status, setStatus] = useState<TodoStatus>("todo");
+  const [recurrence, setRecurrence] = useState<TodoRecurrence>(null);
+  const [recurrenceUntil, setRecurrenceUntil] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [newLabelName, setNewLabelName] = useState("");
@@ -265,6 +276,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         setStartDate(editEntry.start_date ? editEntry.start_date.split("T")[0] : "");
         setRemindAt(isoToLocalInput(editEntry.remind_at));
         setStatus(editEntry.status ?? "todo");
+        setRecurrence(editEntry.recurrence ?? null);
+        setRecurrenceUntil(editEntry.recurrence_until ? editEntry.recurrence_until.split("T")[0] : "");
         setSelectedAssignees(editEntry.assignees.map((a) => a.account_id));
         setSelectedDept(editEntry.assigned_department || "");
         setAssignAll(editEntry.assign_to_all);
@@ -277,6 +290,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
       } else {
         setTitle(""); setDescription(""); setPriority("medium"); setLabel(""); setDueDate("");
         setStartDate(""); setRemindAt(""); setStatus("todo");
+        setRecurrence(null); setRecurrenceUntil("");
         setSelectedAssignees([]); setSelectedDept(""); setAssignAll(false);
         setExtras({}); setShowExtras(false);
       }
@@ -329,6 +343,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           start_date: startDate || null,
           remind_at: localInputToIso(remindAt),
           status,
+          recurrence,
+          recurrence_until: recurrence ? recurrenceUntil || null : null,
           assigned_department: selectedDept || null,
           assign_to_all: assignAll,
           metadata: extras,
@@ -343,6 +359,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           start_date: startDate || null,
           remind_at: localInputToIso(remindAt),
           status,
+          recurrence,
+          recurrence_until: recurrence ? recurrenceUntil || null : null,
           created_by_account_id: accountId || null,
           assigned_by_account_id: accountId || null,
           assignee_account_ids: selectedAssignees,
@@ -557,6 +575,39 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             </div>
           </div>
 
+          {/* Recurrence (Phase C) */}
+          <div>
+            <label className={lbl}>
+              <RefreshCwIcon size={11} className="inline mr-1 -mt-0.5" /> {t("f.recurrence")}
+            </label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {RECURRENCES.map((r) => (
+                <button key={r.key} type="button" onClick={() => setRecurrence(r.value)}
+                  className={`h-9 rounded-lg text-[11px] font-semibold transition-all border flex items-center justify-center ${
+                    recurrence === r.value
+                      ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                  }`}>
+                  {t(r.key)}
+                </button>
+              ))}
+            </div>
+            {recurrence && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-muted)] shrink-0">{t("f.recurrenceUntil")}</span>
+                <div className="flex-1">
+                  <DatePicker value={recurrenceUntil} onChange={setRecurrenceUntil} placeholder={t("f.recurrenceForever")} />
+                </div>
+                {recurrenceUntil && (
+                  <button type="button" onClick={() => setRecurrenceUntil("")}
+                    className="h-9 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0">
+                    {t("common.clear")}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Label */}
           <div>
             <label className={lbl}>{t("f.label")}</label>
@@ -741,6 +792,11 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
                 <TagsIcon size={9} /> {task.label}
+              </span>
+            )}
+            {task.recurrence && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface-active)] px-1.5 py-0.5 rounded">
+                <RefreshCwIcon size={9} /> {t("rec." + task.recurrence)}
               </span>
             )}
             {task.due_date && (
@@ -946,6 +1002,10 @@ export default function TodoPage() {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assignedToMe, setAssignedToMe] = useState(false);
+  // Phase C: cadence lens — "all" | "day" | "week" | "month". Filters the list
+  // to tasks due within today / this week / this month, matching how a user
+  // keeps a daily/weekly/monthly to-do.
+  const [cadenceView, setCadenceView] = useState<"all" | "day" | "week" | "month">("all");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
@@ -1132,8 +1192,32 @@ export default function TodoPage() {
       });
     }
 
+    // Cadence lens: keep tasks due within today / this week (Mon–Sun) / this
+    // month. A task with no due date is kept only in "all".
+    if (cadenceView !== "all") {
+      const now = new Date();
+      const start = new Date(now);
+      const end = new Date(now);
+      if (cadenceView === "day") {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+      } else if (cadenceView === "week") {
+        const dow = (now.getDay() + 6) % 7; // Mon=0
+        start.setDate(now.getDate() - dow); start.setHours(0, 0, 0, 0);
+        end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+      } else {
+        start.setDate(1); start.setHours(0, 0, 0, 0);
+        end.setMonth(now.getMonth() + 1, 0); end.setHours(23, 59, 59, 999);
+      }
+      list = list.filter((t) => {
+        if (!t.due_date) return false;
+        const due = new Date(t.due_date);
+        return due >= start && due <= end;
+      });
+    }
+
     return list;
-  }, [todos, search, filter, priorityFilter, assignedToMe, accountId, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [todos, search, filter, priorityFilter, assignedToMe, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
     total: todos.length,
@@ -1262,6 +1346,18 @@ export default function TodoPage() {
               }`}>
               <UserCheckIcon size={11} /> {t("pill.assignedToMe")}
             </button>
+            <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+            {/* Cadence lens — daily / weekly / monthly to-do horizon */}
+            {(["all", "day", "week", "month"] as const).map((c) => (
+              <button key={c} onClick={() => setCadenceView(c)}
+                className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border whitespace-nowrap ${
+                  cadenceView === c
+                    ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                    : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                }`}>
+                {t("cadence." + c)}
+              </button>
+            ))}
           </div>
 
           {/* Advanced filters panel */}

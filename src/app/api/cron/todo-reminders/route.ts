@@ -10,6 +10,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { spawnDueRecurringTodos } from "@/lib/server/todo-recurrence";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ interface DueTodo {
   title: string;
   description: string | null;
   remind_at: string;
+  reminded_at: string | null;
   created_by_account_id: string | null;
 }
 
@@ -31,22 +33,37 @@ export async function GET(req: Request) {
 
   const nowIso = new Date().toISOString();
 
-  // Due = remind_at reached, task still open, and not already reminded for THIS
-  // remind_at value (so rescheduling a reminder re-arms it).
+  // Phase C: roll recurring templates forward — spawn this period's instances
+  // before we compute reminders, so a freshly-spawned task's remind_at (if any)
+  // is considered in the same tick.
+  let spawned = 0;
+  try {
+    spawned = await spawnDueRecurringTodos(new Date(nowIso));
+  } catch (e) {
+    console.error("[cron/todo-reminders] recurrence:", e);
+  }
+
+  // Due = remind_at reached and task still open. The "not already reminded for
+  // THIS remind_at" check is done in JS below — PostgREST can't compare one
+  // column against another inside an .or() filter (it would parse the column
+  // name as a literal timestamp and error).
   const { data: rows, error } = await supabaseServer
     .from("koleex_todos")
-    .select("id, title, description, remind_at, created_by_account_id")
+    .select("id, title, description, remind_at, reminded_at, created_by_account_id")
     .lte("remind_at", nowIso)
     .eq("completed", false)
-    .or(`reminded_at.is.null,reminded_at.lt.remind_at`)
     .limit(200);
 
   if (error) {
     console.error("[cron/todo-reminders]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const due = (rows ?? []) as DueTodo[];
-  if (due.length === 0) return NextResponse.json({ ok: true, fired: 0 });
+  // Re-arm rule: fire when never reminded, or reminded before the current
+  // remind_at (i.e. the reminder was rescheduled to a later time).
+  const due = ((rows ?? []) as DueTodo[]).filter(
+    (t) => !t.reminded_at || t.reminded_at < t.remind_at,
+  );
+  if (due.length === 0) return NextResponse.json({ ok: true, fired: 0, spawned });
 
   const ids = due.map((t) => t.id);
 
@@ -92,5 +109,5 @@ export async function GET(req: Request) {
     fired += 1;
   }
 
-  return NextResponse.json({ ok: true, fired });
+  return NextResponse.json({ ok: true, fired, spawned });
 }

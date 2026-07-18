@@ -1855,6 +1855,8 @@ export type TodoPriority = "high" | "medium" | "low";
 
 /** Workflow stage for a task (Phase 2). */
 export type TodoStatus = "todo" | "in_progress" | "blocked" | "done";
+/** Phase C: recurring-task cadence. null = a one-off task. */
+export type TodoRecurrence = "daily" | "weekly" | "monthly" | null;
 export interface TodoRow {
   id: string;
   title: string;
@@ -1869,6 +1871,15 @@ export interface TodoRow {
   remind_at: string | null;
   /** Phase 2: workflow stage; kept in sync with `completed`. */
   status: TodoStatus;
+  /** Phase C: recurrence cadence. null = one-off task. On the template row
+      this is set; spawned instances carry null (they are plain tasks). */
+  recurrence: TodoRecurrence;
+  /** Phase C: on a spawned instance, points back to the recurring template. */
+  recurrence_parent_id: string | null;
+  /** Phase C: the period-start date this instance was generated for (dedup). */
+  recurrence_spawned_for: string | null;
+  /** Phase C: optional last date to keep spawning (inclusive). */
+  recurrence_until: string | null;
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
   source: TodoSource;
