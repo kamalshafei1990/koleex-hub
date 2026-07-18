@@ -34,7 +34,7 @@ import {
   fetchAccounts,
   fetchAccountWithLinks,
 } from "@/lib/accounts-admin";
-import { fetchEventsInRange, deleteEvent } from "@/lib/calendar-events";
+import { fetchEventsInRange, deleteEvent, fetchEventById } from "@/lib/calendar-events";
 import { fetchHolidays, expandHolidays, type HolidayRow } from "@/lib/calendar-holidays";
 import { withDefaults } from "@/lib/access-control";
 import { useTranslation } from "@/lib/i18n";
@@ -277,17 +277,8 @@ export default function CalendarApp() {
     });
   }
 
-  function openEditEvent(e: CalendarEventRow) {
-    /* Mirrored items are read-only shadows of another module — they have no
-       real koleex_calendar_events row to edit. A To-do deep-links to its task
-       in the To-do app; other mirrors (Planning) are simply not editable. */
-    if (typeof e.id === "string" && e.id.startsWith("todo:")) {
-      window.location.assign(`/todo?task=${e.id.slice("todo:".length)}`);
-      return;
-    }
-    if (typeof e.id === "string" && e.id.includes(":")) return;
-    setEditingEvent(e);
-    setModalDraft({
+  function draftFrom(e: CalendarEventRow): EventDraft {
+    return {
       account_id: e.account_id,
       title: e.title,
       description: e.description,
@@ -297,7 +288,42 @@ export default function CalendarApp() {
       all_day: e.all_day,
       event_type: e.event_type,
       color: e.color,
-    });
+      is_private: e.is_private ?? false,
+      reminder_minutes: e.reminder_minutes ?? null,
+      recurrence: e.recurrence ?? null,
+      recurrence_until: e.recurrence_until ?? null,
+    };
+  }
+
+  async function openEditEvent(e: CalendarEventRow) {
+    /* Mirrored items are read-only shadows of another module — they have no
+       real koleex_calendar_events row to edit. A To-do deep-links to its task
+       in the To-do app; other mirrors (Planning) are simply not editable. */
+    if (typeof e.id === "string" && e.id.startsWith("todo:")) {
+      window.location.assign(`/todo?task=${e.id.slice("todo:".length)}`);
+      return;
+    }
+
+    /* Recurring occurrence — its id is `<baseId>~<i>` and it carries
+       `series_base_id`. Editing an occurrence edits the WHOLE series, so open
+       the real base row (its true start/end + recurrence rule). */
+    const seriesBaseId = (e as { series_base_id?: string }).series_base_id;
+    if (seriesBaseId) {
+      const base = await fetchEventById(seriesBaseId);
+      if (!base) {
+        setError("Could not open the recurring event.");
+        return;
+      }
+      setEditingEvent(base);
+      setModalDraft(draftFrom(base));
+      return;
+    }
+
+    // Any other synthetic id (planning:, holiday:, …) is not editable.
+    if (typeof e.id === "string" && e.id.includes(":")) return;
+
+    setEditingEvent(e);
+    setModalDraft(draftFrom(e));
   }
 
   async function handleDeleteEvent(id: string) {

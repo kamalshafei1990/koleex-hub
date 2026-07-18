@@ -987,6 +987,8 @@ export type CalendarEventType =
   | "holiday"
   | "out_of_office";
 
+export type CalendarRecurrence = "daily" | "weekly" | "monthly" | null;
+
 export interface CalendarEventRow {
   id: string;
   account_id: string;
@@ -1000,13 +1002,34 @@ export interface CalendarEventRow {
   color: string | null;
   created_at: string;
   updated_at: string;
+  /* Columns that exist on koleex_calendar_events; optional so older callers
+     (and the mirror shims) don't have to supply them. */
+  is_private?: boolean | null;
+  tenant_id?: string | null;
+  /** Minutes before start to alert; null = no reminder. */
+  reminder_minutes?: number | null;
+  /** Cron dedup: the occurrence-start we last alerted for. Server-managed. */
+  reminded_at?: string | null;
+  /** null = one-off; otherwise the cadence of the series. */
+  recurrence?: CalendarRecurrence;
+  /** Optional last date the series repeats until (YYYY-MM-DD). */
+  recurrence_until?: string | null;
 }
 
 export type CalendarEventInsert = Omit<
   CalendarEventRow,
-  "id" | "created_at" | "updated_at"
+  "id" | "created_at" | "updated_at" | "reminded_at"
 >;
 export type CalendarEventUpdate = Partial<CalendarEventInsert>;
+
+export interface CalendarAttendeeRow {
+  id: string;
+  event_id: string;
+  account_id: string;
+  status: "invited" | "accepted" | "declined";
+  tenant_id: string | null;
+  created_at: string;
+}
 
 /* ── Membership requests ("Be a Koleex Member" form) ── */
 

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
 
 /* GET /api/calendar/events
    Returns events for a given account within [from, to).
@@ -52,6 +53,7 @@ export async function GET(req: Request) {
     .from("koleex_calendar_events")
     .select("*")
     .eq("account_id", accountId)
+    .is("recurrence", null) // recurring series render via expansion below, not here
     .lt("start_at", to)
     .gte("end_at", from)
     .order("start_at", { ascending: true });
@@ -92,6 +94,85 @@ export async function GET(req: Request) {
           access_reason: null,
         })),
       );
+    }
+  }
+
+  const winFrom = new Date(from);
+  const winTo = new Date(to);
+
+  /* ── Recurring series (read-expansion) ──
+     A recurring event is ONE row (recurrence = daily/weekly/monthly). Its
+     occurrences are computed here rather than spawned. Each occurrence carries
+     `series_base_id` so the UI edits/deletes the whole series (clicking an
+     occurrence opens the base row). */
+  type Row = Record<string, unknown> & {
+    id: string;
+    start_at: string;
+    end_at: string;
+    recurrence?: CalendarRec;
+    recurrence_until?: string | null;
+  };
+  const expandRow = (base: Row): unknown[] => {
+    const occ = expandRecurrence(
+      base.start_at,
+      base.end_at,
+      base.recurrence,
+      base.recurrence_until ?? null,
+      winFrom,
+      winTo,
+    );
+    return occ.map((o, i) => ({
+      ...base,
+      id: `${base.id}~${i}`,
+      series_base_id: base.id,
+      start_at: o.start.toISOString(),
+      end_at: o.end.toISOString(),
+    }));
+  };
+
+  let recurringExpanded: unknown[] = [];
+  {
+    let rq = supabaseServer
+      .from("koleex_calendar_events")
+      .select("*")
+      .eq("account_id", accountId)
+      .not("recurrence", "is", null)
+      .lte("start_at", to) // series must have started before the window's end
+      .or(`recurrence_until.is.null,recurrence_until.gte.${from.slice(0, 10)}`);
+    if (auth.tenant_id) rq = rq.eq("tenant_id", auth.tenant_id);
+    if (!viewingOwn && !auth.can_view_private) rq = rq.eq("is_private", false);
+    const { data: recRows } = await rq;
+    recurringExpanded = (recRows ?? []).flatMap((r) => expandRow(r as Row));
+  }
+
+  /* ── Events the viewer is INVITED to (not owner) ──
+     Shows on your calendar even though someone else owns it. Only for your own
+     calendar view. Recurring invited events are expanded too. */
+  let attendeeEvents: unknown[] = [];
+  if (viewingOwn) {
+    const { data: att } = await supabaseServer
+      .from("koleex_calendar_event_attendees")
+      .select("event_id")
+      .eq("account_id", accountId)
+      .limit(500);
+    const evIds = Array.from(new Set((att ?? []).map((a) => (a as { event_id: string }).event_id)));
+    if (evIds.length) {
+      let aq = supabaseServer
+        .from("koleex_calendar_events")
+        .select("*")
+        .in("id", evIds)
+        .neq("account_id", accountId); // owned ones already covered above
+      if (auth.tenant_id) aq = aq.eq("tenant_id", auth.tenant_id);
+      const { data: aRows } = await aq;
+      attendeeEvents = (aRows ?? []).flatMap((r) => {
+        const row = r as Row;
+        const base = { ...row, invited: true };
+        if (row.recurrence) return expandRow(base as Row);
+        // one-off: include only if it overlaps the window
+        const s = new Date(row.start_at).getTime();
+        const e = new Date(row.end_at).getTime();
+        return s < winTo.getTime() && e >= winFrom.getTime() ? [base] : [];
+      });
     }
   }
 
@@ -222,7 +303,13 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    events: [...(data ?? []), ...planningMirror, ...todoMirror],
+    events: [
+      ...(data ?? []),
+      ...recurringExpanded,
+      ...attendeeEvents,
+      ...planningMirror,
+      ...todoMirror,
+    ],
   });
 }
 
