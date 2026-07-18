@@ -1053,9 +1053,15 @@ export default function DiscussApp() {
 
     const HEALTHY_GAP = 30_000;   // dirty reconcile cadence while healthy
     const SAFETY_GAP = 300_000;   // quiet-stream insurance pass
-    const GRACE = 8_000;          // unhealthy blips shorter than this: no storm
-    const FB_BASE = 10_000;       // fallback poll base interval
-    const FB_MAX = 40_000;        // fallback backoff cap
+    /* Fallback is now a SHORT bridge, not a way of life: subscribeBroadcast
+       self-heals dead channels (rejoin + backoff + online/visible kicks), so
+       unhealthy windows last seconds. While one is open, a chat app must still
+       FEEL live — poll the open conversation every ~5s (server cost ~150 ms)
+       instead of the old 10s→40s backoff that made messages appear a minute
+       late whenever realtime dropped. */
+    const GRACE = 3_000;          // unhealthy blips shorter than this: no storm
+    const FB_BASE = 5_000;        // fallback poll base interval
+    const FB_MAX = 10_000;        // fallback backoff cap
     const jitter = () => 0.8 + Math.random() * 0.4;
 
     let lastFull = performance.now();

@@ -546,32 +546,81 @@ const broadcastSubs = new Map<
 function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
   let entry = broadcastSubs.get(topic);
   if (!entry) {
-    const channel = supabase.channel(topic);
-    const created = { channel, listeners: new Set<(p: PingPayload) => void>(), t0: performance.now(), joins: 0, status: "PENDING" };
-    channel
-      .on("broadcast", { event: "changed" }, (msg) => {
-        const payload = (msg?.payload ?? undefined) as PingPayload;
-        for (const l of created.listeners) {
-          try { l(payload); } catch { /* one bad listener must not break the rest */ }
-        }
-      })
-      .subscribe((status) => {
-        created.status = status;
-        /* kx-perf: realtime connection health. `scope` is the topic FAMILY
-           (e.g. "discuss:channel") — never an id. First SUBSCRIBED = join
-           time; later ones = automatic reconnects after a drop. */
-        try {
-          const scope = topic.split(":").slice(0, 2).join(":");
-          if (status === "SUBSCRIBED") {
-            created.joins += 1;
-            if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
-            else perfEvent("rt.reconnect", { scope });
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            perfEvent("rt.status", { s: status, scope });
+    const created = {
+      channel: null as unknown as ReturnType<typeof supabase.channel>,
+      listeners: new Set<(p: PingPayload) => void>(),
+      t0: performance.now(),
+      joins: 0,
+      status: "PENDING",
+      /* Self-healing state. Production telemetry showed a channel that hit
+         CHANNEL_ERROR / TIMED_OUT / CLOSED simply STAYED dead — nothing ever
+         re-subscribed, so isChannelStreamHealthy() reported unhealthy for the
+         rest of the session and Discuss limped along on the slow fallback
+         poll ("messages not received immediately"). Every terminal status now
+         schedules a rejoin with capped exponential backoff; `online` +
+         tab-visible events (below) trigger an immediate retry. */
+      retry: 0,
+      rejoinTimer: null as number | null,
+    };
+
+    const scope = topic.split(":").slice(0, 2).join(":");
+
+    const join = () => {
+      const channel = supabase.channel(topic);
+      created.channel = channel;
+      channel
+        .on("broadcast", { event: "changed" }, (msg) => {
+          const payload = (msg?.payload ?? undefined) as PingPayload;
+          for (const l of created.listeners) {
+            try { l(payload); } catch { /* one bad listener must not break the rest */ }
           }
-          perfRecord("rt.channels", broadcastSubs.size);
-        } catch { /* metrics never break realtime */ }
-      });
+        })
+        .subscribe((status) => {
+          /* A rejoin replaces created.channel; the OLD channel's teardown
+             fires a final CLOSED that must not clobber the fresh channel's
+             state or schedule spurious extra rejoins. */
+          if (created.channel !== channel) return;
+          created.status = status;
+          try {
+            if (status === "SUBSCRIBED") {
+              created.joins += 1;
+              created.retry = 0;
+              if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
+              else perfEvent("rt.reconnect", { scope });
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+              perfEvent("rt.status", { s: status, scope });
+            }
+            perfRecord("rt.channels", broadcastSubs.size);
+          } catch { /* metrics never break realtime */ }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            scheduleRejoin();
+          }
+        });
+    };
+
+    const scheduleRejoin = () => {
+      if (created.listeners.size === 0) return; // real teardown, not a drop
+      if (created.rejoinTimer != null) return;  // one pending rejoin at a time
+      const delay = Math.min(15_000, 1_000 * 2 ** created.retry) * (0.8 + Math.random() * 0.4);
+      created.retry += 1;
+      created.rejoinTimer = window.setTimeout(() => {
+        created.rejoinTimer = null;
+        if (created.listeners.size === 0) return;
+        try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
+        join();
+      }, delay);
+    };
+
+    /* Expose an immediate-retry hook for the global online/visible nudges. */
+    (created as unknown as { kick: () => void }).kick = () => {
+      if (created.status === "SUBSCRIBED" || created.listeners.size === 0) return;
+      if (created.rejoinTimer != null) { window.clearTimeout(created.rejoinTimer); created.rejoinTimer = null; }
+      created.retry = 0;
+      try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
+      join();
+    };
+
+    join();
     broadcastSubs.set(topic, created);
     entry = created;
   }
@@ -581,11 +630,27 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
     if (!e) return;
     e.listeners.delete(onPing);
     if (e.listeners.size === 0) {
+      const timer = (e as unknown as { rejoinTimer?: number | null }).rejoinTimer;
+      if (timer != null) window.clearTimeout(timer);
       try { supabase.removeChannel(e.channel); } catch { /* ignore */ }
       broadcastSubs.delete(topic);
       perfRecord("rt.channels", broadcastSubs.size);
     }
   };
+}
+
+/* Network back / tab woken up → any non-SUBSCRIBED topic retries immediately
+   instead of waiting out its backoff. Registered once per session. */
+if (typeof window !== "undefined") {
+  const kickAll = () => {
+    for (const e of broadcastSubs.values()) {
+      try { (e as unknown as { kick?: () => void }).kick?.(); } catch { /* ignore */ }
+    }
+  };
+  window.addEventListener("online", kickAll);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") kickAll();
+  });
 }
 
 /** The signed-in account id, resolved once from the session bootstrap and

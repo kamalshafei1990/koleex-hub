@@ -19,9 +19,6 @@ import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
-import UpdateWatcher from "@/components/pwa/UpdateWatcher";
-import PerfVitals from "@/components/perf/PerfVitals";
-import PerfPanelGate from "@/components/perf/PerfPanelGate";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
@@ -96,12 +93,6 @@ function isBypassed(pathname: string | null): boolean {
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const pathname = usePathname();
-  /* Prime the shared per-user bootstrap once at the top of the authenticated
-     shell, so the single GET /api/me/bootstrap starts deterministically here
-     instead of depending on which child (header / sidebar / page) mounts first.
-     Every consumer shares the same in-flight promise + 60s cache, so this adds
-     no extra request — it just fixes the trigger point (was a dead import). */
-  useMeBootstrap();
   /* The home launcher already lists every app grouped by category, so the
      persistent sidebar rail there is pure duplication. Hide it on "/" and
      reclaim the horizontal space (full-width launcher). Every inner route
@@ -194,13 +185,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}
       <ServiceWorkerRegistrar />
-      {/* Detects new deploys and offers a one-tap refresh (PWA cache-bust). */}
-      <UpdateWatcher />
-      {/* kx-perf bootstrap — cold/warm nav timings, long tasks, online/offline.
-          Renders nothing; see docs/performance/OBSERVABILITY_ARCHITECTURE.md. */}
-      <PerfVitals />
-      {/* Dev-only floating perf panel (zero bytes in production builds). */}
-      <PerfPanelGate />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
     </QAInspectorProvider>
