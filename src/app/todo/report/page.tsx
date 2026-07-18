@@ -16,6 +16,7 @@ import { getCurrentAccountIdSync } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -226,7 +227,7 @@ export default function TodoReportPage() {
                     const late = (r.completed || r.status === "done") && r.due_date && r.completed_at && r.completed_at.split("T")[0] > r.due_date.split("T")[0];
                     return (
                       <div key={r.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_90px_90px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface-subtle)] transition-colors">
-                        <span className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{r.title}</span>
+                        <AutoTranslatedText text={r.title} className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`} />
                         <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map((a) => a.full_name || a.username).join(", ") || "—"}</span>
                         <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
                         <span className={`text-[11.5px] ${late ? "text-red-400" : "text-[var(--text-muted)]"}`}>{fmtDate(r.due_date)}</span>

@@ -39,6 +39,7 @@ import TargetIcon from "@/components/icons/ui/TargetIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
@@ -768,13 +769,20 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
 
         {/* Content */}
         <div className="flex-1 min-w-0">
+          {/* Title + description auto-translate to the viewer's language so an
+              employee always reads an assigned task in a language they know
+              (one tap reveals the original). */}
           <p className={`text-[13px] font-medium leading-snug ${
             task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"
           }`}>
-            {task.title}
+            <AutoTranslatedText text={task.title} />
           </p>
           {task.description && (
-            <p className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-1">{task.description}</p>
+            <AutoTranslatedText
+              text={task.description}
+              block
+              className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-1"
+            />
           )}
 
           {/* Meta badges */}
@@ -882,7 +890,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-[var(--text-muted)]">{note.author_full_name || note.author_username}</span>
                 <span className="text-[var(--text-dim)] ml-2">{new Date(note.created_at).toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <p className="text-[var(--text-primary)] mt-0.5">{note.body}</p>
+                <AutoTranslatedText text={note.body} block className="text-[var(--text-primary)] mt-0.5" />
               </div>
               {note.author_account_id === currentAccountId && (
                 <button onClick={() => onDeleteNote(note.id)} className="text-[var(--text-dim)] hover:text-red-400 p-0.5 shrink-0">
