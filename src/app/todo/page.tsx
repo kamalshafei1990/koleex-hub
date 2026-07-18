@@ -40,6 +40,8 @@ import AwardIcon from "@/components/icons/ui/AwardIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
@@ -1705,9 +1707,10 @@ export default function TodoPage() {
             <div className="inline-flex rounded-lg border border-[var(--border-color)] overflow-hidden">
               {(["list", "board"] as const).map((v) => (
                 <button key={v} onClick={() => setViewMode(v)}
-                  className={`h-8 px-3 text-[11px] font-semibold transition-colors ${
+                  className={`h-8 px-3 text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
                     viewMode === v ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                   }`}>
+                  {v === "list" ? <LayoutListIcon size={13} /> : <LayoutGridIcon size={13} />}
                   {t("view." + v)}
                 </button>
               ))}
