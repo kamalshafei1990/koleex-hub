@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
@@ -106,6 +107,11 @@ export default function EventModal({
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  // Portal to <body> so the overlay is viewport-level (the calendar page sits
+  // inside a scroll container, which otherwise traps `position: fixed` and lets
+  // the app header paint over the modal's top). mounted guards SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   /* Attendees (invite people). Stored separately from the event row and
      persisted via the attendees endpoint after the event itself saves. */
@@ -257,9 +263,11 @@ export default function EventModal({
   const endDate = new Date(form.end_at);
   const color = form.color || EVENT_TYPE_COLORS[form.event_type];
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70"
       onClick={onClose}
     >
       <div
@@ -662,7 +670,8 @@ export default function EventModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
