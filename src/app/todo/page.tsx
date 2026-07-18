@@ -747,10 +747,12 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
 /* ══════════════════════════════════════════════════════════════
    TASK ROW — Compact row with assignee avatars, notes expand
    ══════════════════════════════════════════════════════════════ */
-function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId, selectMode = false, selected = false, onSelect }: {
+function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId, selectMode = false, selected = false, onSelect }: {
   task: TodoWithRelations;
   onToggle: () => void;
   onSetStatus: (status: TodoStatus) => void;
+  onApprove?: () => void;
+  onReopen?: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAddNote: (body: string) => void;
@@ -839,6 +841,11 @@ function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onD
                 <RefreshCwIcon size={9} /> {t("rec." + task.recurrence)}
               </span>
             )}
+            {task.approval_state === "pending" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                {t("approval.pending")}
+              </span>
+            )}
             {task.due_date && (
               <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${
                 overdue ? "text-red-400" : task.completed ? "text-[var(--text-dim)]" : "text-[var(--text-faint)]"
@@ -917,6 +924,28 @@ function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onD
       {/* Full detail panel — opens on row click */}
       {expanded && (
         <div className="px-4 pb-3 ml-8 space-y-3">
+          {/* Approval: the manager who assigned this sees Confirm / Reopen when
+              the assignee has submitted it for approval. */}
+          {task.approval_state === "pending" && task.assigned_by_account_id === currentAccountId && (
+            <div className="flex items-center gap-2 flex-wrap rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+              <span className="text-[11.5px] font-semibold text-amber-400 flex-1">{t("approval.awaitingYou")}</span>
+              <button onClick={onApprove}
+                className="h-7 px-3 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 text-[11px] font-semibold flex items-center gap-1">
+                <CheckCircleIcon size={12} /> {t("approval.confirm")}
+              </button>
+              <button onClick={onReopen}
+                className="h-7 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11px] font-semibold">
+                {t("approval.reopen")}
+              </button>
+            </div>
+          )}
+          {/* Assignee's own view while pending */}
+          {task.approval_state === "pending" && task.assigned_by_account_id !== currentAccountId && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11.5px] font-semibold text-amber-400">
+              {t("approval.submitted")}
+            </div>
+          )}
+
           {/* Full description (no line-clamp here) */}
           {task.description && (
             <div>
@@ -1265,6 +1294,25 @@ export default function TodoPage() {
 
   const handleToggle = async (id: string) => {
     const before = todos.find((t) => t.id === id);
+    if (!before) return;
+    const isDelegatedToMe = !!before.assigned_by_account_id && before.assigned_by_account_id !== accountId;
+
+    // Completing a task a manager delegated to me → submit for THEIR approval
+    // instead of marking it done outright (unless it was already approved).
+    if (!before.completed && isDelegatedToMe && before.approval_state !== "approved") {
+      setTodos((prev) => prev.map((t) => t.id === id ? { ...t, approval_state: "pending" } : t));
+      const ok = await updateTodo(id, { approval_state: "pending" });
+      if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
+      return;
+    }
+    // Toggling a still-pending submission back off → withdraw it.
+    if (before.approval_state === "pending") {
+      setTodos((prev) => prev.map((t) => t.id === id ? { ...t, approval_state: null } : t));
+      const ok = await updateTodo(id, { approval_state: null });
+      if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
+      return;
+    }
+
     setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed, completed_at: !t.completed ? new Date().toISOString() : null } : t));
     const ok = await toggleTodo(id);
     if (!ok && before) {
@@ -1272,6 +1320,23 @@ export default function TodoPage() {
       // never lies. (Previously the optimistic flip stuck even on failure.)
       setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: before.completed, completed_at: before.completed_at } : t));
     }
+  };
+
+  // Manager decisions on a submitted task.
+  const handleApprove = async (id: string) => {
+    const now = new Date().toISOString();
+    setTodos((prev) => prev.map((t) => t.id === id
+      ? { ...t, approval_state: "approved", completed: true, completed_at: now, status: "done", approved_by_account_id: accountId, approved_at: now }
+      : t));
+    await updateTodo(id, { approval_state: "approved", status: "done", approved_by_account_id: accountId, approved_at: now });
+    loadAll();
+  };
+  const handleReopen = async (id: string) => {
+    setTodos((prev) => prev.map((t) => t.id === id
+      ? { ...t, approval_state: "rejected", completed: false, completed_at: null, status: "in_progress" }
+      : t));
+    await updateTodo(id, { approval_state: "rejected", status: "in_progress" });
+    loadAll();
   };
 
   // Set a task's situation directly from the row (To do / In progress /
@@ -1511,6 +1576,8 @@ export default function TodoPage() {
       selectMode={selectMode} selected={selectedIds.has(t.id)} onSelect={() => toggleSelect(t.id)}
       onToggle={() => handleToggle(t.id)}
       onSetStatus={(s) => handleSetStatus(t.id, s)}
+      onApprove={() => handleApprove(t.id)}
+      onReopen={() => handleReopen(t.id)}
       onEdit={() => setModal({ open: true, entry: t })}
       onDelete={() => setDeleteModal({ open: true, task: t })}
       onAddNote={(body) => handleAddNote(t.id, body)}

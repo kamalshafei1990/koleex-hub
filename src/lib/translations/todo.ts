@@ -127,6 +127,13 @@ export const todoT: Translations = {
   "bulk.reassign":     { en: "Reassign to…",               zh: "重新分配给…",            ar: "إعادة الإسناد إلى…" },
   "bulk.delete":       { en: "Delete",                     zh: "删除",                   ar: "حذف" },
 
+  /* Approval loop */
+  "approval.pending":   { en: "Awaiting approval",         zh: "等待审批",               ar: "بانتظار الموافقة" },
+  "approval.submitted": { en: "Submitted — waiting for your manager to confirm.", zh: "已提交，等待经理确认。", ar: "تم الإرسال — بانتظار تأكيد مديرك." },
+  "approval.awaitingYou": { en: "Marked done — approve it?", zh: "已标记完成——是否批准？", ar: "تم وضع علامة كمنجز — هل توافق؟" },
+  "approval.confirm":   { en: "Confirm",                    zh: "确认",                   ar: "تأكيد" },
+  "approval.reopen":    { en: "Reopen",                     zh: "重新打开",               ar: "إعادة فتح" },
+
   /* Priority (medium was missing) */
   "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },
 

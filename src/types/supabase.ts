@@ -1880,6 +1880,11 @@ export interface TodoRow {
   recurrence_spawned_for: string | null;
   /** Phase C: optional last date to keep spawning (inclusive). */
   recurrence_until: string | null;
+  /** Approval loop: null = no approval needed; 'pending' = assignee marked
+      done, awaiting manager; 'approved' = confirmed; 'rejected' = reopened. */
+  approval_state: "pending" | "approved" | "rejected" | null;
+  approved_by_account_id: string | null;
+  approved_at: string | null;
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
   source: TodoSource;
