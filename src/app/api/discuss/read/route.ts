@@ -279,17 +279,45 @@ export async function GET(req: Request) {
           }
         }
 
-        const out = chanRows.map((ch) => ({
-          ...ch,
-          unread_count: unreadMap.get(ch.id) ?? 0,
-          last_read_at: readState.get(ch.id)?.last_read_at ?? null,
-          muted: readState.get(ch.id)?.muted ?? false,
-          notification_pref: readState.get(ch.id)?.notification_pref ?? "all",
-          other: otherByChannel.get(ch.id) ?? null,
-          linked_contact: contactByChannel.get(ch.id) ?? null,
-          last_message: lastByChannel.get(ch.id) ?? null,
-          has_draft: draftChannelIds.has(ch.id),
-        }));
+        const out = chanRows
+          /* Hidden ("removed from list"): drop the conversation UNLESS a newer
+             message arrived after it was hidden — then it resurfaces, exactly
+             like WeChat. Without this filter the sidebar menu's Hide action
+             wrote hidden_at but the list kept showing the chat. */
+          .filter((ch) => {
+            const hiddenAt = readState.get(ch.id)?.hidden_at;
+            if (!hiddenAt) return true;
+            const lastMs = ch.last_message_at ? new Date(ch.last_message_at).getTime() : 0;
+            const hidMs = new Date(hiddenAt).getTime();
+            return Number.isFinite(lastMs) && lastMs > hidMs;
+          })
+          .map((ch) => {
+            const st = readState.get(ch.id);
+            return {
+              ...ch,
+              unread_count: unreadMap.get(ch.id) ?? 0,
+              last_read_at: st?.last_read_at ?? null,
+              muted: st?.muted ?? false,
+              notification_pref: st?.notification_pref ?? "all",
+              pinned: !!st?.pinned_at,
+              pinned_at: st?.pinned_at ?? null,
+              marked_unread: st?.marked_unread ?? false,
+              other: otherByChannel.get(ch.id) ?? null,
+              linked_contact: contactByChannel.get(ch.id) ?? null,
+              last_message: lastByChannel.get(ch.id) ?? null,
+              has_draft: draftChannelIds.has(ch.id),
+            };
+          });
+        /* Pinned conversations float to the top of their group (most-recently
+           pinned first); everything else keeps last-message order. */
+        out.sort((a, b) => {
+          if (a.pinned && b.pinned) {
+            return new Date(b.pinned_at ?? 0).getTime() - new Date(a.pinned_at ?? 0).getTime();
+          }
+          if (a.pinned) return -1;
+          if (b.pinned) return 1;
+          return 0; // chanRows already ordered by last_message_at desc
+        });
         timing.mark("db");
         const { header } = timing.done({ resource: "myChannels", channels: out.length });
         return NextResponse.json({ ok: true, data: out }, { headers: { "Server-Timing": header } });
