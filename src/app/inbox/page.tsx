@@ -18,6 +18,7 @@ import { useScrollLock } from "@/hooks/useScrollLock";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
@@ -768,12 +769,14 @@ export default function InboxPage() {
                                   : "text-[var(--text-muted)]"
                               }`}
                             >
-                              {msg.subject}
+                              <AutoTranslatedText text={msg.subject} />
                             </div>
                             {msg.body && (
-                              <div className="text-[11.5px] text-[var(--text-dim)] mt-0.5 line-clamp-2 leading-snug">
-                                {msg.body}
-                              </div>
+                              <AutoTranslatedText
+                                text={msg.body}
+                                block
+                                className="text-[11.5px] text-[var(--text-dim)] mt-0.5 line-clamp-2 leading-snug"
+                              />
                             )}
                             <div className="flex items-center gap-1.5 mt-1.5">
                               {hasAttachments && (
@@ -1253,13 +1256,15 @@ function MessageDetail({
           </div>
 
           <h2 className="text-[24px] md:text-[28px] font-bold text-[var(--text-primary)] leading-tight tracking-tight mb-6">
-            {msg.subject}
+            <AutoTranslatedText text={msg.subject} />
           </h2>
 
           {msg.body && (
-            <div className="text-[14px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap break-words">
-              {msg.body}
-            </div>
+            <AutoTranslatedText
+              text={msg.body}
+              block
+              className="text-[14px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap break-words"
+            />
           )}
 
           {/* Attachments grid — Apple Mail shows inline thumbnails at

@@ -51,6 +51,7 @@ import {
 } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
   playNotificationSound,
   primeNotificationSound,
@@ -718,21 +719,24 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                                 {timeAgo(msg.created_at)}
                               </span>
                             </div>
+                            {/* Auto-translate the notification into the reader's
+                                language — a task assigned in English reaches an
+                                Arabic/Chinese employee readable. */}
                             <div
                               className={`text-[12.5px] font-semibold truncate ${
                                 dk ? "text-white" : "text-black"
                               }`}
                             >
-                              {msg.subject}
+                              <AutoTranslatedText text={msg.subject} />
                             </div>
                             {msg.body && (
-                              <div
+                              <AutoTranslatedText
+                                text={msg.body}
+                                block
                                 className={`text-[11.5px] mt-0.5 line-clamp-2 ${
                                   dk ? "text-white/55" : "text-black/55"
                                 }`}
-                              >
-                                {msg.body}
-                              </div>
+                              />
                             )}
                             <div
                               className={`text-[10.5px] mt-1 ${
