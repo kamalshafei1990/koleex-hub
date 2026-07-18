@@ -768,6 +768,11 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
                 <CheckSquareIcon size={9} /> {checkDone}/{checklist.length}
               </span>
             )}
+            {task.completed && task.due_date && task.completed_at && (
+              (task.completed_at.split("T")[0] <= task.due_date.split("T")[0])
+                ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded text-green-400 bg-green-500/10">{t("row.onTime")}</span>
+                : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded text-red-400 bg-red-500/10">{t("row.late")}</span>
+            )}
           </div>
 
           {/* Assignee avatars */}
@@ -940,6 +945,7 @@ export default function TodoPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [assignedToMe, setAssignedToMe] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
@@ -1093,6 +1099,8 @@ export default function TodoPage() {
 
     if (filter === "active") list = list.filter((t) => !t.completed);
     if (filter === "completed") list = list.filter((t) => t.completed);
+    // "Assigned to me" = someone else (an admin/manager) assigned it and it reached me.
+    if (assignedToMe) list = list.filter((t) => !!t.assigned_by_account_id && t.assigned_by_account_id !== accountId);
     if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
     if (statusFilter) list = list.filter((t) => t.status === statusFilter);
     if (labelFilter) list = list.filter((t) => t.label === labelFilter);
@@ -1125,7 +1133,7 @@ export default function TodoPage() {
     }
 
     return list;
-  }, [todos, search, filter, priorityFilter, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [todos, search, filter, priorityFilter, assignedToMe, accountId, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
     total: todos.length,
@@ -1206,6 +1214,12 @@ export default function TodoPage() {
               <span className="hidden md:inline">{t("filters")}</span>
               {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
             </button>
+            <Link href="/todo/report"
+              className="h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-all shrink-0 bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              title={t("report.link")}>
+              <BarChart3Icon size={14} />
+              <span className="hidden md:inline">{t("report.link")}</span>
+            </Link>
             <button onClick={() => setModal({ open: true, entry: null })}
               className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0">
               <PlusIcon size={16} />
@@ -1238,6 +1252,16 @@ export default function TodoPage() {
                 <FlagIcon size={10} /> {t("p." + p.value)}
               </button>
             ))}
+            <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+            {/* "Assigned to me" — tasks an admin/manager gave the user */}
+            <button onClick={() => setAssignedToMe((v) => !v)}
+              className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 whitespace-nowrap ${
+                assignedToMe
+                  ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                  : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+              }`}>
+              <UserCheckIcon size={11} /> {t("pill.assignedToMe")}
+            </button>
           </div>
 
           {/* Advanced filters panel */}

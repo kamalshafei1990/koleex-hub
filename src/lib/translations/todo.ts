@@ -88,6 +88,9 @@ export const todoT: Translations = {
 
   /* App chrome + filter pills */
   "app.subtitle":      { en: "Task management",            zh: "任务管理",               ar: "إدارة المهام" },
+  "pill.assignedToMe": { en: "Assigned to me",             zh: "分配给我",               ar: "مُسندة إليّ" },
+  "row.onTime":        { en: "On time",                    zh: "按时",                   ar: "في الوقت" },
+  "row.late":          { en: "Late",                       zh: "逾期完成",               ar: "متأخر" },
   "pill.all":          { en: "All",                        zh: "全部",                   ar: "الكل" },
   "pill.active":       { en: "Active",                     zh: "进行中",                 ar: "نشِطة" },
   "pill.done":         { en: "Done",                       zh: "已完成",                 ar: "منجزة" },
@@ -168,4 +171,26 @@ export const todoT: Translations = {
   /* Errors */
   "err.titleRequired": { en: "Title is required.",         zh: "标题为必填项。",         ar: "العنوان مطلوب." },
   "err.generic":       { en: "Something went wrong.",      zh: "出了点问题。",           ar: "حدث خطأ ما." },
+
+  /* Manager report */
+  "report.link":       { en: "Reports",                    zh: "报告",                   ar: "التقارير" },
+  "report.title":      { en: "Assignment Report",          zh: "任务分配报告",           ar: "تقرير المهام المُسندة" },
+  "report.subtitle":   { en: "What you assigned and how it's going",  zh: "你分配的任务及其进展", ar: "ما أسندته وحالة تنفيذه" },
+  "report.person":     { en: "Person",                     zh: "人员",                   ar: "الشخص" },
+  "report.everyone":   { en: "Everyone",                   zh: "所有人",                 ar: "الجميع" },
+  "report.period":     { en: "Period",                     zh: "周期",                   ar: "الفترة" },
+  "report.today":      { en: "Today",                      zh: "今天",                   ar: "اليوم" },
+  "report.week":       { en: "This week",                  zh: "本周",                   ar: "هذا الأسبوع" },
+  "report.month":      { en: "This month",                 zh: "本月",                   ar: "هذا الشهر" },
+  "report.custom":     { en: "Custom",                     zh: "自定义",                 ar: "مخصص" },
+  "report.assigned":   { en: "Assigned",                   zh: "已分配",                 ar: "مُسندة" },
+  "report.notStarted": { en: "Not started",                zh: "未开始",                 ar: "لم تبدأ" },
+  "report.onTimeRate": { en: "On-time",                    zh: "按时率",                 ar: "في الوقت" },
+  "report.export":     { en: "Export CSV",                 zh: "导出 CSV",               ar: "تصدير CSV" },
+  "report.empty":      { en: "No assigned tasks in this period",  zh: "此周期内没有分配的任务", ar: "لا مهام مُسندة في هذه الفترة" },
+  "report.emptyHint":  { en: "Assign a task from the To-do list to see it reported here.",  zh: "从待办列表分配任务后将在此显示。", ar: "أسند مهمة من قائمة المهام لتظهر هنا." },
+  "report.dueCol":     { en: "Due",                        zh: "截止",                   ar: "الاستحقاق" },
+  "report.doneCol":    { en: "Done",                       zh: "完成于",                 ar: "أُنجزت" },
+  "report.taskCol":    { en: "Task",                       zh: "任务",                   ar: "المهمة" },
+  "report.forCol":     { en: "For",                        zh: "分配给",                 ar: "لـ" },
 };
