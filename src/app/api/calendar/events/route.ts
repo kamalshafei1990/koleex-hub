@@ -142,7 +142,88 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ events: [...(data ?? []), ...planningMirror] });
+  // Mirror To-do items onto the Calendar. Read-only shadow — a task appears
+  // on its due date (or, when it also has a start date, as a start→due span)
+  // so tasks and events live in one view. Tasks the account CREATED or is
+  // ASSIGNED to are shown. Recurrence TEMPLATES are excluded — only their
+  // concrete spawned instances (and one-off tasks) surface, so the calendar
+  // isn't cluttered by the rule itself. Color encodes status: done = muted,
+  // overdue = danger, otherwise the action accent.
+  let todoMirror: unknown[] = [];
+  if (auth.tenant_id) {
+    const fromDate = from.slice(0, 10);
+    const toDate = to.slice(0, 10);
+
+    const { data: asg } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("todo_id")
+      .eq("account_id", accountId)
+      .limit(500);
+    const assignedIds = Array.from(
+      new Set((asg ?? []).map((a) => (a as { todo_id: string }).todo_id)),
+    ).slice(0, 400);
+
+    const orExpr = assignedIds.length
+      ? `created_by_account_id.eq.${accountId},id.in.(${assignedIds.join(",")})`
+      : `created_by_account_id.eq.${accountId}`;
+
+    const { data: todos } = await supabaseServer
+      .from("koleex_todos")
+      .select("id, title, due_date, start_date, priority, status, completed")
+      .eq("tenant_id", auth.tenant_id)
+      .is("recurrence", null)
+      .or(orExpr)
+      .limit(1000);
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const seen = new Set<string>();
+    todoMirror = (todos ?? [])
+      .map((t) => t as {
+        id: string;
+        title: string;
+        due_date: string | null;
+        start_date: string | null;
+        priority: string | null;
+        status: string | null;
+        completed: boolean;
+      })
+      .filter((t) => {
+        if (seen.has(t.id)) return false;
+        const s = t.start_date ?? t.due_date;
+        const e = t.due_date ?? t.start_date;
+        if (!s || !e) return false; // a task needs at least one date to place
+        if (!(s <= toDate && e >= fromDate)) return false; // overlaps the window
+        seen.add(t.id);
+        return true;
+      })
+      .map((t) => {
+        const s = (t.start_date ?? t.due_date) as string;
+        const e = (t.due_date ?? t.start_date) as string;
+        const overdue = !t.completed && e < todayStr;
+        const color = t.completed ? "#9AA0A6" : overdue ? "#FF3333" : "#0066FF";
+        return {
+          id: `todo:${t.id}`,
+          account_id: accountId,
+          tenant_id: auth.tenant_id,
+          title: t.title,
+          description: null,
+          location: null,
+          start_at: `${s}T00:00:00.000Z`,
+          end_at: `${e}T23:59:59.999Z`,
+          all_day: true,
+          color,
+          is_private: false,
+          event_type: "task",
+          source: "todo",
+          source_kind: t.completed ? "done" : overdue ? "overdue" : t.status ?? "todo",
+          todo_id: t.id,
+        };
+      });
+  }
+
+  return NextResponse.json({
+    events: [...(data ?? []), ...planningMirror, ...todoMirror],
+  });
 }
 
 /* POST /api/calendar/events — create a new event.

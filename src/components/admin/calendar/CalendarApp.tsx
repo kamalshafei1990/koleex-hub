@@ -278,6 +278,14 @@ export default function CalendarApp() {
   }
 
   function openEditEvent(e: CalendarEventRow) {
+    /* Mirrored items are read-only shadows of another module — they have no
+       real koleex_calendar_events row to edit. A To-do deep-links to its task
+       in the To-do app; other mirrors (Planning) are simply not editable. */
+    if (typeof e.id === "string" && e.id.startsWith("todo:")) {
+      window.location.assign(`/todo?task=${e.id.slice("todo:".length)}`);
+      return;
+    }
+    if (typeof e.id === "string" && e.id.includes(":")) return;
     setEditingEvent(e);
     setModalDraft({
       account_id: e.account_id,
