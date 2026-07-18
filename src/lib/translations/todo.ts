@@ -112,6 +112,21 @@ export const todoT: Translations = {
   "f.recurrenceForever": { en: "No end date",              zh: "无截止日期",             ar: "بدون تاريخ انتهاء" },
   "common.clear":      { en: "Clear",                      zh: "清除",                   ar: "مسح" },
 
+  /* View / sort / bulk */
+  "view.list":         { en: "List",                       zh: "列表",                   ar: "قائمة" },
+  "view.board":        { en: "Board",                      zh: "看板",                   ar: "لوحة" },
+  "sort.smart":        { en: "Smart",                      zh: "智能排序",               ar: "ذكي" },
+  "sort.due":          { en: "By due date",                zh: "按截止日期",             ar: "حسب الاستحقاق" },
+  "sort.priority":     { en: "By priority",                zh: "按优先级",               ar: "حسب الأولوية" },
+  "sort.created":      { en: "Newest",                     zh: "最新",                   ar: "الأحدث" },
+  "bulk.select":       { en: "Select",                     zh: "选择",                   ar: "تحديد" },
+  "bulk.cancel":       { en: "Cancel",                     zh: "取消",                   ar: "إلغاء" },
+  "bulk.selected":     { en: "selected",                   zh: "已选",                   ar: "محدد" },
+  "bulk.markDone":     { en: "Mark done",                  zh: "标记完成",               ar: "تحديد كمنجز" },
+  "bulk.setStatus":    { en: "Set status…",                zh: "设置状态…",              ar: "تعيين الحالة…" },
+  "bulk.reassign":     { en: "Reassign to…",               zh: "重新分配给…",            ar: "إعادة الإسناد إلى…" },
+  "bulk.delete":       { en: "Delete",                     zh: "删除",                   ar: "حذف" },
+
   /* Priority (medium was missing) */
   "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },
 

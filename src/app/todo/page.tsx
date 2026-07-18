@@ -747,7 +747,7 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
 /* ══════════════════════════════════════════════════════════════
    TASK ROW — Compact row with assignee avatars, notes expand
    ══════════════════════════════════════════════════════════════ */
-function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId }: {
+function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId, selectMode = false, selected = false, onSelect }: {
   task: TodoWithRelations;
   onToggle: () => void;
   onSetStatus: (status: TodoStatus) => void;
@@ -756,6 +756,9 @@ function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onD
   onAddNote: (body: string) => void;
   onDeleteNote: (noteId: string) => void;
   currentAccountId: string | null;
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const { t } = useTranslation(todoT);
   const priorityConfig = PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
@@ -773,8 +776,16 @@ function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onD
 
   return (
     <div className={`transition-all ${task.completed ? "opacity-50" : ""}`}>
-      <div className="group flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-all">
-        {/* Checkbox */}
+      <div className={`group flex items-start gap-3 px-4 py-3.5 transition-all ${selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+        {/* Bulk-select checkbox (only in select mode) */}
+        {selectMode && (
+          <button onClick={onSelect} className="mt-0.5 shrink-0" aria-label="select task">
+            {selected
+              ? <CheckSquareIcon size={20} className="text-blue-400" />
+              : <SquareIcon size={20} className="text-[var(--text-ghost)]" />}
+          </button>
+        )}
+        {/* Done checkbox */}
         <button onClick={onToggle} className="mt-0.5 shrink-0 transition-transform hover:scale-110">
           {task.completed ? (
             <CheckCircleIcon size={20} className="text-green-400" />
@@ -1007,6 +1018,77 @@ function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onD
 }
 
 /* ══════════════════════════════════════════════════════════════
+   BOARD (KANBAN) VIEW — columns by status; drag a card to change it
+   ══════════════════════════════════════════════════════════════ */
+function TodoBoard({ tasks, onSetStatus, t }: {
+  tasks: TodoWithRelations[];
+  onSetStatus: (id: string, status: TodoStatus) => void;
+  t: (key: string, fallback?: string) => string;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<TodoStatus | null>(null);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {STATUSES.map((col) => {
+        const colTasks = tasks.filter((task) => (task.status ?? "todo") === col.value);
+        return (
+          <div key={col.value}
+            onDragOver={(e) => { e.preventDefault(); setOverCol(col.value); }}
+            onDragLeave={() => setOverCol((c) => (c === col.value ? null : c))}
+            onDrop={() => { if (dragId) onSetStatus(dragId, col.value); setDragId(null); setOverCol(null); }}
+            className={`rounded-2xl border bg-[var(--bg-secondary)] p-2 min-h-[120px] transition-colors ${
+              overCol === col.value ? "border-[var(--border-focus)] bg-[var(--bg-surface-active)]" : "border-[var(--border-color)]"
+            }`}>
+            <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1">
+              <span className={`w-1.5 h-1.5 rounded-full ${col.dot}`} />
+              <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{t("st." + col.value)}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] bg-[var(--bg-surface)] rounded-full px-1.5 ml-auto">{colTasks.length}</span>
+            </div>
+            <div className="space-y-2">
+              {colTasks.map((task) => {
+                const pconfig = PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
+                const overdue = !task.completed && isOverdue(task.due_date);
+                return (
+                  <div key={task.id} draggable
+                    onDragStart={() => setDragId(task.id)}
+                    onDragEnd={() => { setDragId(null); setOverCol(null); }}
+                    className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5 cursor-grab active:cursor-grabbing hover:border-[var(--border-color)] transition-colors ${
+                      dragId === task.id ? "opacity-50" : ""
+                    }`}>
+                    <p className={`text-[12.5px] font-medium leading-snug ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
+                      <AutoTranslatedText text={task.title} />
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${pconfig.color}`}>
+                        <FlagIcon size={9} /> {t("p." + task.priority)}
+                      </span>
+                      {task.due_date && (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${overdue ? "text-red-400" : "text-[var(--text-faint)]"}`}>
+                          <ClockIcon size={9} /> {formatDate(task.due_date)}
+                        </span>
+                      )}
+                      {task.assignees.length > 0 && (
+                        <div className="flex -space-x-1 ml-auto">
+                          {task.assignees.slice(0, 3).map((a) => <MiniAvatar key={a.account_id} info={a} size={18} />)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {colTasks.length === 0 && (
+                <div className="text-center text-[11px] text-[var(--text-ghost)] py-4">—</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
    KPI DASHBOARD
    ══════════════════════════════════════════════════════════════ */
 function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
@@ -1106,6 +1188,11 @@ export default function TodoPage() {
   // to tasks due within today / this week / this month, matching how a user
   // keeps a daily/weekly/monthly to-do.
   const [cadenceView, setCadenceView] = useState<"all" | "day" | "week" | "month">("all");
+  // List vs. Board (Kanban) view; sort order; and bulk-select mode.
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [sortBy, setSortBy] = useState<"smart" | "due" | "priority" | "created">("smart");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
@@ -1198,6 +1285,33 @@ export default function TodoPage() {
       : t));
     const ok = await updateTodo(id, { status });
     if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
+  };
+
+  /* ── Bulk selection actions ── */
+  const toggleSelect = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => { setSelectedIds(new Set()); setSelectMode(false); };
+  const bulkStatus = async (status: TodoStatus) => {
+    const ids = [...selectedIds];
+    await Promise.all(ids.map((id) => updateTodo(id, { status })));
+    clearSelection();
+    loadAll();
+  };
+  const bulkDelete = async () => {
+    const ids = [...selectedIds];
+    await Promise.all(ids.map((id) => deleteTodo(id)));
+    clearSelection();
+    loadAll();
+  };
+  const bulkReassign = async (assigneeId: string) => {
+    if (!assigneeId) return;
+    const ids = [...selectedIds];
+    await Promise.all(ids.map((id) => updateTodo(id, {}, [assigneeId])));
+    clearSelection();
+    loadAll();
   };
 
   const handleDelete = async () => {
@@ -1356,6 +1470,26 @@ export default function TodoPage() {
     return { overdue: overdueList, today, upcoming, noDate, completed };
   }, [filtered]);
 
+  // Flat, explicitly-sorted list (used when the user picks a sort other than
+  // "smart", and to fill the Board columns).
+  const sortedFlat = useMemo(() => {
+    const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const arr = [...filtered];
+    if (sortBy === "priority") {
+      arr.sort((a, b) => (rank[a.priority] ?? 9) - (rank[b.priority] ?? 9));
+    } else if (sortBy === "due") {
+      arr.sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1; // undated last
+        if (!b.due_date) return -1;
+        return a.due_date.localeCompare(b.due_date);
+      });
+    } else if (sortBy === "created") {
+      arr.sort((a, b) => b.created_at.localeCompare(a.created_at)); // newest first
+    }
+    return arr;
+  }, [filtered, sortBy]);
+
   // Unique assignees for filter dropdown
   const uniqueAssignees = useMemo(() => {
     const map = new Map<string, TodoAssigneeInfo>();
@@ -1369,6 +1503,19 @@ export default function TodoPage() {
   }, [todos]);
 
   const hasActiveFilters = statusFilter || labelFilter || deptFilter || assigneeFilter || dateFrom || dateTo;
+
+  // One place that builds a task row, so List + Board + sorted views stay in
+  // sync (and bulk-select props are threaded once).
+  const renderRow = (t: TodoWithRelations) => (
+    <TaskRow key={t.id} task={t} currentAccountId={accountId}
+      selectMode={selectMode} selected={selectedIds.has(t.id)} onSelect={() => toggleSelect(t.id)}
+      onToggle={() => handleToggle(t.id)}
+      onSetStatus={(s) => handleSetStatus(t.id, s)}
+      onEdit={() => setModal({ open: true, entry: t })}
+      onDelete={() => setDeleteModal({ open: true, task: t })}
+      onAddNote={(body) => handleAddNote(t.id, body)}
+      onDeleteNote={handleDeleteNote} />
+  );
 
   return (
     <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -1485,6 +1632,66 @@ export default function TodoPage() {
             ))}
           </div>
 
+          {/* View · Sort · Select controls */}
+          <div className="flex items-center gap-2 pb-3 flex-wrap">
+            {/* List / Board */}
+            <div className="inline-flex rounded-lg border border-[var(--border-color)] overflow-hidden">
+              {(["list", "board"] as const).map((v) => (
+                <button key={v} onClick={() => setViewMode(v)}
+                  className={`h-8 px-3 text-[11px] font-semibold transition-colors ${
+                    viewMode === v ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  }`}>
+                  {t("view." + v)}
+                </button>
+              ))}
+            </div>
+            {/* Sort */}
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none">
+              <option value="smart">{t("sort.smart")}</option>
+              <option value="due">{t("sort.due")}</option>
+              <option value="priority">{t("sort.priority")}</option>
+              <option value="created">{t("sort.created")}</option>
+            </select>
+            {/* Select mode */}
+            <button onClick={() => { setSelectMode((v) => !v); setSelectedIds(new Set()); }}
+              className={`h-8 px-3 rounded-lg border text-[11px] font-semibold transition-colors ${
+                selectMode ? "bg-blue-500/10 border-blue-500/30 text-blue-400" : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              }`}>
+              {selectMode ? t("bulk.cancel") : t("bulk.select")}
+            </button>
+          </div>
+
+          {/* Bulk action bar */}
+          {selectMode && selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 pb-3 flex-wrap">
+              <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+                {selectedIds.size} {t("bulk.selected")}
+              </span>
+              <div className="w-px h-4 bg-[var(--border-subtle)]" />
+              <button onClick={() => bulkStatus("done")}
+                className="h-8 px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-[11px] font-semibold flex items-center gap-1.5">
+                <CheckCircleIcon size={13} /> {t("bulk.markDone")}
+              </button>
+              <select onChange={(e) => { if (e.target.value) { bulkStatus(e.target.value as TodoStatus); e.target.value = ""; } }} defaultValue=""
+                className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none">
+                <option value="" disabled>{t("bulk.setStatus")}</option>
+                {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("st." + s.value)}</option>)}
+              </select>
+              {employees.length > 0 && (
+                <select onChange={(e) => { if (e.target.value) { bulkReassign(e.target.value); e.target.value = ""; } }} defaultValue=""
+                  className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none max-w-[160px]">
+                  <option value="" disabled>{t("bulk.reassign")}</option>
+                  {employees.map((emp) => <option key={emp.account_id} value={emp.account_id}>{emp.full_name || emp.username}</option>)}
+                </select>
+              )}
+              <button onClick={bulkDelete}
+                className="h-8 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-semibold flex items-center gap-1.5">
+                <TrashIcon size={13} /> {t("bulk.delete")}
+              </button>
+            </div>
+          )}
+
           {/* Advanced filters panel */}
           {showFilters && (
             <div className="pb-3 space-y-2">
@@ -1575,71 +1782,38 @@ export default function TodoPage() {
               </button>
             )}
           </div>
+        ) : viewMode === "board" ? (
+          <TodoBoard tasks={sortedFlat} onSetStatus={handleSetStatus} t={t} />
+        ) : sortBy !== "smart" ? (
+          /* Flat, explicitly-sorted list */
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+            {sortedFlat.map(renderRow)}
+          </div>
         ) : (
           <div className="space-y-3">
             {grouped.overdue.length > 0 && (
               <Section title={t("section.overdue")} count={grouped.overdue.length} color="text-red-400">
-                {grouped.overdue.map((t) => (
-                  <TaskRow key={t.id} task={t} currentAccountId={accountId}
-                    onToggle={() => handleToggle(t.id)}
-                    onSetStatus={(s) => handleSetStatus(t.id, s)}
-                    onEdit={() => setModal({ open: true, entry: t })}
-                    onDelete={() => setDeleteModal({ open: true, task: t })}
-                    onAddNote={(body) => handleAddNote(t.id, body)}
-                    onDeleteNote={handleDeleteNote} />
-                ))}
+                {grouped.overdue.map(renderRow)}
               </Section>
             )}
             {grouped.today.length > 0 && (
               <Section title={t("section.today")} count={grouped.today.length} color="text-green-400">
-                {grouped.today.map((t) => (
-                  <TaskRow key={t.id} task={t} currentAccountId={accountId}
-                    onToggle={() => handleToggle(t.id)}
-                    onSetStatus={(s) => handleSetStatus(t.id, s)}
-                    onEdit={() => setModal({ open: true, entry: t })}
-                    onDelete={() => setDeleteModal({ open: true, task: t })}
-                    onAddNote={(body) => handleAddNote(t.id, body)}
-                    onDeleteNote={handleDeleteNote} />
-                ))}
+                {grouped.today.map(renderRow)}
               </Section>
             )}
             {grouped.upcoming.length > 0 && (
               <Section title={t("section.upcoming")} count={grouped.upcoming.length} color="text-blue-400">
-                {grouped.upcoming.map((t) => (
-                  <TaskRow key={t.id} task={t} currentAccountId={accountId}
-                    onToggle={() => handleToggle(t.id)}
-                    onSetStatus={(s) => handleSetStatus(t.id, s)}
-                    onEdit={() => setModal({ open: true, entry: t })}
-                    onDelete={() => setDeleteModal({ open: true, task: t })}
-                    onAddNote={(body) => handleAddNote(t.id, body)}
-                    onDeleteNote={handleDeleteNote} />
-                ))}
+                {grouped.upcoming.map(renderRow)}
               </Section>
             )}
             {grouped.noDate.length > 0 && (
               <Section title={t("section.noDate")} count={grouped.noDate.length} color="text-[var(--text-faint)]">
-                {grouped.noDate.map((t) => (
-                  <TaskRow key={t.id} task={t} currentAccountId={accountId}
-                    onToggle={() => handleToggle(t.id)}
-                    onSetStatus={(s) => handleSetStatus(t.id, s)}
-                    onEdit={() => setModal({ open: true, entry: t })}
-                    onDelete={() => setDeleteModal({ open: true, task: t })}
-                    onAddNote={(body) => handleAddNote(t.id, body)}
-                    onDeleteNote={handleDeleteNote} />
-                ))}
+                {grouped.noDate.map(renderRow)}
               </Section>
             )}
             {grouped.completed.length > 0 && (
               <Section title={t("section.completed")} count={grouped.completed.length} color="text-[var(--text-dim)]">
-                {grouped.completed.map((t) => (
-                  <TaskRow key={t.id} task={t} currentAccountId={accountId}
-                    onToggle={() => handleToggle(t.id)}
-                    onSetStatus={(s) => handleSetStatus(t.id, s)}
-                    onEdit={() => setModal({ open: true, entry: t })}
-                    onDelete={() => setDeleteModal({ open: true, task: t })}
-                    onAddNote={(body) => handleAddNote(t.id, body)}
-                    onDeleteNote={handleDeleteNote} />
-                ))}
+                {grouped.completed.map(renderRow)}
               </Section>
             )}
           </div>
