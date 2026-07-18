@@ -747,9 +747,10 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
 /* ══════════════════════════════════════════════════════════════
    TASK ROW — Compact row with assignee avatars, notes expand
    ══════════════════════════════════════════════════════════════ */
-function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId }: {
+function TaskRow({ task, onToggle, onSetStatus, onEdit, onDelete, onAddNote, onDeleteNote, currentAccountId }: {
   task: TodoWithRelations;
   onToggle: () => void;
+  onSetStatus: (status: TodoStatus) => void;
   onEdit: () => void;
   onDelete: () => void;
   onAddNote: (body: string) => void;
@@ -913,10 +914,28 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
             </div>
           )}
 
-          {/* Key fields — only the ones that are set */}
+          {/* Situation / status — set it directly here (To do / In progress /
+              Blocked / Done), no need to open the edit form. */}
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-1.5">{t("f.status")}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {STATUSES.map((s) => (
+                <button key={s.value} type="button"
+                  onClick={(e) => { e.stopPropagation(); onSetStatus(s.value); }}
+                  className={`h-8 rounded-lg text-[11px] font-semibold transition-all border flex items-center justify-center gap-1.5 ${
+                    task.status === s.value
+                      ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                  }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} /> {t("st." + s.value)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Other key fields — only the ones that are set */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
             {[
-              { label: t("f.status"), value: t("st." + task.status) },
               task.start_date ? { label: t("f.startDate"), value: fmtDetailDate(task.start_date) } : null,
               task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date) } : null,
               task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at) } : null,
@@ -1166,6 +1185,19 @@ export default function TodoPage() {
       // never lies. (Previously the optimistic flip stuck even on failure.)
       setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: before.completed, completed_at: before.completed_at } : t));
     }
+  };
+
+  // Set a task's situation directly from the row (To do / In progress /
+  // Blocked / Done) — keeps completed in lockstep, optimistic with rollback.
+  const handleSetStatus = async (id: string, status: TodoStatus) => {
+    const before = todos.find((t) => t.id === id);
+    if (!before || before.status === status) return;
+    const done = status === "done";
+    setTodos((prev) => prev.map((t) => t.id === id
+      ? { ...t, status, completed: done, completed_at: done ? new Date().toISOString() : null }
+      : t));
+    const ok = await updateTodo(id, { status });
+    if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
   };
 
   const handleDelete = async () => {
@@ -1550,6 +1582,7 @@ export default function TodoPage() {
                 {grouped.overdue.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
+                    onSetStatus={(s) => handleSetStatus(t.id, s)}
                     onEdit={() => setModal({ open: true, entry: t })}
                     onDelete={() => setDeleteModal({ open: true, task: t })}
                     onAddNote={(body) => handleAddNote(t.id, body)}
@@ -1562,6 +1595,7 @@ export default function TodoPage() {
                 {grouped.today.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
+                    onSetStatus={(s) => handleSetStatus(t.id, s)}
                     onEdit={() => setModal({ open: true, entry: t })}
                     onDelete={() => setDeleteModal({ open: true, task: t })}
                     onAddNote={(body) => handleAddNote(t.id, body)}
@@ -1574,6 +1608,7 @@ export default function TodoPage() {
                 {grouped.upcoming.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
+                    onSetStatus={(s) => handleSetStatus(t.id, s)}
                     onEdit={() => setModal({ open: true, entry: t })}
                     onDelete={() => setDeleteModal({ open: true, task: t })}
                     onAddNote={(body) => handleAddNote(t.id, body)}
@@ -1586,6 +1621,7 @@ export default function TodoPage() {
                 {grouped.noDate.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
+                    onSetStatus={(s) => handleSetStatus(t.id, s)}
                     onEdit={() => setModal({ open: true, entry: t })}
                     onDelete={() => setDeleteModal({ open: true, task: t })}
                     onAddNote={(body) => handleAddNote(t.id, body)}
@@ -1598,6 +1634,7 @@ export default function TodoPage() {
                 {grouped.completed.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
+                    onSetStatus={(s) => handleSetStatus(t.id, s)}
                     onEdit={() => setModal({ open: true, entry: t })}
                     onDelete={() => setDeleteModal({ open: true, task: t })}
                     onAddNote={(body) => handleAddNote(t.id, body)}
