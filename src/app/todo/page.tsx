@@ -109,6 +109,20 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString("en", { month: "short", day: "numeric" });
 }
 
+/* Absolute date / date-time for the expanded task detail panel. */
+function fmtDetailDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
+}
+function fmtDetailDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function isOverdue(dueDate: string | null): boolean {
   if (!dueDate) return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
@@ -768,15 +782,20 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           )}
         </button>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Content — clicking anywhere here opens the task's full details
+            (the "show original" translation links stopPropagation, so they
+            don't toggle it). */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded((v) => !v)}
+          role="button" tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((v) => !v); } }}>
           {/* Title + description auto-translate to the viewer's language so an
               employee always reads an assigned task in a language they know
               (one tap reveals the original). */}
-          <p className={`text-[13px] font-medium leading-snug ${
+          <p className={`text-[13px] font-medium leading-snug flex items-start gap-1.5 ${
             task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"
           }`}>
-            <AutoTranslatedText text={task.title} />
+            <AngleDownIcon size={13} className={`mt-0.5 shrink-0 text-[var(--text-dim)] transition-transform ${expanded ? "rotate-180" : ""}`} />
+            <span className="flex-1"><AutoTranslatedText text={task.title} /></span>
           </p>
           {task.description && (
             <AutoTranslatedText
@@ -883,9 +902,57 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
         </div>
       </div>
 
-      {/* Notes expansion */}
+      {/* Full detail panel — opens on row click */}
       {expanded && (
-        <div className="px-4 pb-3 ml-8 space-y-2">
+        <div className="px-4 pb-3 ml-8 space-y-3">
+          {/* Full description (no line-clamp here) */}
+          {task.description && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-1">{t("f.description")}</div>
+              <AutoTranslatedText text={task.description} block className="text-[12.5px] text-[var(--text-primary)] leading-relaxed" />
+            </div>
+          )}
+
+          {/* Key fields — only the ones that are set */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+            {[
+              { label: t("f.status"), value: t("st." + task.status) },
+              task.start_date ? { label: t("f.startDate"), value: fmtDetailDate(task.start_date) } : null,
+              task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date) } : null,
+              task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at) } : null,
+              task.recurrence ? { label: t("f.recurrence"), value: t("rec." + task.recurrence) } : null,
+              task.label ? { label: t("f.label"), value: task.label } : null,
+            ].filter(Boolean).map((f, i) => (
+              <div key={i}>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{f!.label}</div>
+                <div className="text-[12px] text-[var(--text-primary)] mt-0.5">{f!.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Checklist / subtasks */}
+          {checklist.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-1.5">
+                {t("checklist.title")} · {checkDone}/{checklist.length}
+              </div>
+              <div className="space-y-1">
+                {checklist.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 text-[12px]">
+                    {c.done
+                      ? <CheckSquareIcon size={13} className="text-green-400 shrink-0" />
+                      : <SquareIcon size={13} className="text-[var(--text-dim)] shrink-0" />}
+                    <span className={c.done ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}>
+                      <AutoTranslatedText text={c.text} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes / comments */}
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)] pt-1">{t("common.notes")}</div>
           {task.notes.map((note) => (
             <div key={note.id} className="flex items-start gap-2 text-[12px]">
               <div className="w-5 h-5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[8px] font-bold text-[var(--text-dim)] shrink-0 mt-0.5">
