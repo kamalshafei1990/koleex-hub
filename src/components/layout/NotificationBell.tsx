@@ -52,6 +52,7 @@ import {
 } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
   playNotificationSound,
   primeNotificationSound,
@@ -168,7 +169,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   /* Discuss unread is derived from the channel list so it stays in
      sync with the dropdown rows the user actually sees. */
   const discussUnread = discussChannels.reduce(
-    (acc, c) => acc + (c.unread_count ?? 0),
+    (acc, c) =>
+      acc +
+      (c.unread_count ?? 0) +
+      /* Manually "marked as unread" (WeChat-style dot, no count) counts as 1
+         so the bell stays in lock-step with the home-tile badge. */
+      (c.marked_unread && !c.unread_count ? 1 : 0),
     0,
   );
   const totalUnread = discussUnread + inboxUnread;
@@ -724,21 +730,24 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                                 {timeAgo(msg.created_at)}
                               </span>
                             </div>
+                            {/* Auto-translate the notification into the reader's
+                                language — a task assigned in English reaches an
+                                Arabic/Chinese employee readable. */}
                             <div
                               className={`text-[12.5px] font-semibold truncate ${
                                 dk ? "text-white" : "text-black"
                               }`}
                             >
-                              {msg.subject}
+                              <AutoTranslatedText text={msg.subject} />
                             </div>
                             {msg.body && (
-                              <div
+                              <AutoTranslatedText
+                                text={msg.body}
+                                block
                                 className={`text-[11.5px] mt-0.5 line-clamp-2 ${
                                   dk ? "text-white/55" : "text-black/55"
                                 }`}
-                              >
-                                {msg.body}
-                              </div>
+                              />
                             )}
                             <div
                               className={`text-[10.5px] mt-1 ${

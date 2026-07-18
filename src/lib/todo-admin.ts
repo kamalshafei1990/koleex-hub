@@ -219,6 +219,11 @@ export async function createTodo(input: {
   priority?: "high" | "medium" | "low";
   label?: string | null;
   due_date?: string | null;
+  start_date?: string | null;
+  remind_at?: string | null;
+  status?: "todo" | "in_progress" | "blocked" | "done";
+  recurrence?: "daily" | "weekly" | "monthly" | null;
+  recurrence_until?: string | null;
   created_by_account_id?: string | null;
   assigned_by_account_id?: string | null;
   source?: "manual" | "crm" | "calendar";
@@ -240,6 +245,11 @@ export async function createTodo(input: {
         priority: input.priority,
         label: input.label,
         due_date: input.due_date,
+        start_date: input.start_date,
+        remind_at: input.remind_at,
+        status: input.status,
+        recurrence: input.recurrence,
+        recurrence_until: input.recurrence_until,
         source: input.source,
         source_id: input.source_id,
         assignee_account_ids: input.assignee_account_ids,
@@ -613,35 +623,48 @@ export function subscribeToTodos(
   onChange: (row: TodoRow) => void,
   onDelete: (oldRow: { id: string }) => void,
 ): () => void {
-  const topic = `todos-live-${Date.now()}`;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  let disposed = false;
 
-  const channel = supabase
-    .channel(topic)
-    .on(
-      "postgres_changes" as never,
-      { event: "INSERT", schema: "public", table: "koleex_todos" },
-      (payload: { new: TodoRow }) => onInsert(payload.new),
-    )
-    .on(
-      "postgres_changes" as never,
-      { event: "UPDATE", schema: "public", table: "koleex_todos" },
-      (payload: { new: TodoRow }) => onChange(payload.new),
-    )
-    .on(
-      "postgres_changes" as never,
-      { event: "DELETE", schema: "public", table: "koleex_todos" },
-      (payload: { old: { id: string } }) => onDelete(payload.old),
-    )
-    .subscribe((status: string) => {
-      if (status === "CHANNEL_ERROR") {
-        setTimeout(() => {
-          channel.unsubscribe();
-          supabase.channel(topic).subscribe();
-        }, 3000);
-      }
-    });
+  /* Build a fully-wired channel. On CHANNEL_ERROR the previous code created a
+     bare `supabase.channel(topic).subscribe()` with NO handlers (and never
+     reassigned it) — so after any transient error, live updates stopped and
+     the dead channel leaked. Rebuild the whole subscription instead. */
+  const build = () => {
+    if (disposed) return;
+    const topic = `todos-live-${Date.now()}`;
+    channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes" as never,
+        { event: "INSERT", schema: "public", table: "koleex_todos" },
+        (payload: { new: TodoRow }) => onInsert(payload.new),
+      )
+      .on(
+        "postgres_changes" as never,
+        { event: "UPDATE", schema: "public", table: "koleex_todos" },
+        (payload: { new: TodoRow }) => onChange(payload.new),
+      )
+      .on(
+        "postgres_changes" as never,
+        { event: "DELETE", schema: "public", table: "koleex_todos" },
+        (payload: { old: { id: string } }) => onDelete(payload.old),
+      )
+      .subscribe((status: string) => {
+        if (status === "CHANNEL_ERROR" && !disposed) {
+          setTimeout(() => {
+            if (disposed || !channel) return;
+            void supabase.removeChannel(channel);
+            build();
+          }, 3000);
+        }
+      });
+  };
+
+  build();
 
   return () => {
-    channel.unsubscribe();
+    disposed = true;
+    if (channel) void supabase.removeChannel(channel);
   };
 }

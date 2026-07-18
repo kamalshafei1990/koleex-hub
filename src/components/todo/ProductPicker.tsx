@@ -9,6 +9,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { todoT } from "@/lib/translations/todo";
 import type { TodoProductRef, ProductRow, DivisionRow, CategoryRow } from "@/types/supabase";
 import { fetchProducts, fetchDivisions, fetchCategories, fetchClassificationIcons } from "@/lib/products-admin";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -117,6 +119,7 @@ export default function ProductPicker({
   onToggle: (ref: TodoProductRef) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(todoT);
   const [products, setProducts] = useState<Pick[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -224,9 +227,9 @@ export default function ProductPicker({
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 md:px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
             <PackageIcon className="h-4 w-4 text-[var(--text-dim)]" />
-            <span className="text-[14px] font-semibold text-[var(--text-primary)]">Link products</span>
+            <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("extras.linkProducts")}</span>
             {selectedIds.length > 0 && (
-              <span className="text-[11px] font-semibold text-[var(--accent)]">{selectedIds.length} selected</span>
+              <span className="text-[11px] font-semibold text-[var(--accent)]">{selectedIds.length} {t("picker.selectedWord")}</span>
             )}
           </div>
           <button onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)]">
@@ -241,7 +244,7 @@ export default function ProductPicker({
             <input
               autoFocus
               className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
-              placeholder="Search by name or code…"
+              placeholder={t("picker.search")}
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -250,9 +253,9 @@ export default function ProductPicker({
             value={div}
             onChange={(v) => { setDiv(v); setCat(""); }}
             options={divisionOpts}
-            allLabel="All divisions"
+            allLabel={t("picker.allDivisions")}
           />
-          <IconSelect value={cat} onChange={setCat} options={categoryOpts} allLabel="All categories" />
+          <IconSelect value={cat} onChange={setCat} options={categoryOpts} allLabel={t("picker.allCategories")} />
         </div>
 
         {/* Grid */}
@@ -262,7 +265,7 @@ export default function ProductPicker({
               <SpinnerIcon className="h-5 w-5 animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No products match.</p>
+            <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">{t("picker.noMatch")}</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filtered.map((p) => {
@@ -312,9 +315,9 @@ export default function ProductPicker({
 
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between px-4 md:px-5 py-3 border-t border-[var(--border-subtle)]">
-          <span className="text-[11px] text-[var(--text-ghost)]">{loading ? "" : `${filtered.length} product${filtered.length === 1 ? "" : "s"}`}</span>
+          <span className="text-[11px] text-[var(--text-ghost)]">{loading ? "" : `${filtered.length} ${t("picker.productsWord")}`}</span>
           <button onClick={onClose} className="h-9 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90">
-            Done
+            {t("common.done")}
           </button>
         </div>
       </div>

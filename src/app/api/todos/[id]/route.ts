@@ -70,6 +70,29 @@ export async function PATCH(
   delete updates.created_at;
   updates.updated_at = new Date().toISOString();
 
+  // Keep completed/completed_at in lockstep with an explicit status change.
+  if (typeof updates.status === "string") {
+    const done = updates.status === "done";
+    updates.completed = done;
+    updates.completed_at = done ? new Date().toISOString() : null;
+  }
+
+  /* Mention-notify: if this edit sets metadata.mentions, capture the prior set
+     first so we only ping people newly added (not on every save). */
+  const nextMentions = (updates.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions;
+  let priorMentionIds: string[] = [];
+  if (Array.isArray(nextMentions)) {
+    const { data: prev } = await supabaseServer
+      .from("koleex_todos")
+      .select("metadata")
+      .eq("id", id)
+      .maybeSingle();
+    const pm = (prev as { metadata?: { mentions?: Array<{ account_id?: string }> } } | null)?.metadata?.mentions;
+    priorMentionIds = Array.isArray(pm)
+      ? (pm.map((m) => m.account_id).filter(Boolean) as string[])
+      : [];
+  }
+
   const { error } = await supabaseServer
     .from("koleex_todos")
     .update(updates)
@@ -129,6 +152,33 @@ export async function PATCH(
         },
       }));
       await supabaseServer.from("inbox_messages").insert(notifs);
+    }
+  }
+
+  // Notify newly-added @mentions (excluding self + anyone already mentioned).
+  if (Array.isArray(nextMentions)) {
+    const prior = new Set(priorMentionIds);
+    const added = Array.from(
+      new Set(nextMentions.map((m) => m.account_id).filter(Boolean) as string[]),
+    ).filter((mid) => mid !== auth.account_id && !prior.has(mid));
+    if (added.length > 0) {
+      const { data: t } = await supabaseServer
+        .from("koleex_todos")
+        .select("title, description")
+        .eq("id", id)
+        .maybeSingle();
+      const td = (t as { title?: string; description?: string | null } | null) ?? {};
+      await supabaseServer.from("inbox_messages").insert(
+        added.map((recipientId) => ({
+          recipient_account_id: recipientId,
+          sender_account_id: auth.account_id,
+          category: "task",
+          subject: `You were mentioned: ${td.title ?? "Task"}`,
+          body: td.description || td.title || "You were mentioned on a task.",
+          link: `/todo?task=${id}`,
+          metadata: { type: "todo_mention", todo_id: id },
+        })),
+      );
     }
   }
 

@@ -12,6 +12,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { todoT } from "@/lib/translations/todo";
 import type {
   TodoMetadata,
   TodoAttachment,
@@ -40,6 +42,7 @@ export default function TaskExtras({
   onChange: (next: TodoMetadata) => void;
   employees: TodoAssigneeInfo[];
 }) {
+  const { t } = useTranslation(todoT);
   const attachments = value.attachments ?? [];
   const mentions = value.mentions ?? [];
   const products = value.products ?? [];
@@ -58,7 +61,7 @@ export default function TaskExtras({
     const res = await fetch("/api/todos/upload", { method: "POST", credentials: "include", body: fd });
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(j.error || "Upload failed");
+      throw new Error(j.error || t("extras.uploadFailed"));
     }
     const j = (await res.json()) as { attachment: TodoAttachment };
     return j.attachment;
@@ -73,7 +76,7 @@ export default function TaskExtras({
       for (const f of files) added.push(await uploadOne(f, f.name));
       patch({ attachments: [...attachments, ...added] });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Upload failed");
+      setErr(e instanceof Error ? e.message : t("extras.uploadFailed"));
     } finally {
       setBusy(false);
     }
@@ -104,7 +107,7 @@ export default function TaskExtras({
     };
     const md = navigator.mediaDevices as DisplayMedia | undefined;
     if (!md || typeof md.getDisplayMedia !== "function") {
-      setErr("Screen capture isn't supported in this browser.");
+      setErr(t("extras.captureUnsupported"));
       return;
     }
     let stream: MediaStream | null = null;
@@ -171,16 +174,16 @@ export default function TaskExtras({
     <div className="space-y-4" onPaste={onPaste}>
       {/* ── Attachments ── */}
       <div>
-        <label className={lbl}>Attachments</label>
+        <label className={lbl}>{t("extras.attachments")}</label>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => fileRef.current?.click()} className={actionBtn} disabled={busy}>
-            <PaperclipIcon className="h-4 w-4" /> Attach file
+            <PaperclipIcon className="h-4 w-4" /> {t("extras.attachFile")}
           </button>
           <button type="button" onClick={captureScreen} className={actionBtn} disabled={busy}>
-            <CameraIcon className="h-4 w-4" /> Capture screen
+            <CameraIcon className="h-4 w-4" /> {t("extras.captureScreen")}
           </button>
           {busy && <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />}
-          <span className="text-[10.5px] text-[var(--text-ghost)]">or paste an image (⌘/Ctrl+V)</span>
+          <span className="text-[10.5px] text-[var(--text-ghost)]">{t("extras.pasteHint")}</span>
           <input
             ref={fileRef}
             type="file"
@@ -208,7 +211,7 @@ export default function TaskExtras({
                   type="button"
                   onClick={() => removeAttachment(a.path)}
                   className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-[#FF3333] text-white inline-flex items-center justify-center shadow"
-                  aria-label={`Remove ${a.name}`}
+                  aria-label={t("common.remove")}
                 >
                   <CrossIcon className="h-3 w-3" />
                 </button>
@@ -220,10 +223,10 @@ export default function TaskExtras({
 
       {/* ── Mentions ── */}
       <div>
-        <label className={lbl}>Mention people</label>
+        <label className={lbl}>{t("extras.mention")}</label>
         <div className="relative">
           <AtSignIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input className={miniInput} placeholder="Search to mention…" value={mq} onChange={(e) => setMq(e.target.value)} />
+          <input className={miniInput} placeholder={t("extras.mentionSearch")} value={mq} onChange={(e) => setMq(e.target.value)} />
           {mq && mentionable.length > 0 && (
             <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
               {mentionable.map((e) => (
@@ -240,7 +243,7 @@ export default function TaskExtras({
             {mentions.map((m) => (
               <span key={m.account_id} className={chip}>
                 @{m.full_name || m.username}
-                <button type="button" onClick={() => removeMention(m.account_id)} className={chipX} aria-label="Remove mention">
+                <button type="button" onClick={() => removeMention(m.account_id)} className={chipX} aria-label={t("common.remove")}>
                   <CrossIcon className="h-3 w-3" />
                 </button>
               </span>
@@ -251,9 +254,9 @@ export default function TaskExtras({
 
       {/* ── Products ── */}
       <div>
-        <label className={lbl}>Link products</label>
+        <label className={lbl}>{t("extras.linkProducts")}</label>
         <button type="button" onClick={() => setPickerOpen(true)} className={actionBtn}>
-          <PackageIcon className="h-4 w-4" /> Browse products
+          <PackageIcon className="h-4 w-4" /> {t("extras.browseProducts")}
         </button>
         {products.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -262,7 +265,7 @@ export default function TaskExtras({
                 <PackageIcon className="h-3 w-3 text-[var(--text-dim)]" />
                 {p.name}
                 {p.code && <span className="text-[10.5px] text-[var(--text-ghost)]">· {p.code}</span>}
-                <button type="button" onClick={() => removeProduct(p.id)} className={chipX} aria-label="Remove product">
+                <button type="button" onClick={() => removeProduct(p.id)} className={chipX} aria-label={t("common.remove")}>
                   <CrossIcon className="h-3 w-3" />
                 </button>
               </span>

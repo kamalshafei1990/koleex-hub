@@ -3,9 +3,7 @@
     "hnd1"
   ],
   "crons": [
-    {
-      "path": "/api/cron/fx-refresh",
-      "schedule": "0 6 * * *"
-    }
+    { "path": "/api/cron/fx-refresh", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/todo-reminders", "schedule": "* * * * *" }
   ]
 }

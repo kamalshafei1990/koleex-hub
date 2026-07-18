@@ -1542,6 +1542,12 @@ export interface DiscussChannelWithState extends DiscussChannelRow {
   last_read_at: string | null;
   muted: boolean;
   notification_pref: DiscussNotificationPref;
+  /** WeChat-style per-user conversation state (sidebar right-click menu).
+   *  `pinned` floats the row to the top of its group; `marked_unread` shows
+   *  an unread dot even when there are no new messages. */
+  pinned?: boolean;
+  pinned_at?: string | null;
+  marked_unread?: boolean;
   /** For direct channels, the OTHER account (not the current user).
    *  Null for group/channel kinds. */
   other: DiscussAuthor | null;
@@ -1910,6 +1916,10 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
 export type TodoSource = "manual" | "crm" | "calendar";
 export type TodoPriority = "high" | "medium" | "low";
 
+/** Workflow stage for a task (Phase 2). */
+export type TodoStatus = "todo" | "in_progress" | "blocked" | "done";
+/** Phase C: recurring-task cadence. null = a one-off task. */
+export type TodoRecurrence = "daily" | "weekly" | "monthly" | null;
 export interface TodoRow {
   id: string;
   title: string;
@@ -1918,6 +1928,26 @@ export interface TodoRow {
   priority: TodoPriority;
   label: string | null;
   due_date: string | null;
+  /** Phase 2: when work should begin. */
+  start_date: string | null;
+  /** Phase 2: when to fire a reminder (ISO timestamptz). */
+  remind_at: string | null;
+  /** Phase 2: workflow stage; kept in sync with `completed`. */
+  status: TodoStatus;
+  /** Phase C: recurrence cadence. null = one-off task. On the template row
+      this is set; spawned instances carry null (they are plain tasks). */
+  recurrence: TodoRecurrence;
+  /** Phase C: on a spawned instance, points back to the recurring template. */
+  recurrence_parent_id: string | null;
+  /** Phase C: the period-start date this instance was generated for (dedup). */
+  recurrence_spawned_for: string | null;
+  /** Phase C: optional last date to keep spawning (inclusive). */
+  recurrence_until: string | null;
+  /** Approval loop: null = no approval needed; 'pending' = assignee marked
+      done, awaiting manager; 'approved' = confirmed; 'rejected' = reopened. */
+  approval_state: "pending" | "approved" | "rejected" | null;
+  approved_by_account_id: string | null;
+  approved_at: string | null;
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
   source: TodoSource;
@@ -1951,10 +1981,17 @@ export interface TodoProductRef {
   name: string;
   code?: string | null;
 }
+/** A single checklist/subtask item on a task. */
+export interface TodoChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 export interface TodoMetadata {
   attachments?: TodoAttachment[];
   mentions?: TodoMention[];
   products?: TodoProductRef[];
+  checklist?: TodoChecklistItem[];
   [key: string]: unknown;
 }
 export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;

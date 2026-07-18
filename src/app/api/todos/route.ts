@@ -222,6 +222,11 @@ export async function POST(req: Request) {
     priority?: "high" | "medium" | "low";
     label?: string | null;
     due_date?: string | null;
+    start_date?: string | null;
+    remind_at?: string | null;
+    status?: "todo" | "in_progress" | "blocked" | "done";
+    recurrence?: "daily" | "weekly" | "monthly" | null;
+    recurrence_until?: string | null;
     source?: "manual" | "crm" | "calendar";
     source_id?: string | null;
     assignee_account_ids?: string[];
@@ -231,16 +236,30 @@ export async function POST(req: Request) {
     metadata?: Record<string, unknown>;
   };
 
+  const status = body.status ?? "todo";
+  const recurrence =
+    body.recurrence === "daily" || body.recurrence === "weekly" || body.recurrence === "monthly"
+      ? body.recurrence
+      : null;
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
       title: body.title,
       metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
       description: body.description ?? null,
-      completed: false,
+      // Keep completed in lockstep with the workflow stage.
+      completed: status === "done",
+      completed_at: status === "done" ? new Date().toISOString() : null,
+      status,
       priority: body.priority ?? "medium",
       label: body.label ?? null,
       due_date: body.due_date ?? null,
+      start_date: body.start_date ?? null,
+      remind_at: body.remind_at ?? null,
+      // Phase C: this row becomes the recurring template. Instances are
+      // spawned by the cron and carry recurrence=null.
+      recurrence,
+      recurrence_until: recurrence ? body.recurrence_until ?? null : null,
       created_by_account_id: auth.account_id,
       assigned_by_account_id: auth.account_id,
       source: body.source ?? "manual",
@@ -313,6 +332,29 @@ export async function POST(req: Request) {
       }));
       await supabaseServer.from("inbox_messages").insert(notifs);
     }
+  }
+
+  // Notify @mentioned people (metadata.mentions) — excluding self and anyone
+  // already notified as an assignee, so nobody gets a double ping.
+  const mentionIds = Array.isArray((body.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions)
+    ? ((body.metadata as { mentions: Array<{ account_id?: string }> }).mentions)
+        .map((m) => m.account_id)
+        .filter(Boolean) as string[]
+    : [];
+  const alreadyNotified = new Set<string>([auth.account_id, ...assigneeIds]);
+  const mentionRecipients = Array.from(new Set(mentionIds)).filter((id) => !alreadyNotified.has(id));
+  if (mentionRecipients.length > 0) {
+    await supabaseServer.from("inbox_messages").insert(
+      mentionRecipients.map((recipientId) => ({
+        recipient_account_id: recipientId,
+        sender_account_id: auth.account_id,
+        category: "task",
+        subject: `You were mentioned: ${body.title}`,
+        body: body.description || body.title,
+        link: `/todo?task=${(todo as { id: string }).id}`,
+        metadata: { type: "todo_mention", todo_id: (todo as { id: string }).id },
+      })),
+    );
   }
 
   return NextResponse.json({ todo });
