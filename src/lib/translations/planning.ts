@@ -21,6 +21,21 @@ export const planningT: Translations = {
   "tab.openShifts":    { en: "Open Shifts",      zh: "空闲班次",           ar: "المناوبات المفتوحة" },
   "tab.myPlanning":    { en: "My Planning",      zh: "我的计划",           ar: "تخطيطي" },
   "tab.configuration": { en: "Configuration",    zh: "配置",              ar: "الإعدادات" },
+  /* Utilization tab + conflicts + leave (Phase 3) */
+  "tab.utilization":     { en: "Utilization",       zh: "利用率",             ar: "معدل الاستغلال" },
+  "util.title":          { en: "This week — scheduled vs capacity (Mon–Fri)", zh: "本周——已排班 vs 产能（周一至周五）", ar: "هذا الأسبوع — المجدول مقابل السعة (الاثنين–الجمعة)" },
+  "util.of":             { en: "of",                zh: "／共",               ar: "من" },
+  "util.billable":       { en: "billable",          zh: "可计费",             ar: "قابل للفوترة" },
+  "util.empty":          { en: "Add employee resources in Configuration to see utilization.", zh: "在“配置”中添加员工资源以查看利用率。", ar: "أضف موارد الموظفين في الإعدادات لعرض معدل الاستغلال." },
+  "sched.conflictWarn":  { en: "Double-booked:",    zh: "重复排班：",          ar: "حجز مزدوج:" },
+  "sched.conflictWarnTail": { en: "items overlap on the same resource this week — highlighted in red.", zh: "个班次本周在同一资源上重叠——已用红色标出。", ar: "عناصر متداخلة على نفس المورد هذا الأسبوع — مميزة بالأحمر." },
+  "sched.onLeave":       { en: "On leave",          zh: "休假中",             ar: "في إجازة" },
+
+  /* Entity picker (shared combobox) */
+  "picker.searchPh":     { en: "Search…",           zh: "搜索…",              ar: "بحث…" },
+  "picker.typeToSearch": { en: "Type to search…",   zh: "输入以搜索…",         ar: "اكتب للبحث…" },
+  "picker.noMatches":    { en: "No matches",        zh: "无匹配结果",          ar: "لا نتائج مطابقة" },
+  "picker.clear":        { en: "Clear selection",   zh: "清除选择",            ar: "مسح التحديد" },
 
   /* Schedule toolbar */
   "sched.today":       { en: "Today",            zh: "今天",              ar: "اليوم" },

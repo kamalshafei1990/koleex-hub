@@ -503,18 +503,22 @@ export async function fetchAccounts(): Promise<AccountLite[]> {
 
 /* ── Helpers ──────────────────────────────────────── */
 
-export function formatDueDate(iso: string | null): string {
+export function formatDueDate(
+  iso: string | null,
+  lang: string = "en",
+  labels?: { today: string; tomorrow: string; yesterday: string },
+): string {
   if (!iso) return "";
   const d = new Date(iso);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Tomorrow";
-  if (diff === -1) return "Yesterday";
-  if (diff > 1 && diff <= 6) return d.toLocaleDateString("en", { weekday: "long" });
-  return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+  if (diff === 0) return labels?.today ?? "Today";
+  if (diff === 1) return labels?.tomorrow ?? "Tomorrow";
+  if (diff === -1) return labels?.yesterday ?? "Yesterday";
+  if (diff > 1 && diff <= 6) return d.toLocaleDateString(lang, { weekday: "long" });
+  return d.toLocaleDateString(lang, { month: "short", day: "numeric" });
 }
 
 export function isOverdue(iso: string | null): boolean {

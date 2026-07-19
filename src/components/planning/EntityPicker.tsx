@@ -14,6 +14,8 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { searchEntities, type EntitySearchResult } from "@/lib/planning";
+import { useTranslation } from "@/lib/i18n";
+import { planningT } from "@/lib/translations/planning";
 
 type EntityType = "customer" | "supplier" | "contact" | "product";
 
@@ -30,6 +32,7 @@ export default function EntityPicker({
   onChange: (id: string | null, label: string | null) => void;
   placeholder?: string;
 }) {
+  const { t } = useTranslation(planningT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,7 +87,7 @@ export default function EntityPicker({
             type="button"
             onClick={clear}
             className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
-            aria-label="Clear selection"
+            aria-label={t("picker.clear")}
           >
             <CrossIcon size={12} />
           </button>
@@ -96,7 +99,7 @@ export default function EntityPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setOpen(true)}
-            placeholder={placeholder ?? "Search…"}
+            placeholder={placeholder ?? t("picker.searchPh")}
             className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
           />
           {loading && (
@@ -109,7 +112,7 @@ export default function EntityPicker({
         <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl max-h-64 overflow-y-auto">
           {results.length === 0 && !loading && (
             <div className="px-3 py-2 text-[12px] text-[var(--text-dim)]">
-              {query.trim() ? "No matches" : "Start typing to search"}
+              {query.trim() ? t("picker.noMatches") : t("picker.typeToSearch")}
             </div>
           )}
           {results.map((r) => (

@@ -115,4 +115,56 @@ export const projectsT: Translations = {
   /* Tooltips */
   "tip.rename":        { en: "Rename",              zh: "重命名",            ar: "إعادة تسمية" },
   "tip.favourite":     { en: "Toggle favourite",    zh: "切换收藏",          ar: "تبديل التفضيل" },
+  /* Views + filters */
+  "view.board":          { en: "Board",             zh: "看板",              ar: "لوحة" },
+  "view.list":           { en: "List",              zh: "列表",              ar: "قائمة" },
+  "filter.overdue":      { en: "Overdue",           zh: "逾期",              ar: "متأخرة" },
+  "action.duplicate":    { en: "Duplicate project", zh: "复制项目",          ar: "تكرار المشروع" },
+
+  /* Project form — sections, budget, billing, templates */
+  "form.section.clientTeam":     { en: "Client & team",     zh: "客户与团队",  ar: "العميل والفريق" },
+  "form.section.scheduleBudget": { en: "Schedule & budget", zh: "排期与预算",  ar: "الجدول والميزانية" },
+  "form.budgetAmount":   { en: "Budget amount",     zh: "预算金额",          ar: "مبلغ الميزانية" },
+  "form.billingRate":    { en: "Billing rate / hour", zh: "计费费率／小时",   ar: "سعر الفوترة / ساعة" },
+  "form.billableHint":   { en: "Bill logged time to the customer", zh: "将已记录时间向客户计费", ar: "فوترة الوقت المسجل للعميل" },
+  "form.isTemplate":     { en: "Template",          zh: "模板",              ar: "قالب" },
+  "form.isTemplateHint": { en: "Save as a reusable template — hidden from project lists, offered when creating new projects", zh: "保存为可复用模板——不会显示在项目列表中，新建项目时可选用", ar: "احفظه كقالب قابل لإعادة الاستخدام — يُخفى من قوائم المشاريع ويُقترح عند إنشاء مشاريع جديدة" },
+  "form.template":       { en: "Start from template", zh: "从模板开始",       ar: "البدء من قالب" },
+  "form.template.blank": { en: "Blank project",     zh: "空白项目",          ar: "مشروع فارغ" },
+  "form.template.hint":  { en: "Stages and the task checklist will be copied from this template.", zh: "将从该模板复制阶段和任务清单。", ar: "سيتم نسخ المراحل وقائمة المهام من هذا القالب." },
+
+  /* Billing action */
+  "bill.btn":            { en: "Invoice time",      zh: "时间开票",          ar: "فوترة الوقت" },
+  "bill.tip":            { en: "Invoice all unbilled logged time (uses the project's billing rate)", zh: "为所有未开票的已记录时间开票（使用项目的计费费率）", ar: "فوترة كل الوقت المسجل غير المفوتر (باستخدام سعر الفوترة للمشروع)" },
+  "bill.confirm":        { en: "Create a draft invoice for all unbilled logged time on this project?", zh: "为该项目所有未开票的已记录时间创建发票草稿？", ar: "إنشاء مسودة فاتورة لكل الوقت المسجل غير المفوتر في هذا المشروع؟" },
+
+  /* Task workspace */
+  "task.searchPh":       { en: "Search tasks…",     zh: "搜索任务…",         ar: "ابحث في المهام…" },
+  "task.unassigned":     { en: "Unassigned",        zh: "未分配",            ar: "غير مسندة" },
+  "task.blockedBy":      { en: "Blocked by",        zh: "受阻于",            ar: "محظورة بسبب" },
+  "task.schedule":       { en: "Schedule in Planning", zh: "排入计划",        ar: "جدولة في التخطيط" },
+  "task.scheduling":     { en: "Scheduling…",       zh: "排期中…",           ar: "جارٍ الجدولة…" },
+  "task.viewPlanning":   { en: "View in Planning",  zh: "在计划中查看",       ar: "عرض في التخطيط" },
+  "task.tab.details":    { en: "Details",           zh: "详情",              ar: "التفاصيل" },
+  "task.tab.subtasks":   { en: "Subtasks",          zh: "子任务",            ar: "المهام الفرعية" },
+  "task.tab.checklist":  { en: "Checklist",         zh: "清单",              ar: "قائمة التحقق" },
+  "task.tab.comments":   { en: "Comments",          zh: "评论",              ar: "التعليقات" },
+  "task.tab.time":       { en: "Time",              zh: "时间",              ar: "الوقت" },
+  "task.tab.files":      { en: "Files",             zh: "文件",              ar: "الملفات" },
+
+  /* Linked-entity types */
+  "entity.customer":     { en: "Customer",          zh: "客户",              ar: "عميل" },
+  "entity.supplier":     { en: "Supplier",          zh: "供应商",            ar: "مورد" },
+  "entity.contact":      { en: "Contact",           zh: "联系人",            ar: "جهة اتصال" },
+  "entity.product":      { en: "Product",           zh: "产品",              ar: "منتج" },
+
+  /* Reporting + config */
+  "report.byProject":    { en: "Project progress",  zh: "项目进度",          ar: "تقدم المشاريع" },
+  "report.dueThisWeek":  { en: "Due this week",     zh: "本周到期",          ar: "مستحقة هذا الأسبوع" },
+  "cfg.tags.empty":      { en: "No tags yet — add your first above.", zh: "暂无标签——请在上方添加第一个。", ar: "لا توجد علامات بعد — أضف الأولى أعلاه." },
+
+  /* Relative dates */
+  "date.today":          { en: "Today",             zh: "今天",              ar: "اليوم" },
+  "date.tomorrow":       { en: "Tomorrow",          zh: "明天",              ar: "غدًا" },
+  "date.yesterday":      { en: "Yesterday",         zh: "昨天",              ar: "أمس" },
 };

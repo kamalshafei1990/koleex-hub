@@ -232,4 +232,7 @@ export const todoT: Translations = {
   "report.doneCol":    { en: "Done",                       zh: "完成于",                 ar: "أُنجزت" },
   "report.taskCol":    { en: "Task",                       zh: "任务",                   ar: "المهمة" },
   "report.forCol":     { en: "For",                        zh: "分配给",                 ar: "لـ" },
+  /* My Work strip */
+  "mywork.tasks":    { en: "My project tasks",          zh: "我的项目任务",       ar: "مهام مشاريعي" },
+  "mywork.schedule": { en: "My schedule — next 7 days", zh: "我的排班——未来7天",  ar: "جدولي — الأيام السبعة القادمة" },
 };

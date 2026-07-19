@@ -185,6 +185,8 @@ export default function ProjectsApp() {
    ACCOUNT PICKER — assignee / manager selector (shared)
    ══════════════════════════════════════════════════════════════════ */
 
+const dueLabels = (t: (k: string) => string) => ({ today: t("date.today"), tomorrow: t("date.tomorrow"), yesterday: t("date.yesterday") });
+
 function AccountSelect({
   value,
   onChange,
@@ -443,7 +445,7 @@ function ProjectDetailView({
   onBack: () => void;
   reloadTags: () => void;
 }) {
-  const { t } = useTranslation(projectsT);
+  const { t, lang } = useTranslation(projectsT);
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [stages, setStages] = useState<ProjectStage[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
@@ -689,7 +691,7 @@ function ProjectDetailView({
                     ) : (
                       cellTasks.map((tk) => {
                         const overdue = isOverdue(tk.due_date) && tk.status === "open";
-                        const due = formatDueDate(tk.due_date);
+                        const due = formatDueDate(tk.due_date, lang, dueLabels(t));
                         return (
                           <div
                             key={tk.id}
@@ -912,7 +914,8 @@ function TaskCard({
   tags: ProjectTag[];
   onClick: () => void;
 }) {
-  const dueLabel = formatDueDate(task.due_date);
+  const { t, lang } = useTranslation(projectsT);
+  const dueLabel = formatDueDate(task.due_date, lang, dueLabels(t));
   const overdue = isOverdue(task.due_date) && task.status === "open";
   const blocked = task.status === "open" && (task.blocked_by_task_ids?.length ?? 0) > 0;
   const color = PRIORITY_COLOR[task.priority];
@@ -1147,7 +1150,8 @@ function FlatTaskRow({
   onClick: () => void;
   onToggleStatus: (next: TaskStatus) => void;
 }) {
-  const dueLabel = formatDueDate(task.due_date);
+  const { t, lang } = useTranslation(projectsT);
+  const dueLabel = formatDueDate(task.due_date, lang, dueLabels(t));
   const overdue = isOverdue(task.due_date) && task.status === "open";
   const blocked = task.status === "open" && (task.blocked_by_task_ids?.length ?? 0) > 0;
   const color = PRIORITY_COLOR[task.priority];
@@ -2074,10 +2078,10 @@ function TaskFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2">
             <select value={linkedType} onChange={(e) => { setLinkedType(e.target.value); setLinkedId(null); setLinkedLabel(""); }} className="h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px]">
               <option value="">{t("task.linked")}</option>
-              <option value="customer">Customer</option>
-              <option value="supplier">Supplier</option>
-              <option value="contact">Contact</option>
-              <option value="product">Product</option>
+              <option value="customer">{t("entity.customer")}</option>
+              <option value="supplier">{t("entity.supplier")}</option>
+              <option value="contact">{t("entity.contact")}</option>
+              <option value="product">{t("entity.product")}</option>
             </select>
             {linkedType === "customer" || linkedType === "supplier" || linkedType === "contact" || linkedType === "product" ? (
               <EntityPicker

@@ -256,12 +256,12 @@ export default function PlanningApp() {
           {/* Brand-aligned tile menu + search — same across every Hub app */}
           <AppHomeMenu
             navItems={[
-              { key: "schedule",  onClick: () => setTab("schedule"), icon: "calendar",     label: "Schedule"      },
-              { key: "open",      onClick: () => setTab("open"),     icon: "paper-plane",  label: "Open Shifts"   },
-              { key: "mine",      onClick: () => setTab("mine"),     icon: "clock",        label: "My Planning"   },
-              { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: "New" },
-              { key: "utilization", onClick: () => setTab("utilization"), icon: "clock", label: "Utilization" },
-              { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: "Configuration" },
+              { key: "schedule",  onClick: () => setTab("schedule"), icon: "calendar",     label: t("tab.schedule")      },
+              { key: "open",      onClick: () => setTab("open"),     icon: "paper-plane",  label: t("tab.openShifts")   },
+              { key: "mine",      onClick: () => setTab("mine"),     icon: "clock",        label: t("tab.myPlanning")   },
+              { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: t("action.new") },
+              { key: "utilization", onClick: () => setTab("utilization"), icon: "clock", label: t("tab.utilization") },
+              { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: t("tab.configuration") },
             ]}
             searchPlaceholder={searchPlaceholder}
           />
@@ -394,7 +394,7 @@ function ScheduleView({
 }) {
   // Track the cell currently under the dragged pointer so we can style it.
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const { t } = useTranslation(planningT);
+  const { t, lang } = useTranslation(planningT);
   const [groupBy, setGroupBy] = useState<"resource" | "role">("resource");
   const [resourceType, setResourceType] = useState<PlanningResourceType | "all">("all");
 
@@ -495,7 +495,7 @@ function ScheduleView({
             .map((r) => ({ id: r.id, name: r.name, sub: null, color: r.color })),
         ];
 
-  const rangeLabel = `${weekStart.toLocaleDateString("en", { month: "short", day: "numeric" })} – ${addDays(weekStart, 6).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}`;
+  const rangeLabel = `${weekStart.toLocaleDateString(lang, { month: "short", day: "numeric" })} – ${addDays(weekStart, 6).toLocaleDateString(lang, { month: "short", day: "numeric", year: "numeric" })}`;
 
   // Mobile-only: which day is currently in focus. Defaults to today if
   // it's inside the current week, otherwise the first day of the week.
@@ -605,7 +605,7 @@ function ScheduleView({
                 }`}
               >
                 <div className="text-[9px] font-bold uppercase tracking-wider">
-                  {d.toLocaleDateString("en", { weekday: "short" })}
+                  {d.toLocaleDateString(lang, { weekday: "short" })}
                 </div>
                 <div className="text-[14px] font-bold leading-tight">
                   {d.getDate()}
@@ -700,7 +700,7 @@ function ScheduleView({
                 }`}
               >
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-                  {d.toLocaleDateString("en", { weekday: "short" })}
+                  {d.toLocaleDateString(lang, { weekday: "short" })}
                 </div>
                 <div
                   className={`text-[15px] font-bold ${
@@ -814,10 +814,10 @@ function MobileItemRow({
   onClick: (i: PlanningItem) => void;
   conflict?: boolean;
 }) {
-  const { t } = useTranslation(planningT);
+  const { t, lang } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+    new Date(iso).toLocaleTimeString(lang, { hour: "numeric", minute: "2-digit" });
   const isDraft = item.status === "draft";
   return (
     <button
@@ -855,12 +855,12 @@ function ItemPill({
   draggable?: boolean;
   conflict?: boolean;
 }) {
-  const { t } = useTranslation(planningT);
+  const { t, lang } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
   const start = new Date(item.start_at);
   const end = new Date(item.end_at);
   const fmt = (d: Date) =>
-    d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+    d.toLocaleTimeString(lang, { hour: "numeric", minute: "2-digit" });
   const isDraft = item.status === "draft";
   return (
     <div

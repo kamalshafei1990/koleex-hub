@@ -10,6 +10,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import { useTranslation } from "@/lib/i18n";
+import { todoT } from "@/lib/translations/todo";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 
 interface WorkTask {
@@ -28,6 +30,7 @@ interface WorkShift {
 }
 
 export default function MyWorkStrip() {
+  const { t, lang } = useTranslation(todoT);
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [tasksCount, setTasksCount] = useState(0);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
@@ -66,9 +69,9 @@ export default function MyWorkStrip() {
 
   const today = new Date().toISOString().slice(0, 10);
   const fmtDay = (iso: string) =>
-    new Date(iso).toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" });
+    new Date(iso).toLocaleDateString(lang, { weekday: "short", month: "short", day: "numeric" });
   const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+    new Date(iso).toLocaleTimeString(lang, { hour: "numeric", minute: "2-digit" });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3">
@@ -76,7 +79,7 @@ export default function MyWorkStrip() {
         <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3">
           <Link href="/projects" className="flex items-center gap-1.5 mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             <BriefcaseIcon size={12} />
-            My project tasks
+            {t("mywork.tasks")}
             <span className="ml-auto font-semibold normal-case tracking-normal">{tasksCount}</span>
           </Link>
           <div className="space-y-1">
@@ -101,7 +104,7 @@ export default function MyWorkStrip() {
         <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3">
           <Link href="/planning" className="flex items-center gap-1.5 mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             <ClockIcon size={12} />
-            My schedule — next 7 days
+            {t("mywork.schedule")}
             <span className="ml-auto font-semibold normal-case tracking-normal">{shiftsCount}</span>
           </Link>
           <div className="space-y-1">
