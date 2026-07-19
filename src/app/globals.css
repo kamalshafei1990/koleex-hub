@@ -159,23 +159,13 @@ body {
 
 /* ── iOS zoom guard ──
    iOS Safari auto-zooms on any input/textarea/select with font-size
-   smaller than 16px. We force all form controls below the md
-   breakpoint to 16px. At md+ (≥768px, desktop) we release the rule
-   so existing compact UIs don't get oversized text.
-
-   `screen and` is critical: without it, this rule ALSO fires during
-   print/Save-as-PDF on mobile (Safari renders the print pipeline at
-   the phone's CSS viewport width, so `max-width: 767px` matches) and
-   blows up every textarea in the quotation preview to 16px, breaking
-   the doc layout. Scoping to `screen` keeps the iOS zoom fix on the
-   editor but lets @media print render at the inline doc sizes. */
-@media screen and (max-width: 767px) {
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
-  }
-}
+   smaller than 16px. That is prevented at the VIEWPORT level
+   (layout.tsx: maximumScale 1 + userScalable false), so form controls
+   render at their designed sizes on phones. The old belt-and-suspenders
+   rule that forced every control to `16px !important` below md is gone
+   on purpose — it inflated every field on mobile far beyond the design
+   (13px inputs rendered 16px) across all apps. Do NOT reintroduce it;
+   if a control ever zooms on focus, fix the viewport meta instead. */
 
 /* Safe-area helpers so fixed chat composers don't sit under the
    home-indicator on iPhone. */
