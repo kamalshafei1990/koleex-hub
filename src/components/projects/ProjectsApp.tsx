@@ -1737,7 +1737,7 @@ function ProjectFormModal({
             </Field>
           </div>
           <Field label={t("form.description")}>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
           </Field>
           <div className="pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-faint)]">
             {t("form.section.clientTeam", "Client & team")}
@@ -2043,7 +2043,7 @@ function TaskFormModal({
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("task.namePh")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
           </Field>
           <Field label={t("task.description")}>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

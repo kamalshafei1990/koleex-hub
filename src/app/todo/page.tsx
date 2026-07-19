@@ -482,7 +482,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           <div>
             <label className={lbl}>{t("f.description")} <span className="font-normal normal-case">(optional)</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("f.description.placeholder")} rows={2} className={inp + " h-auto py-3 resize-none"} />
+              placeholder={t("f.description.placeholder")} rows={4} className={inp + " h-auto py-3 resize-none"} />
           </div>
 
           <div className="h-px bg-[var(--border-subtle)]" />
