@@ -26,7 +26,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // html2canvas-pro is the maintained fork. We use it because Tailwind v4
 // emits utility colors as oklch(), which classic html2canvas can't parse —
 // it throws on the first Tailwind-coloured element it walks.
-import html2canvas from "html2canvas-pro";
+/* html2canvas-pro is ~221KB raw — loaded ON DEMAND at capture time so the
+   QA screenshot engine never rides in any page's first-load bundle. */
 
 const SKIP_ATTR = "data-qa-capture-skip";
 
@@ -140,6 +141,7 @@ export default function CaptureOverlay({ onResult, maxBytes, labels }: Props) {
 
       try {
         const scale = Math.min(window.devicePixelRatio || 1, 2);
+        const html2canvas = (await import("html2canvas-pro")).default;
         let canvas: HTMLCanvasElement;
         if (target.kind === "element") {
           canvas = await html2canvas(target.el, {

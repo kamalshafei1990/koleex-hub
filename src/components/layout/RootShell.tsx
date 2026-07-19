@@ -16,7 +16,10 @@ import AppLaunchSplash from "./AppLaunchSplash";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
-import ReportIssueButton from "@/components/qa/ReportIssueButton";
+import dynamic from "next/dynamic";
+/* QA reporter is post-paint tooling — keep it (and everything it pulls)
+   out of the first-load bundle on every page. */
+const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButton"), { ssr: false });
 import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
