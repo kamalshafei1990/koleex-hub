@@ -49,14 +49,14 @@ export async function GET() {
   const [peopleRes, rolesRes] = await Promise.all([
     personIds.length > 0
       ? supabaseServer.from("people").select("id, full_name, name_alt, avatar_url").in("id", personIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; avatar_url: string | null }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; name_alt: string | null; avatar_url: string | null }> }),
     roleIds.length > 0
       ? supabaseServer.from("roles").select("id, name").in("id", roleIds)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
   ]);
 
   const personMap = new Map(
-    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null }>).map(
+    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null; name_alt: string | null; avatar_url: string | null }>).map(
       (p) => [p.id, p],
     ),
   );
@@ -70,6 +70,7 @@ export async function GET() {
       id: a.id,
       username: a.username,
       full_name: person?.full_name ?? null,
+      name_alt: person?.name_alt ?? null,
       avatar_url: a.avatar_url ?? person?.avatar_url ?? null,
       role_name: a.role_id ? roleMap.get(a.role_id) ?? null : null,
     };

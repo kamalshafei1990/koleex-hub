@@ -65,9 +65,20 @@ type Recipient = {
   id: string;
   username: string;
   full_name: string | null;
+  name_alt: string | null;
   avatar_url: string | null;
   role_name: string | null;
 };
+
+/** Native/alternate name (e.g. Chinese) shown muted beside the primary name,
+ *  only when present and different. */
+function nativeAlt(
+  primary: string | null | undefined,
+  alt: string | null | undefined,
+): string | null {
+  const a = (alt ?? "").trim();
+  return a && a !== (primary ?? "").trim() ? a : null;
+}
 
 /* Mailboxes drive the left rail, same way macOS Mail groups messages into
    "smart boxes". Each mailbox provides its own filter predicate — we
@@ -757,6 +768,11 @@ export default function InboxPage() {
                                 }`}
                               >
                                 {senderName}
+                                {nativeAlt(msg.sender?.full_name, msg.sender?.name_alt) && (
+                                  <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                    {nativeAlt(msg.sender?.full_name, msg.sender?.name_alt)}
+                                  </span>
+                                )}
                               </span>
                               <span className="text-[10.5px] text-[var(--text-dim)] shrink-0 tabular-nums group-hover/row:md:opacity-0 transition-opacity">
                                 {formatTimestamp(msg.created_at)}
@@ -1236,6 +1252,11 @@ function MessageDetail({
                 <div className="min-w-0">
                   <div className="text-[15px] font-bold text-[var(--text-primary)] truncate">
                     {senderName}
+                    {nativeAlt(msg.sender?.full_name, msg.sender?.name_alt) && (
+                      <span lang="zh" className="ms-1.5 text-[0.8em] font-normal text-[var(--text-dim)]">
+                        {nativeAlt(msg.sender?.full_name, msg.sender?.name_alt)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11.5px] text-[var(--text-dim)] truncate">
                     {msg.sender?.username
@@ -1763,6 +1784,11 @@ function ComposeView({
                         <div className="min-w-0 flex-1">
                           <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
                             {r.full_name || r.username}
+                            {nativeAlt(r.full_name, r.name_alt) && (
+                              <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                {nativeAlt(r.full_name, r.name_alt)}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-dim)] truncate">
                             @{r.username}

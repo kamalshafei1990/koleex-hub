@@ -1366,6 +1366,7 @@ export async function fetchMessageableAccounts(): Promise<
     id: string;
     username: string;
     full_name: string | null;
+    name_alt: string | null;
     avatar_url: string | null;
     role_name: string | null;
   }>
@@ -1382,6 +1383,7 @@ export async function fetchMessageableAccounts(): Promise<
           id: string;
           username: string;
           full_name: string | null;
+          name_alt: string | null;
           avatar_url: string | null;
           role_name: string | null;
         }>;

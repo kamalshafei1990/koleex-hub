@@ -26,13 +26,13 @@ type SenderJoin =
       id: string;
       username: string;
       avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
+      person: { full_name: string; name_alt: string | null } | Array<{ full_name: string; name_alt: string | null }> | null;
     }
   | Array<{
       id: string;
       username: string;
       avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
+      person: { full_name: string; name_alt: string | null } | Array<{ full_name: string; name_alt: string | null }> | null;
     }>
   | null;
 
@@ -40,7 +40,7 @@ function flattenSender(raw: SenderJoin) {
   const s = Array.isArray(raw) ? raw[0] ?? null : raw;
   if (!s) return null;
   const person = Array.isArray(s.person) ? s.person[0] ?? null : s.person;
-  return { id: s.id, username: s.username, avatar_url: s.avatar_url, full_name: person?.full_name ?? null };
+  return { id: s.id, username: s.username, avatar_url: s.avatar_url, full_name: person?.full_name ?? null, name_alt: person?.name_alt ?? null };
 }
 
 export async function GET(req: Request) {

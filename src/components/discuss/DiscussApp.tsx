@@ -179,9 +179,20 @@ type Recipient = {
   id: string;
   username: string;
   full_name: string | null;
+  name_alt: string | null;
   avatar_url: string | null;
   role_name: string | null;
 };
+
+/** Native/alternate name (e.g. Chinese) to show muted beneath the primary
+ *  name — only when it exists and differs from the primary. */
+function nativeAltOf(
+  primary: string | null | undefined,
+  alt: string | null | undefined,
+): string | null {
+  const a = (alt ?? "").trim();
+  return a && a !== (primary ?? "").trim() ? a : null;
+}
 
 /** Time formatter that matches WhatsApp / Slack style:
  *    Today      → "14:03"
@@ -2883,6 +2894,7 @@ function ChannelRow({
   onMenu?: (x: number, y: number) => void;
 }) {
   const name = displayNameFor(channel);
+  const altName = channel.kind === "direct" ? altNameFor(channel) : null;
   const preview = previewMessage(channel.last_message);
   const time = channel.last_message?.created_at
     ? formatSidebarTime(channel.last_message.created_at)
@@ -2966,6 +2978,16 @@ function ChannelRow({
                 }`}
               >
                 {name}
+                {altName && (
+                  <span
+                    lang="zh"
+                    className={`ms-1 text-[0.85em] font-normal ${
+                      selected ? "text-[var(--text-inverted)]/55" : "text-[var(--text-dim)]"
+                    }`}
+                  >
+                    {altName}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 {channel.pinned && (
@@ -4329,6 +4351,11 @@ function DetailsPane({
           <div className="text-[15px] font-bold text-[var(--text-primary)]">
             {displayNameFor(channel)}
           </div>
+          {channel.kind === "direct" && altNameFor(channel) && (
+            <div lang="zh" className="text-[12px] text-[var(--text-dim)] -mt-1">
+              {altNameFor(channel)}
+            </div>
+          )}
           {channel.kind === "direct" && channel.other?.username && (
             <div className="text-[11px] text-[var(--text-dim)]">
               @{channel.other.username}
@@ -4401,6 +4428,11 @@ function DetailsPane({
                   <div className="min-w-0 flex-1">
                     <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
                       {m.author.full_name || m.author.username}
+                      {nativeAltOf(m.author.full_name, m.author.name_alt) && (
+                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                          {nativeAltOf(m.author.full_name, m.author.name_alt)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[var(--text-dim)] truncate">
                       @{m.author.username}
@@ -4707,6 +4739,11 @@ function NewChannelModal({
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                         {r.full_name || r.username}
+                        {nativeAltOf(r.full_name, r.name_alt) && (
+                          <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                            {nativeAltOf(r.full_name, r.name_alt)}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-[var(--text-dim)] truncate">
                         @{r.username}
@@ -4818,6 +4855,11 @@ function NewDmModal({
               <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
                   {r.full_name || r.username}
+                  {nativeAltOf(r.full_name, r.name_alt) && (
+                    <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                      {nativeAltOf(r.full_name, r.name_alt)}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10.5px] text-[var(--text-dim)] truncate">
                   @{r.username}
@@ -5035,6 +5077,11 @@ function MentionPicker({
               <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
                   {r.full_name || r.username}
+                  {nativeAltOf(r.full_name, r.name_alt) && (
+                    <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                      {nativeAltOf(r.full_name, r.name_alt)}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10.5px] text-[var(--text-dim)] truncate">
                   @{r.username}

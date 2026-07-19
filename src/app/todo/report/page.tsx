@@ -166,7 +166,7 @@ export default function TodoReportPage() {
               <UsersIcon size={13} className="text-[var(--text-dim)]" />
               <select value={person} onChange={(e) => setPerson(e.target.value)} className={selectCls + " min-w-[160px]"}>
                 <option value="">{t("report.everyone")}</option>
-                {people.map((p) => <option key={p.account_id} value={p.account_id}>{p.full_name || p.username}</option>)}
+                {people.map((p) => { const alt = (p.name_alt ?? "").trim(); const label = (p.full_name || p.username) + (alt && alt !== (p.full_name ?? "").trim() ? ` ${alt}` : ""); return <option key={p.account_id} value={p.account_id}>{label}</option>; })}
               </select>
             </div>
             <div className="flex items-center gap-1.5">
@@ -228,7 +228,7 @@ export default function TodoReportPage() {
                     return (
                       <div key={r.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_90px_90px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface-subtle)] transition-colors">
                         <AutoTranslatedText text={r.title} className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`} />
-                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map((a) => a.full_name || a.username).join(", ") || "—"}</span>
+                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map((a) => { const base = a.full_name || a.username; const alt = (a.name_alt ?? "").trim(); return alt && alt !== (a.full_name ?? "").trim() ? `${base} (${alt})` : base; }).join(", ") || "—"}</span>
                         <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
                         <span className={`text-[11.5px] ${late ? "text-red-400" : "text-[var(--text-muted)]"}`}>{fmtDate(r.due_date)}</span>
                         <span className="text-[11.5px] text-[var(--text-muted)]">{fmtDate(r.completed_at)}{late ? ` · ${t("row.late")}` : (r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : "")}</span>

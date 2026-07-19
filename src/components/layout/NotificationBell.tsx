@@ -699,6 +699,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                       (msg.sender_account_id === null
                         ? "Koleex System"
                         : "Unknown");
+                    const senderAlt = (() => {
+                      const alt = (msg.sender?.name_alt ?? "").trim();
+                      return alt && alt !== (msg.sender?.full_name ?? "").trim()
+                        ? alt
+                        : null;
+                    })();
                     const isUnread = !msg.read_at;
                     return (
                       <li key={msg.id}>
@@ -761,6 +767,11 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                               }`}
                             >
                               From {senderName}
+                              {senderAlt && (
+                                <span lang="zh" className="ms-1">
+                                  {senderAlt}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>

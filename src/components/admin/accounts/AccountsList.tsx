@@ -174,9 +174,11 @@ export default function AccountsList() {
         const company = a.company_id ? companyMap[a.company_id] : null;
         const role = a.role_id ? roleMap[a.role_id] : null;
         const fullName = person?.full_name || a.username;
+        const altRaw = ((person as { name_alt?: string | null } | null)?.name_alt ?? "").trim();
+        const altName = altRaw && altRaw !== (person?.full_name ?? "").trim() ? altRaw : null;
         const country = company?.country || person?.country || null;
         const customerLevel: CustomerLevel | null = company?.customer_level || null;
-        return { account: a, person, company, role, fullName, country, customerLevel };
+        return { account: a, person, company, role, fullName, altName, country, customerLevel };
       }),
     [accounts, personMap, companyMap, roleMap],
   );
@@ -590,7 +592,7 @@ export default function AccountsList() {
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   {filtered.map((row) => {
-                    const { account: a, person, company, role, fullName, country, customerLevel } = row;
+                    const { account: a, person, company, role, fullName, altName, country, customerLevel } = row;
                     return (
                       <tr
                         key={a.id}
@@ -613,6 +615,11 @@ export default function AccountsList() {
                             <div className="min-w-0">
                               <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
                                 {fullName}
+                                {altName && (
+                                  <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                    {altName}
+                                  </span>
+                                )}
                               </div>
                               {person?.job_title && (
                                 <div className="text-[11px] text-[var(--text-dim)] truncate">
@@ -704,7 +711,7 @@ export default function AccountsList() {
             {/* Mobile / tablet card list */}
             <div className="lg:hidden divide-y divide-[var(--border-subtle)]">
               {filtered.map((row) => {
-                const { account: a, person, company, role, fullName, country, customerLevel } = row;
+                const { account: a, person, company, role, fullName, altName, country, customerLevel } = row;
                 return (
                   <div key={a.id} className="p-4 relative">
                     <Link href={`/accounts/${a.id}`} className="flex items-start gap-3">
@@ -724,6 +731,11 @@ export default function AccountsList() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
                             {fullName}
+                            {altName && (
+                              <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                {altName}
+                              </span>
+                            )}
                           </span>
                           <span className="text-[11px] font-mono text-[var(--text-dim)]">
                             @{a.username}

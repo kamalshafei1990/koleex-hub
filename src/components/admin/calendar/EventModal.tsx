@@ -146,13 +146,30 @@ export default function EventModal({
     const q = attendeeSearch.trim().toLowerCase();
     return accounts
       .filter((a) => a.id !== organizerId)
-      .filter((a) => !q || (a.username ?? "").toLowerCase().includes(q) || (a.login_email ?? "").toLowerCase().includes(q))
+      .filter((a) => {
+        if (!q) return true;
+        const pp = (a as { person?: { full_name?: string | null; name_alt?: string | null } }).person;
+        return (
+          (a.username ?? "").toLowerCase().includes(q) ||
+          (a.login_email ?? "").toLowerCase().includes(q) ||
+          (pp?.full_name ?? "").toLowerCase().includes(q) ||
+          (pp?.name_alt ?? "").toLowerCase().includes(q)
+        );
+      })
       .slice(0, 40);
   }, [accounts, attendeeSearch, organizerId]);
 
   const nameFor = (id: string) => {
     const a = accounts.find((x) => x.id === id);
-    return a?.username || a?.login_email || "Someone";
+    const p = (a as { person?: { full_name?: string | null } } | undefined)?.person;
+    return p?.full_name || a?.username || a?.login_email || "Someone";
+  };
+  /** Native/alternate name (e.g. Chinese) for an attendee, or null. */
+  const altFor = (id: string) => {
+    const a = accounts.find((x) => x.id === id);
+    const p = (a as { person?: { full_name?: string | null; name_alt?: string | null } } | undefined)?.person;
+    const alt = (p?.name_alt ?? "").trim();
+    return alt && alt !== (p?.full_name ?? "").trim() ? alt : null;
   };
   const toggleAttendee = (id: string) =>
     setAttendeeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -544,6 +561,11 @@ export default function EventModal({
                         className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)]"
                       >
                         {nameFor(id)}
+                        {altFor(id) && (
+                          <span lang="zh" className="ms-0.5 text-[0.85em] text-[var(--text-dim)]">
+                            {altFor(id)}
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => toggleAttendee(id)}
@@ -588,11 +610,16 @@ export default function EventModal({
                           </span>
                           <span className="min-w-0">
                             <span className="block text-[13px] text-[var(--text-primary)] truncate">
-                              {a.username || a.login_email || "—"}
+                              {nameFor(a.id)}
+                              {altFor(a.id) && (
+                                <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                  {altFor(a.id)}
+                                </span>
+                              )}
                             </span>
-                            {a.login_email && a.username && (
+                            {(a.login_email || a.username) && (
                               <span className="block text-[11px] text-[var(--text-dim)] truncate">
-                                {a.login_email}
+                                {a.username ? `@${a.username}` : a.login_email}
                               </span>
                             )}
                           </span>

@@ -1227,6 +1227,7 @@ export interface InboxMessageWithSender extends InboxMessageRow {
     username: string;
     avatar_url: string | null;
     full_name: string | null;
+    name_alt?: string | null;
   } | null;
 }
 

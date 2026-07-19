@@ -340,6 +340,10 @@ function ThreadMessage({
   const [pickerOpen, setPickerOpen] = useState(false);
   const authorName =
     msg.author?.full_name || msg.author?.username || "Unknown";
+  const authorAlt = (() => {
+    const alt = (msg.author?.name_alt ?? "").trim();
+    return alt && alt !== (msg.author?.full_name ?? "").trim() ? alt : null;
+  })();
   const timeStr = new Date(msg.created_at).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
@@ -379,6 +383,11 @@ function ThreadMessage({
           <div className="flex items-baseline gap-2">
             <span className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
               {authorName}
+              {authorAlt && (
+                <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                  {authorAlt}
+                </span>
+              )}
             </span>
             <span className="text-[9.5px] text-[var(--text-dim)] shrink-0">
               {timeStr}

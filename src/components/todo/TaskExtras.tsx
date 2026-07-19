@@ -231,7 +231,15 @@ export default function TaskExtras({
             <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
               {mentionable.map((e) => (
                 <button key={e.account_id} type="button" onClick={() => addMention(e)} className="w-full text-start px-3 h-9 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06] flex items-center gap-2">
-                  <span className="font-medium">{e.full_name || e.username}</span>
+                  <span className="font-medium">
+                    {e.full_name || e.username}
+                    {(() => {
+                      const alt = ((e as { name_alt?: string | null }).name_alt ?? "").trim();
+                      return alt && alt !== (e.full_name ?? "").trim() ? (
+                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">{alt}</span>
+                      ) : null;
+                    })()}
+                  </span>
                   {e.department && <span className="text-[10.5px] text-[var(--text-ghost)]">· {e.department}</span>}
                 </button>
               ))}

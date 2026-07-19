@@ -406,6 +406,7 @@ export async function fetchMessageableAccounts(): Promise<
     id: string;
     username: string;
     full_name: string | null;
+    name_alt: string | null;
     avatar_url: string | null;
     role_name: string | null;
   }>
@@ -429,7 +430,7 @@ export async function fetchMessageableAccounts(): Promise<
     return [];
   }
   type Row = AccountRow & {
-    person: { full_name: string; avatar_url: string | null } | Array<{ full_name: string; avatar_url: string | null }> | null;
+    person: { full_name: string; name_alt: string | null; avatar_url: string | null } | Array<{ full_name: string; name_alt: string | null; avatar_url: string | null }> | null;
     role: { name: string } | Array<{ name: string }> | null;
   };
   return (data as unknown as Row[]).map((row) => {
@@ -439,6 +440,7 @@ export async function fetchMessageableAccounts(): Promise<
       id: row.id,
       username: row.username,
       full_name: person?.full_name ?? null,
+      name_alt: person?.name_alt ?? null,
       avatar_url: row.avatar_url ?? person?.avatar_url ?? null,
       role_name: role?.name ?? null,
     };
