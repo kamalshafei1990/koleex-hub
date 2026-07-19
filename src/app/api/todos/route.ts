@@ -27,6 +27,7 @@ interface AssigneeInfo {
   account_id: string;
   username: string;
   full_name: string | null;
+  name_alt: string | null;
   avatar_url: string | null;
   department: string | null;
   position: string | null;
@@ -382,9 +383,9 @@ async function resolveAssigneeInfos(
     personIds.length > 0
       ? supabaseServer
           .from("people")
-          .select("id, full_name")
+          .select("id, full_name, name_alt")
           .in("id", personIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; name_alt: string | null }> }),
     supabaseServer
       .from("koleex_employees")
       .select("account_id, department, position")
@@ -392,7 +393,7 @@ async function resolveAssigneeInfos(
   ]);
 
   const personMap = new Map(
-    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null }>).map(
+    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null; name_alt: string | null }>).map(
       (p) => [p.id, p],
     ),
   );
@@ -418,6 +419,7 @@ async function resolveAssigneeInfos(
       account_id: a.id,
       username: a.username,
       full_name: person?.full_name ?? null,
+      name_alt: person?.name_alt ?? null,
       avatar_url: a.avatar_url,
       department: emp?.department ?? null,
       position: emp?.position ?? null,

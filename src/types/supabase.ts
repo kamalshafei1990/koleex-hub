@@ -2053,6 +2053,7 @@ export interface TodoAssigneeInfo {
   account_id: string;
   username: string;
   full_name: string | null;
+  name_alt?: string | null;
   avatar_url: string | null;
   department: string | null;
   position: string | null;

@@ -48,8 +48,8 @@ export async function GET() {
 
   const [peopleRes, empRes] = await Promise.all([
     personIds.length > 0
-      ? supabaseServer.from("people").select("id, full_name").in("id", personIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+      ? supabaseServer.from("people").select("id, full_name, name_alt").in("id", personIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; name_alt: string | null }> }),
     supabaseServer
       .from("koleex_employees")
       .select("account_id, department, position")
@@ -57,7 +57,7 @@ export async function GET() {
   ]);
 
   const personMap = new Map(
-    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null }>).map(
+    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null; name_alt: string | null }>).map(
       (p) => [p.id, p],
     ),
   );
@@ -77,6 +77,7 @@ export async function GET() {
         account_id: a.id,
         username: a.username,
         full_name: person?.full_name ?? null,
+        name_alt: person?.name_alt ?? null,
         avatar_url: a.avatar_url,
         department: emp?.department ?? null,
         position: emp?.position ?? null,

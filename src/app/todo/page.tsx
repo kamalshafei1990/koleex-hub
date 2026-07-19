@@ -513,6 +513,11 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                     <span className="text-[10px] font-medium text-[var(--text-primary)] text-center leading-tight truncate w-full">
                       {emp.full_name || emp.username}
                     </span>
+                    {emp.name_alt && emp.name_alt.trim() && emp.name_alt.trim() !== (emp.full_name ?? "").trim() && (
+                      <span lang="zh" className="text-[10px] text-[var(--text-dim)] text-center leading-tight truncate w-full">
+                        {emp.name_alt}
+                      </span>
+                    )}
                     {emp.position && (
                       <span className="text-[9px] text-[var(--text-dim)] text-center leading-tight truncate w-full">
                         {emp.position}
