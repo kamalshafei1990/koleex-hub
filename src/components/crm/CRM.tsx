@@ -158,6 +158,10 @@ const SWATCH_COLORS = [
    Main component
    ════════════════════════════════════════════════════════════════════════ */
 
+/* Per-tab warm-start snapshot of the board (stages + slim opportunity rows).
+   Cleared with the rest of the session caches at sign-out. */
+const CRM_BOARD_SNAP_KEY = "kx-crm-board-v1";
+
 export default function CRM() {
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
@@ -228,7 +232,33 @@ export default function CRM() {
     async (opts?: { soft?: boolean }) => {
       const soft = opts?.soft ?? false;
       const first = firstLoadRef.current;
-      if (!soft) setLoading(true);
+      /* Warm-start (same pattern as the Customers list): on the cold load,
+         paint the last session's board snapshot instantly, then let the
+         fresh fetch overwrite it — the operator never stares at a spinner
+         for data they already saw. sessionStorage is per-tab and cleared
+         on sign-out, so no cross-account bleed. */
+      let warm = false;
+      if (first && typeof window !== "undefined") {
+        try {
+          const raw = sessionStorage.getItem(CRM_BOARD_SNAP_KEY);
+          if (raw) {
+            const snap = JSON.parse(raw) as {
+              stages?: CrmStageRow[];
+              opps?: CrmOpportunityWithRelations[];
+            };
+            if (Array.isArray(snap.stages) && snap.stages.length > 0) {
+              setStages(snap.stages);
+              setOpps(Array.isArray(snap.opps) ? snap.opps : []);
+              setLoading(false);
+              warm = true;
+              event("crm.board.warm_start");
+            }
+          }
+        } catch {
+          /* corrupt snapshot — cold load as usual */
+        }
+      }
+      if (!soft && !warm) setLoading(true);
       const t0 =
         typeof performance !== "undefined" ? performance.now() : 0;
       const [s, o] = await Promise.all([
@@ -238,6 +268,13 @@ export default function CRM() {
       setStages(s);
       setOpps(o);
       if (!soft) setLoading(false);
+      try {
+        const json = JSON.stringify({ stages: s, opps: o });
+        // Skip absurdly large boards so the snapshot never bloats the tab.
+        if (json.length < 400_000) sessionStorage.setItem(CRM_BOARD_SNAP_KEY, json);
+      } catch {
+        /* quota — snapshot is best-effort */
+      }
       if (first) {
         firstLoadRef.current = false;
         if (typeof performance !== "undefined") {
@@ -1574,6 +1611,7 @@ function ContactComboboxField({
   value,
   onChange,
   onPickContact,
+  onCreateCustomer,
   filter,
   placeholder,
   t,
@@ -1582,12 +1620,18 @@ function ContactComboboxField({
   value: string;
   onChange: (s: string) => void;
   onPickContact: (c: CrmContactPick | null) => void;
+  /* When provided, the dropdown's "+ ..." row CREATES a real customer in the
+     directory (contacts table) and links it — instead of the legacy behaviour
+     of keeping dangling free text with no FK. Returns the created pick, or
+     null on failure (then we fall back to plain text). */
+  onCreateCustomer?: (text: string) => Promise<CrmContactPick | null>;
   filter: "company" | "person";
   placeholder?: string;
   t: (key: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
+  const [creating, setCreating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   /* ── Bounded server search (Phase 4 Wave 2B.2) ───────────────────────────
@@ -1715,13 +1759,25 @@ function ContactComboboxField({
 
   function pickItem(idx: number) {
     const it = items[idx];
-    if (!it) return;
+    if (!it || creating) return;
     if (it.kind === "contact") {
       onPickContact(it.contact);
-    } else {
-      // "Use as new" — keep the typed text, no FK link
-      onPickContact(null);
+      setOpen(false);
+      return;
     }
+    if (onCreateCustomer) {
+      // Create a REAL customer record and link it. On failure the typed
+      // text stays (same as the legacy no-link path) so nothing is lost.
+      setCreating(true);
+      void onCreateCustomer(it.text).then((created) => {
+        setCreating(false);
+        onPickContact(created); // null → plain-text fallback
+        setOpen(false);
+      });
+      return;
+    }
+    // Legacy: keep the typed text, no FK link
+    onPickContact(null);
     setOpen(false);
   }
 
@@ -1828,11 +1884,19 @@ function ContactComboboxField({
                   }`}
                 >
                   <div className="h-7 w-7 rounded-full bg-[var(--bg-inverted)]/[0.08] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] shrink-0">
-                    <PlusIcon className="h-3.5 w-3.5" />
+                    {creating ? (
+                      <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PlusIcon className="h-3.5 w-3.5" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
-                      {t("form.useAsNew")}
+                      {creating
+                        ? t("form.creatingCustomer")
+                        : onCreateCustomer
+                          ? t("form.createCustomer")
+                          : t("form.useAsNew")}
                     </div>
                     <div className="text-[10.5px] text-[var(--text-dim)] truncate">
                       &ldquo;{it.text}&rdquo;
@@ -1991,6 +2055,62 @@ function OpportunityModal({
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
   }, [onClose]);
+
+  /* Quick-create a REAL customer in the directory (contacts table) from the
+     Company / Contact combobox and return the slim pick for linking. Uses the
+     same /api/contacts POST as the Customers app, so the new customer shows
+     up there immediately. Returns null on failure (combobox falls back to
+     plain text, nothing lost). */
+  const quickCreateCustomer = useCallback(
+    async (kind: "company" | "person", text: string): Promise<CrmContactPick | null> => {
+      const trimmedText = text.trim();
+      if (!trimmedText) return null;
+      const isCompany = kind === "company";
+      const parts = trimmedText.split(/\s+/);
+      const body: Record<string, unknown> = {
+        contact_type: "customer",
+        entity_type: isCompany ? "company" : "individual",
+        display_name: trimmedText,
+      };
+      if (isCompany) {
+        body.company_name = trimmedText;
+      } else {
+        body.first_name = parts[0];
+        if (parts.length > 1) body.last_name = parts.slice(1).join(" ");
+        if (companyName.trim()) body.company_name = companyName.trim();
+      }
+      if (email.trim()) body.email = email.trim();
+      if (phone.trim()) body.phone = phone.trim();
+      try {
+        const r = await fetch("/api/contacts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = (await r.json().catch(() => null)) as
+          | { contact?: { id?: string; display_name?: string | null; company_name?: string | null; first_name?: string | null; last_name?: string | null; email?: string | null } }
+          | null;
+        const c = j?.contact;
+        if (!r.ok || !c?.id) return null;
+        event("crm.customer.quick_created");
+        return {
+          id: c.id,
+          display_name: c.display_name ?? trimmedText,
+          full_name: [c.first_name, c.last_name].filter(Boolean).join(" "),
+          first_name: c.first_name ?? "",
+          last_name: c.last_name ?? "",
+          company: c.company_name ?? (isCompany ? trimmedText : ""),
+          email: c.email ?? "",
+          entity_type: isCompany ? "company" : "individual",
+          contact_type: "customer",
+          photo_url: null,
+        };
+      } catch {
+        return null;
+      }
+    },
+    [companyName, email, phone],
+  );
 
   async function handleSave() {
     setError(null);
@@ -2213,6 +2333,7 @@ function OpportunityModal({
                     setContactId(c.id);
                     setLinkedContact(c);
                   }}
+                  onCreateCustomer={(text) => quickCreateCustomer("company", text)}
                   t={t}
                 />
                 <ContactComboboxField
@@ -2240,6 +2361,7 @@ function OpportunityModal({
                     if (!companyName && c.company) setCompanyName(c.company);
                     if (!email && c.email) setEmail(c.email);
                   }}
+                  onCreateCustomer={(text) => quickCreateCustomer("person", text)}
                   t={t}
                 />
               </div>

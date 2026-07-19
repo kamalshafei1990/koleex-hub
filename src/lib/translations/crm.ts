@@ -56,6 +56,8 @@ export const crmT: Translations = {
   "form.companyPh":       { en: "ACME Corp.",       zh: "ACME 公司", ar: "شركة ACME" },
   "form.contactName":     { en: "Contact name",     zh: "联系人姓名", ar: "اسم جهة الاتصال" },
   "form.useAsNew":        { en: "Use as new",       zh: "用作新条目",  ar: "استخدم كجديد" },
+  "form.createCustomer":  { en: "Create new customer", zh: "创建新客户", ar: "إنشاء عميل جديد" },
+  "form.creatingCustomer": { en: "Creating customer…", zh: "正在创建客户…", ar: "جارٍ إنشاء العميل…" },
   "form.viewCustomer":    { en: "View customer profile", zh: "查看客户档案", ar: "عرض ملف العميل" },
   "form.email":           { en: "Email",            zh: "邮箱",      ar: "البريد الإلكتروني" },
   "form.phone":           { en: "Phone",            zh: "电话",      ar: "الهاتف" },
