@@ -854,6 +854,33 @@ export default function AddEmployeePage() {
     return () => { cancelled = true; };
   }, [form.department_id, form.create_new_department]);
 
+  /* Position → suggested account role. Positions carry a default role
+     (koleex_positions.role_id), so picking "Sales Executive" pre-selects
+     the Sales role in Account Setup. Only fills an EMPTY role — a role
+     the admin chose by hand is never overwritten. */
+  useEffect(() => {
+    if (!form.position_id || form.create_new_position) return;
+    const pos = positions.find((p) => p.id === form.position_id);
+    if (pos?.role_id) {
+      setForm((f) => (f.role_id ? f : { ...f, role_id: pos.role_id! }));
+    }
+  }, [form.position_id, form.create_new_position, positions]);
+
+  /* Duplicate-hire guard: warn (non-blocking) when the typed name or
+     email matches an existing employee — protects the people table,
+     which is the identity source of truth for the whole hub. */
+  const dupWarning = useMemo(() => {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    const full = norm(`${form.first_name} ${form.last_name}`);
+    const email = (form.work_email || form.personal_email).trim().toLowerCase();
+    if (full.length < 5 && !email) return null;
+    const hit = employees.find((e) =>
+      (full.length >= 5 && norm(e.person.full_name || "") === full) ||
+      (!!email && (e.person.email || "").trim().toLowerCase() === email),
+    );
+    return hit ? hit.person.full_name : null;
+  }, [employees, form.first_name, form.last_name, form.work_email, form.personal_email]);
+
   /* Browser-level unsaved-changes guard. Fires on tab close /
      refresh / hard navigation. Next.js <Link> soft navigations are
      handled separately by the back-arrow confirm below. */
@@ -1213,6 +1240,16 @@ export default function AddEmployeePage() {
               </div>
             </div>
 
+            {dupWarning && (
+              <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3" role="alert">
+                <ShieldIcon size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                <div className="text-[12px] text-amber-300">
+                  A similar employee already exists: <span className="font-semibold">{dupWarning}</span>.
+                  Double-check before creating a duplicate record.
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               <SelectInput label="Gender" value={form.gender} onChange={(v) => set("gender", v)}
                 options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder="Select..." />
@@ -1247,7 +1284,13 @@ export default function AddEmployeePage() {
               <TextInput label="Personal Phone" value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
               <TextInput name="personal_email" label="Personal Email" value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
               <TextInput label="Work Phone" value={form.work_phone} onChange={(v) => set("work_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-              <TextInput name="work_email" label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")} />
+              <TextInput name="work_email" label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")}
+                onBlur={() => {
+                  // Mirror into the login email while it's still untouched.
+                  if (form.create_account && !form.login_email && form.work_email) {
+                    set("login_email", form.work_email);
+                  }
+                }} />
             </div>
 
             <SubLabel>Home Address</SubLabel>
@@ -1549,7 +1592,23 @@ export default function AddEmployeePage() {
             <div className="flex items-center gap-3 mb-3">
               <button
                 type="button"
-                onClick={() => set("create_account", !form.create_account)}
+                onClick={() => {
+                  /* Turning the account on pre-fills login email (from work
+                     email) and username (from the name) when still empty —
+                     the same address was previously typed twice. */
+                  setForm((f) => {
+                    const next = !f.create_account;
+                    return {
+                      ...f,
+                      create_account: next,
+                      login_email: next && !f.login_email && f.work_email ? f.work_email : f.login_email,
+                      username: next && !f.username && f.first_name && f.last_name
+                        ? suggestUsername(`${f.first_name} ${f.last_name}`)
+                        : f.username,
+                    };
+                  });
+                  setIsDirty(true);
+                }}
                 role="switch"
                 aria-checked={form.create_account}
                 aria-label="Create login account"
