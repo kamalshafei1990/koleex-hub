@@ -553,6 +553,51 @@ function SectionHeader({
   );
 }
 
+/* Collapsible OPTIONAL section — hiring needs only Personal + Employment +
+   Account up front; the rest starts folded so the form isn't a wall of
+   fields. The whole header is the toggle; content stays MOUNTED (just
+   hidden) so typed values and validation are preserved when folding. */
+function CollapsibleSection({
+  icon: Icon, title, description, open, onToggle, children,
+}: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  title: string;
+  description?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={panelCls}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`w-full flex items-start gap-3 text-start group ${open ? "mb-5 pb-4 border-b border-[var(--border-faint)]" : ""}`}
+      >
+        <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0" aria-hidden="true">
+          <Icon size={16} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[14px] font-bold text-[var(--text-primary)] leading-tight">{title}</h2>
+          {description && (
+            <p className="text-[12px] text-[var(--text-dim)] mt-0.5">{description}</p>
+          )}
+        </div>
+        <span className="flex items-center gap-2 shrink-0 mt-1.5">
+          {!open && (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] hidden sm:block group-hover:text-[var(--text-dim)] transition-colors">
+              Optional
+            </span>
+          )}
+          <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+      <div className={open ? "" : "hidden"}>{children}</div>
+    </section>
+  );
+}
+
 function SubLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="col-span-full text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest mt-2 -mb-1">
@@ -808,6 +853,13 @@ export default function AddEmployeePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  /* Optional sections start folded — Personal, Employment and Account are
+     the hiring path; the rest can be completed later on the employee page. */
+  const [openSections, setOpenSections] = useState({
+    contact: false, emergency: false, compensation: false, documents: false,
+  });
+  const toggleSection = (k: keyof typeof openSections) =>
+    setOpenSections((s) => ({ ...s, [k]: !s[k] }));
 
   /* Country options are stable — compute once. The flag is kept in
      `prefix` so the user can actually type-to-search by country
@@ -952,9 +1004,11 @@ export default function AddEmployeePage() {
       /* Clear the plain-text banner; the rich error banner rendered
          below reads from the `errors` memo. */
       setError(null);
-      /* Scroll to the first invalid field automatically. */
+      /* Unfold everything so no invalid field is hidden inside a collapsed
+         section, then scroll to the first one (after the expand renders). */
+      setOpenSections({ contact: true, emergency: true, compensation: true, documents: true });
       const firstKey = Object.keys(errs)[0];
-      if (firstKey) focusField(firstKey);
+      if (firstKey) setTimeout(() => focusField(firstKey), 120);
       return;
     }
     setSaving(true); setError(null);
@@ -1116,7 +1170,7 @@ export default function AddEmployeePage() {
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-6 gap-3">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-10 xl:-mx-16 px-4 md:px-6 lg:px-10 xl:px-16 py-3 -mt-2 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-faint)] flex items-center justify-between mb-6 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -1272,14 +1326,14 @@ export default function AddEmployeePage() {
             </div>
           </section>
 
-          {/* ── 2. CONTACT & ADDRESS ── */}
-          <section className={panelCls}>
-            <SectionHeader
-              icon={PhoneIcon}
-              title={t("sec.contact")}
-              description={t("sec.contact.desc")}
-            />
-
+          {/* ── 2. CONTACT & ADDRESS (optional, folded) ── */}
+          <CollapsibleSection
+            icon={PhoneIcon}
+            title={t("sec.contact")}
+            description={t("sec.contact.desc")}
+            open={openSections.contact}
+            onToggle={() => toggleSection("contact")}
+          >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <TextInput label="Personal Phone" value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
               <TextInput name="personal_email" label="Personal Email" value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
@@ -1309,16 +1363,16 @@ export default function AddEmployeePage() {
               />
               <TextInput label="Postal Code" value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder="ZIP" />
             </div>
-          </section>
+          </CollapsibleSection>
 
-          {/* ── 3. EMERGENCY CONTACTS ── */}
-          <section className={panelCls}>
-            <SectionHeader
-              icon={ShieldIcon}
-              title={t("sec.emergency")}
-              description={t("sec.emergency.desc")}
-            />
-
+          {/* ── 3. EMERGENCY CONTACTS (optional, folded) ── */}
+          <CollapsibleSection
+            icon={ShieldIcon}
+            title={t("sec.emergency")}
+            description={t("sec.emergency.desc")}
+            open={openSections.emergency}
+            onToggle={() => toggleSection("emergency")}
+          >
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3">
               <div>
                 <SubLabel>Primary Contact</SubLabel>
@@ -1339,7 +1393,7 @@ export default function AddEmployeePage() {
                 </div>
               </div>
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* ── 4. EMPLOYMENT & ORGANIZATION ── */}
           <section className={panelCls}>
@@ -1505,13 +1559,14 @@ export default function AddEmployeePage() {
             </div>
           </section>
 
-          {/* ── 5. COMPENSATION & BENEFITS ── */}
-          <section className={panelCls}>
-            <SectionHeader
-              icon={CreditCardIcon}
-              title={t("sec.compensation")}
-              description={t("sec.compensation.desc")}
-            />
+          {/* ── 5. COMPENSATION & BENEFITS (optional, folded) ── */}
+          <CollapsibleSection
+            icon={CreditCardIcon}
+            title={t("sec.compensation")}
+            description={t("sec.compensation.desc")}
+            open={openSections.compensation}
+            onToggle={() => toggleSection("compensation")}
+          >
 
             <SubLabel>Salary</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4 max-w-md">
@@ -1536,15 +1591,16 @@ export default function AddEmployeePage() {
               <SelectInput label="Class" value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
               <DateInput name="insurance_expiry_date" label="Expiry" value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
             </div>
-          </section>
+          </CollapsibleSection>
 
-          {/* ── 6. DOCUMENTS & COMPLIANCE ── */}
-          <section className={panelCls}>
-            <SectionHeader
-              icon={DocumentIcon}
-              title={t("sec.docs")}
-              description={t("sec.docs.desc")}
-            />
+          {/* ── 6. DOCUMENTS & COMPLIANCE (optional, folded) ── */}
+          <CollapsibleSection
+            icon={DocumentIcon}
+            title={t("sec.docs")}
+            description={t("sec.docs.desc")}
+            open={openSections.documents}
+            onToggle={() => toggleSection("documents")}
+          >
 
             <SubLabel>Identification</SubLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3 mb-4">
@@ -1579,7 +1635,7 @@ export default function AddEmployeePage() {
               <SelectInput label="Type" value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
               <DateInput name="driving_license_expiry" label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* ── 7. ACCOUNT SETUP ── */}
           <section className={panelCls}>
