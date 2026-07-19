@@ -87,6 +87,8 @@ import {
   fetchChannelMessages,
   getLastPingAt,
   isChannelStreamHealthy,
+  connectDiscussStream,
+  isDiscussStreamHealthy,
   fetchLinkedContact,
   fetchMyChannels,
   findOrCreateDirectChannel,
@@ -807,6 +809,63 @@ export default function DiscussApp() {
     });
   }, [accountId, loadChannels]);
 
+  /* ── First-party SSE delivery (the China-proof fast path) ──────────────
+     Production telemetry showed the Supabase websocket NEVER connects for our
+     users (0 SUBSCRIBED, 333 CHANNEL_ERROR in 6h) — *.supabase.co is blocked
+     from the mainland, so every message limped in via the 5–10s fallback
+     poll. This stream arrives on OUR origin and carries the FULL message row,
+     so the receiver renders it the moment the frame lands — no refetch RTT.
+     Everything here is idempotent with the broadcast/refetch paths: dedupe is
+     by message id, and my own messages are ignored (the optimistic bubble +
+     send response already own that path). */
+  useEffect(() => {
+    if (!accountId) return;
+    return connectDiscussStream((m) => {
+      if (!m?.id || !m.channel_id) return;
+      const isMine = m.author_account_id === accountId;
+
+      /* Warm the per-channel snapshot cache so switching to that chat shows
+         the new message even before its silent refresh lands. */
+      const cached = messagesCacheRef.current.get(m.channel_id);
+      if (cached && !cached.some((x) => x.id === m.id)) {
+        messagesCacheRef.current.set(m.channel_id, [...cached, m]);
+      }
+
+      /* Open conversation → append instantly (skip own messages). */
+      if (!isMine && selectedChannelIdRef.current === m.channel_id) {
+        setMessages((prev) =>
+          prev.some((x) => x.id === m.id) ? prev : [...prev, m],
+        );
+      }
+
+      /* Sidebar → bump the row in place with the REAL preview (the stream
+         has content, unlike broadcast pings), move to top, count unread. */
+      setChannels((prev) => {
+        const idx = prev.findIndex((c) => c.id === m.channel_id);
+        if (idx === -1) return prev; // membership refetch paths cover new channels
+        const existing = prev[idx];
+        if (existing.last_message?.id === m.id) return prev; // already applied
+        const next: DiscussChannelWithState = {
+          ...existing,
+          last_message_at: m.created_at,
+          last_message: {
+            id: m.id,
+            body: m.body,
+            kind: m.kind,
+            author_username: m.author?.username ?? null,
+            created_at: m.created_at,
+          },
+          unread_count:
+            isMine || selectedChannelIdRef.current === m.channel_id
+              ? existing.unread_count
+              : existing.unread_count + 1,
+        };
+        const rest = prev.filter((_, i) => i !== idx);
+        return [next, ...rest];
+      });
+    });
+  }, [accountId]);
+
   /* Load messages + members when a channel is selected, and subscribe to
      that channel's realtime stream. Cleanup tears down both subscriptions
      and clears typing state so we don't leak between channels. */
@@ -1079,7 +1138,12 @@ export default function DiscussApp() {
     const tick = () => {
       if (!visible()) { perfCount("discuss.poll.hidden_skip"); return; }
       const now = performance.now();
-      if (isChannelStreamHealthy(selectedChannelId)) {
+      /* The first-party SSE stream counts as a healthy live path: with the
+         Supabase websocket blocked (mainland China), SSE is the PRIMARY
+         delivery and the fallback poll must not run alongside it. New
+         messages arrive over SSE; the dirty/safety reconciles below still
+         pick up edits / deletions / reactions. */
+      if (isChannelStreamHealthy(selectedChannelId) || isDiscussStreamHealthy()) {
         if (wasUnhealthy) {
           /* Recovery: realtime is back — catch up on anything missed. */
           wasUnhealthy = false;

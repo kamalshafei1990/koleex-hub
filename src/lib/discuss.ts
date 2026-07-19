@@ -697,6 +697,87 @@ export function isAccountStreamHealthy(accountId: string): boolean {
   return broadcastSubs.get(rtAccountTopic(accountId))?.status === "SUBSCRIBED";
 }
 
+/* ── First-party SSE delivery stream ────────────────────────────────────────
+   Production telemetry showed the Supabase Realtime websocket NEVER connects
+   for our users (mainland-China blocking of *.supabase.co) — zero SUBSCRIBED
+   events, all delivery via the slow fallback poll. This stream replaces that
+   dependency: an authenticated EventSource on OUR origin
+   (/api/discuss/stream) that carries FULL message rows, so the receiver
+   renders instantly with no refetch. The broadcast path above remains a
+   supplement where it works; consumers dedupe by message id. */
+let sseSource: EventSource | null = null;
+let sseHealthy = false;
+let sseRefs = 0;
+const sseListeners = new Set<(m: DiscussMessageWithAuthor) => void>();
+
+export function isDiscussStreamHealthy(): boolean {
+  return sseHealthy;
+}
+
+function sseOpen() {
+  if (sseSource || typeof window === "undefined") return;
+  const src = new EventSource("/api/discuss/stream");
+  sseSource = src;
+  src.addEventListener("hello", () => {
+    sseHealthy = true;
+    try { perfEvent("sse.open"); } catch { /* metrics never break delivery */ }
+  });
+  src.addEventListener("msg", (ev) => {
+    try {
+      const m = JSON.parse((ev as MessageEvent).data) as DiscussMessageWithAuthor;
+      if (m?.channel_id) lastPingAt.set(m.channel_id, performance.now());
+      for (const l of sseListeners) {
+        try { l(m); } catch { /* one bad listener must not break the rest */ }
+      }
+      try { perfRecord("sse.msg", 1); } catch { /* ignore */ }
+    } catch { /* malformed frame — ignore */ }
+  });
+  src.addEventListener("bye", () => {
+    /* Server rotated the stream before maxDuration — reconnect immediately
+       instead of waiting for the error/retry cycle. */
+    sseClose();
+    if (sseRefs > 0 && document.visibilityState !== "hidden") sseOpen();
+  });
+  src.onerror = () => {
+    /* EventSource auto-reconnects (honouring `retry:`). Mark unhealthy so the
+       fallback poll takes over during the gap. */
+    sseHealthy = false;
+    try { perfEvent("sse.err"); } catch { /* ignore */ }
+  };
+}
+
+function sseClose() {
+  sseHealthy = false;
+  try { sseSource?.close(); } catch { /* ignore */ }
+  sseSource = null;
+}
+
+/* Cost + battery: hold the stream only while a Discuss surface is mounted AND
+   the tab is visible. Hidden tabs are covered by web-push; on return the
+   caller's visibility refresh reconciles anything missed. */
+if (typeof window !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (sseRefs === 0) return;
+    if (document.visibilityState === "hidden") sseClose();
+    else if (!sseSource) sseOpen();
+  });
+}
+
+/** Connect to the first-party message stream. Returns an unsubscribe fn.
+ *  Ref-counted: many consumers share ONE EventSource. */
+export function connectDiscussStream(
+  onMessage: (m: DiscussMessageWithAuthor) => void,
+): () => void {
+  sseListeners.add(onMessage);
+  sseRefs += 1;
+  if (typeof document === "undefined" || document.visibilityState !== "hidden") sseOpen();
+  return () => {
+    sseListeners.delete(onMessage);
+    sseRefs = Math.max(0, sseRefs - 1);
+    if (sseRefs === 0) sseClose();
+  };
+}
+
 export function subscribeToChannel(
   channelId: string,
   handlers: {
