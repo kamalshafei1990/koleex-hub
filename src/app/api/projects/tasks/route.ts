@@ -82,6 +82,7 @@ export async function POST(req: Request) {
     stage_id?: string | null;
     priority?: "low" | "normal" | "high" | "urgent";
     assignee_account_id?: string | null;
+    blocked_by_task_ids?: string[];
     followers_account_ids?: string[];
     tag_ids?: string[];
     due_date?: string | null;
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
       assignee_account_id: body.assignee_account_id ?? null,
       followers_account_ids: body.followers_account_ids ?? [],
       tag_ids: body.tag_ids ?? [],
+      blocked_by_task_ids: body.blocked_by_task_ids ?? [],
       due_date: body.due_date ?? null,
       start_date: body.start_date ?? null,
       estimated_hours: body.estimated_hours ?? null,

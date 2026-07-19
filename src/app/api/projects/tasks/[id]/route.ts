@@ -43,6 +43,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     "stage_id", "parent_task_id",
     "title", "description", "priority",
     "assignee_account_id", "followers_account_ids", "tag_ids",
+    "blocked_by_task_ids",
     "due_date", "start_date", "estimated_hours", "logged_hours",
     "progress_pct", "status",
     "linked_planning_item_id", "linked_entity_type", "linked_entity_id", "linked_entity_label",

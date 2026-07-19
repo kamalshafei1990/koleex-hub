@@ -52,6 +52,7 @@ export interface ProjectRow {
   planned_start: string | null;
   planned_end: string | null;
   budget_hours: number | null;
+  budget_amount: number | null;
   progress_pct: number | null;
   sort_order: number;
   created_at: string;
@@ -91,6 +92,7 @@ export interface TaskRow {
   assignee_account_id: string | null;
   followers_account_ids: string[];
   tag_ids: string[];
+  blocked_by_task_ids: string[];
   due_date: string | null;
   start_date: string | null;
   estimated_hours: number | null;

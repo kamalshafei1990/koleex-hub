@@ -43,6 +43,7 @@ import SharedKpiCard from "@/components/ui/KpiCard";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
+import { createItem as createPlanningItem } from "@/lib/planning";
 import { SubtasksPanel, ChecklistPanel, CommentsPanel, TimePanel, AttachmentsPanel, MilestoneStrip } from "@/components/projects/TaskExtras";
 import {
   createProject,
@@ -787,6 +788,7 @@ function ProjectDetailView({
         stages={stages}
         tags={tags}
         reloadTags={reloadTags}
+        allTasks={tasks}
         onClose={() => setTaskModal({ open: false, editing: null })}
         onSaved={() => { setTaskModal({ open: false, editing: null }); reload(); }}
       />
@@ -884,6 +886,7 @@ function TaskCard({
 }) {
   const dueLabel = formatDueDate(task.due_date);
   const overdue = isOverdue(task.due_date) && task.status === "open";
+  const blocked = task.status === "open" && (task.blocked_by_task_ids?.length ?? 0) > 0;
   const color = PRIORITY_COLOR[task.priority];
   const visibleTags = tags.filter((tg) => task.tag_ids.includes(tg.id)).slice(0, 3);
 
@@ -902,6 +905,11 @@ function TaskCard({
       <div className="flex items-start gap-1.5">
         <div className="w-1 rounded-full shrink-0 self-stretch" style={{ background: color, minHeight: 20 }} />
         <div className="flex-1 min-w-0">
+          {blocked && (
+            <span className="inline-block text-[9px] font-bold uppercase tracking-wide text-red-400 bg-red-500/10 border border-red-500/30 rounded px-1 py-px mb-0.5">
+              Blocked
+            </span>
+          )}
           <div className={`text-[12px] font-semibold text-[var(--text-primary)] ${task.status === "done" ? "line-through" : ""}`}>
             {task.title}
           </div>
@@ -1113,6 +1121,7 @@ function FlatTaskRow({
 }) {
   const dueLabel = formatDueDate(task.due_date);
   const overdue = isOverdue(task.due_date) && task.status === "open";
+  const blocked = task.status === "open" && (task.blocked_by_task_ids?.length ?? 0) > 0;
   const color = PRIORITY_COLOR[task.priority];
   const projectColor = task.project?.color ?? "#818cf8";
   const visibleTags = tags.filter((tg) => task.tag_ids.includes(tg.id)).slice(0, 2);
@@ -1501,6 +1510,7 @@ function ProjectFormModal({
   const [plannedStart, setPlannedStart] = useState("");
   const [plannedEnd, setPlannedEnd] = useState("");
   const [budgetHours, setBudgetHours] = useState<string>("");
+  const [budgetAmount, setBudgetAmount] = useState<string>("");
   const [status, setStatus] = useState<"active" | "on_hold" | "completed" | "archived">("active");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerLabel, setCustomerLabel] = useState<string>("");
@@ -1517,6 +1527,7 @@ function ProjectFormModal({
       setPlannedStart(editing.planned_start ?? "");
       setPlannedEnd(editing.planned_end ?? "");
       setBudgetHours(editing.budget_hours?.toString() ?? "");
+      setBudgetAmount(editing.budget_amount?.toString() ?? "");
       setStatus(editing.status);
       setCustomerId(editing.customer_id);
       setCustomerLabel(editing.customer?.display_name ?? editing.customer?.company_name ?? "");
@@ -1530,6 +1541,7 @@ function ProjectFormModal({
       setPlannedStart("");
       setPlannedEnd("");
       setBudgetHours("");
+      setBudgetAmount("");
       setStatus("active");
       setCustomerId(null);
       setCustomerLabel("");
@@ -1550,6 +1562,7 @@ function ProjectFormModal({
       planned_start: plannedStart || null,
       planned_end: plannedEnd || null,
       budget_hours: budgetHours ? Number(budgetHours) : null,
+      budget_amount: budgetAmount ? Number(budgetAmount) : null,
       status,
       customer_id: customerId,
       manager_account_id: managerId,
@@ -1616,6 +1629,9 @@ function ProjectFormModal({
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Field label={t("form.budgetAmount", "Budget amount")}>
+              <input type="number" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
+            </Field>
             <Field label={t("form.budgetHours")}>
               <input type="number" value={budgetHours} onChange={(e) => setBudgetHours(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
             </Field>
@@ -1677,6 +1693,7 @@ function TaskFormModal({
   stages,
   tags,
   reloadTags: _reloadTags,
+  allTasks = [],
   onClose,
   onSaved,
 }: {
@@ -1687,6 +1704,7 @@ function TaskFormModal({
   stages: ProjectStage[];
   tags: ProjectTag[];
   reloadTags: () => void;
+  allTasks?: TaskRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1705,6 +1723,8 @@ function TaskFormModal({
   const [linkedType, setLinkedType] = useState<string>("");
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const [linkedLabel, setLinkedLabel] = useState<string>("");
+  const [blockedBy, setBlockedBy] = useState<string[]>([]);
+  const [scheduling, setScheduling] = useState(false);
   const [detailTab, setDetailTab] = useState<"details" | "subtasks" | "checklist" | "comments" | "time" | "files">("details");
 
   useEffect(() => {
@@ -1728,6 +1748,7 @@ function TaskFormModal({
       setLinkedType(editing.linked_entity_type ?? "");
       setLinkedId(editing.linked_entity_id);
       setLinkedLabel(editing.linked_entity_label ?? "");
+      setBlockedBy(editing.blocked_by_task_ids ?? []);
     } else {
       setTitle("");
       setDescription("");
@@ -1743,6 +1764,7 @@ function TaskFormModal({
       setLinkedType("");
       setLinkedId(null);
       setLinkedLabel("");
+      setBlockedBy([]);
     }
   }, [open, editing, presetStageId, stages]);
 
@@ -1766,6 +1788,7 @@ function TaskFormModal({
       linked_entity_type: linkedType || null,
       linked_entity_id: linkedId,
       linked_entity_label: linkedLabel || null,
+      blocked_by_task_ids: blockedBy,
     };
     if (editing) {
       await updateTask(editing.id, payload);
@@ -1784,6 +1807,40 @@ function TaskFormModal({
 
   const toggleTag = (id: string) => {
     setTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleBlocker = (id: string) => {
+    setBlockedBy((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  /* Two-way sync: create a draft Planning item for this task (on its due
+     date, 09:00-17:00) and remember the link on the task, so completing
+     the shift later logs its hours back here automatically. */
+  const scheduleInPlanning = async () => {
+    if (!editing || scheduling) return;
+    setScheduling(true);
+    try {
+      const day = editing.due_date ?? new Date().toISOString().slice(0, 10);
+      const start = new Date(`${day}T09:00:00`);
+      const end = new Date(`${day}T17:00:00`);
+      const item = await createPlanningItem({
+        type: "project_task",
+        title: editing.title,
+        start_at: start.toISOString(),
+        end_at: end.toISOString(),
+        allocated_hours: editing.estimated_hours ?? null,
+        linked_entity_type: "project",
+        linked_entity_id: editing.project_id,
+        linked_entity_label: editing.project?.name ?? editing.title,
+        status: "draft",
+      });
+      if (item) {
+        await updateTask(editing.id, { linked_planning_item_id: item.id });
+        onSaved();
+      }
+    } finally {
+      setScheduling(false);
+    }
   };
 
   return (
@@ -1935,6 +1992,33 @@ function TaskFormModal({
             )}
           </div>
 
+          {(allTasks.length > 0 || blockedBy.length > 0) && (
+            <Field label={t("task.blockedBy", "Blocked by")}>
+              <div className="flex flex-wrap gap-1.5">
+                {allTasks
+                  .filter((tk) => tk.id !== editing?.id && tk.status !== "cancelled")
+                  .slice(0, 40)
+                  .map((tk) => {
+                    const on = blockedBy.includes(tk.id);
+                    return (
+                      <button
+                        key={tk.id}
+                        type="button"
+                        onClick={() => toggleBlocker(tk.id)}
+                        className={`text-[11px] font-semibold px-2 py-1 rounded border transition-colors max-w-[220px] truncate ${
+                          on
+                            ? "bg-red-500/10 text-red-400 border-red-500/30"
+                            : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                        } ${tk.status === "done" ? "line-through opacity-60" : ""}`}
+                      >
+                        {tk.title}
+                      </button>
+                    );
+                  })}
+              </div>
+            </Field>
+          )}
+
           <Field label={t("task.status")}>
             <div className="flex gap-1.5 flex-wrap">
               {(["open", "done", "cancelled"] as const).map((s) => (
@@ -1951,11 +2035,25 @@ function TaskFormModal({
         </div>
 
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)]">
-          <div>
+          <div className="flex items-center gap-1.5">
             {editing && (
               <button onClick={remove} className="h-9 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5">
                 <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
               </button>
+            )}
+            {editing && !editing.linked_planning_item_id && (
+              <button
+                onClick={scheduleInPlanning}
+                disabled={scheduling}
+                className="h-9 px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <ClockIcon size={13} /> {scheduling ? t("task.scheduling", "Scheduling…") : t("task.schedule", "Schedule in Planning")}
+              </button>
+            )}
+            {editing?.linked_planning_item_id && (
+              <Link href="/planning" className="h-9 px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[12px] font-semibold flex items-center gap-1.5">
+                <LinkIcon size={13} /> {t("task.viewPlanning", "View in Planning")}
+              </Link>
             )}
           </div>
           <div className="flex items-center gap-2">

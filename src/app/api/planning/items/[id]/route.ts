@@ -93,6 +93,14 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     void notifyAssigneeOnPublish(auth, data);
   }
 
+  // Two-way sync: completing a planning item that a project task is linked
+  // to logs the item's hours onto that task automatically.
+  const becameCompleted =
+    prev && prev.status !== "completed" && data?.status === "completed";
+  if (becameCompleted) {
+    void logHoursOnLinkedTask(auth, data);
+  }
+
   return NextResponse.json({ item: data });
 }
 
@@ -142,6 +150,36 @@ async function notifyAssigneeOnPublish(
     );
   } catch (e) {
     console.error("[planning] publish push:", e);
+  }
+}
+
+/** When a completed planning item is linked from a project task
+ *  (task.linked_planning_item_id), add its hours to the task's logged_hours.
+ *  Falls back to the item's wall-clock span when allocated_hours is unset.
+ *  Fire-and-forget: never fails the PATCH. */
+async function logHoursOnLinkedTask(
+  auth: { account_id: string; tenant_id: string },
+  item: { id: string; start_at: string; end_at: string; allocated_hours: number | null },
+): Promise<void> {
+  try {
+    const { data: task } = await supabaseServer
+      .from("project_tasks")
+      .select("id, logged_hours")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("linked_planning_item_id", item.id)
+      .maybeSingle();
+    if (!task) return;
+    const spanH =
+      (new Date(item.end_at).getTime() - new Date(item.start_at).getTime()) / 3_600_000;
+    const add = item.allocated_hours ?? Math.round(spanH * 10) / 10;
+    if (!add || add <= 0) return;
+    await supabaseServer
+      .from("project_tasks")
+      .update({ logged_hours: (Number(task.logged_hours) || 0) + add })
+      .eq("id", task.id)
+      .eq("tenant_id", auth.tenant_id);
+  } catch (e) {
+    console.error("[planning] logHoursOnLinkedTask:", e);
   }
 }
 

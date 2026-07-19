@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     planned_start?: string | null;
     planned_end?: string | null;
     budget_hours?: number | null;
+    budget_amount?: number | null;
   };
   if (!body.name?.trim()) {
     return NextResponse.json({ error: "name required" }, { status: 400 });
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
       planned_start: body.planned_start ?? null,
       planned_end: body.planned_end ?? null,
       budget_hours: body.budget_hours ?? null,
+      budget_amount: body.budget_amount ?? null,
       created_by_account_id: auth.account_id,
     })
     .select("*")
