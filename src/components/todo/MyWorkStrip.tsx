@@ -13,6 +13,7 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 interface WorkTask {
   id: string;
@@ -88,7 +89,7 @@ export default function MyWorkStrip() {
               return (
                 <Link key={tk.id} href="/projects" className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[var(--bg-surface)] transition-colors">
                   <span className="w-1 h-4 rounded-full shrink-0" style={{ background: tk.project?.color ?? "#94a3b8" }} />
-                  <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{tk.title}</span>
+                  <span className="text-[12px] text-[var(--text-primary)] truncate flex-1"><AutoTranslatedText text={tk.title} /></span>
                   {tk.due_date && (
                     <span className={`text-[10px] font-semibold shrink-0 ${overdue ? "text-red-400" : "text-[var(--text-dim)]"}`}>
                       {tk.due_date.slice(5)}
@@ -110,7 +111,7 @@ export default function MyWorkStrip() {
           <div className="space-y-1">
             {shifts.map((sh) => (
               <Link key={sh.id} href="/planning" className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[var(--bg-surface)] transition-colors">
-                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{sh.title || sh.type}</span>
+                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{sh.title ? <AutoTranslatedText text={sh.title} /> : sh.type}</span>
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] shrink-0">
                   {fmtDay(sh.start_at)} · {fmtTime(sh.start_at)}–{fmtTime(sh.end_at)}
                 </span>

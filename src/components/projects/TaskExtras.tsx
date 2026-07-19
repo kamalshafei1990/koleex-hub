@@ -8,6 +8,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -127,7 +128,7 @@ export function CommentsPanel({ taskId }: { taskId: string }) {
                 <button type="button" onClick={async () => { await deleteComment(taskId, c.id); load(); }} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400"><TrashIcon className="h-3 w-3" /></button>
               </div>
             </div>
-            <div className="text-[12.5px] text-[var(--text-primary)] whitespace-pre-wrap break-words">{c.body}</div>
+            <AutoTranslatedText block text={c.body} className="text-[12.5px] text-[var(--text-primary)] break-words" />
           </div>
         ))}
         {items.length === 0 && <Empty text="No comments yet." />}

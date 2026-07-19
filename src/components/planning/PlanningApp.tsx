@@ -35,6 +35,7 @@ import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPicker from "@/components/planning/EntityPicker";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import {
   addDays,
@@ -833,7 +834,7 @@ function MobileItemRow({
       <div className="w-1 h-8 rounded-full shrink-0" style={{ background: color }} />
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
-          {item.title || t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
+          {item.title ? <AutoTranslatedText text={item.title} /> : t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
         </div>
         <div className="text-[10px] text-[var(--text-dim)] truncate">
           {fmt(item.start_at)} – {fmt(item.end_at)}
@@ -887,7 +888,7 @@ function ItemPill({
       }}
     >
       <div className="font-bold text-[10px] text-[var(--text-primary)] truncate">
-        {item.title || t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
+        {item.title ? <AutoTranslatedText text={item.title} /> : t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
       </div>
       <div className="text-[9px] opacity-80">
         {fmt(start)}–{fmt(end)}
@@ -939,7 +940,7 @@ function OpenShiftsView({
             />
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                {i.title || t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
+                {i.title ? <AutoTranslatedText text={i.title} /> : t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
                 {formatRange(i.start_at, i.end_at)} ·{" "}
@@ -1025,7 +1026,7 @@ function MyPlanningView({
             />
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                {i.title || t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
+                {i.title ? <AutoTranslatedText text={i.title} /> : t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
                 {formatRange(i.start_at, i.end_at)} ·{" "}

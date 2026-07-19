@@ -34,6 +34,7 @@ import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
@@ -422,7 +423,7 @@ function ProjectCard({
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-[14px] font-bold text-[var(--text-primary)] truncate">
-              {project.name}
+              <AutoTranslatedText text={project.name} />
             </div>
             <div className="text-[11px] text-[var(--text-dim)] truncate">
               {customerName ?? t("card.noCustomer")}{project.code ? ` · ${project.code}` : ""}
@@ -653,7 +654,7 @@ function ProjectDetailView({
             <div className="h-8 w-1 rounded-full shrink-0" style={{ background: color }} />
             <div className="flex-1 min-w-0">
               <h1 className="text-[18px] md:text-[20px] font-bold tracking-tight truncate">
-                {project.name}
+                <AutoTranslatedText text={project.name} />
               </h1>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
                 {customerName ?? t("card.noCustomer")}
@@ -745,7 +746,7 @@ function ProjectDetailView({
                             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] cursor-pointer transition-colors"
                           >
                             <span className="w-1 h-4 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[tk.priority] }} />
-                            <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{tk.title}</span>
+                            <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}><AutoTranslatedText text={tk.title} /></span>
                             {due && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? "bg-rose-500/15 text-rose-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"}`}>{due}</span>}
                             {tk.assignee?.username && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] shrink-0">@{tk.assignee.username}</span>}
                           </div>
@@ -985,7 +986,7 @@ function TaskCard({
             </span>
           )}
           <div className={`text-[12px] font-semibold text-[var(--text-primary)] ${task.status === "done" ? "line-through" : ""}`}>
-            {task.title}
+            <AutoTranslatedText text={task.title} />
           </div>
         </div>
       </div>
@@ -1224,7 +1225,7 @@ function FlatTaskRow({
         <div className="w-1 self-stretch rounded-full shrink-0" style={{ background: color, minHeight: 20 }} />
         <div className="flex-1 min-w-0">
           <div className={`text-[12px] font-semibold text-[var(--text-primary)] truncate ${task.status === "done" ? "line-through opacity-60" : ""}`}>
-            {task.title}
+            <AutoTranslatedText text={task.title} />
           </div>
           <div className="text-[10px] text-[var(--text-dim)] truncate flex items-center gap-1.5">
             <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: projectColor }} />
@@ -2158,7 +2159,7 @@ function TaskFormModal({
                             : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                         } ${tk.status === "done" ? "line-through opacity-60" : ""}`}
                       >
-                        {tk.title}
+                        <AutoTranslatedText text={tk.title} />
                       </button>
                     );
                   })}
