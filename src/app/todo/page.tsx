@@ -61,6 +61,7 @@ import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
+import { usePermissions } from "@/lib/permissions";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 
 /* ── Priority config ── */
@@ -1300,6 +1301,11 @@ export default function TodoPage() {
   const [labels, setLabels] = useState<TodoLabelRow[]>([]);
   const accountId = getCurrentAccountIdSync();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
+  /* Super-admin audience lens: "own" (default — SA sees THEIR tasks like any
+     user), "all" (every task in the tenant), or an account_id (that user's
+     tasks). Non-SA callers never see this control; the server already limits
+     their data to tasks they're involved in. */
+  const [saView, setSaView] = useState<string>("own");
   const deepLinkHandledRef = useRef(false);
 
   // Load scope context once per session so fetchTodos knows which filter
@@ -1460,9 +1466,22 @@ export default function TodoPage() {
     loadAll();
   };
 
+  const { isSuperAdmin: isSA } = usePermissions();
+  const involves = useCallback((t: TodoWithRelations, id: string) =>
+    t.created_by_account_id === id ||
+    t.assigned_by_account_id === id ||
+    t.assignees.some((a) => a.account_id === id), []);
+  const scopedTodos = useMemo(() => {
+    if (!isSA || saView === "all") return todos;
+    if (saView === "own") {
+      return todos.filter((t) => t.assign_to_all || (accountId ? involves(t, accountId) : true));
+    }
+    return todos.filter((t) => involves(t, saView));
+  }, [todos, isSA, saView, accountId, involves]);
+
   // Filtering
   const filtered = useMemo(() => {
-    let list = todos;
+    let list = scopedTodos;
 
     // Text search: title, description, label, assignee, department, date
     if (search) {
@@ -1576,14 +1595,14 @@ export default function TodoPage() {
     }
 
     return list;
-  }, [todos, search, filter, priorityFilter, sourceFilter, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [scopedTodos, search, filter, priorityFilter, sourceFilter, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
-    total: todos.length,
-    active: todos.filter((t) => !t.completed).length,
-    completed: todos.filter((t) => t.completed).length,
-    overdue: todos.filter((t) => !t.completed && isOverdue(t.due_date)).length,
-  }), [todos]);
+    total: scopedTodos.length,
+    active: scopedTodos.filter((t) => !t.completed).length,
+    completed: scopedTodos.filter((t) => t.completed).length,
+    overdue: scopedTodos.filter((t) => !t.completed && isOverdue(t.due_date)).length,
+  }), [scopedTodos]);
 
   // Group: overdue → today → upcoming → no date → completed
   const grouped = useMemo(() => {
@@ -1733,6 +1752,27 @@ export default function TodoPage() {
                 <FlagIcon size={10} /> {t("p." + p.value)}
               </button>
             ))}
+            {isSA && (
+              <>
+                <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+                {/* SA audience lens — whose tasks am I looking at? */}
+                <select value={saView} onChange={(e) => setSaView(e.target.value)}
+                  className={`h-7 ps-2.5 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer appearance-none bg-no-repeat bg-[right_0.5rem_center] ${
+                    saView === "own"
+                      ? "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)]"
+                      : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                  }`}
+                  style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>\")" }}>
+                  <option value="own">{t("sa.viewOwn")}</option>
+                  <option value="all">{t("sa.viewAll")}</option>
+                  {employees.filter((e) => e.account_id !== accountId).map((e) => (
+                    <option key={e.account_id} value={e.account_id}>
+                      {(e.full_name || e.username) + (e.name_alt ? ` · ${e.name_alt}` : "")}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
             {/* Source separator: my own to-dos vs. tasks a manager/other gave me */}
             {([
@@ -1892,7 +1932,7 @@ export default function TodoPage() {
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full min-w-0">
 
         {/* KPI Dashboard */}
-        {!loading && todos.length > 0 && <div className="mb-5"><KpiDashboard todos={todos} /></div>}
+        {!loading && scopedTodos.length > 0 && <div className="mb-5"><KpiDashboard todos={scopedTodos} /></div>}
 
         {/* Task List */}
         {loading ? (
