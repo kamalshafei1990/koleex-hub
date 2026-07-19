@@ -132,6 +132,11 @@ export default function AppLaunchLink({
       const pressMs = pressAtRef.current != null ? now - pressAtRef.current : 0;
       // Classify cold (chunk not yet warmed → pays the download) vs warm.
       markAppLaunch(app.id, pressMs, !wasChunkWarmed(app.id));
+      // Tell the launch splash a same-tab app launch just started — it takes
+      // over the screen if the route doesn't arrive almost immediately.
+      try {
+        window.dispatchEvent(new CustomEvent("kx:app-launch", { detail: { appId: app.id, route: app.route } }));
+      } catch { /* best-effort */ }
     },
     [inactive, app.id, onNavigate],
   );
@@ -144,11 +149,14 @@ export default function AppLaunchLink({
     );
   }
 
-  // Tier C: don't auto-prefetch heavy routes on viewport-enter; still prefetch
-  // on explicit hover/focus intent (handled by doPreload → onPreload can call
-  // router.prefetch). Save-Data also disables auto-prefetch.
+  /* FULL payload prefetch for every visible tile. The RSC payload of these
+     static app shells is a few KB — prefetching it is what makes the FIRST
+     tap swap instantly instead of paying a full round-trip (1-3s from
+     mainland China). Only genuinely constrained networks (Save-Data,
+     2g/slow-2g, offline) opt out. The heavy client CHUNK is warmed
+     separately (idle warm-all + intent preload). */
   const net = typeof navigator !== "undefined" ? readNetworkContext() : null;
-  const autoPrefetch = prefetchTier(app.id) === "C" || (net && !isPreloadAllowed(net)) ? false : undefined;
+  const autoPrefetch = net && !isPreloadAllowed(net) ? false : true;
 
   return (
     <Link

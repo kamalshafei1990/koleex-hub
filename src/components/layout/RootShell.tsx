@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
+import AppLaunchSplash from "./AppLaunchSplash";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
@@ -158,6 +159,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       `}</style>
       <div className="kx-titlebar-drag" aria-hidden />
       <NavigationProgress />
+      <AppLaunchSplash />
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
           another user. Sits below MainHeader (fixed, top-14) and is

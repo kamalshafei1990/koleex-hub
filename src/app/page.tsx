@@ -823,6 +823,31 @@ export default function HomePage() {
           chunksWarmed += 1;
         }
       }
+      /* Warm-ALL follow-up: after the Tier-A hot set, progressively warm the
+         REST of the user's authorized apps (route payload + client chunk),
+         one every 450 ms so it never competes with what the user is doing.
+         This is what makes the FIRST tap on ANY app fast on high-latency
+         links (mainland China): by the time the user has scanned Home, most
+         app code + payloads are already on the device. Re-checks the network
+         guard before every step; dedupe lives inside preloadAppChunk /
+         router.prefetch. */
+      const rest = Array.from(authorized).filter((id) => !apps.includes(id));
+      let i = 0;
+      const warmNext = () => {
+        if (i >= rest.length) return;
+        if (document.visibilityState === "hidden" || !isPreloadAllowed(readNetworkContext())) {
+          window.setTimeout(warmNext, 3000); // paused — try again later
+          return;
+        }
+        const id = rest[i++];
+        const a = getApp(id);
+        if (a?.active) {
+          try { router.prefetch(a.route); } catch { /* ignore */ }
+          if (hasChunkPreloader(id)) { try { preloadAppChunk(id); } catch { /* ignore */ } }
+        }
+        window.setTimeout(warmNext, 450);
+      };
+      window.setTimeout(warmNext, 1200);
     };
     const w = window as unknown as {
       requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
