@@ -141,9 +141,14 @@ function getInitials(name: string | null, username?: string): string {
 
 /* ── Avatar ── */
 function MiniAvatar({ info, size = 28 }: { info: TodoAssigneeInfo; size?: number }) {
-  return info.avatar_url ? (
+  // Track load failure so a broken/blocked image degrades to initials instead
+  // of the browser's broken-image glyph. Reset when the source changes.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [info.avatar_url]);
+
+  return info.avatar_url && !failed ? (
     <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
-      style={{ width: size, height: size }} />
+      style={{ width: size, height: size }} onError={() => setFailed(true)} />
   ) : (
     <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"
       style={{ width: size, height: size, fontSize: size * 0.38 }}>
