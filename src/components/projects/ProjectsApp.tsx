@@ -1539,6 +1539,9 @@ function ProjectFormModal({
   const [budgetHours, setBudgetHours] = useState<string>("");
   const [budgetAmount, setBudgetAmount] = useState<string>("");
   const [billingRate, setBillingRate] = useState<string>("");
+  const [isTemplate, setIsTemplate] = useState(false);
+  const [templateId, setTemplateId] = useState<string>("");
+  const [templates, setTemplates] = useState<ProjectRow[]>([]);
   const [status, setStatus] = useState<"active" | "on_hold" | "completed" | "archived">("active");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerLabel, setCustomerLabel] = useState<string>("");
@@ -1557,6 +1560,8 @@ function ProjectFormModal({
       setBudgetHours(editing.budget_hours?.toString() ?? "");
       setBudgetAmount(editing.budget_amount?.toString() ?? "");
       setBillingRate(editing.billing_rate?.toString() ?? "");
+      setIsTemplate(editing.is_template);
+      setTemplateId("");
       setStatus(editing.status);
       setCustomerId(editing.customer_id);
       setCustomerLabel(editing.customer?.display_name ?? editing.customer?.company_name ?? "");
@@ -1572,12 +1577,39 @@ function ProjectFormModal({
       setBudgetHours("");
       setBudgetAmount("");
       setBillingRate("");
+      setIsTemplate(false);
+      setTemplateId("");
       setStatus("active");
       setCustomerId(null);
       setCustomerLabel("");
       setManagerId(null);
     }
   }, [open, editing]);
+
+  /* Template gallery — only needed when starting a NEW project. */
+  useEffect(() => {
+    if (!open || editing) return;
+    let cancelled = false;
+    fetchProjects({ templates: true }).then((rows) => {
+      if (!cancelled) setTemplates(rows);
+    });
+    return () => { cancelled = true; };
+  }, [open, editing]);
+
+  /* Picking a template pre-fills the commercial defaults; the name stays
+     yours. The stage pipeline + task checklist are copied server-side on
+     Create via template_id. */
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const tpl = templates.find((t) => t.id === id);
+    if (!tpl) return;
+    setColor(tpl.color ?? "#818cf8");
+    setDescription(tpl.description ?? "");
+    setIsBillable(tpl.is_billable);
+    setBillingRate(tpl.billing_rate?.toString() ?? "");
+    setBudgetAmount(tpl.budget_amount?.toString() ?? "");
+    setBudgetHours(tpl.budget_hours?.toString() ?? "");
+  };
 
   if (!open) return null;
 
@@ -1594,6 +1626,7 @@ function ProjectFormModal({
       budget_hours: budgetHours ? Number(budgetHours) : null,
       budget_amount: budgetAmount ? Number(budgetAmount) : null,
       billing_rate: billingRate ? Number(billingRate) : null,
+      is_template: isTemplate,
       status,
       customer_id: customerId,
       manager_account_id: managerId,
@@ -1601,7 +1634,7 @@ function ProjectFormModal({
     if (editing) {
       await updateProject(editing.id, payload);
     } else {
-      await createProject(payload);
+      await createProject({ ...payload, template_id: templateId || null });
     }
     onSaved();
   };
@@ -1625,6 +1658,25 @@ function ProjectFormModal({
           </button>
         </div>
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
+          {!editing && templates.length > 0 && (
+            <Field label={t("form.template", "Start from template")}>
+              <select
+                value={templateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none"
+              >
+                <option value="">{t("form.template.blank", "Blank project")}</option>
+                {templates.map((tp) => (
+                  <option key={tp.id} value={tp.id}>{tp.name}</option>
+                ))}
+              </select>
+              {templateId && (
+                <div className="text-[11px] text-[var(--text-dim)] pt-1">
+                  {t("form.template.hint", "Stages and the task checklist will be copied from this template.")}
+                </div>
+              )}
+            </Field>
+          )}
           <Field label={t("form.name")}>
             <input value={name} onChange={(e) => setName(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
           </Field>
@@ -1682,6 +1734,12 @@ function ProjectFormModal({
               </label>
             </Field>
           </div>
+          <Field label={t("form.isTemplate", "Template")}>
+            <label className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] cursor-pointer">
+              <input type="checkbox" checked={isTemplate} onChange={(e) => setIsTemplate(e.target.checked)} className="accent-white" />
+              <span className="text-[13px] text-[var(--text-dim)]">{t("form.isTemplateHint", "Save as a reusable template — hidden from project lists, offered when creating new projects")}</span>
+            </label>
+          </Field>
           <Field label={t("form.status")}>
             <div className="flex gap-1.5 flex-wrap">
               {(["active", "on_hold", "completed", "archived"] as const).map((s) => (

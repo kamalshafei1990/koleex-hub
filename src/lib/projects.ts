@@ -126,11 +126,13 @@ export async function fetchProjects(params: {
   status?: ProjectStatus | "all";
   customer_id?: string;
   search?: string;
+  templates?: boolean;
 } = {}): Promise<ProjectRow[]> {
   const q = new URLSearchParams();
   if (params.status) q.set("status", params.status);
   if (params.customer_id) q.set("customer_id", params.customer_id);
   if (params.search) q.set("search", params.search);
+  if (params.templates) q.set("templates", "1");
   const res = await fetch(`/api/projects?${q.toString()}`, { credentials: "include" });
   if (!res.ok) return [];
   const { projects } = (await res.json()) as { projects: ProjectRow[] };
@@ -144,7 +146,7 @@ export async function fetchProject(id: string): Promise<ProjectRow | null> {
   return project ?? null;
 }
 
-export async function createProject(body: Partial<ProjectRow> & { name: string }): Promise<ProjectRow | null> {
+export async function createProject(body: Partial<ProjectRow> & { name: string; template_id?: string | null }): Promise<ProjectRow | null> {
   const res = await fetch("/api/projects", {
     method: "POST",
     credentials: "include",

@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     .select(
       `id, tenant_id, project_id, stage_id, parent_task_id,
        title, description, priority, assignee_account_id, followers_account_ids,
-       tag_ids, due_date, start_date, estimated_hours, logged_hours,
+       tag_ids, blocked_by_task_ids, due_date, start_date, estimated_hours, logged_hours,
        progress_pct, status,
        linked_planning_item_id, linked_entity_type, linked_entity_id, linked_entity_label,
        sort_order, closed_at, created_at, updated_at,

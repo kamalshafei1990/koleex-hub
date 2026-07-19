@@ -22,6 +22,9 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status") ?? "active";
   const customerId = url.searchParams.get("customer_id");
   const search = url.searchParams.get("search")?.trim();
+  // templates=1 → template gallery only; otherwise templates never mix
+  // into the regular project lists.
+  const templatesOnly = url.searchParams.get("templates") === "1";
 
   let q = supabaseServer
     .from("projects")
@@ -29,14 +32,15 @@ export async function GET(req: Request) {
       `id, tenant_id, name, code, description, color, icon, status,
        is_billable, is_template, is_favorite,
        customer_id, manager_account_id,
-       planned_start, planned_end, budget_hours, progress_pct,
+       planned_start, planned_end, budget_hours, budget_amount, billing_rate, progress_pct,
        sort_order, created_at, updated_at,
        customer:customer_id ( id, display_name, company_name ),
        manager:manager_account_id ( id, username )`,
     )
     .eq("tenant_id", auth.tenant_id);
 
-  if (status !== "all") q = q.eq("status", status);
+  q = q.eq("is_template", templatesOnly);
+  if (!templatesOnly && status !== "all") q = q.eq("status", status);
   if (customerId) q = q.eq("customer_id", customerId);
   if (search) {
     const term = `%${search}%`;
@@ -77,6 +81,8 @@ export async function POST(req: Request) {
     budget_hours?: number | null;
     budget_amount?: number | null;
     billing_rate?: number | null;
+    is_template?: boolean;
+    template_id?: string | null;
   };
   if (!body.name?.trim()) {
     return NextResponse.json({ error: "name required" }, { status: 400 });
@@ -99,6 +105,7 @@ export async function POST(req: Request) {
       budget_hours: body.budget_hours ?? null,
       budget_amount: body.budget_amount ?? null,
       billing_rate: body.billing_rate ?? null,
+      is_template: body.is_template ?? false,
       created_by_account_id: auth.account_id,
     })
     .select("*")
@@ -109,24 +116,119 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error?.message ?? "Insert failed" }, { status: 500 });
   }
 
-  // Seed 4 sensible default kanban stages.
-  const defaults = [
-    { name: "To Do",       color: "#94a3b8", sort: 0, closed: false, default_new: true  },
-    { name: "In Progress", color: "#60a5fa", sort: 1, closed: false, default_new: false },
-    { name: "Review",      color: "#fbbf24", sort: 2, closed: false, default_new: false },
-    { name: "Done",        color: "#34d399", sort: 3, closed: true,  default_new: false },
-  ];
-  await supabaseServer.from("project_stages").insert(
-    defaults.map((d) => ({
-      tenant_id: auth.tenant_id,
-      project_id: project.id,
-      name: d.name,
-      color: d.color,
-      sort_order: d.sort,
-      is_closed: d.closed,
-      is_default_new: d.default_new,
-    })),
-  );
+  if (body.template_id) {
+    // Start from template: copy the template's stage pipeline and its task
+    // checklist (titles/descriptions/priorities/estimates, subtask +
+    // blocked-by structure remapped) — fresh, unassigned, undated.
+    await copyFromTemplate(auth.tenant_id, body.template_id, project.id);
+  } else {
+    // Seed 4 sensible default kanban stages.
+    const defaults = [
+      { name: "To Do",       color: "#94a3b8", sort: 0, closed: false, default_new: true  },
+      { name: "In Progress", color: "#60a5fa", sort: 1, closed: false, default_new: false },
+      { name: "Review",      color: "#fbbf24", sort: 2, closed: false, default_new: false },
+      { name: "Done",        color: "#34d399", sort: 3, closed: true,  default_new: false },
+    ];
+    await supabaseServer.from("project_stages").insert(
+      defaults.map((d) => ({
+        tenant_id: auth.tenant_id,
+        project_id: project.id,
+        name: d.name,
+        color: d.color,
+        sort_order: d.sort,
+        is_closed: d.closed,
+        is_default_new: d.default_new,
+      })),
+    );
+  }
 
   return NextResponse.json({ project });
+}
+
+/** Copy a template project's stages + non-cancelled tasks into a fresh
+ *  project. Task assignees, dates, logged hours and progress are reset;
+ *  parent/blocked-by links are remapped onto the new task ids. Best-effort:
+ *  a partial copy still leaves a usable project. */
+async function copyFromTemplate(
+  tenantId: string,
+  templateId: string,
+  projectId: string,
+): Promise<void> {
+  try {
+    const { data: stages } = await supabaseServer
+      .from("project_stages")
+      .select("id, name, color, sort_order, is_closed, is_default_new")
+      .eq("tenant_id", tenantId)
+      .eq("project_id", templateId)
+      .order("sort_order", { ascending: true });
+
+    const stageMap = new Map<string, string>();
+    for (const s of stages ?? []) {
+      const { data: created } = await supabaseServer
+        .from("project_stages")
+        .insert({
+          tenant_id: tenantId,
+          project_id: projectId,
+          name: s.name,
+          color: s.color,
+          sort_order: s.sort_order,
+          is_closed: s.is_closed,
+          is_default_new: s.is_default_new,
+        })
+        .select("id")
+        .single();
+      if (created) stageMap.set(s.id as string, created.id as string);
+    }
+
+    const { data: tasks } = await supabaseServer
+      .from("project_tasks")
+      .select("id, stage_id, parent_task_id, title, description, priority, tag_ids, estimated_hours, blocked_by_task_ids, sort_order")
+      .eq("tenant_id", tenantId)
+      .eq("project_id", templateId)
+      .neq("status", "cancelled")
+      .order("sort_order", { ascending: true })
+      .limit(500);
+    if (!tasks || tasks.length === 0) return;
+
+    // Pass 1: create all tasks, remembering old→new ids.
+    const taskMap = new Map<string, string>();
+    for (const t of tasks) {
+      const { data: created } = await supabaseServer
+        .from("project_tasks")
+        .insert({
+          tenant_id: tenantId,
+          project_id: projectId,
+          stage_id: t.stage_id ? stageMap.get(t.stage_id as string) ?? null : null,
+          title: t.title,
+          description: t.description,
+          priority: t.priority,
+          tag_ids: t.tag_ids ?? [],
+          estimated_hours: t.estimated_hours,
+          sort_order: t.sort_order,
+          status: "open",
+        })
+        .select("id")
+        .single();
+      if (created) taskMap.set(t.id as string, created.id as string);
+    }
+
+    // Pass 2: remap subtask + blocked-by structure onto the new ids.
+    for (const t of tasks) {
+      const newId = taskMap.get(t.id as string);
+      if (!newId) continue;
+      const parent = t.parent_task_id ? taskMap.get(t.parent_task_id as string) ?? null : null;
+      const blockers = ((t.blocked_by_task_ids as string[] | null) ?? [])
+        .map((b) => taskMap.get(b))
+        .filter(Boolean) as string[];
+      if (parent || blockers.length > 0) {
+        await supabaseServer
+          .from("project_tasks")
+          .update({ parent_task_id: parent, blocked_by_task_ids: blockers })
+          .eq("id", newId)
+          .eq("tenant_id", tenantId);
+      }
+    }
+  } catch (e) {
+    console.error("[api/projects] copyFromTemplate:", e);
+  }
 }
