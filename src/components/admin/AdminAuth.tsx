@@ -284,7 +284,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
     return (
       <div
-        className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4 py-10 relative overflow-hidden"
+        className="h-[100dvh] bg-[#0A0A0A] flex justify-center overflow-y-auto overflow-x-hidden p-4 py-10 relative"
         style={{
           backgroundImage:
             "radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.05), transparent 60%)",
@@ -306,7 +306,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         />
 
         <div
-          className={`relative w-full transition-[max-width] duration-300 ${
+          className={`relative w-full my-auto transition-[max-width] duration-300 ${
             isWide ? "max-w-[560px]" : "max-w-md"
           }`}
         >
