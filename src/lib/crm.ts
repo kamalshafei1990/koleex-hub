@@ -76,11 +76,14 @@ export interface CrmContactPick {
  *  keystroke cancels an in-flight request. */
 export async function searchCrmContacts(
   q: string,
-  opts?: { kind?: "company" | "person"; limit?: number; signal?: AbortSignal },
+  opts?: { kind?: "company" | "person"; limit?: number; signal?: AbortSignal; browse?: boolean },
 ): Promise<CrmContactPick[]> {
   const needle = q.trim();
-  if (needle.length < 2) return [];
+  /* Empty needle + browse → first page (picker's browse-on-focus list). */
+  const browse = needle.length === 0 && opts?.browse === true;
+  if (needle.length < 2 && !browse) return [];
   const params = new URLSearchParams({ q: needle });
+  if (browse) params.set("browse", "1");
   if (opts?.kind) params.set("kind", opts.kind);
   if (opts?.limit) params.set("limit", String(opts.limit));
   try {

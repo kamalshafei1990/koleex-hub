@@ -68,25 +68,31 @@ export async function GET(req: Request) {
     50,
   );
 
-  /* Guard: never stream the directory. Below the minimum, return nothing —
-     the client shows the currently-selected value (which it already holds)
-     instead of a broad list. */
-  if (q.length < MIN_QUERY) {
+  /* `browse=1` with an EMPTY query returns the first page (≤ limit, still
+     tenant-scoped + slim) so the picker can show a browsable customer list
+     on focus — the operator shouldn't have to guess two letters before
+     seeing anyone. Any other sub-minimum query still returns nothing; the
+     full directory is never streamed. */
+  const browse = url.searchParams.get("browse") === "1" && q.length === 0;
+  if (q.length < MIN_QUERY && !browse) {
     return NextResponse.json({ rows: [] as CrmContactPick[] });
   }
 
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
   let query = supabaseServer
     .from("contacts")
     .select(
       "id, entity_type, contact_type, display_name, first_name, last_name, company, email, photo_url",
     )
     .eq("tenant_id", auth.tenant_id)
-    .or(
-      `display_name.ilike.${like},company.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`,
-    )
     .order("display_name", { ascending: true, nullsFirst: false })
     .limit(limit);
+
+  if (!browse) {
+    const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+    query = query.or(
+      `display_name.ilike.${like},company.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`,
+    );
+  }
 
   /* Optional server-side kind narrowing. "person" excludes org-type rows;
      "company" is left broad because a person row can still carry a matching

@@ -1662,13 +1662,14 @@ function ContactComboboxField({
 
   useEffect(() => {
     const q = value.trim();
-    // Below the minimum (or while an IME candidate is open, or the dropdown is
-    // closed) we show nothing — the selected value stays visible in the input
-    // and we never stream the directory.
-    if (!open || composing || q.length < 2) {
+    // Closed or mid-IME → nothing. Empty query → BROWSE page (first ≤20
+    // customers) so focusing the field shows a pickable list. One char →
+    // nothing (too broad to search, too narrow to browse). 2+ → search.
+    if (!open || composing || q.length === 1) {
       setResults([]);
       return;
     }
+    const browse = q.length === 0;
     const timer = setTimeout(() => {
       const seq = ++seqRef.current;
       abortRef.current?.abort();
@@ -1680,6 +1681,7 @@ function ContactComboboxField({
         kind: filter,
         limit: 20,
         signal: ctrl.signal,
+        browse,
       }).then((rows) => {
         if (seq !== seqRef.current) {
           // A newer keystroke superseded this response — drop it.
@@ -1705,7 +1707,13 @@ function ContactComboboxField({
 
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return [] as CrmContactPick[];
+    /* Browse mode (empty query): show the server's first page as-is, only
+       hiding rows that make no sense for the field kind. */
+    if (!q) {
+      return results
+        .filter((c) => (filter === "person" ? !isOrg(c) : true))
+        .slice(0, 8);
+    }
     // The server already bounds + (for "person") kind-narrows the set; we
     // re-apply the exact company/person predicate on the small result page so
     // the dropdown semantics match the legacy behaviour precisely.
@@ -1794,9 +1802,7 @@ function ContactComboboxField({
           }}
           onCompositionStart={() => setComposing(true)}
           onCompositionEnd={() => setComposing(false)}
-          onFocus={() => {
-            if (value.trim().length > 0) setOpen(true);
-          }}
+          onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
             if (!open || items.length === 0) {
               if (e.key === "Escape") setOpen(false);
