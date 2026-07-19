@@ -63,6 +63,7 @@ import {
   fetchTasks,
   formatDueDate,
   type AccountLite,
+  accountLabel,
   isOverdue,
   PRIORITY_COLOR,
   updateProject,
@@ -205,7 +206,7 @@ function AccountSelect({
     >
       <option value="">{placeholder}</option>
       {accounts.map((a) => (
-        <option key={a.id} value={a.id}>{a.username}</option>
+        <option key={a.id} value={a.id}>{accountLabel(a)}</option>
       ))}
     </select>
   );

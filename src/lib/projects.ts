@@ -473,20 +473,30 @@ export async function deleteAttachment(taskId: string, id: string): Promise<bool
 export interface AccountLite {
   id: string;
   username: string;
+  full_name: string | null;
+  name_alt: string | null;
+}
+
+/** Display label for a picker option: real name first, native name beside it. */
+export function accountLabel(a: AccountLite): string {
+  const name = a.full_name || a.username;
+  return a.name_alt ? `${name} · ${a.name_alt}` : name;
 }
 
 let _accountsCache: AccountLite[] | null = null;
 export async function fetchAccounts(): Promise<AccountLite[]> {
   if (_accountsCache) return _accountsCache;
-  const res = await fetch("/api/accounts", { credentials: "include" });
+  const res = await fetch("/api/projects/members", { credentials: "include" });
   if (!res.ok) return [];
-  const { accounts } = (await res.json()) as {
-    accounts: { id: string; username: string; status?: string }[];
+  const { members } = (await res.json()) as {
+    members: { account_id: string; username: string; full_name: string | null; name_alt: string | null }[];
   };
-  const list = (accounts ?? [])
-    .filter((a) => a.status !== "inactive" && a.status !== "disabled")
-    .map((a) => ({ id: a.id, username: a.username }))
-    .sort((a, b) => a.username.localeCompare(b.username));
+  const list = (members ?? []).map((m) => ({
+    id: m.account_id,
+    username: m.username,
+    full_name: m.full_name,
+    name_alt: m.name_alt,
+  }));
   _accountsCache = list;
   return list;
 }

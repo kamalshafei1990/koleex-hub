@@ -47,7 +47,9 @@ export async function GET(req: Request) {
       const term = `%${q}%`;
       query = query.or(`display_name.ilike.${term},company_name.ilike.${term}`);
     }
-    const { data, error } = await query.limit(LIMIT);
+    const { data, error } = await query
+      .order("display_name", { ascending: true, nullsFirst: false })
+      .limit(LIMIT);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -65,7 +67,9 @@ export async function GET(req: Request) {
       const term = `%${q}%`;
       query = query.or(`name.ilike.${term},sku.ilike.${term}`);
     }
-    const { data, error } = await query.limit(LIMIT);
+    const { data, error } = await query
+      .order("name", { ascending: true, nullsFirst: false })
+      .limit(LIMIT);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
