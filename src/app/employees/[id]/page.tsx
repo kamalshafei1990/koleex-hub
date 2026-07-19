@@ -13,7 +13,10 @@
 import { useEffect, useMemo, useState, use } from "react";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -29,10 +32,12 @@ import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import {
   fetchEmployeeProfile,
   fetchEmployeeActivity,
+  deleteEmployee,
   type ActivityBucket,
   type ActivityItem,
   type EmployeeActivity,
 } from "@/lib/employees-admin";
+import { usePermissions } from "@/lib/permissions";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { EmployeeWithLinks } from "@/types/supabase";
@@ -230,11 +235,28 @@ export default function EmployeeProfilePage({
 }) {
   const { t } = useTranslation(employeesT);
   const { id } = use(params);
+  const router = useRouter();
+  const perms = usePermissions();
   const [profile, setProfile] = useState<EmployeeWithLinks | null>(null);
   const [activity, setActivity] = useState<EmployeeActivity | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const canEdit = perms.can("Employees", "edit");
+  const canDelete = perms.can("Employees", "delete");
+
+  const onDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await deleteEmployee(id);
+    setDeleting(false);
+    if (!res.ok) { setDeleteError(res.error ?? "Delete failed."); return; }
+    router.push("/employees");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -296,7 +318,7 @@ export default function EmployeeProfilePage({
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
-        {/* ── Back ── */}
+        {/* ── Back + actions ── */}
         <div className="flex items-center gap-3 mb-5">
           <Link
             href="/employees"
@@ -305,7 +327,28 @@ export default function EmployeeProfilePage({
           >
             <ArrowLeftIcon size={16} />
           </Link>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">{t("app.profile")}</h1>
+          <h1 className="text-lg font-semibold text-[var(--text-primary)] flex-1 min-w-0 truncate">{t("app.profile")}</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <Link
+                href={`/employees/${id}/edit`}
+                className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all"
+              >
+                <PencilIcon size={13} />
+                Edit
+              </Link>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => { setDeleteError(null); setConfirmDelete(true); }}
+                className="h-9 px-3.5 rounded-xl border border-red-500/30 text-red-400 text-[12.5px] font-semibold flex items-center gap-2 hover:bg-red-500/10 transition-colors"
+              >
+                <TrashIcon size={13} />
+                Delete
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Header card ── */}
@@ -588,6 +631,57 @@ export default function EmployeeProfilePage({
           </div>
         )}
       </div>
+
+      {/* ── Delete confirm ── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div
+            className="w-full max-w-md bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 shrink-0">
+                <TrashIcon size={16} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Delete {person.full_name}?</h3>
+                <p className="text-[12.5px] text-[var(--text-dim)] mt-1 leading-relaxed">
+                  This permanently removes the employee record and their HR history
+                  (leave, payslips, appraisals, attendance, documents). Their login
+                  account will be suspended and their identity is kept for audit
+                  trails. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            {deleteError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/25 text-[12px] text-red-400">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="h-9 px-4 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={deleting}
+                className="h-9 px-4 rounded-lg bg-red-500 text-white text-[12.5px] font-semibold flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {deleting && <SpinnerIcon size={13} className="animate-spin" />}
+                Delete employee
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

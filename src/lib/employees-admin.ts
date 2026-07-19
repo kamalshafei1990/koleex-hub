@@ -31,12 +31,8 @@ import type {
 } from "@/types/supabase";
 
 /* ── Table names ── */
-const PEOPLE = "people";
-const EMPLOYEES = "koleex_employees";
-const ACCOUNTS = "accounts";
 const DEPARTMENTS = "koleex_departments";
 const POSITIONS = "koleex_positions";
-const ASSIGNMENTS = "koleex_assignments";
 const HISTORY = "koleex_position_history";
 
 /* ── Employee list item (joined data) ── */
@@ -754,64 +750,64 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
 
 
 /* ═══════════════════════════════════════════════════
-   UPDATE / DELETE
+   UPDATE / DELETE — API-first.
+
+   The old updateEmployeePerson/updateEmployeeHR/deactivateEmployee
+   helpers wrote through the browser anon client, which the P0 RLS
+   lockdown blocks on people/koleex_employees/accounts — they silently
+   failed and had no callers. Replaced with server-route calls that
+   carry real permission gating + audit logging.
    ═══════════════════════════════════════════════════ */
 
-/** Update person fields */
-export async function updateEmployeePerson(
-  personId: string,
-  updates: Partial<PersonRow>,
-): Promise<boolean> {
-  const { error } = await supabase.from(PEOPLE).update(updates).eq("id", personId);
-  if (error) { console.error("[Person] Update:", error.message); return false; }
-  return true;
+export interface UpdateEmployeeInput {
+  /** koleex_employees columns to update (HR fields). */
+  employee?: Partial<EmployeeRow>;
+  /** Shared people profile columns (name, contact, address). */
+  person?: Partial<PersonRow>;
+  /** Move the employee in the org chart. Both ids required together. */
+  assignment?: { department_id: string; position_id: string };
 }
 
-/** Update HR fields */
-export async function updateEmployeeHR(
+/** Update an employee across employee/person/assignment in one call.
+ *  Server enforces the Employees·edit permission + private-column policy. */
+export async function updateEmployee(
   employeeId: string,
-  updates: Partial<EmployeeRow>,
-): Promise<boolean> {
-  const { error } = await supabase.from(EMPLOYEES).update(updates).eq("id", employeeId);
-  if (error) { console.error("[Employee] Update:", error.message); return false; }
-  return true;
+  input: UpdateEmployeeInput,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!res.ok) return { ok: false, error: json?.error ?? `Server returned ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
+  }
 }
 
-/** Deactivate an employee (soft delete) */
-export async function deactivateEmployee(employeeId: string): Promise<boolean> {
-  // Set employee status
-  const { error: empErr } = await supabase
-    .from(EMPLOYEES)
-    .update({ employment_status: "inactive" })
-    .eq("id", employeeId);
-
-  if (empErr) { console.error("[Employee] Deactivate:", empErr.message); return false; }
-
-  // Get person_id and account_id
-  const { data: emp } = await supabase
-    .from(EMPLOYEES)
-    .select("person_id, account_id")
-    .eq("id", employeeId)
-    .maybeSingle();
-
-  if (emp?.person_id) {
-    // Deactivate assignments
-    await supabase
-      .from(ASSIGNMENTS)
-      .update({ is_active: false, end_date: new Date().toISOString().split("T")[0] })
-      .eq("person_id", emp.person_id)
-      .eq("is_active", true);
+/** Hard-delete an employee record. HR-owned rows cascade; the shared
+ *  person stays and any login account is suspended server-side.
+ *  Server enforces the Employees·delete permission. */
+export async function deleteEmployee(
+  employeeId: string,
+): Promise<{ ok: boolean; error?: string; accountSuspended?: boolean }> {
+  try {
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { ok?: boolean; error?: string; accountSuspended?: boolean }
+      | null;
+    if (!res.ok) return { ok: false, error: json?.error ?? `Server returned ${res.status}` };
+    return { ok: true, accountSuspended: json?.accountSuspended };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
   }
-
-  if (emp?.account_id) {
-    // Suspend the account
-    await supabase
-      .from(ACCOUNTS)
-      .update({ status: "suspended" })
-      .eq("id", emp.account_id);
-  }
-
-  return true;
 }
 
 /* ═══════════════════════════════════════════════════
