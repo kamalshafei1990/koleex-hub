@@ -130,7 +130,7 @@ export default function UserActivityDrawer({
   const acc = detail?.account;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 top-14 z-[70] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="kx-below-header fixed inset-x-0 bottom-0 top-14 z-[70] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="h-full w-full max-w-[480px] bg-[var(--bg-secondary)] border-s border-[var(--border-subtle)] shadow-[-12px_0_40px_rgba(0,0,0,0.45)] flex flex-col"
         onClick={(e) => e.stopPropagation()}

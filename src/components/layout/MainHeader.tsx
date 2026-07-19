@@ -121,14 +121,14 @@ export default function MainHeader() {
   return (
     <header
       dir="ltr"
-      className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 border-b transition-colors duration-300 ${
+      className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-1 px-2 min-[400px]:px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
           ? "border-white/[0.08] bg-[#0A0A0A]"
           : "border-black/[0.08] bg-white"
       }`}
     >
       {/* Left: Hamburger (mobile) + Logo + Breadcrumb */}
-      <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
+      <div className="flex items-center gap-1.5 min-[400px]:gap-2 md:gap-2.5 min-w-0 shrink">
         {/* Mobile hamburger — opens sidebar drawer */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -165,7 +165,7 @@ export default function MainHeader() {
       </div>
 
       {/* Right: Language + Theme + Notifications + Account */}
-      <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+      <div className="flex items-center gap-1 min-[400px]:gap-1.5 md:gap-2 shrink-0">
         {/* Language — desktop pill bar */}
         <div
           className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${

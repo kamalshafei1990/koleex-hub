@@ -146,7 +146,7 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`h-9 px-3 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
+        className={`h-7 px-1.5 md:h-9 md:px-3 rounded-md md:rounded-xl border text-[12px] font-medium flex items-center gap-1 md:gap-2 transition-all ${
           dk
             ? "bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
             : "bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"

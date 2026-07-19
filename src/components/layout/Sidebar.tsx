@@ -487,7 +487,7 @@ export default function Sidebar() {
       {/* ── Desktop sidebar (hidden on the home launcher) ── */}
       {!isHome && (
         <aside
-          className={`hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
+          className={`kx-below-header hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
           style={{ width: w }}
         >
           <SidebarContent
@@ -527,7 +527,7 @@ export default function Sidebar() {
 
       {/* ── Mobile drawer ── */}
       <aside
-        className={`md:hidden fixed top-14 bottom-0 start-0 z-50 ${bg} border-e ${border} transition-transform duration-300 ease-in-out ${
+        className={`kx-below-header md:hidden fixed top-14 bottom-0 start-0 z-50 ${bg} border-e ${border} transition-transform duration-300 ease-in-out ${
           mobileOpen
             ? "translate-x-0 rtl:-translate-x-0"
             : "-translate-x-full rtl:translate-x-full"

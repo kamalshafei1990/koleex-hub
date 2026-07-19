@@ -120,8 +120,18 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   return (
     <QAInspectorProvider>
       <style>{`
-        :root { --kx-titlebar: 0px; --kx-safe-top: env(safe-area-inset-top, 0px); }
-        html.kx-desktop { --kx-titlebar: 30px; }
+        :root {
+          --kx-titlebar: 0px;
+          --kx-safe-top: env(safe-area-inset-top, 0px);
+          /* ONE derived var every fixed/sticky element pins to, so the whole
+             shell agrees on where "below the header" is on every device —
+             notched iPhones (safe-area), Android edge-to-edge, desktop app
+             title bar. Never hardcode top-14 on fixed elements again. */
+          --kx-header-h: calc(3.5rem + var(--kx-safe-top));
+        }
+        html.kx-desktop { --kx-titlebar: 30px; --kx-header-h: calc(3.5rem + var(--kx-titlebar)); }
+        /* Anything fixed/sticky that must sit flush under the main header. */
+        .kx-below-header { top: var(--kx-header-h) !important; }
         /* iOS installed PWA (Add to Home Screen): the status bar is
            translucent and the web view renders UNDER it, so the fixed header
            was overlapping the clock / battery / wifi. Grow the header by the

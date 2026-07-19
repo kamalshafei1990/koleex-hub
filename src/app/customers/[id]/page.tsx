@@ -466,7 +466,7 @@ export default function CustomerProfilePage({
         </section>
 
         {/* ── Tabs (sticky pill nav — matches Supplier 360) ── */}
-        <nav className="sticky top-[56px] md:top-[64px] z-20 mb-4 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
+        <nav className="kx-below-header sticky top-[56px] md:top-[64px] z-20 mb-4 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
           {TABS.map((tabKey) => {
             const label = tabKey === "activity" ? `${t("tab.activity")}${activity ? ` · ${activityTotal}` : ""}`
               : tabKey === "commercial" ? t("tab.commercial")

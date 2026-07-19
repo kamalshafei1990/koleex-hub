@@ -139,7 +139,7 @@ export default function PolicySidebar({ mobileOpen, onMobileClose }: { mobileOpe
     <>
       {/* Desktop sidebar */}
       <aside
-        className="sticky top-14 hidden h-[calc(100vh-56px)] w-[240px] shrink-0 overflow-y-auto border-r lg:block"
+        className="kx-below-header sticky top-14 hidden h-[calc(100vh-var(--kx-header-h,3.5rem))] w-[240px] shrink-0 overflow-y-auto border-r lg:block"
         style={{
           borderColor: "var(--border-subtle)",
           background: "var(--bg-primary)",
@@ -158,7 +158,7 @@ export default function PolicySidebar({ mobileOpen, onMobileClose }: { mobileOpe
           />
           {/* Drawer */}
           <aside
-            className="fixed left-0 top-14 z-50 h-[calc(100vh-56px)] w-[280px] overflow-y-auto border-r lg:hidden"
+            className="kx-below-header fixed left-0 top-14 z-50 h-[calc(100vh-var(--kx-header-h,3.5rem))] w-[280px] overflow-y-auto border-r lg:hidden"
             style={{
               borderColor: "var(--border-subtle)",
               background: "var(--bg-primary)",

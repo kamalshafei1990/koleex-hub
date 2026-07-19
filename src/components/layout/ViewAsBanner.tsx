@@ -65,7 +65,7 @@ export default function ViewAsBanner() {
     /* Compact floating pill — centered near the top, auto width, so it reads as
        a reminder of who you're viewing as without covering the page behind it.
        Not edge-to-edge; pointer-events only on the pill itself. */
-    <div className="pointer-events-none fixed inset-x-0 top-16 z-[120] flex justify-center px-3">
+    <div className="pointer-events-none fixed inset-x-0 z-[120] flex justify-center px-3" style={{ top: "calc(var(--kx-header-h, 3.5rem) + 0.5rem)" }}>
       <div
         role="status"
         aria-live="polite"
