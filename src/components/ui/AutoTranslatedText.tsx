@@ -26,9 +26,14 @@ interface Props {
   className?: string;
   /** Render the text block as a <p> (multi-line) instead of inline <span>. */
   block?: boolean;
+  /** Text only — no "auto-translated" toggle chip. The original is exposed
+      via the title tooltip instead. REQUIRED inside <button> hosts (labels,
+      dropdown rows, chips): the chip is itself a button and nested buttons
+      are invalid HTML (hydration error) — and it visually clutters tight UI. */
+  plain?: boolean;
 }
 
-export default function AutoTranslatedText({ text, className, block }: Props) {
+export default function AutoTranslatedText({ text, className, block, plain }: Props) {
   const { t } = useTranslation(commonT);
   const { display, wasTranslated, original, loading } = useAutoTranslate(text);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -37,6 +42,15 @@ export default function AutoTranslatedText({ text, className, block }: Props) {
 
   const shown = showOriginal ? original : display;
   const Wrapper = (block ? "p" : "span") as "p" | "span";
+
+  if (plain) {
+    return (
+      <Wrapper className={className} title={wasTranslated ? original ?? undefined : undefined}
+        style={block ? { whiteSpace: "pre-wrap" } : undefined}>
+        {display}
+      </Wrapper>
+    );
+  }
 
   return (
     <Wrapper className={className} style={block ? { whiteSpace: "pre-wrap" } : undefined}>

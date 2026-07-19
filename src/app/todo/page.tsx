@@ -310,7 +310,7 @@ function LabelPicker({ labels, value, onChange, t, newLabelName, setNewLabelName
         {selected ? (
           <span className="flex items-center gap-2 text-[var(--text-primary)] min-w-0">
             {selected.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />}
-            <span className="truncate">{selected.name}</span>
+            <span className="truncate"><AutoTranslatedText text={selected.name} plain /></span>
           </span>
         ) : (
           <span className="text-[var(--text-dim)]">{t("f.label.choose")}</span>
@@ -352,7 +352,7 @@ function LabelPicker({ labels, value, onChange, t, newLabelName, setNewLabelName
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
                   }`}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: l.color ?? "#94a3b8" }} />
-                  <span className="truncate">{l.name}</span>
+                  <span className="truncate"><AutoTranslatedText text={l.name} plain /></span>
                 </button>
               );
             })}
@@ -1000,7 +1000,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
             )}
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
-                <TagsIcon size={9} /> {task.label}
+                <TagsIcon size={9} /> <AutoTranslatedText text={task.label} plain />
               </span>
             )}
             {task.recurrence && (
@@ -1147,7 +1147,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date) } : null,
               task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at) } : null,
               task.recurrence ? { label: t("f.recurrence"), value: t("rec." + task.recurrence) } : null,
-              task.label ? { label: t("f.label"), value: task.label } : null,
+              task.label ? { label: t("f.label"), value: <AutoTranslatedText text={task.label} plain /> } : null,
             ].filter(Boolean).map((f, i) => (
               <div key={i}>
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{f!.label}</div>
