@@ -53,6 +53,7 @@ export interface ProjectRow {
   planned_end: string | null;
   budget_hours: number | null;
   budget_amount: number | null;
+  billing_rate: number | null;
   progress_pct: number | null;
   sort_order: number;
   created_at: string;

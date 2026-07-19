@@ -629,6 +629,33 @@ function ProjectDetailView({
                 </button>
               ))}
             </div>
+            {project.is_billable && (
+              <button
+                onClick={async () => {
+                  if (!confirm(t("bill.confirm", "Create a draft invoice for all unbilled logged time on this project?"))) return;
+                  const res = await fetch("/api/invoices/from-project-time", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ project_id: projectId }),
+                  });
+                  const json = (await res.json().catch(() => null)) as
+                    | { invoice?: { inv_no: string }; hours?: number; error?: string }
+                    | null;
+                  if (!res.ok || !json?.invoice) {
+                    alert(json?.error ?? `HTTP ${res.status}`);
+                    return;
+                  }
+                  alert(`${json.invoice.inv_no} created — ${json.hours ?? 0}h billed.`);
+                  window.location.assign("/invoices");
+                }}
+                className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 text-[11px] font-semibold shrink-0"
+                title={t("bill.tip", "Invoice all unbilled logged time (uses the project's billing rate)")}
+              >
+                <ClockIcon size={12} />
+                <span className="hidden md:inline">{t("bill.btn", "Invoice time")}</span>
+              </button>
+            )}
             <button
               onClick={() => setProjectFormOpen(true)}
               className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
@@ -1511,6 +1538,7 @@ function ProjectFormModal({
   const [plannedEnd, setPlannedEnd] = useState("");
   const [budgetHours, setBudgetHours] = useState<string>("");
   const [budgetAmount, setBudgetAmount] = useState<string>("");
+  const [billingRate, setBillingRate] = useState<string>("");
   const [status, setStatus] = useState<"active" | "on_hold" | "completed" | "archived">("active");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerLabel, setCustomerLabel] = useState<string>("");
@@ -1528,6 +1556,7 @@ function ProjectFormModal({
       setPlannedEnd(editing.planned_end ?? "");
       setBudgetHours(editing.budget_hours?.toString() ?? "");
       setBudgetAmount(editing.budget_amount?.toString() ?? "");
+      setBillingRate(editing.billing_rate?.toString() ?? "");
       setStatus(editing.status);
       setCustomerId(editing.customer_id);
       setCustomerLabel(editing.customer?.display_name ?? editing.customer?.company_name ?? "");
@@ -1542,6 +1571,7 @@ function ProjectFormModal({
       setPlannedEnd("");
       setBudgetHours("");
       setBudgetAmount("");
+      setBillingRate("");
       setStatus("active");
       setCustomerId(null);
       setCustomerLabel("");
@@ -1563,6 +1593,7 @@ function ProjectFormModal({
       planned_end: plannedEnd || null,
       budget_hours: budgetHours ? Number(budgetHours) : null,
       budget_amount: budgetAmount ? Number(budgetAmount) : null,
+      billing_rate: billingRate ? Number(billingRate) : null,
       status,
       customer_id: customerId,
       manager_account_id: managerId,
@@ -1629,6 +1660,9 @@ function ProjectFormModal({
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Field label={t("form.billingRate", "Billing rate / hour")}>
+              <input type="number" value={billingRate} onChange={(e) => setBillingRate(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
+            </Field>
             <Field label={t("form.budgetAmount", "Budget amount")}>
               <input type="number" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
             </Field>

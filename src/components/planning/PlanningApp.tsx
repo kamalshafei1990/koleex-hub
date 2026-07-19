@@ -19,6 +19,7 @@ import { planningT } from "@/lib/translations/planning";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -62,10 +63,12 @@ import {
   type PlanningResource,
   type PlanningResourceType,
   type PlanningRole,
+  fetchLeaves,
+  type LeaveSpan,
 } from "@/lib/planning";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 
-type TabId = "schedule" | "open" | "mine" | "config";
+type TabId = "schedule" | "open" | "mine" | "utilization" | "config";
 
 export default function PlanningApp() {
   const { t } = useTranslation(planningT);
@@ -76,6 +79,7 @@ export default function PlanningApp() {
   const [items, setItems] = useState<PlanningItem[]>([]);
   const [resources, setResources] = useState<PlanningResource[]>([]);
   const [roles, setRoles] = useState<PlanningRole[]>([]);
+  const [leaves, setLeaves] = useState<LeaveSpan[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [anchor, setAnchor] = useState<Date>(() => startOfWeek(new Date()));
@@ -89,17 +93,22 @@ export default function PlanningApp() {
   }>({ open: false, editing: null });
 
   const reload = useCallback(async () => {
-    const [i, r, ro] = await Promise.all([
+    const [i, r, ro, lv] = await Promise.all([
       fetchItems({
         start: weekStart.toISOString(),
         end: weekEnd.toISOString(),
       }),
       fetchResources(),
       fetchRoles(),
+      fetchLeaves(
+        weekStart.toISOString().slice(0, 10),
+        weekEnd.toISOString().slice(0, 10),
+      ),
     ]);
     setItems(i);
     setResources(r);
     setRoles(ro);
+    setLeaves(lv);
   }, [weekStart, weekEnd]);
 
   useEffect(() => {
@@ -226,6 +235,12 @@ export default function PlanningApp() {
               label={t("tab.myPlanning")}
             />
             <TabButton
+              active={tab === "utilization"}
+              onClick={() => setTab("utilization")}
+              icon={<BarChart3Icon size={13} />}
+              label={t("tab.utilization", "Utilization")}
+            />
+            <TabButton
               active={tab === "config"}
               onClick={() => setTab("config")}
               icon={<CogIcon size={13} />}
@@ -245,6 +260,7 @@ export default function PlanningApp() {
               { key: "open",      onClick: () => setTab("open"),     icon: "paper-plane",  label: "Open Shifts"   },
               { key: "mine",      onClick: () => setTab("mine"),     icon: "clock",        label: "My Planning"   },
               { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: "New" },
+              { key: "utilization", onClick: () => setTab("utilization"), icon: "clock", label: "Utilization" },
               { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: "Configuration" },
             ]}
             searchPlaceholder={searchPlaceholder}
@@ -260,6 +276,7 @@ export default function PlanningApp() {
               items={items}
               resources={resources}
               roles={roles}
+              leaves={leaves}
               onPrev={() => setAnchor(addDays(weekStart, -7))}
               onNext={() => setAnchor(addDays(weekStart, 7))}
               onToday={() => setAnchor(startOfWeek(new Date()))}
@@ -269,6 +286,8 @@ export default function PlanningApp() {
               onItemClick={(item) => setModal({ open: true, editing: item })}
               onItemDrop={handleItemDrop}
             />
+          ) : tab === "utilization" ? (
+            <UtilizationView items={items} resources={resources} leaves={leaves} />
           ) : tab === "open" ? (
             <OpenShiftsView
               items={items.filter((i) => !i.resource_id)}
@@ -349,6 +368,7 @@ function ScheduleView({
   items,
   resources,
   roles,
+  leaves,
   onPrev,
   onNext,
   onToday,
@@ -360,6 +380,7 @@ function ScheduleView({
   items: PlanningItem[];
   resources: PlanningResource[];
   roles: PlanningRole[];
+  leaves: LeaveSpan[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -381,6 +402,18 @@ function ScheduleView({
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
+
+  /* Approved-leave overlay: resource|dayKey cells the person is away. */
+  const leaveCells = useMemo(() => {
+    const set = new Set<string>();
+    for (const lv of leaves) {
+      for (const d of days) {
+        const dk = toLocalDateKey(d.toISOString());
+        if (lv.start_date <= dk && dk <= lv.end_date) set.add(`${lv.resource_id}|${dk}`);
+      }
+    }
+    return set;
+  }, [leaves, days]);
 
   const visibleResources = useMemo(() => {
     if (resourceType === "all") return resources.filter((r) => r.is_active);
@@ -426,8 +459,13 @@ function ScheduleView({
         }
       }
     }
+    // Items scheduled on a day their resource is on approved leave.
+    for (const it of items) {
+      if (!it.resource_id || it.status === "cancelled") continue;
+      if (leaveCells.has(`${it.resource_id}|${toLocalDateKey(it.start_at)}`)) set.add(it.id);
+    }
     return set;
-  }, [items]);
+  }, [items, leaveCells]);
 
   const rows =
     groupBy === "resource"
@@ -609,6 +647,11 @@ function ScheduleView({
                     </button>
                   )}
                 </div>
+                {leaveCells.has(key) && (
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-amber-400 mb-1">
+                    {t("sched.onLeave", "On leave")}
+                  </div>
+                )}
                 {cellItems.length > 0 ? (
                   <div className="space-y-1.5">
                     {cellItems.map((it) => (
@@ -732,6 +775,11 @@ function ScheduleView({
                       : "hover:bg-[var(--bg-surface-subtle)]"
                   }`}
                 >
+                  {leaveCells.has(key) && (
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-px self-start">
+                      {t("sched.onLeave", "On leave")}
+                    </span>
+                  )}
                   {cellItems.map((it) => (
                     <ItemPill
                       key={it.id}
@@ -1680,4 +1728,78 @@ function toDTLocal(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   UTILIZATION — scheduled vs capacity per employee, current week
+   ══════════════════════════════════════════════════════════════════ */
+
+function UtilizationView({
+  items,
+  resources,
+  leaves,
+}: {
+  items: PlanningItem[];
+  resources: PlanningResource[];
+  leaves: LeaveSpan[];
+}) {
+  const { t } = useTranslation(planningT);
+  const spanHours = (i: PlanningItem) =>
+    i.allocated_hours ??
+    Math.max(0, (new Date(i.end_at).getTime() - new Date(i.start_at).getTime()) / 3_600_000);
+
+  const rows = resources
+    .filter((r) => r.is_active && r.type === "employee")
+    .map((r) => {
+      const mine = items.filter((i) => i.resource_id === r.id && i.status !== "cancelled");
+      const hours = mine.reduce((s, i) => s + spanHours(i), 0);
+      const billable = mine.filter((i) => i.is_billable).reduce((s, i) => s + spanHours(i), 0);
+      const leaveDays = leaves.filter((l) => l.resource_id === r.id).length;
+      const capacity = (r.capacity_hours_per_day ?? 8) * 5;
+      const pct = capacity > 0 ? Math.round((hours / capacity) * 100) : 0;
+      return { r, hours, billable, capacity, pct, onLeave: leaveDays > 0 };
+    })
+    .sort((a, b) => b.pct - a.pct);
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-6 py-12 text-center text-[12px] text-[var(--text-dim)]">
+        {t("util.empty", "Add employee resources in Configuration to see utilization.")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">
+      <div className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+        {t("util.title", "This week — scheduled vs capacity (Mon–Fri)")}
+      </div>
+      {rows.map(({ r, hours, billable, capacity, pct, onLeave }) => (
+        <div key={r.id} className="px-4 py-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{r.name}</span>
+            {onLeave && (
+              <span className="text-[9px] font-bold uppercase tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-px">
+                {t("sched.onLeave", "On leave")}
+              </span>
+            )}
+            <span className={`ml-auto text-[12px] font-bold ${pct > 100 ? "text-red-400" : "text-[var(--text-primary)]"}`}>
+              {pct}%
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+            <div
+              className={`h-full rounded-full ${pct > 100 ? "bg-red-500/80" : "bg-[var(--bg-inverted)]"}`}
+              style={{ width: `${Math.min(100, pct)}%` }}
+            />
+          </div>
+          <div className="mt-1 text-[11px] text-[var(--text-dim)]">
+            {hours.toFixed(1)}h {t("util.of", "of")} {capacity}h
+            {billable > 0 ? ` · ${billable.toFixed(1)}h ${t("util.billable", "billable")}` : ""}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

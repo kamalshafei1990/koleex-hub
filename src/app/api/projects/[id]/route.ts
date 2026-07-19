@@ -40,7 +40,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     "name", "code", "description", "color", "icon", "status",
     "is_billable", "is_template", "is_favorite",
     "customer_id", "manager_account_id",
-    "planned_start", "planned_end", "budget_hours", "budget_amount", "progress_pct",
+    "planned_start", "planned_end", "budget_hours", "budget_amount", "billing_rate", "progress_pct",
     "sort_order",
   ];
   const patch: Record<string, unknown> = {};

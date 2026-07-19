@@ -422,3 +422,16 @@ export async function fetchLinkedItems(
   const { items } = (await res.json()) as { items: PlanningItem[] };
   return items ?? [];
 }
+
+/* ── HR leave overlay (approved leave mapped to employee resources) ── */
+export interface LeaveSpan {
+  resource_id: string;
+  start_date: string;
+  end_date: string;
+}
+export async function fetchLeaves(from: string, to: string): Promise<LeaveSpan[]> {
+  const res = await fetch(`/api/planning/leaves?from=${from}&to=${to}`, { credentials: "include" });
+  if (!res.ok) return [];
+  const { leaves } = (await res.json()) as { leaves: LeaveSpan[] };
+  return leaves ?? [];
+}
