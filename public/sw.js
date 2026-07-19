@@ -16,7 +16,10 @@
       The respondWith promise can never reject: on any error it falls back to a
       plain network fetch, so a cache problem can't break asset loading. */
 
-const STATIC_CACHE = "kx-static-v2";
+/* v3: version bump forces every open window onto fresh code on activate (the
+   `hadOld` navigate below) — used to roll the fleet onto the Discuss SSE
+   delivery build promptly. */
+const STATIC_CACHE = "kx-static-v3";
 
 self.addEventListener("install", () => {
   // Activate immediately so the first subscribe works without a reload.
@@ -61,6 +64,10 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   // ONLY the immutable, hashed build output. Everything else is untouched.
   if (!url.pathname.startsWith("/_next/static/")) return;
+  // DEV GUARD: dev-server chunk names are NOT content-hashed (stable names,
+  // changing content), so cache-first would pin stale code across rebuilds —
+  // the recurring "my change doesn't show" trap. Never cache on localhost.
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return;
 
   event.respondWith(
     (async () => {
