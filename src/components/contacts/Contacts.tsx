@@ -6316,7 +6316,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {/* Avatar — stronger container on the active row */}
                     <div className={`w-12 h-12 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--border-color)]" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
                       {(c.photo_url || c.logo_url) ? (
-                        <img src={fpAvatar((c.photo_url || c.logo_url) as string)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <img
+                          src={fpAvatar((c.photo_url || c.logo_url) as string)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          /* Broken image → swap to initials instead of a torn img box. */
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            el.style.display = "none";
+                            if (el.parentElement && !el.parentElement.textContent?.trim()) {
+                              el.parentElement.textContent = getInitials(c);
+                            }
+                          }}
+                        />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
                         <Building2Icon size={16} className="text-[var(--text-dim)]" />
                       ) : (

@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { fetchEmployeeList } from "./employees-admin";
 import type {
   LeaveTypeRow,
   LeaveBalanceRow,
@@ -73,8 +74,6 @@ const PAYSLIPS = "hr_payslips";
 const COURSES = "hr_courses";
 const TRAINING_RECORDS = "hr_training_records";
 const HR_DOCUMENTS = "hr_documents";
-const EMPLOYEES = "koleex_employees";
-const PEOPLE = "people";
 const DEPARTMENTS = "koleex_departments";
 const POSITIONS = "koleex_positions";
 
@@ -84,35 +83,20 @@ const POSITIONS = "koleex_positions";
 async function buildEmployeeNameMap(
   employeeIds: string[],
 ): Promise<Map<string, string>> {
+  /* API-first: koleex_employees/people are service-role-only (P0 lockdown),
+     so the anon join this used to do always came back empty and every HR
+     module showed "Unknown" names. The employees API already returns the
+     joined directory — one cached call covers every id. */
   const map = new Map<string, string>();
   if (employeeIds.length === 0) return map;
-
-  const unique = [...new Set(employeeIds)];
-
-  const { data: employees } = await supabase
-    .from(EMPLOYEES)
-    .select("id, person_id")
-    .in("id", unique);
-
-  if (!employees || employees.length === 0) return map;
-
-  const personIds = employees
-    .map((e: any) => e.person_id)
-    .filter(Boolean) as string[];
-
-  const { data: people } = await supabase
-    .from(PEOPLE)
-    .select("id, full_name")
-    .in("id", personIds);
-
-  const personMap = new Map(
-    (people || []).map((p: any) => [p.id, p.full_name as string]),
-  );
-
-  for (const e of employees) {
-    if (e.person_id && personMap.has(e.person_id)) {
-      map.set(e.id, personMap.get(e.person_id)!);
+  try {
+    const list = await fetchEmployeeList();
+    const wanted = new Set(employeeIds);
+    for (const e of list) {
+      if (wanted.has(e.id)) map.set(e.id, e.person.full_name);
     }
+  } catch (err) {
+    console.error("[HR] name map:", err instanceof Error ? err.message : err);
   }
   return map;
 }
@@ -158,20 +142,14 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
   };
 
   try {
-    // Total headcount + status breakdown
-    const { data: employees, error: empErr } = await supabase
-      .from(EMPLOYEES)
-      .select("id, employment_status");
-
-    if (empErr) {
-      console.error("[HR Dashboard] Employees:", empErr.message);
-    } else if (employees) {
-      stats.headcount = employees.length;
-      for (const e of employees) {
-        if (e.employment_status === "active") stats.active++;
-        else if (e.employment_status === "on_leave") stats.on_leave++;
-        else if (e.employment_status === "inactive") stats.inactive++;
-      }
+    // Total headcount + status breakdown — same source as the Employees app
+    // (the anon koleex_employees read is RLS-blocked and always returned 0).
+    const employees = await fetchEmployeeList();
+    stats.headcount = employees.length;
+    for (const e of employees) {
+      if (e.employment_status === "active") stats.active++;
+      else if (e.employment_status === "on_leave") stats.on_leave++;
+      else if (e.employment_status === "inactive") stats.inactive++;
     }
 
     // Pending leave requests
@@ -243,16 +221,24 @@ export async function fetchExpiringItems(
   const futureStr = future.toISOString().split("T")[0];
 
   try {
-    // Visa expiries from koleex_employees
-    const { data: visas, error: visaErr } = await supabase
-      .from(EMPLOYEES)
-      .select("id, person_id, visa_number, visa_expiry_date")
-      .not("visa_expiry_date", "is", null)
-      .gte("visa_expiry_date", today)
-      .lte("visa_expiry_date", futureStr);
-
-    if (visaErr) {
-      console.error("[Expiring] Visas:", visaErr.message);
+    // Visa expiries — via the server route (koleex_employees is
+    // service-role-only, the old anon read silently returned nothing).
+    let visas: Array<{ id: string; visa_number: string | null; visa_expiry_date: string; employee_name?: string }> = [];
+    try {
+      const res = await fetch(`/api/hr/visa-expiries?days=${withinDays}`, { credentials: "include" });
+      if (res.ok) {
+        const json = (await res.json()) as {
+          items?: Array<{ employee_id: string; employee_name: string; visa_number: string | null; visa_expiry_date: string }>;
+        };
+        visas = (json.items ?? []).map((v) => ({
+          id: v.employee_id,
+          visa_number: v.visa_number,
+          visa_expiry_date: v.visa_expiry_date,
+          employee_name: v.employee_name,
+        }));
+      }
+    } catch (err) {
+      console.error("[Expiring] Visas:", err instanceof Error ? err.message : err);
     }
 
     // Document expiries from hr_documents
@@ -279,7 +265,7 @@ export async function fetchExpiringItems(
       items.push({
         type: "visa",
         employee_id: v.id,
-        employee_name: nameMap.get(v.id) || "Unknown",
+        employee_name: v.employee_name || nameMap.get(v.id) || "Unknown",
         label: `Visa ${v.visa_number || ""}`.trim(),
         expiry_date: v.visa_expiry_date,
       });

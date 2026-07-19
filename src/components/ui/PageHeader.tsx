@@ -306,6 +306,12 @@ function SlidingPillNav({
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
+    /* Touch-only guard: this lock exists to absorb iOS momentum leakage.
+       On mouse/trackpad devices touchstart never fires, so the lock would
+       treat every wheel scroll as "not the user" and snap the strip back —
+       making it impossible to scroll. Desktop needs no lock at all. */
+    const isTouch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    if (!isTouch) return;
     const onTouchStart = () => { userScrollingRef.current = true; lockedScrollRef.current = null; };
     const onTouchEnd = () => {
       userScrollingRef.current = false;
@@ -388,7 +394,7 @@ function SlidingPillNav({
       style={{
         overscrollBehaviorX: "contain",
         WebkitOverflowScrolling: "auto",
-        scrollSnapType: "x mandatory",
+        scrollSnapType: "x proximity",
         scrollPaddingLeft: `${TRACK_PADDING}px`,
       }}
       // Subtle but visible thin scrollbar — issue 4c9884b1 (Mustafa) reported

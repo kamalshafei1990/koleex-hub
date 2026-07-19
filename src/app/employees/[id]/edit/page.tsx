@@ -29,8 +29,13 @@ import {
   fetchEmployeeProfile,
   fetchDepartments,
   fetchPositionsByDepartment,
+  fetchEmployeeList,
   updateEmployee,
+  type EmployeeListItem,
 } from "@/lib/employees-admin";
+import { uploadToStorage } from "@/lib/storage-client";
+import { fpAvatar } from "@/lib/cdn";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
 import { usePermissions } from "@/lib/permissions";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
@@ -58,6 +63,7 @@ const LOCATION_OPTIONS = [
   { value: "hybrid", label: "Hybrid" },
 ];
 const RELATIONSHIP_OPTIONS = ["", "Spouse", "Parent", "Sibling", "Child", "Friend", "Other"];
+const BLOOD_TYPE_OPTIONS = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const DEGREE_OPTIONS = [
   { value: "", label: "—" },
   { value: "high_school", label: "High school" },
@@ -84,6 +90,7 @@ const EMP_TEXT_KEYS = [
   "work_email", "work_phone",
   "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
   "emergency_contact2_name", "emergency_contact2_phone", "emergency_contact2_relationship",
+  "blood_type", "religion", "number_of_children", "manager_id",
   "notes",
 ] as const;
 
@@ -97,19 +104,52 @@ const EMP_PRIVATE_TEXT_KEYS = [
 
 const EMP_EDU_KEYS = [
   "education_degree", "education_institution", "education_field", "education_graduation_year",
-  "driving_license_number", "driving_license_expiry",
+  "driving_license_number", "driving_license_type", "driving_license_expiry",
 ] as const;
 
 /* Fields that must be sent as numbers (or null). */
-const NUMERIC_KEYS = new Set(["initial_salary", "education_graduation_year"]);
+const NUMERIC_KEYS = new Set(["initial_salary", "education_graduation_year", "number_of_children"]);
 /* Fields that must be sent as null when blank (dates, enums). */
 const NULLABLE_KEYS = new Set([
   "birth_date", "hire_date", "contract_end_date", "probation_end_date",
   "visa_expiry_date", "insurance_expiry_date", "driving_license_expiry",
-  "gender", "marital_status",
+  "gender", "marital_status", "blood_type", "manager_id",
 ]);
 
 const panelCls = "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
+
+/* Compress + upload the photo to Supabase Storage; people.avatar_url stores
+   only the CDN URL (never base64 — that bloated rows before). Same pipeline
+   as Add Employee. */
+async function compressAndUploadPhoto(file: File, hint: string): Promise<string> {
+  if (file.size > 5 * 1024 * 1024) throw new Error("Image is too large. Maximum is 5 MB.");
+  if (!file.type.startsWith("image/")) throw new Error("Only image files are allowed.");
+  const blob: Blob = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > 400) { h = (h * 400) / w; w = 400; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Compression failed"))), "image/jpeg", 0.82);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+  const safe = hint.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40) || "photo";
+  const up = await uploadToStorage("media", `employees/${Date.now()}_${safe}.jpg`, blob, {
+    cacheControl: "3600",
+    contentType: "image/jpeg",
+  });
+  if (!up.ok) throw new Error(up.error);
+  return up.data.publicUrl;
+}
 const inputCls = "w-full h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors";
 const labelCls = "block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1";
 
@@ -190,6 +230,9 @@ export default function EmployeeEditPage({
   const [hasPrivate, setHasPrivate] = useState(false);
   const [form, setForm] = useState<F>({});
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [managers, setManagers] = useState<EmployeeListItem[]>([]);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [positions, setPositions] = useState<PositionRow[]>([]);
   const [deptId, setDeptId] = useState("");
@@ -202,10 +245,16 @@ export default function EmployeeEditPage({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [prof, depts] = await Promise.all([fetchEmployeeProfile(id), fetchDepartments()]);
+      const [prof, depts, allEmps] = await Promise.all([
+        fetchEmployeeProfile(id),
+        fetchDepartments(),
+        fetchEmployeeList(),
+      ]);
       if (cancelled) return;
       if (!prof) { setNotFound(true); setLoading(false); return; }
       setDepartments(depts);
+      setManagers(allEmps.filter((e) => e.id !== id));
+      setAvatarUrl((prof.person as { avatar_url?: string | null }).avatar_url ?? null);
 
       const { person, employee, assignment } = prof;
       const emp = employee as unknown as Record<string, unknown>;
@@ -232,6 +281,18 @@ export default function EmployeeEditPage({
     return () => { cancelled = true; };
   }, [id]);
 
+  const onPickPhoto = async (file: File | null) => {
+    if (!file) return;
+    setAvatarBusy(true); setError(null);
+    try {
+      setAvatarUrl(await compressAndUploadPhoto(file, form.full_name || "photo"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo upload failed.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   /* Department change reloads its positions. */
   const onDeptChange = async (d: string) => {
     setDeptId(d); setPosId("");
@@ -255,6 +316,7 @@ export default function EmployeeEditPage({
     const person: Record<string, unknown> = {};
     for (const k of PERSON_KEYS) person[k] = form[k].trim() || null;
     person.full_name = form.full_name.trim(); // never null
+    person.avatar_url = avatarUrl;
 
     const employee: Record<string, unknown> = {};
     /* Private columns are stripped from the GET for non-privileged viewers,
@@ -360,6 +422,31 @@ export default function EmployeeEditPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <SectionCard icon={UserIcon} title={t("ov.personal")}>
+            {/* Photo — spans both columns */}
+            <div className="sm:col-span-2 flex items-center gap-4">
+              {avatarUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={fpAvatar(avatarUrl) ?? avatarUrl} alt={form.full_name} className="h-16 w-16 rounded-2xl object-cover border border-[var(--border-faint)]" />
+              ) : (
+                <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)]">
+                  <UserIcon size={24} />
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <label className="h-9 px-3.5 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2 cursor-pointer transition-colors">
+                  {avatarBusy ? <SpinnerIcon size={13} className="animate-spin" /> : <CameraIcon size={13} />}
+                  {avatarUrl ? "Change photo" : "Add photo"}
+                  <input type="file" accept="image/*" className="hidden" disabled={avatarBusy}
+                    onChange={(e) => { void onPickPhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                </label>
+                {avatarUrl && (
+                  <button type="button" onClick={() => setAvatarUrl(null)}
+                    className="h-9 px-3 rounded-lg text-[12px] text-red-400 hover:bg-red-400/10 font-medium transition-colors">
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
             <Field label="Full name" value={form.full_name} onChange={set("full_name")} />
             <Field label="Native name (中文)" value={form.name_alt} onChange={set("name_alt")} placeholder="e.g. 黎鑫燕" />
             <SelectField label="Gender" value={form.gender} onChange={set("gender")} options={GENDER_OPTIONS} />
@@ -369,6 +456,9 @@ export default function EmployeeEditPage({
             <Field label="Personal email" type="email" value={form.email} onChange={set("email")} />
             <Field label="Personal phone" value={form.phone} onChange={set("phone")} />
             <Field label="Languages" value={form.languages} onChange={set("languages")} placeholder="English, 中文…" />
+            <SelectField label="Blood type" value={form.blood_type} onChange={set("blood_type")} options={BLOOD_TYPE_OPTIONS} />
+            <Field label="Religion" value={form.religion} onChange={set("religion")} />
+            <Field label="Children" type="number" value={form.number_of_children} onChange={set("number_of_children")} />
           </SectionCard>
 
           <SectionCard icon={BriefcaseIcon} title={t("ov.employment")}>
@@ -380,6 +470,12 @@ export default function EmployeeEditPage({
             <Field label="Hire date" type="date" value={form.hire_date.slice(0, 10)} onChange={set("hire_date")} />
             <Field label="Contract end" type="date" value={form.contract_end_date.slice(0, 10)} onChange={set("contract_end_date")} />
             <Field label="Probation end" type="date" value={form.probation_end_date.slice(0, 10)} onChange={set("probation_end_date")} />
+            <SelectField
+              label="Manager"
+              value={form.manager_id}
+              onChange={set("manager_id")}
+              options={[{ value: "", label: "—" }, ...managers.map((m) => ({ value: m.id, label: m.person.full_name }))]}
+            />
           </SectionCard>
 
           <SectionCard icon={Building2Icon} title={t("ov.workContact")}>
@@ -441,6 +537,7 @@ export default function EmployeeEditPage({
             {hasPrivate && (
               <>
                 <Field label="License #" value={form.driving_license_number} onChange={set("driving_license_number")} />
+                <Field label="License type" value={form.driving_license_type} onChange={set("driving_license_type")} />
                 <Field label="License expiry" type="date" value={form.driving_license_expiry.slice(0, 10)} onChange={set("driving_license_expiry")} />
               </>
             )}

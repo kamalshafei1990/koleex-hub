@@ -46,6 +46,11 @@ const nextConfig: NextConfig = {
     /* Most uploads use unique timestamped paths (effectively immutable); a
        replaced-in-place image converges within 4h. */
     minimumCacheTTL: 14400,
+    /* DEV ONLY: VPN clients in fake-IP mode (Clash/Surge — standard in China)
+       resolve supabase.co to 198.18.x.x locally, tripping the optimizer's
+       private-IP SSRF guard and 400ing EVERY avatar in dev. Production builds
+       never get this flag — Vercel resolves real IPs. */
+    ...(process.env.NODE_ENV === "development" ? { dangerouslyAllowLocalIP: true } : {}),
   },
   /* Native N-API module (Argon2id password hashing, Phase 2A S0). Keep it
      OUT of the server bundle so the prebuilt .node binary is require()'d at

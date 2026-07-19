@@ -83,6 +83,7 @@ export async function GET(req: Request) {
   type Person = {
     id: string;
     full_name: string;
+    name_alt: string | null;
     first_name: string | null;
     last_name: string | null;
     email: string | null;
@@ -105,6 +106,7 @@ export async function GET(req: Request) {
         person_id: e.person_id!,
         person: {
           full_name: person.full_name,
+          name_alt: person.name_alt ?? null,
           first_name: person.first_name,
           last_name: person.last_name,
           email: person.email,
