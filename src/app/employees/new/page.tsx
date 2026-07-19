@@ -763,6 +763,71 @@ function validateForm(form: EmployeeWizardData): Record<string, string> {
 const panelCls =
   "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
 
+/* ── Employee tabs — same premium sticky pill nav as the Customer /
+   Supplier form (CustomerTabBar in Contacts.tsx): photo hero up top,
+   then the form split into tab panes instead of one long scroll. Panes
+   stay MOUNTED (hidden, not unmounted) so values and validation hold. */
+type EmpTab = "personal" | "employment" | "compensation" | "documents" | "account";
+
+const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }[] = [
+  { id: "personal", label: "Personal", icon: UserIcon },
+  { id: "employment", label: "Employment", icon: BriefcaseIcon },
+  { id: "compensation", label: "Compensation", icon: CreditCardIcon },
+  { id: "documents", label: "Documents", icon: DocumentIcon },
+  { id: "account", label: "Account", icon: KeyIcon },
+];
+
+/* Which tab owns each validated field — error chips and the submit path
+   must land on the right pane before scrolling to the field. */
+const FIELD_TAB: Record<string, EmpTab> = {
+  first_name: "personal", last_name: "personal", birthday: "personal",
+  number_of_children: "personal", personal_email: "personal", work_email: "personal",
+  employee_number: "employment", hire_date: "employment",
+  department_id: "employment", department_name: "employment",
+  position_id: "employment", position_title: "employment",
+  contract_end_date: "employment", probation_end_date: "employment",
+  initial_salary: "compensation", insurance_expiry_date: "compensation",
+  visa_expiry_date: "documents", driving_license_expiry: "documents",
+  education_graduation_year: "documents",
+  login_email: "account",
+};
+
+function EmployeeTabBar({ activeTab, onChange, errorTabs }: {
+  activeTab: EmpTab;
+  onChange: (tab: EmpTab) => void;
+  /* Tabs holding validation errors get a red dot (after a failed save). */
+  errorTabs?: Set<EmpTab>;
+}) {
+  return (
+    <div className="sticky top-[58px] z-20 -mx-4 md:-mx-6 lg:-mx-10 xl:-mx-16 px-4 md:px-6 lg:px-10 xl:px-16 bg-[var(--bg-primary)] pt-1 pb-2 mb-4">
+      <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
+        {EMP_TABS.map(({ id, label, icon: Icon }) => {
+          const active = activeTab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onChange(id)}
+              aria-current={active ? "true" : undefined}
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
+                active
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <Icon size={14} className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"} />
+              <span>{label}</span>
+              {errorTabs?.has(id) && !active && (
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" aria-hidden="true" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    PAGE COMPONENT
    ═══════════════════════════════════════════════════ */
@@ -856,11 +921,11 @@ export default function AddEmployeePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  /* Optional sections start folded — Personal, Employment and Account are
-     the hiring path; the rest can be completed later on the employee page. */
-  const [openSections, setOpenSections] = useState({
-    contact: false, emergency: false, compensation: false, documents: false,
-  });
+  /* Tabbed layout (same grammar as the Customer / Supplier form). The
+     optional Contact / Emergency sections inside the Personal tab still
+     start folded so the hiring path reads short. */
+  const [activeTab, setActiveTab] = useState<EmpTab>("personal");
+  const [openSections, setOpenSections] = useState({ contact: false, emergency: false });
   const toggleSection = (k: keyof typeof openSections) =>
     setOpenSections((s) => ({ ...s, [k]: !s[k] }));
 
@@ -970,6 +1035,11 @@ export default function AddEmployeePage() {
      displayed after the user has tried to submit at least once —
      users shouldn't see red fields the moment they open the form. */
   const errors = useMemo(() => validateForm(form), [form]);
+  /* Tabs that currently hold at least one invalid field (red-dot marker). */
+  const errorTabs = useMemo(
+    () => new Set(Object.keys(errors).map((k) => FIELD_TAB[k] ?? "personal")),
+    [errors],
+  );
   const errFor = (key: string): string | undefined =>
     attemptedSubmit ? errors[key] : undefined;
 
@@ -1011,6 +1081,16 @@ export default function AddEmployeePage() {
     }, 250);
   }, []);
 
+  /* Switch to the tab that owns a field (unfolding its section when it
+     lives in a folded one), then scroll+focus once the pane rendered. */
+  const jumpToField = useCallback((fieldKey: string) => {
+    setActiveTab(FIELD_TAB[fieldKey] ?? "personal");
+    if (fieldKey === "personal_email" || fieldKey === "work_email") {
+      setOpenSections((s) => ({ ...s, contact: true }));
+    }
+    setTimeout(() => focusField(fieldKey), 140);
+  }, [focusField]);
+
   const handleSubmit = useCallback(async () => {
     setAttemptedSubmit(true);
     const errs = validateForm(form);
@@ -1018,11 +1098,11 @@ export default function AddEmployeePage() {
       /* Clear the plain-text banner; the rich error banner rendered
          below reads from the `errors` memo. */
       setError(null);
-      /* Unfold everything so no invalid field is hidden inside a collapsed
-         section, then scroll to the first one (after the expand renders). */
-      setOpenSections({ contact: true, emergency: true, compensation: true, documents: true });
+      /* Unfold the folded Personal sub-sections, then jump to the tab
+         holding the first invalid field and focus it. */
+      setOpenSections({ contact: true, emergency: true });
       const firstKey = Object.keys(errs)[0];
-      if (firstKey) setTimeout(() => focusField(firstKey), 120);
+      if (firstKey) jumpToField(firstKey);
       return;
     }
     setSaving(true); setError(null);
@@ -1038,7 +1118,7 @@ export default function AddEmployeePage() {
         if (next !== form.employee_number) {
           setForm((f) => ({ ...f, employee_number: next }));
         }
-        focusField("employee_number");
+        jumpToField("employee_number");
       }
       return;
     }
@@ -1052,7 +1132,7 @@ export default function AddEmployeePage() {
       tempPassword: result.tempPassword,
     });
     setSaving(false);
-  }, [form]);
+  }, [form, jumpToField]);
 
   const resetForm = async () => {
     const empNum = await generateEmployeeNumber();
@@ -1225,6 +1305,47 @@ export default function AddEmployeePage() {
         {/* Profile completeness — counts the trackable fields filled */}
         <EmployeeCompletenessBar form={form} />
 
+        {/* ── Photo hero — same centered uploader as the Customer form ── */}
+        <div className="flex flex-col items-center mb-5">
+          <label className="block cursor-pointer group" aria-label="Upload employee photo">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-label="Photo file"
+              onChange={(e) => handlePhotoSelect(e.target.files?.[0])}
+            />
+            <div className="relative h-28 w-28 rounded-2xl border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center overflow-hidden group-hover:border-[var(--border-focus)] transition-colors">
+              {photoUploading ? (
+                <SpinnerIcon size={22} className="animate-spin text-[var(--text-dim)]" />
+              ) : form.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fpAvatar(form.photo_url)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="text-center">
+                  <CameraIcon size={22} className="mx-auto text-[var(--text-faint)] group-hover:text-[var(--text-dim)] transition-colors" />
+                  <span className="block text-[10px] text-[var(--text-faint)] mt-1">Add Photo</span>
+                </div>
+              )}
+            </div>
+          </label>
+          <p className="text-[11px] text-[var(--text-faint)] mt-2">
+            Shown on the profile, directory, and across the Hub.
+          </p>
+          {photoError && (
+            <p className="text-[11px] text-red-400 mt-1" role="alert">{photoError}</p>
+          )}
+          {form.photo_url && !photoUploading && (
+            <button
+              type="button"
+              onClick={() => set("photo_url", null)}
+              className="text-[10px] text-red-400 hover:text-red-300 mt-1 transition-colors"
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
+
         {/* Validation summary — lists the exact fields that need
             attention, with click-to-jump chips. Appears only after
             the user has attempted a save at least once. Lets them
@@ -1239,7 +1360,7 @@ export default function AddEmployeePage() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => focusField(key)}
+                  onClick={() => jumpToField(key)}
                   className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 transition-colors cursor-pointer"
                   title={`Jump to ${FIELD_LABELS[key] || key}`}
                 >
@@ -1256,9 +1377,16 @@ export default function AddEmployeePage() {
         )}
 
         {/* ═══════════════════════════════════════════
-           FORM SECTIONS
+           FORM SECTIONS — tabbed like the Customer form
            ═══════════════════════════════════════════ */}
-        <div className="space-y-4">
+        <EmployeeTabBar
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          errorTabs={attemptedSubmit ? errorTabs : undefined}
+        />
+        <div>
+          {/* ── PERSONAL TAB ── */}
+          <div className={activeTab === "personal" ? "space-y-4" : "hidden"}>
 
           {/* ── 1. PERSONAL PROFILE ── */}
           <section className={panelCls}>
@@ -1268,46 +1396,14 @@ export default function AddEmployeePage() {
               description={t("sec.personal.desc")}
             />
 
-            {/* Photo + Name */}
-            <div className="flex gap-4 mb-4">
-              <label className="block cursor-pointer group shrink-0" aria-label="Upload employee photo">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  aria-label="Photo file"
-                  onChange={(e) => handlePhotoSelect(e.target.files?.[0])}
-                />
-                <div className="relative h-24 w-24 rounded-2xl border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-primary)] flex items-center justify-center overflow-hidden group-hover:border-[var(--border-focus)] transition-colors">
-                  {photoUploading ? (
-                    <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
-                  ) : form.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={fpAvatar(form.photo_url)} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="text-center">
-                      <CameraIcon size={20} className="mx-auto text-[var(--text-faint)] group-hover:text-[var(--text-dim)] transition-colors" />
-                      <span className="block text-[9px] text-[var(--text-faint)] mt-0.5">Photo</span>
-                    </div>
-                  )}
-                </div>
-              </label>
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
-                <SelectInput label="Title" value={form.title} onChange={(v) => set("title", v)}
-                  options={TITLE_OPTIONS.map((t) => ({ value: t, label: t || "—" }))} placeholder="—" />
-                <TextInput name="first_name" label="First Name" value={form.first_name} onChange={(v) => set("first_name", v)} placeholder="First name" required error={errFor("first_name")} />
-                <TextInput label="Middle Name" value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder="Middle name" />
-                <TextInput name="last_name" label="Last Name" value={form.last_name} onChange={(v) => set("last_name", v)} placeholder="Last name" required error={errFor("last_name")} />
-              </div>
+            {/* Name row — the photo moved to the hero above the tabs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <SelectInput label="Title" value={form.title} onChange={(v) => set("title", v)}
+                options={TITLE_OPTIONS.map((t) => ({ value: t, label: t || "—" }))} placeholder="—" />
+              <TextInput name="first_name" label="First Name" value={form.first_name} onChange={(v) => set("first_name", v)} placeholder="First name" required error={errFor("first_name")} />
+              <TextInput label="Middle Name" value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder="Middle name" />
+              <TextInput name="last_name" label="Last Name" value={form.last_name} onChange={(v) => set("last_name", v)} placeholder="Last name" required error={errFor("last_name")} />
             </div>
-
-            {photoError && (
-              <p className="text-[11px] text-red-400 mb-3" role="alert">{photoError}</p>
-            )}
-            {form.photo_url && !photoUploading && (
-              <button type="button" onClick={() => set("photo_url", null)}
-                className="text-[10px] text-red-400 hover:text-red-300 mb-3 transition-colors">Remove photo</button>
-            )}
 
             {/* Alternate name */}
             <div className="mb-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-faint)]">
@@ -1422,6 +1518,11 @@ export default function AddEmployeePage() {
               </div>
             </div>
           </CollapsibleSection>
+
+          </div>
+
+          {/* ── EMPLOYMENT TAB ── */}
+          <div className={activeTab === "employment" ? "space-y-4" : "hidden"}>
 
           {/* ── 4. EMPLOYMENT & ORGANIZATION ── */}
           <section className={panelCls}>
@@ -1588,14 +1689,18 @@ export default function AddEmployeePage() {
             </div>
           </section>
 
-          {/* ── 5. COMPENSATION & BENEFITS (optional, folded) ── */}
-          <CollapsibleSection
-            icon={CreditCardIcon}
-            title={t("sec.compensation")}
-            description={t("sec.compensation.desc")}
-            open={openSections.compensation}
-            onToggle={() => toggleSection("compensation")}
-          >
+          </div>
+
+          {/* ── COMPENSATION TAB ── */}
+          <div className={activeTab === "compensation" ? "space-y-4" : "hidden"}>
+
+          {/* ── 5. COMPENSATION & BENEFITS ── */}
+          <section className={panelCls}>
+            <SectionHeader
+              icon={CreditCardIcon}
+              title={t("sec.compensation")}
+              description={t("sec.compensation.desc")}
+            />
 
             <SubLabel>Salary</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4 max-w-md">
@@ -1620,16 +1725,19 @@ export default function AddEmployeePage() {
               <SelectInput label="Class" value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
               <DateInput name="insurance_expiry_date" label="Expiry" value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
             </div>
-          </CollapsibleSection>
+          </section>
+          </div>
 
-          {/* ── 6. DOCUMENTS & COMPLIANCE (optional, folded) ── */}
-          <CollapsibleSection
-            icon={DocumentIcon}
-            title={t("sec.docs")}
-            description={t("sec.docs.desc")}
-            open={openSections.documents}
-            onToggle={() => toggleSection("documents")}
-          >
+          {/* ── DOCUMENTS TAB ── */}
+          <div className={activeTab === "documents" ? "space-y-4" : "hidden"}>
+
+          {/* ── 6. DOCUMENTS & COMPLIANCE ── */}
+          <section className={panelCls}>
+            <SectionHeader
+              icon={DocumentIcon}
+              title={t("sec.docs")}
+              description={t("sec.docs.desc")}
+            />
 
             <SubLabel>Identification</SubLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3 mb-4">
@@ -1664,7 +1772,11 @@ export default function AddEmployeePage() {
               <SelectInput label="Type" value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
               <DateInput name="driving_license_expiry" label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>
-          </CollapsibleSection>
+          </section>
+          </div>
+
+          {/* ── ACCOUNT TAB ── */}
+          <div className={activeTab === "account" ? "space-y-4" : "hidden"}>
 
           {/* ── 7. ACCOUNT SETUP ── */}
           <section className={panelCls}>
@@ -1778,6 +1890,7 @@ export default function AddEmployeePage() {
               </div>
             )}
           </section>
+          </div>
         </div>
       </div>
     </div>
