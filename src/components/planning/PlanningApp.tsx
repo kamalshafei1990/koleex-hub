@@ -18,6 +18,7 @@ import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -403,6 +404,31 @@ function ScheduleView({
     return map;
   }, [items, groupBy]);
 
+  /* Double-booking detection — same real resource, overlapping time window,
+     not cancelled. Pure client-side over the loaded week; flags both sides
+     of every overlapping pair. */
+  const conflictIds = useMemo(() => {
+    const set = new Set<string>();
+    const byRes = new Map<string, PlanningItem[]>();
+    for (const it of items) {
+      if (!it.resource_id || it.status === "cancelled") continue;
+      const arr = byRes.get(it.resource_id) ?? [];
+      arr.push(it);
+      byRes.set(it.resource_id, arr);
+    }
+    for (const arr of byRes.values()) {
+      arr.sort((a, b) => a.start_at.localeCompare(b.start_at));
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          if (arr[j].start_at >= arr[i].end_at) break;
+          set.add(arr[i].id);
+          set.add(arr[j].id);
+        }
+      }
+    }
+    return set;
+  }, [items]);
+
   const rows =
     groupBy === "resource"
       ? [
@@ -450,6 +476,15 @@ function ScheduleView({
 
   return (
     <div className="space-y-3">
+      {conflictIds.size > 0 && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-400 flex items-center gap-2">
+          <ExclamationIcon size={13} className="shrink-0" />
+          <span>
+            {t("sched.conflictWarn", "Double-booked:")} {conflictIds.size}{" "}
+            {t("sched.conflictWarnTail", "items overlap on the same resource this week — highlighted in red.")}
+          </span>
+        </div>
+      )}
       {/* Toolbar — stacks on mobile so controls don't cramp */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5">
@@ -581,6 +616,7 @@ function ScheduleView({
                         key={it.id}
                         item={it}
                         onClick={onItemClick}
+                        conflict={conflictIds.has(it.id)}
                       />
                     ))}
                   </div>
@@ -702,6 +738,7 @@ function ScheduleView({
                       item={it}
                       onClick={onItemClick}
                       draggable={droppable}
+                      conflict={conflictIds.has(it.id)}
                     />
                   ))}
                 </button>
@@ -723,9 +760,11 @@ function ScheduleView({
 function MobileItemRow({
   item,
   onClick,
+  conflict = false,
 }: {
   item: PlanningItem;
   onClick: (i: PlanningItem) => void;
+  conflict?: boolean;
 }) {
   const { t } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
@@ -737,7 +776,7 @@ function MobileItemRow({
       onClick={() => onClick(item)}
       className={`w-full text-start rounded-lg px-2.5 py-2 flex items-center gap-2 transition-opacity hover:opacity-90 ${
         isDraft ? "border border-dashed" : ""
-      }`}
+      }${conflict ? " ring-1 ring-red-500/70" : ""}`}
       style={{
         background: `${color}22`,
         borderColor: isDraft ? color : "transparent",
@@ -761,10 +800,12 @@ function ItemPill({
   item,
   onClick,
   draggable = false,
+  conflict = false,
 }: {
   item: PlanningItem;
   onClick: (i: PlanningItem) => void;
   draggable?: boolean;
+  conflict?: boolean;
 }) {
   const { t } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
@@ -786,7 +827,9 @@ function ItemPill({
         e.stopPropagation();
         onClick(item);
       }}
-      className={`rounded-md px-1.5 py-1 text-[10px] leading-tight cursor-pointer hover:opacity-90 transition-opacity ${
+      className={`rounded-md px-1.5 py-1 text-[10px] leading-tight cursor-pointer hover:opacity-90 transition-opacity${
+        conflict ? " ring-1 ring-red-500/70" : ""
+      } ${
         isDraft ? "border border-dashed" : ""
       } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{

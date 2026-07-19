@@ -302,6 +302,61 @@ export async function GET(req: Request) {
       });
   }
 
+  // Mirror Project tasks assigned to the viewer onto the Calendar — the same
+  // read-only shadow treatment as the To-do mirror. A task appears on its due
+  // date (or as a start→due span). Done = muted, overdue = danger, otherwise
+  // the project's color (action accent fallback). Clicking deep-links to the
+  // Projects app; these synthetic rows are never editable as events.
+  let projectTaskMirror: unknown[] = [];
+  if (auth.tenant_id) {
+    const pFrom = from.slice(0, 10);
+    const pTo = to.slice(0, 10);
+    const { data: ptasks } = await supabaseServer
+      .from("project_tasks")
+      .select("id, title, due_date, start_date, status, project:project_id ( name, color )")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("assignee_account_id", accountId)
+      .neq("status", "cancelled")
+      .limit(1000);
+    const pToday = new Date().toISOString().slice(0, 10);
+    projectTaskMirror = (ptasks ?? []).flatMap((raw) => {
+      const t = raw as {
+        id: string;
+        title: string;
+        due_date: string | null;
+        start_date: string | null;
+        status: string;
+        project?: { name?: string | null; color?: string | null } | null;
+      };
+      const s = t.start_date ?? t.due_date;
+      const e = t.due_date ?? t.start_date;
+      if (!s || !e) return [];
+      if (!(s <= pTo && e >= pFrom)) return [];
+      const done = t.status === "done";
+      const overdue = !done && e < pToday;
+      const color = done ? "#9AA0A6" : overdue ? "#FF3333" : t.project?.color ?? "#0066FF";
+      return [
+        {
+          id: `ptask:${t.id}`,
+          account_id: accountId,
+          tenant_id: auth.tenant_id,
+          title: t.title,
+          description: t.project?.name ?? null,
+          location: null,
+          start_at: `${s}T00:00:00.000Z`,
+          end_at: `${e}T23:59:59.999Z`,
+          all_day: true,
+          color,
+          is_private: false,
+          event_type: "task",
+          source: "project",
+          source_kind: done ? "done" : overdue ? "overdue" : "open",
+          project_task_id: t.id,
+        },
+      ];
+    });
+  }
+
   return NextResponse.json({
     events: [
       ...(data ?? []),
@@ -309,6 +364,7 @@ export async function GET(req: Request) {
       ...attendeeEvents,
       ...planningMirror,
       ...todoMirror,
+      ...projectTaskMirror,
     ],
   });
 }

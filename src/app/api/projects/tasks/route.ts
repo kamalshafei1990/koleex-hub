@@ -2,6 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { notifyTaskAssigned } from "@/lib/server/project-notify";
+import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET  /api/projects/tasks — list tasks across one or all projects.
@@ -137,18 +139,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Fire-and-forget inbox notification when assignee is set + not self.
-  if (data?.assignee_account_id && data.assignee_account_id !== auth.account_id) {
-    void supabaseServer.from("inbox_messages").insert({
-      recipient_account_id: data.assignee_account_id,
-      sender_account_id: auth.account_id,
-      tenant_id: auth.tenant_id,
-      category: "system",
-      subject: `Task assigned: ${data.title}`,
-      body: `You've been assigned a task${data.due_date ? ` due ${data.due_date}` : ""}.`,
-      link: "/projects",
-      metadata: { source: "projects", task_id: data.id, project_id: data.project_id },
-    });
+  // Fire-and-forget: notify the assignee (inbox + web-push) and keep the
+  // project's progress % in sync with its task counts.
+  if (data) {
+    void notifyTaskAssigned(auth, data);
+    void recomputeProjectProgress(auth.tenant_id, data.project_id);
   }
 
   return NextResponse.json({ task: data });

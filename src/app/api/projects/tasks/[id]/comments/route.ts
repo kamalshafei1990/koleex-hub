@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { notifyTaskComment } from "@/lib/server/project-notify";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -44,5 +45,9 @@ export async function POST(req: Request, { params }: RouteCtx) {
     .select(`*, author:author_account_id ( id, username )`)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Fire-and-forget: ping the task's assignee + followers (inbox + push).
+  void notifyTaskComment(auth, id, body);
+
   return NextResponse.json({ comment: data });
 }

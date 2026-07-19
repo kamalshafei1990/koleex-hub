@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET    /api/planning/items/:id — fetch a single item
@@ -127,6 +128,21 @@ async function notifyAssigneeOnPublish(
     link: "/planning",
     metadata: { source: "planning", planning_item_id: item.id, type: item.type },
   });
+  try {
+    await sendPushToAccounts(
+      [res.account_id],
+      {
+        title: "You've been scheduled",
+        body: `${item.title || item.type} — ${fmt(start)}`,
+        url: "/planning",
+        tag: `planning:${item.id}`,
+        kind: "planning_published",
+      },
+      { actorAccountId: auth.account_id },
+    );
+  } catch (e) {
+    console.error("[planning] publish push:", e);
+  }
 }
 
 export async function DELETE(_req: Request, { params }: RouteCtx) {

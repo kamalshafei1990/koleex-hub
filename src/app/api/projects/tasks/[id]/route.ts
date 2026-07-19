@@ -2,6 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { notifyTaskAssigned } from "@/lib/server/project-notify";
+import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -75,24 +77,13 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify on fresh assignment (not on re-save with same assignee).
+  // Notify on fresh assignment (not on re-save with same assignee) —
+  // inbox + web-push — and keep the project's progress % in sync.
   const newAssignee = data?.assignee_account_id as string | null;
-  if (
-    newAssignee &&
-    newAssignee !== prev?.assignee_account_id &&
-    newAssignee !== auth.account_id
-  ) {
-    void supabaseServer.from("inbox_messages").insert({
-      recipient_account_id: newAssignee,
-      sender_account_id: auth.account_id,
-      tenant_id: auth.tenant_id,
-      category: "system",
-      subject: `Task assigned: ${data.title}`,
-      body: `You've been assigned a task${data.due_date ? ` due ${data.due_date}` : ""}.`,
-      link: "/projects",
-      metadata: { source: "projects", task_id: data.id, project_id: data.project_id },
-    });
+  if (newAssignee && newAssignee !== prev?.assignee_account_id) {
+    void notifyTaskAssigned(auth, data);
   }
+  void recomputeProjectProgress(auth.tenant_id, data?.project_id as string | null);
 
   return NextResponse.json({ task: data });
 }
@@ -104,11 +95,19 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   if (deny) return deny;
   const { id } = await params;
 
+  const { data: victim } = await supabaseServer
+    .from("project_tasks")
+    .select("project_id")
+    .eq("id", id)
+    .eq("tenant_id", auth.tenant_id)
+    .maybeSingle();
+
   const { error } = await supabaseServer
     .from("project_tasks")
     .delete()
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  void recomputeProjectProgress(auth.tenant_id, victim?.project_id as string | null);
   return NextResponse.json({ ok: true });
 }
