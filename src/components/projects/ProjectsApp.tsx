@@ -1615,7 +1615,7 @@ function ProjectFormModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">
             {editing ? t("form.title.edit") : t("form.title.new")}
@@ -1639,6 +1639,9 @@ function ProjectFormModal({
           <Field label={t("form.description")}>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
           </Field>
+          <div className="pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-faint)]">
+            {t("form.section.clientTeam", "Client & team")}
+          </div>
           <Field label={t("form.customer")}>
             <EntityPicker
               entityType="customer"
@@ -1651,6 +1654,9 @@ function ProjectFormModal({
           <Field label={t("form.manager", "Project manager")}>
             <AccountSelect value={managerId} onChange={setManagerId} placeholder={t("form.manager", "Project manager")} />
           </Field>
+          <div className="pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-faint)]">
+            {t("form.section.scheduleBudget", "Schedule & budget")}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label={t("form.plannedStart")}>
               <input type="date" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
@@ -1672,7 +1678,7 @@ function ProjectFormModal({
             <Field label={t("form.billable")}>
               <label className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] cursor-pointer">
                 <input type="checkbox" checked={isBillable} onChange={(e) => setIsBillable(e.target.checked)} className="accent-white" />
-                <span className="text-[13px]">{isBillable ? t("form.billable") : "—"}</span>
+                <span className="text-[13px] text-[var(--text-dim)]">{t("form.billableHint", "Bill logged time to the customer")}</span>
               </label>
             </Field>
           </div>
@@ -1879,7 +1885,7 @@ function TaskFormModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">
             {editing ? t("task.title.edit") : t("task.title.new")}
