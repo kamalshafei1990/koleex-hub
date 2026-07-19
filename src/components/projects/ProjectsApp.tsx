@@ -2026,7 +2026,8 @@ function TaskFormModal({
             )}
           </div>
 
-          {(allTasks.length > 0 || blockedBy.length > 0) && (
+          {(allTasks.filter((tk) => tk.id !== editing?.id && tk.status !== "cancelled").length > 0 ||
+            blockedBy.length > 0) && (
             <Field label={t("task.blockedBy", "Blocked by")}>
               <div className="flex flex-wrap gap-1.5">
                 {allTasks
