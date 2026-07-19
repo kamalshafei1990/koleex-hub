@@ -39,16 +39,28 @@ export async function GET() {
   const deny = await requireModuleAccess(auth, "To-do");
   if (deny) return deny;
 
-  // Step 1: resolve the set of todo_ids the caller is an assignee of.
-  // Needed for the "shared" branch of the scope OR.
+  // Step 1: resolve the set of todo_ids the caller is an assignee of,
+  // plus the ones they observe (metadata.observers). Needed for the
+  // "shared" branch of the scope OR.
   let assigneeTodoIds: string[] = [];
   if (!auth.is_super_admin) {
-    const { data: rows } = await supabaseServer
-      .from("koleex_todo_assignees")
-      .select("todo_id")
-      .eq("account_id", auth.account_id);
-    assigneeTodoIds = (rows ?? []).map(
-      (r) => (r as { todo_id: string }).todo_id,
+    let obsQuery = supabaseServer
+      .from("koleex_todos")
+      .select("id")
+      .contains("metadata", { observers: [{ account_id: auth.account_id }] });
+    if (auth.tenant_id) obsQuery = obsQuery.eq("tenant_id", auth.tenant_id);
+    const [{ data: rows }, { data: obsRows }] = await Promise.all([
+      supabaseServer
+        .from("koleex_todo_assignees")
+        .select("todo_id")
+        .eq("account_id", auth.account_id),
+      obsQuery,
+    ]);
+    assigneeTodoIds = Array.from(
+      new Set([
+        ...(rows ?? []).map((r) => (r as { todo_id: string }).todo_id),
+        ...(obsRows ?? []).map((r) => (r as { id: string }).id),
+      ]),
     );
   }
 
@@ -354,6 +366,29 @@ export async function POST(req: Request) {
         body: body.description || body.title,
         link: `/todo?task=${(todo as { id: string }).id}`,
         metadata: { type: "todo_mention", todo_id: (todo as { id: string }).id },
+      })),
+    );
+    mentionRecipients.forEach((id) => alreadyNotified.add(id));
+  }
+
+  // Notify observers (metadata.observers) — they follow the task and can
+  // update its situation, so they should know it exists from the start.
+  const observerIds = Array.isArray((body.metadata as { observers?: Array<{ account_id?: string }> } | undefined)?.observers)
+    ? ((body.metadata as { observers: Array<{ account_id?: string }> }).observers)
+        .map((o) => o.account_id)
+        .filter(Boolean) as string[]
+    : [];
+  const observerRecipients = Array.from(new Set(observerIds)).filter((id) => !alreadyNotified.has(id));
+  if (observerRecipients.length > 0) {
+    await supabaseServer.from("inbox_messages").insert(
+      observerRecipients.map((recipientId) => ({
+        recipient_account_id: recipientId,
+        sender_account_id: auth.account_id,
+        category: "task",
+        subject: `You are now an observer: ${body.title}`,
+        body: body.description || body.title,
+        link: `/todo?task=${(todo as { id: string }).id}`,
+        metadata: { type: "todo_observer", todo_id: (todo as { id: string }).id },
       })),
     );
   }

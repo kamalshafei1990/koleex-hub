@@ -2017,6 +2017,9 @@ export interface TodoMetadata {
   attachments?: TodoAttachment[];
   project?: { id: string; name: string } | null;
   mentions?: TodoMention[];
+  /* Observers: follow the task and may update its situation (status),
+     but their "done" still needs the assigner's confirmation. */
+  observers?: TodoMention[];
   products?: TodoProductRef[];
   checklist?: TodoChecklistItem[];
   [key: string]: unknown;

@@ -29,6 +29,7 @@ import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -333,7 +334,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           const m = editEntry.metadata && typeof editEntry.metadata === "object" ? editEntry.metadata : {};
           setExtras(m);
           // Auto-expand the attachments section only when the task already has some.
-          setShowExtras(!!(m.attachments?.length || m.mentions?.length || m.products?.length));
+          setShowExtras(!!(m.attachments?.length || m.mentions?.length || m.observers?.length || m.products?.length));
         }
       } else {
         setTitle(""); setDescription(""); setPriority("medium"); setLabel(""); setDueDate("");
@@ -762,8 +763,9 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
   const atts = Array.isArray(meta.attachments) ? meta.attachments : [];
   const prods = Array.isArray(meta.products) ? meta.products : [];
   const mentions = Array.isArray(meta.mentions) ? meta.mentions : [];
+  const observers = Array.isArray(meta.observers) ? meta.observers : [];
   const proj = meta.project && typeof meta.project === "object" ? meta.project : null;
-  if (atts.length === 0 && prods.length === 0 && mentions.length === 0 && !proj) return null;
+  if (atts.length === 0 && prods.length === 0 && mentions.length === 0 && observers.length === 0 && !proj) return null;
 
   const chip =
     "inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] max-w-[150px]";
@@ -800,6 +802,12 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
         <span key={m.account_id} className={chip}>
           <AtSignIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
           <span className="truncate">{m.full_name || m.username}</span>
+        </span>
+      ))}
+      {observers.map((o) => (
+        <span key={o.account_id} className={chip}>
+          <EyeIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
+          <span className="truncate">{o.full_name || o.username}</span>
         </span>
       ))}
     </div>
@@ -1359,14 +1367,18 @@ export default function TodoPage() {
     );
   }, [loadAll]);
 
+  /* Owners (SA / creator / assigner) complete tasks directly; everyone else
+     (assignees + observers) goes through the assigner's approval. */
+  const isTaskOwner = (t: TodoWithRelations) =>
+    isSA || t.created_by_account_id === accountId || t.assigned_by_account_id === accountId;
+
   const handleToggle = async (id: string) => {
     const before = todos.find((t) => t.id === id);
     if (!before) return;
-    const isDelegatedToMe = !!before.assigned_by_account_id && before.assigned_by_account_id !== accountId;
 
-    // Completing a task a manager delegated to me → submit for THEIR approval
+    // Completing a task someone else assigned → submit for THEIR approval
     // instead of marking it done outright (unless it was already approved).
-    if (!before.completed && isDelegatedToMe && before.approval_state !== "approved") {
+    if (!before.completed && !isTaskOwner(before) && before.approval_state !== "approved") {
       setTodos((prev) => prev.map((t) => t.id === id ? { ...t, approval_state: "pending" } : t));
       const ok = await updateTodo(id, { approval_state: "pending" });
       if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
@@ -1412,6 +1424,16 @@ export default function TodoPage() {
     const before = todos.find((t) => t.id === id);
     if (!before || before.status === status) return;
     const done = status === "done";
+
+    // Non-owners (assignee / observer) picking "Done" → submit for approval;
+    // the server enforces the same conversion, this just keeps the UI honest.
+    if (done && !isTaskOwner(before) && before.approval_state !== "approved") {
+      setTodos((prev) => prev.map((t) => t.id === id ? { ...t, approval_state: "pending" } : t));
+      const ok = await updateTodo(id, { status });
+      if (!ok) setTodos((prev) => prev.map((t) => t.id === id ? before : t));
+      return;
+    }
+
     setTodos((prev) => prev.map((t) => t.id === id
       ? { ...t, status, completed: done, completed_at: done ? new Date().toISOString() : null }
       : t));

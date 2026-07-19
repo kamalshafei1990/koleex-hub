@@ -25,6 +25,7 @@ import ProductPicker from "@/components/todo/ProductPicker";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -45,6 +46,7 @@ export default function TaskExtras({
   const { t } = useTranslation(todoT);
   const attachments = value.attachments ?? [];
   const mentions = value.mentions ?? [];
+  const observers = value.observers ?? [];
   const products = value.products ?? [];
 
   const [busy, setBusy] = useState(false);
@@ -152,6 +154,24 @@ export default function TaskExtras({
   };
   const removeMention = (id: string) => patch({ mentions: mentions.filter((m) => m.account_id !== id) });
 
+  /* ── Observers ── follow the task + can update its situation */
+  const [oq, setOq] = useState("");
+  const observable = useMemo(() => {
+    const taken = new Set(observers.map((o) => o.account_id));
+    const q = oq.trim().toLowerCase();
+    return employees
+      .filter((e) => !taken.has(e.account_id))
+      .filter((e) => !q || (e.full_name || e.username || "").toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [employees, observers, oq]);
+
+  const addObserver = (e: TodoAssigneeInfo) => {
+    const o: TodoMention = { account_id: e.account_id, username: e.username, full_name: e.full_name };
+    patch({ observers: [...observers, o] });
+    setOq("");
+  };
+  const removeObserver = (id: string) => patch({ observers: observers.filter((o) => o.account_id !== id) });
+
   /* ── Products ── (grid picker with photos + division/category filters) */
   const [pickerOpen, setPickerOpen] = useState(false);
   const toggleProduct = (ref: TodoProductRef) =>
@@ -252,6 +272,47 @@ export default function TaskExtras({
               <span key={m.account_id} className={chip}>
                 @{m.full_name || m.username}
                 <button type="button" onClick={() => removeMention(m.account_id)} className={chipX} aria-label={t("common.remove")}>
+                  <CrossIcon className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Observers ── */}
+      <div>
+        <label className={lbl}>{t("extras.observers")}</label>
+        <div className="relative">
+          <EyeIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+          <input className={miniInput} placeholder={t("extras.observerSearch")} value={oq} onChange={(e) => setOq(e.target.value)} />
+          {oq && observable.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
+              {observable.map((e) => (
+                <button key={e.account_id} type="button" onClick={() => addObserver(e)} className="w-full text-start px-3 h-9 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06] flex items-center gap-2">
+                  <span className="font-medium">
+                    {e.full_name || e.username}
+                    {(() => {
+                      const alt = ((e as { name_alt?: string | null }).name_alt ?? "").trim();
+                      return alt && alt !== (e.full_name ?? "").trim() ? (
+                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">{alt}</span>
+                      ) : null;
+                    })()}
+                  </span>
+                  {e.department && <span className="text-[10.5px] text-[var(--text-ghost)]">· {e.department}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
+        {observers.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {observers.map((o) => (
+              <span key={o.account_id} className={chip}>
+                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
+                {o.full_name || o.username}
+                <button type="button" onClick={() => removeObserver(o.account_id)} className={chipX} aria-label={t("common.remove")}>
                   <CrossIcon className="h-3 w-3" />
                 </button>
               </span>
