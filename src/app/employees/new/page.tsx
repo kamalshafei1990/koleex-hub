@@ -463,8 +463,11 @@ function DateInput({
     onChange(`${yy}-${mm}-${dd}`);
   };
 
+  /* On phones each triad shares half a card column — with the desktop
+     padding + chevron the selected value clips to "Ju" / "2". Below sm
+     the selects go compact: centered value, no chevron, minimal padding. */
   const sCls =
-    `h-10 px-2 rounded-xl bg-[var(--bg-primary)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none transition-colors w-full pr-6 ${borderFor(error)}`;
+    `h-10 px-1 sm:px-2 rounded-xl bg-[var(--bg-primary)] text-[12px] sm:text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none transition-colors w-full pr-1 sm:pr-6 text-center sm:text-start ${borderFor(error)}`;
 
   return (
     <div data-field={name}>
@@ -483,7 +486,7 @@ function DateInput({
               <option key={d} value={String(d).padStart(2, "0")}>{d}</option>
             ))}
           </select>
-          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none hidden sm:block" />
         </div>
         <div className="relative flex-[1.3]">
           <select
@@ -503,7 +506,7 @@ function DateInput({
             <option value="">Month</option>
             {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
           </select>
-          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none hidden sm:block" />
         </div>
         <div className="relative flex-[1.1]">
           <select
@@ -523,7 +526,7 @@ function DateInput({
               <option key={y} value={String(y)}>{y}</option>
             ))}
           </select>
-          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+          <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none hidden sm:block" />
         </div>
       </div>
       <FieldError msg={error} />
@@ -861,6 +864,17 @@ export default function AddEmployeePage() {
   const toggleSection = (k: keyof typeof openSections) =>
     setOpenSections((s) => ({ ...s, [k]: !s[k] }));
 
+  /* Completeness % mirrored in the sticky action bar — the full bar at
+     the top scrolls away, this keeps the signal while filling. */
+  const completenessDefaults = useMemo(() => emptyWizardData(), []);
+  const completenessPct = useMemo(() => {
+    const filled = TRACKED_EMPLOYEE_FIELDS.reduce(
+      (n, k) => n + (isUserFilled(k, form[k], completenessDefaults) ? 1 : 0),
+      0,
+    );
+    return Math.round((filled / TRACKED_EMPLOYEE_FIELDS.length) * 100);
+  }, [form, completenessDefaults]);
+
   /* Country options are stable — compute once. The flag is kept in
      `prefix` so the user can actually type-to-search by country
      name (the old native <select> matched the emoji first). */
@@ -1183,15 +1197,29 @@ export default function AddEmployeePage() {
             <EmployeesIcon size={18} className="text-[var(--text-dim)] shrink-0 hidden sm:block" />
             <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">{t("app.add")}</h1>
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-            aria-label={t("save.employee")}
-          >
-            {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
-            <span className="hidden xs:inline sm:inline">{saving ? t("saving") : t("save.employee")}</span>
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <span
+              className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-[var(--text-dim)] tabular-nums"
+              title="Profile completeness"
+            >
+              <span className="h-1.5 w-16 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] overflow-hidden">
+                <span
+                  className="block h-full rounded-full bg-[var(--text-primary)] transition-[width] duration-300"
+                  style={{ width: `${completenessPct}%` }}
+                />
+              </span>
+              {completenessPct}%
+            </span>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              aria-label={t("save.employee")}
+            >
+              {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
+              <span className="hidden xs:inline sm:inline">{saving ? t("saving") : t("save.employee")}</span>
+            </button>
+          </div>
         </div>
 
         {/* Profile completeness — counts the trackable fields filled */}
@@ -1459,9 +1487,10 @@ export default function AddEmployeePage() {
                 </div>
                 <Link
                   href="/management"
-                  className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors underline-offset-2 hover:underline"
+                  className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors underline-offset-2 hover:underline shrink-0 whitespace-nowrap"
                 >
-                  Manage in Management app →
+                  <span className="hidden sm:inline">Manage in Management app →</span>
+                  <span className="sm:hidden">Manage →</span>
                 </Link>
               </div>
 
