@@ -31,6 +31,7 @@ import FileIcon from "@/components/icons/ui/FileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { fpAvatar } from "@/lib/cdn";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 const isImage = (t: string) => t.startsWith("image/");
@@ -312,6 +313,32 @@ export default function TaskExtras({
    several people can be picked in one go. Panel background uses the OPAQUE
    --bg-secondary token — --bg-elevated is a 10%-alpha wash and rendered the
    old suggestion list transparent/unreadable. ── */
+/* Photo with initials fallback (mirrors MiniAvatar on the To-do page) —
+   broken/blocked images degrade to initials, never the broken-image glyph. */
+function PickerAvatar({ info, size = 24 }: { info: TodoAssigneeInfo; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [info.avatar_url]);
+
+  const initials = (info.full_name || info.username || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  return info.avatar_url && !failed ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
+      style={{ width: size, height: size }} onError={() => setFailed(true)} />
+  ) : (
+    <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"
+      style={{ width: size, height: size, fontSize: size * 0.38 }}>
+      {initials}
+    </div>
+  );
+}
+
 function PeoplePicker({
   icon,
   placeholder,
@@ -382,7 +409,7 @@ function PeoplePicker({
                 key={e.account_id}
                 type="button"
                 onClick={() => onToggle(e)}
-                className={`w-full text-start px-3 h-9 text-[12px] flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] transition-colors ${
+                className={`w-full text-start px-3 h-10 text-[12px] flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] transition-colors ${
                   on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
                 }`}
               >
@@ -395,6 +422,7 @@ function PeoplePicker({
                 >
                   <CheckIcon className="h-3 w-3" />
                 </span>
+                <PickerAvatar info={e} />
                 <span className="font-medium truncate">
                   {e.full_name || e.username}
                   {alt && alt !== (e.full_name ?? "").trim() ? (
