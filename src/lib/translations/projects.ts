@@ -44,6 +44,7 @@ export const projectsT: Translations = {
   "form.code":         { en: "Code",                zh: "代号",              ar: "الرمز" },
   "form.description":  { en: "Description",         zh: "描述",              ar: "الوصف" },
   "form.color":        { en: "Colour",              zh: "颜色",              ar: "اللون" },
+  "form.customColor":  { en: "Custom colour",       zh: "自定义颜色",         ar: "لون مخصص" },
   "form.customer":     { en: "Customer",            zh: "客户",              ar: "العميل" },
   "form.manager":      { en: "Manager",             zh: "负责人",            ar: "المدير" },
   "form.billable":     { en: "Billable",            zh: "可计费",            ar: "قابلة للفوترة" },

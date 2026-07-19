@@ -185,6 +185,35 @@ export default function ProjectsApp() {
    ACCOUNT PICKER — assignee / manager selector (shared)
    ══════════════════════════════════════════════════════════════════ */
 
+/* Suggested project colours — one tap instead of the native colour bar.
+   The trailing swatch still opens the native picker for a custom value. */
+const PROJECT_COLORS = [
+  "#818cf8", "#60a5fa", "#2dd4bf", "#34d399", "#fbbf24",
+  "#fb923c", "#f87171", "#f472b6", "#a78bfa", "#94a3b8",
+];
+
+function ColorSwatchPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  const { t } = useTranslation(projectsT);
+  const custom = !PROJECT_COLORS.includes(value.toLowerCase());
+  const ring = "ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-secondary)]";
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-1">
+      {PROJECT_COLORS.map((c) => (
+        <button key={c} type="button" onClick={() => onChange(c)} aria-label={c}
+          className={`h-7 w-7 rounded-full transition-transform ${value.toLowerCase() === c ? ring : "hover:scale-110"}`}
+          style={{ background: c }} />
+      ))}
+      <label title={t("form.customColor")}
+        className={`relative h-7 w-7 rounded-full cursor-pointer flex items-center justify-center overflow-hidden border ${custom ? `${ring} border-transparent` : "border-dashed border-[var(--border-color)]"}`}
+        style={custom ? { background: value } : undefined}>
+        {!custom && <PlusIcon size={11} className="text-[var(--text-dim)]" />}
+        <input type="color" value={value} onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("form.customColor")} />
+      </label>
+    </div>
+  );
+}
+
 const dueLabels = (t: (k: string) => string) => ({ today: t("date.today"), tomorrow: t("date.tomorrow"), yesterday: t("date.yesterday") });
 
 function AccountSelect({
@@ -1690,7 +1719,7 @@ function ProjectFormModal({
               <input value={code} onChange={(e) => setCode(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
             </Field>
             <Field label={t("form.color")}>
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] cursor-pointer" />
+              <ColorSwatchPicker value={color} onChange={setColor} />
             </Field>
           </div>
           <Field label={t("form.description")}>
