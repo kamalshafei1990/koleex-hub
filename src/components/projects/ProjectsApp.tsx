@@ -188,25 +188,39 @@ export default function ProjectsApp() {
 /* Suggested project colours — one tap instead of the native colour bar.
    The trailing swatch still opens the native picker for a custom value. */
 const PROJECT_COLORS = [
-  "#818cf8", "#60a5fa", "#2dd4bf", "#34d399", "#fbbf24",
-  "#fb923c", "#f87171", "#f472b6", "#a78bfa", "#94a3b8",
+  "#818cf8", "#60a5fa", "#2dd4bf", "#34d399",
+  "#fbbf24", "#fb923c", "#f87171", "#f472b6",
 ];
 
 function ColorSwatchPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   const { t } = useTranslation(projectsT);
   const custom = !PROJECT_COLORS.includes(value.toLowerCase());
-  const ring = "ring-2 ring-[var(--text-primary)] ring-offset-2 ring-offset-[var(--bg-secondary)]";
   return (
-    <div className="flex flex-wrap items-center gap-2 py-1">
-      {PROJECT_COLORS.map((c) => (
-        <button key={c} type="button" onClick={() => onChange(c)} aria-label={c}
-          className={`h-7 w-7 rounded-full transition-transform ${value.toLowerCase() === c ? ring : "hover:scale-110"}`}
-          style={{ background: c }} />
-      ))}
+    <div className="h-10 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between gap-1">
+      {PROJECT_COLORS.map((c) => {
+        const active = value.toLowerCase() === c;
+        return (
+          <button key={c} type="button" onClick={() => onChange(c)} aria-label={c}
+            className={`h-6 w-6 rounded-full flex items-center justify-center transition-all duration-150 ${
+              active
+                ? "scale-110 shadow-[0_0_0_1.5px_var(--bg-surface),0_0_0_3px_currentColor]"
+                : "opacity-80 hover:opacity-100 hover:scale-110"
+            }`}
+            style={{ background: c, color: c }}>
+            {active && <CheckIcon size={10} className="text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]" />}
+          </button>
+        );
+      })}
       <label title={t("form.customColor")}
-        className={`relative h-7 w-7 rounded-full cursor-pointer flex items-center justify-center overflow-hidden border ${custom ? `${ring} border-transparent` : "border-dashed border-[var(--border-color)]"}`}
+        className={`relative h-6 w-6 rounded-full cursor-pointer flex items-center justify-center overflow-hidden transition-all duration-150 ${
+          custom
+            ? "scale-110 shadow-[0_0_0_1.5px_var(--bg-surface),0_0_0_3px_var(--border-color)]"
+            : "border border-dashed border-[var(--border-color)] opacity-80 hover:opacity-100 hover:scale-110"
+        }`}
         style={custom ? { background: value } : undefined}>
-        {!custom && <PlusIcon size={11} className="text-[var(--text-dim)]" />}
+        {custom
+          ? <CheckIcon size={10} className="text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]" />
+          : <PlusIcon size={10} className="text-[var(--text-dim)]" />}
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)}
           className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("form.customColor")} />
       </label>
