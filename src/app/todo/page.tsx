@@ -47,6 +47,7 @@ import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
+import MyWorkStrip from "@/components/todo/MyWorkStrip";
 import {
   fetchTodos, createTodo, updateTodo, toggleTodo, deleteTodo,
   addTodoNote, deleteTodoNote,
@@ -1656,6 +1657,9 @@ export default function TodoPage() {
               <span className="hidden md:inline">{t("add")}</span>
             </button>
           </div>
+
+          {/* Cross-app: my project tasks + upcoming shifts (renders only when non-empty) */}
+          <MyWorkStrip />
 
           {/* Filter pills row */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none">

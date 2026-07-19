@@ -9,6 +9,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { downloadDocXlsx, downloadDocSnapshotXlsx, money } from "@/lib/excel-export";
@@ -1436,6 +1437,32 @@ export default function Quotations() {
     }
   }, [current, handleSave]);
 
+  /* ── Create delivery project from an accepted quote ── */
+  const handleCreateProject = useCallback(async () => {
+    if (!current || current.id.length !== 36) {
+      alert("Save the quotation first, then create the project.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/projects/from-quotation", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quotation_id: current.id }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { project?: { id: string }; already?: boolean; error?: string }
+        | null;
+      if (!res.ok || !json?.project) {
+        alert(`Could not create the project: ${json?.error ?? `HTTP ${res.status}`}`);
+        return;
+      }
+      window.location.assign("/projects");
+    } catch (err) {
+      alert(`Could not create the project: ${humanizeError(err)}`);
+    }
+  }, [current]);
+
   /* ── Print ── */
   const handlePrint = useCallback(() => {
     if (!current) return;
@@ -2561,6 +2588,16 @@ export default function Quotations() {
           <DocumentIcon size={14} />
           {t("btn.convertToInvoice")}
         </button>
+        {current.status === "accepted" && (
+          <button
+            onClick={handleCreateProject}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+            title="Create a delivery project in the Projects app linked to this quote's customer, with the quote total as its budget."
+          >
+            <BriefcaseIcon size={14} />
+            {t("btn.createProject", "Create Project")}
+          </button>
+        )}
         <button
           onClick={handleExportPdf}
           disabled={pdfState === "loading"}
