@@ -117,13 +117,15 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     if (!account) return null;
     const avatar = account.avatar_url || account.person?.avatar_url || null;
     const fullName = account.person?.full_name || account.username;
+    const nameAlt =
+      (account.person as { name_alt?: string | null } | null | undefined)?.name_alt || null;
     const subtitle = [
       account.user_type,
       account.role?.name,
     ]
       .filter(Boolean)
       .join(" · ");
-    return { avatar, fullName, subtitle };
+    return { avatar, fullName, nameAlt, subtitle };
   }, [account]);
 
   /* Load initial identity + keep it in sync. */
@@ -284,6 +286,16 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             >
               {profile.fullName}
             </span>
+            {profile.nameAlt && (
+              <span
+                lang="zh"
+                className={`text-[10px] leading-tight max-w-[140px] truncate ${
+                  dk ? "text-white/55" : "text-black/55"
+                }`}
+              >
+                {profile.nameAlt}
+              </span>
+            )}
             <span
               className={`text-[10px] capitalize max-w-[140px] truncate ${
                 dk ? "text-white/45" : "text-black/45"

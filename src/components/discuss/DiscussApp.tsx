@@ -269,6 +269,14 @@ function formatBytes(bytes: number): string {
 
 /** Human-readable display for a channel row — falls back to the other
  *  member's full_name for DMs, or the channel.name for groups/channels. */
+/* The other party's native/alternate name (people.name_alt, e.g. Chinese),
+   for the muted second line under the English name. Direct chats only. */
+function altNameFor(c: DiscussChannelWithState): string | null {
+  const alt = (c.other?.name_alt ?? "").trim();
+  if (!alt) return null;
+  return alt === (c.other?.full_name ?? "").trim() ? null : alt;
+}
+
 function displayNameFor(c: DiscussChannelWithState): string {
   if (c.kind === "direct") {
     return c.other?.full_name || c.other?.username || "Direct message";
@@ -2466,6 +2474,11 @@ export default function DiscussApp() {
                 <div className="flex-1 min-w-0">
                   <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
                     {displayNameFor(selectedChannel)}
+                    {altNameFor(selectedChannel) && (
+                      <span lang="zh" className="ms-1.5 text-[12px] font-normal text-[var(--text-dim)]">
+                        {altNameFor(selectedChannel)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-[var(--text-dim)] truncate">
                     {selectedChannel.kind === "direct"
@@ -3360,6 +3373,10 @@ function MessageBubble({
 }: MessageBubbleProps) {
   const author = msg.author;
   const authorName = author?.full_name || author?.username || "Unknown";
+  const authorAlt = (() => {
+    const a = (author?.name_alt ?? "").trim();
+    return a && a !== (author?.full_name ?? "").trim() ? a : null;
+  })();
   const time = formatFullTime(msg.created_at);
   const isDeleted = !!msg.deleted_at;
   const meta = msg.metadata ?? {};
@@ -3482,6 +3499,11 @@ function MessageBubble({
             {!isSelf && (
               <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">
                 {authorName}
+                {authorAlt && (
+                  <span lang="zh" className="ms-1 font-normal text-[var(--text-dim)]">
+                    {authorAlt}
+                  </span>
+                )}
               </span>
             )}
             <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">

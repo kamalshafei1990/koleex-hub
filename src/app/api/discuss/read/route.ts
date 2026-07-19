@@ -55,13 +55,14 @@ function flattenAuthor(raw: AuthorJoin) {
     username: acc.username,
     avatar_url: acc.avatar_url,
     full_name: person?.full_name ?? null,
+    name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null,
   };
 }
 
 const AUTHOR_SELECT = `
   *,
   author:accounts!discuss_messages_author_account_id_fkey (
-    id, username, avatar_url, person:people ( full_name )
+    id, username, avatar_url, person:people ( full_name, name_alt )
   )
 `;
 
@@ -185,7 +186,7 @@ export async function GET(req: Request) {
           const { data: others } = await supabaseServer
             .from(MEMBERS)
             .select(
-              `channel_id, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name ) )`,
+              `channel_id, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`,
             )
             .in("channel_id", directIds)
             .neq("account_id", me);
@@ -513,7 +514,7 @@ export async function GET(req: Request) {
         if (!scope.includes(channelId)) return NextResponse.json({ ok: true, data: [] });
         const { data } = await supabaseServer
           .from(MEMBERS)
-          .select(`*, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name ) )`)
+          .select(`*, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`)
           .eq("channel_id", channelId)
           .is("left_at", null);
         const out = ((data ?? []) as Array<Record<string, unknown> & { account: AuthorJoin }>).map((row) => ({
@@ -536,7 +537,7 @@ export async function GET(req: Request) {
           .from(MESSAGES)
           .select(
             `id, channel_id, body, created_at,
-             author:accounts!discuss_messages_author_account_id_fkey ( username, avatar_url, person:people ( full_name ) ),
+             author:accounts!discuss_messages_author_account_id_fkey ( username, avatar_url, person:people ( full_name, name_alt ) ),
              channel:discuss_channels!discuss_messages_channel_id_fkey ( id, name, kind )`,
           )
           .in("channel_id", scope)

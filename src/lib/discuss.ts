@@ -1399,7 +1399,7 @@ export async function fetchMessageableAccounts(): Promise<
       id,
       username,
       avatar_url,
-      person:people ( full_name, avatar_url ),
+      person:people ( full_name, name_alt, avatar_url ),
       role:roles ( name )
       `,
     )
@@ -1427,6 +1427,7 @@ export async function fetchMessageableAccounts(): Promise<
       id: row.id,
       username: row.username,
       full_name: person?.full_name ?? null,
+    name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null,
       avatar_url: row.avatar_url ?? person?.avatar_url ?? null,
       role_name: role?.name ?? null,
     };

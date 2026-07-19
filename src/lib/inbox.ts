@@ -417,7 +417,7 @@ export async function fetchMessageableAccounts(): Promise<
       id,
       username,
       avatar_url,
-      person:people ( full_name, avatar_url ),
+      person:people ( full_name, name_alt, avatar_url ),
       role:roles ( name )
       `,
     )

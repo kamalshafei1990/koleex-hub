@@ -156,7 +156,7 @@ export async function fetchAccountForHeader(
         person_id,
         company_id,
         role_id,
-        person:people(id, full_name, avatar_url),
+        person:people(id, full_name, name_alt, avatar_url),
         role:roles(id, name)
       `,
     )
@@ -764,7 +764,7 @@ export async function fetchEmployeesWithPerson(
     .from(EMPLOYEES)
     .select(
       `id, person_id, account_id, employee_number, department, position, work_email,
-       person:people(full_name, email, job_title)`,
+       person:people(full_name, name_alt, email, job_title)`,
     )
     .order("employee_number", { ascending: true, nullsFirst: false });
   // Multi-tenancy: limit the Employee picker to the current tenant so a

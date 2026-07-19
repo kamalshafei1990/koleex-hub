@@ -59,7 +59,7 @@ export async function GET(req: Request) {
         let q = supabaseServer
           .from(INBOX)
           .select(
-            `*, sender:accounts!inbox_messages_sender_account_id_fkey ( id, username, avatar_url, person:people ( full_name ) )`,
+            `*, sender:accounts!inbox_messages_sender_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`,
           )
           .eq("recipient_account_id", me)
           .order("created_at", { ascending: false })

@@ -48,7 +48,7 @@ const MESSAGES = "discuss_messages";
 const AUTHOR_SELECT = `
   *,
   author:accounts!discuss_messages_author_account_id_fkey (
-    id, username, avatar_url, person:people ( full_name )
+    id, username, avatar_url, person:people ( full_name, name_alt )
   )
 `;
 
@@ -61,7 +61,7 @@ function flattenAuthor(raw: AuthorJoin) {
   const acc = Array.isArray(raw) ? raw[0] ?? null : raw;
   if (!acc) return null;
   const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-  return { id: acc.id, username: acc.username, avatar_url: acc.avatar_url, full_name: person?.full_name ?? null };
+  return { id: acc.id, username: acc.username, avatar_url: acc.avatar_url, full_name: person?.full_name ?? null, name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null };
 }
 
 async function myChannelIds(me: string): Promise<string[]> {

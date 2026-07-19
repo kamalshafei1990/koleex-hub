@@ -48,7 +48,7 @@ export async function GET() {
 
   const [peopleRes, rolesRes] = await Promise.all([
     personIds.length > 0
-      ? supabaseServer.from("people").select("id, full_name, avatar_url").in("id", personIds)
+      ? supabaseServer.from("people").select("id, full_name, name_alt, avatar_url").in("id", personIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; avatar_url: string | null }> }),
     roleIds.length > 0
       ? supabaseServer.from("roles").select("id, name").in("id", roleIds)

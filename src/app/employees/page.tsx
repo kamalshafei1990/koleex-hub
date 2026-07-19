@@ -319,6 +319,9 @@ export default function EmployeesPage() {
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-faint)] shrink-0">{emp.employee_number}</span>
                       )}
                     </div>
+                    {(emp.person as { name_alt?: string | null }).name_alt && (
+                      <div lang="zh" className="text-[12px] text-[var(--text-dim)] truncate leading-tight">{(emp.person as { name_alt?: string | null }).name_alt}</div>
+                    )}
                     <div className="flex items-center gap-3 mt-0.5">
                       {emp.work_email && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)] truncate"><EnvelopeIcon size={10} /> {emp.work_email}</span>}
                       {emp.work_phone && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><PhoneIcon size={10} /> {emp.work_phone}</span>}

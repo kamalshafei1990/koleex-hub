@@ -314,7 +314,14 @@ export default function EmployeeProfilePage({
             <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={80} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{person.full_name}</h2>
+                <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">
+                  {person.full_name}
+                  {(person as { name_alt?: string | null }).name_alt && (
+                    <span lang="zh" className="ms-2 text-base font-normal text-[var(--text-dim)]">
+                      {(person as { name_alt?: string | null }).name_alt}
+                    </span>
+                  )}
+                </h2>
                 {employee.employee_number && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-faint)]">
                     {employee.employee_number}

@@ -1505,6 +1505,8 @@ export interface DiscussAuthor {
   username: string;
   avatar_url: string | null;
   full_name: string | null;
+  /** Native/alternate name (people.name_alt), e.g. a Chinese name. */
+  name_alt?: string | null;
 }
 
 /** Compact preview of a replied-to message, embedded inside a
