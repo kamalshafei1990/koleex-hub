@@ -11,7 +11,7 @@
    role) → public todo-attachments bucket; only the returned metadata is kept.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import type {
@@ -29,6 +29,7 @@ import EyeIcon from "@/components/icons/ui/EyeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
@@ -137,39 +138,21 @@ export default function TaskExtras({
     patch({ attachments: attachments.filter((a) => a.path !== path) });
 
   /* ── Mentions ── */
-  const [mq, setMq] = useState("");
-  const mentionable = useMemo(() => {
-    const taken = new Set(mentions.map((m) => m.account_id));
-    const q = mq.trim().toLowerCase();
-    return employees
-      .filter((e) => !taken.has(e.account_id))
-      .filter((e) => !q || (e.full_name || e.username || "").toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [employees, mentions, mq]);
-
-  const addMention = (e: TodoAssigneeInfo) => {
-    const m: TodoMention = { account_id: e.account_id, username: e.username, full_name: e.full_name };
-    patch({ mentions: [...mentions, m] });
-    setMq("");
-  };
+  const toggleMention = (e: TodoAssigneeInfo) =>
+    patch({
+      mentions: mentions.some((m) => m.account_id === e.account_id)
+        ? mentions.filter((m) => m.account_id !== e.account_id)
+        : [...mentions, { account_id: e.account_id, username: e.username, full_name: e.full_name } as TodoMention],
+    });
   const removeMention = (id: string) => patch({ mentions: mentions.filter((m) => m.account_id !== id) });
 
   /* ── Observers ── follow the task + can update its situation */
-  const [oq, setOq] = useState("");
-  const observable = useMemo(() => {
-    const taken = new Set(observers.map((o) => o.account_id));
-    const q = oq.trim().toLowerCase();
-    return employees
-      .filter((e) => !taken.has(e.account_id))
-      .filter((e) => !q || (e.full_name || e.username || "").toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [employees, observers, oq]);
-
-  const addObserver = (e: TodoAssigneeInfo) => {
-    const o: TodoMention = { account_id: e.account_id, username: e.username, full_name: e.full_name };
-    patch({ observers: [...observers, o] });
-    setOq("");
-  };
+  const toggleObserver = (e: TodoAssigneeInfo) =>
+    patch({
+      observers: observers.some((o) => o.account_id === e.account_id)
+        ? observers.filter((o) => o.account_id !== e.account_id)
+        : [...observers, { account_id: e.account_id, username: e.username, full_name: e.full_name } as TodoMention],
+    });
   const removeObserver = (id: string) => patch({ observers: observers.filter((o) => o.account_id !== id) });
 
   /* ── Products ── (grid picker with photos + division/category filters) */
@@ -185,8 +168,6 @@ export default function TaskExtras({
   const chip =
     "inline-flex items-center gap-1.5 h-7 ps-2.5 pe-1 rounded-full bg-[var(--bg-inverted)]/[0.06] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)]";
   const chipX = "h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-[var(--bg-inverted)]/[0.12] text-[var(--text-dim)]";
-  const miniInput =
-    "w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
   const actionBtn =
     "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-inverted)]/[0.04] transition-colors disabled:opacity-50";
 
@@ -244,28 +225,14 @@ export default function TaskExtras({
       {/* ── Mentions ── */}
       <div>
         <label className={lbl}>{t("extras.mention")}</label>
-        <div className="relative">
-          <AtSignIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input className={miniInput} placeholder={t("extras.mentionSearch")} value={mq} onChange={(e) => setMq(e.target.value)} />
-          {mq && mentionable.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
-              {mentionable.map((e) => (
-                <button key={e.account_id} type="button" onClick={() => addMention(e)} className="w-full text-start px-3 h-9 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06] flex items-center gap-2">
-                  <span className="font-medium">
-                    {e.full_name || e.username}
-                    {(() => {
-                      const alt = ((e as { name_alt?: string | null }).name_alt ?? "").trim();
-                      return alt && alt !== (e.full_name ?? "").trim() ? (
-                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">{alt}</span>
-                      ) : null;
-                    })()}
-                  </span>
-                  {e.department && <span className="text-[10.5px] text-[var(--text-ghost)]">· {e.department}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <PeoplePicker
+          icon={<AtSignIcon className="h-4 w-4" />}
+          placeholder={t("extras.mentionSearch")}
+          selected={mentions}
+          employees={employees}
+          noMatchesLabel={t("extras.noMatches")}
+          onToggle={toggleMention}
+        />
         {mentions.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {mentions.map((m) => (
@@ -283,28 +250,14 @@ export default function TaskExtras({
       {/* ── Observers ── */}
       <div>
         <label className={lbl}>{t("extras.observers")}</label>
-        <div className="relative">
-          <EyeIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input className={miniInput} placeholder={t("extras.observerSearch")} value={oq} onChange={(e) => setOq(e.target.value)} />
-          {oq && observable.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
-              {observable.map((e) => (
-                <button key={e.account_id} type="button" onClick={() => addObserver(e)} className="w-full text-start px-3 h-9 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06] flex items-center gap-2">
-                  <span className="font-medium">
-                    {e.full_name || e.username}
-                    {(() => {
-                      const alt = ((e as { name_alt?: string | null }).name_alt ?? "").trim();
-                      return alt && alt !== (e.full_name ?? "").trim() ? (
-                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">{alt}</span>
-                      ) : null;
-                    })()}
-                  </span>
-                  {e.department && <span className="text-[10.5px] text-[var(--text-ghost)]">· {e.department}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <PeoplePicker
+          icon={<EyeIcon className="h-4 w-4" />}
+          placeholder={t("extras.observerSearch")}
+          selected={observers}
+          employees={employees}
+          noMatchesLabel={t("extras.noMatches")}
+          onToggle={toggleObserver}
+        />
         <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
         {observers.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -349,6 +302,113 @@ export default function TaskExtras({
         onToggle={toggleProduct}
         onClose={() => setPickerOpen(false)}
       />
+    </div>
+  );
+}
+
+/* ── PeoplePicker — browsable multi-select dropdown for mentions/observers.
+   Opens on click/focus with the FULL employee list (typing filters it);
+   each row toggles selection with a checkbox and the list stays open so
+   several people can be picked in one go. Panel background uses the OPAQUE
+   --bg-secondary token — --bg-elevated is a 10%-alpha wash and rendered the
+   old suggestion list transparent/unreadable. ── */
+function PeoplePicker({
+  icon,
+  placeholder,
+  selected,
+  employees,
+  noMatchesLabel,
+  onToggle,
+}: {
+  icon: React.ReactNode;
+  placeholder: string;
+  selected: TodoMention[];
+  employees: TodoAssigneeInfo[];
+  noMatchesLabel: string;
+  onToggle: (e: TodoAssigneeInfo) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (ev: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(ev.target as Node)) {
+        setOpen(false);
+        setQ("");
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [open]);
+
+  const selectedIds = useMemo(() => new Set(selected.map((s) => s.account_id)), [selected]);
+  const list = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return employees.filter(
+      (e) => !query || (e.full_name || e.username || "").toLowerCase().includes(query),
+    );
+  }, [employees, q]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <span className="absolute start-3 top-[18px] -translate-y-1/2 text-[var(--text-dim)] pointer-events-none">{icon}</span>
+      <input
+        className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+        placeholder={placeholder}
+        value={q}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onChange={(ev) => {
+          setQ(ev.target.value);
+          setOpen(true);
+        }}
+      />
+      {open && (
+        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+          {list.length === 0 && (
+            <div className="px-3 h-9 flex items-center text-[12px] text-[var(--text-dim)]">{noMatchesLabel}</div>
+          )}
+          {list.map((e) => {
+            const on = selectedIds.has(e.account_id);
+            const alt = ((e as { name_alt?: string | null }).name_alt ?? "").trim();
+            return (
+              <button
+                key={e.account_id}
+                type="button"
+                onClick={() => onToggle(e)}
+                className={`w-full text-start px-3 h-9 text-[12px] flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] transition-colors ${
+                  on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                }`}
+              >
+                <span
+                  className={`h-4 w-4 rounded-[5px] border flex items-center justify-center shrink-0 ${
+                    on
+                      ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--bg-primary)]"
+                      : "border-[var(--border-strong)] text-transparent"
+                  }`}
+                >
+                  <CheckIcon className="h-3 w-3" />
+                </span>
+                <span className="font-medium truncate">
+                  {e.full_name || e.username}
+                  {alt && alt !== (e.full_name ?? "").trim() ? (
+                    <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">{alt}</span>
+                  ) : null}
+                </span>
+                {e.department && (
+                  <span className="text-[10.5px] text-[var(--text-ghost)] ms-auto shrink-0">{e.department}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

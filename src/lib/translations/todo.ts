@@ -194,6 +194,7 @@ export const todoT: Translations = {
   "extras.pasteHint":  { en: "or paste an image (⌘/Ctrl+V)", zh: "或粘贴图片 (⌘/Ctrl+V)", ar: "أو الصق صورة (⌘/Ctrl+V)" },
   "extras.mention":    { en: "Mention people",             zh: "提及成员",               ar: "الإشارة إلى أشخاص" },
   "extras.mentionSearch": { en: "Search to mention…",      zh: "搜索以提及…",            ar: "ابحث للإشارة…" },
+  "extras.noMatches":  { en: "No matches",                 zh: "无匹配结果",             ar: "لا توجد نتائج" },
   "extras.observers":  { en: "Observers",                  zh: "关注人",                 ar: "المراقبون" },
   "extras.observerSearch": { en: "Add an observer…",       zh: "添加关注人…",            ar: "أضف مراقبًا…" },
   "extras.observerHint": { en: "Observers follow the task and can update its situation — their “Done” still needs the assigner's confirmation.", zh: "关注人可跟进任务并更新其状态——其“完成”仍需分配人确认。", ar: "يتابع المراقبون المهمة ويمكنهم تحديث حالتها — ويظل إتمامهم بحاجة إلى تأكيد من مُسنِد المهمة." },
