@@ -114,6 +114,7 @@ import {
   uploadDiscussVoice,
   fetchMessageableAccounts,
 } from "@/lib/discuss";
+import { setActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { discussAttachmentUrl } from "@/lib/discuss-attachments";
 import {
   createPreviewUrl,
@@ -1307,6 +1308,25 @@ export default function DiscussApp() {
     }, 600);
     return () => window.clearTimeout(id);
   }, [selectedChannelId, accountId, messages.length]);
+
+  /* Publish the conversation the user is ACTIVELY viewing (open + tab in the
+     foreground) so the notification bell can skip counting a message that
+     arrives in the chat you're already looking at — you can see it, the chime
+     is enough (WeChat behaviour). Cleared when Discuss is backgrounded or
+     unmounted. */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const publish = () =>
+      setActiveDiscussChannel(
+        document.visibilityState === "visible" ? selectedChannelId : null,
+      );
+    publish();
+    document.addEventListener("visibilitychange", publish);
+    return () => {
+      document.removeEventListener("visibilitychange", publish);
+      setActiveDiscussChannel(null);
+    };
+  }, [selectedChannelId]);
 
   /* Drafts: load a saved draft when switching channels, save on change
      (debounced), clear on send. */

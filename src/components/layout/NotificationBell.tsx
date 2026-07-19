@@ -50,6 +50,7 @@ import {
   markChannelRead,
   subscribeToMyChannels,
 } from "@/lib/discuss";
+import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { useCurrentAccount } from "@/lib/identity";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
@@ -221,8 +222,16 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         const myId = accountIdRef.current;
         if (!myId) return;
         if (msg.author_account_id === myId) return;
-        /* Optimistic bump on the matching channel so the badge updates
-           before the recount round-trip lands. recountDiscuss() then
+        /* Chime fires for every inbound message from someone else,
+           regardless of which page we're on — a sound is a welcome signal. */
+        playNotificationSound();
+        /* But if the message landed in the conversation you're ACTIVELY
+           viewing, you can already see it — don't add it to the bell badge
+           (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
+           WeChat behaviour: sound yes, notification no. */
+        if (getActiveDiscussChannel() === msg.channel_id) return;
+        /* Otherwise optimistic bump on the matching channel so the badge
+           updates before the recount round-trip lands. recountDiscuss() then
            reconciles with the real DB state. */
         setDiscussChannels((prev) =>
           prev.map((c) =>
@@ -232,9 +241,6 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
           ),
         );
         void recountDiscuss();
-        /* Chime fires for every inbound message from someone else,
-           regardless of which page we're on. */
-        playNotificationSound();
       },
       onChannelChange: () => {
         void recountDiscuss();
