@@ -28,13 +28,31 @@
    to launch inactive/disabled apps — it never widens access.
    --------------------------------------------------------------------------- */
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useCallback, useRef } from "react";
 import type { AppDef } from "@/lib/navigation";
 import { trackAppOpen } from "@/lib/app-launcher";
 import { markAppLaunch } from "@/lib/perf/client";
 import { prefetchTier, readNetworkContext, isPreloadAllowed } from "@/lib/app-prefetch";
 import { preloadAppChunk, wasChunkWarmed } from "@/lib/app-chunk-preload";
+
+/* Renders INSIDE the <Link>: while the navigation this link started is still
+   in flight (RSC payload / chunk on a slow network), dim the tile and show a
+   small spinner so a tap ALWAYS visibly responds. 150 ms delay so instant
+   navigations never flash. */
+function LaunchPendingOverlay() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      aria-hidden
+      className="absolute inset-0 z-10 flex items-center justify-end rounded-[inherit] bg-[var(--bg-primary)]/40 pe-3 opacity-0 [animation:kx-launch-pending_.15s_.15s_forwards]"
+    >
+      <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--text-dim)] border-t-transparent" />
+      <style>{`@keyframes kx-launch-pending { to { opacity: 1; } }`}</style>
+    </span>
+  );
+}
 
 export interface AppLaunchLinkProps {
   app: AppDef;
@@ -136,7 +154,7 @@ export default function AppLaunchLink({
     <Link
       href={app.route}
       prefetch={autoPrefetch}
-      className={`${className}${press}`}
+      className={`relative ${className}${press}`}
       title={title}
       role={role}
       tabIndex={tabIndex}
@@ -148,6 +166,7 @@ export default function AppLaunchLink({
       {...aria}
     >
       {children}
+      <LaunchPendingOverlay />
     </Link>
   );
 }
