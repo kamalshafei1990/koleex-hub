@@ -19,7 +19,7 @@
 /* v3: version bump forces every open window onto fresh code on activate (the
    `hadOld` navigate below) — used to roll the fleet onto the Discuss SSE
    delivery build promptly. */
-const STATIC_CACHE = "kx-static-v3";
+const STATIC_CACHE = "kx-static-v4";
 
 self.addEventListener("install", () => {
   // Activate immediately so the first subscribe works without a reload.
@@ -39,15 +39,13 @@ self.addEventListener("activate", (event) => {
         /* Cache API unavailable — ignore; push still works. */
       }
       await self.clients.claim();
-      // If this activation REPLACED an older cache version, any open windows are
-      // running stale JS — navigate them to the fresh code. Skipped on a first
-      // install (no prior version), so we never reload a brand-new visitor.
-      if (hadOld) {
-        try {
-          const wins = await self.clients.matchAll({ type: "window" });
-          for (const w of wins) { try { w.navigate(w.url); } catch { /* ignore */ } }
-        } catch { /* ignore */ }
-      }
+      // NOTE: we deliberately do NOT navigate open windows here anymore.
+      // The old forced w.navigate() could fire while the user was mid-tap
+      // into an app (URL still "/") and yank them back to Home — reported
+      // as "loading… then suddenly the home page". Stale windows keep
+      // working (hashed chunks stay served) and pick up fresh code on
+      // their next natural full load.
+      void hadOld;
     })(),
   );
 });

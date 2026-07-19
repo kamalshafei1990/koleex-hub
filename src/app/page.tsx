@@ -33,8 +33,8 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
-import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
-import { fetchUnreadTaskCount, subscribeToInboxMessages } from "@/lib/inbox";
+/* discuss/inbox are imported DYNAMICALLY inside the badge effects below —
+   keeping the heavy data layer off Home's first-paint critical path. */
 
 
 function getGreetingKey(): string {
@@ -592,8 +592,10 @@ export default function HomePage() {
     if (!id) return;
     let cancelled = false;
 
+    let unsubscribe: () => void = () => {};
     const recount = async () => {
       try {
+        const { fetchMyChannels } = await import("@/lib/discuss");
         const rows = await fetchMyChannels(id);
         if (cancelled) return;
         /* A manually "marked as unread" chat (WeChat-style dot, no count)
@@ -612,12 +614,15 @@ export default function HomePage() {
 
     void recount();
 
-    const unsubscribe = subscribeToMyChannels({
-      onMessageInsert: (msg) => {
-        if (msg.author_account_id === id) return;
-        void recount();
-      },
-      onChannelChange: () => void recount(),
+    void import("@/lib/discuss").then(({ subscribeToMyChannels }) => {
+      if (cancelled) return;
+      unsubscribe = subscribeToMyChannels({
+        onMessageInsert: (msg) => {
+          if (msg.author_account_id === id) return;
+          void recount();
+        },
+        onChannelChange: () => void recount(),
+      });
     });
 
     const onUnreadChanged = () => void recount();
@@ -646,8 +651,10 @@ export default function HomePage() {
     if (!id) return;
     let cancelled = false;
 
+    let unsubscribe: () => void = () => {};
     const recount = async () => {
       try {
+        const { fetchUnreadTaskCount } = await import("@/lib/inbox");
         const n = await fetchUnreadTaskCount(id);
         if (!cancelled) setTodoUnread(n);
       } catch {
@@ -657,8 +664,11 @@ export default function HomePage() {
 
     void recount();
 
-    const unsubscribe = subscribeToInboxMessages(id, (msg) => {
-      if (msg.category === "task") void recount();
+    void import("@/lib/inbox").then(({ subscribeToInboxMessages }) => {
+      if (cancelled) return;
+      unsubscribe = subscribeToInboxMessages(id, (msg) => {
+        if (msg.category === "task") void recount();
+      });
     });
 
     const onRecount = () => void recount();
@@ -823,31 +833,6 @@ export default function HomePage() {
           chunksWarmed += 1;
         }
       }
-      /* Warm-ALL follow-up: after the Tier-A hot set, progressively warm the
-         REST of the user's authorized apps (route payload + client chunk),
-         one every 450 ms so it never competes with what the user is doing.
-         This is what makes the FIRST tap on ANY app fast on high-latency
-         links (mainland China): by the time the user has scanned Home, most
-         app code + payloads are already on the device. Re-checks the network
-         guard before every step; dedupe lives inside preloadAppChunk /
-         router.prefetch. */
-      const rest = Array.from(authorized).filter((id) => !apps.includes(id));
-      let i = 0;
-      const warmNext = () => {
-        if (i >= rest.length) return;
-        if (document.visibilityState === "hidden" || !isPreloadAllowed(readNetworkContext())) {
-          window.setTimeout(warmNext, 3000); // paused — try again later
-          return;
-        }
-        const id = rest[i++];
-        const a = getApp(id);
-        if (a?.active) {
-          try { router.prefetch(a.route); } catch { /* ignore */ }
-          if (hasChunkPreloader(id)) { try { preloadAppChunk(id); } catch { /* ignore */ } }
-        }
-        window.setTimeout(warmNext, 450);
-      };
-      window.setTimeout(warmNext, 1200);
     };
     const w = window as unknown as {
       requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;

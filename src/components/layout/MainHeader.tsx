@@ -9,8 +9,15 @@ import SunIcon from "@/components/icons/ui/SunIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+import dynamic from "next/dynamic";
 import UserMenu from "./UserMenu";
-import NotificationBell from "./NotificationBell";
+/* Lazy: the bell pulls the discuss + inbox + supabase data layer (~90KB gz).
+   Deferring it takes that entire stack OFF the first-paint critical path on
+   EVERY page; the icon slot is reserved so nothing shifts. */
+const NotificationBell = dynamic(() => import("./NotificationBell"), {
+  ssr: false,
+  loading: () => <div className="w-7 h-7 md:w-9 md:h-9" aria-hidden />,
+});
 import TenantPicker from "./TenantPicker";
 import ViewAsPicker from "./ViewAsPicker";
 import KoleexLogo from "./KoleexLogo";
