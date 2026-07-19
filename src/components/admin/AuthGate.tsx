@@ -16,11 +16,10 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AdminAuth from "./AdminAuth";
-import {
-  isSupabaseAuthEnabled,
-  getCurrentSession,
-  onAuthStateChange,
-} from "@/lib/auth-client";
+/* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
+   mounted gate never statically imports the supabase client. */
+const isSupabaseAuthEnabled = () =>
+  process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
 
 interface Props {
   title: string;
@@ -56,6 +55,7 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     (async () => {
+      const { getCurrentSession } = await import("@/lib/auth-client");
       const session = await getCurrentSession();
       if (cancelled) return;
 
@@ -69,17 +69,21 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
     })();
 
     // Keep the gate in sync if the user signs out in another tab.
-    const unsubscribe = onAuthStateChange((session) => {
+    let unsubscribe: (() => void) | null = null;
+    void import("@/lib/auth-client").then(({ onAuthStateChange }) => {
       if (cancelled) return;
-      if (!session) {
-        const next = encodeURIComponent(pathname || "/");
-        router.replace(`/login?next=${next}`);
-      }
+      unsubscribe = onAuthStateChange((session) => {
+        if (cancelled) return;
+        if (!session) {
+          const next = encodeURIComponent(pathname || "/");
+          router.replace(`/login?next=${next}`);
+        }
+      });
     });
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      unsubscribe?.();
     };
   }, [router, pathname]);
 

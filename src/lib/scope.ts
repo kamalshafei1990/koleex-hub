@@ -29,7 +29,12 @@
    debug — the helper just tells them "here are the extra conditions".
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
+/* supabase-admin is imported lazily so @supabase/supabase-js stays out of
+   the shell's first-load bundle — every call site below is already async. */
+async function sb() {
+  const { supabaseAdmin } = await import("./supabase-admin");
+  return supabaseAdmin;
+}
 
 /** Four scope levels. Order matters: from most restrictive to least. */
 export type DataScope = "private" | "own" | "department" | "all";
@@ -212,14 +217,14 @@ async function loadScopeContextUncached(
 ): Promise<ScopeContext> {
   // Parallel: account+role and employee
   const [accRes, empRes] = await Promise.all([
-    supabase
+    (await sb())
       .from("accounts")
       .select(
         "role_id, tenant_id, is_super_admin, roles:role_id(is_super_admin, can_view_private)",
       )
       .eq("id", accountId)
       .maybeSingle(),
-    supabase
+    (await sb())
       .from("koleex_employees")
       .select("department")
       .eq("account_id", accountId)
@@ -287,7 +292,7 @@ export async function getModuleScope(
   if (TYPE_C_MODULES.has(module_name)) return "own";
 
   if (!ctx.role_id) return "private";
-  const { data } = await supabase
+  const { data } = await (await sb())
     .from("koleex_permissions")
     .select("data_scope")
     .eq("role_id", ctx.role_id)
@@ -331,7 +336,7 @@ export async function canViewAccount(
   if (scope === "all") return { allowed: true, reason: "scope_all" };
 
   if (scope === "department" && ctx.department) {
-    const { data } = await supabase
+    const { data } = await (await sb())
       .from("koleex_employees")
       .select("department")
       .eq("account_id", target_account_id)
@@ -375,7 +380,7 @@ export async function filterAccessibleAccounts(
 
   // Department scope — batch-fetch departments for the candidates
   if (scope === "department" && ctx.department) {
-    const { data } = await supabase
+    const { data } = await (await sb())
       .from("koleex_employees")
       .select("account_id, department")
       .in("account_id", candidate_account_ids);
@@ -468,7 +473,7 @@ export async function buildScopeFilter(params: {
     scope !== "bypass" &&
     scope !== "all"
   ) {
-    const { data } = await supabase
+    const { data } = await (await sb())
       .from(config.sharing_junction.table)
       .select(config.sharing_junction.fk_record)
       .eq(config.sharing_junction.fk_account, params.ctx.account_id);
@@ -570,7 +575,7 @@ export async function logPrivateAccess(
     record_id: id,
     access_reason: access_reason ?? null,
   }));
-  const { error } = await supabase
+  const { error } = await (await sb())
     .from("koleex_private_access_log")
     .insert(rows);
   if (error) {

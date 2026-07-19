@@ -16,7 +16,6 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -70,6 +69,8 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
     const accountId = getCurrentAccountIdSync();
     if (!accountId) return;
     (async () => {
+      /* Lazy: keeps @supabase/supabase-js out of the header's first-load JS. */
+      const { supabaseAdmin } = await import("@/lib/supabase-admin");
       // Check if viewer is SA (role or account level)
       const { data: acc } = await supabaseAdmin
         .from("accounts")

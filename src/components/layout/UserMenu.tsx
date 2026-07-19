@@ -36,17 +36,16 @@ import { useInboxUnread } from "@/lib/inbox-unread-store";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import BellRawIcon from "@/components/icons/ui/BellIcon";
-import {
-  getCurrentUser,
-  isSupabaseAuthEnabled,
-  onAuthStateChange,
-  signOut as supabaseSignOut,
-} from "@/lib/auth-client";
 import { setCurrentAccountId, useCurrentAccount } from "@/lib/identity";
 import {
   LEGACY_SESSION_KEY,
   LEGACY_SESSION_USER_KEY,
 } from "@/components/admin/AdminAuth";
+
+/* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
+   mounted header component never statically imports the supabase client. */
+const isSupabaseAuthEnabled = () =>
+  process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
 
 type Identity =
   | { mode: "supabase"; signedIn: true; email: string; username?: string }
@@ -134,6 +133,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
     async function refresh() {
       if (isSupabaseAuthEnabled()) {
+        const { getCurrentUser } = await import("@/lib/auth-client");
         const user = await getCurrentUser();
         if (cancelled) return;
         if (user?.email) {
@@ -159,12 +159,16 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
     /* Supabase: react to sign-in / sign-out events in this or other tabs. */
     if (isSupabaseAuthEnabled()) {
-      const unsub = onAuthStateChange(() => {
-        void refresh();
+      let unsub: (() => void) | null = null;
+      void import("@/lib/auth-client").then(({ onAuthStateChange }) => {
+        if (cancelled) return;
+        unsub = onAuthStateChange(() => {
+          void refresh();
+        });
       });
       return () => {
         cancelled = true;
-        unsub();
+        unsub?.();
       };
     }
 
@@ -221,6 +225,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     try { queryClient.clear(); } catch { /* ignore */ }
     clearSessionScopedCaches();
     if (identity.mode === "supabase") {
+      const { signOut: supabaseSignOut } = await import("@/lib/auth-client");
       await supabaseSignOut();
       setIdentity({ mode: "supabase", signedIn: false });
       router.replace("/login");

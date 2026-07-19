@@ -39,8 +39,6 @@ import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
-import { verifyAccountLogin } from "@/lib/accounts-admin";
-import { createMembershipRequest } from "@/lib/inbox";
 import { setCurrentAccountId } from "@/lib/identity";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { COUNTRIES } from "@/types/product-form";
@@ -142,6 +140,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
       return;
     }
     setSignInBusy(true);
+    /* Lazy: accounts-admin pulls the supabase client — only needed at the
+       moment of a sign-in attempt, never for the authed shell. */
+    const { verifyAccountLogin } = await import("@/lib/accounts-admin");
     const result = await verifyAccountLogin(username, password);
     setSignInBusy(false);
 
@@ -214,6 +215,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
     /* Primary path: insert into `membership_requests`. The DB trigger
        fans out a notification to every active Super Admin. */
+    const { createMembershipRequest } = await import("@/lib/inbox");
     const result = await createMembershipRequest({
       full_name: name,
       email,

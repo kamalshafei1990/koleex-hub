@@ -15,7 +15,6 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import { getCurrentAccountIdSync } from "./identity";
 import { APP_REGISTRY } from "./navigation";
 import {

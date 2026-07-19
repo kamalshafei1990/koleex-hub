@@ -14,12 +14,14 @@ import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
 import AppLaunchSplash from "./AppLaunchSplash";
 import Sidebar from "./Sidebar";
-import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import dynamic from "next/dynamic";
 /* QA reporter is post-paint tooling — keep it (and everything it pulls)
    out of the first-load bundle on every page. */
 const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButton"), { ssr: false });
+/* FloatingPanel (AI/Discuss dock) statically pulls the discuss lib + supabase
+   client — lazy so the shell's first paint never waits on or ships them. */
+const FloatingPanel = dynamic(() => import("./FloatingPanel"), { ssr: false });
 import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";

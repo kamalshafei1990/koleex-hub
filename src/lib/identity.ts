@@ -24,7 +24,6 @@
 --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchAccounts, fetchAccountForHeader } from "./accounts-admin";
 import type { AccountWithLinks } from "@/types/supabase";
 import { clearScopeContextCache } from "./scope";
 
@@ -149,6 +148,7 @@ export function useCurrentAccount() {
          internal account exists in the DB, that's "me". */
       if (!id) {
         try {
+          const { fetchAccounts } = await import("./accounts-admin");
           const rows = await fetchAccounts();
           const internals = rows.filter((r) => r.user_type === "internal");
           if (internals.length === 1) {
@@ -178,6 +178,7 @@ export function useCurrentAccount() {
       }
 
       /* Cache miss: single-query fetch (people + roles joined). */
+      const { fetchAccountForHeader } = await import("./accounts-admin");
       const full = await fetchAccountForHeader(id);
       if (cancelled) return;
       if (full) writeCache(id, full);
