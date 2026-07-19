@@ -261,6 +261,127 @@ function ChecklistField({ items, onChange }: {
 /* ══════════════════════════════════════════════════════════════
    TASK MODAL — Create / Edit with employee assignment
    ══════════════════════════════════════════════════════════════ */
+/* ── LabelPicker — compact dropdown replacing the old label pill wall.
+   With 30+ labels the pills took 4+ rows of the modal; this is one
+   input-height control: click → searchable 2-column list (opaque panel),
+   pick one (click again to clear), or create a new label from the footer. ── */
+function LabelPicker({ labels, value, onChange, t, newLabelName, setNewLabelName, showNewLabel, setShowNewLabel, onCreate }: {
+  labels: TodoLabelRow[];
+  value: string;
+  onChange: (name: string) => void;
+  t: (key: string, fallback?: string) => string;
+  newLabelName: string;
+  setNewLabelName: (v: string) => void;
+  showNewLabel: boolean;
+  setShowNewLabel: (v: boolean) => void;
+  onCreate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (ev: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(ev.target as Node)) {
+        setOpen(false);
+        setQ("");
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [open]);
+
+  const selected = labels.find((l) => l.name === value) ?? null;
+  const list = q.trim()
+    ? labels.filter((l) => l.name.toLowerCase().includes(q.trim().toLowerCase()))
+    : labels;
+
+  return (
+    <div ref={rootRef} className="relative">
+      {/* Trigger — reads like the other inputs in the form */}
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] flex items-center gap-2 hover:border-[var(--border-focus)] transition-all">
+        <TagsIcon size={14} className="text-[var(--text-dim)] shrink-0" />
+        {selected ? (
+          <span className="flex items-center gap-2 text-[var(--text-primary)] min-w-0">
+            {selected.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />}
+            <span className="truncate">{selected.name}</span>
+          </span>
+        ) : (
+          <span className="text-[var(--text-dim)]">{t("f.label.choose")}</span>
+        )}
+        <span className="ms-auto flex items-center gap-1 shrink-0">
+          {value && (
+            <span role="button" tabIndex={0} aria-label={t("common.clear")}
+              onClick={(ev) => { ev.stopPropagation(); onChange(""); }}
+              onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.stopPropagation(); onChange(""); } }}
+              className="h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-[var(--bg-surface-hover)] text-[var(--text-dim)]">
+              <CrossIcon size={11} />
+            </span>
+          )}
+          <AngleDownIcon size={13} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
+          {/* Search */}
+          <div className="p-1.5 border-b border-[var(--border-subtle)]">
+            <input autoFocus value={q} onChange={(ev) => setQ(ev.target.value)}
+              placeholder={t("f.label.search")}
+              className="w-full h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
+          </div>
+          {/* Two-column label grid */}
+          <div className="max-h-52 overflow-y-auto p-1 grid grid-cols-2 gap-0.5">
+            {list.length === 0 && (
+              <div className="col-span-2 px-3 h-8 flex items-center text-[12px] text-[var(--text-dim)]">{t("extras.noMatches")}</div>
+            )}
+            {list.map((l) => {
+              const on = l.name === value;
+              return (
+                <button key={l.id} type="button"
+                  onClick={() => { onChange(on ? "" : l.name); setOpen(false); setQ(""); }}
+                  className={`h-8 px-2.5 rounded-lg text-[12px] flex items-center gap-2 text-start transition-colors ${
+                    on
+                      ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold"
+                      : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                  }`}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: l.color ?? "#94a3b8" }} />
+                  <span className="truncate">{l.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Create a new label */}
+          <div className="p-1.5 border-t border-[var(--border-subtle)]">
+            {showNewLabel ? (
+              <div className="flex items-center gap-1.5">
+                <input type="text" value={newLabelName} onChange={(ev) => setNewLabelName(ev.target.value)}
+                  placeholder={t("f.label.placeholder")} autoFocus
+                  className="flex-1 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                  onKeyDown={(ev) => { if (ev.key === "Enter") onCreate(); if (ev.key === "Escape") setShowNewLabel(false); }} />
+                <button type="button" onClick={onCreate}
+                  className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold shrink-0">{t("common.add")}</button>
+                <button type="button" onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)] shrink-0 px-1"><CrossIcon size={12} /></button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowNewLabel(true)}
+                className="w-full h-8 px-2.5 rounded-lg text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5">
+                <PlusIcon size={11} /> {t("common.new")}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskModal({ open, editEntry, employees, departments, labels, onClose, onSave }: {
   open: boolean;
   editEntry: TodoWithRelations | null;
@@ -680,38 +801,14 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             )}
           </div>
 
-          {/* Label */}
+          {/* Label — one compact dropdown; the pill wall stopped scaling
+              once the label library grew past a handful of entries */}
           <div>
             <label className={lbl}>{t("f.label")}</label>
-            <div className="flex flex-wrap gap-1.5">
-              {labels.map((l) => (
-                <button key={l.id} onClick={() => setLabel(label === l.name ? "" : l.name)}
-                  className={`h-7 px-3 rounded-full text-[11px] font-medium transition-all border flex items-center gap-1.5 ${
-                    label === l.name
-                      ? "bg-white/10 border-white/20 text-[var(--text-primary)]"
-                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                  }`}>
-                  {l.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: l.color }} />}
-                  {l.name}
-                </button>
-              ))}
-              {/* Add new label */}
-              {showNewLabel ? (
-                <div className="flex items-center gap-1">
-                  <input type="text" value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)}
-                    placeholder={t("f.label.placeholder")} autoFocus
-                    className="h-7 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none w-24"
-                    onKeyDown={(e) => { if (e.key === "Enter") handleNewLabel(); if (e.key === "Escape") setShowNewLabel(false); }} />
-                  <button onClick={handleNewLabel} className="h-7 px-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">{t("common.add")}</button>
-                  <button onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)]"><CrossIcon size={12} /></button>
-                </div>
-              ) : (
-                <button onClick={() => setShowNewLabel(true)}
-                  className="h-7 px-3 rounded-full text-[11px] font-medium border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-all flex items-center gap-1">
-                  <PlusIcon size={10} /> {t("common.new")}
-                </button>
-              )}
-            </div>
+            <LabelPicker labels={labels} value={label} onChange={setLabel} t={t}
+              newLabelName={newLabelName} setNewLabelName={setNewLabelName}
+              showNewLabel={showNewLabel} setShowNewLabel={setShowNewLabel}
+              onCreate={handleNewLabel} />
           </div>
 
           <div className="h-px bg-[var(--border-subtle)]" />
