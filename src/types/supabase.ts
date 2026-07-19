@@ -2015,6 +2015,7 @@ export interface TodoChecklistItem {
 }
 export interface TodoMetadata {
   attachments?: TodoAttachment[];
+  project?: { id: string; name: string } | null;
   mentions?: TodoMention[];
   products?: TodoProductRef[];
   checklist?: TodoChecklistItem[];

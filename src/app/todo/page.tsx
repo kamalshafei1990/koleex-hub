@@ -30,6 +30,7 @@ import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -55,6 +56,7 @@ import {
   fetchAssignableEmployees, fetchDepartments,
   subscribeToTodos,
 } from "@/lib/todo-admin";
+import { fetchProjects } from "@/lib/projects";
 import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
@@ -287,8 +289,28 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [empSearch, setEmpSearch] = useState("");
   const [extras, setExtras] = useState<TodoMetadata>({});
   const [showExtras, setShowExtras] = useState(false);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const accountId = getCurrentAccountIdSync();
+
+  /* Active projects for the optional "Related project" link. fetchProjects
+     returns [] when the user lacks Projects access, which hides the field. */
+  useEffect(() => {
+    if (!open || projects.length > 0) return;
+    fetchProjects({ status: "active" })
+      .then((rows) => setProjects(rows.map((r) => ({ id: r.id, name: r.name }))))
+      .catch(() => {});
+  }, [open, projects.length]);
+
+  const setRelatedProject = (id: string) => {
+    setExtras((prev) => {
+      const next = { ...prev };
+      const p = projects.find((x) => x.id === id) ?? (prev.project?.id === id ? prev.project : null);
+      if (p) next.project = { id: p.id, name: p.name };
+      else delete next.project;
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (open) {
@@ -578,6 +600,24 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             </div>
           </div>
 
+          {/* Related project — stored in metadata.project, no schema change */}
+          {(projects.length > 0 || extras.project) && (
+            <div>
+              <label className={lbl}>
+                <BriefcaseIcon size={11} className="inline mr-1 -mt-0.5" /> {t("f.project", "Related project")}{" "}
+                <span className="font-normal normal-case">{t("common.optional")}</span>
+              </label>
+              <select value={extras.project?.id ?? ""} onChange={(e) => setRelatedProject(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all">
+                <option value="">{t("f.noProject", "None")}</option>
+                {extras.project && !projects.some((p) => p.id === extras.project?.id) && (
+                  <option value={extras.project.id}>{extras.project.name}</option>
+                )}
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+
           {/* Start + Due date — stack on mobile so each picker gets full width */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -721,7 +761,8 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
   const atts = Array.isArray(meta.attachments) ? meta.attachments : [];
   const prods = Array.isArray(meta.products) ? meta.products : [];
   const mentions = Array.isArray(meta.mentions) ? meta.mentions : [];
-  if (atts.length === 0 && prods.length === 0 && mentions.length === 0) return null;
+  const proj = meta.project && typeof meta.project === "object" ? meta.project : null;
+  if (atts.length === 0 && prods.length === 0 && mentions.length === 0 && !proj) return null;
 
   const chip =
     "inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] max-w-[150px]";
@@ -729,6 +770,12 @@ function TaskExtrasStrip({ metadata }: { metadata: TodoMetadata | null | undefin
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {proj && (
+        <span className={chip}>
+          <BriefcaseIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
+          <span className="truncate">{proj.name}</span>
+        </span>
+      )}
       {atts.map((a) =>
         a.type?.startsWith("image/") ? (
           <a key={a.path} href={a.url} target="_blank" rel="noreferrer" onClick={stop}
