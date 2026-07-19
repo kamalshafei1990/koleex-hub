@@ -164,6 +164,10 @@ export const projectsT: Translations = {
   "report.dueThisWeek":  { en: "Due this week",     zh: "本周到期",          ar: "مستحقة هذا الأسبوع" },
   "cfg.tags.empty":      { en: "No tags yet — add your first above.", zh: "暂无标签——请在上方添加第一个。", ar: "لا توجد علامات بعد — أضف الأولى أعلاه." },
 
+  /* Super-admin audience lens */
+  "sa.viewOwn": { en: "My view",   zh: "我的视图", ar: "عرضي" },
+  "sa.viewAll": { en: "All users", zh: "所有用户", ar: "كل المستخدمين" },
+
   /* Relative dates */
   "date.today":          { en: "Today",             zh: "今天",              ar: "اليوم" },
   "date.tomorrow":       { en: "Tomorrow",          zh: "明天",              ar: "غدًا" },

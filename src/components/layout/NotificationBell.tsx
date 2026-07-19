@@ -180,6 +180,17 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   );
   const totalUnread = discussUnread + inboxUnread;
 
+  /* Notification chime for INBOX notifications (task assigned, reminders,
+     approvals…) — mirrors the Discuss chime. Fires only when the unread
+     count RISES after the first resolved value, so the initial load and
+     mark-as-read never beep. */
+  const prevInboxRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevInboxRef.current;
+    prevInboxRef.current = inboxUnread;
+    if (prev !== null && inboxUnread > prev) playNotificationSound();
+  }, [inboxUnread]);
+
   /* Publish the authoritative inbox count to the shared store so the
      UserMenu badge consumes it instead of running its own duplicate
      60 s poll. Additive only — the bell stays the single inbox poller

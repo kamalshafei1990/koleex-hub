@@ -41,6 +41,24 @@ export async function GET(req: Request) {
 
   q = q.eq("is_template", templatesOnly);
   if (!templatesOnly && status !== "all") q = q.eq("status", status);
+
+  // Type C scope: non-SA callers see only projects they're involved in —
+  // manager, creator, or holding at least one task assigned to them.
+  // Templates stay org-wide (they're reusable blueprints, not work items).
+  if (!auth.is_super_admin && !templatesOnly) {
+    const { data: myTaskProjects } = await supabaseServer
+      .from("project_tasks")
+      .select("project_id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("assignee_account_id", auth.account_id);
+    const ids = [...new Set((myTaskProjects ?? []).map((r) => (r as { project_id: string }).project_id))];
+    const orParts = [
+      `manager_account_id.eq.${auth.account_id}`,
+      `created_by_account_id.eq.${auth.account_id}`,
+    ];
+    if (ids.length > 0) orParts.push(`id.in.(${ids.join(",")})`);
+    q = q.or(orParts.join(","));
+  }
   if (customerId) q = q.eq("customer_id", customerId);
   if (search) {
     const term = `%${search}%`;

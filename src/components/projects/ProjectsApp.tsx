@@ -15,6 +15,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
+import { usePermissions } from "@/lib/permissions";
+import { getCurrentAccountIdSync } from "@/lib/identity";
 import { projectsT } from "@/lib/translations/projects";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -264,6 +266,14 @@ function AccountSelect({
 
 function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => void }) {
   const { t } = useTranslation(projectsT);
+  const { isSuperAdmin: isSA } = usePermissions();
+  const meId = getCurrentAccountIdSync();
+  /* SA audience lens — "own" | "all" | account_id (mirrors To-do's lens). */
+  const [saView, setSaView] = useState<string>("own");
+  const [lensAccounts, setLensAccounts] = useState<AccountLite[]>([]);
+  useEffect(() => {
+    if (isSA) fetchAccounts().then(setLensAccounts);
+  }, [isSA]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [tasksByProject, setTasksByProject] = useState<Record<string, TaskRow[]>>({});
   const [loading, setLoading] = useState(true);
@@ -290,6 +300,16 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
   useEffect(() => {
     reload();
   }, [reload]);
+
+  const projectInvolves = useCallback((pr: ProjectRow, id: string | null) => {
+    if (!id) return true;
+    if (pr.manager_account_id === id) return true;
+    return (tasksByProject[pr.id] ?? []).some((tk) => tk.assignee_account_id === id);
+  }, [tasksByProject]);
+  const scopedProjects = useMemo(() => {
+    if (!isSA || saView === "all") return projects;
+    return projects.filter((pr) => projectInvolves(pr, saView === "own" ? meId : saView));
+  }, [projects, isSA, saView, meId, projectInvolves]);
 
   const filterCounts = useMemo(() => {
     return {
@@ -329,6 +349,20 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
             </button>
           ))}
         </div>
+        {isSA && (
+          <select value={saView} onChange={(e) => setSaView(e.target.value)}
+            className={`h-8 ps-3 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer appearance-none ${
+              saView === "own"
+                ? "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)]"
+                : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+            }`}>
+            <option value="own">{t("sa.viewOwn")}</option>
+            <option value="all">{t("sa.viewAll")}</option>
+            {lensAccounts.filter((a) => a.id !== meId).map((a) => (
+              <option key={a.id} value={a.id}>{accountLabel(a)}</option>
+            ))}
+          </select>
+        )}
         <div className="flex-1" />
         <Button onClick={() => { setEditingProject(null); setFormOpen(true); }} icon={<PlusIcon size={12} />}>
           {t("action.newProject")}
@@ -347,7 +381,7 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {projects.map((p) => (
+          {scopedProjects.map((p) => (
             <ProjectCard
               key={p.id}
               project={p}

@@ -31,6 +31,10 @@ export const planningT: Translations = {
   "sched.conflictWarnTail": { en: "items overlap on the same resource this week — highlighted in red.", zh: "个班次本周在同一资源上重叠——已用红色标出。", ar: "عناصر متداخلة على نفس المورد هذا الأسبوع — مميزة بالأحمر." },
   "sched.onLeave":       { en: "On leave",          zh: "休假中",             ar: "في إجازة" },
 
+  /* Super-admin audience lens */
+  "sa.viewOwn": { en: "My view",   zh: "我的视图", ar: "عرضي" },
+  "sa.viewAll": { en: "All users", zh: "所有用户", ar: "كل المستخدمين" },
+
   /* Entity picker (shared combobox) */
   "picker.searchPh":     { en: "Search…",           zh: "搜索…",              ar: "بحث…" },
   "picker.typeToSearch": { en: "Type to search…",   zh: "输入以搜索…",         ar: "اكتب للبحث…" },

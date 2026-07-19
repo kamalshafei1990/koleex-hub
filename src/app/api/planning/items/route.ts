@@ -76,6 +76,23 @@ export async function GET(req: Request) {
     q = q.in("resource_id", ids);
   }
 
+  // Type C scope: non-SA callers see items on THEIR resource, items they
+  // created (planners see their own planning), and open (unassigned) shifts.
+  if (!auth.is_super_admin) {
+    const { data: mineRes } = await supabaseServer
+      .from("planning_resources")
+      .select("id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("account_id", auth.account_id);
+    const rids = (mineRes ?? []).map((r) => (r as { id: string }).id);
+    const orParts = [
+      `created_by_account_id.eq.${auth.account_id}`,
+      `resource_id.is.null`,
+    ];
+    if (rids.length > 0) orParts.push(`resource_id.in.(${rids.join(",")})`);
+    q = q.or(orParts.join(","));
+  }
+
   q = q.order("start_at", { ascending: true });
 
   const { data, error } = await q;

@@ -52,10 +52,29 @@ export async function GET() {
     planningCount = count ?? 0;
   }
 
+  // Open to-dos assigned to the viewer — powers the To-do app-icon badge.
+  let todoCount = 0;
+  {
+    const { data: myAssign } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("todo_id")
+      .eq("account_id", auth.account_id);
+    const tids = (myAssign ?? []).map((r) => (r as { todo_id: string }).todo_id);
+    if (tids.length > 0) {
+      const { count } = await supabaseServer
+        .from("koleex_todos")
+        .select("id", { count: "exact", head: true })
+        .in("id", tids)
+        .eq("completed", false);
+      todoCount = count ?? 0;
+    }
+  }
+
   return NextResponse.json({
     tasks: taskRes.data ?? [],
     tasksCount: taskRes.count ?? 0,
     planning,
     planningCount,
+    todoCount,
   });
 }

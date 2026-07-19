@@ -19,6 +19,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
+import { useAppBadges } from "@/lib/app-badges";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   SIDEBAR_GROUPS,
@@ -80,6 +81,8 @@ function AppLink({
 }) {
   const Icon = app.icon;
   const label = t(app.tKey, app.name);
+  const appBadges = useAppBadges();
+  const badgeCount = appBadges[app.id] ?? 0;
   const textMuted = dk ? "text-white/50" : "text-black/50";
   const hoverBg = dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.05]";
 
@@ -110,6 +113,11 @@ function AppLink({
       <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
         {label}
       </span>
+      {badgeCount > 0 && (
+        <span className="ms-auto shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-[#FF3333] text-white text-[9.5px] font-bold flex items-center justify-center">
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      )}
     </AppLaunchLink>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from "@/lib/navigation";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
+import { useAppBadges } from "@/lib/app-badges";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
 import { markHomeInteractive } from "@/lib/perf/client";
@@ -195,6 +196,8 @@ const AppCard = memo(function AppCard({
   const isAi = app.id === "ai";
   const badge = getAppBadge(app);
 
+  const appBadges = useAppBadges();
+  const appBadgeCount = appBadges[app.id] ?? 0;
   return (
     <AppLaunchLink
       app={app}
@@ -221,6 +224,11 @@ const AppCard = memo(function AppCard({
       }`}
     >
 
+      {(appBadgeCount ?? 0) > 0 && (
+        <span className="absolute top-2 end-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3333] text-white text-[10px] font-bold flex items-center justify-center pointer-events-none select-none">
+          {appBadgeCount! > 99 ? "99+" : appBadgeCount}
+        </span>
+      )}
       {(badge === "new" || badge === "updated") && (
         <span
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${

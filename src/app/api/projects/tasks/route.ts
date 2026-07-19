@@ -50,6 +50,23 @@ export async function GET(req: Request) {
 
   if (projectId) q = q.eq("project_id", projectId);
   if (mine) q = q.eq("assignee_account_id", auth.account_id);
+
+  // Type C scope: non-SA callers see tasks they're involved in (assignee or
+  // creator) plus every task inside projects they manage or created.
+  if (!auth.is_super_admin) {
+    const { data: myProjects } = await supabaseServer
+      .from("projects")
+      .select("id")
+      .eq("tenant_id", auth.tenant_id)
+      .or(`manager_account_id.eq.${auth.account_id},created_by_account_id.eq.${auth.account_id}`);
+    const pids = (myProjects ?? []).map((r) => (r as { id: string }).id);
+    const orParts = [
+      `assignee_account_id.eq.${auth.account_id}`,
+      `created_by_account_id.eq.${auth.account_id}`,
+    ];
+    if (pids.length > 0) orParts.push(`project_id.in.(${pids.join(",")})`);
+    q = q.or(orParts.join(","));
+  }
   if (status !== "all") q = q.eq("status", status);
   if (priority) q = q.eq("priority", priority);
   if (stageId) q = q.eq("stage_id", stageId);

@@ -15,6 +15,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
+import { usePermissions } from "@/lib/permissions";
+import { getCurrentAccountIdSync } from "@/lib/identity";
 import { planningT } from "@/lib/translations/planning";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -73,11 +75,25 @@ type TabId = "schedule" | "open" | "mine" | "utilization" | "config";
 
 export default function PlanningApp() {
   const { t } = useTranslation(planningT);
+  const { isSuperAdmin: isSA } = usePermissions();
+  const meId = getCurrentAccountIdSync();
+  /* SA audience lens — "own" | "all" | resource account_id. */
+  const [saView, setSaView] = useState<string>("own");
   const searchPlaceholder = useSearchPlaceholder("planning");
   const [tab, setTab] = useState<TabId>("schedule");
 
   // Shared data — the schedule tab consumes everything, so load it up front.
   const [items, setItems] = useState<PlanningItem[]>([]);
+
+  const itemInvolves = useCallback((it: { resource?: { account_id?: string | null } | null; resource_id?: string | null; created_by_account_id?: string | null }, id: string | null) => {
+    if (!id) return true;
+    return it.resource?.account_id === id || it.created_by_account_id === id || !it.resource_id;
+  }, []);
+  const scopedItems = useMemo(() => {
+    if (!isSA || saView === "all") return items;
+    return items.filter((it) => itemInvolves(it, saView === "own" ? meId : saView));
+  }, [items, isSA, saView, meId, itemInvolves]);
+
   const [resources, setResources] = useState<PlanningResource[]>([]);
   const [roles, setRoles] = useState<PlanningRole[]>([]);
   const [leaves, setLeaves] = useState<LeaveSpan[]>([]);
@@ -267,6 +283,23 @@ export default function PlanningApp() {
             searchPlaceholder={searchPlaceholder}
           />
 
+          {isSA && (
+            <div className="flex justify-end">
+              <select value={saView} onChange={(e) => setSaView(e.target.value)}
+                className={`h-8 ps-3 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer appearance-none ${
+                  saView === "own"
+                    ? "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)]"
+                    : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                }`}>
+                <option value="own">{t("sa.viewOwn", "My view")}</option>
+                <option value="all">{t("sa.viewAll", "All users")}</option>
+                {resources.filter((r) => r.type === "employee" && r.account_id && r.account_id !== meId).map((r) => (
+                  <option key={r.id} value={r.account_id as string}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
@@ -274,7 +307,7 @@ export default function PlanningApp() {
           ) : tab === "schedule" ? (
             <ScheduleView
               weekStart={weekStart}
-              items={items}
+              items={scopedItems}
               resources={resources}
               roles={roles}
               leaves={leaves}
@@ -288,7 +321,7 @@ export default function PlanningApp() {
               onItemDrop={handleItemDrop}
             />
           ) : tab === "utilization" ? (
-            <UtilizationView items={items} resources={resources} leaves={leaves} />
+            <UtilizationView items={scopedItems} resources={resources} leaves={leaves} />
           ) : tab === "open" ? (
             <OpenShiftsView
               items={items.filter((i) => !i.resource_id)}
