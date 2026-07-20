@@ -64,7 +64,18 @@ export default function SquareLogoCropper({ src, onCancel, onCrop }: { src: stri
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(img, sel.x * s, sel.y * s, srcSide, srcSide, 0, 0, out, out);
-    onCrop(canvas.toDataURL("image/png"));
+    /* PNG output of a photo crop was 5–10× the size of JPEG and rode inside
+       the save payload as base64 — the single biggest reason "save with a
+       photo" took forever on slow uplinks. Keep PNG only when the crop
+       actually contains transparency (logos); photos become JPEG q0.85. */
+    let hasAlpha = false;
+    try {
+      const px = ctx.getImageData(0, 0, out, out).data;
+      for (let i = 3; i < px.length; i += 64) {
+        if (px[i] < 250) { hasAlpha = true; break; }
+      }
+    } catch { /* tainted canvas can't be sampled — JPEG is the safe default */ }
+    onCrop(hasAlpha ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.85));
   };
 
   return (

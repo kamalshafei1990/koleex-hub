@@ -1505,13 +1505,13 @@ async function readFileAsDataURL(file: File): Promise<string> {
     inline base64 if the upload fails, so the feature never silently breaks. */
 /** Upload a Blob/File to the media bucket; returns its public URL + storage path
     (or null on failure). Used for both the catalogue file and its cover. */
-async function uploadToMediaStorage(blob: Blob, name: string): Promise<{ url: string; path: string } | null> {
+async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier-catalogues"): Promise<{ url: string; path: string } | null> {
   try {
     const safe = (name || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(0, 80);
     const fd = new FormData();
     fd.append("file", blob, safe);
     fd.append("bucket", "media");
-    fd.append("path", `supplier-catalogues/${Date.now()}_${safe}`);
+    fd.append("path", `${prefix}/${Date.now()}_${safe}`);
     const ct = (blob as File).type || "application/octet-stream";
     fd.append("contentType", ct);
     const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
@@ -1524,6 +1524,32 @@ async function uploadToMediaStorage(blob: Blob, name: string): Promise<{ url: st
 async function uploadFileToStorage(file: File): Promise<string> {
   const up = await uploadToMediaStorage(file, file.name);
   return up ? up.url : readFileAsDataURL(file);
+}
+
+/** Upload an already-compressed data-URL image to Storage at PICK time and
+    return its short public URL. Falls back to the data URL itself on any
+    failure so the operator never loses the image. Root cause this kills:
+    base64 images used to stay in the form and ride inside the SAVE payload
+    (a phone photo ≈ MBs of JSON), making "Save" hang on slow uplinks while
+    the server then re-uploaded each blob to Storage before responding.
+    Now the (small) upload happens while the operator is still filling the
+    form, and Save carries only tiny URLs. */
+async function persistImageDataUrl(dataUrl: string, name: string): Promise<string> {
+  if (!dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const up = await uploadToMediaStorage(blob, name || "image.jpg", "contact-images");
+    return up ? up.url : dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
+/** Compress an image file then persist it to Storage — the standard pick-time
+    path for every contact image field (photo, business cards, QR codes...). */
+async function compressImageToStorage(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+  const dataUrl = await compressImage(file, maxWidth, quality);
+  return persistImageDataUrl(dataUrl, file.name.replace(/\.[^.]+$/, "") + ".jpg");
 }
 
 /** Convert a base64 data URL to a Blob URL that browsers can open/download */
@@ -4056,7 +4082,7 @@ const MessagingIdField = React.memo(function MessagingIdField({
   const accept = (file?: File | null) => {
     if (!file) return;
     if (!/^image\/(png|jpe?g)$/i.test(file.type)) return; // PNG / JPG only
-    compressImage(file, 600, 0.85).then(onQrChange);
+    compressImageToStorage(file, 600, 0.85).then(onQrChange);
   };
   const qrBox = qrValue ? (
     <div className="relative shrink-0">
@@ -4118,7 +4144,7 @@ const ImageDropField = React.memo(function ImageDropField({
   const accept = (file?: File | null) => {
     if (!file) return;
     if (!/^image\/(png|jpe?g)$/i.test(file.type)) return; // PNG / JPG only
-    compressImage(file, 1600, 0.85).then(onChange);
+    compressImageToStorage(file, 1600, 0.85).then(onChange);
   };
   return (
     <div>
@@ -9181,7 +9207,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       {s.qr_code_url ? t("btn.change") : t("photo.uploadQr")}
                       <input type="file" accept="image/*" className="hidden" onChange={e => {
                         const file = e.target.files?.[0];
-                        if (file) compressImage(file, 400, 0.8).then(url => updateSocial(i, "qr_code_url", url));
+                        if (file) compressImageToStorage(file, 400, 0.8).then(url => updateSocial(i, "qr_code_url", url));
                       }} />
                     </label>
                     {s.qr_code_url && (
@@ -9290,7 +9316,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
-                    if (file) compressImage(file).then(url => setField("business_card_front", url));
+                    if (file) compressImageToStorage(file).then(url => setField("business_card_front", url));
                   }} />
                 </label>
                 {form.business_card_front && (
@@ -9310,7 +9336,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
-                    if (file) compressImage(file).then(url => setField("business_card_back", url));
+                    if (file) compressImageToStorage(file).then(url => setField("business_card_back", url));
                   }} />
                 </label>
                 {form.business_card_back && (
@@ -9536,7 +9562,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 const file = e.target.files?.[0];
                 if (file) {
                   const isImage = file.type.startsWith("image/");
-                  const handler = isImage ? compressImage(file, 1200, 0.8) : uploadFileToStorage(file);
+                  const handler = isImage ? compressImageToStorage(file, 1200, 0.8) : uploadFileToStorage(file);
                   handler.then(url => {
                     setField("attachments", [...form.attachments, {
                       name: file.name,
@@ -9959,7 +9985,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                             const file = e.target.files?.[0];
                             if (file) {
                               const isPdf = file.type === "application/pdf";
-                              const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
+                              const handler = isPdf ? uploadFileToStorage(file) : compressImageToStorage(file, 1200, 0.8);
                               handler.then(url => {
                                 const arr = [...form.documents];
                                 arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
@@ -10982,7 +11008,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               const file = e.target.files?.[0];
                               if (file) {
                                 const isPdf = file.type === "application/pdf";
-                                const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
+                                const handler = isPdf ? uploadFileToStorage(file) : compressImageToStorage(file, 1200, 0.8);
                                 handler.then(url => {
                                   const arr = [...form.documents];
                                   arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
@@ -11171,9 +11197,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           const file = e.target.files?.[0];
                           if (file) {
                             if (file.type.startsWith("image/")) {
-                              compressImage(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
+                              compressImageToStorage(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
                             } else {
-                              readFileAsDataURL(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
+                              uploadFileToStorage(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
                             }
                           }
                         }} />
@@ -11292,7 +11318,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    const reader = (file.type.startsWith("image/") ? compressImage(file) : readFileAsDataURL(file));
+                    const reader = (file.type.startsWith("image/") ? compressImageToStorage(file) : uploadFileToStorage(file));
                     reader.then(url => {
                       setField("visa_documents", [...form.visa_documents, { name: file.name, url, type: file.type, uploaded_at: new Date().toISOString() }]);
                     });
@@ -11531,7 +11557,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <SquareLogoCropper
           src={logoCropSrc}
           onCancel={() => setLogoCropSrc(null)}
-          onCrop={(url) => { setField("photo_url", url); setLogoCropSrc(null); }}
+          onCrop={(url) => {
+            /* Instant preview from the local crop, then swap in the tiny
+               Storage URL in the background so Save never carries base64. */
+            setField("photo_url", url);
+            setLogoCropSrc(null);
+            void persistImageDataUrl(url, "photo.jpg").then((remote) => {
+              if (remote !== url) setField("photo_url", remote);
+            });
+          }}
         />
       )}
 

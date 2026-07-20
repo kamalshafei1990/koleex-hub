@@ -69,15 +69,20 @@ export async function persistContactImages(
   tenantId: string | null,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  for (const field of IMAGE_FIELDS) {
-    const v = payload[field];
-    if (typeof v === "string" && v.startsWith("data:")) {
-      try {
-        payload[field] = await uploadOne(tenantId, field, v);
-      } catch {
-        /* Keep the original base64 rather than lose the image; the row will be
-           migrated on the next successful save. */
+  /* Parallel: with the client now uploading at pick time this is only a
+     fallback for stragglers, but when it does run the fields shouldn't
+     queue behind each other. */
+  await Promise.all(
+    IMAGE_FIELDS.map(async (field) => {
+      const v = payload[field];
+      if (typeof v === "string" && v.startsWith("data:")) {
+        try {
+          payload[field] = await uploadOne(tenantId, field, v);
+        } catch {
+          /* Keep the original base64 rather than lose the image; the row will
+             be migrated on the next successful save. */
+        }
       }
-    }
-  }
+    }),
+  );
 }
