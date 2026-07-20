@@ -53,7 +53,8 @@ const listMyTodos: ToolDef<
       },
       due: {
         type: "string",
-        description: "Optional due filter: 'any' (default), 'overdue', 'today', 'week' (next 7 days).",
+        description:
+          "Optional due filter. Default 'any' — use 'any' for general questions like 'what tasks do I have', 'what's on my plate', or even 'what do I have today' (an active task with NO due date is still something the user has, so 'any' surfaces it). Only use 'today' when the user explicitly asks what is DUE today (it excludes undated tasks); 'overdue' for past-due; 'week' for the next 7 days.",
         enum: ["any", "overdue", "today", "week"],
       },
       limit: { type: "integer", description: "Max rows. Default 20, cap 50." },
