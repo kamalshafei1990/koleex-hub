@@ -31,6 +31,13 @@ import { productTools } from "./tools/products";
 import { inventoryTools } from "./tools/inventory";
 import { permissionTools } from "./tools/permissions-tool";
 import { quotationTools } from "./tools/quotations";
+/* Work-management read tools (To-do / Projects / Planning / Calendar).
+   Each ports the owning app's per-user visibility scope verbatim, so the
+   agent can only surface rows the caller could see in the app itself. */
+import { todoTools } from "./tools/todos";
+import { projectTools } from "./tools/projects";
+import { planningTools } from "./tools/planning";
+import { calendarTools } from "./tools/calendar";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -41,6 +48,10 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...inventoryTools,
       ...permissionTools,
       ...quotationTools,
+      ...todoTools,
+      ...projectTools,
+      ...planningTools,
+      ...calendarTools,
     ].map((t) => [t.name, t]),
   ),
 );
