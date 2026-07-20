@@ -205,6 +205,20 @@ export async function POST(req: Request) {
           event_type: "login_success",
           metadata: { via: "password" },
         }),
+        /* Clear any admin force-logout (revoked presence) for this account.
+           app_sessions rows are keyed by (account_id, device_id) and device_id
+           is a persistent client id, so without this a re-login on the SAME
+           browser would hit the still-"revoked" row — the heartbeat returns
+           revoked:true and bounces the user straight back to /login?revoked=1,
+           an unbreakable loop. A successful password sign-in supersedes the
+           revoke (force-logout kicks a live session; it is not a ban — a ban is
+           a disabled account, blocked above). Retire the revoked rows so the
+           next heartbeat starts a clean session. */
+        supabaseServer
+          .from("app_sessions")
+          .update({ status: "offline", ended_at: now })
+          .eq("account_id", account.id)
+          .eq("status", "revoked"),
       ]);
     } catch {
       /* never block a successful login on a side-effect write */
