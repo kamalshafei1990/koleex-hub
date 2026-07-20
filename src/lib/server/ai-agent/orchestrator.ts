@@ -29,17 +29,18 @@ import { brandKnowledgeFor } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-/* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
-   minute on Groq's free tier (vs 6k for 3.3 70B) and roughly 3× faster
-   inference. Tool-calling quality is still strong for ERP-style
-   orchestration; we're not asking the model to reason deeply, just to
-   pick the right tool and summarise results. `GROQ_AGENT_MODEL` env
-   overrides, so we can A/B swap to 70B later without a deploy. */
-const GROQ_MODEL =
-  process.env.GROQ_AGENT_MODEL ||
-  process.env.GROQ_MODEL ||
-  "llama-3.1-8b-instant";
+/* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
+   removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
+   body, same `tools` + `tool_choice:"auto"` function-calling contract, same
+   `choices[].message.tool_calls` response shape — so the whole tool loop below
+   works against it unchanged. `DEEPSEEK_AGENT_MODEL`/`DEEPSEEK_MODEL` env can
+   override the default. The internal helper names still say "Groq" for now;
+   only the endpoint/model/key changed. */
+const AGENT_LLM_URL = "https://api.deepseek.com/v1/chat/completions";
+const AGENT_MODEL =
+  process.env.DEEPSEEK_AGENT_MODEL ||
+  process.env.DEEPSEEK_MODEL ||
+  "deepseek-chat";
 const MAX_ITERATIONS = 4;
 /* Hard ceiling on total tool executions per user turn. Prevents small
    models from loop-calling the same tool 50 times and blowing past
@@ -425,7 +426,7 @@ function isBusinessDataQuery(msg: string): boolean {
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const { ctx, history, userMessage, userLang, conversationId } = input;
-  const key = process.env.GROQ_API_KEY;
+  const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
      features genuinely need Groq's OpenAI-style tool schema (and the
@@ -571,7 +572,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `groq:${GROQ_MODEL}`,
+          provider: `deepseek:${AGENT_MODEL}`,
           conversationId,
         };
       }
@@ -603,7 +604,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `groq:${GROQ_MODEL}`,
+          provider: `deepseek:${AGENT_MODEL}`,
           conversationId,
         };
       }
@@ -623,7 +624,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       return {
         steps,
         finalReply: safeReply,
-        provider: `groq:${GROQ_MODEL}`,
+        provider: `deepseek:${AGENT_MODEL}`,
         conversationId,
       };
     }
@@ -652,7 +653,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `groq:${GROQ_MODEL}`,
+          provider: `deepseek:${AGENT_MODEL}`,
           conversationId,
         };
       }
@@ -890,7 +891,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   return {
     steps,
     finalReply: safeReply,
-    provider: `groq:${GROQ_MODEL}`,
+    provider: `deepseek:${AGENT_MODEL}`,
     conversationId,
   };
 }
@@ -2338,7 +2339,7 @@ function fallback(
   return {
     steps,
     finalReply: safeReply,
-    provider: `groq:${GROQ_MODEL}`,
+    provider: `deepseek:${AGENT_MODEL}`,
     conversationId,
   };
 }
@@ -2379,14 +2380,14 @@ async function callGroqPlain(
      complete without truncation. The agent loop uses its own
      callGroqWithRetry with 2048 tokens. */
   const maxTokens = opts.maxTokens ?? 160;
-  const res = await fetch(GROQ_URL, {
+  const res = await fetch(AGENT_LLM_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: AGENT_MODEL,
       messages,
       temperature: 0.3,
       max_tokens: maxTokens,
@@ -2407,7 +2408,7 @@ async function callGroqWithRetry(
 ): Promise<Response> {
   const toolChoice = opts.toolChoice ?? "auto";
   const body: Record<string, unknown> = {
-    model: GROQ_MODEL,
+    model: AGENT_MODEL,
     messages,
     temperature: 0.3,
     max_tokens: 2048,
@@ -2416,7 +2417,7 @@ async function callGroqWithRetry(
     body.tools = openAiToolSchemas();
     body.tool_choice = "auto";
   }
-  const res = await fetch(GROQ_URL, {
+  const res = await fetch(AGENT_LLM_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
