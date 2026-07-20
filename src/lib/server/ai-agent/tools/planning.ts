@@ -98,4 +98,97 @@ const listMyPlanning: ToolDef<
   },
 };
 
-export const planningTools: ToolDef[] = [listMyPlanning as ToolDef];
+/* ── Create planning item (with confirm) — on the user's own resource ── */
+const createPlanningItem: ToolDef<
+  {
+    title?: string;
+    start_at?: string;
+    end_at?: string;
+    type?: string;
+    notes?: string;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "createPlanningItem",
+  description:
+    "Create a NEW planning item / shift on the current user's own schedule. Needs start and end times (ISO). ALWAYS call WITHOUT confirm first to preview; only call again with confirm:true after the user explicitly agrees.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Short title/label for the item." },
+      start_at: { type: "string", description: "ISO start datetime (required)." },
+      end_at: { type: "string", description: "ISO end datetime (required)." },
+      type: { type: "string", description: "shift | task | time_off | other. Default shift." },
+      notes: { type: "string", description: "Optional notes." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
+    },
+    required: ["start_at", "end_at"],
+  },
+  requiredModule: PLANNING_MODULE,
+  requiredAction: "create",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const startAt = String(args.start_at ?? "").trim();
+    const endAt = String(args.end_at ?? "").trim();
+    if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    const title = args.title ? String(args.title) : "";
+    const type = String(args.type ?? "shift");
+
+    // Attach to the caller's own resource so it's their planned time (not an
+    // open shift). If they have none, it's created unassigned.
+    const { data: mineRes } = await supabaseServer
+      .from("planning_resources").select("id").eq("tenant_id", ctx.auth.tenant_id).eq("account_id", ctx.auth.account_id).limit(1);
+    const resourceId = (mineRes ?? [])[0] ? (mineRes as { id: string }[])[0].id : null;
+
+    const normalized = { title, start_at: startAt, end_at: endAt, type, notes: args.notes ? String(args.notes) : null };
+
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { ...normalized, resource_assigned: !!resourceId } },
+        message: `Ready to add to your schedule: ${title || type} from ${startAt} to ${endAt}${resourceId ? "" : " (unassigned — you have no personal resource)"}. Confirm and I'll create it.`,
+        pendingAction: { tool: "createPlanningItem", args: { ...normalized, confirm: true } },
+      };
+    }
+
+    const { data, error } = await supabaseServer
+      .from("planning_items")
+      .insert({
+        tenant_id: ctx.auth.tenant_id,
+        type: normalized.type,
+        title: normalized.title,
+        notes: normalized.notes,
+        resource_id: resourceId,
+        role_id: null,
+        start_at: normalized.start_at,
+        end_at: normalized.end_at,
+        allocated_hours: null,
+        allocated_pct: null,
+        linked_entity_type: null,
+        linked_entity_id: null,
+        linked_entity_label: null,
+        is_billable: false,
+        hourly_rate: null,
+        status: "draft",
+        recurrence_rule: null,
+        created_by_account_id: ctx.auth.account_id,
+      })
+      .select("id, type, title, start_at, end_at, status, created_at")
+      .single();
+
+    if (error) {
+      console.error("[tool.createPlanningItem]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the planning item — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: data as Record<string, unknown>,
+      message: `Added ${title || type} to your schedule (draft).`,
+      sources: ["planning_items(insert)"],
+    };
+  },
+};
+
+export const planningTools: ToolDef[] = [listMyPlanning as ToolDef, createPlanningItem as ToolDef];

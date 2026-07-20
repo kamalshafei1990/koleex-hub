@@ -150,7 +150,123 @@ const listProjectTasks: ToolDef<
   },
 };
 
+/* ── Create project task (with confirm) ── */
+const createProjectTask: ToolDef<
+  {
+    project_id?: string;
+    title?: string;
+    description?: string;
+    priority?: string;
+    due_date?: string;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "createProjectTask",
+  description:
+    "Create a NEW task inside a project, assigned to the current user. You MUST have a real project_id first — call listMyProjects to find it if the user names a project. ALWAYS call this WITHOUT confirm to preview; only call again with confirm:true after the user explicitly agrees.",
+  parameters: {
+    type: "object",
+    properties: {
+      project_id: { type: "string", description: "The id of the project to add the task to (required — resolve via listMyProjects)." },
+      title: { type: "string", description: "The task title (required)." },
+      description: { type: "string", description: "Optional description." },
+      priority: { type: "string", description: "low | normal | high. Default normal.", enum: ["low", "normal", "high"] },
+      due_date: { type: "string", description: "Optional ISO due date." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
+    },
+    required: ["project_id", "title"],
+  },
+  requiredModule: PROJECTS_MODULE,
+  requiredAction: "create",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const projectId = String(args.project_id ?? "").trim();
+    const title = String(args.title ?? "").trim();
+    if (!projectId) return { ok: false, permissionStatus: "denied", data: null, message: "Which project should the task go in? I can list your projects." };
+    if (!title) return { ok: false, permissionStatus: "denied", data: null, message: "What should the task be called?" };
+    const priority = ["low", "normal", "high"].includes(String(args.priority)) ? String(args.priority) : "normal";
+
+    // Verify the project is visible to this user (same scope as listMyProjects
+    // read), so the AI can't drop a task into a project they can't see.
+    let projQ = supabaseServer.from("projects").select("id, name").eq("tenant_id", ctx.auth.tenant_id).eq("id", projectId);
+    if (!ctx.isSuperAdmin) {
+      const { data: myTaskProjects } = await supabaseServer
+        .from("project_tasks").select("project_id").eq("tenant_id", ctx.auth.tenant_id).eq("assignee_account_id", ctx.auth.account_id);
+      const ids = [...new Set((myTaskProjects ?? []).map((r) => (r as { project_id: string }).project_id))];
+      const orParts = [`manager_account_id.eq.${ctx.auth.account_id}`, `created_by_account_id.eq.${ctx.auth.account_id}`];
+      if (ids.length > 0) orParts.push(`id.in.(${ids.join(",")})`);
+      projQ = projQ.or(orParts.join(","));
+    }
+    const { data: proj } = await projQ.maybeSingle();
+    if (!proj) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that project among the ones you can access." };
+    const projectName = (proj as { name: string }).name;
+
+    const normalized = {
+      project_id: projectId,
+      title,
+      description: args.description ? String(args.description) : null,
+      priority,
+      due_date: args.due_date ? String(args.due_date) : null,
+    };
+
+    if (args.confirm !== true) {
+      const due = normalized.due_date ? ` · due ${normalized.due_date}` : "";
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { ...normalized, project: projectName } },
+        message: `Ready to add this task to "${projectName}": "${title}" (priority ${priority}${due}), assigned to you. Confirm and I'll create it.`,
+        pendingAction: { tool: "createProjectTask", args: { ...normalized, confirm: true } },
+      };
+    }
+
+    // Default stage = the project's is_default_new stage (as the route does).
+    const { data: stage } = await supabaseServer
+      .from("project_stages").select("id")
+      .eq("tenant_id", ctx.auth.tenant_id).eq("project_id", projectId).eq("is_default_new", true).maybeSingle();
+
+    const { data, error } = await supabaseServer
+      .from("project_tasks")
+      .insert({
+        tenant_id: ctx.auth.tenant_id,
+        project_id: projectId,
+        stage_id: (stage as { id: string } | null)?.id ?? null,
+        parent_task_id: null,
+        title: normalized.title,
+        description: normalized.description,
+        priority: normalized.priority,
+        assignee_account_id: ctx.auth.account_id,
+        followers_account_ids: [],
+        tag_ids: [],
+        blocked_by_task_ids: [],
+        due_date: normalized.due_date,
+        start_date: null,
+        estimated_hours: null,
+        linked_planning_item_id: null,
+        linked_entity_type: null,
+        linked_entity_id: null,
+        linked_entity_label: null,
+        created_by_account_id: ctx.auth.account_id,
+      })
+      .select("id, project_id, title, status, priority, due_date, created_at")
+      .single();
+
+    if (error) {
+      console.error("[tool.createProjectTask]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the project task — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: data as Record<string, unknown>,
+      message: `Added "${title}" to project "${projectName}", assigned to you.`,
+      sources: ["project_tasks(insert)"],
+    };
+  },
+};
+
 export const projectTools: ToolDef[] = [
   listMyProjects as ToolDef,
   listProjectTasks as ToolDef,
+  createProjectTask as ToolDef,
 ];

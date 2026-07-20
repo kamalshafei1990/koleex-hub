@@ -138,4 +138,108 @@ const listMyTodos: ToolDef<
   },
 };
 
-export const todoTools: ToolDef[] = [listMyTodos as ToolDef];
+/* ── Create (with confirm) ──
+   Two-phase by design: the FIRST call (no confirm) returns a preview and
+   writes NOTHING; only a second call with confirm:true actually inserts.
+   The orchestrator prompt instructs the model to preview → get the user's
+   explicit yes → then call again with confirm:true. The dispatcher's
+   module guard (requiredAction:"create") already enforced can_create before
+   we got here, so a user who can't create tasks can't create via AI. */
+const createTodo: ToolDef<
+  {
+    title?: string;
+    description?: string;
+    priority?: string;
+    due_date?: string;
+    label?: string;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "createTodo",
+  description:
+    "Create a NEW personal to-do task for the current user. ALWAYS call this first WITHOUT confirm to preview what will be created; show the user the details and only call again with confirm:true after they explicitly agree. Creates the task as the user's own (assigned to them). It cannot assign tasks to other people yet.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "The task title (required)." },
+      description: { type: "string", description: "Optional longer description." },
+      priority: { type: "string", description: "low | medium | high. Default medium.", enum: ["low", "medium", "high"] },
+      due_date: { type: "string", description: "Optional ISO date/datetime the task is due." },
+      label: { type: "string", description: "Optional short label/category." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user has explicitly confirmed the previewed task." },
+    },
+    required: ["title"],
+  },
+  requiredModule: TODO_MODULE,
+  requiredAction: "create",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const title = String(args.title ?? "").trim();
+    if (!title) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "What should the task be called? Give me a title." };
+    }
+    const priority = ["low", "medium", "high"].includes(String(args.priority)) ? String(args.priority) : "medium";
+    const normalized = {
+      title,
+      description: args.description ? String(args.description) : null,
+      priority,
+      due_date: args.due_date ? String(args.due_date) : null,
+      label: args.label ? String(args.label) : null,
+    };
+
+    // Phase 1: preview only — nothing is written.
+    if (args.confirm !== true) {
+      const due = normalized.due_date ? ` · due ${normalized.due_date}` : "";
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: normalized },
+        message: `Ready to create this to-do for you: "${title}" (priority ${priority}${due}). Confirm and I'll add it.`,
+        pendingAction: { tool: "createTodo", args: { ...normalized, confirm: true } },
+      };
+    }
+
+    // Phase 2: confirmed — insert exactly like /api/todos POST (personal task).
+    const { data, error } = await supabaseServer
+      .from("koleex_todos")
+      .insert({
+        title: normalized.title,
+        metadata: {},
+        description: normalized.description,
+        completed: false,
+        completed_at: null,
+        status: "todo",
+        priority: normalized.priority,
+        label: normalized.label,
+        due_date: normalized.due_date,
+        start_date: null,
+        remind_at: null,
+        recurrence: null,
+        recurrence_until: null,
+        created_by_account_id: ctx.auth.account_id,
+        assigned_by_account_id: ctx.auth.account_id,
+        source: "koleex-ai",
+        source_id: null,
+        assigned_department: null,
+        assign_to_all: false,
+        is_private: false,
+        tenant_id: ctx.auth.tenant_id,
+      })
+      .select("id, title, status, priority, due_date, created_at")
+      .single();
+
+    if (error) {
+      console.error("[tool.createTodo]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the task — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: data as Record<string, unknown>,
+      message: `Created the to-do "${title}". You'll find it in your To-do app.`,
+      sources: ["koleex_todos(insert)"],
+    };
+  },
+};
+
+export const todoTools: ToolDef[] = [listMyTodos as ToolDef, createTodo as ToolDef];

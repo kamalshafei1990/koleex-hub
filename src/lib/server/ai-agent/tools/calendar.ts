@@ -77,4 +77,90 @@ const listMyCalendar: ToolDef<
   },
 };
 
-export const calendarTools: ToolDef[] = [listMyCalendar as ToolDef];
+/* ── Create calendar event (with confirm) — always on the caller's own calendar ── */
+const createCalendarEvent: ToolDef<
+  {
+    title?: string;
+    start_at?: string;
+    end_at?: string;
+    all_day?: boolean;
+    description?: string;
+    is_private?: boolean;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "createCalendarEvent",
+  description:
+    "Create a NEW event on the current user's OWN calendar. Needs a title and start/end times (ISO datetimes). ALWAYS call WITHOUT confirm first to preview; only call again with confirm:true after the user explicitly agrees.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Event title (required)." },
+      start_at: { type: "string", description: "ISO start datetime (required)." },
+      end_at: { type: "string", description: "ISO end datetime (required)." },
+      all_day: { type: "boolean", description: "All-day event. Default false." },
+      description: { type: "string", description: "Optional details." },
+      is_private: { type: "boolean", description: "Mark private. Default false." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
+    },
+    required: ["title", "start_at", "end_at"],
+  },
+  requiredModule: CALENDAR_MODULE,
+  requiredAction: "create",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const title = String(args.title ?? "").trim();
+    const startAt = String(args.start_at ?? "").trim();
+    const endAt = String(args.end_at ?? "").trim();
+    if (!title) return { ok: false, permissionStatus: "denied", data: null, message: "What's the event called?" };
+    if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+
+    const normalized = {
+      title,
+      start_at: startAt,
+      end_at: endAt,
+      all_day: args.all_day === true,
+      description: args.description ? String(args.description) : null,
+      is_private: args.is_private === true,
+    };
+
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: normalized },
+        message: `Ready to add to your calendar: "${title}" from ${startAt} to ${endAt}${normalized.all_day ? " (all day)" : ""}. Confirm and I'll create it.`,
+        pendingAction: { tool: "createCalendarEvent", args: { ...normalized, confirm: true } },
+      };
+    }
+
+    const { data, error } = await supabaseServer
+      .from("koleex_calendar_events")
+      .insert({
+        title: normalized.title,
+        start_at: normalized.start_at,
+        end_at: normalized.end_at,
+        all_day: normalized.all_day,
+        description: normalized.description,
+        is_private: normalized.is_private,
+        account_id: ctx.auth.account_id, // own calendar only
+        tenant_id: ctx.auth.tenant_id,   // server-side truth
+      })
+      .select("id, title, start_at, end_at, all_day, created_at")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[tool.createCalendarEvent]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the event — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: (data ?? null) as Record<string, unknown> | null,
+      message: `Added "${title}" to your calendar.`,
+      sources: ["koleex_calendar_events(insert)"],
+    };
+  },
+};
+
+export const calendarTools: ToolDef[] = [listMyCalendar as ToolDef, createCalendarEvent as ToolDef];
