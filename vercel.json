@@ -4,8 +4,8 @@
   ],
   "crons": [
     { "path": "/api/cron/fx-refresh", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/todo-reminders", "schedule": "* * * * *" },
-    { "path": "/api/cron/calendar-reminders", "schedule": "* * * * *" },
+    { "path": "/api/cron/todo-reminders", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/calendar-reminders", "schedule": "*/2 * * * *" },
     { "path": "/api/cron/project-task-reminders", "schedule": "0 1 * * *" },
     { "path": "/api/cron/hr-expiry-reminders", "schedule": "0 2 * * *" }
   ]

@@ -73,7 +73,8 @@ async function myChannelIds(me: string): Promise<string[]> {
   return ((data ?? []) as Array<{ channel_id: string }>).map((r) => r.channel_id);
 }
 
-const POLL_MS = 900;          // cursor-poll cadence (median delivery ≈ 450ms)
+const POLL_MS = 900;          // hot cursor-poll cadence (median delivery ≈ 450ms)
+const IDLE_POLL_MS = 2500;    // relaxed cadence after 60s without a delivered row
 const HEARTBEAT_EVERY = 22;   // ≈20s — keep proxies/CDN from timing the stream out
 const MEMBERSHIP_EVERY = 33;  // ≈30s — pick up newly joined/left channels
 const LIFETIME_MS = 280_000;  // self-terminate under maxDuration; client reconnects
@@ -110,8 +111,17 @@ export async function GET(req: Request) {
       const started = Date.now();
       let iter = 0;
 
+      /* Adaptive cadence: poll fast while the conversation is live, back
+         off when quiet. A delivered row (or fresh stream) counts as
+         activity; after 60s without one the cursor poll relaxes to
+         IDLE_POLL_MS. First row after a quiet spell arrives ≤2.5s late —
+         imperceptible for a dormant chat — and immediately snaps the
+         cadence back to hot. Cuts steady-state DB polling ~65% per
+         connected user, which is what made 10 concurrent users heavy. */
+      let lastActivity = Date.now();
       while (!closed && Date.now() - started < LIFETIME_MS) {
-        await new Promise((r) => setTimeout(r, POLL_MS));
+        const quiet = Date.now() - lastActivity > 60_000;
+        await new Promise((r) => setTimeout(r, quiet ? IDLE_POLL_MS : POLL_MS));
         if (closed) break;
         iter += 1;
 
@@ -143,6 +153,7 @@ export async function GET(req: Request) {
             send(`event: msg\ndata: ${JSON.stringify(serialized)}\n\n`);
             if (row.created_at > cursor) cursor = row.created_at;
           }
+          if (rows.length > 0) lastActivity = Date.now();
         } catch { /* transient query failure — next tick retries */ }
       }
 

@@ -64,6 +64,26 @@ export interface ServerAuthContext extends ScopeContext {
    so it can compare the uncached resolver against the cache()-wrapped
    getServerAuth under identical mocked contexts. Not used in production paths —
    every runtime caller goes through the memoized getServerAuth below. */
+/* ── Cross-request auth-context micro-cache (concurrency fix, 2026-07-20) ──
+   Every authenticated request paid 2 DB round-trips (accounts + employee
+   department) just to rebuild the same auth context. With ~6 background
+   polls per user (heartbeat, inbox feed, discuss read, perf ingest, ...)
+   that tax dominated DB traffic once ~10 users were online (pg_stat showed
+   ~224k calls EACH on those two lookups). Cache the resolved context per
+   REAL account for a short TTL on the warm function instance.
+
+   Safety envelope — this does NOT change who is authenticated:
+   · The session cookie HMAC is still verified on EVERY request
+     (getSessionAccountId is DB-free); the cache only skips re-loading the
+     account/role/department rows.
+   · View-as paths are NEVER cached (SA-only, safety-sensitive).
+   · Only status="active" contexts are cached, so a deactivated account
+     keeps access for at most TTL (15s) on an already-warm instance.
+   · Role/permission edits propagate within TTL as well. */
+const AUTH_CTX_TTL_MS = 15_000;
+const AUTH_CTX_MAX = 500;
+const authCtxCache = new Map<string, { ctx: ServerAuthContext; at: number }>();
+
 export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   /* SW-1: measure the universal auth prefix (runs on every authenticated
      request → sampled by stageTimer). Stages are code-authored names; the
@@ -90,6 +110,15 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
     ? null
     : await getViewAsRoleId(realAccountId);
   _t.mark("viewas");
+
+  /* Micro-cache hit path — plain sessions only (never view-as). */
+  if (!overrideTargetAccountId && !overrideTargetRoleId) {
+    const hit = authCtxCache.get(realAccountId);
+    if (hit && Date.now() - hit.at < AUTH_CTX_TTL_MS) {
+      _t.done({ status: "ok", view_as: false });
+      return hit.ctx;
+    }
+  }
 
   /* Two Supabase lookups are needed to build the auth context:
      - `accounts` row (with joined role)
@@ -204,7 +233,7 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   }
 
   _t.done({ status: "ok", view_as: viewingAs });
-  return {
+  const ctx: ServerAuthContext = {
     account_id: data.id,
     tenant_id: data.tenant_id,
     role_id: roleModeActive ? overrideTargetRoleId! : data.role_id,
@@ -222,6 +251,14 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
     view_as_kind: viewingAs ? (roleModeActive ? "role" : "account") : null,
     view_as_role_id: roleModeActive ? overrideTargetRoleId : null,
   };
+  if (!viewAsActive) {
+    if (authCtxCache.size >= AUTH_CTX_MAX) {
+      const oldest = authCtxCache.keys().next().value;
+      if (oldest !== undefined) authCtxCache.delete(oldest);
+    }
+    authCtxCache.set(realAccountId, { ctx, at: Date.now() });
+  }
+  return ctx;
 }
 
 /**

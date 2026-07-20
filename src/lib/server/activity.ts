@@ -139,18 +139,26 @@ export async function touchDevice(args: {
     const now = new Date().toISOString();
 
     if (existing) {
-      await supabaseServer
-        .from("user_devices")
-        .update({
-          last_seen_at: now,
-          last_ip: args.meta.ip,
-          last_country: args.meta.country,
-          browser: args.meta.browser,
-          os: args.meta.os,
-          device_type: args.meta.device_type,
-          user_agent_hash: uaHash,
-        })
-        .eq("id", (existing as { id: string }).id);
+      /* Same write-throttle as the session row: the device metadata never
+         changes between beats, so refreshing last_seen_at every 30s is pure
+         write amplification. The blocked check above already ran (read). */
+      const key = throttleKey(args.account_id, args.device_id);
+      const prevAt = deviceWriteAt.get(key);
+      if (!prevAt || Date.now() - prevAt >= WRITE_THROTTLE_MS) {
+        deviceWriteAt.set(key, Date.now());
+        await supabaseServer
+          .from("user_devices")
+          .update({
+            last_seen_at: now,
+            last_ip: args.meta.ip,
+            last_country: args.meta.country,
+            browser: args.meta.browser,
+            os: args.meta.os,
+            device_type: args.meta.device_type,
+            user_agent_hash: uaHash,
+          })
+          .eq("id", (existing as { id: string }).id);
+      }
       return { isNew: false, isBlocked: !!(existing as { is_blocked: boolean }).is_blocked };
     }
 
@@ -173,6 +181,20 @@ export async function touchDevice(args: {
 }
 
 /* ── Presence heartbeat (app_sessions upsert) ──────────────────────────── */
+
+/* Write-throttle (concurrency fix, 2026-07-20). The client heartbeats every
+   30s per tab; writing app_sessions + user_devices on EVERY beat produced
+   ~120k row updates that serialized on per-user row locks once several
+   users were online. Presence is best-effort telemetry: skip the UPDATE
+   when nothing meaningful changed and the last write is fresh (<75s).
+   Per-instance memory — a cold instance simply writes once and seeds it.
+   Revocation/blocked checks are READS and are NEVER skipped. */
+const WRITE_THROTTLE_MS = 75_000;
+const sessionWriteAt = new Map<string, { at: number; sig: string }>();
+const deviceWriteAt = new Map<string, number>();
+function throttleKey(accountId: string, deviceId: string): string {
+  return `${accountId}:${deviceId}`;
+}
 
 export interface HeartbeatInput {
   account_id: string;
@@ -205,6 +227,15 @@ export async function heartbeat(
       const row = existing as { id: string; status: string };
       // An admin-revoked session stays revoked — tell the client to sign out.
       if (row.status === "revoked") return { session_id: row.id, revoked: true };
+      /* Skip the presence UPDATE when this beat carries nothing new and the
+         last write is recent — kills the per-request row-lock contention. */
+      const key = throttleKey(input.account_id, input.device_id);
+      const sig = `${input.status}|${input.current_route ?? ""}|${input.current_module ?? ""}`;
+      const prev = sessionWriteAt.get(key);
+      if (prev && prev.sig === sig && Date.now() - prev.at < WRITE_THROTTLE_MS) {
+        return { session_id: row.id, revoked: false };
+      }
+      sessionWriteAt.set(key, { at: Date.now(), sig });
       await supabaseServer
         .from("app_sessions")
         .update({
