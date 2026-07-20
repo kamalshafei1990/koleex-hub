@@ -12,7 +12,7 @@
    risk to the existing deployment until the flag is set.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AdminAuth from "./AdminAuth";
@@ -20,6 +20,16 @@ import AdminAuth from "./AdminAuth";
    mounted gate never statically imports the supabase client. */
 const isSupabaseAuthEnabled = () =>
   process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
+
+/* Set once a Supabase session is confirmed on this device; cleared on sign-out
+   or a failed check. Lets the gate paint the shell instantly for a returning
+   user instead of blocking every cold load behind a session-check spinner —
+   the single biggest first-paint cost on weak clients (X5 webview / low-spec
+   Windows). Only a hint for paint timing: the real session is still verified in
+   the background every load, and all data is enforced server-side per request. */
+const AUTHED_HINT_KEY = "koleex-authed";
+/* useLayoutEffect on the server is a no-op and warns; fall back to useEffect. */
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface Props {
   title: string;
@@ -47,9 +57,21 @@ export default function AuthGate({ title, subtitle, children }: Props) {
 function SupabaseGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  /* Start "checking" so the SSR/first-hydration render matches (no mismatch).
+     The layout effect below promotes to "authed" BEFORE paint when the device
+     has a confirmed-session hint, so a returning user never sees the spinner. */
   const [state, setState] = useState<"checking" | "authed" | "redirecting">(
     "checking",
   );
+
+  /* Optimistic paint: pre-paint, before the network check, trust the hint. */
+  useIsoLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(AUTHED_HINT_KEY) === "1") setState("authed");
+    } catch {
+      /* storage blocked — fall back to the spinner + network check */
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,8 +82,13 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       if (session) {
+        try { localStorage.setItem(AUTHED_HINT_KEY, "1"); } catch { /* ignore */ }
         setState("authed");
       } else {
+        // Stale hint (session expired / revoked): drop it and redirect. The
+        // shell may have painted for a moment, but no data is exposed — every
+        // API call would 401 — and we're leaving immediately.
+        try { localStorage.removeItem(AUTHED_HINT_KEY); } catch { /* ignore */ }
         setState("redirecting");
         const next = encodeURIComponent(pathname || "/");
         router.replace(`/login?next=${next}`);
@@ -75,8 +102,11 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
       unsubscribe = onAuthStateChange((session) => {
         if (cancelled) return;
         if (!session) {
+          try { localStorage.removeItem(AUTHED_HINT_KEY); } catch { /* ignore */ }
           const next = encodeURIComponent(pathname || "/");
           router.replace(`/login?next=${next}`);
+        } else {
+          try { localStorage.setItem(AUTHED_HINT_KEY, "1"); } catch { /* ignore */ }
         }
       });
     });
