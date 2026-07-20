@@ -224,11 +224,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       {/* Deferred to browser-idle after first paint — keeps the heavy Discuss/AI
-          dock (parse + hydrate + channel fetch + SSE) off every route's critical
-          path on weak clients. */}
+          dock (parse + hydrate + channel fetch + SSE) AND the QA reporter (both
+          post-paint tooling, not needed for first interaction) off every route's
+          critical path on weak clients. */}
       {panelReady && <FloatingPanel />}
       {/* Global QA issue reporter (floating button + modal). */}
-      <ReportIssueButton />
+      {panelReady && <ReportIssueButton />}
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
           picked component on arrival (issue dc295123 follow-up). */}
       <Suspense fallback={null}><QaFocusHighlight /></Suspense>
