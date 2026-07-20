@@ -56,6 +56,11 @@ export interface UserContext {
   department: string | null;
   isSuperAdmin: boolean;
   canViewPrivate: boolean;
+  /** IANA timezone from the user's calendar preferences (default
+   *  "Asia/Dubai"). Used so the agent resolves "today"/"tomorrow" and
+   *  event times in the user's local time, not the model's stale idea of
+   *  "now" or naive UTC. */
+  timezone: string;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

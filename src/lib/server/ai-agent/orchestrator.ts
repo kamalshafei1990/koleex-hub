@@ -1088,6 +1088,42 @@ Reply: "I was built by Koleex International Group, with the vision driven by Mr.
 ${brandKnowledgeFor(section)}`;
 }
 
+/* Build the "current date/time" directive in the user's timezone. Server
+   runtime (not the workflow sandbox), so Date + Intl are available. Falls
+   back gracefully if an invalid tz string ever slips through. */
+function buildNowBlock(timezone: string): string {
+  const tz = timezone || "Asia/Dubai";
+  const now = new Date();
+  let human: string;
+  let isoDate: string;
+  let offset: string;
+  try {
+    human = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, weekday: "long", year: "numeric", month: "long",
+      day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(now);
+    // en-CA renders as YYYY-MM-DD — exactly the ISO date part we want.
+    isoDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(now);
+    const raw = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, timeZoneName: "longOffset",
+    }).formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
+    offset = raw.replace(/^GMT/, "") || "+00:00"; // "GMT+08:00" → "+08:00"
+    if (offset === "" || offset === "Z") offset = "+00:00";
+  } catch {
+    human = now.toUTCString();
+    isoDate = now.toISOString().slice(0, 10);
+    offset = "+00:00";
+  }
+  const year = isoDate.slice(0, 4);
+  return `Current date & time: ${human} (timezone ${tz}, UTC${offset}). TODAY is ${isoDate}.
+Date rules (critical — the model does NOT know the date on its own):
+- Resolve every relative date ("today", "tonight", "tomorrow", "this week", "next Monday", "in 3 days") from TODAY = ${isoDate}. NEVER use a date from your training data or assume a different year — the current year is ${year}.
+- When a tool needs start_at / end_at / due_date, output a full ISO-8601 datetime in the user's offset, e.g. 3 PM tomorrow → "${isoDate}T15:00:00${offset}" adjusted to the correct day. Always include the ${offset} offset so the time is stored correctly.
+- Before creating any dated item, state the resolved absolute date (e.g. "tomorrow, ${isoDate}") in your preview so the user can catch a mistake.`;
+}
+
 function buildSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
@@ -1111,7 +1147,16 @@ function buildSystemPrompt(
     ? `\n\n${brandKnowledgeFor(opts.brandSection)}\n`
     : "";
 
+  /* Current date/time in the user's timezone. Without this the model
+     resolves "today"/"tomorrow" from its stale training-cutoff notion of
+     "now" (e.g. answering "tomorrow is April 16, 2025" in mid-2026) and
+     creates calendar/task dates in the wrong year. Computed server-side
+     each turn from ctx.timezone (the user's Calendar preference). */
+  const nowBlock = buildNowBlock(ctx.timezone);
+
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
+
+${nowBlock}
 
 ${ENTITY_GUIDANCE_FULL}
 

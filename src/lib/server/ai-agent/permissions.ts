@@ -85,7 +85,7 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   const canViewPrivate = auth.can_view_private === true || superAdmin;
 
   // Load everything this user is allowed to see, one DB round-trip each.
-  const [rolePermsRes, overridesRes] = await Promise.all([
+  const [rolePermsRes, overridesRes, prefsRes] = await Promise.all([
     auth.role_id
       ? supabaseServer
           .from("koleex_permissions")
@@ -99,7 +99,20 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
       .from("account_permission_overrides")
       .select("module_key, can_view, can_create, can_edit, can_delete")
       .eq("account_id", auth.account_id),
+    // Calendar timezone lives in the account's preferences JSONB (same
+    // source the Calendar app reads). Fetched in parallel so it adds no
+    // latency; used to give the agent the user's real "now".
+    supabaseServer
+      .from("accounts")
+      .select("preferences")
+      .eq("id", auth.account_id)
+      .maybeSingle(),
   ]);
+
+  const prefs = (prefsRes.data?.preferences ?? {}) as {
+    calendar?: { timezone?: string };
+  };
+  const timezone = prefs.calendar?.timezone || "Asia/Dubai";
 
   const modulePermissions: UserContext["modulePermissions"] = {};
 
@@ -150,6 +163,7 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     department: auth.department,
     isSuperAdmin: superAdmin,
     canViewPrivate,
+    timezone,
   };
 }
 
