@@ -64,6 +64,13 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false, // no 2–3 MB maps shipped to users
   compress: true,                     // brotli/gzip on the edge
   poweredByHeader: false,             // one fewer header
+  /* React Compiler (babel-plugin-react-compiler v1) — auto-memoizes
+     components/hooks at build time so weak clients (WeChat X5 webview, low-spec
+     Windows) do far fewer re-renders. Conservative by design: it skips any
+     component it can't prove safe rather than break it. Trialled on a preview
+     branch first; the prior impure-render audit cleared the known violations.
+     (Next 16 promoted this out of `experimental` to a top-level key.) */
+  reactCompiler: true,
   experimental: {
     optimizeCss: true,
     /* Tree-shake the heaviest peer deps — each has dozens of
