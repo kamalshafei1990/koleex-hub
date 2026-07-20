@@ -22,7 +22,7 @@ const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButto
 /* FloatingPanel (AI/Discuss dock) statically pulls the discuss lib + supabase
    client — lazy so the shell's first paint never waits on or ships them. */
 const FloatingPanel = dynamic(() => import("./FloatingPanel"), { ssr: false });
-import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
@@ -37,6 +37,32 @@ import {
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/* Defer non-critical, heavy corner widgets (the Discuss/AI FloatingPanel) until
+   the browser is idle AFTER first paint. On weak clients — WeChat's X5/TBS
+   webview, low-spec Windows PCs on Edge/Chrome — parsing + hydrating the
+   1000+-line panel and opening its channel fetch/SSE on the critical path of
+   EVERY route is a big share of the "everything feels heavy" lag. The FAB is
+   not needed for first interaction, so it appears a beat later, once the page
+   is already usable. The header bell still carries the global unread signal. */
+function useIdleMount(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const flag = () => { if (!cancelled) setReady(true); };
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    };
+    if (typeof w.requestIdleCallback === "function") {
+      w.requestIdleCallback(flag, { timeout: 2500 });
+    } else {
+      const t = setTimeout(flag, 1200);
+      return () => { cancelled = true; clearTimeout(t); };
+    }
+    return () => { cancelled = true; };
+  }, []);
+  return ready;
+}
 
 function ScrollToTopOnRouteChange() {
   const pathname = usePathname();
@@ -124,6 +150,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     if (isDesktop) document.documentElement.classList.add("kx-desktop");
   }, []);
 
+  /* Gate the heavy Discuss/AI dock on browser-idle after first paint. */
+  const panelReady = useIdleMount();
+
   return (
     <QAInspectorProvider>
       <style>{`
@@ -194,7 +223,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </div>
-      <FloatingPanel />
+      {/* Deferred to browser-idle after first paint — keeps the heavy Discuss/AI
+          dock (parse + hydrate + channel fetch + SSE) off every route's critical
+          path on weak clients. */}
+      {panelReady && <FloatingPanel />}
       {/* Global QA issue reporter (floating button + modal). */}
       <ReportIssueButton />
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
