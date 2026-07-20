@@ -189,9 +189,9 @@ export function modeFor(intent: TaskIntent): TaskMode {
   return intent === "business" ? "business" : "chat";
 }
 
-/** Spec: chat → Groq, business → DeepSeek. */
-export function providerFor(mode: TaskMode): ProviderName {
-  return mode === "business" ? "deepseek" : "groq";
+/** Groq removed (owner decision, 2026-07-20): every mode → DeepSeek. */
+export function providerFor(_mode: TaskMode): ProviderName {
+  return "deepseek";
 }
 
 /** Build the correct prompt for a mode. Exposed so the voice pipeline
@@ -229,11 +229,11 @@ export function detectLane(
   return "FAST";
 }
 
-/** Provider chain for each lane. Fallback stays inside the same
- *  lane — FAST never crosses into DeepSeek/Gemini; SMART never
- *  falls back to Groq's 8B model. */
+/** Provider chain for each lane. Groq removed (owner decision) — every
+ *  lane now runs on DeepSeek, with Gemini as the only fallback where one
+ *  is configured. */
 export function providersForLane(lane: Lane): Array<"groq" | "deepseek" | "gemini"> {
-  if (lane === "FAST") return ["groq"];
+  if (lane === "FAST") return ["deepseek", "gemini"];
   if (lane === "SMART") return ["deepseek", "gemini"];
   return []; // PROTECTED handled by orchestrator, not this router
 }
