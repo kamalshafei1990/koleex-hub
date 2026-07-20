@@ -326,6 +326,7 @@ export {
   isSmallTalk,
   tryFastReply,
   isBusinessDataQuery,
+  isWorkDataQuery,
 };
 
 /* ─── Phase 10: business-data detector ────────────────────────────
@@ -419,6 +420,49 @@ function isBusinessDataQuery(msg: string): boolean {
 
   /* Chinese business terms. */
   if (/客户|产品|库存|发票|报价|订单|供应商/.test(msg)) return true;
+
+  return false;
+}
+
+/* ─── Work / schedule data detector ───────────────────────────────
+   Returns true when the question is about the user's OWN work data —
+   To-do / Projects / Planning / Calendar. These MUST reach the
+   tool-calling orchestrator (listMyTodos / listMyProjects /
+   listProjectTasks / listMyPlanning / listMyCalendar). The general
+   fast-path has NO tools, so any of these slipping through it makes
+   the model deflect ("check the app / please log in") instead of
+   reading the user's real tasks — exactly the bug users reported.
+
+   isBusinessDataQuery() deliberately does NOT cover these modules, so
+   the route checks BOTH: a query that is business OR work data bypasses
+   the tool-less fast-path.
+
+   Guarded to personal / temporal / status framing so pure general
+   chat ("explain agile project management", "what is a good meeting
+   agenda") stays on the fast lane. */
+function isWorkDataQuery(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s) return false;
+
+  /* A work-module noun … */
+  const workNoun =
+    /\b(task|tasks|to-?do|to-?dos|todo|todos|assignment|assignments|project|projects|schedule|shift|shifts|calendar|meeting|meetings|deadline|deadlines|reminder|reminders|planning|agenda)\b/;
+  /* … combined with personal / temporal / status framing. */
+  const framing =
+    /\b(my|our|mine|assigned\s+to\s+me|assigned|today|tonight|tomorrow|this\s+(week|month)|next\s+(week|month)|due|overdue|upcoming|pending|open|do\s+i|does\s+i|i\s+have|have\s+any|remind\s+me)\b/;
+  if (workNoun.test(s) && framing.test(s)) return true;
+
+  /* Direct phrasings that don't need the noun+framing combo. */
+  if (/\bwhat('?s| is| are|'re)?\s+(due|on\s+my\s+(plate|calendar|schedule|agenda|list)|assigned\s+to\s+me|coming\s+up)\b/.test(s)) return true;
+  if (/\bwhat\s+am\s+i\s+(working\s+on|planned\s+for|doing\s+(today|this\s+week))\b/.test(s)) return true;
+  if (/\bremind\s+me\s+to\b/.test(s)) return true;
+  if (/\b(add|create)\s+(a\s+)?(task|to-?do|reminder|shift|event)\b/.test(s)) return true;
+
+  /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي. */
+  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|تذكير|ذكرني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
+
+  /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排. */
+  if (/任务|日程|日历|会议|提醒|待办|项目|安排/.test(msg)) return true;
 
   return false;
 }

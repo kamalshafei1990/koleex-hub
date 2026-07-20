@@ -35,11 +35,12 @@ import {
   classifyBrandSection,
   isSmallTalk,
   isBusinessDataQuery,
+  isWorkDataQuery,
   buildBrandSystemPrompt,
   buildMinimalSystemPrompt,
   sealPricingSafety,
 } from "@/lib/server/ai-agent/orchestrator";
-import { groqChatStream } from "@/lib/server/ai/providers/groq";
+import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
@@ -399,13 +400,22 @@ export async function POST(req: Request) {
           const isBrand = brandSection !== "none";
           const isSmall = isSmallTalk(normalizedContent);
           const isBusinessData = isBusinessDataQuery(normalizedContent);
-          const fastPathKey = process.env.GROQ_API_KEY;
+          /* Work/schedule queries (my tasks, my calendar, "what's due")
+             need the tool-calling orchestrator (listMyTodos etc.). The
+             general fast-path has NO tools, so letting these through it
+             makes the model deflect ("check the app / please log in")
+             instead of reading the user's real data. Exclude them here
+             so they always reach orchestrate(). */
+          const isWorkData = isWorkDataQuery(normalizedContent);
+          /* DeepSeek powers the fast lanes now (Groq fully removed).
+             USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
+          const fastPathKey = process.env.DEEPSEEK_API_KEY;
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
 
           const canFastPath = fastPathKey && (
-            isBrand || isSmall || !isBusinessData
+            isBrand || isSmall || (!isBusinessData && !isWorkData)
           );
 
           if (canFastPath) {
@@ -445,7 +455,7 @@ export async function POST(req: Request) {
             let accumulated = "";
             let gotFirst = false;
             try {
-              for await (const ch of groqChatStream(fastMessages, {
+              for await (const ch of deepseekChatStream(fastMessages, {
                 maxTokens,
               })) {
                 if (ch.type === "delta" && ch.text) {
@@ -454,7 +464,7 @@ export async function POST(req: Request) {
                   controller.enqueue(send({ type: "delta", text: ch.text }));
                 } else if (ch.type === "done") {
                   fastReply = ch.text ?? accumulated;
-                  fastProvider = ch.provider ?? "groq:stream";
+                  fastProvider = ch.provider ?? "deepseek:stream";
                 } else if (ch.type === "error") {
                   /* Drop what we have and fall through to orchestrate.
                      Can't "un-emit" the deltas the client already got —
@@ -463,7 +473,7 @@ export async function POST(req: Request) {
                      token failure mode. */
                   if (gotFirst) {
                     fastReply = accumulated || null;
-                    fastProvider = "groq:stream";
+                    fastProvider = "deepseek:stream";
                   }
                   break;
                 }
@@ -486,7 +496,7 @@ export async function POST(req: Request) {
                 { kind: "answer", text: sealed, permissionStatus: "allowed" },
               ],
               finalReply: sealed,
-              provider: fastProvider ?? "groq:stream",
+              provider: fastProvider ?? "deepseek:stream",
               conversationId: conversationId!,
             };
             /* If sealPricingSafety redacted content, the client has
