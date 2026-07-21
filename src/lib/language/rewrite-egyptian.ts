@@ -203,21 +203,34 @@ export function removeRepetition(text: string): string {
     keptParas.push(p);
   }
 
-  /* Within each paragraph, dedupe sentences. Sentence boundary = any
-     of .,!,?,؟ followed by whitespace or newline. Keeps the first
-     occurrence of each unique sentence. */
+  /* Within each paragraph, dedupe sentences — LINE BY LINE.
+
+     MARKDOWN-SAFE (2026-07-21 fix): the old implementation split the whole
+     paragraph at sentence punctuation and re-joined with a single space,
+     which MERGED every single-newline structure — bullet lists, numbered
+     steps, table rows, headings — into one flat run of text. That is why
+     Koleex AI's answers rendered as "one big unorganized paragraph" even
+     though the model emitted proper markdown and the bubble renderer
+     (MessageMarkdown + remark-gfm) supports it. Newlines are now
+     preserved verbatim; sentence-dedupe happens only WITHIN a line. */
   const dedupeSentencesIn = (para: string): string => {
-    const sentences = para.split(/(?<=[.!؟?])\s+/);
-    const seen = new Set<string>();
-    const kept: string[] = [];
-    for (const s of sentences) {
-      const norm = s.replace(/\s+/g, " ").trim().toLowerCase();
-      if (!norm) continue;
-      if (seen.has(norm)) continue;
-      seen.add(norm);
-      kept.push(s.trim());
-    }
-    return kept.join(" ");
+    return para
+      .split("\n")
+      .map((line) => {
+        const sentences = line.split(/(?<=[.!؟?])\s+/);
+        if (sentences.length < 2) return line; // nothing to dedupe — keep verbatim
+        const seen = new Set<string>();
+        const kept: string[] = [];
+        for (const s of sentences) {
+          const norm = s.replace(/\s+/g, " ").trim().toLowerCase();
+          if (!norm) continue;
+          if (seen.has(norm)) continue;
+          seen.add(norm);
+          kept.push(s.trim());
+        }
+        return kept.join(" ");
+      })
+      .join("\n");
   };
 
   return keptParas.map(dedupeSentencesIn).join("\n\n");
