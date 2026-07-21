@@ -186,21 +186,41 @@ export default function MessageMarkdown({
         .koleex-md :global(h2),
         .koleex-md :global(h3),
         .koleex-md :global(h4) {
-          margin: 14px 0 6px;
-          font-weight: 600;
+          margin: 16px 0 6px;
+          font-weight: 650;
           line-height: 1.3;
         }
-        .koleex-md :global(h1) { font-size: 1.15em; }
-        .koleex-md :global(h2) { font-size: 1.1em; }
-        .koleex-md :global(h3) { font-size: 1.05em; }
+        .koleex-md :global(h1:first-child),
+        .koleex-md :global(h2:first-child),
+        .koleex-md :global(h3:first-child) {
+          margin-top: 2px;
+        }
+        .koleex-md :global(h1) { font-size: 1.2em; }
+        .koleex-md :global(h2) { font-size: 1.12em; }
+        .koleex-md :global(h3) { font-size: 1.06em; }
         .koleex-md :global(h4) { font-size: 1em; }
         .koleex-md :global(ul),
         .koleex-md :global(ol) {
-          margin: 6px 0 10px;
+          margin: 6px 0 12px;
           padding-inline-start: 22px;
         }
+        /* Tailwind's preflight resets list-style to NONE globally — without
+           restoring it here, every markdown bullet/numbered list rendered as
+           bare flush-left lines (the "big unorganized paragraph" report,
+           even though the model emitted perfectly-structured markdown). */
+        .koleex-md :global(ul) {
+          list-style: disc outside;
+        }
+        .koleex-md :global(ol) {
+          list-style: decimal outside;
+        }
+        .koleex-md :global(ul ul) {
+          list-style: circle outside;
+          margin: 2px 0 4px;
+        }
         .koleex-md :global(li) {
-          margin: 2px 0;
+          margin: 3px 0;
+          display: list-item;
         }
         .koleex-md :global(li > p) {
           margin: 0;
