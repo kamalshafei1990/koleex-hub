@@ -85,17 +85,21 @@ function formatHint(ctx: AiContext): string {
     }
     return ` RESPONSE SHAPE: 1–2 sentences, plain prose.`;
   }
+  /* The chat bubble renders full Markdown (MessageMarkdown + GFM), so
+     structured answers should USE it — ChatGPT-style. Every list item
+     must start with "- " or "1. " on its own line (bare lines render as
+     a wall of text), with a blank line before each list/heading. */
   if (format === "structured") {
     if (type === "explanation") {
-      return ` RESPONSE SHAPE: one-sentence summary, then 2–4 short numbered or bulleted steps. No headers.`;
+      return ` RESPONSE SHAPE: one-sentence summary, then 2–4 numbered Markdown steps ("1. " each on its own line, blank line before the list).`;
     }
     if (type === "business") {
-      return ` RESPONSE SHAPE: one summary sentence, then 2–4 concise bullet points. Actionable, no fluff, no headers.`;
+      return ` RESPONSE SHAPE: one summary sentence, then 2–4 concise Markdown bullets ("- " each on its own line, blank line before the list). Actionable, no fluff.`;
     }
-    return ` RESPONSE SHAPE: one summary sentence, then 2–4 short bullet points. No headers.`;
+    return ` RESPONSE SHAPE: one summary sentence, then 2–4 short Markdown bullets ("- " each on its own line, blank line before the list).`;
   }
   /* detailed */
-  return ` RESPONSE SHAPE: thorough answer — summary sentence, 3–5 key points or short paragraphs, an example if useful. Plain prose, no "###" headers, no "**bold**" labels.`;
+  return ` RESPONSE SHAPE: thorough Markdown answer — a short summary paragraph, then "### " section headings with "- " bullets or short paragraphs under each (blank line between sections), **bold** for key terms, a table for comparisons. Like ChatGPT.`;
 }
 
 /* ─── FAST lane prompt (Phase 2) ─────────────────────────────────
