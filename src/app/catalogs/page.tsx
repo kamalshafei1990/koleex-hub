@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { fpAvatar, cdnImage } from "@/lib/cdn";
+import PermissionGate from "@/components/layout/PermissionGate";
 import { useQueryClient } from "@tanstack/react-query";
 import { currentScopeKey } from "@/lib/me-bootstrap";
 import Link from "next/link";
@@ -2710,7 +2711,19 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
 /* ═══════════════════════════════
    ── MAIN PAGE ──
    ═══════════════════════════════ */
+/* Gated on the same "Catalogs" module as /api/catalogs and the
+   /api/files/catalog streaming route, so UI visibility and file access
+   can never disagree again (the pre-2026-07-21 state: an ungated page
+   showing cards whose previews/downloads all 404'd for gated roles). */
 export default function CatalogsPage() {
+  return (
+    <PermissionGate module="Catalogs">
+      <CatalogsApp />
+    </PermissionGate>
+  );
+}
+
+function CatalogsApp() {
   const queryClient = useQueryClient();
   /* Shared cache key for THIS tenant/scope's catalog list. Reading the cache on
      mount lets a revisit paint the grid instantly (no skeleton) while loadAll

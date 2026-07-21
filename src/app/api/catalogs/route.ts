@@ -34,6 +34,15 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
+  /* Same module gate as the file-streaming route (/api/files/catalog/…).
+     The two MUST agree: when the list was ungated but files were gated, a
+     role without Catalogs view (e.g. Data Entry before 2026-07-21, or the
+     Customer portal role) saw every catalog card but every preview/download
+     404'd — a silently broken app. One coherent switch, controlled from
+     Roles & Permissions. */
+  const denied = await requireModuleAccess(auth, "catalogs");
+  if (denied) return denied;
+
   const { data, error } = await supabaseServer
     .from("catalogs")
     .select("*")
