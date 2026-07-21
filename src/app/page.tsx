@@ -203,6 +203,18 @@ const AppCard = memo(function AppCard({
 
   const appBadges = useAppBadges();
   const appBadgeCount = appBadges[app.id] ?? 0;
+  /* ONE badge per tile. Two systems used to render simultaneously on the
+     same card (e.g. To-do showed "1" on the icon AND "2" on the corner):
+       · appUnread      — NEW/unread items (clears once seen) — true
+                          red-badge semantics, wins when present
+       · appBadgeCount  — total OPEN work (useAppBadges) — fallback only
+     Both render in the same spot (on the icon, Discuss-style) so the
+     badge position never jumps between states. */
+  const tileBadge = appUnread > 0 ? appUnread : appBadgeCount;
+  const tileBadgeTitle =
+    appUnread > 0
+      ? `${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`
+      : `${appBadgeCount} open item${appBadgeCount === 1 ? "" : "s"}`;
   return (
     <AppLaunchLink
       app={app}
@@ -229,11 +241,6 @@ const AppCard = memo(function AppCard({
       }`}
     >
 
-      {(appBadgeCount ?? 0) > 0 && (
-        <span className="absolute top-2 end-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3333] text-white text-[10px] font-bold flex items-center justify-center pointer-events-none select-none">
-          {appBadgeCount! > 99 ? "99+" : appBadgeCount}
-        </span>
-      )}
       {(badge === "new" || badge === "updated") && (
         <span
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
@@ -260,13 +267,13 @@ const AppCard = memo(function AppCard({
         } : undefined}
       >
         <span className="relative inline-flex">
-          {appUnread > 0 && (
+          {tileBadge > 0 && (
             <span
               className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
-              aria-label={`${appUnread} unread`}
-              title={`${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`}
+              aria-label={tileBadgeTitle}
+              title={tileBadgeTitle}
             >
-              {appUnread > 99 ? "99+" : appUnread}
+              {tileBadge > 99 ? "99+" : tileBadge}
             </span>
           )}
           {(() => {
