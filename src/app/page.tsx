@@ -53,8 +53,13 @@ function getGreetingKey(): string {
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
 const APP_DATA_PREFETCH: Record<string, string> = {
-  products: "/api/products",
-  "product-data": "/api/products",
+  /* MUST be ?view=list — the catalogue fetches that exact URL, so the warm
+     entry is reused. The bare /api/products URL was the FULL 80-column
+     projection (706 rows, megabyte-scale): a different cache key the app
+     never reads, so every hover/open paid a wasted heavyweight download
+     that competed with the app's real fetch. */
+  products: "/api/products?view=list",
+  "product-data": "/api/products?view=list",
   projects: "/api/projects",
   todo: "/api/todos",
   accounts: "/api/accounts",

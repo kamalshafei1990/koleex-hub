@@ -480,14 +480,10 @@ export async function fetchSupplierNames(): Promise<SupplierLite[]> {
   return json.suppliers ?? [];
 }
 
-// ── Unique brand names + tags → /api/products/facets ──
+// ── Unique brand names → /api/products/facets ──
 export async function fetchUniqueBrands(): Promise<string[]> {
   const json = await jget<{ brands?: string[] }>("/api/products/facets", {});
   return json.brands ?? [];
-}
-export async function fetchUniqueTags(): Promise<string[]> {
-  const json = await jget<{ tags?: string[] }>("/api/products/facets", {});
-  return json.tags ?? [];
 }
 
 // ── Taxonomy logos (storage proxy — no secrets, unchanged) ──

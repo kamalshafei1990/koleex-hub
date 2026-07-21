@@ -578,6 +578,14 @@ export default function LegacyProductView() {
       if (!p) { setNotFound(true); setLoading(false); return; }
 
       setProduct(p);
+      /* PAINT NOW — the product row alone carries the name, breadcrumb,
+         description and pricing header. The old code held the skeleton
+         through TWO more waves of requests (models/media/specs/related,
+         then a per-related-product fan-out) — up to ~18 API calls before
+         anything appeared, which is why opening a product felt so slow.
+         Everything below hydrates into an already-visible page. */
+      setLoading(false);
+
       const [mdls, mds, specs, rel, certs, docs] = await Promise.all([
         fetchModelsByProductId(p.id),
         fetchMediaByProductId(p.id),
@@ -595,10 +603,8 @@ export default function LegacyProductView() {
       setCertifications(certs);
       setDocuments(docs);
 
-      /* PERF: related products used to fan out two sequential
-              Promise.alls (details, then media). Now a single
-              Promise.all interleaves both — same number of network
-              calls but one RTT shorter. */
+      /* Related-products fan-out — far below the fold; runs entirely
+         post-paint so it never delays the page. */
       if (rel.length > 0) {
         const fanout = await Promise.all(
           rel.flatMap(r => [
@@ -620,8 +626,6 @@ export default function LegacyProductView() {
           setRelatedImages(imgMap);
         }
       }
-
-      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [handle]);
@@ -1342,7 +1346,8 @@ export default function LegacyProductView() {
                     >
                       <div className="aspect-[4/3] bg-white flex items-center justify-center overflow-hidden">
                         {img ? (
-                          <img src={img} alt={label} loading="lazy" className="w-full h-full object-contain p-3" />
+                          /* IMG.card: CDN-downscaled — raw URL was the full-size upload. */
+                          <img src={IMG.card(img)} alt={label} loading="lazy" decoding="async" className="w-full h-full object-contain p-3" />
                         ) : (
                           <ImageRawIcon className="h-8 w-8 text-gray-300" />
                         )}
@@ -1875,17 +1880,22 @@ export default function LegacyProductView() {
                   ))}
                 </ul>
               </div>
-              {/* RIGHT — image */}
+              {/* RIGHT — image. Guarded: an empty src="" makes the browser
+                  re-request the page URL itself (wasted round-trip) — and
+                  with progressive hydration every product passes through a
+                  media-less state for a moment. */}
               <div className="lg:col-span-7 order-1 lg:order-2">
                 <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-gradient-to-b from-white to-[#f4f5f7] border border-[var(--border-subtle)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-contain p-8"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  {(galleryImages[1]?.url || mainImage) && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-contain p-8"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
                 </div>
               </div>
             </div>

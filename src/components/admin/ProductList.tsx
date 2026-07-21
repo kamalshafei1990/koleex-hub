@@ -220,6 +220,16 @@ export default function ProductList() {
           paintedFromCache = true;
         }
       }
+      /* Warm-start the photo map too — without this, a revisit painted the
+         cards instantly but every image slot sat EMPTY until the media
+         round-trip finished, which read as "photos take forever". */
+      const rawImgs = typeof window !== "undefined"
+        ? window.localStorage.getItem(`kx_products_imgs_v1:${currentScopeKey()}`)
+        : null;
+      if (rawImgs) {
+        const cachedImgs = JSON.parse(rawImgs) as Record<string, string>;
+        if (cachedImgs && typeof cachedImgs === "object") setMainImages(cachedImgs);
+      }
     } catch { /* corrupt/absent cache → normal load path */ }
     setLoading(!paintedFromCache);
     setLoadError(null);
@@ -239,6 +249,10 @@ export default function ProductList() {
           fetchDivisions(), fetchCategories(),
           fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
         ]);
+        /* If the products fetch throws we bail to the error state without
+           awaiting meta — observe its rejection so it can't surface as an
+           unhandled-promise error. */
+        metaPromise.catch(() => {});
         let p: ProductRow[];
         try {
           /* ?view=list keeps the response to the ~15 columns this grid
@@ -251,7 +265,6 @@ export default function ProductList() {
         } finally {
           clearTimeout(timeoutId);
         }
-        const [d, c, s, ms, imgs] = await metaPromise;
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
         /* Persist for instant paint on the next cold load / PWA restart. */
@@ -259,30 +272,40 @@ export default function ProductList() {
           const json = JSON.stringify(p);
           if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
         } catch { /* quota / serialize guard */ }
-        setProducts(p); setDivisions(d); setCategories(c);
-        setSubcategories(s);
-        setModelCounts(ms.counts);
-        setProductSuppliers(ms.suppliers);
-        setAllSuppliers(ms.allSuppliers);
-        setPrimaryModelNames(ms.primaryModelNames || {});
-        setMainImages(imgs);
-      /* Public catalog lands on Garment Machinery by default — it's
-         the flagship. Customers browsing /products should see the
-         primary line first; they can click "All divisions" or any
-         other pill to broaden. Admins (/product-data) still see
-         everything so they don't miss products when filtering.
-
-         Only apply the flagship default when the user has NO stored
-         filter from a previous visit — otherwise we'd overwrite
-         their persisted choice on every data refresh. */
-        if (
-          !isInternal &&
-          !initialFilters.div &&
-          d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
-        ) {
-          setFilterDiv(FLAGSHIP_DIVISION_SLUG);
-        }
+        /* PAINT NOW — products are the page. Taxonomy pills, model counts,
+           supplier chips and photos hydrate in below the moment their
+           (slower) fetches land; they must never hold the whole grid
+           hostage. This is what made "opening the app" feel slow: the
+           grid used to wait for the SLOWEST of five secondary requests. */
+        setProducts(p);
         setLoading(false);
+        /* Meta hydration — tolerant: a failed secondary fetch degrades a
+           filter/photo, it must not blank an already-painted catalogue. */
+        try {
+          const [d, c, s, ms, imgs] = await metaPromise;
+          if (cancelled) return;
+          setDivisions(d); setCategories(c);
+          setSubcategories(s);
+          setModelCounts(ms.counts);
+          setProductSuppliers(ms.suppliers);
+          setAllSuppliers(ms.allSuppliers);
+          setPrimaryModelNames(ms.primaryModelNames || {});
+          setMainImages(imgs);
+          /* Persist the photo map for instant thumbnails on the next visit. */
+          try {
+            const json = JSON.stringify(imgs);
+            if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
+          } catch { /* quota guard */ }
+          /* Public catalog lands on Garment Machinery by default — it's
+             the flagship. Only when the user has NO stored filter. */
+          if (
+            !isInternal &&
+            !initialFilters.div &&
+            d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
+          ) {
+            setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+          }
+        } catch { /* secondary data only — the grid is already up */ }
       } catch (e) {
         if (!cancelled) {
           const aborted = e instanceof DOMException && e.name === "AbortError";
@@ -1260,8 +1283,13 @@ export default function ProductList() {
                       stays put. */}
                   <div className="relative aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
                     {imgUrl ? (
+                      /* IMG.card = CDN-downscaled 480px render. The raw
+                         URL here was the original multi-MB upload — the
+                         whole grid was pulling full-size photos for
+                         thumbnail-sized cells, which is why images took
+                         forever to appear. */
                       <img
-                        src={imgUrl}
+                        src={IMG.card(imgUrl)}
                         alt={p.product_name}
                         loading="lazy"
                         decoding="async"
