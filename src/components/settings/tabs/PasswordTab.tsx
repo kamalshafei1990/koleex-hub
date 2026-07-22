@@ -8,11 +8,14 @@ import { useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 const MIN_LENGTH = 8;
 
 export default function PasswordTab(_props: { account: AccountWithLinks }) {
   const [current, setCurrent] = useState("");
+  const { t } = useTranslation(settingsT);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,8 +27,8 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
 
   async function submit() {
     setError(null); setOk(false);
-    if (next !== confirm) { setError("New passwords don't match."); return; }
-    if (next.length < MIN_LENGTH) { setError(`New password must be at least ${MIN_LENGTH} characters.`); return; }
+    if (next !== confirm) { setError(t("pwd.mismatch")); return; }
+    if (next.length < MIN_LENGTH) { setError(t("pwd.tooShort").replace("{n}", String(MIN_LENGTH))); return; }
     setBusy(true);
     try {
       const res = await fetch("/api/me/password", {
@@ -35,10 +38,10 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
         body: JSON.stringify({ current, next }),
       });
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok || !j.ok) { setError(j.error || `Couldn't update password (${res.status})`); return; }
+      if (!res.ok || !j.ok) { setError(j.error || t("pwd.failed").replace("{code}", String(res.status))); return; }
       setOk(true); setCurrent(""); setNext(""); setConfirm("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("pwd.error"));
     } finally {
       setBusy(false);
     }
@@ -47,15 +50,15 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
   return (
     <div className="space-y-4">
       <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-        <h2 className="text-[14px] font-bold text-[var(--text-primary)]">Change password</h2>
+        <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{t("pwd.title")}</h2>
         <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-5">
-          Enter your current password, then choose a new one (at least {MIN_LENGTH} characters).
+          {t("pwd.sub").replace("{n}", String(MIN_LENGTH))}
         </p>
 
         <div className="space-y-4 max-w-sm">
-          <Field label="Current password" value={current} onChange={setCurrent} autoComplete="current-password" />
-          <Field label="New password" value={next} onChange={setNext} autoComplete="new-password" />
-          <Field label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+          <Field label={t("pwd.current")} value={current} onChange={setCurrent} autoComplete="current-password" />
+          <Field label={t("pwd.new")} value={next} onChange={setNext} autoComplete="new-password" />
+          <Field label={t("pwd.confirm")} value={confirm} onChange={setConfirm} autoComplete="new-password" />
         </div>
 
         <div className="mt-5 flex items-center gap-3">
@@ -66,19 +69,19 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
             {busy ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
-            {busy ? "Updating…" : "Update password"}
+            {busy ? t("pwd.updating") : t("pwd.update")}
           </button>
           {ok && (
             <span className="text-[12.5px] text-[#00CC66] inline-flex items-center gap-1.5">
-              <CheckIcon size={13} /> Password updated
+              <CheckIcon size={13} /> {t("pwd.updated")}
             </span>
           )}
-          {error && <span className="text-[12.5px] text-[#FF6B6B]">{error}</span>}
+          {error && <span className="text-[12.5px] text-[#FF3333]">{error}</span>}
         </div>
       </section>
 
       <p className="text-[11px] text-[var(--text-faint)] px-1">
-        You&apos;ll stay signed in on this device after changing your password.
+        {t("pwd.footer")}
       </p>
     </div>
   );

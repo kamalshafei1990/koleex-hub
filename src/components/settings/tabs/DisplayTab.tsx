@@ -13,11 +13,14 @@ import {
   type ThemeMode,
 } from "@/lib/display-prefs";
 import { SettingsCard, ControlRow, Segmented, SwitchRow } from "./ui";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 export default function DisplayTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
   const [d, setD] = useState<DisplayPrefs>(() => withDefaults(account.preferences).display as DisplayPrefs);
+  const { t } = useTranslation(settingsT);
   const [theme, setThemeState] = useState<ThemeMode>("dark");
 
   /* Theme is the app's binary light/dark switch (localStorage). Read the
@@ -54,15 +57,15 @@ export default function DisplayTab({ account, onChanged }: {
 
   return (
     <div className="space-y-4">
-      <SettingsCard title="Display" subtitle="Changes apply across the hub instantly.">
-        <ControlRow label="Theme" hint="Light or dark appearance.">
+      <SettingsCard title={t("display.title")} subtitle={t("display.sub")}>
+        <ControlRow label={t("display.theme")} hint={t("display.theme.hint")}>
           <Segmented<ThemeMode>
             value={theme}
             onChange={pickTheme}
-            options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
+            options={[{ value: "light", label: t("display.light") }, { value: "dark", label: t("display.dark") }]}
           />
         </ControlRow>
-        <ControlRow label="Text size" hint="Scale interface text — layout stays put.">
+        <ControlRow label={t("display.textSize")} hint={t("display.textSize.hint")}>
           <Segmented<TextSizePref>
             value={d.text_size}
             onChange={(v) => patch({ text_size: v })}
@@ -74,52 +77,52 @@ export default function DisplayTab({ account, onChanged }: {
             ]}
           />
         </ControlRow>
-        <ControlRow label="Density" hint="Comfortable spacing, or compact to fit more." last>
+        <ControlRow label={t("display.density")} hint={t("display.density.hint")} last>
           <Segmented<DensityPref>
             value={d.density}
             onChange={(v) => patch({ density: v })}
             options={[
-              { value: "comfortable", label: "Comfortable" },
-              { value: "compact", label: "Compact" },
+              { value: "comfortable", label: t("display.comfortable") },
+              { value: "compact", label: t("display.compact") },
             ]}
           />
         </ControlRow>
       </SettingsCard>
 
-      <SettingsCard title="Accessibility" subtitle="Make the hub easier to read and use.">
+      <SettingsCard title={t("display.a11y")} subtitle={t("display.a11y.sub")}>
         <SwitchRow
-          label="Bold text"
-          hint="Heavier text weight for legibility."
+          label={t("display.bold")}
+          hint={t("display.bold.hint")}
           checked={d.bold_text}
           onChange={(v) => patch({ bold_text: v })}
         />
         <SwitchRow
-          label="Underline links"
-          hint="Always underline links, not just on hover."
+          label={t("display.underline")}
+          hint={t("display.underline.hint")}
           checked={d.underline_links}
           onChange={(v) => patch({ underline_links: v })}
         />
         <SwitchRow
-          label="Always show focus ring"
-          hint="Strong outline on the focused control (keyboard users)."
+          label={t("display.focus")}
+          hint={t("display.focus.hint")}
           checked={d.focus_ring}
           onChange={(v) => patch({ focus_ring: v })}
         />
         <SwitchRow
-          label="Reduce motion"
-          hint="Minimize animations and transitions."
+          label={t("display.motion")}
+          hint={t("display.motion.hint")}
           checked={d.reduce_motion}
           onChange={(v) => patch({ reduce_motion: v })}
         />
         <SwitchRow
-          label="Increase contrast"
-          hint="Stronger borders and clearer secondary text."
+          label={t("display.contrast")}
+          hint={t("display.contrast.hint")}
           checked={d.high_contrast}
           onChange={(v) => patch({ high_contrast: v })}
         />
         <SwitchRow
-          label="Reduce transparency"
-          hint="Turn off blur and translucency for legibility."
+          label={t("display.transparency")}
+          hint={t("display.transparency.hint")}
           checked={d.reduce_transparency}
           onChange={(v) => patch({ reduce_transparency: v })}
           last
@@ -127,7 +130,7 @@ export default function DisplayTab({ account, onChanged }: {
       </SettingsCard>
 
       <p className="text-[11px] text-[var(--text-faint)] px-1">
-        Language is in Preferences. Date, time and number formats are in Language &amp; region.
+        {t("display.footer")}
       </p>
     </div>
   );

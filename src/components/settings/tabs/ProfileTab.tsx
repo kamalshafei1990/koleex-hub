@@ -36,6 +36,9 @@ import IdCardIcon from "@/components/icons/ui/IdCardIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
+import { SettingsCard } from "@/components/settings/tabs/ui";
 
 /* ── State shape ── */
 interface PeopleForm {
@@ -83,6 +86,7 @@ export default function ProfileTab({
   account: AccountWithLinks;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation(settingsT);
   const [form, setForm] = useState<PeopleForm>(() => peopleFrom(account));
   const [prof, setProf] = useState<ProfilePrefs>(
     () => withDefaults(account.preferences).profile as ProfilePrefs,
@@ -148,7 +152,7 @@ export default function ProfileTab({
     setSaving(true); setError(null);
     try {
       if (peopleDirty) {
-        if (!personId) { setError("No linked profile record to update."); return; }
+        if (!personId) { setError(t("prof.noRecord")); return; }
         const res = await fetch(`/api/people/${personId}`, {
           method: "PATCH",
           credentials: "include",
@@ -173,16 +177,16 @@ export default function ProfileTab({
         });
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
-          setError(j.error || `Save failed (${res.status})`);
+          setError(j.error || t("prof.saveFailed").replace("{code}", String(res.status)));
           return;
         }
       }
       if (profDirty) {
         // Send ONLY the profile slice; the server merges it onto the rest.
         const ok = await updateAccountPreferences(account.id, { profile: prof });
-        if (!ok) { setError("Couldn't save pronouns / links."); return; }
+        if (!ok) { setError(t("prof.prefsFailed")); return; }
       }
-      setToast("Profile updated");
+      setToast(t("prof.saved"));
       onChanged();
     } finally {
       setSaving(false);
@@ -190,17 +194,17 @@ export default function ProfileTab({
   }
 
   async function handlePhoto(file: File) {
-    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
-    if (file.size > 8 * 1024 * 1024) { setError("Image too large — max 8 MB."); return; }
+    if (!file.type.startsWith("image/")) { setError(t("prof.photo.notImage")); return; }
+    if (file.size > 8 * 1024 * 1024) { setError(t("prof.photo.tooLarge")); return; }
     setUploadingAvatar(true); setError(null);
     try {
       const dataUrl = await resizeToDataUrl(file);
       const ok = await updateAccountAvatar(account.id, dataUrl);
-      if (!ok) { setError("Couldn't save the photo. Please try again."); return; }
-      setToast("Photo updated");
+      if (!ok) { setError(t("prof.photo.saveFailed")); return; }
+      setToast(t("prof.photo.updated"));
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Photo upload failed");
+      setError(e instanceof Error ? e.message : t("prof.photo.uploadFailed"));
     } finally {
       setUploadingAvatar(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -211,8 +215,8 @@ export default function ProfileTab({
     setUploadingAvatar(true);
     const ok = await updateAccountAvatar(account.id, null);
     setUploadingAvatar(false);
-    if (!ok) { setError("Couldn't remove the photo."); return; }
-    setToast("Photo removed");
+    if (!ok) { setError(t("prof.photo.removeFailed")); return; }
+    setToast(t("prof.photo.removed"));
     onChanged();
   }
 
@@ -224,14 +228,12 @@ export default function ProfileTab({
     <div className="space-y-4 pb-2">
       <IdentitySourceNote
         text={
-          canEditIdentity
-            ? "Your name, contact, and address are one shared person record — the same details also shown in the Accounts app and your HR profile. Editing here updates them everywhere."
-            : "Your name, contact, and address are company records maintained by HR — contact your manager to update them. Your photo, pronouns, and links are yours to change."
+          canEditIdentity ? t("prof.note.editable") : t("prof.note.readonly")
         }
       />
 
       {/* ── Identity ── */}
-      <Card title="Identity" subtitle="How you appear across the hub.">
+      <SettingsCard title={t("prof.identity")} subtitle={t("prof.identity.sub")}>
         {/* Avatar */}
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -239,7 +241,7 @@ export default function ProfileTab({
             onClick={() => fileRef.current?.click()}
             disabled={uploadingAvatar}
             className="group relative h-20 w-20 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden hover:border-[var(--border-focus)] transition-colors disabled:opacity-60"
-            title="Change photo"
+            title={t("prof.photo.change")}
           >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -265,57 +267,57 @@ export default function ProfileTab({
             />
           </button>
           <div>
-            <p className="text-[13px] text-[var(--text-primary)] font-medium">Profile photo</p>
-            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">PNG, JPG, or WebP. Square works best.</p>
+            <p className="text-[13px] text-[var(--text-primary)] font-medium">{t("prof.photo")}</p>
+            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{t("prof.photo.hint")}</p>
             {avatarUrl && (
               <button type="button" onClick={removePhoto} disabled={uploadingAvatar} className="mt-2 text-[11px] text-red-400 hover:text-red-300">
-                Remove photo
+                {t("prof.photo.remove")}
               </button>
             )}
           </div>
         </div>
 
         <Grid>
-          <Field label="Full name" icon={<UserIcon size={14} />} value={form.full_name} onChange={set("full_name")} placeholder="Your legal / full name" disabled={ro} />
-          <Field label="Preferred name" value={form.display_name} onChange={set("display_name")} placeholder="What people call you" disabled={ro} />
-          <Field label="Name in native script" value={form.name_alt} onChange={set("name_alt")} placeholder="الاسم / 姓名" dir="auto" disabled={ro} />
-          <Field label="Job title" icon={<BriefcaseIcon size={14} />} value={form.job_title} onChange={set("job_title")} placeholder="e.g. Operations Manager" disabled={ro} />
-          <Field label="Pronouns" value={prof.pronouns ?? ""} onChange={(v) => setProf((p) => ({ ...p, pronouns: v }))} placeholder="e.g. he/him" />
-          <Select label="Preferred language" icon={<GlobeIcon size={14} />} value={form.language} onChange={set("language")}
-            options={[{ v: "", l: "Not set" }, { v: "en", l: "English" }, { v: "ar", l: "العربية" }, { v: "zh", l: "中文" }]} disabled={ro} />
+          <Field label={t("prof.fullName")} icon={<UserIcon size={14} />} value={form.full_name} onChange={set("full_name")} placeholder={t("prof.fullName.ph")} disabled={ro} />
+          <Field label={t("prof.preferredName")} value={form.display_name} onChange={set("display_name")} placeholder={t("prof.preferredName.ph")} disabled={ro} />
+          <Field label={t("prof.nativeName")} value={form.name_alt} onChange={set("name_alt")} placeholder="الاسم / 姓名" dir="auto" disabled={ro} />
+          <Field label={t("prof.jobTitle")} icon={<BriefcaseIcon size={14} />} value={form.job_title} onChange={set("job_title")} placeholder={t("prof.jobTitle.ph")} disabled={ro} />
+          <Field label={t("prof.pronouns")} value={prof.pronouns ?? ""} onChange={(v) => setProf((p) => ({ ...p, pronouns: v }))} placeholder={t("prof.pronouns.ph")} />
+          <Select label={t("prof.language")} icon={<GlobeIcon size={14} />} value={form.language} onChange={set("language")}
+            options={[{ v: "", l: t("prof.language.notSet") }, { v: "en", l: "English" }, { v: "ar", l: "العربية" }, { v: "zh", l: "中文" }]} disabled={ro} />
         </Grid>
 
         <div className="mt-4">
-          <TextArea label="About" value={form.notes} onChange={set("notes")} placeholder="A short line about your role or focus — shown on your profile card." disabled={ro} />
+          <TextArea label={t("prof.about")} value={form.notes} onChange={set("notes")} placeholder={t("prof.about.ph")} disabled={ro} />
         </div>
-      </Card>
+      </SettingsCard>
 
       {/* ── Contact & address ── */}
-      <Card title="Contact & address">
+      <SettingsCard title={t("prof.contact")}>
         <Grid>
-          <Field label="Personal phone" icon={<PhoneIcon size={14} />} value={form.phone} onChange={set("phone")} type="tel" placeholder="+1 234 567 890" disabled={ro} />
-          <Field label="Mobile" icon={<PhoneIcon size={14} />} value={form.mobile} onChange={set("mobile")} type="tel" placeholder="Cell number" disabled={ro} />
+          <Field label={t("prof.phone")} icon={<PhoneIcon size={14} />} value={form.phone} onChange={set("phone")} type="tel" placeholder="+1 234 567 890" disabled={ro} />
+          <Field label={t("prof.mobile")} icon={<PhoneIcon size={14} />} value={form.mobile} onChange={set("mobile")} type="tel" placeholder={t("prof.mobile.ph")} disabled={ro} />
         </Grid>
         <div className="mt-4">
-          <Field label="Personal email" icon={<EnvelopeIcon size={14} />} value={form.email} onChange={set("email")} type="email" placeholder="your-personal@example.com" disabled={ro} />
+          <Field label={t("prof.email")} icon={<EnvelopeIcon size={14} />} value={form.email} onChange={set("email")} type="email" placeholder="your-personal@example.com" disabled={ro} />
         </div>
 
         {/* Links */}
-        <p className="mt-6 mb-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1.5"><LinkIcon size={13} /> Links</p>
+        <p className="mt-6 mb-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1.5"><LinkIcon size={13} /> {t("prof.links")}</p>
         <Grid>
           <Field label="LinkedIn" value={prof.links?.linkedin ?? ""} onChange={setLink("linkedin")} placeholder="linkedin.com/in/…" />
-          <Field label="Website" value={prof.links?.website ?? ""} onChange={setLink("website")} placeholder="https://…" />
-          <Field label="WeChat ID" icon={<MessageSquareIcon size={14} />} value={prof.links?.wechat ?? ""} onChange={setLink("wechat")} placeholder="wechat-id" />
+          <Field label={t("prof.website")} value={prof.links?.website ?? ""} onChange={setLink("website")} placeholder="https://…" />
+          <Field label={t("prof.wechat")} icon={<MessageSquareIcon size={14} />} value={prof.links?.wechat ?? ""} onChange={setLink("wechat")} placeholder="wechat-id" />
           <Field label="WhatsApp" icon={<MessageSquareIcon size={14} />} value={prof.links?.whatsapp ?? ""} onChange={setLink("whatsapp")} placeholder="+1 234 567 890" />
         </Grid>
 
         {/* Address */}
-        <p className="mt-6 mb-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1.5"><MapPinIcon size={13} /> Address</p>
+        <p className="mt-6 mb-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1.5"><MapPinIcon size={13} /> {t("prof.address")}</p>
         {!ro && (
           <AddressAutocomplete
-            label="Search address"
-            placeholder="Start typing an address…"
-            hint="Picks fill country / province / city below."
+            label={t("prof.searchAddress")}
+            placeholder={t("prof.searchAddress.ph")}
+            hint={t("prof.searchAddress.hint")}
             onSelect={(g) => setForm((f) => ({
               ...f,
               address_line1: g.formatted || f.address_line1,
@@ -326,38 +328,36 @@ export default function ProfileTab({
           />
         )}
         <div className="mt-3 space-y-4">
-          <Field label="Address line 1" value={form.address_line1} onChange={set("address_line1")} placeholder="Street address" disabled={ro} />
-          <Field label="Address line 2" value={form.address_line2} onChange={set("address_line2")} placeholder="Apt, suite, unit (optional)" disabled={ro} />
+          <Field label={t("prof.addr1")} value={form.address_line1} onChange={set("address_line1")} placeholder={t("prof.addr1.ph")} disabled={ro} />
+          <Field label={t("prof.addr2")} value={form.address_line2} onChange={set("address_line2")} placeholder={t("prof.addr2.ph")} disabled={ro} />
           <Grid>
-            <Field label="City" value={form.city} onChange={set("city")} disabled={ro} />
-            <Field label="State / province" value={form.state} onChange={set("state")} disabled={ro} />
-            <Field label="Country" value={form.country} onChange={set("country")} disabled={ro} />
-            <Field label="Postal code" value={form.postal_code} onChange={set("postal_code")} disabled={ro} />
+            <Field label={t("prof.city")} value={form.city} onChange={set("city")} disabled={ro} />
+            <Field label={t("prof.state")} value={form.state} onChange={set("state")} disabled={ro} />
+            <Field label={t("prof.country")} value={form.country} onChange={set("country")} disabled={ro} />
+            <Field label={t("prof.postal")} value={form.postal_code} onChange={set("postal_code")} disabled={ro} />
           </Grid>
         </div>
 
         <p className="mt-5 text-[11px] text-[var(--text-faint)]">
-          {ro
-            ? "Name, contact, and address are maintained by HR. Username, login email, password, role, and HR data are managed by your administrator."
-            : "Username, login email, password, role, and HR data are managed by your administrator."}
+          {ro ? t("prof.adminNote.ro") : t("prof.adminNote")}
         </p>
-      </Card>
+      </SettingsCard>
 
       {/* ── Work identity (read-only) ── */}
-      <Card title="Work identity" subtitle="Managed by your administrator — shown here for reference.">
+      <SettingsCard title={t("prof.work")} subtitle={t("prof.work.sub")}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
-          <ReadRow icon={<ShieldIcon className="h-3.5 w-3.5" />} label="Role" value={roleLine} badge={account.is_super_admin ? "Super Admin" : undefined} />
-          <ReadRow icon={<AtSignIcon size={14} />} label="Username" value={account.username ? `@${account.username}` : null} />
-          <ReadRow icon={<BriefcaseIcon size={14} />} label="Department" value={account.employee?.department} />
-          <ReadRow icon={<BriefcaseIcon size={14} />} label="Position" value={account.employee?.position} />
-          <ReadRow icon={<IdCardIcon size={14} />} label="Employee no." value={account.employee?.employee_number} />
-          <ReadRow icon={<CalendarIcon size={14} />} label="Hire date" value={fmtDate(account.employee?.hire_date)} />
-          <ReadRow icon={<EnvelopeIcon size={14} />} label="Work email" value={account.employee?.work_email || account.login_email} />
-          <ReadRow icon={<PhoneIcon size={14} />} label="Work phone" value={account.employee?.work_phone} />
-          <ReadRow icon={<CalendarIcon size={14} />} label="Account created" value={fmtDate(account.created_at)} />
-          <ReadRow icon={<CalendarIcon size={14} />} label="Last sign-in" value={fmtDateTime(account.last_login_at)} />
+          <ReadRow icon={<ShieldIcon className="h-3.5 w-3.5" />} label={t("prof.role")} value={roleLine} badge={account.is_super_admin ? t("prof.superAdmin") : undefined} />
+          <ReadRow icon={<AtSignIcon size={14} />} label={t("prof.username")} value={account.username ? `@${account.username}` : null} />
+          <ReadRow icon={<BriefcaseIcon size={14} />} label={t("prof.department")} value={account.employee?.department} />
+          <ReadRow icon={<BriefcaseIcon size={14} />} label={t("prof.position")} value={account.employee?.position} />
+          <ReadRow icon={<IdCardIcon size={14} />} label={t("prof.empNo")} value={account.employee?.employee_number} />
+          <ReadRow icon={<CalendarIcon size={14} />} label={t("prof.hireDate")} value={fmtDate(account.employee?.hire_date)} />
+          <ReadRow icon={<EnvelopeIcon size={14} />} label={t("prof.workEmail")} value={account.employee?.work_email || account.login_email} />
+          <ReadRow icon={<PhoneIcon size={14} />} label={t("prof.workPhone")} value={account.employee?.work_phone} />
+          <ReadRow icon={<CalendarIcon size={14} />} label={t("prof.created")} value={fmtDate(account.created_at)} />
+          <ReadRow icon={<CalendarIcon size={14} />} label={t("prof.lastSignIn")} value={fmtDateTime(account.last_login_at)} />
         </div>
-      </Card>
+      </SettingsCard>
 
       {/* Status + save */}
       <div className="sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
@@ -371,7 +371,7 @@ export default function ProfileTab({
             className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
             {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <CheckIcon size={14} />}
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("prof.saving") : t("prof.save")}
           </button>
         </div>
       </div>
@@ -380,17 +380,6 @@ export default function ProfileTab({
 }
 
 /* ─────────────── building blocks ─────────────── */
-
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-      <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{title}</h2>
-      {subtitle && <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-4">{subtitle}</p>}
-      {!subtitle && <div className="mb-4" />}
-      {children}
-    </section>
-  );
-}
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
@@ -473,7 +462,7 @@ function ReadRow({ icon, label, value, badge }: {
       <span className="inline-flex items-center gap-2 text-[12px] text-[var(--text-dim)] shrink-0">
         <span className="text-[var(--text-faint)]">{icon}</span>{label}
       </span>
-      <span className="min-w-0 text-right text-[13px] text-[var(--text-primary)] truncate flex items-center gap-2 justify-end">
+      <span className="min-w-0 text-end text-[13px] text-[var(--text-primary)] truncate flex items-center gap-2 justify-end">
         {value && <span className="truncate">{value}</span>}
         {badge && (
           <span className="shrink-0 rounded-full bg-[var(--accent-blue,#0066FF)]/15 text-[var(--accent-blue,#0066FF)] px-2 py-0.5 text-[10px] font-semibold">

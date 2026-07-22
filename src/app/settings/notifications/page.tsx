@@ -24,6 +24,8 @@ import {
   subscribeToPush,
   unsubscribeCurrent,
 } from "@/lib/push-client";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 interface Device {
   id: string;
@@ -50,6 +52,7 @@ function fmt(ts: string | null): string {
 }
 
 export default function NotificationsSettingsPage() {
+  const { t } = useTranslation(settingsT);
   const { data: boot, loading: bootLoading } = useMeBootstrap();
   const isSA = !!boot?.isSuperAdmin;
 
@@ -89,10 +92,10 @@ export default function NotificationsSettingsPage() {
     const r = await subscribeToPush();
     setPerm(permissionState());
     if (r.ok) {
-      setMsg({ kind: "ok", text: "This device is now registered for notifications." });
+      setMsg({ kind: "ok", text: t("push.registered") });
       await loadDevices();
     } else {
-      setMsg({ kind: "err", text: r.error || "Couldn’t enable notifications." });
+      setMsg({ kind: "err", text: r.error || t("push.enableFailed") });
     }
     setBusy(false);
   };
@@ -104,8 +107,8 @@ export default function NotificationsSettingsPage() {
     const j = (await res.json().catch(() => ({}))) as { ok?: boolean; sent?: number; error?: string };
     setMsg(
       j.ok
-        ? { kind: "ok", text: `Test sent to ${j.sent} device(s). Check your lock screen.` }
-        : { kind: "err", text: j.error || "No active devices — enable notifications first." },
+        ? { kind: "ok", text: t("push.testSent").replace("{n}", String(j.sent ?? 0)) }
+        : { kind: "err", text: j.error || t("push.noDevices") },
     );
     await loadHistory();
     setBusy(false);
@@ -133,8 +136,8 @@ export default function NotificationsSettingsPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 p-10 text-center">
         <LockIcon className="h-10 w-10 text-[var(--text-ghost)]" />
-        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">Super Admin only</h2>
-        <p className="text-[13px] text-[var(--text-dim)] max-w-sm">Mobile push notifications are restricted to Super Administrators.</p>
+        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{t("push.saOnly")}</h2>
+        <p className="text-[13px] text-[var(--text-dim)] max-w-sm">{t("push.saOnly.sub")}</p>
       </div>
     );
   }
@@ -148,8 +151,8 @@ export default function NotificationsSettingsPage() {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <PageHeader
-        title="Notifications"
-        subtitle="Mobile push on your iPhone, iPad, and desktop"
+        title={t("push.title")}
+        subtitle={t("push.subtitle")}
         icon={<BellIcon className="h-5 w-5" />}
         backHref="/settings"
       />
@@ -158,10 +161,7 @@ export default function NotificationsSettingsPage() {
         {/* iOS install hint */}
         {needsInstall && (
           <div className="rounded-2xl border border-[#FFCC00]/30 bg-[#FFCC00]/[0.06] p-4 text-[12.5px] text-[var(--text-secondary)]">
-            <strong className="text-[var(--text-primary)]">iPhone / iPad:</strong> add Koleex Hub to your
-            Home Screen first — tap the <strong>Share</strong> icon in Safari → <strong>Add to Home Screen</strong>,
-            then open the app from that icon and return here to enable notifications. (iOS only delivers push to
-            installed apps.)
+            <strong className="text-[var(--text-primary)]">{t("push.iosLabel")}</strong> {t("push.iosHint")}
           </div>
         )}
 
@@ -169,13 +169,13 @@ export default function NotificationsSettingsPage() {
         <div className={card}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Push on this device</h3>
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("push.device")}</h3>
               <p className="text-[12px] text-[var(--text-dim)] mt-0.5">
-                Permission:{" "}
+                {t("push.permission")}{" "}
                 <span className="font-medium text-[var(--text-secondary)]">
-                  {perm === "granted" ? "Granted" : perm === "denied" ? "Blocked" : perm === "unsupported" ? "Unsupported" : "Not set"}
+                  {perm === "granted" ? t("push.granted") : perm === "denied" ? t("push.blocked") : perm === "unsupported" ? t("push.unsupported") : t("push.notSet")}
                 </span>
-                {!supported && perm !== "granted" ? " · not available on this device" : ""}
+                {!supported && perm !== "granted" ? ` · ${t("push.notAvailable")}` : ""}
               </p>
             </div>
             {perm === "granted" ? (
@@ -188,13 +188,13 @@ export default function NotificationsSettingsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={enable} disabled={busy || (!supported && perm !== "granted")} className={btnPrimary}>
               {busy ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <BellIcon className="h-4 w-4" />}
-              Enable Mobile Notifications
+              {t("push.enableBtn")}
             </button>
             <button onClick={sendTest} disabled={busy} className={btnGhost}>
-              Send Test Notification
+              {t("push.testBtn")}
             </button>
             <button onClick={() => setPrefsOpen(true)} className={btnGhost}>
-              <LockIcon className="h-4 w-4" /> Alert preferences
+              <LockIcon className="h-4 w-4" /> {t("push.prefsBtn")}
             </button>
           </div>
 
@@ -209,17 +209,16 @@ export default function NotificationsSettingsPage() {
 
           {perm === "denied" && (
             <p className="mt-2 text-[11.5px] text-[var(--text-dim)]">
-              Notifications are blocked in your device settings. Enable them for Koleex Hub in iOS Settings →
-              Notifications (or the site settings) and try again.
+              {t("push.deniedHint")}
             </p>
           )}
         </div>
 
         {/* Devices */}
         <div className={card}>
-          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">Your devices</h3>
+          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">{t("push.yourDevices")}</h3>
           {devices.length === 0 ? (
-            <p className="text-[12.5px] text-[var(--text-ghost)]">No devices registered yet. Tap “Enable Mobile Notifications” above.</p>
+            <p className="text-[12.5px] text-[var(--text-ghost)]">{t("push.noneRegistered")}</p>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {devices.map((d) => (
@@ -229,12 +228,12 @@ export default function NotificationsSettingsPage() {
                     <div className="text-[13px] text-[var(--text-primary)] truncate">
                       {d.device_name || `${d.browser ?? "?"} on ${d.os ?? "?"}`}
                     </div>
-                    <div className="text-[11px] text-[var(--text-ghost)]">Added {fmt(d.created_at)} · last used {fmt(d.last_used_at)}</div>
+                    <div className="text-[11px] text-[var(--text-ghost)]">{t("push.added").replace("{a}", fmt(d.created_at)).replace("{b}", fmt(d.last_used_at))}</div>
                   </div>
                   <button
                     onClick={() => removeDevice(d.id)}
                     className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[#FF3333]/10 hover:text-[#FF6B6B]"
-                    aria-label="Remove device"
+                    aria-label={t("push.removeDevice")}
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
@@ -246,9 +245,9 @@ export default function NotificationsSettingsPage() {
 
         {/* History */}
         <div className={card}>
-          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">Recent notifications</h3>
+          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">{t("push.recent")}</h3>
           {history.length === 0 ? (
-            <p className="text-[12.5px] text-[var(--text-ghost)]">Nothing sent yet.</p>
+            <p className="text-[12.5px] text-[var(--text-ghost)]">{t("push.nothingSent")}</p>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {history.map((h) => (

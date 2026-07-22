@@ -39,6 +39,8 @@ import { SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
 import VlIcon from "@/components/ui/VlIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 const TONE_LABELS: Record<"classic" | SynthTone, string> = {
   classic: "Classic",
@@ -52,9 +54,9 @@ const TONE_LABELS: Record<"classic" | SynthTone, string> = {
 
 /** Display name for ANY tone — built-in, library, or silent. One helper so
  *  the summary rows and the picker can never disagree about a name. */
-function toneLabel(tone: SoundTone | undefined): string {
-  if (tone === undefined) return "Default";
-  if (tone === "none") return "Silent";
+function toneLabel(tone: SoundTone | undefined, t: (k: string) => string): string {
+  if (tone === undefined) return t("sounds.default");
+  if (tone === "none") return t("sounds.silent");
   return (
     LIBRARY_LABELS[tone as LibraryTone] ??
     TONE_LABELS[tone as "classic" | SynthTone] ??
@@ -62,22 +64,21 @@ function toneLabel(tone: SoundTone | undefined): string {
   );
 }
 
-const CATEGORY_LABELS: Record<SoundCategory, string> = {
-  notification: "Notifications",
-  message: "Messages",
+/* Category + activity names come from the shared settings dictionary so the
+   Sounds screen and Notification preferences always use identical wording. */
+const CATEGORY_KEYS: Record<SoundCategory, string> = {
+  notification: "sounds.cat.notification",
+  message: "sounds.cat.message",
 };
-
-/* Same labels as Settings → Notification preferences "By activity", so the
-   two screens read as one system. */
-const ACTIVITY_LABELS: Record<SoundActivity, string> = {
-  mentions: "Mentions and replies",
-  approvals: "Approvals",
-  assignments: "Assignments",
-  tasks_due: "Task reminders",
-  quotation_activity: "Quotation activity",
-  low_stock: "Low stock",
-  qa_reports: "QA reports",
-  price_fx: "Price and FX changes",
+const ACTIVITY_KEYS: Record<SoundActivity, string> = {
+  mentions: "act.mentions",
+  approvals: "act.approvals",
+  assignments: "act.assignments",
+  tasks_due: "act.tasksDue",
+  quotation_activity: "act.quotation",
+  low_stock: "act.lowStock",
+  qa_reports: "act.qa",
+  price_fx: "act.priceFx",
 };
 
 /** What the picker screen is currently editing. */
@@ -86,6 +87,7 @@ type PickerTarget =
   | { kind: "activity"; activity: SoundActivity };
 
 export default function SoundsTab() {
+  const { t } = useTranslation(settingsT);
   const [prefs, setPrefs] = useState<SoundPrefs>(getSoundPrefs);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   useEffect(() => subscribeSoundPrefs(setPrefs), []);
@@ -102,18 +104,18 @@ export default function SoundsTab() {
     <div className="space-y-4">
       <SettingsCard
         flush
-        title="Sound"
-        subtitle="One switch for everything, plus volume. Changes apply instantly on this device."
+        title={t("sounds.title")}
+        subtitle={t("sounds.sub")}
       >
         <SwitchRow
-          label="All sounds"
-          hint="Master switch — off silences every sound in the Hub."
+          label={t("sounds.all")}
+          hint={t("sounds.all.hint")}
           checked={prefs.master}
           onChange={(on) => setSoundPrefs({ master: on })}
         />
         <SwitchRow
-          label="Do not disturb"
-          hint="Temporarily silence everything without touching your other settings."
+          label={t("sounds.dnd")}
+          hint={t("sounds.dnd.hint")}
           checked={prefs.dnd}
           onChange={(on) => setSoundPrefs({ dnd: on })}
         />
@@ -122,7 +124,7 @@ export default function SoundsTab() {
         <div className="flex items-center gap-3 py-3">
           <Volume2Icon className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium text-[var(--text-primary)]">Volume</div>
+            <div className="text-[13px] font-medium text-[var(--text-primary)]">{t("sounds.volume")}</div>
             <input
               type="range"
               min={0}
@@ -146,29 +148,29 @@ export default function SoundsTab() {
           tone row. Mirrors iOS's "Alerts and System Sounds" block. */}
       <SettingsCard
         flush
-        title="Alerts and sounds"
-        subtitle={muted ? "Currently silenced by the master switch / Do Not Disturb." : "Pick a different sound for each kind of alert."}
+        title={t("sounds.alerts")}
+        subtitle={muted ? t("sounds.alerts.muted") : t("sounds.alerts.sub")}
       >
         <SwitchRow
-          label="Notification sounds"
-          hint="Task assignments, approvals, reminders — the bell."
+          label={t("sounds.notifSounds")}
+          hint={t("sounds.notifSounds.hint")}
           checked={prefs.notification.enabled}
           onChange={(on) => setSoundPrefs({ notification: { enabled: on } })}
         />
         <NavRow
-          label="Notification tone"
-          value={toneLabel(prefs.notification.tone)}
+          label={t("sounds.notifTone")}
+          value={toneLabel(prefs.notification.tone, t)}
           onClick={() => setPicker({ kind: "category", category: "notification" })}
         />
         <SwitchRow
-          label="Message sounds"
-          hint="Discuss chat messages. Muted conversations stay silent regardless."
+          label={t("sounds.msgSounds")}
+          hint={t("sounds.msgSounds.hint")}
           checked={prefs.message.enabled}
           onChange={(on) => setSoundPrefs({ message: { enabled: on } })}
         />
         <NavRow
-          label="Message tone"
-          value={toneLabel(prefs.message.tone)}
+          label={t("sounds.msgTone")}
+          value={toneLabel(prefs.message.tone, t)}
           onClick={() => setPicker({ kind: "category", category: "message" })}
           last
         />
@@ -180,16 +182,16 @@ export default function SoundsTab() {
           reminder. "Default" inherits the notification tone above. */}
       <SettingsCard
         flush
-        title="By activity"
-        subtitle="Give any activity its own sound. Default uses the notification tone."
+        title={t("sounds.byActivity")}
+        subtitle={t("sounds.byActivity.sub")}
       >
         {SOUND_ACTIVITIES.map((act, i) => {
           const override = prefs.notification.activityTones?.[act];
           return (
             <NavRow
               key={act}
-              label={ACTIVITY_LABELS[act]}
-              value={toneLabel(override)}
+              label={t(ACTIVITY_KEYS[act])}
+              value={toneLabel(override, t)}
               onClick={() => setPicker({ kind: "activity", activity: act })}
               last={i === SOUND_ACTIVITIES.length - 1}
             />
@@ -198,10 +200,7 @@ export default function SoundsTab() {
       </SettingsCard>
 
       <p className="px-1 text-[11.5px] text-[var(--text-dim)]">
-        Koleex tones are real recordings, loudness-matched so none is louder
-        than another; only the tone you pick is downloaded. Basic tones are
-        generated on this device and always work offline. Sound settings are
-        per-device, like a phone&apos;s ringtone.
+        {t("sounds.footer")}
       </p>
     </div>
   );
@@ -252,10 +251,11 @@ function TonePicker({
   prefs: SoundPrefs;
   onBack: () => void;
 }) {
+  const { t } = useTranslation(settingsT);
   const isActivity = target.kind === "activity";
   const title = isActivity
-    ? ACTIVITY_LABELS[target.activity]
-    : `${CATEGORY_LABELS[target.category]} tone`;
+    ? t(ACTIVITY_KEYS[target.activity])
+    : t("sounds.tonePicker").replace("{name}", t(CATEGORY_KEYS[target.category]));
 
   /* Current selection. For an activity, `undefined` means "inherit the
      notification tone" and is shown as its own row rather than as a tone. */
@@ -283,7 +283,7 @@ function TonePicker({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back to Sounds"
+          aria-label={t("sounds.back")}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
         >
           <VlIcon slug="angle-small-down" size={16} className="rotate-90" />
@@ -298,15 +298,15 @@ function TonePicker({
       <SettingsCard flush>
         {isActivity && (
           <ToneRow
-            label="Default"
-            hint={`Same as the notification tone (${toneLabel(prefs.notification.tone)})`}
+            label={t("sounds.default")}
+            hint={t("sounds.default.hint").replace("{name}", toneLabel(prefs.notification.tone, t))}
             selected={current === undefined}
             onClick={() => choose(undefined)}
           />
         )}
         <ToneRow
-          label="Silent"
-          hint={isActivity ? "No sound for this activity." : "No sound for this channel."}
+          label={t("sounds.silent")}
+          hint={isActivity ? t("sounds.silent.activity") : t("sounds.silent.channel")}
           selected={current === "none"}
           onClick={() => choose("none")}
           last
@@ -315,7 +315,7 @@ function TonePicker({
 
       {/* Group 2 — the real recordings. First, because these are the ones
           people actually want; the synthesized set is the fallback. */}
-      <SettingsCard flush title="Koleex tones" subtitle="Tap a tone to hear it and select it.">
+      <SettingsCard flush title={t("sounds.koleexTones")} subtitle={t("sounds.koleexTones.sub")}>
         {SOUND_LIBRARY.map((tone, i) => (
           <ToneRow
             key={tone}
@@ -329,7 +329,7 @@ function TonePicker({
 
       {/* Group 3 — the built-ins. Kept because they need no network at all,
           which matters on a bad connection or offline. */}
-      <SettingsCard flush title="Basic tones" subtitle="Generated on this device — no download, works offline.">
+      <SettingsCard flush title={t("sounds.basicTones")} subtitle={t("sounds.basicTones.sub")}>
         {SOUND_TONES.map((tone, i) => (
           <ToneRow
             key={tone}

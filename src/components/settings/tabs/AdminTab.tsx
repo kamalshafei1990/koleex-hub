@@ -8,6 +8,8 @@ import type { AccountWithLinks } from "@/types/supabase";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 function LinkRow({ href, icon, label, hint, last }: {
   href: string; icon: React.ReactNode; label: string; hint: string; last?: boolean;
@@ -30,32 +32,33 @@ function LinkRow({ href, icon, label, hint, last }: {
 }
 
 export default function AdminTab(_props: { account: AccountWithLinks }) {
+  const { t } = useTranslation(settingsT);
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         <LinkRow
           href="/super-admin/activity"
           icon={<ActivityIcon className="h-4 w-4" />}
-          label="Activity monitor"
-          hint="Who did what, and when, across the hub."
+          label={t("admin.activity")}
+          hint={t("admin.activity.hint")}
         />
         <LinkRow
           href="/roles"
           icon={<ShieldIcon className="h-4 w-4" />}
-          label="Roles and permissions"
-          hint="Module access, data scope, sensitive fields."
+          label={t("admin.roles")}
+          hint={t("admin.roles.hint")}
         />
         <LinkRow
           href="/accounts"
           icon={<UsersIcon className="h-4 w-4" />}
-          label="Accounts"
-          hint="Create and manage user logins."
+          label={t("admin.accounts")}
+          hint={t("admin.accounts.hint")}
           last
         />
       </div>
 
       <p className="text-[11px] text-[var(--text-faint)] px-1">
-        View-as and workspace switching live in the top bar. These controls are only visible to Super Admins.
+        {t("admin.footer")}
       </p>
     </div>
   );

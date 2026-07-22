@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 /* Human-facing app version. Bump on notable releases. */
 const APP_VERSION = "2026.7";
@@ -20,6 +22,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 export default function AboutTab({ account }: { account: AccountWithLinks; onChanged?: () => void }) {
   const [device, setDevice] = useState({ browser: "—", installed: false });
+  const { t } = useTranslation(settingsT);
 
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -40,30 +43,29 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
           <div className="h-11 w-11 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center text-[15px] font-bold tracking-tight">KX</div>
           <div>
             <p className="text-[15px] font-bold text-[var(--text-primary)]">Koleex Hub</p>
-            <p className="text-[12px] text-[var(--text-dim)]">Shaping the Future</p>
+            <p className="text-[12px] text-[var(--text-dim)]">{t("about.slogan")}</p>
           </div>
         </div>
         <div className="space-y-1">
-          <Row label="Version" value={APP_VERSION} />
-          <Row label="Desktop app" value={`v${DESKTOP_VERSION} (macOS)`} />
-          <Row label="This device" value={`${device.browser}${device.installed ? " · installed app" : ""}`} last />
+          <Row label={t("about.version")} value={APP_VERSION} />
+          <Row label={t("about.desktop")} value={`v${DESKTOP_VERSION} (macOS)`} />
+          <Row label={t("about.device")} value={`${device.browser}${device.installed ? ` · ${t("about.installed")}` : ""}`} last />
         </div>
       </section>
 
       <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-        <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-3">Workspace</h2>
+        <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-3">{t("about.workspace")}</h2>
         <div className="space-y-1">
-          <Row label="Signed in as" value={`@${account.username}`} />
-          <Row label="Account type" value={account.user_type} />
-          <Row label="Role" value={account.role?.name || "—"} last />
+          <Row label={t("about.signedIn")} value={`@${account.username}`} />
+          <Row label={t("about.accountType")} value={account.user_type ? account.user_type.charAt(0).toUpperCase() + account.user_type.slice(1) : "—"} />
+          <Row label={t("about.role")} value={account.role?.name || "—"} last />
         </div>
       </section>
 
       <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-        <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Support</h2>
+        <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("about.support")}</h2>
         <p className="text-[12px] text-[var(--text-dim)]">
-          Found a problem? Use the floating <span className="font-medium text-[var(--text-secondary)]">Report</span> button
-          at the bottom-right of any page — it captures the screen and page for the team.
+          {t("about.support.pre")} <span className="font-medium text-[var(--text-secondary)]">{t("about.support.report")}</span> {t("about.support.post")}
         </p>
       </section>
     </div>

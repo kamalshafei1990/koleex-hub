@@ -8,12 +8,15 @@ import { useEffect, useRef, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 
 type Kind = "stamp" | "signature";
 interface Assets { stampUrl: string | null; signatureUrl: string | null }
 
 export default function StampSignatureTab(_props: { account: AccountWithLinks }) {
   const [assets, setAssets] = useState<Assets>({ stampUrl: null, signatureUrl: null });
+  const { t } = useTranslation(settingsT);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<Kind | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -34,8 +37,8 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
   }, [msg]);
 
   async function upload(kind: Kind, file: File) {
-    if (!file.type.startsWith("image/")) { setMsg({ kind: "err", text: "Please choose an image." }); return; }
-    if (file.size > 4 * 1024 * 1024) { setMsg({ kind: "err", text: "Image too large — max 4 MB." }); return; }
+    if (!file.type.startsWith("image/")) { setMsg({ kind: "err", text: t("assets.notImage") }); return; }
+    if (file.size > 4 * 1024 * 1024) { setMsg({ kind: "err", text: t("assets.tooLarge") }); return; }
     setBusy(kind); setMsg(null);
     try {
       const fd = new FormData();
@@ -44,10 +47,10 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
       const res = await fetch("/api/quotations/saved-assets", { method: "POST", credentials: "include", body: fd });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
-        setMsg({ kind: "err", text: j.error || `Upload failed (${res.status})` });
+        setMsg({ kind: "err", text: j.error || t("assets.uploadFailed").replace("{code}", String(res.status)) });
         return;
       }
-      setMsg({ kind: "ok", text: `${kind === "stamp" ? "Stamp" : "Signature"} updated` });
+      setMsg({ kind: "ok", text: kind === "stamp" ? t("assets.stampUpdated") : t("assets.sigUpdated") });
       await load();
     } finally { setBusy(null); }
   }
@@ -61,8 +64,8 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind }),
       });
-      if (!res.ok) { setMsg({ kind: "err", text: `Couldn't remove (${res.status})` }); return; }
-      setMsg({ kind: "ok", text: "Removed" });
+      if (!res.ok) { setMsg({ kind: "err", text: t("assets.removeFailed").replace("{code}", String(res.status)) }); return; }
+      setMsg({ kind: "ok", text: t("assets.removed") });
       await load();
     } finally { setBusy(null); }
   }
@@ -70,7 +73,7 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-6">
-        <SpinnerIcon className="h-4 w-4 animate-spin" /> Loading…
+        <SpinnerIcon className="h-4 w-4 animate-spin" /> {t("assets.loading")}
       </div>
     );
   }
@@ -78,13 +81,13 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
   return (
     <div className="space-y-4">
       <p className="text-[12px] text-[var(--text-dim)] px-1">
-        Applied tenant-wide to quotations, invoices, and packing lists.
+        {t("assets.intro")}
       </p>
-      <Slot kind="stamp" label="Company stamp" hint="Square works best (China-standard seal)." square url={assets.stampUrl} busy={busy === "stamp"} onUpload={upload} onRemove={remove} />
-      <Slot kind="signature" label="Authorized signature" hint="Transparent PNG on white looks cleanest." url={assets.signatureUrl} busy={busy === "signature"} onUpload={upload} onRemove={remove} />
+      <Slot kind="stamp" label={t("assets.stamp")} hint={t("assets.stamp.hint")} square url={assets.stampUrl} busy={busy === "stamp"} onUpload={upload} onRemove={remove} />
+      <Slot kind="signature" label={t("assets.signature")} hint={t("assets.signature.hint")} url={assets.signatureUrl} busy={busy === "signature"} onUpload={upload} onRemove={remove} />
 
       {msg && (
-        <p className={`text-[12px] px-1 ${msg.kind === "ok" ? "text-[#00CC66]" : "text-[#FF6B6B]"}`}>{msg.text}</p>
+        <p className={`text-[12px] px-1 ${msg.kind === "ok" ? "text-[#00CC66]" : "text-[#FF3333]"}`}>{msg.text}</p>
       )}
     </div>
   );
@@ -94,6 +97,7 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
   kind: Kind; label: string; hint: string; url: string | null; square?: boolean;
   busy: boolean; onUpload: (k: Kind, f: File) => void; onRemove: (k: Kind) => void;
 }) {
+  const { t } = useTranslation(settingsT);
   const fileRef = useRef<HTMLInputElement>(null);
   return (
     <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
@@ -113,7 +117,7 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={label} className="max-h-full max-w-full object-contain" />
           ) : (
-            <span className="text-[11px] text-[#9CA3AF]">None set</span>
+            <span className="text-[11px] text-[#9CA3AF]">{t("assets.none")}</span>
           )}
         </div>
         <div className="flex flex-col gap-2">
@@ -123,16 +127,16 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
             disabled={busy}
             className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50"
           >
-            {url ? "Replace" : "Upload"}
+            {url ? t("assets.replace") : t("assets.upload")}
           </button>
           {url && (
             <button
               type="button"
               onClick={() => onRemove(kind)}
               disabled={busy}
-              className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[#FF6B6B] hover:border-[#FF6B6B]/40 disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[#FF3333] hover:border-[#FF3333]/40 disabled:opacity-50 inline-flex items-center gap-1.5"
             >
-              <TrashIcon className="h-3.5 w-3.5" /> Remove
+              <TrashIcon className="h-3.5 w-3.5" /> {t("assets.remove")}
             </button>
           )}
           <input

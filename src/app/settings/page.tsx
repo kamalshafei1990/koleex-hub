@@ -56,6 +56,8 @@ import LockIcon from "@/components/icons/ui/LockIcon";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { useTranslation } from "@/lib/i18n";
+import { settingsT } from "@/lib/translations/settings";
 import type { AccountWithLinks } from "@/types/supabase";
 
 type Tab = "profile" | "preferences" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
@@ -105,6 +107,7 @@ function capitalize(s: string) {
    --------------------------------------------------------------------------- */
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
+  const { t } = useTranslation(settingsT);
   const { data: boot } = useMeBootstrap();
   const isSA = !!boot?.isSuperAdmin;
   const [tab, setTab] = useState<Tab>("profile");
@@ -131,70 +134,70 @@ function SettingsContent() {
 
   const sections: SectionDef[] = [
     {
-      id: "profile", label: "Profile", subtitle: "Photo, name, contact",
+      id: "profile", label: t("nav.profile"), subtitle: t("nav.profile.sub"),
       icon: <UserIcon size={15} />,
       node: <ProfileTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "preferences", label: "Preferences", subtitle: "Language, theme, notifications",
+      id: "preferences", label: t("nav.preferences"), subtitle: t("nav.preferences.sub"),
       icon: <Settings2Icon className="h-3.5 w-3.5" />,
       node: <PreferencesTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "calendar", label: "Calendar", subtitle: "Timezone, hours, availability",
+      id: "calendar", label: t("nav.calendar"), subtitle: t("nav.calendar.sub"),
       icon: <CalendarIcon className="h-3.5 w-3.5" />,
       node: <CalendarTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "display", label: "Display & accessibility", subtitle: "Text size, motion, contrast",
+      id: "display", label: t("nav.display"), subtitle: t("nav.display.sub"),
       icon: <PaletteIcon className="h-3.5 w-3.5" />,
       node: <DisplayTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "sounds", label: "Sounds", subtitle: "Tones, volume, do not disturb",
+      id: "sounds", label: t("nav.sounds"), subtitle: t("nav.sounds.sub"),
       icon: <Volume2Icon className="h-3.5 w-3.5" />,
       node: <SoundsTab />,
     },
     {
-      id: "region", label: "Language & region", subtitle: "Date, time, number formats",
+      id: "region", label: t("nav.region"), subtitle: t("nav.region.sub"),
       icon: <GlobeIcon className="h-3.5 w-3.5" />,
       node: <RegionTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "notifications", label: "Notification preferences", subtitle: "Channels and per-activity",
+      id: "notifications", label: t("nav.notifications"), subtitle: t("nav.notifications.sub"),
       icon: <BellIcon className="h-3.5 w-3.5" />,
       node: <NotificationsTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "password", label: "Password", subtitle: "Change your password",
+      id: "password", label: t("nav.password"), subtitle: t("nav.password.sub"),
       icon: <KeyIcon className="h-3.5 w-3.5" />,
       node: <PasswordTab account={account} />,
     },
     {
-      id: "security", label: "Login history", subtitle: "Recent sign-ins",
+      id: "security", label: t("nav.history"), subtitle: t("nav.history.sub"),
       icon: <LockIcon className="h-3.5 w-3.5" />,
       node: <LoginHistoryTab account={account} />,
     },
     {
-      id: "privacy", label: "Privacy & data", subtitle: "Download your data",
+      id: "privacy", label: t("nav.privacy"), subtitle: t("nav.privacy.sub"),
       icon: <ShieldIcon className="h-3.5 w-3.5" />,
       node: <PrivacyTab account={account} />,
     },
     /* Super-admin-only sections. */
     ...(isSA ? [
       {
-        id: "assets" as Tab, label: "Signature & stamp", subtitle: "Company seal for documents",
+        id: "assets" as Tab, label: t("nav.assets"), subtitle: t("nav.assets.sub"),
         icon: <FileBadge2Icon className="h-3.5 w-3.5" />,
         node: <StampSignatureTab account={account} />,
       },
       {
-        id: "admin" as Tab, label: "Admin tools", subtitle: "Activity, roles, accounts",
+        id: "admin" as Tab, label: t("nav.admin"), subtitle: t("nav.admin.sub"),
         icon: <ShieldIcon className="h-3.5 w-3.5" />,
         node: <AdminTab account={account} />,
       },
     ] : []),
     {
-      id: "about", label: "About", subtitle: "Version, device, support",
+      id: "about", label: t("nav.about"), subtitle: t("nav.about.sub"),
       icon: <InfoIcon className="h-3.5 w-3.5" />,
       node: <AboutTab account={account} />,
     },
@@ -216,8 +219,8 @@ function SettingsContent() {
           master list below and the whole page fills the desktop viewport. */}
       <div className="shrink-0 w-full mx-auto max-w-[1600px] px-4 md:px-6 pt-4 sm:pt-5">
         <PageHeader
-          title="Settings"
-          subtitle="Your profile, preferences, and calendar defaults"
+          title={t("title")}
+          subtitle={t("subtitle")}
           icon={<SettingsIcon className="h-5 w-5" />}
           backHref="/"
         />
@@ -233,7 +236,7 @@ function SettingsContent() {
             <button
               type="button"
               onClick={() => openSection("profile")}
-              className="w-full flex items-center gap-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-focus)] transition-colors"
+              className="w-full flex items-center gap-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 text-start hover:border-[var(--border-focus)] transition-colors"
             >
               <span className="h-12 w-12 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
                 {avatarUrl ? (
@@ -251,14 +254,14 @@ function SettingsContent() {
             </button>
 
             {/* Personal */}
-            <MasterGroup label="Personal" items={personalItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            <MasterGroup label={t("group.personal")} items={personalItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
             {/* Display */}
-            <MasterGroup label="Display" items={displayItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            <MasterGroup label={t("group.display")} items={displayItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
             {/* Notifications — preferences (in-pane) + link to the push page. */}
             <div>
-              <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Notifications</p>
+              <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">{t("group.notifications")}</p>
               <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
                 <SettingsRow
                   active={!mobileDetail && tab === "notifications"}
@@ -266,32 +269,37 @@ function SettingsContent() {
                   icon={notificationsItem.icon}
                   label={notificationsItem.label}
                   subtitle={notificationsItem.subtitle}
+                  isLast={!isSA}
                 />
-                <SettingsRow
-                  href="/settings/notifications"
-                  icon={<BellIcon className="h-3.5 w-3.5" />}
-                  label="Push notifications"
-                  subtitle="Devices and alerts"
-                  isLast
-                />
+                {/* The push-management page is Super-Admin-only; showing the
+                    row to everyone sent regular users into a lock screen. */}
+                {isSA && (
+                  <SettingsRow
+                    href="/settings/notifications"
+                    icon={<BellIcon className="h-3.5 w-3.5" />}
+                    label={t("nav.push")}
+                    subtitle={t("nav.push.sub")}
+                    isLast
+                  />
+                )}
               </div>
             </div>
 
             {/* Security */}
-            <MasterGroup label="Security" items={securityItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            <MasterGroup label={t("group.security")} items={securityItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
             {/* Workspace (super-admin) */}
             {workspaceItems.length > 0 && (
-              <MasterGroup label="Workspace" items={workspaceItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+              <MasterGroup label={t("group.workspace")} items={workspaceItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
             )}
 
             {/* Admin (super-admin) */}
             {adminItems.length > 0 && (
-              <MasterGroup label="Admin" items={adminItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+              <MasterGroup label={t("group.admin")} items={adminItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
             )}
 
             {/* About */}
-            <MasterGroup label="About" items={aboutItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            <MasterGroup label={t("group.about")} items={aboutItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
           </aside>
 
           {/* Detail pane */}
@@ -302,7 +310,7 @@ function SettingsContent() {
               onClick={() => setMobileDetail(false)}
               className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
             >
-              <Chevron className="rotate-180" /> All settings
+              <Chevron className="rtl:rotate-0 rotate-180" /> {t("allSettings")}
             </button>
             {/* Fill the detail pane on desktop; cap only so ultra-wide
                 monitors don't stretch forms to unreadable line lengths. */}
@@ -370,7 +378,7 @@ function SettingsRow({
       <Chevron className="text-[var(--text-faint)] shrink-0" />
     </>
   );
-  const cls = `w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+  const cls = `w-full flex items-center gap-3 px-3 py-2.5 text-start transition-colors ${
     active ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]"
   } ${!isLast ? "border-b border-[var(--border-faint)]" : ""}`;
 
