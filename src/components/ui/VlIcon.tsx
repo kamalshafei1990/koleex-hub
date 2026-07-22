@@ -32,7 +32,12 @@ export default function VlIcon({
     <span
       aria-hidden
       title={title}
-      className={`inline-block shrink-0 bg-current ${className ?? ""}`}
+      /* align-middle matters: an empty inline-block otherwise sits ON the
+         text baseline, so next to a label it reads as floating high by a
+         couple of pixels. `middle` centres it against the text instead.
+         Inside a flex row this is inert (flex items ignore vertical-align),
+         so it only ever helps. */
+      className={`inline-block shrink-0 bg-current align-middle ${className ?? ""}`}
       style={vlMaskStyle(slug, size)}
     />
   );

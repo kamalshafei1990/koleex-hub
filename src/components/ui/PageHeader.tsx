@@ -383,8 +383,17 @@ function SlidingPillNav({
             : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]");
         const inner = (
           <>
+            {/* Icon wrapper is inline-flex, not a bare span: the icon inside
+                is an inline-block, so in a plain span it sits on the TEXT
+                BASELINE and the line box reserves descender space below it —
+                which pushed a 14px icon ~2.6px above the label's centre. As a
+                flex container there's no baseline to sit on, so the icon
+                centres against the text properly. */}
             {tab.icon && (
-              <span aria-hidden className={isActive ? "opacity-90" : "opacity-70"}>
+              <span
+                aria-hidden
+                className={`inline-flex items-center leading-none ${isActive ? "opacity-90" : "opacity-70"}`}
+              >
                 {typeof tab.icon === "string" ? (
                   <RrIcon name={tab.icon as RrIconName} size={14} />
                 ) : (
