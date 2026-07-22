@@ -319,6 +319,23 @@ export async function POST(req: Request) {
     assigneeIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
   }
 
+  /* INTERNAL ONLY. A task is company work, so it can only be assigned to an
+     internal Koleex account — never a customer/portal login. assign_to_all
+     already filtered on user_type; the explicit list and the department
+     expansion did not, so a portal account id posted directly (or an
+     employee row pointing at one) could land in the assignee table and then
+     show up in Top Performers. Filtered here on the SERVER so it holds
+     regardless of what the client sends. */
+  if (assigneeIds.length > 0 && auth.tenant_id) {
+    const { data: internal } = await supabaseServer
+      .from("accounts")
+      .select("id")
+      .in("id", assigneeIds)
+      .eq("user_type", "internal")
+      .eq("tenant_id", auth.tenant_id);
+    assigneeIds = (internal ?? []).map((a) => (a as { id: string }).id);
+  }
+
   if (assigneeIds.length > 0) {
     await supabaseServer.from("koleex_todo_assignees").insert(
       assigneeIds.map((accountId) => ({

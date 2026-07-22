@@ -1327,10 +1327,23 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
   const high = todos.filter((t) => !t.completed && t.priority === "high").length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  // Top performers (completed tasks by assignee)
+  /* Top performers — credit belongs to the ASSIGNEE only.
+     Observers (metadata.observers) follow a task and can nudge it along, but
+     the work is not theirs, so they must never earn a completion. Observers
+     already live in a different field from assignees, but they are excluded
+     explicitly here too: this is the number people are judged on, and it
+     should not silently start counting watchers if the two lists are ever
+     merged upstream. */
   const performerMap = new Map<string, { info: TodoAssigneeInfo; count: number }>();
   todos.filter((t) => t.completed).forEach((t) => {
+    const observerIds = new Set(
+      (Array.isArray((t.metadata as { observers?: Array<{ account_id?: string }> } | null)?.observers)
+        ? ((t.metadata as { observers: Array<{ account_id?: string }> }).observers)
+        : []
+      ).map((o) => o.account_id).filter(Boolean) as string[],
+    );
     t.assignees.forEach((a) => {
+      if (observerIds.has(a.account_id)) return;   // watching ≠ doing
       const existing = performerMap.get(a.account_id);
       if (existing) existing.count++;
       else performerMap.set(a.account_id, { info: a, count: 1 });

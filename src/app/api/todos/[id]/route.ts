@@ -261,13 +261,27 @@ export async function PATCH(
       (priorRows ?? []).map((r) => (r as { account_id: string }).account_id),
     );
 
+    /* Same INTERNAL-ONLY rule as create: reassignment must not be able to
+       hand company work to a customer/portal account. Enforced server-side,
+       so it holds whatever the client posts. */
+    let nextAssigneeIds = body.newAssigneeIds;
+    if (nextAssigneeIds.length > 0 && auth.tenant_id) {
+      const { data: internal } = await supabaseServer
+        .from("accounts")
+        .select("id")
+        .in("id", nextAssigneeIds)
+        .eq("user_type", "internal")
+        .eq("tenant_id", auth.tenant_id);
+      nextAssigneeIds = (internal ?? []).map((a) => (a as { id: string }).id);
+    }
+
     await supabaseServer
       .from("koleex_todo_assignees")
       .delete()
       .eq("todo_id", id);
-    if (body.newAssigneeIds.length > 0) {
+    if (nextAssigneeIds.length > 0) {
       await supabaseServer.from("koleex_todo_assignees").insert(
-        body.newAssigneeIds.map((accountId) => ({
+        nextAssigneeIds.map((accountId) => ({
           todo_id: id,
           account_id: accountId,
         })),
