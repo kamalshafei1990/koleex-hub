@@ -17,6 +17,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
+import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -134,7 +135,7 @@ export default function VisualRelationshipModal({
               <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">{confidence}%</span>
             </div>
             <input type="range" min={0} max={100} step={5} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}
-              className="w-full accent-[var(--accent)]" />
+              className={KX_RANGE_CLASS} style={kxRangeStyle(confidence)} />
           </div>
 
           {/* Target search */}

@@ -26,6 +26,7 @@ import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 
 const T: Translations = {
   "vl.review.loadFail":           { en: "Couldn’t load the review.", zh: "无法加载审核。", ar: "تعذّر تحميل المراجعة." },
@@ -237,7 +238,7 @@ export default function AssetReview({
                 </div>
                 <input type="range" min={0} max={100} step={5} value={v.score}
                   onChange={(e) => setScore(c.id, { score: Number(e.target.value), passed: Number(e.target.value) >= 70 })}
-                  className="h-1 w-20 accent-[var(--accent)]" />
+                  className={KX_RANGE_CLASS} style={{ ...kxRangeStyle(v.score), width: "5rem" }} />
                 <span className="w-7 shrink-0 text-right text-[11px] tabular-nums text-[var(--text-dim)]">{v.score}</span>
               </div>
             );

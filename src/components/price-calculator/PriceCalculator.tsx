@@ -27,6 +27,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import { fetchPricingConfig, type PricingConfig, type CountryEntry } from "@/lib/pricing-config";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
+import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 
@@ -520,7 +521,7 @@ export default function PriceCalculator() {
                     <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><TagsIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /> Manual Discount</label>
                     <span className="text-[13px] font-mono font-semibold text-blue-400 tabular-nums">{discountPct}%</span>
                   </div>
-                  <input type="range" min={0} max={cfgMaxDiscount} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-blue-500" style={{ background: `linear-gradient(to right, #3b82f6 ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%, rgba(255,255,255,0.06) ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%)` }} />
+                  <input type="range" min={0} max={cfgMaxDiscount} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className={KX_RANGE_CLASS} style={kxRangeStyle(cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0)} />
                   <div className="flex justify-between text-[9px] text-[var(--text-ghost)]"><span>0%</span><span>{Math.floor(cfgMaxDiscount / 2)}%</span><span>{cfgMaxDiscount}%</span></div>
                 </div>
                 {/* Tax Refund */}

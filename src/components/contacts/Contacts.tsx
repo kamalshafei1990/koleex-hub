@@ -118,6 +118,7 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import SupplierDetail from "@/components/suppliers/SupplierDetail";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
+import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -4462,8 +4463,8 @@ const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, ma
         disabled={disabled}
         onChange={(e) => { if (!disabled) onChange(e.target.value); }}
         aria-label={label}
-        className={`h-2 w-full appearance-none rounded-full outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"} [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0066FF] [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0066FF]`}
-        style={{ background: `linear-gradient(to right, #0066FF ${pct}%, var(--bg-surface-active) ${pct}%)` }}
+        className={`${KX_RANGE_CLASS} ${disabled ? "cursor-not-allowed" : ""}`}
+        style={kxRangeStyle(pct)}
       />
       <div className="mt-1 flex justify-between text-[10px] text-[var(--text-dim)]">
         <span>0</span><span>50</span><span>{max}</span>

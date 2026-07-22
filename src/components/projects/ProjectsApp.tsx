@@ -48,6 +48,7 @@ import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import { createItem as createPlanningItem } from "@/lib/planning";
 import { SubtasksPanel, ChecklistPanel, CommentsPanel, TimePanel, AttachmentsPanel, MilestoneStrip } from "@/components/projects/TaskExtras";
+import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import {
   createProject,
   createStage,
@@ -2127,7 +2128,7 @@ function TaskFormModal({
             </Field>
             <Field label={t("task.progress")}>
               <div className="flex items-center gap-2 h-10">
-                <input type="range" min={0} max={100} value={progress} onChange={(e) => setProgress(Number(e.target.value))} className="flex-1" />
+                <input type="range" min={0} max={100} value={progress} onChange={(e) => setProgress(Number(e.target.value))} className={`flex-1 ${KX_RANGE_CLASS}`} style={kxRangeStyle(progress)} />
                 <span className="text-[11px] font-semibold text-[var(--text-muted)] w-10 text-end">{progress}%</span>
               </div>
             </Field>
