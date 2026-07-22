@@ -113,11 +113,16 @@ export default function SoundsTab() {
               onChange={(e) => setSoundPrefs({ volume: Number(e.target.value) / 100 })}
               onMouseUp={() => previewSound(prefs.notification.tone)}
               onTouchEnd={() => previewSound(prefs.notification.tone)}
-              /* Emerald, same as every switch in the system: the filled part
-                 of the track is an "on" indicator and should read as one.
-                 --bg-inverted made it near-black in light mode and pure
-                 white in dark — invisible against one theme or the other. */
-              className="mt-1.5 w-full accent-emerald-500"
+              /* Painted by hand rather than with accent-color, which colours
+                 the track AND the thumb the same green. The system's control
+                 language is a coloured track with a WHITE knob (see the
+                 toggles), so the fill is emerald and the thumb is white. */
+              style={{
+                background: `linear-gradient(to right, var(--kx-slider-fill) 0 ${Math.round(prefs.volume * 100)}%, var(--kx-slider-rest) ${Math.round(prefs.volume * 100)}% 100%)`,
+              }}
+              className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full [--kx-slider-fill:theme(colors.emerald.500)] [--kx-slider-rest:var(--border-color,#6b7280)]
+                [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-black/10 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow
+                [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-black/10 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
             />
           </div>
           <span className="w-10 shrink-0 text-end text-[12px] tabular-nums text-[var(--text-muted)]">
