@@ -94,6 +94,7 @@ async function notifyApprovalDecision(
   t: TodoOwnership,
   actorId: string,
   decision: "approved" | "rejected",
+  reason?: string,
 ): Promise<void> {
   const { data: rows } = await supabaseServer
     .from("koleex_todo_assignees")
@@ -115,14 +116,16 @@ async function notifyApprovalDecision(
         : `Task reopened: ${title}`,
       body: approved
         ? `Your submission for "${title}" was confirmed. The task is done.`
-        : `"${title}" was reopened — it is not fully done yet.`,
+        : reason
+          ? `"${title}" was sent back: ${reason}`
+          : `"${title}" was reopened — it is not fully done yet.`,
       link: `/todo?task=${t.id}`,
-      metadata: { type: "todo_approval_decision", todo_id: t.id, decision },
+      metadata: { type: "todo_approval_decision", todo_id: t.id, decision, reason: reason || undefined },
     })),
   );
   await sendPushToAccounts(recipients, {
-    title: approved ? "Task confirmed done" : "Task reopened",
-    body: title,
+    title: approved ? "Task confirmed done" : "Task sent back for rework",
+    body: approved ? title : reason ? `${title} — ${reason}` : title,
     url: `/todo?task=${t.id}`,
   });
 }
@@ -238,7 +241,14 @@ export async function PATCH(
 
   // Approval notifications (submit → assigner; decide → assignees).
   if (submittedForApproval) await notifySubmittedForApproval(existing, auth.account_id);
-  if (approvalDecision) await notifyApprovalDecision(existing, auth.account_id, approvalDecision);
+  if (approvalDecision) {
+    const rejectionReason =
+      approvalDecision === "rejected" &&
+      typeof (updates.metadata as { rejection?: { reason?: unknown } } | undefined)?.rejection?.reason === "string"
+        ? ((updates.metadata as { rejection: { reason: string } }).rejection.reason || undefined)
+        : undefined;
+    await notifyApprovalDecision(existing, auth.account_id, approvalDecision, rejectionReason);
+  }
 
   if (isOwner && body.newAssigneeIds !== undefined) {
     /* Capture the prior assignee set BEFORE resyncing so we can notify only

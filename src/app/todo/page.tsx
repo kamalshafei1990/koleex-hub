@@ -1051,6 +1051,18 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
             )}
           </div>
 
+          {/* Returned-for-rework banner — shows the manager's reason right on
+              the card until the assignee finishes and resubmits. */}
+          {task.approval_state === "rejected" && !task.completed && (
+            <div className="mt-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+              <span className="font-bold">{t("approval.returned")}</span>
+              {(() => {
+                const reason = (task.metadata as { rejection?: { reason?: string } } | null)?.rejection?.reason;
+                return reason ? <>: <AutoTranslatedText text={reason} plain /></> : null;
+              })()}
+            </div>
+          )}
+
           {/* Assignee avatars */}
           {task.assignees.length > 0 && (
             <div className="flex items-center gap-1 mt-2">
@@ -1526,11 +1538,32 @@ export default function TodoPage() {
     await updateTodo(id, { approval_state: "approved", status: "done", approved_by_account_id: accountId, approved_at: now });
     loadAll();
   };
-  const handleReopen = async (id: string) => {
+  /* Reopen = reject the submitted completion. Opens a small dialog first so
+     the manager can say WHY (not finished / wrong / needs changes) — the
+     reason travels to the assignee via the task banner, their inbox and
+     push. Reason is optional; returning without one is still allowed. */
+  const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const handleReopen = (id: string) => {
+    setRejectReason("");
+    setRejectTaskId(id);
+  };
+  const performReject = async () => {
+    const id = rejectTaskId;
+    if (!id) return;
+    const before = todos.find((t) => t.id === id);
+    const reason = rejectReason.trim();
+    const meta = {
+      ...((before?.metadata as Record<string, unknown>) ?? {}),
+      rejection: reason
+        ? { reason, by: accountId, at: new Date().toISOString() }
+        : undefined,
+    };
+    setRejectTaskId(null);
     setTodos((prev) => prev.map((t) => t.id === id
-      ? { ...t, approval_state: "rejected", completed: false, completed_at: null, status: "in_progress" }
+      ? { ...t, approval_state: "rejected", completed: false, completed_at: null, status: "in_progress", metadata: meta }
       : t));
-    await updateTodo(id, { approval_state: "rejected", status: "in_progress" });
+    await updateTodo(id, { approval_state: "rejected", status: "in_progress", metadata: meta });
     loadAll();
   };
 
@@ -2165,6 +2198,38 @@ export default function TodoPage() {
         onConfirm={handleDelete}
         onClose={() => setDeleteModal({ open: false, task: null })}
       />
+
+      {/* Return-for-rework dialog — lets the manager say WHY a submitted
+          completion is not approved. The reason reaches the assignee via the
+          task's red banner + inbox + push. */}
+      {rejectTaskId && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setRejectTaskId(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("approval.rejectTitle")}</h3>
+            <p className="text-[12px] text-[var(--text-dim)] mt-1">{t("approval.rejectHint")}</p>
+            <textarea
+              autoFocus
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder={t("approval.rejectPlaceholder")}
+              rows={3}
+              className="mt-3 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none"
+            />
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button onClick={() => setRejectTaskId(null)}
+                className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+                {t("modal.cancel")}
+              </button>
+              <button onClick={performReject}
+                className="h-9 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[12.5px] font-bold hover:bg-amber-500/30 transition-colors">
+                {t("approval.rejectSubmit")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

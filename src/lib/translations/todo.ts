@@ -134,6 +134,11 @@ export const todoT: Translations = {
   "approval.awaitingYou": { en: "Marked done — approve it?", zh: "已标记完成——是否批准？", ar: "تم وضع علامة كمنجز — هل توافق؟" },
   "approval.confirm":   { en: "Confirm",                    zh: "确认",                   ar: "تأكيد" },
   "approval.reopen":    { en: "Reopen",                     zh: "重新打开",               ar: "إعادة فتح" },
+  "approval.rejectTitle": { en: "Send back for rework",     zh: "退回返工",               ar: "إعادة للمراجعة" },
+  "approval.rejectHint": { en: "Tell the assignee why this isn't approved yet. They'll see it on the task and get a notification.", zh: "告诉执行人为什么尚未批准。他们会在任务上看到原因并收到通知。", ar: "أخبر المكلّف لماذا لم تتم الموافقة بعد. سيظهر السبب على المهمة وسيصله إشعار." },
+  "approval.rejectPlaceholder": { en: "Reason (optional) — e.g. missing the report attachment…", zh: "原因（可选）— 例如：缺少报告附件…", ar: "السبب (اختياري) — مثال: مرفق التقرير ناقص…" },
+  "approval.rejectSubmit": { en: "Send back",               zh: "退回",                   ar: "إعادة" },
+  "approval.returned":  { en: "Returned",                   zh: "已退回",                 ar: "أُعيدت" },
 
   /* Priority (medium was missing) */
   "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },
