@@ -568,7 +568,7 @@ export default function ContactsSection({
 
       {/* ── QR upload modal ── */}
       {qrOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !qrBusy && setQrOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !qrBusy && setQrOpen(false)}>
           <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <ScanLineIcon className="h-4 w-4 text-[var(--text-secondary)]" />

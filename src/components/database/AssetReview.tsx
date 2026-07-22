@@ -328,7 +328,7 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
     return () => { alive = false; clearTimeout(t); };
   }, [q, excludeId]);
   return (
-    <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 pt-24" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 backdrop-blur-sm pt-24" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.review.pickerTitle", "Link replacement (approved assets)")}</span>

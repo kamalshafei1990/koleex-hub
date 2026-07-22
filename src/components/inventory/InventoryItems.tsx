@@ -447,7 +447,7 @@ function DrawerShell({
   title, onClose, children, footer,
 }: { title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-[120] flex justify-end bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         /* INV-H5C — full-screen on mobile, side drawer on desktop. */

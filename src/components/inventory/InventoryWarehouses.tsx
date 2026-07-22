@@ -244,7 +244,7 @@ function NewLocationDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex justify-end bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}

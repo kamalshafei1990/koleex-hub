@@ -247,7 +247,7 @@ export default function SourcingSection({
 
       {/* profile editor modal */}
       {pEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !pBusy && setPEdit(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !pBusy && setPEdit(false)}>
           <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><GaugeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.sourcingScore", "Sourcing score")}</span></div>
             <div className="text-[11px] text-[var(--text-faint)]">{t("srcg.autoScorePrefix", "Auto score (from risk · readiness · negotiation · certs): ")}<span className="font-semibold text-[var(--text-secondary)]">{sourcing?.score ?? "—"}</span>{t("srcg.autoScoreSuffix", ". Set an override to pin it.")}</div>
@@ -267,7 +267,7 @@ export default function SourcingSection({
 
       {/* assign role modal */}
       {addOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !aBusy && setAddOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !aBusy && setAddOpen(false)}>
           <div className="max-h-[88vh] w-full max-w-md space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><PackageIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.assignModalTitle", "Assign product sourcing role")}</span></div>
             <Field label={t("srcg.productLabel", "Product")}>
@@ -308,7 +308,7 @@ export default function SourcingSection({
 
       {/* comparison modal */}
       {cmpOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !cmpBusy && setCmpOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !cmpBusy && setCmpOpen(false)}>
           <div className="max-h-[88vh] w-full max-w-3xl space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><ArrowRightLeftIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.compareModalTitle", "Compare suppliers")}</span></div>
             {!cmpRows ? (

@@ -94,7 +94,7 @@ export default function SmartCreateDrawer() {
   function pick(t: Tile) { close(); router.push(t.href); }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 p-3 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 backdrop-blur-sm p-3 sm:items-center sm:p-6">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--bg-primary)] shadow-2xl">
         <header className="border-b border-white/[0.06] px-5 py-3.5">
           <div className="flex items-center justify-between">

@@ -1485,7 +1485,10 @@ export default function TranslatorApp() {
             type="button"
             aria-label={t("tr.close", "Close")}
             onClick={() => setPanel(null)}
-            className="absolute inset-0 bg-black/50"
+            /* Blurred backdrop: the standing rule for every popup in the Hub —
+               the layer behind a dialog is dimmed AND blurred so the sheet
+               reads as the only live surface. */
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
           <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:max-h-[80vh] sm:rounded-2xl">
             <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">

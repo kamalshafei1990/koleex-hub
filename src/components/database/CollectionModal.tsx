@@ -59,7 +59,7 @@ export default function CollectionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{existing ? t("vl.colModal.editTitle", "Edit collection") : t("vl.colModal.newTitle", "New collection")}</h3>

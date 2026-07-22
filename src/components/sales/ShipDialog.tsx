@@ -183,7 +183,7 @@ export default function ShipDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-4xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="min-w-0">

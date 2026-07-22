@@ -282,7 +282,7 @@ function CreateBatchDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
       <div
         className="h-full w-full max-w-md overflow-y-auto border-l border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-5"
         role="dialog"

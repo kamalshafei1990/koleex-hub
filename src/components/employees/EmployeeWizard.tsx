@@ -219,7 +219,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
   /* ── Success state ── */
   if (success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className={`${sectionWrap} max-w-md w-full mx-4 text-center py-12`}>
           <div
             className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -239,7 +239,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div
         className="w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col rounded-2xl border overflow-hidden"
         style={{ background: "var(--bg-primary)", borderColor: "var(--border-subtle)" }}

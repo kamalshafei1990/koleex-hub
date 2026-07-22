@@ -96,7 +96,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
 
   return (
-    <div className="fixed inset-0 z-[90] flex justify-end bg-black/40" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[90] flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
       <div
         onClick={(e) => e.stopPropagation()}
         className="flex h-full w-full max-w-[640px] flex-col border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"

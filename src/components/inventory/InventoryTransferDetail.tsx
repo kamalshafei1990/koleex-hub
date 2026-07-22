@@ -473,7 +473,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
         </DetailsAccordion>
 
         {showVoid && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
             <div className="w-full max-w-md rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
               <div className="mb-2 text-[13px] font-medium">{t("inv.transfers.act.void")}</div>
               <textarea

@@ -439,7 +439,7 @@ export function InlineCreateModal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
       <div className="w-full max-w-md overflow-hidden rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] shadow-2xl">
         <header className="border-b border-white/[0.06] px-4 py-3">
           <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Add</div>
