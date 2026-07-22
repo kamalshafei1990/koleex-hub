@@ -300,7 +300,7 @@ function SettingsContent() {
             <button
               type="button"
               onClick={() => setMobileDetail(false)}
-              className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--accent-blue,#0066FF)]"
+              className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
             >
               <Chevron className="rotate-180" /> All settings
             </button>

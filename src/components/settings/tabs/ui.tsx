@@ -63,9 +63,11 @@ export function Segmented<T extends string | number>({ value, onChange, options 
   );
 }
 
-/** iOS-style on/off switch row. */
-export function SwitchRow({ label, hint, checked, onChange, last }: {
-  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean;
+/** iOS-style on/off switch row. `mono` renders the ON state in the theme's
+ *  inverted neutral (white on dark, black on light) instead of accent blue —
+ *  for pages that follow the strict monochrome brand language. */
+export function SwitchRow({ label, hint, checked, onChange, last, mono }: {
+  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean; mono?: boolean;
 }) {
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
@@ -80,10 +82,14 @@ export function SwitchRow({ label, hint, checked, onChange, last }: {
         aria-label={label}
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
-          checked ? "bg-[var(--accent-blue,#0066FF)]" : "bg-[var(--border-color,#6b7280)]"
+          checked
+            ? mono ? "bg-[var(--bg-inverted)]" : "bg-[var(--accent-blue,#0066FF)]"
+            : "bg-[var(--border-color,#6b7280)]"
         }`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
+        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full shadow transition-transform duration-200 ${
+          checked && mono ? "bg-[var(--bg-primary)]" : "bg-white"
+        } ${checked ? "translate-x-5" : ""}`} />
       </button>
     </div>
   );

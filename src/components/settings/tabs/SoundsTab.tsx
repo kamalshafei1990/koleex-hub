@@ -58,12 +58,14 @@ export default function SoundsTab() {
           hint="Master switch — off silences every sound in the Hub."
           checked={prefs.master}
           onChange={(on) => setSoundPrefs({ master: on })}
+          mono
         />
         <SwitchRow
           label="Do not disturb"
           hint="Temporarily silence everything without touching your other settings."
           checked={prefs.dnd}
           onChange={(on) => setSoundPrefs({ dnd: on })}
+          mono
         />
         {/* Volume — released slider previews at the new level so you hear
             what you chose without hunting for a test button. */}
@@ -79,7 +81,7 @@ export default function SoundsTab() {
               onChange={(e) => setSoundPrefs({ volume: Number(e.target.value) / 100 })}
               onMouseUp={() => previewSound(prefs.notification.tone)}
               onTouchEnd={() => previewSound(prefs.notification.tone)}
-              className="mt-1.5 w-full accent-[var(--accent-blue,#0066FF)]"
+              className="mt-1.5 w-full accent-[var(--bg-inverted)]"
             />
           </div>
           <span className="w-10 shrink-0 text-end text-[12px] tabular-nums text-[var(--text-muted)]">
@@ -132,6 +134,7 @@ function CategoryCard({
         hint={muted ? "Currently silenced by the master switch / Do Not Disturb." : undefined}
         checked={cat.enabled}
         onChange={(on) => setSoundPrefs({ [category]: { enabled: on } } as Partial<SoundPrefs>)}
+        mono
       />
       <div className="pt-2">
         <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
@@ -154,12 +157,12 @@ function CategoryCard({
                 <span
                   className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
                     cat.tone === tone
-                      ? "border-[var(--accent-blue,#0066FF)]"
+                      ? "border-[var(--text-primary)]"
                       : "border-[var(--border-color)]"
                   }`}
                 >
                   {cat.tone === tone && (
-                    <span className="h-2 w-2 rounded-full bg-[var(--accent-blue,#0066FF)]" />
+                    <span className="h-2 w-2 rounded-full bg-[var(--text-primary)]" />
                   )}
                 </span>
                 <span className={`text-[13px] ${cat.tone === tone ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
