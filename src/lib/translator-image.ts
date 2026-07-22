@@ -39,6 +39,38 @@ export interface OcrResult {
   confidence: number;
 }
 
+/* Strip the junk lines OCR produces from graphics and decoration — a stylised
+   poster yields lines like "A :", ": |", "y iil il) 3 e N J" from the artwork
+   itself. Rules are conservative (the text stays editable, so a wrongly kept
+   line is cheap; a wrongly DROPPED line loses information):
+     · a line with fewer than 2 letters/digits is decoration, not text;
+     · a line that is mostly punctuation is decoration;
+     · a line of 3+ tokens where most tokens are single characters is the OCR
+       misreading artwork ("3 e N J"), not a sentence or a model code. */
+export function cleanOcrText(raw: string): string {
+  const lines = raw.split("\n").map((l) => l.trim());
+  const kept = lines.filter((line) => {
+    if (!line) return true; // keep paragraph breaks
+    const substantive = (line.match(/[\p{L}\p{N}]/gu) ?? []).length;
+    if (substantive < 2) return false;
+    const nonSpace = line.replace(/\s+/g, "").length;
+    if (nonSpace - substantive > substantive) return false;
+    const tokens = line.split(/\s+/);
+    if (tokens.length >= 4) {
+      // A CJK "word" IS one character and OCR spaces them apart, so a single
+      // CJK char is normal text — only isolated Latin letters/digits count as
+      // the artwork-misread signature ("3 e N J").
+      const singles = tokens.filter(
+        (t) => !/[⺀-鿿぀-ヿ가-힯]/.test(t) && (t.match(/[\p{L}\p{N}]/gu) ?? []).length <= 1,
+      ).length;
+      if (singles / tokens.length > 0.6) return false;
+    }
+    return true;
+  });
+  // Collapse the blank runs left behind by dropped lines.
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 /**
  * Recognise text in an image file.
  * Throws "too_large" | "unsupported_type" | "no_text" | "ocr_failed".
@@ -66,7 +98,7 @@ export async function recognizeImage(
 
   try {
     const { data } = await worker.recognize(file);
-    const text = (data.text ?? "").trim();
+    const text = cleanOcrText((data.text ?? "").trim());
     if (!text) throw new Error("no_text");
     return { text, confidence: Math.round(data.confidence ?? 0) };
   } catch (e) {

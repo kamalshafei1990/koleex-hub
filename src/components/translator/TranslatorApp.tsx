@@ -474,10 +474,15 @@ export default function TranslatorApp() {
     writeLocal(PREFS_KEY, { from, to });
   }, [from, to]);
 
-  const detected = useMemo(
-    () => (from === "auto" ? guessLanguage(source) : null),
-    [from, source],
-  );
+  /* Detection reads the text of the ACTIVE tab. On the Image tab that's the
+     recognised text — before this it kept reading the Text tab's box, so a
+     Chinese poster sat under a "Detect language · English" label left over
+     from whatever was typed earlier. */
+  const detected = useMemo(() => {
+    if (from !== "auto") return null;
+    const sample = tab === "image" && imgText.trim() ? imgText : source;
+    return guessLanguage(sample);
+  }, [from, source, imgText, tab]);
   const effectiveFrom = from === "auto" ? (detected ?? "auto") : from;
 
   /* ── The translation call ── */

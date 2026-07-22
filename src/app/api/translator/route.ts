@@ -92,7 +92,11 @@ function buildMessages(text: string, source: string, target: string) {
     "- Preserve the original line breaks, list markers and punctuation style.",
     "- Keep names, brands, product codes, numbers and units exactly as written.",
     "- Match the register of the source (formal stays formal, casual stays casual).",
-    `- If the text is already in ${targetName}, return it unchanged.`,
+    `- If the ENTIRE text is already in ${targetName}, return it unchanged.`,
+    /* OCR output and supplier docs routinely mix languages. Without this the
+       model saw "mostly Chinese" and returned everything untouched, leaving
+       the English lines untranslated. */
+    `- If the text MIXES languages, translate every part that is not in ${targetName} and keep the parts already in ${targetName} as they are.`,
     /* Company vocabulary: pins KOLEEX model codes and garment-machinery terms
        that a general model otherwise mangles. Empty when the text contains
        neither, so ordinary sentences pay nothing for it. */
