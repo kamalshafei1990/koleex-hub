@@ -21,7 +21,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
-import TranslatorIcon from "@/components/icons/TranslatorIcon";
 import { useTranslation } from "@/lib/i18n";
 import type { Lang as UiLang } from "@/lib/i18n";
 import { translatorT } from "@/lib/translations/translator";
@@ -34,16 +33,10 @@ import {
   isRtl,
   langLabel,
 } from "@/lib/translator-langs";
-import CopyIcon from "@/components/icons/ui/CopyIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
-import MicIcon from "@/components/icons/ui/MicIcon";
-import Volume2Icon from "@/components/icons/ui/Volume2Icon";
-import StarIcon from "@/components/icons/ui/StarIcon";
-import TrashIcon from "@/components/icons/ui/TrashIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
-import SearchIcon from "@/components/icons/ui/SearchIcon";
+/* Every icon in this app comes from the Database app's Visual Library
+   (General Icons) via <VlIcon>, per the standing rule — no hand-authored SVG
+   and no third-party icon packs. */
+import VlIcon from "@/components/ui/VlIcon";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 450;
@@ -434,7 +427,7 @@ export default function TranslatorApp() {
           }`}
         >
           <span className="truncate">{label}</span>
-          <AngleDownIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
+          <VlIcon slug="angle-small-down" size={13} className="text-[var(--text-dim)]" />
         </button>
 
         {open && (
@@ -442,7 +435,7 @@ export default function TranslatorApp() {
             <div className="fixed inset-0 z-[60]" onClick={() => setPickerOpen(null)} />
             <div className="absolute inset-x-0 z-[61] mt-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl">
               <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-                <SearchIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
+                <VlIcon slug="search" size={13} className="text-[var(--text-dim)]" />
                 <input
                   autoFocus
                   value={pickerQuery}
@@ -487,7 +480,7 @@ export default function TranslatorApp() {
     if (items.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
-          <TranslatorIcon size={28} className="text-[var(--text-dim)]" />
+          <VlIcon slug="translate" size={28} className="text-[var(--text-dim)]" />
           <p className="mt-3 text-[13px] text-[var(--text-muted)]">
             {kind === "history"
               ? t("tr.historyEmpty", "Your recent translations appear here.")
@@ -530,7 +523,7 @@ export default function TranslatorApp() {
               }}
               className="shrink-0 rounded-lg p-1.5 text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             >
-              <CrossIcon size={13} />
+              <VlIcon slug="cross-small" size={14} />
             </button>
           </div>
         ))}
@@ -561,7 +554,7 @@ export default function TranslatorApp() {
         <PageHeader
           title={t("tr.title", "Translator")}
           subtitle={t("tr.subtitle", "Translate text between 18 languages")}
-          icon={<TranslatorIcon size={20} />}
+          icon={<VlIcon slug="translate" size={20} />}
           backHref="/"
           tabs={[
             { key: "text", label: t("tr.title", "Translator"), active: tab === "text", onClick: () => setTab("text") },
@@ -597,11 +590,7 @@ export default function TranslatorApp() {
                 aria-label={t("tr.swap", "Swap languages")}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 4 3.5 7.5 7 11" />
-                  <path d="M3.5 7.5H16a4.5 4.5 0 0 1 0 9h-1" />
-                  <path d="m17 20 3.5-3.5L17 13" />
-                </svg>
+                <VlIcon slug="exchange" size={16} />
               </button>
             </div>
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
@@ -656,7 +645,7 @@ export default function TranslatorApp() {
                     aria-label={t("tr.clear", "Clear text")}
                     className={iconBtn}
                   >
-                    <CrossIcon size={14} />
+                    <VlIcon slug="cross-small" size={15} />
                   </button>
                 )}
                 <button
@@ -666,7 +655,7 @@ export default function TranslatorApp() {
                   aria-label={listening ? t("tr.stopSpeak", "Stop recording") : t("tr.speak", "Speak")}
                   className={`${iconBtn} ${listening ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}
                 >
-                  <MicIcon size={15} />
+                  <VlIcon slug="microphone" size={15} />
                 </button>
               </div>
             </div>
@@ -704,18 +693,18 @@ export default function TranslatorApp() {
               <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
                 <div className="flex items-center gap-0.5">
                   <button type="button" onClick={speak} disabled={!translated} title={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} aria-label={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} className={`${iconBtn} ${speaking ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}>
-                    <Volume2Icon size={15} />
+                    <VlIcon slug={speaking ? "volume-mute" : "speaker"} size={15} />
                   </button>
                   <button type="button" onClick={copy} disabled={!translated} title={copied ? t("tr.copied", "Copied") : t("tr.copy", "Copy")} aria-label={t("tr.copy", "Copy")} className={iconBtn}>
-                    {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
+                    {copied ? <VlIcon slug="check" size={15} /> : <VlIcon slug="copy-alt" size={15} />}
                   </button>
                   <button type="button" onClick={toggleSave} disabled={!translated} title={isSavedNow ? t("tr.saved", "Saved") : t("tr.save", "Save")} aria-label={t("tr.save", "Save")} className={`${iconBtn} ${isSavedNow ? "text-[var(--text-primary)]" : ""}`}>
-                    <StarIcon size={15} />
+                    <VlIcon slug="star" size={15} />
                   </button>
                 </div>
                 {/* Right side stays clear of the floating AI orb on desktop. */}
                 <span className="flex items-center gap-1.5 pe-10 text-[11px] text-[var(--text-dim)] md:pe-0">
-                  {busy && <SpinnerIcon size={12} className="animate-spin" />}
+                  {busy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
                   {!busy && cached && translated && t("tr.fromCache", "instant")}
                 </span>
               </div>
@@ -737,7 +726,7 @@ export default function TranslatorApp() {
                   }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 >
-                  <TrashIcon size={12} /> {t("tr.clearHistory", "Clear history")}
+                  <VlIcon slug="trash-xmark" size={13} /> {t("tr.clearHistory", "Clear history")}
                 </button>
               </div>
             )}
