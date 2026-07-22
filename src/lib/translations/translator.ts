@@ -1,0 +1,72 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Translator app — UI chrome in en/zh/ar.
+   Language NAMES live in LANGUAGES (src/lib/translator-langs.ts) with their
+   own per-language labels, so a Chinese viewer sees 阿拉伯语 not "Arabic". */
+
+export const translatorT: Translations = {
+  "tr.title":            { en: "Translator",          zh: "翻译",             ar: "المترجم" },
+  "tr.subtitle":         { en: "Translate text between 18 languages",
+                           zh: "在 18 种语言之间翻译文本",
+                           ar: "ترجم النصوص بين 18 لغة" },
+
+  /* Language bar */
+  "tr.detect":           { en: "Detect language",     zh: "检测语言",         ar: "اكتشاف اللغة" },
+  "tr.detected":         { en: "Detected",            zh: "已检测",           ar: "تم الاكتشاف" },
+  "tr.swap":             { en: "Swap languages",      zh: "交换语言",         ar: "تبديل اللغتين" },
+  "tr.from":             { en: "From",                zh: "源语言",           ar: "من" },
+  "tr.to":               { en: "To",                  zh: "目标语言",         ar: "إلى" },
+  "tr.moreLanguages":    { en: "More languages",      zh: "更多语言",         ar: "لغات أخرى" },
+  "tr.searchLanguage":   { en: "Search language…",    zh: "搜索语言…",        ar: "ابحث عن لغة…" },
+
+  /* Panes */
+  "tr.sourcePlaceholder":{ en: "Enter text",          zh: "输入文本",         ar: "أدخل النص" },
+  "tr.translation":      { en: "Translation",         zh: "翻译",             ar: "الترجمة" },
+  "tr.translating":      { en: "Translating…",        zh: "翻译中…",          ar: "جارٍ الترجمة…" },
+  "tr.clear":            { en: "Clear text",          zh: "清除文本",         ar: "مسح النص" },
+  "tr.copy":             { en: "Copy",                zh: "复制",             ar: "نسخ" },
+  "tr.copied":           { en: "Copied",              zh: "已复制",           ar: "تم النسخ" },
+  "tr.listen":           { en: "Listen",              zh: "朗读",             ar: "استماع" },
+  "tr.stopListen":       { en: "Stop",                zh: "停止",             ar: "إيقاف" },
+  "tr.speak":            { en: "Speak",               zh: "语音输入",         ar: "إدخال صوتي" },
+  "tr.stopSpeak":        { en: "Stop recording",      zh: "停止录音",         ar: "إيقاف التسجيل" },
+  "tr.listening":        { en: "Listening…",          zh: "正在聆听…",        ar: "جارٍ الاستماع…" },
+  "tr.save":             { en: "Save",                zh: "收藏",             ar: "حفظ" },
+  "tr.saved":            { en: "Saved",               zh: "已收藏",           ar: "محفوظ" },
+  "tr.charCount":        { en: "{n} / {max}",         zh: "{n} / {max}",      ar: "{n} / {max}" },
+  "tr.fromCache":        { en: "instant",             zh: "即时",             ar: "فوري" },
+
+  /* Errors */
+  "tr.error":            { en: "Translation failed. Try again.",
+                           zh: "翻译失败，请重试。",
+                           ar: "فشلت الترجمة. حاول مرة أخرى." },
+  "tr.tooLong":          { en: "Text is too long — max {max} characters.",
+                           zh: "文本过长——最多 {max} 个字符。",
+                           ar: "النص طويل جدًا — بحد أقصى {max} حرف." },
+  "tr.unavailable":      { en: "Translation service is unavailable right now.",
+                           zh: "翻译服务当前不可用。",
+                           ar: "خدمة الترجمة غير متاحة حاليًا." },
+  "tr.retry":            { en: "Retry",               zh: "重试",             ar: "إعادة المحاولة" },
+  "tr.voiceUnsupported": { en: "Voice input isn't supported in this browser.",
+                           zh: "此浏览器不支持语音输入。",
+                           ar: "الإدخال الصوتي غير مدعوم في هذا المتصفح." },
+
+  /* History / Saved */
+  "tr.history":          { en: "History",             zh: "历史记录",         ar: "السجل" },
+  "tr.savedTab":         { en: "Saved",               zh: "收藏",             ar: "المحفوظات" },
+  "tr.historyEmpty":     { en: "Your recent translations appear here.",
+                           zh: "您最近的翻译会显示在这里。",
+                           ar: "ستظهر ترجماتك الأخيرة هنا." },
+  "tr.savedEmpty":       { en: "Star a translation to keep it here.",
+                           zh: "为翻译加星标即可保存在这里。",
+                           ar: "ضع نجمة على ترجمة لحفظها هنا." },
+  "tr.clearHistory":     { en: "Clear history",       zh: "清除历史记录",     ar: "مسح السجل" },
+  "tr.clearHistoryConfirm": { en: "Clear all translation history on this device?",
+                           zh: "清除此设备上的所有翻译历史记录？",
+                           ar: "مسح كل سجل الترجمة على هذا الجهاز؟" },
+  "tr.remove":           { en: "Remove",              zh: "移除",             ar: "إزالة" },
+  "tr.reuse":            { en: "Use again",           zh: "再次使用",         ar: "استخدام مجددًا" },
+  "tr.localOnly":        { en: "Stored on this device only",
+                           zh: "仅存储在此设备上",
+                           ar: "مخزّن على هذا الجهاز فقط" },
+};

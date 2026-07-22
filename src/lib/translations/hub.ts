@@ -71,6 +71,7 @@ export const hubT: Translations = {
   "app.calendar":        { en: "Calendar",         zh: "日历",              ar: "التقويم" },
   "app.todo":            { en: "To-do",            zh: "待办事项",          ar: "المهام" },
   "app.notes":           { en: "Notes",            zh: "笔记",              ar: "الملاحظات" },
+  "app.translator":      { en: "Translator",       zh: "翻译",              ar: "المترجم" },
   "app.catalogs":        { en: "Catalogs",         zh: "产品目录",          ar: "الكتالوجات" },
   "app.website":         { en: "Website",          zh: "网站",              ar: "الموقع" },
   "app.marketing":       { en: "Marketing",        zh: "营销",              ar: "التسويق" },
