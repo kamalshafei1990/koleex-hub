@@ -22,6 +22,7 @@ import {
   isToday,
   isoWeekday,
   startOfWeek,
+  type WeekStart,
   formatTime,
 } from "@/lib/calendar-utils";
 
@@ -43,7 +44,9 @@ export default function WeekView({
   onNewEventAtSlot,
   onEventClick,
 }: Props) {
-  const weekStart = startOfWeek(focusDate);
+  /* First day of week follows Settings → Language & region. */
+  const firstDay: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
+  const weekStart = startOfWeek(focusDate, firstDay);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const wh = preferences.calendar?.working_hours || {
     start: "09:00",

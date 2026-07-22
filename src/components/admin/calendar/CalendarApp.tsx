@@ -56,6 +56,7 @@ import {
   endOfDay,
   startOfMonth,
   startOfWeek,
+  type WeekStart,
 } from "@/lib/calendar-utils";
 
 import MonthView from "./MonthView";
@@ -169,22 +170,28 @@ export default function CalendarApp() {
     })();
   }, [activeAccountId]);
 
+  /* The viewer's first-day-of-week (Settings → Language & region). The grid
+     and the fetch window must agree on it, or the month view would request
+     the wrong leading/trailing days. */
+  const weekStart: WeekStart =
+    (withDefaults(activeAccount?.preferences).display?.week_start as WeekStart) ?? 1;
+
   /* ── Compute the visible time range based on view + focus date ── */
   const visibleRange = useMemo(() => {
     if (view === "month") {
       // Include leading / trailing days shown in the grid
-      const gridStart = startOfWeek(startOfMonth(focusDate));
+      const gridStart = startOfWeek(startOfMonth(focusDate), weekStart);
       const gridEnd = addDays(gridStart, 42);
       return { from: gridStart, to: gridEnd };
     }
     if (view === "week") {
       return {
-        from: startOfWeek(focusDate),
-        to: addDays(endOfWeek(focusDate), 1),
+        from: startOfWeek(focusDate, weekStart),
+        to: addDays(endOfWeek(focusDate, weekStart), 1),
       };
     }
     return { from: startOfDay(focusDate), to: addDays(startOfDay(focusDate), 1) };
-  }, [view, focusDate]);
+  }, [view, focusDate, weekStart]);
 
   /* ── Fetch events whenever the account or visible window changes ── */
   const loadEvents = useCallback(async () => {

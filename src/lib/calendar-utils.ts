@@ -94,20 +94,34 @@ export function isoWeekday(d: Date): number {
 
 /* ── Week helpers ───────────────────────────────────────────────────────── */
 
-/** Monday-anchored start of the ISO week containing d. */
-export function startOfWeek(d: Date): Date {
-  const iso = isoWeekday(d); // 1..7
-  return startOfDay(addDays(d, -(iso - 1)));
+/** Which day the user's week starts on: 0=Sunday, 1=Monday, 6=Saturday.
+ *  Comes from Settings → Language & region (preferences.display.week_start);
+ *  Monday stays the default because that is the ISO week. */
+export type WeekStart = 0 | 1 | 6;
+
+/** Start of the week containing d, anchored on `weekStart`. */
+export function startOfWeek(d: Date, weekStart: WeekStart = 1): Date {
+  const iso = isoWeekday(d);                        // 1..7 (Mon..Sun)
+  const isoStart = weekStart === 0 ? 7 : weekStart; // Sun=7, Mon=1, Sat=6
+  const back = (iso - isoStart + 7) % 7;            // days since the anchor
+  return startOfDay(addDays(d, -back));
 }
 
-export function endOfWeek(d: Date): Date {
-  return endOfDay(addDays(startOfWeek(d), 6));
+export function endOfWeek(d: Date, weekStart: WeekStart = 1): Date {
+  return endOfDay(addDays(startOfWeek(d, weekStart), 6));
 }
 
-/** Seven consecutive days starting Monday of the week containing d. */
-export function weekDays(d: Date): Date[] {
-  const start = startOfWeek(d);
+/** Seven consecutive days starting on the user's first day of week. */
+export function weekDays(d: Date, weekStart: WeekStart = 1): Date[] {
+  const start = startOfWeek(d, weekStart);
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** ISO weekday numbers (1=Mon..7=Sun) in the user's column order — so a
+ *  header row can label the grid without re-deriving the rotation. */
+export function weekdayOrder(weekStart: WeekStart = 1): number[] {
+  const isoStart = weekStart === 0 ? 7 : weekStart;
+  return Array.from({ length: 7 }, (_, i) => ((isoStart - 1 + i) % 7) + 1);
 }
 
 /* ── Month grid ─────────────────────────────────────────────────────────── */
@@ -124,9 +138,9 @@ export function endOfMonth(d: Date): Date {
  * Build the 6-row × 7-column grid for a month view.
  * Always returns 42 dates so layout stays stable across months.
  */
-export function monthGrid(d: Date): Date[] {
+export function monthGrid(d: Date, weekStart: WeekStart = 1): Date[] {
   const first = startOfMonth(d);
-  const gridStart = startOfWeek(first);
+  const gridStart = startOfWeek(first, weekStart);
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 

@@ -252,7 +252,15 @@ export default function MainHeader() {
 
         {/* Theme toggle */}
         <button
-          onClick={() => setTheme(dk ? "light" : "dark")}
+          onClick={() => {
+            /* Tapping this is an explicit choice — record it as the theme
+               MODE too, otherwise Settings' "Auto" would still be active and
+               the system watcher would flip it straight back. */
+            const next = dk ? "light" : "dark";
+            try { localStorage.setItem("koleex-theme-mode", next); } catch { /* ignore */ }
+            window.dispatchEvent(new CustomEvent("thememodechange", { detail: next }));
+            setTheme(next);
+          }}
           aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
           className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
             dk

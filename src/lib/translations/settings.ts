@@ -54,6 +54,11 @@ export const settingsT: Translations = {
   "display.theme.hint":   { en: "Light or dark appearance.", zh: "浅色或深色外观。", ar: "مظهر فاتح أو داكن." },
   "display.light":        { en: "Light", zh: "浅色", ar: "فاتح" },
   "display.dark":         { en: "Dark", zh: "深色", ar: "داكن" },
+  "display.auto":         { en: "Auto", zh: "自动", ar: "تلقائي" },
+  "display.theme.autoHint": { en: "Following your device — switches with your system appearance.", zh: "跟随设备——随系统外观自动切换。", ar: "يتبع جهازك — يتبدّل مع مظهر النظام." },
+  "display.sample":       { en: "Sample", zh: "示例", ar: "عيّنة" },
+  "display.sample.text":  { en: "The quick brown fox", zh: "敏捷的棕色狐狸", ar: "الثعلب البني السريع" },
+  "display.reset":        { en: "Reset to defaults", zh: "恢复默认", ar: "استعادة الافتراضي" },
   "display.textSize":     { en: "Text size", zh: "文字大小", ar: "حجم النص" },
   "display.textSize.hint":{ en: "Scale interface text — layout stays put.", zh: "缩放界面文字，布局保持不变。", ar: "تكبير نص الواجهة دون تغيير التخطيط." },
   "display.density":      { en: "Density", zh: "密度", ar: "الكثافة" },
@@ -74,10 +79,20 @@ export const settingsT: Translations = {
   "display.contrast.hint":{ en: "Stronger borders and clearer secondary text.", zh: "更明显的边框和更清晰的次要文字。", ar: "حدود أوضح ونص ثانوي أكثر وضوحًا." },
   "display.transparency": { en: "Reduce transparency", zh: "降低透明度", ar: "تقليل الشفافية" },
   "display.transparency.hint": { en: "Turn off blur and translucency for legibility.", zh: "关闭模糊和半透明效果以提升可读性。", ar: "إيقاف الضبابية والشفافية لوضوح أفضل." },
-  "display.footer":       { en: "Language is in Preferences. Date, time and number formats are in Language & region.", zh: "语言设置在“偏好设置”中。日期、时间和数字格式在“语言与地区”中。", ar: "اللغة في «التفضيلات». تنسيقات التاريخ والوقت والأرقام في «اللغة والمنطقة»." },
+  "display.footer":       { en: "Language, date, time and number formats are in Language & region.", zh: "语言以及日期、时间和数字格式在“语言与地区”中。", ar: "اللغة وتنسيقات التاريخ والوقت والأرقام في «اللغة والمنطقة»." },
 
   /* ── Language & region ── */
   "region.preview":       { en: "Preview", zh: "预览", ar: "معاينة" },
+  "region.language":      { en: "Language", zh: "语言", ar: "اللغة" },
+  "region.language.sub":  { en: "The language the hub is shown in, on this device.", zh: "本设备上平台显示所用的语言。", ar: "اللغة التي تُعرض بها المنصة على هذا الجهاز." },
+  "region.interfaceLang": { en: "Interface language", zh: "界面语言", ar: "لغة الواجهة" },
+  "region.interfaceLang.hint": { en: "Applies instantly. Arabic switches the whole hub to right-to-left.", zh: "立即生效。选择阿拉伯语会将整个平台切换为从右到左。", ar: "يُطبَّق فورًا. العربية تحوّل المنصة بالكامل إلى اتجاه من اليمين لليسار." },
+  "region.preview.weekStart": { en: "Weeks start on {day}.", zh: "每周从{day}开始。", ar: "تبدأ الأسابيع يوم {day}." },
+  "region.monday":        { en: "Monday", zh: "周一", ar: "الاثنين" },
+  "region.sunday":        { en: "Sunday", zh: "周日", ar: "الأحد" },
+  "region.saturday":      { en: "Saturday", zh: "周六", ar: "السبت" },
+  "region.weekStart.hint":{ en: "Sets the first column in the Calendar's month and week views.", zh: "决定日历月视图和周视图的第一列。", ar: "يحدّد العمود الأول في عرضَي الشهر والأسبوع في التقويم." },
+
   "region.dateTime":      { en: "Date & time", zh: "日期与时间", ar: "التاريخ والوقت" },
   "region.dateFormat":    { en: "Date format", zh: "日期格式", ar: "تنسيق التاريخ" },
   "region.timeFormat":    { en: "Time format", zh: "时间格式", ar: "تنسيق الوقت" },
@@ -94,7 +109,7 @@ export const settingsT: Translations = {
   "region.sun":           { en: "Sun", zh: "周日", ar: "الأحد" },
   "region.mon":           { en: "Mon", zh: "周一", ar: "الاثنين" },
   "region.sat":           { en: "Sat", zh: "周六", ar: "السبت" },
-  "region.footer":        { en: "Formats apply where the hub displays dates and numbers. Interface language is in Preferences.", zh: "这些格式应用于平台显示日期和数字的位置。界面语言在“偏好设置”中。", ar: "تُطبَّق التنسيقات حيث تعرض المنصة التواريخ والأرقام. لغة الواجهة في «التفضيلات»." },
+  "region.footer":        { en: "First day of week drives the Calendar. Date, time and number formats are being adopted screen by screen — Login history uses them today.", zh: "“每周首日”会影响日历。日期、时间和数字格式正在逐屏启用——登录记录已在使用。", ar: "«أول أيام الأسبوع» يتحكم في التقويم. تنسيقات التاريخ والوقت والأرقام يجري اعتمادها شاشة تلو الأخرى — سجل الدخول يستخدمها اليوم." },
 
   /* ── Sounds ── */
   "sounds.title":         { en: "Sound", zh: "声音", ar: "الصوت" },

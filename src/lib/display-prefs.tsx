@@ -64,21 +64,87 @@ export function cacheDisplayPreferences(d: DisplayPrefs): void {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch { /* ignore */ }
 }
 
-/* ── Theme ── the app's existing binary light/dark mechanism (localStorage
-   "koleex-theme" + data-theme + a "themechange" event). Kept separate from the
-   display bag so the header toggle and Settings drive the exact same switch. */
-export type ThemeMode = "light" | "dark";
+/* After a Settings tab saves, the account refetch that follows can still
+   return the PRE-save snapshot, and the applier below would then re-apply and
+   re-cache the old values — undoing what the user just chose. A short window
+   where the local write wins closes that race without any of the callers
+   needing to know about it. */
+let localWriteUntil = 0;
 
-export function getTheme(): ThemeMode {
+/** Cache a locally-saved bag and let it outrank incoming account snapshots
+ *  for a few seconds. Call this instead of cacheDisplayPreferences when the
+ *  USER is the one who made the change. */
+export function saveDisplayPreferencesLocally(d: DisplayPrefs): void {
+  cacheDisplayPreferences(d);
+  localWriteUntil = Date.now() + 8000;
+}
+
+/* ── Theme ────────────────────────────────────────────────────────────────
+   Two values, deliberately:
+
+     · koleex-theme       the RESOLVED appearance, always "light" | "dark".
+                          This is what <html data-theme> carries and what the
+                          "themechange" event announces, so MainHeader and
+                          every other listener keep working unchanged.
+     · koleex-theme-mode  what the USER chose — "light", "dark", or "system".
+                          Only "system" behaves differently: it follows the
+                          OS and re-resolves when the OS flips at sunset.
+
+   Keeping them apart is what lets Auto exist without every consumer having
+   to learn a third value. */
+export type ThemeMode = "light" | "dark";
+export type ThemePreference = ThemeMode | "system";
+
+const MODE_KEY = "koleex-theme-mode";
+
+/** What the OS is currently asking for. Defaults to dark off-browser. */
+export function systemTheme(): ThemeMode {
+  if (typeof window === "undefined" || !window.matchMedia) return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+/** The user's CHOICE (may be "system"). */
+export function getThemePreference(): ThemePreference {
   if (typeof window === "undefined") return "dark";
+  const saved = window.localStorage.getItem(MODE_KEY);
+  if (saved === "light" || saved === "dark" || saved === "system") return saved;
+  /* No mode stored yet — infer it from the legacy resolved value so nobody's
+     existing choice changes the first time they load this build. */
   return window.localStorage.getItem("koleex-theme") === "light" ? "light" : "dark";
 }
 
-export function setTheme(theme: ThemeMode): void {
+/** The appearance actually in effect right now. */
+export function getTheme(): ThemeMode {
+  const pref = getThemePreference();
+  return pref === "system" ? systemTheme() : pref;
+}
+
+/** Apply a resolved theme to the document + tell everyone. */
+function applyTheme(theme: ThemeMode): void {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", theme);
   try { localStorage.setItem("koleex-theme", theme); } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));
+}
+
+/** Set the user's choice. Pass "system" to follow the OS from now on. */
+export function setTheme(pref: ThemePreference): void {
+  if (typeof document === "undefined") return;
+  try { localStorage.setItem(MODE_KEY, pref); } catch { /* ignore */ }
+  applyTheme(pref === "system" ? systemTheme() : pref);
+  window.dispatchEvent(new CustomEvent("thememodechange", { detail: pref }));
+}
+
+/** Watch the OS and re-resolve while the user is on "system". Returns an
+ *  unsubscribe. Mounted once by DisplayPreferencesApplier. */
+function watchSystemTheme(): () => void {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  const onChange = () => {
+    if (getThemePreference() === "system") applyTheme(systemTheme());
+  };
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
 }
 
 function readCachedDisplay(): DisplayPrefs | null {
@@ -102,10 +168,19 @@ export function DisplayPreferencesApplier() {
     if (cached) applyDisplayPreferences(cached);
   }, []);
 
+  /* Auto theme: resolve once on mount (the OS may have flipped while the tab
+     was closed) and keep following it for as long as "system" is chosen. */
+  useEffect(() => {
+    if (getThemePreference() === "system") applyTheme(systemTheme());
+    return watchSystemTheme();
+  }, []);
+
   /* Whenever the account (and thus its preferences) resolves or changes,
      apply + refresh the cache. */
   useEffect(() => {
     if (!account) return;
+    /* A just-made local choice outranks a possibly-stale server snapshot. */
+    if (Date.now() < localWriteUntil) return;
     const d = withDefaults(account.preferences).display;
     if (d) { applyDisplayPreferences(d); cacheDisplayPreferences(d); }
   }, [account]);

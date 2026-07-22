@@ -1,7 +1,8 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   MonthView — 6-row Monday-anchored month grid with event chips.
+   MonthView — 6-row month grid with event chips, anchored on the viewer's
+   first day of week (Settings → Language & region).
 
    Click a day → open day view.
    Hover a day → show a "+" button to create a new event on that day.
@@ -19,6 +20,8 @@ import {
   colorForEvent,
   isoWeekday,
   formatTime,
+  weekdayOrder,
+  type WeekStart,
 } from "@/lib/calendar-utils";
 
 interface Props {
@@ -32,7 +35,11 @@ interface Props {
   onEventClick?: (e: CalendarEventRow) => void;
 }
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/* Indexed by ISO weekday (1=Mon..7=Sun) so the header can be rotated to
+   whatever first-day-of-week the viewer picked. */
+const ISO_LABELS: Record<number, string> = {
+  1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun",
+};
 const MAX_CHIPS = 3;
 const HOLIDAY_COLOR = "#EC4899"; // matches the Calendar "Holiday" legend dot
 
@@ -51,19 +58,21 @@ export default function MonthView({
   onNewEventOnDay,
   onEventClick,
 }: Props) {
-  const days = monthGrid(focusDate);
+  const firstDay: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
+  const days = monthGrid(focusDate, firstDay);
+  const columnDays = weekdayOrder(firstDay);   // ISO numbers, in column order
   const workingDays = preferences.calendar?.working_hours?.days || [1, 2, 3, 4, 5];
 
   return (
     <div>
       {/* Weekday header */}
       <div className="grid grid-cols-7 border-b border-[var(--border-subtle)]">
-        {WEEKDAY_LABELS.map((label, i) => {
-          const iso = i + 1;
+        {columnDays.map((iso) => {
+          const label = ISO_LABELS[iso];
           const isWorking = workingDays.includes(iso);
           return (
             <div
-              key={label}
+              key={iso}
               className={`text-[10px] font-semibold uppercase tracking-wider py-3 text-center ${
                 isWorking
                   ? "text-[var(--text-muted)]"
