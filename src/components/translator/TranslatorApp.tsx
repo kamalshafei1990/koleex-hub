@@ -550,7 +550,11 @@ export default function TranslatorApp() {
           padding as the workspace below. Without this the hero and tabs ran
           flush against the sidebar while the panes were inset — the rows
           didn't line up. */}
-      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-3 sm:px-5">
+      {/* Same container the other apps use for their header block
+          (Inventory/Database layouts: `mx-auto max-w-… px-4 py-6 sm:px-6`), so
+          the hero starts at the same inset and the same distance below the
+          main header instead of butting straight against it. */}
+      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-6 sm:px-6">
         <PageHeader
           title={t("tr.title", "Translator")}
           subtitle={t("tr.subtitle", "Translate text between 18 languages")}
@@ -571,7 +575,7 @@ export default function TranslatorApp() {
            Reserving that band is the only way to keep those buttons tappable
            at 390px. Desktop clusters them centre-ward instead, so it only
            needs normal padding. */
-        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-3 pb-14 pt-3 sm:px-5 sm:pb-4">
+        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
           {/* Language row — TWO separate cards, one per side, each sitting
               directly above its own pane, with the swap button in the gutter
               between them. Both this row and the pane row below use the same
