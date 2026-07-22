@@ -10,6 +10,11 @@ export const translatorT: Translations = {
                            zh: "在 18 种语言之间翻译文本",
                            ar: "ترجم النصوص بين 18 لغة" },
 
+  /* Tab labels — "Text" (not "Translator") so the rail reads as four peer
+     MODES the way Google and Apple name them: Text · Document · Image ·
+     Website. "Translator" is the app, not one of its modes. */
+  "tr.tabText":          { en: "Text",                zh: "文本",             ar: "نص" },
+
   /* Language bar */
   "tr.detect":           { en: "Detect language",     zh: "检测语言",         ar: "اكتشاف اللغة" },
   "tr.detected":         { en: "Detected",            zh: "已检测",           ar: "تم الاكتشاف" },

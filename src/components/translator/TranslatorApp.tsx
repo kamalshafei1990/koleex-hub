@@ -796,7 +796,11 @@ export default function TranslatorApp() {
      tabs so both read as the same app and the columns line up with whatever
      sits under them. */
   const LanguageRow = () => (
-    <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-[1fr_40px_1fr] md:gap-3">
+    /* Desktop only. On a phone the selectors live INSIDE each pane (Apple's
+       arrangement) — a separate two-card bar plus a swap button cost ~200px
+       of vertical space before you reached the text, on the screen with the
+       least of it to give. */
+    <div className="hidden shrink-0 grid-cols-1 gap-2 md:grid md:grid-cols-[1fr_40px_1fr] md:gap-3">
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
         <LangButton side="from" />
       </div>
@@ -935,7 +939,7 @@ export default function TranslatorApp() {
             /* Tab icons, like every other icon here, are Visual Library
                assets. `language` (not `translate`) on the text tab so it
                doesn't duplicate the app icon sitting right above it. */
-            { key: "text", label: t("tr.title", "Translator"), icon: <VlIcon slug="language" size={14} />, active: tab === "text", onClick: () => setTab("text") },
+            { key: "text", label: t("tr.tabText", "Text"), icon: <VlIcon slug="language" size={14} />, active: tab === "text", onClick: () => setTab("text") },
             { key: "document", label: t("tr.document", "Document"), icon: <VlIcon slug="document" size={14} />, active: tab === "document", onClick: () => setTab("document") },
             { key: "image", label: t("tr.image", "Image"), icon: <VlIcon slug="image" size={14} />, active: tab === "image", onClick: () => setTab("image") },
             { key: "website", label: t("tr.website", "Website"), icon: <VlIcon slug="globe" size={14} />, active: tab === "website", onClick: () => setTab("website") },
@@ -962,9 +966,22 @@ export default function TranslatorApp() {
           {/* Panes — same track as the language row above so the columns align.
               min-h-0 on every level is what lets the inner scroll work
               instead of the panes growing and pushing the page. */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[1fr_40px_1fr]">
-            {/* Source */}
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
+          {/* grid-rows-[1fr_auto_1fr] is load-bearing on mobile: with three
+              AUTO rows, grid's default stretch alignment splits the leftover
+              height equally between them, which handed the 1px divider row an
+              ~82px empty band between the two halves. Pinning the middle row
+              to auto keeps the hairline a hairline and lets the two panes
+              share the space. */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[1fr_auto_1fr] gap-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:grid-cols-[1fr_40px_1fr] md:grid-rows-none md:gap-3 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent">
+            {/* Source. On mobile this is the TOP HALF of one shared card, so
+                it drops its own border/rounding; on desktop it becomes its
+                own card again. */}
+            <div className="flex min-h-0 flex-col overflow-hidden border-0 bg-transparent md:rounded-2xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-card)] md:focus-within:border-[var(--border-focus)]">
+              {/* Mobile-only language chip, sitting directly above the text it
+                  applies to — you read "English → this box" in one glance. */}
+              <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
+                <LangButton side="from" />
+              </div>
               {/* px-4 py-3.5 EXACTLY matches the result pane. The clear button
                   used to float over the text, forcing pr-11 here only — which
                   made the source column ~28px narrower than the translation
@@ -1021,12 +1038,27 @@ export default function TranslatorApp() {
               </div>
             </div>
 
-            {/* Gutter — keeps the pane columns on the same track as the
-                language selectors above. Empty by design. */}
-            <div className="hidden md:block" aria-hidden />
+            {/* Gutter — desktop keeps the pane columns on the same track as
+                the language selectors above (empty by design). On mobile it
+                becomes the hairline BETWEEN the two halves with the swap
+                button centred on it, the way Apple splits its single card. */}
+            <div className="relative flex h-px items-center justify-center bg-[var(--border-subtle)] md:h-auto md:bg-transparent" aria-hidden={undefined}>
+              <button
+                type="button"
+                onClick={swap}
+                title={t("tr.swap", "Swap languages")}
+                aria-label={t("tr.swap", "Swap languages")}
+                className="absolute grid h-9 w-9 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)] transition-colors active:bg-[var(--bg-surface-hover)] md:hidden"
+              >
+                <VlIcon slug="exchange" size={15} />
+              </button>
+            </div>
 
             {/* Translation */}
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+            <div className="flex min-h-0 flex-col overflow-hidden border-0 bg-transparent md:rounded-2xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-surface-subtle)]">
+              <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
+                <LangButton side="to" />
+              </div>
               <div
                 dir={isRtl(to) ? "rtl" : "ltr"}
                 className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3.5 text-[15px] leading-relaxed text-[var(--text-primary)] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
