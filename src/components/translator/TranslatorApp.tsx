@@ -373,63 +373,74 @@ export default function TranslatorApp() {
     requestAnimationFrame(() => sourceRef.current?.focus());
   };
 
-  /* ── Small presentational pieces ── */
-  const LangTab = ({
-    code,
-    active,
-    onClick,
-  }: {
-    code: string;
-    active: boolean;
-    onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-        active
-          ? "bg-[var(--bg-surface)] font-semibold text-[var(--text-primary)]"
-          : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      {code === "auto"
+  /* ── Language selector ──────────────────────────────────────────────
+     One button per side (current language + chevron) opening a searchable
+     list. Deliberately NOT a row of quick chips: at 18 languages the chip
+     row wrapped and cramped the bar at every width below ~1400px. The
+     three languages Koleex uses daily are pinned to the top of the list
+     instead, so they stay one tap away without eating the bar.          */
+  const LangButton = ({ side }: { side: "from" | "to" }) => {
+    const open = pickerOpen === side;
+    const current = side === "from" ? from : to;
+    const pinned = side === "from" ? QUICK_SOURCE : QUICK_TARGET;
+
+    const label =
+      current === "auto"
         ? detected
           ? `${t("tr.detect", "Detect language")} · ${langLabel(detected, ui)}`
           : t("tr.detect", "Detect language")
-        : langLabel(code, ui)}
-    </button>
-  );
+        : langLabel(current, ui);
 
-  const LangPicker = ({ side }: { side: "from" | "to" }) => {
-    const open = pickerOpen === side;
-    const current = side === "from" ? from : to;
-    const list = LANGUAGES.filter((l) => {
-      if (!pickerQuery.trim()) return true;
-      const q = pickerQuery.toLowerCase();
-      return (
-        l.label[ui].toLowerCase().includes(q) ||
-        l.label.en.toLowerCase().includes(q) ||
-        l.native.toLowerCase().includes(q) ||
-        l.code.includes(q)
-      );
-    });
+    const q = pickerQuery.trim().toLowerCase();
+    const matches = (l: (typeof LANGUAGES)[number]) =>
+      !q ||
+      l.label[ui].toLowerCase().includes(q) ||
+      l.label.en.toLowerCase().includes(q) ||
+      l.native.toLowerCase().includes(q) ||
+      l.code.includes(q);
+
+    const pinnedList = LANGUAGES.filter((l) => pinned.includes(l.code) && matches(l));
+    const restList = LANGUAGES.filter((l) => !pinned.includes(l.code) && matches(l));
+
+    const Row = ({ l }: { l: (typeof LANGUAGES)[number] }) => (
+      <button
+        type="button"
+        onClick={() => {
+          if (side === "from") setFrom(l.code);
+          else setTo(l.code);
+          setPickerOpen(null);
+        }}
+        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+          current === l.code ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+        }`}
+      >
+        <span className="truncate">{l.label[ui]}</span>
+        <span className="shrink-0 text-[11px] text-[var(--text-dim)]">{l.native}</span>
+      </button>
+    );
+
     return (
-      <div className="relative shrink-0">
+      <div className="relative min-w-0 flex-1">
         <button
           type="button"
           onClick={() => {
             setPickerOpen(open ? null : side);
             setPickerQuery("");
           }}
-          title={t("tr.moreLanguages", "More languages")}
-          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${
+            open
+              ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+              : "text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+          }`}
         >
-          <AngleDownIcon size={14} />
+          <span className="truncate">{label}</span>
+          <AngleDownIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
         </button>
+
         {open && (
           <>
             <div className="fixed inset-0 z-[60]" onClick={() => setPickerOpen(null)} />
-            <div className="absolute z-[61] mt-1 max-h-[320px] w-64 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl ltr:left-0 rtl:right-0">
+            <div className="absolute inset-x-0 z-[61] mt-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl">
               <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
                 <SearchIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
                 <input
@@ -440,37 +451,29 @@ export default function TranslatorApp() {
                   className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
                 />
               </div>
-              <div className="max-h-[268px] overflow-y-auto py-1">
-                {side === "from" && (
+              <div className="max-h-[46vh] overflow-y-auto py-1">
+                {side === "from" && !q && (
                   <button
                     type="button"
                     onClick={() => {
                       setFrom("auto");
                       setPickerOpen(null);
                     }}
-                    className={`flex w-full items-center justify-between px-3 py-1.5 text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+                    className={`flex w-full items-center px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
                       current === "auto" ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
                     }`}
                   >
                     {t("tr.detect", "Detect language")}
                   </button>
                 )}
-                {list.map((l) => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    onClick={() => {
-                      if (side === "from") setFrom(l.code);
-                      else setTo(l.code);
-                      setPickerOpen(null);
-                    }}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
-                      current === l.code ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
-                    }`}
-                  >
-                    <span className="truncate">{l.label[ui]}</span>
-                    <span className="shrink-0 text-[11px] text-[var(--text-dim)]">{l.native}</span>
-                  </button>
+                {pinnedList.map((l) => (
+                  <Row key={l.code} l={l} />
+                ))}
+                {pinnedList.length > 0 && restList.length > 0 && (
+                  <div className="my-1 border-t border-[var(--border-subtle)]" />
+                )}
+                {restList.map((l) => (
+                  <Row key={l.code} l={l} />
                 ))}
               </div>
             </div>
@@ -502,16 +505,10 @@ export default function TranslatorApp() {
             className={`flex items-start gap-3 px-4 py-3 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}
           >
             <button type="button" onClick={() => reuse(e)} className="min-w-0 flex-1 text-start">
-              <span
-                className="block truncate text-[13px] text-[var(--text-primary)]"
-                dir={isRtl(e.from) ? "rtl" : "ltr"}
-              >
+              <span className="block truncate text-[13px] text-[var(--text-primary)]" dir={isRtl(e.from) ? "rtl" : "ltr"}>
                 {e.source}
               </span>
-              <span
-                className="mt-0.5 block truncate text-[12.5px] text-[var(--text-muted)]"
-                dir={isRtl(e.to) ? "rtl" : "ltr"}
-              >
+              <span className="mt-0.5 block truncate text-[12.5px] text-[var(--text-muted)]" dir={isRtl(e.to) ? "rtl" : "ltr"}>
                 {e.translated}
               </span>
               <span className="mt-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">
@@ -545,70 +542,71 @@ export default function TranslatorApp() {
     "rounded-lg p-2 text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:hover:bg-transparent";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <PageHeader
-        title={t("tr.title", "Translator")}
-        subtitle={t("tr.subtitle", "Translate text between 18 languages")}
-        icon={<TranslatorIcon size={20} />}
-        backHref="/"
-        tabs={[
-          { key: "text", label: t("tr.title", "Translator"), active: tab === "text", onClick: () => setTab("text") },
-          { key: "history", label: t("tr.history", "History"), active: tab === "history", onClick: () => setTab("history") },
-          { key: "saved", label: t("tr.savedTab", "Saved"), active: tab === "saved", onClick: () => setTab("saved") },
-        ]}
-      />
+    /* Viewport-locked shell — the translator is a workspace, not a document:
+       the page itself must never scroll. Each pane scrolls INTERNALLY so the
+       language bar stays put at the top and each pane's toolbar stays pinned
+       to its own bottom edge. `100dvh` (not vh) so mobile browsers' shrinking
+       URL bar and the on-screen keyboard don't push the toolbars off-screen.
+       Same lock Discuss uses. */
+    <div
+      className="flex flex-col overflow-hidden bg-[var(--bg-primary)]"
+      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}
+    >
+      <div className="shrink-0">
+        <PageHeader
+          title={t("tr.title", "Translator")}
+          subtitle={t("tr.subtitle", "Translate text between 18 languages")}
+          icon={<TranslatorIcon size={20} />}
+          backHref="/"
+          tabs={[
+            { key: "text", label: t("tr.title", "Translator"), active: tab === "text", onClick: () => setTab("text") },
+            { key: "history", label: t("tr.history", "History"), active: tab === "history", onClick: () => setTab("history") },
+            { key: "saved", label: t("tr.savedTab", "Saved"), active: tab === "saved", onClick: () => setTab("saved") },
+          ]}
+        />
+      </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-4 sm:px-6">
-        {tab === "text" && (
-          <>
-            {/* Language bar */}
-            <div className="mb-3 flex flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 md:flex-row md:items-center">
-              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-                <LangTab code="auto" active={from === "auto"} onClick={() => setFrom("auto")} />
-                {QUICK_SOURCE.map((c) => (
-                  <LangTab key={c} code={c} active={from === c} onClick={() => setFrom(c)} />
-                ))}
-                {from !== "auto" && !QUICK_SOURCE.includes(from) && (
-                  <LangTab code={from} active onClick={() => setFrom(from)} />
-                )}
-                <LangPicker side="from" />
-              </div>
+      {tab === "text" ? (
+        /* pb-14 on mobile: the Hub's floating chrome (AI orb, Discuss chip, QA
+           issues chip) is anchored to the viewport bottom and on a narrow
+           screen it lands straight on the result pane's Listen/Copy/Save row.
+           Reserving that band is the only way to keep those buttons tappable
+           at 390px. Desktop clusters them centre-ward instead, so it only
+           needs normal padding. */
+        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-3 pb-14 pt-3 sm:px-5 sm:pb-4">
+          {/* Language bar — one control per side, swap between them. */}
+          <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+            <LangButton side="from" />
+            <button
+              type="button"
+              onClick={swap}
+              title={t("tr.swap", "Swap languages")}
+              aria-label={t("tr.swap", "Swap languages")}
+              className="shrink-0 rounded-xl p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 4 3.5 7.5 7 11" />
+                <path d="M3.5 7.5H16a4.5 4.5 0 0 1 0 9h-1" />
+                <path d="m17 20 3.5-3.5L17 13" />
+              </svg>
+            </button>
+            <LangButton side="to" />
+          </div>
 
-              <button
-                type="button"
-                onClick={swap}
-                title={t("tr.swap", "Swap languages")}
-                aria-label={t("tr.swap", "Swap languages")}
-                className="mx-auto shrink-0 rounded-xl border border-[var(--border-subtle)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:mx-1"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 4 3.5 7.5 7 11" />
-                  <path d="M3.5 7.5H16a4.5 4.5 0 0 1 0 9h-1" />
-                  <path d="m17 20 3.5-3.5L17 13" />
-                </svg>
-              </button>
-
-              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-                {QUICK_TARGET.map((c) => (
-                  <LangTab key={c} code={c} active={to === c} onClick={() => setTo(c)} />
-                ))}
-                {!QUICK_TARGET.includes(to) && <LangTab code={to} active onClick={() => setTo(to)} />}
-                <LangPicker side="to" />
-              </div>
-            </div>
-
-            {/* Two panes */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {/* Source */}
-              <div className="relative rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
+          {/* Panes — equal halves on desktop, stacked halves on mobile.
+              min-h-0 on every level is what lets the inner scroll work
+              instead of the panes growing and pushing the page. */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
+            {/* Source */}
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
+              <div className="relative min-h-0 flex-1">
                 <textarea
                   ref={sourceRef}
                   value={source}
                   onChange={(e) => setSource(e.target.value.slice(0, MAX_CHARS))}
                   placeholder={t("tr.sourcePlaceholder", "Enter text")}
                   dir={isRtl(effectiveFrom) ? "rtl" : "ltr"}
-                  rows={8}
-                  className="min-h-[220px] w-full resize-none bg-transparent px-4 pb-12 pt-4 text-[16px] leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+                  className="h-full w-full resize-none bg-transparent px-4 py-3.5 text-[15px] leading-relaxed text-[var(--text-primary)] outline-none [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin] placeholder:text-[var(--text-dim)] ltr:pr-11 rtl:pl-11"
                 />
                 {source && (
                   <button
@@ -621,82 +619,89 @@ export default function TranslatorApp() {
                     }}
                     title={t("tr.clear", "Clear text")}
                     aria-label={t("tr.clear", "Clear text")}
-                    className={`absolute top-3 ${isRtl(effectiveFrom) ? "left-3" : "right-3"} ${iconBtn}`}
+                    className={`absolute top-2.5 ltr:right-2 rtl:left-2 ${iconBtn}`}
                   >
-                    <CrossIcon size={14} />
+                    <CrossIcon size={13} />
                   </button>
                 )}
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={toggleMic}
-                    title={listening ? t("tr.stopSpeak", "Stop recording") : t("tr.speak", "Speak")}
-                    aria-label={listening ? t("tr.stopSpeak", "Stop recording") : t("tr.speak", "Speak")}
-                    className={`${iconBtn} ${listening ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}
-                  >
-                    <MicIcon size={15} />
-                  </button>
-                  <span className="text-[11px] tabular-nums text-[var(--text-dim)]">
-                    {listening
-                      ? t("tr.listening", "Listening…")
-                      : t("tr.charCount", "{n} / {max}")
-                          .replace("{n}", String(source.length))
-                          .replace("{max}", String(MAX_CHARS))}
-                  </span>
-                </div>
               </div>
-
-              {/* Translation */}
-              <div className="relative rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-                <div
-                  dir={isRtl(to) ? "rtl" : "ltr"}
-                  className="min-h-[220px] whitespace-pre-wrap px-4 pb-12 pt-4 text-[16px] leading-relaxed text-[var(--text-primary)]"
+              {/* Toolbar content hugs the INNER edge (screen centre). The Hub
+                  floats chrome over both bottom corners — the QA issues chip
+                  bottom-left, the AI + Discuss chips bottom-right — which sat
+                  directly on top of these controls. Clustering inward keeps
+                  every corner clear without stealing pane height. */}
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                <span className="text-[11px] tabular-nums text-[var(--text-dim)]">
+                  {listening
+                    ? t("tr.listening", "Listening…")
+                    : t("tr.charCount", "{n} / {max}")
+                        .replace("{n}", String(source.length))
+                        .replace("{max}", String(MAX_CHARS))}
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  title={listening ? t("tr.stopSpeak", "Stop recording") : t("tr.speak", "Speak")}
+                  aria-label={listening ? t("tr.stopSpeak", "Stop recording") : t("tr.speak", "Speak")}
+                  className={`${iconBtn} ${listening ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}
                 >
-                  {translated || (
-                    <span className="text-[var(--text-dim)]">
-                      {busy && source.trim() ? t("tr.translating", "Translating…") : t("tr.translation", "Translation")}
-                    </span>
-                  )}
-                </div>
-
-                {error && (
-                  <div className="mx-4 mb-2 flex items-center justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
-                    <span>{error}</span>
-                    <button
-                      type="button"
-                      onClick={() => void translate(source, from, to)}
-                      className="shrink-0 font-semibold underline underline-offset-2"
-                    >
-                      {t("tr.retry", "Retry")}
-                    </button>
-                  </div>
-                )}
-
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    <button type="button" onClick={speak} disabled={!translated} title={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} aria-label={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} className={`${iconBtn} ${speaking ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}>
-                      <Volume2Icon size={15} />
-                    </button>
-                    <button type="button" onClick={copy} disabled={!translated} title={copied ? t("tr.copied", "Copied") : t("tr.copy", "Copy")} aria-label={t("tr.copy", "Copy")} className={iconBtn}>
-                      {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
-                    </button>
-                    <button type="button" onClick={toggleSave} disabled={!translated} title={isSavedNow ? t("tr.saved", "Saved") : t("tr.save", "Save")} aria-label={t("tr.save", "Save")} className={`${iconBtn} ${isSavedNow ? "text-[var(--text-primary)]" : ""}`}>
-                      <StarIcon size={15} />
-                    </button>
-                  </div>
-                  <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
-                    {busy && <SpinnerIcon size={12} className="animate-spin" />}
-                    {!busy && cached && translated && t("tr.fromCache", "instant")}
-                  </span>
-                </div>
+                  <MicIcon size={15} />
+                </button>
               </div>
             </div>
-          </>
-        )}
 
-        {tab === "history" && (
-          <div className="space-y-3">
-            {history.length > 0 && (
+            {/* Translation */}
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+              <div
+                dir={isRtl(to) ? "rtl" : "ltr"}
+                className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3.5 text-[15px] leading-relaxed text-[var(--text-primary)] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
+              >
+                {translated || (
+                  <span className="text-[var(--text-dim)]">
+                    {busy && source.trim() ? t("tr.translating", "Translating…") : t("tr.translation", "Translation")}
+                  </span>
+                )}
+              </div>
+
+              {error && (
+                <div className="mx-3 mb-2 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+                  <span className="min-w-0 flex-1">{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => void translate(source, from, to)}
+                    className="shrink-0 font-semibold underline underline-offset-2"
+                  >
+                    {t("tr.retry", "Retry")}
+                  </button>
+                </div>
+              )}
+
+              <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                <div className="flex items-center gap-0.5">
+                  <button type="button" onClick={speak} disabled={!translated} title={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} aria-label={speaking ? t("tr.stopListen", "Stop") : t("tr.listen", "Listen")} className={`${iconBtn} ${speaking ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : ""}`}>
+                    <Volume2Icon size={15} />
+                  </button>
+                  <button type="button" onClick={copy} disabled={!translated} title={copied ? t("tr.copied", "Copied") : t("tr.copy", "Copy")} aria-label={t("tr.copy", "Copy")} className={iconBtn}>
+                    {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
+                  </button>
+                  <button type="button" onClick={toggleSave} disabled={!translated} title={isSavedNow ? t("tr.saved", "Saved") : t("tr.save", "Save")} aria-label={t("tr.save", "Save")} className={`${iconBtn} ${isSavedNow ? "text-[var(--text-primary)]" : ""}`}>
+                    <StarIcon size={15} />
+                  </button>
+                </div>
+                {/* Right side stays clear of the floating AI orb on desktop. */}
+                <span className="flex items-center gap-1.5 pe-10 text-[11px] text-[var(--text-dim)] md:pe-0">
+                  {busy && <SpinnerIcon size={12} className="animate-spin" />}
+                  {!busy && cached && translated && t("tr.fromCache", "instant")}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* History / Saved scroll normally inside the locked shell. */
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl space-y-3 px-4 pb-16 pt-3 sm:px-6">
+            {tab === "history" && history.length > 0 && (
               <div className="flex justify-end">
                 <button
                   type="button"
@@ -711,12 +716,10 @@ export default function TranslatorApp() {
                 </button>
               </div>
             )}
-            <EntryList items={history} kind="history" />
+            <EntryList items={tab === "history" ? history : saved} kind={tab === "history" ? "history" : "saved"} />
           </div>
-        )}
-
-        {tab === "saved" && <EntryList items={saved} kind="saved" />}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
