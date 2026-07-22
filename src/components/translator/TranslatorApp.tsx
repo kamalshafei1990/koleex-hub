@@ -795,12 +795,18 @@ export default function TranslatorApp() {
   /* The two language cards + swap button. Shared by the Text and Document
      tabs so both read as the same app and the columns line up with whatever
      sits under them. */
-  const LanguageRow = () => (
-    /* Desktop only. On a phone the selectors live INSIDE each pane (Apple's
-       arrangement) — a separate two-card bar plus a swap button cost ~200px
-       of vertical space before you reached the text, on the screen with the
-       least of it to give. */
-    <div className="hidden shrink-0 grid-cols-1 gap-2 md:grid md:grid-cols-[1fr_40px_1fr] md:gap-3">
+  /* `inPane` = the Text tab, where mobile shows the selectors INSIDE each
+     pane (Apple's arrangement) so this row hides below md — a separate
+     two-card bar plus a swap button cost ~200px of vertical space before you
+     reached the text. Document / Image / Website have no pane to host a chip,
+     so they keep this row at every width; hiding it there would leave them
+     with no way to choose a language on a phone at all. */
+  const LanguageRow = ({ inPane = false }: { inPane?: boolean }) => (
+    <div
+      className={`shrink-0 grid-cols-1 gap-2 md:grid md:grid-cols-[1fr_40px_1fr] md:gap-3 ${
+        inPane ? "hidden" : "grid"
+      }`}
+    >
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
         <LangButton side="from" />
       </div>
@@ -961,7 +967,7 @@ export default function TranslatorApp() {
               [1fr 40px 1fr] track, so each selector lines up exactly with the
               pane it controls. (One merged bar read as a single unrelated
               toolbar and cramped at narrow widths.) */}
-          <LanguageRow />
+          <LanguageRow inPane />
 
           {/* Panes — same track as the language row above so the columns align.
               min-h-0 on every level is what lets the inner scroll work
