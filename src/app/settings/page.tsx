@@ -37,6 +37,7 @@ import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import DisplayTab from "@/components/settings/tabs/DisplayTab";
+import SoundsTab from "@/components/settings/tabs/SoundsTab";
 import RegionTab from "@/components/settings/tabs/RegionTab";
 import AboutTab from "@/components/settings/tabs/AboutTab";
 import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
@@ -48,6 +49,7 @@ import KeyIcon from "@/components/icons/ui/KeyIcon";
 import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
 import AdminTab from "@/components/settings/tabs/AdminTab";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
@@ -56,7 +58,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -149,6 +151,11 @@ function SettingsContent() {
       node: <DisplayTab account={account} onChanged={onChanged} />,
     },
     {
+      id: "sounds", label: "Sounds", subtitle: "Tones, volume, do not disturb",
+      icon: <Volume2Icon className="h-3.5 w-3.5" />,
+      node: <SoundsTab />,
+    },
+    {
       id: "region", label: "Language & region", subtitle: "Date, time, number formats",
       icon: <GlobeIcon className="h-3.5 w-3.5" />,
       node: <RegionTab account={account} onChanged={onChanged} />,
@@ -195,7 +202,7 @@ function SettingsContent() {
   const active = sections.find((s) => s.id === tab) ?? sections[0];
   const byId = (id: Tab) => sections.find((s) => s.id === id)!;
   const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
-  const displayItems = (["display", "region"] as Tab[]).map(byId);
+  const displayItems = (["display", "sounds", "region"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
   const workspaceItems = isSA ? (["assets"] as Tab[]).map(byId) : [];

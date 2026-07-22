@@ -30,6 +30,142 @@
 
 const SOUND_URL = "/notification.wav";
 
+/* ── Sound preferences (Settings → Sounds) ────────────────────────────────
+   ONE source of truth for every sound the Hub makes. Before this, the bell
+   played the WAV with no way to turn it off, and Discuss synthesized its own
+   different chime behind its own toggle — two systems, two tones, and
+   "sound off" in one didn't silence the other. Every sound now flows
+   through playAppSound(category), which consults these prefs.
+
+   Stored in localStorage (device-level preference, like ringtones on a
+   phone): instant, offline-safe, no migration. */
+
+export type SoundTone =
+  | "classic"   // the original /notification.wav
+  | "chime"     // two-tone rising sweep (the old Discuss bloop)
+  | "ding" | "bell" | "pop" | "glass" | "pulse"
+  | "none";
+
+export type SoundCategory = "notification" | "message";
+
+export interface SoundPrefs {
+  master: boolean;                                  // one switch to rule them all
+  dnd: boolean;                                     // do not disturb
+  volume: number;                                   // 0..1
+  notification: { enabled: boolean; tone: SoundTone }; // inbox / tasks / approvals
+  message: { enabled: boolean; tone: SoundTone };      // Discuss messages
+}
+
+export const SOUND_TONES: Array<Exclude<SoundTone, "none">> = [
+  "classic", "chime", "ding", "bell", "pop", "glass", "pulse",
+];
+
+const PREFS_KEY = "kx:sound:prefs:v1";
+
+const DEFAULT_PREFS: SoundPrefs = {
+  master: true,
+  dnd: false,
+  volume: 0.8,
+  notification: { enabled: true, tone: "classic" },
+  message: { enabled: true, tone: "classic" },
+};
+
+let prefsCache: SoundPrefs | null = null;
+const prefListeners = new Set<(p: SoundPrefs) => void>();
+
+export function getSoundPrefs(): SoundPrefs {
+  if (prefsCache) return prefsCache;
+  if (typeof window === "undefined") return DEFAULT_PREFS;
+  let stored: Partial<SoundPrefs> | null = null;
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (raw) stored = JSON.parse(raw) as Partial<SoundPrefs>;
+  } catch { /* corrupted — fall back to defaults */ }
+
+  if (!stored) {
+    /* First run: honour the OLD Discuss-local toggles so nobody who had
+       already silenced Discuss suddenly gets sound back. */
+    const legacySound = localStorage.getItem("discuss:pref:sound");
+    const legacyDnd = localStorage.getItem("discuss:pref:dnd");
+    prefsCache = {
+      ...DEFAULT_PREFS,
+      dnd: legacyDnd === "1",
+      message: { ...DEFAULT_PREFS.message, enabled: legacySound !== "0" },
+    };
+    return prefsCache;
+  }
+  prefsCache = {
+    ...DEFAULT_PREFS,
+    ...stored,
+    notification: { ...DEFAULT_PREFS.notification, ...(stored.notification ?? {}) },
+    message: { ...DEFAULT_PREFS.message, ...(stored.message ?? {}) },
+  };
+  return prefsCache;
+}
+
+export function setSoundPrefs(patch: {
+  master?: boolean; dnd?: boolean; volume?: number;
+  notification?: Partial<SoundPrefs["notification"]>;
+  message?: Partial<SoundPrefs["message"]>;
+}): SoundPrefs {
+  const cur = getSoundPrefs();
+  const next: SoundPrefs = {
+    master: patch.master ?? cur.master,
+    dnd: patch.dnd ?? cur.dnd,
+    volume: patch.volume !== undefined ? Math.min(1, Math.max(0, patch.volume)) : cur.volume,
+    notification: { ...cur.notification, ...(patch.notification ?? {}) },
+    message: { ...cur.message, ...(patch.message ?? {}) },
+  };
+  prefsCache = next;
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+  prefListeners.forEach((fn) => fn(next));
+  return next;
+}
+
+/** Subscribe to pref changes (Settings UI ↔ Discuss toggles stay in sync). */
+export function subscribeSoundPrefs(fn: (p: SoundPrefs) => void): () => void {
+  prefListeners.add(fn);
+  return () => prefListeners.delete(fn);
+}
+
+/* ── Synthesized tones ───────────────────────────────────────────────────
+   Each tone is a tiny Web Audio recipe — no assets, no network, identical
+   offline and in mainland China. All routed through a GainNode so the
+   volume pref applies uniformly. */
+function synthTone(ctx: AudioContext, tone: SoundTone, volume: number): void {
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.value = volume;
+  master.connect(ctx.destination);
+
+  const note = (
+    freq: number, at: number, dur: number, peak: number,
+    type: OscillatorType = "sine", glideTo?: number,
+  ) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now + at);
+    if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, now + at + dur * 0.55);
+    gain.gain.setValueAtTime(0.0001, now + at);
+    gain.gain.exponentialRampToValueAtTime(peak, now + at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + at + dur);
+    osc.connect(gain).connect(master);
+    osc.start(now + at);
+    osc.stop(now + at + dur + 0.05);
+  };
+
+  switch (tone) {
+    case "chime": note(880, 0, 0.22, 0.5, "sine", 1320); break;
+    case "ding":  note(1568, 0, 0.35, 0.5); break;
+    case "bell":  note(660, 0, 0.5, 0.45, "triangle"); note(1320, 0, 0.35, 0.18, "sine"); break;
+    case "pop":   note(440, 0, 0.09, 0.4, "square"); break;
+    case "glass": note(2093, 0, 0.18, 0.35); note(2637, 0.07, 0.22, 0.3); break;
+    case "pulse": note(980, 0, 0.08, 0.45); note(980, 0.13, 0.08, 0.45); break;
+    default: break;
+  }
+}
+
 let audioCtx: AudioContext | null = null;
 let decodedBuffer: AudioBuffer | null = null;
 let decodePromise: Promise<AudioBuffer | null> | null = null;
@@ -131,13 +267,15 @@ function decode(): Promise<AudioBuffer | null> {
   return decodePromise;
 }
 
-function playBufferNow(): boolean {
+function playBufferNow(volume?: number): boolean {
   const ctx = audioCtx;
   if (!ctx || !decodedBuffer) return false;
   try {
     const src = ctx.createBufferSource();
     src.buffer = decodedBuffer;
-    src.connect(ctx.destination);
+    const gain = ctx.createGain();
+    gain.gain.value = volume ?? getSoundPrefs().volume;
+    src.connect(gain).connect(ctx.destination);
     src.start(0);
     return true;
   } catch {
@@ -209,10 +347,58 @@ export function primeNotificationSound() {
   void decode();
 }
 
-/** Play the notification sound. Safe to call from any callback. If
- *  the audio context can't play yet (no prior user gesture) the call
- *  is queued and the next user gesture will fire a single backlog
- *  chime. */
+/** Play the sound for a CATEGORY, honouring the user's Settings → Sounds
+ *  preferences (master switch, do-not-disturb, per-category enable, chosen
+ *  tone, volume). This is THE way any part of the Hub makes a sound. */
+export function playAppSound(category: SoundCategory) {
+  const prefs = getSoundPrefs();
+  if (!prefs.master || prefs.dnd) return;
+  const cat = prefs[category];
+  if (!cat.enabled || cat.tone === "none") return;
+  if (cat.tone === "classic") {
+    playNotificationSound();
+    return;
+  }
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    void ctx.resume().then(() => {
+      if (audioCtx?.state === "running") synthTone(audioCtx, cat.tone, prefs.volume);
+    });
+    return;
+  }
+  try { synthTone(ctx, cat.tone, prefs.volume); } catch { /* stay silent */ }
+}
+
+/** Preview a tone at a given volume — used by Settings → Sounds. Ignores
+ *  the enable/DND switches on purpose: previewing while "off" is how you
+ *  choose the tone you'll turn back on. Always called from a click, so
+ *  the context is already unlockable. */
+export function previewSound(tone: SoundTone, volume?: number) {
+  if (tone === "none") return;
+  const vol = volume ?? getSoundPrefs().volume;
+  if (tone === "classic") {
+    attachUnlockListeners();
+    const ctx = ensureCtx();
+    if (!ctx) return;
+    void Promise.all([
+      ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
+      decode(),
+    ]).then(() => playBufferNow(vol));
+    return;
+  }
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    void ctx.resume().then(() => { if (audioCtx?.state === "running") synthTone(audioCtx, tone, vol); });
+    return;
+  }
+  try { synthTone(ctx, tone, vol); } catch { /* stay silent */ }
+}
+
+/** Play the classic notification WAV. Prefer playAppSound(category) — this
+ *  stays exported for the unlock/backlog machinery and the classic tone. */
 export function playNotificationSound() {
   attachUnlockListeners();
   const ctx = ensureCtx();

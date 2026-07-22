@@ -29,11 +29,17 @@
        matches Slack's behavior.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  getSoundPrefs,
+  playAppSound,
+  setSoundPrefs,
+  subscribeSoundPrefs,
+} from "@/lib/notificationSound";
 
-const LS_KEY_SOUND = "discuss:pref:sound";
+/* discuss:pref:sound + :dnd migrated into the shared engine (see
+   notificationSound.ts getSoundPrefs first-run migration). */
 const LS_KEY_DESKTOP = "discuss:pref:desktop";
-const LS_KEY_DND = "discuss:pref:dnd";
 
 type NotificationPermissionState =
   | "default"
@@ -119,20 +125,17 @@ export function useDiscussNotifications(): DiscussNotificationApi {
   const [permission, setPermission] = useState<NotificationPermissionState>(
     "default",
   );
-  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() =>
-    readBoolPref(LS_KEY_SOUND, true),
-  );
+  /* Sound + DND come from the SHARED sound engine (Settings → Sounds), so
+     the toggle here and the one in Settings are the same switch — before
+     this, turning sound off in Discuss silenced only Discuss's own chime
+     while the bell kept beeping. Desktop-toast pref stays Discuss-local. */
+  const [enginePrefs, setEnginePrefs] = useState(getSoundPrefs);
+  useEffect(() => subscribeSoundPrefs(setEnginePrefs), []);
+  const soundEnabled = enginePrefs.message.enabled;
+  const dndEnabled = enginePrefs.dnd;
   const [desktopEnabled, setDesktopEnabledState] = useState<boolean>(() =>
     readBoolPref(LS_KEY_DESKTOP, true),
   );
-  const [dndEnabled, setDndEnabledState] = useState<boolean>(() =>
-    readBoolPref(LS_KEY_DND, false),
-  );
-
-  /* Shared AudioContext — created lazily on the first notify() so we
-     respect Chrome's autoplay policy (AudioContext must be constructed
-     from a user gesture, but once constructed it can play forever). */
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   /* Read the current browser permission on mount. We avoid doing this
      on SSR because Notification is undefined there. */
@@ -146,8 +149,7 @@ export function useDiscussNotifications(): DiscussNotificationApi {
   }, []);
 
   const setSoundEnabled = useCallback((on: boolean) => {
-    setSoundEnabledState(on);
-    writeBoolPref(LS_KEY_SOUND, on);
+    setSoundPrefs({ message: { enabled: on } });
   }, []);
 
   const setDesktopEnabled = useCallback((on: boolean) => {
@@ -156,8 +158,7 @@ export function useDiscussNotifications(): DiscussNotificationApi {
   }, []);
 
   const setDndEnabled = useCallback((on: boolean) => {
-    setDndEnabledState(on);
-    writeBoolPref(LS_KEY_DND, on);
+    setSoundPrefs({ dnd: on });
   }, []);
 
   const requestDesktopPermission = useCallback(async () => {
@@ -173,38 +174,10 @@ export function useDiscussNotifications(): DiscussNotificationApi {
     }
   }, []);
 
-  /** Synthesize a short two-tone "bloop" chime. Cheap, no assets. */
+  /** Message sound — the shared engine applies the user's chosen tone,
+      volume, master switch and DND, so this is just a category ping. */
   const playChime = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!Ctor) return;
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new Ctor();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === "suspended") {
-        void ctx.resume();
-      }
-      const now = ctx.currentTime;
-      /* Two notes: 880 Hz → 1320 Hz over 180ms with a soft envelope. */
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.25);
-    } catch {
-      /* Autoplay blocked, user denied audio, whatever — stay silent. */
-    }
+    playAppSound("message");
   }, []);
 
   const notify = useCallback<DiscussNotificationApi["notify"]>(
@@ -213,14 +186,16 @@ export function useDiscussNotifications(): DiscussNotificationApi {
       if (dndEnabled) return;
       if (channelPrefs.muted) return;
 
+
       /* Per-channel filter: if the user set this channel to "mentions"
          only, bail unless THIS message actually mentions them. "none"
          bails unconditionally. */
       if (channelPrefs.pref === "none") return;
       if (channelPrefs.pref === "mentions" && !channelPrefs.mentionsMe) return;
 
-      /* Sound first — cheapest and most noticeable. */
-      if (soundEnabled) playChime();
+      /* Sound first — cheapest and most noticeable. The engine applies
+         the master/enabled/DND gates and the user's tone + volume. */
+      playChime();
 
       /* Desktop toast requires explicit permission. */
       if (
@@ -254,7 +229,7 @@ export function useDiscussNotifications(): DiscussNotificationApi {
         }
       }
     },
-    [dndEnabled, soundEnabled, desktopEnabled, permission, playChime],
+    [dndEnabled, desktopEnabled, permission, playChime],
   );
 
   return useMemo(

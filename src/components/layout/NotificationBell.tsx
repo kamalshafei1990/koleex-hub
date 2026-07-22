@@ -55,7 +55,7 @@ import { useCurrentAccount } from "@/lib/identity";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
-  playNotificationSound,
+  playAppSound,
   primeNotificationSound,
 } from "@/lib/notificationSound";
 import type {
@@ -188,7 +188,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   useEffect(() => {
     const prev = prevInboxRef.current;
     prevInboxRef.current = inboxUnread;
-    if (prev !== null && inboxUnread > prev) playNotificationSound();
+    if (prev !== null && inboxUnread > prev) playAppSound("notification");
   }, [inboxUnread]);
 
   /* Publish the authoritative inbox count to the shared store so the
@@ -233,9 +233,11 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         const myId = accountIdRef.current;
         if (!myId) return;
         if (msg.author_account_id === myId) return;
-        /* Chime fires for every inbound message from someone else,
-           regardless of which page we're on — a sound is a welcome signal. */
-        playNotificationSound();
+        /* Chime fires for every inbound message from someone else —
+           EXCEPT on /discuss, where DiscussApp raises its own sound with
+           per-channel mute/mention rules for the same event. Both firing
+           at once was the "two different sounds per message" bug. */
+        if (!window.location.pathname.startsWith("/discuss")) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
            (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
@@ -264,7 +266,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
     const aid = accountIdRef.current;
     if (!aid) return;
     const n = await fetchUnreadCount(aid);
-    setInboxUnread((prev) => Math.max(prev, n));
+    /* Inside the 5s realtime grace window, never step on an optimistic bump.
+       Outside it, take the DB's word as-is — Math.max here pinned the badge
+       HIGH after the user read notifications on another device, until the
+       next poll happened to correct it. */
+    const withinGrace = Date.now() - lastRealtimeBumpRef.current < 5000;
+    setInboxUnread((prev) => (withinGrace ? Math.max(prev, n) : n));
   }, []);
 
   /* React to "discuss:unread-changed" (DiscussApp marked a channel as
@@ -346,8 +353,8 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             (s, c) => s + (c.unread_count ?? 0),
             0,
           );
-          if (newTotal > oldTotal) {
-            playNotificationSound();
+          if (newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")) {
+            playAppSound("message");
           }
           return rows;
         });
