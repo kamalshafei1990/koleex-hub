@@ -688,11 +688,12 @@ export default function TranslatorApp() {
      row wrapped and cramped the bar at every width below ~1400px. The
      three languages Koleex uses daily are pinned to the top of the list
      instead, so they stay one tap away without eating the bar.          */
-  /* `pill` is the in-pane chip on mobile: a bordered pill that hugs its
-     label, so each half of the workspace clearly owns its own language.
-     Without a border it read as loose text floating above the box. The
-     desktop row keeps the plain full-width button — it already sits in its
-     own bordered card, so a pill inside it would be a border on a border. */
+  /* `pill` is the in-pane selector on mobile: a bordered, fully-rounded
+     control that spans the card so it lines up with the text below it and
+     gives the chevron a fixed home at the far edge. (It hugged its label
+     first — that left a ragged right edge inside a full-width card.) The
+     desktop row keeps the plain button: it already sits in its own bordered
+     card, where a pill would be a border on a border. */
   const LangButton = ({ side, pill = false }: { side: "from" | "to"; pill?: boolean }) => {
     const open = pickerOpen === side;
     const current = side === "from" ? from : to;
@@ -734,7 +735,7 @@ export default function TranslatorApp() {
     );
 
     return (
-      <div className={`relative min-w-0 ${pill ? "inline-flex max-w-full" : "flex-1"}`}>
+      <div className="relative min-w-0 flex-1">
         <button
           type="button"
           onClick={() => {
@@ -743,7 +744,7 @@ export default function TranslatorApp() {
           }}
           className={`flex items-center gap-2 font-medium transition-colors ${
             pill
-              ? "w-auto max-w-full justify-start rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px]"
+              ? "w-full justify-between rounded-full border border-[var(--border-subtle)] px-3.5 py-1.5 text-[12.5px]"
               : "w-full justify-between rounded-xl px-3 py-2 text-[13px]"
           } ${
             open
