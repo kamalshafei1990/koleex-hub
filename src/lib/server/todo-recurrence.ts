@@ -20,6 +20,16 @@ import { sendPushToAccounts } from "@/lib/server/web-push";
 
 type Cadence = "daily" | "weekly" | "monthly";
 
+/* The business day rolls over at midnight CHINA time, not UTC. Koleex
+   operates on Asia/Shanghai (UTC+8, no DST), and keying periods to UTC
+   meant a "daily" task didn't start its next run until 08:00 local.
+   All period math below works on the clock shifted by this offset. */
+const TENANT_UTC_OFFSET_HOURS = 8;
+
+function toTenantClock(d: Date): Date {
+  return new Date(d.getTime() + TENANT_UTC_OFFSET_HOURS * 3600_000);
+}
+
 interface TemplateRow {
   id: string;
   title: string;
@@ -39,10 +49,11 @@ interface TemplateRow {
   metadata: Record<string, unknown> | null;
 }
 
-/* Return the period-start date (UTC, YYYY-MM-DD) that `d` falls into for the
-   given cadence. Daily = that day; weekly = Monday of that ISO week; monthly =
-   the 1st of that month. */
-function periodStart(d: Date, cadence: Cadence): string {
+/* Return the period-start date (tenant-local, YYYY-MM-DD) that `d` falls into
+   for the given cadence. Daily = that day; weekly = Monday of that ISO week;
+   monthly = the 1st of that month. */
+function periodStart(instant: Date, cadence: Cadence): string {
+  const d = toTenantClock(instant);
   const y = d.getUTCFullYear();
   const m = d.getUTCMonth();
   const day = d.getUTCDate();
@@ -60,8 +71,9 @@ function periodStart(d: Date, cadence: Cadence): string {
   return dt.toISOString().slice(0, 10);
 }
 
-/* End-of-period date (inclusive) used as the spawned task's due_date, so the
-   assignee has until the end of the day/week/month to finish it. */
+/* End-of-period instant (inclusive) used as the spawned task's due_date, so
+   the assignee has until the end of the local day/week/month to finish it.
+   23:59 tenant-local, expressed back in UTC (so daily = 15:59Z). */
 function periodDue(startIso: string, cadence: Cadence): string {
   const [y, m, d] = startIso.split("-").map(Number);
   let end: Date;
@@ -73,7 +85,7 @@ function periodDue(startIso: string, cadence: Cadence): string {
     // last day of the month
     end = new Date(Date.UTC(y, m, 0, 23, 59, 0));
   }
-  return end.toISOString();
+  return new Date(end.getTime() - TENANT_UTC_OFFSET_HOURS * 3600_000).toISOString();
 }
 
 export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<number> {
@@ -92,7 +104,8 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
   const templates = (rows ?? []) as TemplateRow[];
   if (templates.length === 0) return 0;
 
-  const todayKey = now.toISOString().slice(0, 10);
+  // Local calendar date — recurrence_until means "through this day in China".
+  const todayKey = toTenantClock(now).toISOString().slice(0, 10);
   let spawned = 0;
 
   for (const t of templates) {

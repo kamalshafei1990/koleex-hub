@@ -142,6 +142,8 @@ export const todoT: Translations = {
   "approval.rejectPlaceholder": { en: "Reason (optional) — e.g. missing the report attachment…", zh: "原因（可选）— 例如：缺少报告附件…", ar: "السبب (اختياري) — مثال: مرفق التقرير ناقص…" },
   "approval.rejectSubmit": { en: "Send back",               zh: "退回",                   ar: "إعادة" },
   "approval.returned":  { en: "Returned",                   zh: "已退回",                 ar: "أُعيدت" },
+  /* Only shown on returns that predate the mandatory-reason rule. */
+  "approval.noReason":  { en: "no reason was recorded",     zh: "未记录原因",             ar: "لم يُسجَّل سبب" },
 
   /* Priority (medium was missing) */
   "p.medium":          { en: "Medium",                     zh: "中",                     ar: "متوسطة" },

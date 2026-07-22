@@ -1072,7 +1072,12 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               <span className="font-bold">{t("approval.returned")}</span>
               {(() => {
                 const reason = (task.metadata as { rejection?: { reason?: string } } | null)?.rejection?.reason;
-                return reason ? <>: <AutoTranslatedText text={reason} plain /></> : null;
+                // New returns always carry a reason (enforced client + server).
+                // Rows returned before that rule have none — say so instead of
+                // rendering a bare "Returned" that looks broken.
+                return reason
+                  ? <>: <AutoTranslatedText text={reason} plain /></>
+                  : <span className="font-normal text-red-300/70"> — {t("approval.noReason")}</span>;
               })()}
             </div>
           )}
