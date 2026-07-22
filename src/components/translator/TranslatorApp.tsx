@@ -552,7 +552,12 @@ export default function TranslatorApp() {
       className="flex flex-col overflow-hidden bg-[var(--bg-primary)]"
       style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}
     >
-      <div className="shrink-0">
+      {/* PageHeader carries no horizontal padding of its own (its sticky tab
+          rail even uses -mx-4), so it must sit inside the SAME container +
+          padding as the workspace below. Without this the hero and tabs ran
+          flush against the sidebar while the panes were inset — the rows
+          didn't line up. */}
+      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-3 sm:px-5">
         <PageHeader
           title={t("tr.title", "Translator")}
           subtitle={t("tr.subtitle", "Translate text between 18 languages")}
@@ -574,40 +579,70 @@ export default function TranslatorApp() {
            at 390px. Desktop clusters them centre-ward instead, so it only
            needs normal padding. */
         <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-3 pb-14 pt-3 sm:px-5 sm:pb-4">
-          {/* Language bar — one control per side, swap between them. */}
-          <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
-            <LangButton side="from" />
-            <button
-              type="button"
-              onClick={swap}
-              title={t("tr.swap", "Swap languages")}
-              aria-label={t("tr.swap", "Swap languages")}
-              className="shrink-0 rounded-xl p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 4 3.5 7.5 7 11" />
-                <path d="M3.5 7.5H16a4.5 4.5 0 0 1 0 9h-1" />
-                <path d="m17 20 3.5-3.5L17 13" />
-              </svg>
-            </button>
-            <LangButton side="to" />
+          {/* Language row — TWO separate cards, one per side, each sitting
+              directly above its own pane, with the swap button in the gutter
+              between them. Both this row and the pane row below use the same
+              [1fr 40px 1fr] track, so each selector lines up exactly with the
+              pane it controls. (One merged bar read as a single unrelated
+              toolbar and cramped at narrow widths.) */}
+          <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-[1fr_40px_1fr] md:gap-3">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+              <LangButton side="from" />
+            </div>
+            <div className="flex items-center justify-center">
+              <button
+                type="button"
+                onClick={swap}
+                title={t("tr.swap", "Swap languages")}
+                aria-label={t("tr.swap", "Swap languages")}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 4 3.5 7.5 7 11" />
+                  <path d="M3.5 7.5H16a4.5 4.5 0 0 1 0 9h-1" />
+                  <path d="m17 20 3.5-3.5L17 13" />
+                </svg>
+              </button>
+            </div>
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+              <LangButton side="to" />
+            </div>
           </div>
 
-          {/* Panes — equal halves on desktop, stacked halves on mobile.
+          {/* Panes — same track as the language row above so the columns align.
               min-h-0 on every level is what lets the inner scroll work
               instead of the panes growing and pushing the page. */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[1fr_40px_1fr]">
             {/* Source */}
             <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
-              <div className="relative min-h-0 flex-1">
+              {/* px-4 py-3.5 EXACTLY matches the result pane. The clear button
+                  used to float over the text, forcing pr-11 here only — which
+                  made the source column ~28px narrower than the translation
+                  and read as "the English is compressed". It now lives in the
+                  toolbar, so both languages get identical measure. */}
+              <div className="min-h-0 flex-1">
                 <textarea
                   ref={sourceRef}
                   value={source}
                   onChange={(e) => setSource(e.target.value.slice(0, MAX_CHARS))}
                   placeholder={t("tr.sourcePlaceholder", "Enter text")}
                   dir={isRtl(effectiveFrom) ? "rtl" : "ltr"}
-                  className="h-full w-full resize-none bg-transparent px-4 py-3.5 text-[15px] leading-relaxed text-[var(--text-primary)] outline-none [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin] placeholder:text-[var(--text-dim)] ltr:pr-11 rtl:pl-11"
+                  className="h-full w-full resize-none bg-transparent px-4 py-3.5 text-[15px] leading-relaxed text-[var(--text-primary)] outline-none [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin] placeholder:text-[var(--text-dim)]"
                 />
+              </div>
+              {/* Toolbar content hugs the INNER edge (screen centre). The Hub
+                  floats chrome over both bottom corners — the QA issues chip
+                  bottom-left, the AI + Discuss chips bottom-right — which sat
+                  directly on top of these controls. Clustering inward keeps
+                  every corner clear without stealing pane height. */}
+              <div className="flex shrink-0 items-center justify-end gap-1.5 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                <span className="text-[11px] tabular-nums text-[var(--text-dim)]">
+                  {listening
+                    ? t("tr.listening", "Listening…")
+                    : t("tr.charCount", "{n} / {max}")
+                        .replace("{n}", String(source.length))
+                        .replace("{max}", String(MAX_CHARS))}
+                </span>
                 {source && (
                   <button
                     type="button"
@@ -619,25 +654,11 @@ export default function TranslatorApp() {
                     }}
                     title={t("tr.clear", "Clear text")}
                     aria-label={t("tr.clear", "Clear text")}
-                    className={`absolute top-2.5 ltr:right-2 rtl:left-2 ${iconBtn}`}
+                    className={iconBtn}
                   >
-                    <CrossIcon size={13} />
+                    <CrossIcon size={14} />
                   </button>
                 )}
-              </div>
-              {/* Toolbar content hugs the INNER edge (screen centre). The Hub
-                  floats chrome over both bottom corners — the QA issues chip
-                  bottom-left, the AI + Discuss chips bottom-right — which sat
-                  directly on top of these controls. Clustering inward keeps
-                  every corner clear without stealing pane height. */}
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
-                <span className="text-[11px] tabular-nums text-[var(--text-dim)]">
-                  {listening
-                    ? t("tr.listening", "Listening…")
-                    : t("tr.charCount", "{n} / {max}")
-                        .replace("{n}", String(source.length))
-                        .replace("{max}", String(MAX_CHARS))}
-                </span>
                 <button
                   type="button"
                   onClick={toggleMic}
@@ -649,6 +670,10 @@ export default function TranslatorApp() {
                 </button>
               </div>
             </div>
+
+            {/* Gutter — keeps the pane columns on the same track as the
+                language selectors above. Empty by design. */}
+            <div className="hidden md:block" aria-hidden />
 
             {/* Translation */}
             <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
