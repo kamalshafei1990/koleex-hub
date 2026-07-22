@@ -3,18 +3,18 @@
 /* ---------------------------------------------------------------------------
    Settings → Sounds — full control over every sound the Hub makes.
 
-   One engine (src/lib/notificationSound.ts) plays everything; this panel
-   edits its preferences. Two categories exist today:
-     · Notifications — inbox: task assignments, approvals, reminders
-     · Messages      — Discuss chat messages
-   Each has its own on/off switch and its own tone, on top of a master
-   switch, Do Not Disturb and a global volume. Tones are synthesized with
-   Web Audio (except Classic, the original WAV) — no downloads, identical
-   offline and in mainland China. The ▶ button previews any tone at the
-   current volume even while sounds are off, because previewing is how you
-   pick the tone you're about to turn back on.
+   Layout follows iOS Sounds & Haptics, which is the pattern people already
+   know: the main screen is a list of grouped ROWS showing each alert and its
+   CURRENT tone ("Approvals … Bell ›"); tapping a row opens a picker screen
+   listing the tones with a checkmark on the selected one. Tapping a tone in
+   that list selects AND plays it, exactly like choosing a text tone on a
+   phone — you never hunt for a separate preview button.
 
-   Prefs are device-local (localStorage), like ringtones on a phone.
+   One engine (src/lib/notificationSound.ts) plays everything; this panel only
+   edits its preferences. Tones are synthesized with Web Audio (except
+   Classic, the original WAV) — no downloads, identical offline and in
+   mainland China. Prefs are device-local (localStorage), like a phone's
+   ringtone.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -30,7 +30,8 @@ import {
   setSoundPrefs,
   subscribeSoundPrefs,
 } from "@/lib/notificationSound";
-import { SelectControl, SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
+import { SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
+import VlIcon from "@/components/ui/VlIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 
 const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
@@ -41,6 +42,11 @@ const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
   pop: "Pop",
   glass: "Glass",
   pulse: "Pulse",
+};
+
+const CATEGORY_LABELS: Record<SoundCategory, string> = {
+  notification: "Notifications",
+  message: "Messages",
 };
 
 /* Same labels as Settings → Notification preferences "By activity", so the
@@ -56,9 +62,21 @@ const ACTIVITY_LABELS: Record<SoundActivity, string> = {
   price_fx: "Price and FX changes",
 };
 
+/** What the picker screen is currently editing. */
+type PickerTarget =
+  | { kind: "category"; category: SoundCategory }
+  | { kind: "activity"; activity: SoundActivity };
+
 export default function SoundsTab() {
   const [prefs, setPrefs] = useState<SoundPrefs>(getSoundPrefs);
+  const [picker, setPicker] = useState<PickerTarget | null>(null);
   useEffect(() => subscribeSoundPrefs(setPrefs), []);
+
+  /* Picker replaces the pane, iOS-push style — one thing on screen at a
+     time, and the back chevron returns to the list. */
+  if (picker) {
+    return <TonePicker target={picker} prefs={prefs} onBack={() => setPicker(null)} />;
+  }
 
   const muted = !prefs.master || prefs.dnd;
 
@@ -80,8 +98,8 @@ export default function SoundsTab() {
           checked={prefs.dnd}
           onChange={(on) => setSoundPrefs({ dnd: on })}
         />
-        {/* Volume — released slider previews at the new level so you hear
-            what you chose without hunting for a test button. */}
+        {/* Volume — releasing the slider previews at the new level so you
+            hear what you chose without hunting for a test button. */}
         <div className="flex items-center gap-3 py-3">
           <Volume2Icon className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
           <div className="min-w-0 flex-1">
@@ -103,20 +121,65 @@ export default function SoundsTab() {
         </div>
       </SettingsCard>
 
-      <CategoryCard
-        title="Notifications"
-        subtitle="Task assignments, approvals, reminders — the bell."
-        category="notification"
-        prefs={prefs}
-        muted={muted}
-      />
-      <CategoryCard
-        title="Messages"
-        subtitle="Discuss chat messages. Muted conversations stay silent regardless."
-        category="message"
-        prefs={prefs}
-        muted={muted}
-      />
+      {/* ── Alerts and sounds ─────────────────────────────────────────────
+          The two top-level channels, each with its own on/off and its own
+          tone row. Mirrors iOS's "Alerts and System Sounds" block. */}
+      <SettingsCard
+        title="Alerts and sounds"
+        subtitle={muted ? "Currently silenced by the master switch / Do Not Disturb." : "Pick a different sound for each kind of alert."}
+      >
+        <SwitchRow
+          label="Notification sounds"
+          hint="Task assignments, approvals, reminders — the bell."
+          checked={prefs.notification.enabled}
+          onChange={(on) => setSoundPrefs({ notification: { enabled: on } })}
+        />
+        <NavRow
+          label="Notification tone"
+          value={TONE_LABELS[prefs.notification.tone as Exclude<SoundTone, "none">] ?? "Silent"}
+          onClick={() => setPicker({ kind: "category", category: "notification" })}
+        />
+        <SwitchRow
+          label="Message sounds"
+          hint="Discuss chat messages. Muted conversations stay silent regardless."
+          checked={prefs.message.enabled}
+          onChange={(on) => setSoundPrefs({ message: { enabled: on } })}
+        />
+        <NavRow
+          label="Message tone"
+          value={TONE_LABELS[prefs.message.tone as Exclude<SoundTone, "none">] ?? "Silent"}
+          onClick={() => setPicker({ kind: "category", category: "message" })}
+          last
+        />
+      </SettingsCard>
+
+      {/* ── Per-activity tones ────────────────────────────────────────────
+          Exactly the activities from Notification preferences, each able to
+          carry its own sound so an approval is audibly different from a task
+          reminder. "Default" inherits the notification tone above. */}
+      <SettingsCard
+        title="By activity"
+        subtitle="Give any activity its own sound. Default uses the notification tone."
+      >
+        {SOUND_ACTIVITIES.map((act, i) => {
+          const override = prefs.notification.activityTones?.[act];
+          return (
+            <NavRow
+              key={act}
+              label={ACTIVITY_LABELS[act]}
+              value={
+                override === undefined
+                  ? "Default"
+                  : override === "none"
+                    ? "Silent"
+                    : TONE_LABELS[override]
+              }
+              onClick={() => setPicker({ kind: "activity", activity: act })}
+              last={i === SOUND_ACTIVITIES.length - 1}
+            />
+          );
+        })}
+      </SettingsCard>
 
       <p className="px-1 text-[11.5px] text-[var(--text-dim)]">
         Tones are generated on this device — nothing to download, and they work
@@ -126,133 +189,158 @@ export default function SoundsTab() {
   );
 }
 
-function CategoryCard({
-  title,
-  subtitle,
-  category,
-  prefs,
-  muted,
+/* ── A tappable row: label left, current value + chevron right ──────────── */
+function NavRow({
+  label,
+  value,
+  onClick,
+  last,
 }: {
-  title: string;
-  subtitle: string;
-  category: SoundCategory;
-  prefs: SoundPrefs;
-  muted: boolean;
+  label: string;
+  value: string;
+  onClick: () => void;
+  last?: boolean;
 }) {
-  const cat = prefs[category];
   return (
-    <SettingsCard title={title} subtitle={subtitle}>
-      <SwitchRow
-        label={`${title} sound`}
-        hint={muted ? "Currently silenced by the master switch / Do Not Disturb." : undefined}
-        checked={cat.enabled}
-        onChange={(on) => setSoundPrefs({ [category]: { enabled: on } } as Partial<SoundPrefs>)}
-      />
-      <div className="pt-2">
-        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
-          Tone
-        </div>
-        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-          {SOUND_TONES.map((tone, i) => (
-            <div
-              key={tone}
-              className={`flex items-center gap-2 px-3 py-2 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""} ${
-                cat.tone === tone ? "bg-[var(--bg-surface)]" : ""
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setSoundPrefs({ [category]: { tone } } as Partial<SoundPrefs>)}
-                className="flex min-w-0 flex-1 items-center gap-2 text-start"
-              >
-                {/* Radio dot */}
-                <span
-                  className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
-                    cat.tone === tone
-                      ? "border-[var(--text-primary)]"
-                      : "border-[var(--border-color)]"
-                  }`}
-                >
-                  {cat.tone === tone && (
-                    <span className="h-2 w-2 rounded-full bg-[var(--text-primary)]" />
-                  )}
-                </span>
-                <span className={`text-[13px] ${cat.tone === tone ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
-                  {TONE_LABELS[tone]}
-                </span>
-                {tone === "classic" && (
-                  <span className="text-[10.5px] text-[var(--text-dim)]">default</span>
-                )}
-              </button>
-              {/* Preview — deliberately works even while sounds are off. */}
-              <button
-                type="button"
-                onClick={() => previewSound(tone)}
-                title="Preview"
-                aria-label={`Preview ${TONE_LABELS[tone]}`}
-                className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-              >
-                ▶
-              </button>
-            </div>
-          ))}
-        </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-4 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
+        last ? "" : "border-b border-[var(--border-faint)]"
+      }`}
+    >
+      <span className="min-w-0 truncate text-[13px] font-medium text-[var(--text-primary)]">
+        {label}
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5">
+        <span className="text-[13px] text-[var(--text-muted)]">{value}</span>
+        {/* -90° turns the down-chevron into the standard "drills in" arrow —
+            one Visual Library asset instead of a second near-identical one. */}
+        <VlIcon slug="angle-small-down" size={14} className="-rotate-90 text-[var(--text-dim)]" />
+      </span>
+    </button>
+  );
+}
+
+/* ── Tone picker screen ─────────────────────────────────────────────────── */
+function TonePicker({
+  target,
+  prefs,
+  onBack,
+}: {
+  target: PickerTarget;
+  prefs: SoundPrefs;
+  onBack: () => void;
+}) {
+  const isActivity = target.kind === "activity";
+  const title = isActivity
+    ? ACTIVITY_LABELS[target.activity]
+    : `${CATEGORY_LABELS[target.category]} tone`;
+
+  /* Current selection. For an activity, `undefined` means "inherit the
+     notification tone" and is shown as its own row rather than as a tone. */
+  const current: SoundTone | undefined = isActivity
+    ? prefs.notification.activityTones?.[target.activity]
+    : prefs[target.category].tone;
+
+  /* Select AND play, the way a phone does it — hearing the tone is the whole
+     point of opening this screen. The engine's own gates are bypassed for
+     the preview so you can audition while sounds are off. */
+  const choose = (tone: SoundTone | undefined) => {
+    if (isActivity) {
+      setSoundPrefs({ notification: { activityTones: { [target.activity]: tone } } });
+      previewSound(tone ?? prefs.notification.tone);
+    } else {
+      setSoundPrefs({ [target.category]: { tone: tone ?? "classic" } } as Partial<SoundPrefs>);
+      previewSound(tone ?? "classic");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Picker header — back chevron + what we're choosing for. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to Sounds"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+        >
+          <VlIcon slug="angle-small-down" size={16} className="rotate-90" />
+        </button>
+        <h2 className="min-w-0 truncate text-[15px] font-bold text-[var(--text-primary)]">{title}</h2>
       </div>
 
-      {/* Per-activity overrides — notifications only. Each activity from
-          Notification preferences can carry its OWN tone, so an approval is
-          audibly different from a task reminder. "Default" inherits the tone
-          selected above. */}
-      {category === "notification" && (
-        <div className="pt-4">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
-            Per-activity tones
-          </div>
-          <p className="mb-2 text-[11px] text-[var(--text-dim)]">
-            Give any activity its own sound. &ldquo;Default&rdquo; uses the tone selected above.
-          </p>
-          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-            {SOUND_ACTIVITIES.map((act, i) => {
-              const override = prefs.notification.activityTones?.[act];
-              const effective = override ?? prefs.notification.tone;
-              return (
-                <div
-                  key={act}
-                  className={`flex items-center gap-2 px-3 py-2 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}
-                >
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">
-                    {ACTIVITY_LABELS[act]}
-                  </span>
-                  <SelectControl<string>
-                    value={override ?? "default"}
-                    onChange={(v) =>
-                      setSoundPrefs({
-                        notification: {
-                          activityTones: { [act]: v === "default" ? undefined : (v as SoundTone) },
-                        },
-                      })
-                    }
-                    options={[
-                      { value: "default", label: "Default" },
-                      ...SOUND_TONES.map((t) => ({ value: t as string, label: TONE_LABELS[t] })),
-                      { value: "none", label: "Silent" },
-                    ]}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => previewSound(effective)}
-                    title="Preview"
-                    aria-label={`Preview ${ACTIVITY_LABELS[act]} sound`}
-                    className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                  >
-                    ▶
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </SettingsCard>
+      {/* Group 1 — the non-tone choices, set apart the way iOS separates
+          "None" from the tone list. */}
+      <SettingsCard title={isActivity ? "Use" : "Silence"}>
+        {isActivity && (
+          <ToneRow
+            label="Default"
+            hint={`Same as the notification tone (${TONE_LABELS[prefs.notification.tone as Exclude<SoundTone, "none">] ?? "Silent"})`}
+            selected={current === undefined}
+            onClick={() => choose(undefined)}
+          />
+        )}
+        <ToneRow
+          label="Silent"
+          hint={isActivity ? "No sound for this activity." : "No sound for this channel."}
+          selected={current === "none"}
+          onClick={() => choose("none")}
+          last
+        />
+      </SettingsCard>
+
+      {/* Group 2 — the tones. Tapping plays. */}
+      <SettingsCard title="Alert tones" subtitle="Tap a tone to hear it and select it.">
+        {SOUND_TONES.map((tone, i) => (
+          <ToneRow
+            key={tone}
+            label={TONE_LABELS[tone]}
+            hint={tone === "classic" ? "The original Koleex alert." : undefined}
+            selected={current === tone}
+            onClick={() => choose(tone)}
+            last={i === SOUND_TONES.length - 1}
+          />
+        ))}
+      </SettingsCard>
+    </div>
+  );
+}
+
+function ToneRow({
+  label,
+  hint,
+  selected,
+  onClick,
+  last,
+}: {
+  label: string;
+  hint?: string;
+  selected: boolean;
+  onClick: () => void;
+  last?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`flex w-full items-center justify-between gap-3 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
+        last ? "" : "border-b border-[var(--border-faint)]"
+      }`}
+    >
+      <span className="min-w-0">
+        <span className={`block truncate text-[13px] ${selected ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-primary)]"}`}>
+          {label}
+        </span>
+        {hint && <span className="mt-0.5 block text-[11px] text-[var(--text-dim)]">{hint}</span>}
+      </span>
+      {/* Checkmark marks the selection, iOS-style — no radio dots, no extra
+          preview button, because the row itself plays the tone. */}
+      <span className="w-5 shrink-0 text-center">
+        {selected && <VlIcon slug="check" size={14} className="text-[var(--text-primary)]" />}
+      </span>
+    </button>
   );
 }
