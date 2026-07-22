@@ -11,6 +11,7 @@ import {
   TRANSLATE_LANG_NAMES,
 } from "@/lib/server/ai-provider";
 import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
+import { buildGlossaryHint } from "@/lib/server/translator-glossary";
 
 /* POST /api/translator — the Translator app's translation endpoint.
 
@@ -92,6 +93,10 @@ function buildMessages(text: string, source: string, target: string) {
     "- Keep names, brands, product codes, numbers and units exactly as written.",
     "- Match the register of the source (formal stays formal, casual stays casual).",
     `- If the text is already in ${targetName}, return it unchanged.`,
+    /* Company vocabulary: pins KOLEEX model codes and garment-machinery terms
+       that a general model otherwise mangles. Empty when the text contains
+       neither, so ordinary sentences pay nothing for it. */
+    buildGlossaryHint(text, target),
   ].join("\n");
   return [
     { role: "system" as const, content: system },

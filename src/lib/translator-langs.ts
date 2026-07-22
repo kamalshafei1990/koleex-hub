@@ -63,23 +63,91 @@ export function isRtl(code: string): boolean {
   return LANG_BY_CODE[code]?.rtl === true;
 }
 
-/* Script-based source detection — the same cheap heuristic the Hub's
-   auto-translate uses. Good enough to label "Detected: Chinese" instantly
-   without a server round-trip; the provider still does the real detection
-   when translating with source "auto". */
+/* ── Source-language detection ────────────────────────────────────────────
+   Runs client-side on every keystroke, so it must be instant and allocation-
+   cheap — no network. Two stages:
+
+     1. SCRIPT. Arabic/Chinese/Japanese/Korean/Cyrillic/Thai/Devanagari are
+        unambiguous from their code blocks alone.
+     2. LATIN DISAMBIGUATION. Nine of our languages share the Latin alphabet,
+        so script alone said "English" for Spanish, French, German, Portuguese,
+        Dutch, Polish, Turkish, Indonesian and Vietnamese — the label was
+        simply wrong. Those are separated by scoring characteristic letters
+        (ñ, ß, ğ, ł, ơ…) and high-frequency function words, which is what
+        actually distinguishes them in short business text.
+
+   This only drives the LABEL shown next to "Detect language". The provider
+   still performs its own detection when translating with source "auto", so a
+   wrong guess here can never produce a wrong translation.
+   ------------------------------------------------------------------------ */
+
+/** Function words that are common in ONE Latin language and rare in the
+    others. Words shared across siblings (de/que/para — Spanish, Portuguese and
+    French all use them) are deliberately excluded: they add noise and let the
+    first-listed language win ties. Portuguese vs Spanish in particular hangs
+    on do/da/dos/das vs del/la/los/las. Kept short — runs per keystroke. */
+const LATIN_MARKERS: Record<string, string[]> = {
+  en: ["the", "and", "is", "for", "with", "you", "this", "that", "are", "please", "we", "of", "to"],
+  es: ["el", "la", "los", "las", "del", "por", "con", "una", "es", "gracias", "fecha", "pero", "muy", "está", "usted"],
+  fr: ["le", "les", "des", "une", "est", "pour", "avec", "vous", "nous", "dans", "merci", "du", "veuillez"],
+  de: ["der", "die", "das", "und", "ist", "nicht", "mit", "wir", "sie", "für", "auf", "ein", "eine", "bitte"],
+  pt: ["o", "os", "as", "do", "da", "dos", "das", "com", "uma", "não", "obrigado", "você", "é", "data", "prezado"],
+  nl: ["het", "een", "en", "van", "niet", "wij", "voor", "met", "dat", "zijn", "op", "gelieve", "beste"],
+  pl: ["nie", "jest", "się", "oraz", "dla", "przez", "który", "dziękuję", "proszę", "na", "zamówienia"],
+  tr: ["ve", "bir", "için", "ile", "bu", "olarak", "var", "değil", "teşekkür", "lütfen", "olan"],
+  id: ["dan", "yang", "untuk", "dengan", "tidak", "ini", "adalah", "dari", "kami", "terima", "kasih", "mohon"],
+  vi: ["và", "của", "cho", "với", "không", "là", "các", "được", "này", "chúng", "tôi", "cảm", "ơn", "vui"],
+};
+
+/** Letters that essentially only appear in one of the Latin languages.
+    A single hit is strong evidence, so these outweigh function words. */
+const LATIN_LETTER_HINTS: Array<[string, RegExp]> = [
+  ["vi", /[ơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i],
+  ["pl", /[ąćęłńśźż]/i],
+  ["tr", /[ğışİ]/],
+  ["es", /[ñ¿¡]/i],
+  ["de", /[ßäöü]/i],
+  ["pt", /[ãõ]/i],                                  // ã/õ are Portuguese-only here;
+  ["fr", /[àâçéèêëîïôùûœ]/i],                       // á/â/ê/ç are shared with French
+
+  ["nl", /\bij\b|ĳ/i],
+];
+
 export function guessLanguage(text: string): string | null {
-  const s = text.slice(0, 300);
+  const s = text.slice(0, 400);
   if (!s.trim()) return null;
-  if (/[؀-ۿ]/.test(s)) return /[ٹڈھہے]/.test(s) ? "ur" : "ar";
-  if (/[一-鿿㐀-䶿]/.test(s)) {
-    if (/[぀-ゟ゠-ヿ]/.test(s)) return "ja";
-    return "zh";
-  }
-  if (/[぀-ゟ゠-ヿ]/.test(s)) return "ja";
+
+  /* ── 1. Unambiguous scripts ── */
+  if (/[؀-ۿ]/.test(s)) return /[ٹڈھہےڑں]/.test(s) ? "ur" : "ar";
+  if (/[぀-ゟ゠-ヿ]/.test(s)) return "ja";          // kana ⇒ Japanese even with kanji
+  if (/[一-鿿㐀-䶿]/.test(s)) return "zh";
   if (/[가-힯]/.test(s)) return "ko";
   if (/[Ѐ-ӿ]/.test(s)) return "ru";
   if (/[฀-๿]/.test(s)) return "th";
   if (/[ऀ-ॿ]/.test(s)) return "hi";
-  if (/[A-Za-z]/.test(s)) return "en";
-  return null;
+  if (!/[A-Za-zÀ-ÿĀ-ſ]/.test(s)) return null;
+
+  /* ── 2. Latin: score letters (weight 3) + function words (weight 1) ── */
+  const scores: Record<string, number> = {};
+  const bump = (code: string, n: number) => { scores[code] = (scores[code] ?? 0) + n; };
+
+  for (const [code, re] of LATIN_LETTER_HINTS) if (re.test(s)) bump(code, 3);
+
+  const words = s.toLowerCase().match(/[a-zà-ÿā-ſ]+/g) ?? [];
+  if (words.length) {
+    const seen = new Set(words);
+    for (const [code, markers] of Object.entries(LATIN_MARKERS)) {
+      for (const m of markers) if (seen.has(m)) bump(code, 1);
+    }
+  }
+
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const [code, score] of Object.entries(scores)) {
+    if (score > bestScore) { best = code; bestScore = score; }
+  }
+
+  /* Nothing distinctive (a product code, a number, one unknown word) — English
+     is the right default for this team's Latin-script text. */
+  return bestScore > 0 ? best : "en";
 }

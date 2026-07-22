@@ -29,6 +29,9 @@ export const VL_ICON_PATHS = {
   "rotate-left":      "visual-library/pack/navigation/rotate-left.svg",
   "trash-xmark":      "visual-library/pack/misc/trash-xmark.svg",
   spinner:            "visual-library/pack/actions/spinner.svg",
+  document:           "visual-library/general/documents/document.svg",
+  "cloud-upload":     "visual-library/pack/devices/cloud-upload.svg",
+  download:           "visual-library/general/actions/download.svg",
 } as const;
 
 export type VlIconSlug = keyof typeof VL_ICON_PATHS;

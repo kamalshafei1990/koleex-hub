@@ -37,6 +37,11 @@ import {
    (General Icons) via <VlIcon>, per the standing rule — no hand-authored SVG
    and no third-party icon packs. */
 import VlIcon from "@/components/ui/VlIcon";
+import {
+  DOC_ACCEPT,
+  chunkText,
+  extractDocumentText,
+} from "@/lib/translator-document";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 450;
@@ -54,7 +59,7 @@ interface Entry {
   at: number;
 }
 
-type Tab = "text" | "history" | "saved";
+type Tab = "text" | "document" | "history" | "saved";
 
 /* ── Speech helpers (browser-native — no backend, works offline) ── */
 interface SpeechRecognitionLike {
@@ -113,6 +118,17 @@ export default function TranslatorApp() {
   const [saved, setSaved] = useState<Entry[]>([]);
   const [pickerOpen, setPickerOpen] = useState<"from" | "to" | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
+
+  /* Document translation state. Kept separate from the text panes so switching
+     tabs never destroys either piece of work. */
+  const [docName, setDocName] = useState<string | null>(null);
+  const [docMeta, setDocMeta] = useState<{ pages: number | null; chars: number; truncated: boolean } | null>(null);
+  const [docOut, setDocOut] = useState("");
+  const [docBusy, setDocBusy] = useState(false);
+  const [docStep, setDocStep] = useState<{ done: number; total: number } | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const reqRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -357,6 +373,111 @@ export default function TranslatorApp() {
     });
   };
 
+  /* ── Document translation ────────────────────────────────────────────
+     Extraction runs in the BROWSER, so the file itself never leaves the
+     device — only its plain text does, and only in chunks. Chunks go through
+     the SAME endpoint as the text pane, so paragraphs already translated
+     anywhere in the Hub come back from cache instantly.
+
+     Sequential, not parallel: parallel chunks race the provider's rate limit
+     and a failure mid-flight would leave holes in the middle of the document.
+     A run counter guards against a second file being dropped mid-translation
+     (the old run must not keep appending to the new one's output). */
+  const docRunRef = useRef(0);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      const run = ++docRunRef.current;
+      setDocName(file.name);
+      setDocOut("");
+      setDocMeta(null);
+      setDocError(null);
+      setDocStep(null);
+      setDocBusy(true);
+
+      let doc: Awaited<ReturnType<typeof extractDocumentText>>;
+      try {
+        doc = await extractDocumentText(file);
+      } catch (e) {
+        if (run !== docRunRef.current) return;
+        const code = e instanceof Error ? e.message : "";
+        setDocError(
+          code === "no_text_layer"
+            ? t("tr.docNoText", "This PDF has no text layer — it's a scan. Photo translation isn't supported yet.")
+            : code === "unsupported_type"
+              ? t("tr.docUnsupported", "Unsupported file type. Use PDF, TXT, MD or CSV.")
+              : code === "empty_file"
+                ? t("tr.docEmpty", "That file is empty.")
+                : t("tr.docFailed", "Couldn't read that file."),
+        );
+        setDocBusy(false);
+        return;
+      }
+      if (run !== docRunRef.current) return;
+      setDocMeta({ pages: doc.pages, chars: doc.text.length, truncated: doc.truncated });
+
+      const chunks = chunkText(doc.text);
+      setDocStep({ done: 0, total: chunks.length });
+
+      const out: string[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        try {
+          const res = await fetch("/api/translator", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: chunks[i], target_lang: to, source_lang: from }),
+          });
+          const json = (await res.json()) as { translated?: string };
+          if (run !== docRunRef.current) return;
+          // A chunk that fails keeps its ORIGINAL text rather than vanishing —
+          // a document with one untranslated paragraph is still usable.
+          out.push(json.translated?.trim() ? json.translated : chunks[i]);
+        } catch {
+          if (run !== docRunRef.current) return;
+          out.push(chunks[i]);
+        }
+        setDocOut(out.join("\n\n"));
+        setDocStep({ done: i + 1, total: chunks.length });
+      }
+      if (run !== docRunRef.current) return;
+      setDocBusy(false);
+    },
+    [from, to, t],
+  );
+
+  const resetDoc = () => {
+    docRunRef.current++;          // abandons any run still in flight
+    setDocName(null);
+    setDocMeta(null);
+    setDocOut("");
+    setDocError(null);
+    setDocStep(null);
+    setDocBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const downloadDoc = () => {
+    const blob = new Blob([docOut], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = `${(docName ?? "document").replace(/\.[^.]+$/, "")}.${to}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyDoc = async () => {
+    if (!docOut) return;
+    try {
+      await navigator.clipboard.writeText(docOut);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* clipboard blocked — the text is on screen and selectable anyway */
+    }
+  };
+
   const reuse = (e: Entry) => {
     setFrom(e.from === "auto" ? "auto" : e.from);
     setTo(e.to);
@@ -476,6 +597,33 @@ export default function TranslatorApp() {
     );
   };
 
+  /* The two language cards + swap button. Shared by the Text and Document
+     tabs so both read as the same app and the columns line up with whatever
+     sits under them. */
+  const LanguageRow = () => (
+    <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-[1fr_40px_1fr] md:gap-3">
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+        <LangButton side="from" />
+      </div>
+      <div className="flex items-center justify-center">
+        <button
+          type="button"
+          onClick={swap}
+          title={t("tr.swap", "Swap languages")}
+          aria-label={t("tr.swap", "Swap languages")}
+          /* Fixed 40px box: exactly the width of the grid gutter it sits in,
+             and a proper touch target. */
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
+        >
+          <VlIcon slug="exchange" size={16} />
+        </button>
+      </div>
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+        <LangButton side="to" />
+      </div>
+    </div>
+  );
+
   const EntryList = ({ items, kind }: { items: Entry[]; kind: "history" | "saved" }) => {
     if (items.length === 0) {
       return (
@@ -562,6 +710,7 @@ export default function TranslatorApp() {
           backHref="/"
           tabs={[
             { key: "text", label: t("tr.title", "Translator"), active: tab === "text", onClick: () => setTab("text") },
+            { key: "document", label: t("tr.document", "Document"), active: tab === "document", onClick: () => setTab("document") },
             { key: "history", label: t("tr.history", "History"), active: tab === "history", onClick: () => setTab("history") },
             { key: "saved", label: t("tr.savedTab", "Saved"), active: tab === "saved", onClick: () => setTab("saved") },
           ]}
@@ -582,29 +731,7 @@ export default function TranslatorApp() {
               [1fr 40px 1fr] track, so each selector lines up exactly with the
               pane it controls. (One merged bar read as a single unrelated
               toolbar and cramped at narrow widths.) */}
-          <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-[1fr_40px_1fr] md:gap-3">
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
-              <LangButton side="from" />
-            </div>
-            <div className="flex items-center justify-center">
-              <button
-                type="button"
-                onClick={swap}
-                title={t("tr.swap", "Swap languages")}
-                aria-label={t("tr.swap", "Swap languages")}
-                /* Fixed 40px box: exactly the width of the grid gutter it sits
-                   in, and a proper touch target. Padding-sized before, it gave
-                   a cramped 32px hover square floating between 48px-tall
-                   language cards. */
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
-              >
-                <VlIcon slug="exchange" size={16} />
-              </button>
-            </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
-              <LangButton side="to" />
-            </div>
-          </div>
+          <LanguageRow />
 
           {/* Panes — same track as the language row above so the columns align.
               min-h-0 on every level is what lets the inner scroll work
@@ -717,6 +844,147 @@ export default function TranslatorApp() {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      ) : tab === "document" ? (
+        /* ── Document tab ──────────────────────────────────────────────
+           Same shell and same language row as the text tab, with one pane
+           that swaps between drop-zone and result. Extraction happens in the
+           browser; only plain text is ever sent. */
+        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
+          <LanguageRow />
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={DOC_ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleFile(f);
+              }}
+            />
+
+            {!docName ? (
+              /* Drop zone — the whole pane is the target, not a small box, so
+                 a dragged file can be released anywhere in the workspace. */
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) void handleFile(f);
+                }}
+                className={`m-3 flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 text-center transition-colors ${
+                  dragging
+                    ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
+                    : "border-[var(--border-subtle)]"
+                }`}
+              >
+                <VlIcon slug="cloud-upload" size={28} className="text-[var(--text-dim)]" />
+                <div className="text-[14px] font-medium text-[var(--text-primary)]">
+                  {t("tr.docDrop", "Drop a PDF or text file here")}
+                </div>
+                <div className="text-[12px] text-[var(--text-dim)]">
+                  {t("tr.docTypes", "PDF, TXT, MD or CSV — up to 60 pages")}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+                >
+                  <VlIcon slug="document" size={14} /> {t("tr.docBrowse", "Choose file")}
+                </button>
+                {docError && (
+                  <div className="mt-1 max-w-md rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+                    {docError}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* File strip */}
+                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+                  <VlIcon slug="document" size={15} className="shrink-0 text-[var(--text-dim)]" />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
+                    {docName}
+                  </span>
+                  <span className="hidden shrink-0 text-[11px] tabular-nums text-[var(--text-dim)] sm:block">
+                    {docMeta?.pages
+                      ? t("tr.docPages", "{n} pages").replace("{n}", String(docMeta.pages))
+                      : docMeta
+                        ? t("tr.docChars", "{n} characters").replace("{n}", String(docMeta.chars))
+                        : t("tr.docReading", "Reading document…")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetDoc}
+                    title={t("tr.docAnother", "New document")}
+                    aria-label={t("tr.docAnother", "New document")}
+                    className={iconBtn}
+                  >
+                    <VlIcon slug="cross-small" size={15} />
+                  </button>
+                </div>
+
+                {docError ? (
+                  <div className="m-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+                    {docError}
+                  </div>
+                ) : (
+                  <>
+                    {docMeta?.truncated && (
+                      <div className="mx-3 mt-2 shrink-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
+                        {t("tr.docTruncated", "Very long document — only the first part was read.")}
+                      </div>
+                    )}
+
+                    <div
+                      dir={isRtl(to) ? "rtl" : "ltr"}
+                      className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3.5 text-[14px] leading-relaxed text-[var(--text-primary)] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
+                    >
+                      {docOut || (
+                        <span className="text-[var(--text-dim)]">
+                          {/* Extraction and translation are different waits —
+                              saying "Reading…" once chunks are in flight reads
+                              as if nothing had progressed. */}
+                          {docStep
+                            ? t("tr.translating", "Translating…")
+                            : docBusy
+                              ? t("tr.docReading", "Reading document…")
+                              : t("tr.translation", "Translation")}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                      <div className="flex items-center gap-0.5">
+                        <button type="button" onClick={() => void copyDoc()} disabled={!docOut} title={copied ? t("tr.copied", "Copied") : t("tr.copy", "Copy")} aria-label={t("tr.copy", "Copy")} className={iconBtn}>
+                          {copied ? <VlIcon slug="check" size={15} /> : <VlIcon slug="copy-alt" size={15} />}
+                        </button>
+                        <button type="button" onClick={downloadDoc} disabled={!docOut} title={t("tr.docDownload", "Download")} aria-label={t("tr.docDownload", "Download")} className={iconBtn}>
+                          <VlIcon slug="download" size={15} />
+                        </button>
+                      </div>
+                      <span className="flex items-center gap-1.5 pe-10 text-[11px] tabular-nums text-[var(--text-dim)] md:pe-0">
+                        {docBusy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
+                        {docStep && docStep.done < docStep.total
+                          ? t("tr.docProgress", "Translating {done} of {total}")
+                              .replace("{done}", String(docStep.done + 1))
+                              .replace("{total}", String(docStep.total))
+                          : null}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       ) : (
