@@ -30,6 +30,40 @@
 
 const SOUND_URL = "/notification.wav";
 
+/* ── The Koleex tone library ──────────────────────────────────────────────
+   Real recordings supplied by the owner, in /public/sounds. Each was
+   trimmed of leading/trailing silence and loudness-matched to ≈ −15 LUFS,
+   so no tone is jarringly louder than its neighbour in the picker (the
+   sources ranged over 15 dB). They are fetched ON DEMAND — see prime() —
+   because 24 files is far too much to pull on boot for a sound most users
+   will never change. */
+export const SOUND_LIBRARY = [
+  "alert", "announce", "arrive", "beacon", "bloom", "bounce",
+  "bright", "confirm", "depart", "galaxy", "inbox", "lantern",
+  "mail", "marker", "message", "note", "ping", "prompt",
+  "signal", "sparkle", "success", "surface", "tap", "task",
+] as const;
+export type LibraryTone = (typeof SOUND_LIBRARY)[number];
+
+/** Display names for the library, in picker order. */
+export const LIBRARY_LABELS: Record<LibraryTone, string> = {
+  alert: "Alert", announce: "Announce", arrive: "Arrive", beacon: "Beacon",
+  bloom: "Bloom", bounce: "Bounce", bright: "Bright", confirm: "Confirm",
+  depart: "Depart", galaxy: "Galaxy", inbox: "Inbox", lantern: "Lantern",
+  mail: "Mail", marker: "Marker", message: "Message", note: "Note",
+  ping: "Ping", prompt: "Prompt", signal: "Signal", sparkle: "Sparkle",
+  success: "Success", surface: "Surface", tap: "Tap", task: "Task",
+};
+
+const LIBRARY_SET = new Set<string>(SOUND_LIBRARY);
+
+/** Where a tone's audio lives, or null when it is synthesized. */
+function toneSrc(tone: SoundTone): string | null {
+  if (tone === "classic") return SOUND_URL;
+  if (LIBRARY_SET.has(tone)) return `/sounds/${tone}.mp3`;
+  return null;
+}
+
 /* ── Sound preferences (Settings → Sounds) ────────────────────────────────
    ONE source of truth for every sound the Hub makes. Before this, the bell
    played the WAV with no way to turn it off, and Discuss synthesized its own
@@ -40,10 +74,14 @@ const SOUND_URL = "/notification.wav";
    Stored in localStorage (device-level preference, like ringtones on a
    phone): instant, offline-safe, no migration. */
 
+export type SynthTone =
+  | "chime"     // two-tone rising sweep (the old Discuss bloop)
+  | "ding" | "bell" | "pop" | "glass" | "pulse";
+
 export type SoundTone =
   | "classic"   // the original /notification.wav
-  | "chime"     // two-tone rising sweep (the old Discuss bloop)
-  | "ding" | "bell" | "pop" | "glass" | "pulse"
+  | SynthTone
+  | LibraryTone // the owner's recorded tones in /public/sounds
   | "none";
 
 export type SoundCategory = "notification" | "message";
@@ -90,7 +128,11 @@ export function classifyInboxActivity(meta: unknown): SoundActivity | null {
   return null;
 }
 
-export const SOUND_TONES: Array<Exclude<SoundTone, "none">> = [
+/** The built-in tones: the original WAV plus the six synthesized ones.
+ *  Kept separate from SOUND_LIBRARY so the picker can group them — the
+ *  synthesized set needs no network and works offline, which is why it
+ *  stays even now that there are real recordings. */
+export const SOUND_TONES: Array<"classic" | SynthTone> = [
   "classic", "chime", "ding", "bell", "pop", "glass", "pulse",
 ];
 
@@ -208,8 +250,11 @@ function synthTone(ctx: AudioContext, tone: SoundTone, volume: number): void {
 }
 
 let audioCtx: AudioContext | null = null;
-let decodedBuffer: AudioBuffer | null = null;
-let decodePromise: Promise<AudioBuffer | null> | null = null;
+/* One decoded buffer per URL. Was a single global back when there was
+   exactly one WAV; with a 24-tone library each tone caches independently
+   and only the ones actually used are ever fetched. */
+const buffers = new Map<string, AudioBuffer>();
+const decodes = new Map<string, Promise<AudioBuffer | null>>();
 let unlocked = false;
 let unlockListenersAttached = false;
 let pendingPlayOnUnlock = false;
@@ -238,17 +283,19 @@ function ensureCtx(): AudioContext | null {
   return audioCtx;
 }
 
-/** Fetch + decode the WAV once. Memoized; subsequent calls return the
- *  same promise. Old Safari needs the callback form of decodeAudioData,
- *  modern browsers return a promise — we handle both. */
-function decode(): Promise<AudioBuffer | null> {
-  if (decodedBuffer) return Promise.resolve(decodedBuffer);
-  if (decodePromise) return decodePromise;
+/** Fetch + decode one tone's audio. Memoized per URL; subsequent calls
+ *  return the same promise. Old Safari needs the callback form of
+ *  decodeAudioData, modern browsers return a promise — we handle both. */
+function decode(url: string = SOUND_URL): Promise<AudioBuffer | null> {
+  const cached = buffers.get(url);
+  if (cached) return Promise.resolve(cached);
+  const inflight = decodes.get(url);
+  if (inflight) return inflight;
   const ctx = ensureCtx();
   if (!ctx) return Promise.resolve(null);
-  decodePromise = (async () => {
+  const job = (async () => {
     try {
-      const r = await fetch(SOUND_URL);
+      const r = await fetch(url);
       if (!r.ok) {
         if (typeof console !== "undefined") {
           console.warn(
@@ -296,24 +343,29 @@ function decode(): Promise<AudioBuffer | null> {
           reject(e);
         }
       });
-      decodedBuffer = buf;
+      buffers.set(url, buf);
       return buf;
     } catch (e) {
       if (typeof console !== "undefined") {
-        console.warn("[notificationSound] decode failed", e);
+        console.warn("[notificationSound] decode failed", url, e);
       }
+      /* Drop the memo so a transient network failure can be retried the
+         next time this tone is asked for, instead of staying dead. */
+      decodes.delete(url);
       return null;
     }
   })();
-  return decodePromise;
+  decodes.set(url, job);
+  return job;
 }
 
-function playBufferNow(volume?: number): boolean {
+function playBufferNow(url: string = SOUND_URL, volume?: number): boolean {
   const ctx = audioCtx;
-  if (!ctx || !decodedBuffer) return false;
+  const buf = buffers.get(url);
+  if (!ctx || !buf) return false;
   try {
     const src = ctx.createBufferSource();
-    src.buffer = decodedBuffer;
+    src.buffer = buf;
     const gain = ctx.createGain();
     gain.gain.value = volume ?? getSoundPrefs().volume;
     src.connect(gain).connect(ctx.destination);
@@ -379,13 +431,62 @@ function attachUnlockListeners() {
   });
 }
 
+/** Every file-backed tone the user has actually selected — the default
+ *  notification and message tones plus any per-activity overrides. This is
+ *  what prime() warms, so a 24-tone library still costs at most a couple of
+ *  small fetches on boot instead of 700 KB. */
+function selectedSrcs(): string[] {
+  const p = getSoundPrefs();
+  const tones: SoundTone[] = [
+    p.notification.tone,
+    p.message.tone,
+    ...Object.values(p.notification.activityTones ?? {}),
+  ];
+  const srcs = new Set<string>();
+  for (const t of tones) {
+    const src = toneSrc(t);
+    if (src) srcs.add(src);
+  }
+  return [...srcs];
+}
+
 /** Call once on app mount so the audio is preloaded and the unlock
  *  listeners are attached as early as possible. Safe to call multiple
  *  times. */
 export function primeNotificationSound() {
   attachUnlockListeners();
   ensureCtx();
-  void decode();
+  for (const src of selectedSrcs()) void decode(src);
+}
+
+/** Play a tone through the shared context, resuming it first if the
+ *  browser has it suspended. Handles both file-backed and synthesized
+ *  tones so the three entry points below don't each re-implement it. */
+function playTone(tone: SoundTone, volume: number) {
+  if (tone === "none") return;
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  const src = toneSrc(tone);
+
+  const fire = () => {
+    const c = audioCtx;
+    if (!c || c.state !== "running") return;
+    if (src) {
+      if (!playBufferNow(src, volume)) void decode(src).then(() => playBufferNow(src, volume));
+    } else {
+      try { synthTone(c, tone, volume); } catch { /* stay silent */ }
+    }
+  };
+
+  if (ctx.state === "suspended") {
+    void ctx.resume().then(fire);
+    return;
+  }
+  /* A file tone that hasn't been decoded yet needs one await; a synth tone
+     and an already-decoded file play in this same turn. */
+  if (src && !buffers.has(src)) { void decode(src).then(fire); return; }
+  fire();
 }
 
 /** Play the sound for a CATEGORY, honouring the user's Settings → Sounds
@@ -403,20 +504,13 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
       ? prefs.notification.activityTones?.[activity]
       : undefined) ?? cat.tone;
   if (tone === "none") return;
+  /* The classic WAV keeps the backlog path: if the context is still locked
+     it queues one chime for the next gesture rather than swallowing it. */
   if (tone === "classic") {
     playNotificationSound();
     return;
   }
-  attachUnlockListeners();
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  if (ctx.state === "suspended") {
-    void ctx.resume().then(() => {
-      if (audioCtx?.state === "running") synthTone(audioCtx, tone, prefs.volume);
-    });
-    return;
-  }
-  try { synthTone(ctx, tone, prefs.volume); } catch { /* stay silent */ }
+  playTone(tone, prefs.volume);
 }
 
 /** Preview a tone at a given volume — used by Settings → Sounds. Ignores
@@ -424,25 +518,7 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
  *  choose the tone you'll turn back on. Always called from a click, so
  *  the context is already unlockable. */
 export function previewSound(tone: SoundTone, volume?: number) {
-  if (tone === "none") return;
-  const vol = volume ?? getSoundPrefs().volume;
-  if (tone === "classic") {
-    attachUnlockListeners();
-    const ctx = ensureCtx();
-    if (!ctx) return;
-    void Promise.all([
-      ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
-      decode(),
-    ]).then(() => playBufferNow(vol));
-    return;
-  }
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  if (ctx.state === "suspended") {
-    void ctx.resume().then(() => { if (audioCtx?.state === "running") synthTone(audioCtx, tone, vol); });
-    return;
-  }
-  try { synthTone(ctx, tone, vol); } catch { /* stay silent */ }
+  playTone(tone, volume ?? getSoundPrefs().volume);
 }
 
 /** Play the classic notification WAV. Prefer playAppSound(category) — this
@@ -458,7 +534,7 @@ export function playNotificationSound() {
   }
 
   /* Hot path: context running and buffer ready → play immediately. */
-  if (ctx.state === "running" && decodedBuffer) {
+  if (ctx.state === "running" && buffers.has(SOUND_URL)) {
     playBufferNow();
     return;
   }
@@ -471,7 +547,7 @@ export function playNotificationSound() {
     ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
     decode(),
   ]).then(() => {
-    if (audioCtx && audioCtx.state === "running" && decodedBuffer) {
+    if (audioCtx && audioCtx.state === "running" && buffers.has(SOUND_URL)) {
       pendingPlayOnUnlock = false;
       playBufferNow();
     }

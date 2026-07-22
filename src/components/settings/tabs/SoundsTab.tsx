@@ -11,20 +11,25 @@
    phone — you never hunt for a separate preview button.
 
    One engine (src/lib/notificationSound.ts) plays everything; this panel only
-   edits its preferences. Tones are synthesized with Web Audio (except
-   Classic, the original WAV) — no downloads, identical offline and in
-   mainland China. Prefs are device-local (localStorage), like a phone's
-   ringtone.
+   edits its preferences. Two tone groups: the Koleex library (real
+   recordings in /public/sounds, trimmed and loudness-matched, fetched only
+   when chosen) and the basic tones (synthesized with Web Audio — no
+   download at all, so they still work offline). Prefs are device-local
+   (localStorage), like a phone's ringtone.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
 import {
+  LIBRARY_LABELS,
   SOUND_ACTIVITIES,
+  SOUND_LIBRARY,
   SOUND_TONES,
+  type LibraryTone,
   type SoundActivity,
   type SoundCategory,
   type SoundPrefs,
   type SoundTone,
+  type SynthTone,
   getSoundPrefs,
   previewSound,
   setSoundPrefs,
@@ -35,7 +40,7 @@ import VlIcon from "@/components/ui/VlIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 
-const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
+const TONE_LABELS: Record<"classic" | SynthTone, string> = {
   classic: "Classic",
   chime: "Chime",
   ding: "Ding",
@@ -44,6 +49,18 @@ const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
   glass: "Glass",
   pulse: "Pulse",
 };
+
+/** Display name for ANY tone — built-in, library, or silent. One helper so
+ *  the summary rows and the picker can never disagree about a name. */
+function toneLabel(tone: SoundTone | undefined): string {
+  if (tone === undefined) return "Default";
+  if (tone === "none") return "Silent";
+  return (
+    LIBRARY_LABELS[tone as LibraryTone] ??
+    TONE_LABELS[tone as "classic" | SynthTone] ??
+    "Silent"
+  );
+}
 
 const CATEGORY_LABELS: Record<SoundCategory, string> = {
   notification: "Notifications",
@@ -140,7 +157,7 @@ export default function SoundsTab() {
         />
         <NavRow
           label="Notification tone"
-          value={TONE_LABELS[prefs.notification.tone as Exclude<SoundTone, "none">] ?? "Silent"}
+          value={toneLabel(prefs.notification.tone)}
           onClick={() => setPicker({ kind: "category", category: "notification" })}
         />
         <SwitchRow
@@ -151,7 +168,7 @@ export default function SoundsTab() {
         />
         <NavRow
           label="Message tone"
-          value={TONE_LABELS[prefs.message.tone as Exclude<SoundTone, "none">] ?? "Silent"}
+          value={toneLabel(prefs.message.tone)}
           onClick={() => setPicker({ kind: "category", category: "message" })}
           last
         />
@@ -172,13 +189,7 @@ export default function SoundsTab() {
             <NavRow
               key={act}
               label={ACTIVITY_LABELS[act]}
-              value={
-                override === undefined
-                  ? "Default"
-                  : override === "none"
-                    ? "Silent"
-                    : TONE_LABELS[override]
-              }
+              value={toneLabel(override)}
               onClick={() => setPicker({ kind: "activity", activity: act })}
               last={i === SOUND_ACTIVITIES.length - 1}
             />
@@ -187,8 +198,10 @@ export default function SoundsTab() {
       </SettingsCard>
 
       <p className="px-1 text-[11.5px] text-[var(--text-dim)]">
-        Tones are generated on this device — nothing to download, and they work
-        offline. Sound settings are per-device, like a phone&apos;s ringtone.
+        Koleex tones are real recordings, loudness-matched so none is louder
+        than another; only the tone you pick is downloaded. Basic tones are
+        generated on this device and always work offline. Sound settings are
+        per-device, like a phone&apos;s ringtone.
       </p>
     </div>
   );
@@ -286,7 +299,7 @@ function TonePicker({
         {isActivity && (
           <ToneRow
             label="Default"
-            hint={`Same as the notification tone (${TONE_LABELS[prefs.notification.tone as Exclude<SoundTone, "none">] ?? "Silent"})`}
+            hint={`Same as the notification tone (${toneLabel(prefs.notification.tone)})`}
             selected={current === undefined}
             onClick={() => choose(undefined)}
           />
@@ -300,8 +313,23 @@ function TonePicker({
         />
       </SettingsCard>
 
-      {/* Group 2 — the tones. Tapping plays. */}
-      <SettingsCard flush title="Alert tones" subtitle="Tap a tone to hear it and select it.">
+      {/* Group 2 — the real recordings. First, because these are the ones
+          people actually want; the synthesized set is the fallback. */}
+      <SettingsCard flush title="Koleex tones" subtitle="Tap a tone to hear it and select it.">
+        {SOUND_LIBRARY.map((tone, i) => (
+          <ToneRow
+            key={tone}
+            label={LIBRARY_LABELS[tone as LibraryTone]}
+            selected={current === tone}
+            onClick={() => choose(tone)}
+            last={i === SOUND_LIBRARY.length - 1}
+          />
+        ))}
+      </SettingsCard>
+
+      {/* Group 3 — the built-ins. Kept because they need no network at all,
+          which matters on a bad connection or offline. */}
+      <SettingsCard flush title="Basic tones" subtitle="Generated on this device — no download, works offline.">
         {SOUND_TONES.map((tone, i) => (
           <ToneRow
             key={tone}
