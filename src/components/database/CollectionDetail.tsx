@@ -24,6 +24,35 @@ import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.colDetail.collections":      { en: "Collections", zh: "合集", ar: "المجموعات" },
+  "vl.colDetail.deleteConfirm":    { en: "Delete this collection? Assets stay in the library.", zh: "删除此合集？素材仍保留在库中。", ar: "هل تريد حذف هذه المجموعة؟ ستبقى العناصر في المكتبة." },
+  "vl.colDetail.notFound":         { en: "Collection not found.", zh: "未找到该合集。", ar: "لم يتم العثور على المجموعة." },
+  "vl.colDetail.backToCollections": { en: "← Back to collections", zh: "← 返回合集", ar: "← العودة إلى المجموعات" },
+  "vl.colDetail.edit":             { en: "Edit", zh: "编辑", ar: "تعديل" },
+  "vl.colDetail.approve":          { en: "Approve", zh: "批准", ar: "اعتماد" },
+  "vl.colDetail.unapprove":        { en: "Unapprove", zh: "取消批准", ar: "إلغاء الاعتماد" },
+  "vl.colDetail.archive":          { en: "Archive", zh: "归档", ar: "أرشفة" },
+  "vl.colDetail.restore":          { en: "Restore", zh: "恢复", ar: "استعادة" },
+  "vl.colDetail.assetsCount":      { en: "{n} assets", zh: "{n} 个素材", ar: "{n} عنصرًا" },
+  "vl.colDetail.usesCount":        { en: "{n} uses", zh: "{n} 次使用", ar: "{n} استخدامًا" },
+  "vl.colDetail.emptyAssets":      { en: "No assets yet — search above to add some.", zh: "暂无素材 — 在上方搜索并添加。", ar: "لا توجد عناصر بعد — ابحث أعلاه لإضافتها." },
+  "vl.colDetail.noIcon":           { en: "no icon", zh: "无图标", ar: "بلا أيقونة" },
+  "vl.colDetail.remove":           { en: "Remove", zh: "移除", ar: "إزالة" },
+  "vl.colDetail.intelligence":     { en: "Collection intelligence", zh: "合集智能分析", ar: "تحليلات المجموعة" },
+  "vl.colDetail.dominantStyle":    { en: "Dominant style", zh: "主导风格", ar: "النمط السائد" },
+  "vl.colDetail.categories":       { en: "Categories", zh: "分类", ar: "الفئات" },
+  "vl.colDetail.commonMeanings":   { en: "Common meanings", zh: "常见含义", ar: "المعاني الشائعة" },
+  "vl.colDetail.duplicateConcepts": { en: "Duplicate concepts", zh: "重复概念", ar: "مفاهيم مكررة" },
+  "vl.colDetail.noneDetected":     { en: "None detected", zh: "未检测到", ar: "لم يُرصد أي منها" },
+  "vl.colDetail.styleRules":       { en: "Style rules", zh: "风格规则", ar: "قواعد النمط" },
+  "vl.colDetail.preferredStyle":   { en: "Preferred style", zh: "首选风格", ar: "النمط المفضل" },
+  "vl.colDetail.preferMonochrome": { en: "Prefer monochrome", zh: "偏好单色", ar: "تفضيل أحادي اللون" },
+  "vl.colDetail.addSearchPlaceholder": { en: "Search the library to add assets…", zh: "搜索素材库以添加素材…", ar: "ابحث في المكتبة لإضافة عناصر…" },
+  "vl.colDetail.upload":           { en: "Upload", zh: "上传", ar: "رفع" },
+};
 
 interface Intel {
   total: number; total_usage: number;
@@ -34,6 +63,7 @@ interface Intel {
 }
 
 export default function CollectionDetail({ cid }: { cid: string }) {
+  const { t } = useTranslation(T);
   const router = useRouter();
   const [col, setCol] = useState<VisualCollection | null>(null);
   const [intel, setIntel] = useState<Intel | null>(null);
@@ -67,7 +97,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
     loadAssets(); loadMeta();
   };
   const del = async () => {
-    if (!confirm("Delete this collection? Assets stay in the library.")) return;
+    if (!confirm(t("vl.colDetail.deleteConfirm", "Delete this collection? Assets stay in the library."))) return;
     await fetch(`/api/visual-library/collections/${cid}`, { method: "DELETE", credentials: "include" });
     router.push("/database/collections");
   };
@@ -87,8 +117,8 @@ export default function CollectionDetail({ cid }: { cid: string }) {
   if (loading) return <div className="flex justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
   if (!col) return (
     <div className="py-16 text-center">
-      <p className="text-[14px] text-[var(--text-muted)]">Collection not found.</p>
-      <Link href="/database/collections" className="mt-2 inline-block text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">← Back to collections</Link>
+      <p className="text-[14px] text-[var(--text-muted)]">{t("vl.colDetail.notFound", "Collection not found.")}</p>
+      <Link href="/database/collections" className="mt-2 inline-block text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.colDetail.backToCollections", "← Back to collections")}</Link>
     </div>
   );
 
@@ -97,7 +127,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
 
   return (
     <div className="space-y-5">
-      <Link href="/database/collections" className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"><ArrowLeftIcon size={12} /> Collections</Link>
+      <Link href="/database/collections" className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"><ArrowLeftIcon size={12} /> {t("vl.colDetail.collections", "Collections")}</Link>
 
       {/* Hero */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
@@ -112,19 +142,19 @@ export default function CollectionDetail({ cid }: { cid: string }) {
               <Tag>{COLLECTION_TYPE_LABEL[col.collection_type as CollectionType]}</Tag>
               {col.category && <Tag>{col.category}</Tag>}
               {col.style_type && <Tag>{col.style_type.replace(/_/g, " ")}</Tag>}
-              <Tag>{items.length} assets</Tag>
-              {intel && <Tag>{intel.total_usage} uses</Tag>}
+              <Tag>{t("vl.colDetail.assetsCount", "{n} assets").replace("{n}", String(items.length))}</Tag>
+              {intel && <Tag>{t("vl.colDetail.usesCount", "{n} uses").replace("{n}", String(intel.total_usage))}</Tag>}
               <Tag>{col.approval_status.replace(/_/g, " ")}</Tag>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setShowEdit(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PencilIcon size={12} /> Edit</button>
+            <button type="button" onClick={() => setShowEdit(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PencilIcon size={12} /> {t("vl.colDetail.edit", "Edit")}</button>
             {!isApproved
-              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "approve" })} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"><BadgeCheckIcon size={12} /> Approve</button>
-              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">Unapprove</button>}
+              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "approve" })} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"><BadgeCheckIcon size={12} /> {t("vl.colDetail.approve", "Approve")}</button>
+              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("vl.colDetail.unapprove", "Unapprove")}</button>}
             {!isArchived
-              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "archive" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><ArchiveIcon size={12} /> Archive</button>
-              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">Restore</button>}
+              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "archive" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><ArchiveIcon size={12} /> {t("vl.colDetail.archive", "Archive")}</button>
+              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("vl.colDetail.restore", "Restore")}</button>}
             <button type="button" onClick={del} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-dim)] hover:text-rose-400"><TrashIcon size={12} /></button>
           </div>
         </div>
@@ -135,7 +165,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
         <div className="space-y-3">
           <AddAssets cid={cid} existing={new Set(items.map((i) => i.asset_id))} onAdded={() => { loadAssets(); loadMeta(); }} />
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-12 text-center text-[12.5px] text-[var(--text-muted)]">No assets yet — search above to add some.</div>
+            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-12 text-center text-[12.5px] text-[var(--text-muted)]">{t("vl.colDetail.emptyAssets", "No assets yet — search above to add some.")}</div>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6">
               {items.map((it, idx) => (
@@ -145,11 +175,11 @@ export default function CollectionDetail({ cid }: { cid: string }) {
                     {it.asset?.public_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={it.asset.public_url} alt={it.asset.title} className="h-full w-full object-contain" loading="lazy" />
-                    ) : <span className="text-[9px] uppercase text-neutral-400">no icon</span>}
+                    ) : <span className="text-[9px] uppercase text-neutral-400">{t("vl.colDetail.noIcon", "no icon")}</span>}
                   </button>
                   <div className="flex items-center justify-between gap-1 border-t border-[var(--border-subtle)] px-2 py-1.5">
                     <span className="truncate text-[10.5px] text-[var(--text-muted)]">{it.asset?.title ?? "—"}</span>
-                    <button type="button" onClick={() => removeAsset(it.id)} title="Remove" className="shrink-0 text-[var(--text-dim)] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"><TrashIcon size={11} /></button>
+                    <button type="button" onClick={() => removeAsset(it.id)} title={t("vl.colDetail.remove", "Remove")} className="shrink-0 text-[var(--text-dim)] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"><TrashIcon size={11} /></button>
                   </div>
                 </div>
               ))}
@@ -160,18 +190,18 @@ export default function CollectionDetail({ cid }: { cid: string }) {
         {/* Intelligence */}
         <aside className="space-y-3">
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Collection intelligence</h3>
-            <IntelBlock label="Dominant style" rows={intel?.styles} fmt={(v) => v.replace(/_/g, " ")} />
-            <IntelBlock label="Categories" rows={intel?.categories} />
-            <IntelBlock label="Common meanings" rows={intel?.meanings} />
-            <IntelBlock label="Duplicate concepts" rows={intel?.duplicate_concepts} empty="None detected" />
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("vl.colDetail.intelligence", "Collection intelligence")}</h3>
+            <IntelBlock label={t("vl.colDetail.dominantStyle", "Dominant style")} rows={intel?.styles} fmt={(v) => v.replace(/_/g, " ")} />
+            <IntelBlock label={t("vl.colDetail.categories", "Categories")} rows={intel?.categories} />
+            <IntelBlock label={t("vl.colDetail.commonMeanings", "Common meanings")} rows={intel?.meanings} />
+            <IntelBlock label={t("vl.colDetail.duplicateConcepts", "Duplicate concepts")} rows={intel?.duplicate_concepts} empty={t("vl.colDetail.noneDetected", "None detected")} />
           </div>
 
           {/* Style rules */}
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Style rules</h3>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("vl.colDetail.styleRules", "Style rules")}</h3>
             <label className="mb-2 block">
-              <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">Preferred style</span>
+              <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.colDetail.preferredStyle", "Preferred style")}</span>
               <select value={col.preferred_style ?? ""} onChange={(e) => colAction({ preferred_style: e.target.value || null })}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
                 <option value="">—</option>
@@ -181,7 +211,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
             <label className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
               <input type="checkbox" checked={!!col.preferred_monochrome} onChange={(e) => colAction({ preferred_monochrome: e.target.checked })}
                 className="h-3.5 w-3.5 rounded border-[var(--border-color)] bg-transparent" />
-              Prefer monochrome
+              {t("vl.colDetail.preferMonochrome", "Prefer monochrome")}
             </label>
           </div>
 
@@ -223,6 +253,7 @@ function IntelBlock({ label, rows, fmt, empty }: { label: string; rows?: { value
 }
 
 function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<string>; onAdded: () => void }) {
+  const { t } = useTranslation(T);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<VisualAsset[]>([]);
   const [searching, setSearching] = useState(false);
@@ -267,12 +298,12 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
           <PlusIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library to add assets…" className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.colDetail.addSearchPlaceholder", "Search the library to add assets…")} className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
           {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
         </div>
         <button type="button" onClick={() => setUploadOpen(true)}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-          <PlusIcon size={12} /> Upload
+          <PlusIcon size={12} /> {t("vl.colDetail.upload", "Upload")}
         </button>
       </div>
       {uploadOpen && <VisualLibraryUploadModal onClose={() => setUploadOpen(false)} onUploaded={addUploaded} />}

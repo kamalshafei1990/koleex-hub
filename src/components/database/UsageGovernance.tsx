@@ -17,6 +17,17 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.gov.title":          { en: "Usage governance", zh: "使用治理", ar: "ضوابط الاستخدام" },
+  "vl.gov.rule.allowed":   { en: "Allowed", zh: "允许", ar: "مسموح" },
+  "vl.gov.rule.forbidden": { en: "Forbidden", zh: "禁止", ar: "محظور" },
+  "vl.gov.rule.preferred": { en: "Preferred", zh: "首选", ar: "مفضل" },
+  "vl.gov.add":            { en: "Add", zh: "添加", ar: "إضافة" },
+  "vl.gov.context":        { en: "context", zh: "情境", ar: "سياق" },
+  "vl.gov.compatibility":  { en: "Compatibility", zh: "兼容性", ar: "التوافق" },
+};
 
 const RULE_META: Record<RuleKind, { label: string; cls: string }> = {
   allowed:   { label: "Allowed",   cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
@@ -27,6 +38,7 @@ const RULE_META: Record<RuleKind, { label: string; cls: string }> = {
 export default function UsageGovernance({
   entityType, entityId,
 }: { entityType: "asset" | "collection"; entityId: string }) {
+  const { t } = useTranslation(T);
   const base = entityType === "asset"
     ? `/api/visual-library/${entityId}/governance`
     : `/api/visual-library/collections/${entityId}/governance`;
@@ -75,7 +87,7 @@ export default function UsageGovernance({
     <div className="mt-4">
       <div className="mb-2 flex items-center gap-1.5">
         <ShieldCheckIcon size={13} className="text-[var(--text-dim)]" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Usage governance</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("vl.gov.title", "Usage governance")}</span>
       </div>
 
       {/* Violations */}
@@ -93,10 +105,10 @@ export default function UsageGovernance({
       {(["allowed", "forbidden", "preferred"] as RuleKind[]).map((k) => (
         <div key={k} className="mb-2.5">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{RULE_META[k].label}</span>
+            <span className="text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{t(`vl.gov.rule.${k}`, RULE_META[k].label)}</span>
             <button type="button" onClick={() => setPicker(picker === k ? null : k)}
               className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] px-1.5 py-0.5 text-[10.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-              <PlusIcon size={10} /> Add
+              <PlusIcon size={10} /> {t("vl.gov.add", "Add")}
             </button>
           </div>
           {byRule(k).length === 0 ? (
@@ -105,7 +117,7 @@ export default function UsageGovernance({
             <div className="flex flex-wrap gap-1.5">
               {byRule(k).map((r) => (
                 <span key={r.id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] ${RULE_META[k].cls}`}>
-                  {(r.context as UsageContext | null)?.name ?? "context"}
+                  {(r.context as UsageContext | null)?.name ?? t("vl.gov.context", "context")}
                   <button type="button" onClick={() => removeRule(r.id)} className="opacity-70 hover:opacity-100"><CrossIcon size={9} /></button>
                 </span>
               ))}
@@ -134,7 +146,7 @@ export default function UsageGovernance({
       {/* Compatibility (assets only) */}
       {entityType === "asset" && compat.length > 0 && (
         <div className="mt-1">
-          <span className="text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">Compatibility</span>
+          <span className="text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{t("vl.gov.compatibility", "Compatibility")}</span>
           <div className="mt-1.5 space-y-1">
             {compat.map((c) => {
               const v = scoreVerdict(c.score);

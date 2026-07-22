@@ -11,6 +11,19 @@ import { displayState } from "@/lib/visual-library/types";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.card.deselect":         { en: "Deselect", zh: "取消选择", ar: "إلغاء التحديد" },
+  "vl.card.select":           { en: "Select", zh: "选择", ar: "تحديد" },
+  "vl.card.no-icon":          { en: "No icon", zh: "无图标", ar: "بدون أيقونة" },
+  "vl.state.missing":         { en: "missing", zh: "缺失", ar: "مفقود" },
+  "vl.state.draft":           { en: "draft", zh: "草稿", ar: "مسودة" },
+  "vl.state.pending":         { en: "pending", zh: "待审核", ar: "قيد الانتظار" },
+  "vl.state.approved":        { en: "approved", zh: "已批准", ar: "معتمد" },
+  "vl.state.deprecated":      { en: "deprecated", zh: "已弃用", ar: "مهمل" },
+  "vl.state.archived":        { en: "archived", zh: "已归档", ar: "مؤرشف" },
+};
 
 export const STATE_PILL: Record<string, string> = {
   approved:   "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -42,6 +55,7 @@ export default function VisualAssetCard({
   onToggleSelect: () => void;
   onOpen: () => void;
 }) {
+  const { t } = useTranslation(T);
   const state = displayState(asset);
   return (
     <div
@@ -53,7 +67,7 @@ export default function VisualAssetCard({
       <button
         type="button"
         onClick={onToggleSelect}
-        aria-label={selected ? "Deselect" : "Select"}
+        aria-label={selected ? t("vl.card.deselect", "Deselect") : t("vl.card.select", "Select")}
         className={`absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
             ? "border-[var(--accent)] bg-[var(--accent)] text-white"
@@ -70,7 +84,7 @@ export default function VisualAssetCard({
         ) : (
           <span className="flex flex-col items-center gap-1 text-neutral-400">
             <ImageRawIcon size={20} />
-            <span className="text-[8px] font-semibold uppercase tracking-wide">No icon</span>
+            <span className="text-[8px] font-semibold uppercase tracking-wide">{t("vl.card.no-icon", "No icon")}</span>
           </span>
         )}
       </button>
@@ -78,7 +92,7 @@ export default function VisualAssetCard({
       <button type="button" onClick={onOpen} className="flex flex-col items-start gap-0.5 border-t border-[var(--border-subtle)] px-2 py-1.5 text-left">
         <div className="flex w-full items-center justify-between gap-1.5">
           <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">{asset.title}</span>
-          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state] ?? STATE_DOT.draft}`} title={state} />
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state] ?? STATE_DOT.draft}`} title={t(`vl.state.${state}`, state)} />
         </div>
         <span className="truncate font-mono text-[9px] text-[var(--text-dim)]">{asset.visual_asset_code}</span>
       </button>

@@ -24,6 +24,93 @@ import {
   fetchAttributeUsage, mergeConfigWithUsage,
   type AttributeConfig, type VisualMode,
 } from "@/lib/product-attributes";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  /* Page header */
+  "vl.specs.kicker":   { en: "Product Data",   zh: "产品数据", ar: "بيانات المنتجات" },
+  "vl.specs.title":    { en: "Visual Library", zh: "视觉库",   ar: "مكتبة الصور" },
+  "vl.specs.subtitle": {
+    en: "The single home for every product data point and how it shows — Icon, Photo, Text, or Icon+Text. You pick from the Visual Library or upload; nothing is auto-generated.",
+    zh: "所有产品数据点及其展示方式的唯一归属——图标、照片、文字或图标+文字。由你从视觉库选择或上传，不会自动生成。",
+    ar: "الموطن الوحيد لكل نقطة بيانات في المنتجات وطريقة عرضها — أيقونة أو صورة أو نص أو أيقونة+نص. أنت تختار من مكتبة الصور أو ترفع بنفسك؛ لا شيء يُنشأ تلقائيًا.",
+  },
+
+  /* Tabs */
+  "vl.specs.tab.commercial": { en: "Commercial",        zh: "商务",           ar: "تجاري" },
+  "vl.specs.tab.identity":   { en: "Identity & Common", zh: "标识与通用",     ar: "الهوية والمشترك" },
+  "vl.specs.tab.specs":      { en: "Specs (per type)",  zh: "规格（按类型）", ar: "المواصفات (حسب النوع)" },
+  "vl.specs.tab.media":      { en: "Media",             zh: "媒体",           ar: "الوسائط" },
+
+  /* Commercial value-list groups */
+  "vl.specs.group.levels":         { en: "Levels",     zh: "等级",     ar: "المستويات" },
+  "vl.specs.group.levels.hint":    { en: "Entry · Mid · Premium · Enterprise", zh: "入门 · 中端 · 高端 · 企业级", ar: "مبتدئ · متوسط · مميز · مؤسسي" },
+  "vl.specs.group.tags":           { en: "Tags",       zh: "标签",     ar: "الوسوم" },
+  "vl.specs.group.tags.hint":      { en: "Free-form product tags", zh: "自由填写的产品标签", ar: "وسوم منتجات حرة" },
+  "vl.specs.group.colors":         { en: "Colors",     zh: "颜色",     ar: "الألوان" },
+  "vl.specs.group.colors.hint":    { en: "Body / finish colors", zh: "机身/外观颜色", ar: "ألوان الهيكل / التشطيب" },
+  "vl.specs.group.voltage":        { en: "Voltage",    zh: "电压",     ar: "الجهد الكهربائي" },
+  "vl.specs.group.voltage.hint":   { en: "110V · 220V · 380V…", zh: "110V · 220V · 380V…", ar: "110V · 220V · 380V…" },
+  "vl.specs.group.watt":           { en: "Watt",       zh: "瓦数",     ar: "الواط" },
+  "vl.specs.group.watt.hint":      { en: "Motor power options", zh: "电机功率选项", ar: "خيارات قدرة المحرك" },
+  "vl.specs.group.plug_types":     { en: "Plug Types", zh: "插头类型", ar: "أنواع القوابس" },
+  "vl.specs.group.plug_types.hint":{ en: "Socket standards by region", zh: "各地区插座标准", ar: "معايير المقابس حسب المنطقة" },
+
+  /* Visual modes */
+  "vl.specs.mode.icon":      { en: "Icon",      zh: "图标",      ar: "أيقونة" },
+  "vl.specs.mode.photo":     { en: "Photo",     zh: "照片",      ar: "صورة" },
+  "vl.specs.mode.text":      { en: "Text",      zh: "文字",      ar: "نص" },
+  "vl.specs.mode.icon_text": { en: "Icon+Text", zh: "图标+文字", ar: "أيقونة+نص" },
+
+  /* Shared states */
+  "vl.specs.loading": { en: "Loading…", zh: "加载中…",  ar: "جارٍ التحميل…" },
+  "vl.specs.saving":  { en: "saving…",  zh: "保存中…",  ar: "جارٍ الحفظ…" },
+
+  /* Commercial tab */
+  "vl.specs.commercialIntro": {
+    en: "These value lists used to live in the Control Panel — now managed here, each with its own visual.",
+    zh: "这些值列表原先位于控制面板——现在在此管理，每个值都有自己的视觉。",
+    ar: "كانت قوائم القيم هذه في لوحة التحكم — وتُدار الآن هنا، ولكل قيمة عنصرها المرئي.",
+  },
+  "vl.specs.valueCount.one":   { en: "{n} value",  zh: "{n} 个值", ar: "{n} قيمة" },
+  "vl.specs.valueCount.other": { en: "{n} values", zh: "{n} 个值", ar: "{n} قيم" },
+  "vl.specs.noValues": {
+    en: "No values yet — add some in the product form or here later.",
+    zh: "暂无值——稍后可在产品表单或此处添加。",
+    ar: "لا توجد قيم بعد — أضِف بعضها في نموذج المنتج أو هنا لاحقًا.",
+  },
+  "vl.specs.none":        { en: "none",    zh: "无",     ar: "لا شيء" },
+  "vl.specs.library":     { en: "Library", zh: "素材库", ar: "المكتبة" },
+  "vl.specs.upload":      { en: "Upload",  zh: "上传",   ar: "رفع" },
+  "vl.specs.visualFor":   { en: "Visual for \"{v}\"", zh: "“{v}”的视觉", ar: "العنصر المرئي لـ \"{v}\"" },
+  "vl.specs.chooseVisual":{ en: "Choose a visual", zh: "选择视觉", ar: "اختر عنصرًا مرئيًا" },
+
+  /* Specs tab */
+  "vl.specs.specsIntro": {
+    en: "Only the {special} specs of each type. Common specs live in Identity & Common.",
+    zh: "仅限每个类型的{special}规格。通用规格位于“标识与通用”。",
+    ar: "فقط المواصفات {special} لكل نوع. أما المواصفات العامة فتوجد في «الهوية والمشترك».",
+  },
+  "vl.specs.special":         { en: "special",   zh: "专属",       ar: "الخاصة" },
+  "vl.specs.noTemplate":      { en: "No template.", zh: "暂无模板。", ar: "لا يوجد قالب." },
+  "vl.specs.noSpecial":       { en: "No special specs for this type yet.", zh: "该类型暂无专属规格。", ar: "لا توجد مواصفات خاصة لهذا النوع بعد." },
+  "vl.specs.setIcon":         { en: "Set icon", zh: "设置图标", ar: "تعيين أيقونة" },
+  "vl.specs.iconPlaceholder": { en: "icon",     zh: "图标",     ar: "أيقونة" },
+  "vl.specs.iconFor":         { en: "Icon for \"{v}\"", zh: "“{v}”的图标", ar: "أيقونة \"{v}\"" },
+
+  /* Coming-next placeholders */
+  "vl.specs.comingNext": { en: "Coming next", zh: "即将推出", ar: "قريبًا" },
+  "vl.specs.coming.identity": {
+    en: "The universal fields shared by all products (name · code · status · main image · the common specs) — mapped once here.",
+    zh: "所有产品共享的通用字段（名称 · 编码 · 状态 · 主图 · 通用规格）——在此一次性映射。",
+    ar: "الحقول العامة المشتركة بين جميع المنتجات (الاسم · الرمز · الحالة · الصورة الرئيسية · المواصفات العامة) — تُحدد هنا مرة واحدة.",
+  },
+  "vl.specs.coming.media": {
+    en: "Image · gallery · video · documents representation — building next.",
+    zh: "图片 · 图库 · 视频 · 文档的展示方式——即将构建。",
+    ar: "طريقة عرض الصورة · المعرض · الفيديو · المستندات — قيد البناء لاحقًا.",
+  },
+};
 
 /* Classification & Brands & the asset repository live in the Database app's
    own Visual Library tabs — not duplicated here. This screen owns only the
@@ -64,6 +151,7 @@ function slugify(s: string) {
 }
 
 export default function ProductVisualLibrary({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useTranslation(T);
   const [tab, setTab] = useState<TabId>("commercial");
 
   return (
@@ -71,11 +159,10 @@ export default function ProductVisualLibrary({ embedded = false }: { embedded?: 
       {/* Header — hidden when embedded inside the Database app (its layout shows the title). */}
       {!embedded && (
         <div className="mb-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">Product Data</p>
-          <h1 className="text-[26px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">Visual Library</h1>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">{t("vl.specs.kicker", "Product Data")}</p>
+          <h1 className="text-[26px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">{t("vl.specs.title", "Visual Library")}</h1>
           <p className="text-[13px] text-[var(--text-muted)] mt-1 max-w-[720px]">
-            The single home for every product data point and how it shows — Icon, Photo, Text, or Icon+Text. You pick from
-            the Visual Library or upload; nothing is auto-generated.
+            {t("vl.specs.subtitle", "The single home for every product data point and how it shows — Icon, Photo, Text, or Icon+Text. You pick from the Visual Library or upload; nothing is auto-generated.")}
           </p>
         </div>
       )}
@@ -92,7 +179,7 @@ export default function ProductVisualLibrary({ embedded = false }: { embedded?: 
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
             }`}
           >
-            {tt.label}
+            {t(`vl.specs.tab.${tt.id}`, tt.label)}
           </button>
         ))}
       </div>
@@ -107,6 +194,7 @@ export default function ProductVisualLibrary({ embedded = false }: { embedded?: 
 /* ── Commercial tab — the Control Panel merge ──────────────────────────── */
 
 function CommercialTab() {
+  const { t } = useTranslation(T);
   const [cfg, setCfg] = useState<AttributeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -176,13 +264,13 @@ function CommercialTab() {
   );
 
   if (loading || !cfg) {
-    return <div className="h-60 grid place-items-center text-[13px] text-[var(--text-dim)]">Loading…</div>;
+    return <div className="h-60 grid place-items-center text-[13px] text-[var(--text-dim)]">{t("vl.specs.loading", "Loading…")}</div>;
   }
 
   return (
     <div className="space-y-6">
       <p className="text-[12px] text-[var(--text-dim)] -mt-2">
-        These value lists used to live in the Control Panel — now managed here, each with its own visual.
+        {t("vl.specs.commercialIntro", "These value lists used to live in the Control Panel — now managed here, each with its own visual.")}
       </p>
 
       {ATTR_GROUPS.map((g) => {
@@ -191,14 +279,19 @@ function CommercialTab() {
           <section key={String(g.key)} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
             <div className="px-4 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div>
-                <h2 className="text-[13px] font-bold text-[var(--text-primary)]">{g.label}</h2>
-                <p className="text-[11px] text-[var(--text-dim)]">{g.hint}</p>
+                <h2 className="text-[13px] font-bold text-[var(--text-primary)]">{t(`vl.specs.group.${String(g.key)}`, g.label)}</h2>
+                <p className="text-[11px] text-[var(--text-dim)]">{t(`vl.specs.group.${String(g.key)}.hint`, g.hint)}</p>
               </div>
-              <span className="text-[11px] text-[var(--text-dim)]">{values.length} value{values.length === 1 ? "" : "s"}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">
+                {(values.length === 1
+                  ? t("vl.specs.valueCount.one", "{n} value")
+                  : t("vl.specs.valueCount.other", "{n} values")
+                ).replace("{n}", String(values.length))}
+              </span>
             </div>
 
             {values.length === 0 ? (
-              <p className="px-4 py-5 text-[12px] text-[var(--text-dim)]">No values yet — add some in the product form or here later.</p>
+              <p className="px-4 py-5 text-[12px] text-[var(--text-dim)]">{t("vl.specs.noValues", "No values yet — add some in the product form or here later.")}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--border-subtle)]">
                 {values.map((value) => {
@@ -212,7 +305,7 @@ function CommercialTab() {
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img src={img} alt={value} className="max-h-8 max-w-8 object-contain" />
                         ) : (
-                          <span className="text-[var(--text-ghost)] text-[10px] uppercase">none</span>
+                          <span className="text-[var(--text-ghost)] text-[10px] uppercase">{t("vl.specs.none", "none")}</span>
                         )}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -229,7 +322,7 @@ function CommercialTab() {
                                   : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                               }`}
                             >
-                              {m.label}
+                              {t(`vl.specs.mode.${m.id}`, m.label)}
                             </button>
                           ))}
                         </div>
@@ -239,16 +332,16 @@ function CommercialTab() {
                           onClick={() => setPicker({ group: g.key, value })}
                           className="h-6 px-2 rounded-md text-[10px] font-medium bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
                         >
-                          Library
+                          {t("vl.specs.library", "Library")}
                         </button>
                         <button
                           onClick={() => { uploadTarget.current = { group: g.key, value }; fileRef.current?.click(); }}
                           className="h-6 px-2 rounded-md text-[10px] font-medium bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
                         >
-                          Upload
+                          {t("vl.specs.upload", "Upload")}
                         </button>
                       </div>
-                      {savingKey === k && <span className="text-[10px] text-[var(--text-dim)] shrink-0">saving…</span>}
+                      {savingKey === k && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{t("vl.specs.saving", "saving…")}</span>}
                     </div>
                   );
                 })}
@@ -268,7 +361,7 @@ function CommercialTab() {
 
       <VisualAssetPicker
         open={picker !== null}
-        title={picker ? `Visual for "${picker.value}"` : "Choose a visual"}
+        title={picker ? t("vl.specs.visualFor", "Visual for \"{v}\"").replace("{v}", picker.value) : t("vl.specs.chooseVisual", "Choose a visual")}
         onPick={(a: PickedAsset | null) => {
           if (picker) setVisual(picker.group, picker.value, a ? a.public_url : null, a ? "icon" : "text");
           setPicker(null);
@@ -291,6 +384,7 @@ interface TemplateLite { id: string; name: string; slug: string; }
 const COMMON_SECTIONS = new Set(["Basic Information", "Features & Highlights", "Packaging", "Electrical Specs", "Accessories"]);
 
 function SpecsTab() {
+  const { t } = useTranslation(T);
   const [templates, setTemplates] = useState<TemplateLite[]>([]);
   const [slug, setSlug] = useState("");
   const [tree, setTree] = useState<Tree | null>(null);
@@ -356,10 +450,15 @@ function SpecsTab() {
     void save(f, oj);
   };
 
+  /* The intro sentence keeps its emphasized word across languages via a
+     {special} placeholder split — no English-only concatenation. */
+  const intro = t("vl.specs.specsIntro", "Only the {special} specs of each type. Common specs live in Identity & Common.");
+  const [introPre, introPost] = intro.split("{special}");
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] text-[var(--text-dim)]">Only the <span className="text-[var(--text-muted)] font-medium">special</span> specs of each type. Common specs live in Identity & Common.</p>
+        <p className="text-[12px] text-[var(--text-dim)]">{introPre}<span className="text-[var(--text-muted)] font-medium">{t("vl.specs.special", "special")}</span>{introPost}</p>
         {templates.length > 0 && (
           <select value={slug} onChange={(e) => setSlug(e.target.value)} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] outline-none">
             {templates.map((t) => <option key={t.id} value={t.slug}>{t.name}</option>)}
@@ -368,11 +467,11 @@ function SpecsTab() {
       </div>
 
       {loading ? (
-        <div className="h-40 grid place-items-center text-[13px] text-[var(--text-dim)]">Loading…</div>
+        <div className="h-40 grid place-items-center text-[13px] text-[var(--text-dim)]">{t("vl.specs.loading", "Loading…")}</div>
       ) : !tree ? (
-        <div className="h-32 grid place-items-center text-[13px] text-[var(--text-dim)]">No template.</div>
+        <div className="h-32 grid place-items-center text-[13px] text-[var(--text-dim)]">{t("vl.specs.noTemplate", "No template.")}</div>
       ) : specialSections.length === 0 ? (
-        <div className="h-32 grid place-items-center text-[13px] text-[var(--text-dim)]">No special specs for this type yet.</div>
+        <div className="h-32 grid place-items-center text-[13px] text-[var(--text-dim)]">{t("vl.specs.noSpecial", "No special specs for this type yet.")}</div>
       ) : (
         specialSections.map((section) => (
           <section key={section.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
@@ -384,22 +483,22 @@ function SpecsTab() {
                 return (
                   <div key={field.id} className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => setPicker({ field })} title="Set icon" className={`shrink-0 h-10 w-10 grid place-items-center rounded-lg border overflow-hidden ${oj.field_icon_url ? "border-[var(--border-subtle)] bg-[var(--bg-surface)]" : "border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40"}`}>
+                      <button onClick={() => setPicker({ field })} title={t("vl.specs.setIcon", "Set icon")} className={`shrink-0 h-10 w-10 grid place-items-center rounded-lg border overflow-hidden ${oj.field_icon_url ? "border-[var(--border-subtle)] bg-[var(--bg-surface)]" : "border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40"}`}>
                         {oj.field_icon_url
                           /* eslint-disable-next-line @next/next/no-img-element */
                           ? <img src={oj.field_icon_url} alt="" className="max-h-7 max-w-7 object-contain" />
-                          : <span className="text-[9px] uppercase text-[var(--text-ghost)]">icon</span>}
+                          : <span className="text-[9px] uppercase text-[var(--text-ghost)]">{t("vl.specs.iconPlaceholder", "icon")}</span>}
                       </button>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{field.field_label}{field.unit ? <span className="text-[var(--text-dim)] font-normal"> · {field.unit}</span> : null}</p>
                         <p className="text-[11px] text-[var(--text-dim)]">{field.field_key} · {field.field_type}</p>
                       </div>
-                      {savingId === field.id && <span className="text-[11px] text-[var(--text-dim)]">saving…</span>}
+                      {savingId === field.id && <span className="text-[11px] text-[var(--text-dim)]">{t("vl.specs.saving", "saving…")}</span>}
                     </div>
                     {options.length > 0 && (
                       <div className="mt-3 ml-[52px] flex flex-wrap gap-2">
                         {options.map((o) => (
-                          <button key={o.value} onClick={() => setPicker({ field, value: o.value })} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]" title={`Icon for "${o.label ?? o.value}"`}>
+                          <button key={o.value} onClick={() => setPicker({ field, value: o.value })} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]" title={t("vl.specs.iconFor", "Icon for \"{v}\"").replace("{v}", o.label ?? o.value)}>
                             <span className="h-6 w-6 grid place-items-center rounded bg-[var(--bg-surface-subtle)] overflow-hidden">
                               {o.icon
                                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -421,7 +520,7 @@ function SpecsTab() {
 
       <VisualAssetPicker
         open={picker !== null}
-        title={picker?.value !== undefined ? `Icon for "${picker.value}"` : picker ? `Icon for "${picker.field.field_label}"` : "Choose a visual"}
+        title={picker?.value !== undefined ? t("vl.specs.iconFor", "Icon for \"{v}\"").replace("{v}", picker.value) : picker ? t("vl.specs.iconFor", "Icon for \"{v}\"").replace("{v}", picker.field.field_label) : t("vl.specs.chooseVisual", "Choose a visual")}
         onPick={applyPick}
         onClose={() => setPicker(null)}
       />
@@ -430,13 +529,14 @@ function SpecsTab() {
 }
 
 function ComingNext({ tab }: { tab: TabId }) {
+  const { t } = useTranslation(T);
   const copy: Record<string, string> = {
-    identity: "The universal fields shared by all products (name · code · status · main image · the common specs) — mapped once here.",
-    media: "Image · gallery · video · documents representation — building next.",
+    identity: t("vl.specs.coming.identity", "The universal fields shared by all products (name · code · status · main image · the common specs) — mapped once here."),
+    media: t("vl.specs.coming.media", "Image · gallery · video · documents representation — building next."),
   };
   return (
     <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-8 text-center">
-      <p className="text-[14px] font-semibold text-[var(--text-primary)]">Coming next</p>
+      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t("vl.specs.comingNext", "Coming next")}</p>
       <p className="text-[12px] text-[var(--text-muted)] mt-1 max-w-[520px] mx-auto leading-relaxed">{copy[tab]}</p>
     </div>
   );

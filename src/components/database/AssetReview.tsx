@@ -25,6 +25,50 @@ import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.review.loadFail":           { en: "Couldn’t load the review.", zh: "无法加载审核。", ar: "تعذّر تحميل المراجعة." },
+  "vl.review.decision.approved":            { en: "Approve",             zh: "批准",       ar: "اعتماد" },
+  "vl.review.decision.approved_with_notes": { en: "Approve w/ notes",    zh: "批准并附注", ar: "اعتماد مع ملاحظات" },
+  "vl.review.decision.needs_revision":      { en: "Needs revision",      zh: "需修改",     ar: "يحتاج تعديلًا" },
+  "vl.review.decision.replace_recommended": { en: "Replace recommended", zh: "建议替换",   ar: "يُنصح بالاستبدال" },
+  "vl.review.decision.deprecated":          { en: "Deprecate",           zh: "弃用",       ar: "إيقاف الاستخدام" },
+  "vl.review.decision.rejected":            { en: "Reject",              zh: "拒绝",       ar: "رفض" },
+  "vl.review.status.pending":             { en: "Pending",             zh: "待审核",         ar: "قيد الانتظار" },
+  "vl.review.status.approved":            { en: "Approved",            zh: "已批准",         ar: "معتمد" },
+  "vl.review.status.approved_with_notes": { en: "Approved (notes)",    zh: "已批准（附注）", ar: "معتمد (بملاحظات)" },
+  "vl.review.status.needs_revision":      { en: "Needs revision",      zh: "需修改",         ar: "يحتاج تعديلًا" },
+  "vl.review.status.replace_recommended": { en: "Replace recommended", zh: "建议替换",       ar: "يُنصح بالاستبدال" },
+  "vl.review.status.deprecated":          { en: "Deprecated",          zh: "已弃用",         ar: "موقوف" },
+  "vl.review.status.rejected":            { en: "Rejected",            zh: "已拒绝",         ar: "مرفوض" },
+  "vl.review.decided":     { en: "decided",   zh: "已裁定", ar: "تم البتّ" },
+  "vl.review.suggested":   { en: "suggested", zh: "建议",   ar: "مقترح" },
+  "vl.review.risk":        { en: "Risk",      zh: "风险",   ar: "المخاطر" },
+  "vl.review.lvl.low":      { en: "low",      zh: "低",     ar: "منخفض" },
+  "vl.review.lvl.medium":   { en: "medium",   zh: "中",     ar: "متوسط" },
+  "vl.review.lvl.high":     { en: "high",     zh: "高",     ar: "مرتفع" },
+  "vl.review.lvl.critical": { en: "critical", zh: "严重",   ar: "حرج" },
+  "vl.review.production":  { en: "Production", zh: "生产",  ar: "الإنتاج" },
+  "vl.review.ready":       { en: "ready",     zh: "就绪",   ar: "جاهز" },
+  "vl.review.notReady":    { en: "not ready", zh: "未就绪", ar: "غير جاهز" },
+  "vl.review.checklistPill": { en: "Checklist", zh: "检查表", ar: "قائمة التحقق" },
+  "vl.review.recompute":   { en: "Recompute", zh: "重新计算", ar: "إعادة الحساب" },
+  "vl.review.checklist":   { en: "Review checklist", zh: "审核检查表", ar: "قائمة التحقق للمراجعة" },
+  "vl.review.req":         { en: "req",       zh: "必填",   ar: "إلزامي" },
+  "vl.review.reviewerNotes": { en: "Reviewer notes", zh: "审核备注", ar: "ملاحظات المراجع" },
+  "vl.review.notesPh":     { en: "Notes shown on the review record…", zh: "显示在审核记录上的备注…", ar: "ملاحظات تظهر في سجل المراجعة…" },
+  "vl.review.internalPh":  { en: "Internal notes (not customer-facing)…", zh: "内部备注（不对客户展示）…", ar: "ملاحظات داخلية (غير موجّهة للعملاء)…" },
+  "vl.review.priority":    { en: "Priority",  zh: "优先级", ar: "الأولوية" },
+  "vl.review.replacement": { en: "Replacement asset", zh: "替换素材", ar: "الأصل البديل" },
+  "vl.review.linkReplacement": { en: "Link a replacement asset", zh: "关联替换素材", ar: "ربط أصل بديل" },
+  "vl.review.decisionTitle": { en: "Decision", zh: "裁定",  ar: "القرار" },
+  "vl.review.lastDecision": { en: "Last decision {date} · score {score} · {risk} risk", zh: "上次裁定 {date} · 分数 {score} · {risk}风险", ar: "آخر قرار {date} · النتيجة {score} · مخاطر {risk}" },
+  "vl.review.pickerTitle": { en: "Link replacement (approved assets)", zh: "关联替换（已批准素材）", ar: "ربط بديل (أصول معتمدة)" },
+  "vl.review.searchPh":    { en: "Search by name…", zh: "按名称搜索…", ar: "ابحث بالاسم…" },
+  "vl.review.typeToSearch": { en: "Type to search…", zh: "输入以搜索…", ar: "اكتب للبحث…" },
+  "vl.review.noMatches":   { en: "No approved matches.", zh: "没有已批准的匹配项。", ar: "لا توجد نتائج معتمدة." },
+};
 
 interface Resp {
   recommendation: ReviewRecommendation;
@@ -50,6 +94,7 @@ const DECISIONS: { status: ReviewStatus; label: string }[] = [
 export default function AssetReview({
   asset, onOpenAsset, onChanged,
 }: { asset: { id: string; title: string; public_url?: string | null }; onOpenAsset?: (id: string) => void; onChanged?: () => void }) {
+  const { t } = useTranslation(T);
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -113,7 +158,7 @@ export default function AssetReview({
   };
 
   if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>;
-  if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">Couldn’t load the review.</p>;
+  if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">{t("vl.review.loadFail", "Couldn’t load the review.")}</p>;
 
   const reco = data.recommendation;
   const riskTone = RISK_TONE[reco.risk_level];
@@ -134,22 +179,22 @@ export default function AssetReview({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className={`text-[13px] font-semibold ${toneText(reviewStatusTone(review?.review_status ?? reco.suggested_status))}`}>
-                {REVIEW_STATUS_LABEL[review?.review_status ?? reco.suggested_status]}
+                {t(`vl.review.status.${review?.review_status ?? reco.suggested_status}`, REVIEW_STATUS_LABEL[review?.review_status ?? reco.suggested_status])}
               </span>
               {review ? (
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">decided</span>
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.decided", "decided")}</span>
               ) : (
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">suggested</span>
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.suggested", "suggested")}</span>
               )}
             </div>
             <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-muted)]">{reco.recommendation}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10.5px]">
-              <Pill label="Risk" value={reco.risk_level} tone={toneText(riskTone)} />
-              <Pill label="Production" value={reco.production_ready ? "ready" : "not ready"} tone={reco.production_ready ? "text-emerald-400" : "text-amber-400"} />
-              <Pill label="Checklist" value={`${checkPct}%`} tone={checkPct >= 80 ? "text-emerald-400" : checkPct >= 50 ? "text-amber-400" : "text-rose-400"} />
+              <Pill label={t("vl.review.risk", "Risk")} value={t(`vl.review.lvl.${reco.risk_level}`, reco.risk_level)} tone={toneText(riskTone)} />
+              <Pill label={t("vl.review.production", "Production")} value={reco.production_ready ? t("vl.review.ready", "ready") : t("vl.review.notReady", "not ready")} tone={reco.production_ready ? "text-emerald-400" : "text-amber-400"} />
+              <Pill label={t("vl.review.checklistPill", "Checklist")} value={`${checkPct}%`} tone={checkPct >= 80 ? "text-emerald-400" : checkPct >= 50 ? "text-amber-400" : "text-rose-400"} />
             </div>
           </div>
-          <button type="button" onClick={load} title="Recompute"
+          <button type="button" onClick={load} title={t("vl.review.recompute", "Recompute")}
             className="self-start rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             <RefreshCwIcon size={13} />
           </button>
@@ -173,7 +218,7 @@ export default function AssetReview({
       )}
 
       {/* 3 · Interactive checklist */}
-      <Section title={`Review checklist · ${checkPct}%`}>
+      <Section title={`${t("vl.review.checklist", "Review checklist")} · ${checkPct}%`}>
         <div className="space-y-1">
           {data.checklists.map((c) => {
             const v = scores[c.id] ?? { score: 0, passed: false };
@@ -186,7 +231,7 @@ export default function AssetReview({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-[12px] text-[var(--text-primary)]">{c.name}</span>
-                    {c.required && <span className="shrink-0 rounded-full bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold uppercase text-rose-300">req</span>}
+                    {c.required && <span className="shrink-0 rounded-full bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold uppercase text-rose-300">{t("vl.review.req", "req")}</span>}
                   </div>
                   {c.category && <span className="text-[9.5px] uppercase tracking-wide text-[var(--text-dim)]">{c.category}</span>}
                 </div>
@@ -201,22 +246,22 @@ export default function AssetReview({
       </Section>
 
       {/* 4 · Reviewer notes + priority */}
-      <Section title="Reviewer notes">
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes shown on the review record…"
+      <Section title={t("vl.review.reviewerNotes", "Reviewer notes")}>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t("vl.review.notesPh", "Notes shown on the review record…")}
           className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-        <textarea value={internal} onChange={(e) => setInternal(e.target.value)} rows={1} placeholder="Internal notes (not customer-facing)…"
+        <textarea value={internal} onChange={(e) => setInternal(e.target.value)} rows={1} placeholder={t("vl.review.internalPh", "Internal notes (not customer-facing)…")}
           className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <div className="mt-2 flex items-center gap-1.5">
-          <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">Priority</span>
+          <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.priority", "Priority")}</span>
           {REVIEW_PRIORITIES.map((p) => (
             <button key={p} type="button" onClick={() => setPriority(p)}
-              className={`rounded-full border px-2 py-0.5 text-[10.5px] font-medium capitalize transition-colors ${priority === p ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>{p}</button>
+              className={`rounded-full border px-2 py-0.5 text-[10.5px] font-medium capitalize transition-colors ${priority === p ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>{t(`vl.review.lvl.${p}`, p)}</button>
           ))}
         </div>
       </Section>
 
       {/* 5 · Replacement linking */}
-      <Section title="Replacement asset">
+      <Section title={t("vl.review.replacement", "Replacement asset")}>
         {replacement ? (
           <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 pl-1.5 pr-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-neutral-900">
@@ -234,13 +279,13 @@ export default function AssetReview({
         ) : (
           <button type="button" onClick={() => setPicker(true)}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
-            Link a replacement asset
+            {t("vl.review.linkReplacement", "Link a replacement asset")}
           </button>
         )}
       </Section>
 
       {/* 6 · Decision buttons */}
-      <Section title="Decision">
+      <Section title={t("vl.review.decisionTitle", "Decision")}>
         <div className="grid grid-cols-2 gap-1.5">
           {DECISIONS.map((d) => {
             const tone = reviewStatusTone(d.status);
@@ -250,13 +295,13 @@ export default function AssetReview({
                 className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-[11.5px] font-semibold transition-colors disabled:opacity-50
                   ${active ? "border-transparent bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                     : `border-[var(--border-subtle)] ${toneText(tone)} hover:border-[var(--border-color)]`}`}>
-                {saving === d.status ? <SpinnerIcon size={12} className="animate-spin" /> : null}{d.label}
+                {saving === d.status ? <SpinnerIcon size={12} className="animate-spin" /> : null}{t(`vl.review.decision.${d.status}`, d.label)}
               </button>
             );
           })}
         </div>
         {review?.reviewed_at && (
-          <p className="mt-2 text-[10.5px] text-[var(--text-dim)]">Last decision {new Date(review.reviewed_at).toLocaleString()} · score {review.approval_score} · {review.risk_level} risk</p>
+          <p className="mt-2 text-[10.5px] text-[var(--text-dim)]">{t("vl.review.lastDecision", "Last decision {date} · score {score} · {risk} risk").replace("{date}", new Date(review.reviewed_at).toLocaleString()).replace("{score}", String(review.approval_score)).replace("{risk}", t(`vl.review.lvl.${review.risk_level}`, review.risk_level))}</p>
         )}
       </Section>
 
@@ -267,6 +312,7 @@ export default function AssetReview({
 
 /* ── Replacement picker modal ── */
 function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; onClose: () => void; onPick: (a: SearchAsset) => void }) {
+  const { t } = useTranslation(T);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchAsset[]>([]);
   const [loading, setLoading] = useState(false);
@@ -285,14 +331,14 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 pt-24" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-[var(--text-primary)]">Link replacement (approved assets)</span>
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.review.pickerTitle", "Link replacement (approved assets)")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
         </div>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name…"
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.review.searchPh", "Search by name…")}
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
           {loading ? <div className="flex justify-center py-4 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
-            : results.length === 0 ? <p className="py-4 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim().length < 2 ? "Type to search…" : "No approved matches."}</p>
+            : results.length === 0 ? <p className="py-4 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim().length < 2 ? t("vl.review.typeToSearch", "Type to search…") : t("vl.review.noMatches", "No approved matches.")}</p>
             : results.map((a) => (
               <button key={a.id} type="button" onClick={() => onPick(a)}
                 className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 pl-1.5 pr-2.5 text-left hover:border-[var(--border-color)]">

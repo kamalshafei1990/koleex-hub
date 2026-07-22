@@ -12,10 +12,23 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.addCol.title":             { en: "Add to collection", zh: "添加到合集", ar: "إضافة إلى مجموعة" },
+  "vl.addCol.assetCountOne":     { en: "{n} asset", zh: "{n} 个素材", ar: "{n} عنصر" },
+  "vl.addCol.assetCount":        { en: "{n} assets", zh: "{n} 个素材", ar: "{n} عناصر" },
+  "vl.addCol.close":             { en: "Close", zh: "关闭", ar: "إغلاق" },
+  "vl.addCol.searchPlaceholder": { en: "Search collections…", zh: "搜索合集…", ar: "ابحث في المجموعات…" },
+  "vl.addCol.createNew":         { en: "Create new collection", zh: "新建合集", ar: "إنشاء مجموعة جديدة" },
+  "vl.addCol.selectedCount":     { en: "{n} selected", zh: "已选 {n} 项", ar: "{n} محدد" },
+  "vl.addCol.add":               { en: "Add", zh: "添加", ar: "إضافة" },
+};
 
 export default function AddToCollectionModal({
   assetIds, onClose, onDone,
 }: { assetIds: string[]; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation(T);
   const [cols, setCols] = useState<VisualCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -33,8 +46,8 @@ export default function AddToCollectionModal({
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return cols.filter((c) => !t || c.name.toLowerCase().includes(t) || (c.code ?? "").toLowerCase().includes(t));
+    const term = q.trim().toLowerCase();
+    return cols.filter((c) => !term || c.name.toLowerCase().includes(term) || (c.code ?? "").toLowerCase().includes(term));
   }, [cols, q]);
 
   const toggle = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -56,16 +69,16 @@ export default function AddToCollectionModal({
       <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <div>
-            <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Add to collection</h3>
-            <p className="text-[11.5px] text-[var(--text-dim)]">{assetIds.length} asset{assetIds.length === 1 ? "" : "s"}</p>
+            <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("vl.addCol.title", "Add to collection")}</h3>
+            <p className="text-[11.5px] text-[var(--text-dim)]">{(assetIds.length === 1 ? t("vl.addCol.assetCountOne", "{n} asset") : t("vl.addCol.assetCount", "{n} assets")).replace("{n}", String(assetIds.length))}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>
+          <button type="button" onClick={onClose} aria-label={t("vl.addCol.close", "Close")} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>
         </div>
 
         <div className="border-b border-[var(--border-subtle)] px-5 py-3">
           <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search collections…"
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.addCol.searchPlaceholder", "Search collections…")}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
           </div>
         </div>
@@ -74,7 +87,7 @@ export default function AddToCollectionModal({
           <button type="button" onClick={() => setShowCreate(true)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] text-[var(--text-dim)]"><PlusIcon size={14} /></span>
-            Create new collection
+            {t("vl.addCol.createNew", "Create new collection")}
           </button>
           {loading ? (
             <div className="flex justify-center py-8 text-[var(--text-dim)]"><SpinnerIcon size={16} className="animate-spin" /></div>
@@ -102,10 +115,10 @@ export default function AddToCollectionModal({
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-5 py-4">
-          <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{sel.size} selected</span>
+          <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{t("vl.addCol.selectedCount", "{n} selected").replace("{n}", String(sel.size))}</span>
           <button type="button" onClick={save} disabled={saving || sel.size === 0}
             className="inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-            {saving && <SpinnerIcon size={14} className="animate-spin" />}Add
+            {saving && <SpinnerIcon size={14} className="animate-spin" />}{t("vl.addCol.add", "Add")}
           </button>
         </div>
       </div>

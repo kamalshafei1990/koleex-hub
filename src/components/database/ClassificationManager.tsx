@@ -36,6 +36,52 @@ import {
   createSubcategory, updateSubcategory, deleteSubcategory,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.class.divisions":         { en: "Divisions",       zh: "大类",     ar: "الأقسام" },
+  "vl.class.newDivision":       { en: "New division",    zh: "新建大类", ar: "قسم جديد" },
+  "vl.class.lvl.divisions":     { en: "divisions",       zh: "大类",     ar: "الأقسام" },
+  "vl.class.lvl.categories":    { en: "categories",      zh: "类别",     ar: "الفئات" },
+  "vl.class.lvl.subcategories": { en: "subcategories",   zh: "子类别",   ar: "الفئات الفرعية" },
+  "vl.class.lvl.kinds":         { en: "kinds",           zh: "类型",     ar: "الأنواع" },
+  "vl.class.one.division":      { en: "division",        zh: "大类",     ar: "قسم" },
+  "vl.class.one.category":      { en: "category",        zh: "类别",     ar: "فئة" },
+  "vl.class.one.subcategory":   { en: "subcategory",     zh: "子类别",   ar: "فئة فرعية" },
+  "vl.class.one.kind":          { en: "kind",            zh: "类型",     ar: "نوع" },
+  "vl.class.search":            { en: "Search {x}…",     zh: "搜索{x}…", ar: "ابحث في {x}…" },
+  "vl.class.new":               { en: "New {x}",         zh: "新建{x}",  ar: "إضافة {x}" },
+  "vl.class.newNamePh":         { en: "New {x} name…",   zh: "新{x}名称…", ar: "اسم {x} الجديد…" },
+  "vl.class.add":               { en: "Add",             zh: "添加",     ar: "إضافة" },
+  "vl.class.cancel":            { en: "Cancel",          zh: "取消",     ar: "إلغاء" },
+  "vl.class.kindsNote":         { en: "Kinds come from the product schema engine — set their icon here; add/rename kinds in the schema.", zh: "类型来自产品架构引擎——可在此设置图标；添加/重命名类型请在架构中进行。", ar: "الأنواع مصدرها محرك مخطط المنتجات — عيّن أيقوناتها هنا؛ وتتم إضافتها وإعادة تسميتها في المخطط." },
+  "vl.class.noMatch":           { en: "Nothing matches", zh: "没有匹配项", ar: "لا توجد نتائج مطابقة" },
+  "vl.class.noKinds":           { en: "No kinds for this subcategory", zh: "该子类别暂无类型", ar: "لا توجد أنواع لهذه الفئة الفرعية" },
+  "vl.class.noneYet":           { en: "No {x} yet",      zh: "暂无{x}",  ar: "لا توجد {x} بعد" },
+  "vl.class.tryAnother":        { en: "Try another search term.", zh: "请尝试其他搜索词。", ar: "جرّب كلمة بحث أخرى." },
+  "vl.class.useNew":            { en: "Use “New {x}” to add one.", zh: "使用“新建{x}”来添加。", ar: "استخدم «إضافة {x}» للإضافة." },
+  "vl.class.createFail":        { en: "Couldn't create — the name/slug may already exist.", zh: "创建失败——名称或标识可能已存在。", ar: "تعذّر الإنشاء — قد يكون الاسم أو المعرّف موجودًا بالفعل." },
+  "vl.class.removeConfirm":     { en: "Remove this from the product taxonomy? Products that use it may be affected.", zh: "确定从产品分类体系中移除？使用它的产品可能会受影响。", ar: "هل تريد إزالة هذا من تصنيف المنتجات؟ قد تتأثر المنتجات التي تستخدمه." },
+  "vl.class.deleteFail":        { en: "Couldn't delete — it may still be in use by products.", zh: "删除失败——可能仍被产品使用。", ar: "تعذّر الحذف — قد يكون لا يزال مستخدمًا في منتجات." },
+  "vl.class.iconSaveFail":      { en: "Couldn't save the icon. Please try again.", zh: "无法保存图标，请重试。", ar: "تعذّر حفظ الأيقونة. يُرجى المحاولة مرة أخرى." },
+  "vl.class.iconSaveNetwork":   { en: "Couldn't save the icon — network error. Please try again.", zh: "无法保存图标——网络错误，请重试。", ar: "تعذّر حفظ الأيقونة — خطأ في الشبكة. يُرجى المحاولة مرة أخرى." },
+  "vl.class.moveUp":            { en: "Move up",         zh: "上移",     ar: "نقل لأعلى" },
+  "vl.class.moveDown":          { en: "Move down",       zh: "下移",     ar: "نقل لأسفل" },
+  "vl.class.rename":            { en: "Rename",          zh: "重命名",   ar: "إعادة تسمية" },
+  "vl.class.delete":            { en: "Delete",          zh: "删除",     ar: "حذف" },
+  "vl.class.changeIcon":        { en: "Change icon",     zh: "更换图标", ar: "تغيير الأيقونة" },
+  "vl.class.addIcon":           { en: "Add icon from Visual Library", zh: "从视觉库添加图标", ar: "إضافة أيقونة من مكتبة الصور" },
+  "vl.class.noIcon":            { en: "No icon",         zh: "无图标",   ar: "بدون أيقونة" },
+  "vl.class.pickTitle":         { en: "Choose an icon from the Visual Library", zh: "从视觉库选择图标", ar: "اختر أيقونة من مكتبة الصور" },
+  "vl.class.pickSearch":        { en: "Search Visual Library icons…", zh: "搜索视觉库图标…", ar: "ابحث في أيقونات مكتبة الصور…" },
+  "vl.class.allCategories":     { en: "All categories",  zh: "所有类别", ar: "كل الفئات" },
+  "vl.class.allIcons":          { en: "All icons",       zh: "所有图标", ar: "كل الأيقونات" },
+  "vl.class.noIconsFound":      { en: "No icons found.", zh: "未找到图标。", ar: "لم يتم العثور على أيقونات." },
+  "vl.class.noIconsYet":        { en: "No icons here yet.", zh: "这里还没有图标。", ar: "لا توجد أيقونات هنا بعد." },
+  "vl.class.showing":           { en: "Showing {n} of {m}", zh: "显示 {n} / {m}", ar: "عرض {n} من {m}" },
+  "vl.class.iconsLive":         { en: "Icons live in the Visual Library.", zh: "图标存放在视觉库中。", ar: "الأيقونات محفوظة في مكتبة الصور." },
+  "vl.class.clearIcon":         { en: "Clear icon",      zh: "清除图标", ar: "إزالة الأيقونة" },
+};
 
 interface Item { id: string; name: string; slug: string; order: number }
 interface VlIcon { id: string; title: string; visual_asset_code: string; public_url: string | null }
@@ -54,6 +100,7 @@ const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export default function ClassificationManager() {
+  const { t } = useTranslation(T);
   // drill trail below the root; empty = showing divisions. Each entry carries
   // the slug so the kinds level (keyed by subcategory slug) can resolve.
   const [trail, setTrail] = useState<{ level: LevelKey; id: string; name: string; slug: string }[]>([]);
@@ -77,6 +124,9 @@ export default function ClassificationManager() {
   const level: LevelKey = trail.length === 0 ? "divisions"
     : trail.length === 1 ? "categories"
     : trail.length === 2 ? "subcategories" : "types";
+  /* Translated level labels ("divisions" / "division", …) used in templates. */
+  const lvlLabel = t(`vl.class.lvl.${level === "types" ? "kinds" : level}`, level === "types" ? "kinds" : level);
+  const oneLabel = t(`vl.class.one.${SINGULAR[level]}`, SINGULAR[level]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -160,7 +210,7 @@ export default function ClassificationManager() {
       }
     } catch { /* surfaced below */ }
     setBusyId(null); setNewName(""); setAdding(false);
-    if (!res) alert("Couldn't create — the name/slug may already exist.");
+    if (!res) alert(t("vl.class.createFail", "Couldn't create — the name/slug may already exist."));
     refresh();
   };
 
@@ -176,14 +226,14 @@ export default function ClassificationManager() {
 
   const remove = async (id: string) => {
     if (isTypes) return;
-    if (!confirm("Remove this from the product taxonomy? Products that use it may be affected.")) return;
+    if (!confirm(t("vl.class.removeConfirm", "Remove this from the product taxonomy? Products that use it may be affected."))) return;
     setBusyId(id);
     let ok = true;
     if (level === "divisions") ok = await deleteDivision(id);
     else if (level === "categories") ok = await deleteCategory(id);
     else if (level === "subcategories") ok = await deleteSubcategory(id);
     setBusyId(null);
-    if (!ok) { alert("Couldn't delete — it may still be in use by products."); refresh(); return; }
+    if (!ok) { alert(t("vl.class.deleteFail", "Couldn't delete — it may still be in use by products.")); refresh(); return; }
     if (trail.some((t) => t.id === id)) setTrail((prev) => prev.slice(0, prev.findIndex((t) => t.id === id)));
     refresh();
   };
@@ -209,9 +259,9 @@ export default function ClassificationManager() {
         method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ level: HUB_LEVEL[pLevel], slug, icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
       });
-      if (!r.ok) alert("Couldn't save the icon. Please try again.");
+      if (!r.ok) alert(t("vl.class.iconSaveFail", "Couldn't save the icon. Please try again."));
     } catch {
-      alert("Couldn't save the icon — network error. Please try again.");
+      alert(t("vl.class.iconSaveNetwork", "Couldn't save the icon — network error. Please try again."));
     } finally {
       setBusyId(null); setPicker(null); refresh();
     }
@@ -235,8 +285,8 @@ export default function ClassificationManager() {
       <aside className="hidden w-56 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">
           <div className="mb-1.5 flex items-center justify-between px-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Divisions</span>
-            <button type="button" onClick={() => { setTrail([]); setAdding(true); }} title="New division"
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("vl.class.divisions", "Divisions")}</span>
+            <button type="button" onClick={() => { setTrail([]); setAdding(true); }} title={t("vl.class.newDivision", "New division")}
               className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><PlusIcon size={12} /></button>
           </div>
           {loading && divisions.length === 0 ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
@@ -254,7 +304,7 @@ export default function ClassificationManager() {
       <div className="min-w-0 flex-1 space-y-4">
         {/* Breadcrumb */}
         <nav className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
-          <Crumb label="Divisions" active={trail.length === 0} onClick={() => goTo(0)} />
+          <Crumb label={t("vl.class.divisions", "Divisions")} active={trail.length === 0} onClick={() => goTo(0)} />
           {trail.map((t, i) => (
             <span key={t.id} className="flex items-center gap-1.5">
               <span className="text-[var(--text-dim)]">›</span>
@@ -267,29 +317,29 @@ export default function ClassificationManager() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${level === "types" ? "kinds" : level}…`}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.class.search", "Search {x}…").replace("{x}", lvlLabel)}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
           </div>
           {!isTypes && (
             <button type="button" onClick={() => setAdding((v) => !v)}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-              <PlusIcon size={14} /> New {SINGULAR[level]}
+              <PlusIcon size={14} /> {t("vl.class.new", "New {x}").replace("{x}", oneLabel)}
             </button>
           )}
         </div>
 
         {isTypes && (
-          <p className="text-[11.5px] text-[var(--text-dim)]">Kinds come from the product schema engine — set their icon here; add/rename kinds in the schema.</p>
+          <p className="text-[11.5px] text-[var(--text-dim)]">{t("vl.class.kindsNote", "Kinds come from the product schema engine — set their icon here; add/rename kinds in the schema.")}</p>
         )}
 
         {adding && !isTypes && (
           <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2">
             <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") create(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
-              placeholder={`New ${SINGULAR[level]} name…`}
+              placeholder={t("vl.class.newNamePh", "New {x} name…").replace("{x}", oneLabel)}
               className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-            <button type="button" disabled={busyId === "new"} onClick={create} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} className="animate-spin" /> : "Add"}</button>
-            <button type="button" onClick={() => { setAdding(false); setNewName(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
+            <button type="button" disabled={busyId === "new"} onClick={create} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} className="animate-spin" /> : t("vl.class.add", "Add")}</button>
+            <button type="button" onClick={() => { setAdding(false); setNewName(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.class.cancel", "Cancel")}</button>
           </div>
         )}
 
@@ -299,8 +349,8 @@ export default function ClassificationManager() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
             <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
-            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{q ? "Nothing matches" : isTypes ? "No kinds for this subcategory" : `No ${level} yet`}</p>
-            {!isTypes && <p className="mt-1 text-[12px] text-[var(--text-dim)]">{q ? "Try another search term." : `Use “New ${SINGULAR[level]}” to add one.`}</p>}
+            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{q ? t("vl.class.noMatch", "Nothing matches") : isTypes ? t("vl.class.noKinds", "No kinds for this subcategory") : t("vl.class.noneYet", "No {x} yet").replace("{x}", lvlLabel)}</p>
+            {!isTypes && <p className="mt-1 text-[12px] text-[var(--text-dim)]">{q ? t("vl.class.tryAnother", "Try another search term.") : t("vl.class.useNew", "Use “New {x}” to add one.").replace("{x}", oneLabel)}</p>}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -337,18 +387,19 @@ function ClassificationCard({
   onStartRename?: () => void; onDelete?: () => void; onMoveUp?: () => void; onMoveDown?: () => void;
   onOpenIcon: () => void; onDrill?: () => void;
 }) {
+  const { t } = useTranslation(T);
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
       {/* hover actions */}
       <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        {onMoveUp && <CardBtn title="Move up" onClick={onMoveUp}><ArrowUpIcon size={11} /></CardBtn>}
-        {onMoveDown && <CardBtn title="Move down" onClick={onMoveDown}><ArrowDownIcon size={11} /></CardBtn>}
-        {onStartRename && <CardBtn title="Rename" onClick={onStartRename}><PencilIcon size={11} /></CardBtn>}
-        {onDelete && <CardBtn title="Delete" tone="rose" onClick={onDelete}><TrashIcon size={11} /></CardBtn>}
+        {onMoveUp && <CardBtn title={t("vl.class.moveUp", "Move up")} onClick={onMoveUp}><ArrowUpIcon size={11} /></CardBtn>}
+        {onMoveDown && <CardBtn title={t("vl.class.moveDown", "Move down")} onClick={onMoveDown}><ArrowDownIcon size={11} /></CardBtn>}
+        {onStartRename && <CardBtn title={t("vl.class.rename", "Rename")} onClick={onStartRename}><PencilIcon size={11} /></CardBtn>}
+        {onDelete && <CardBtn title={t("vl.class.delete", "Delete")} tone="rose" onClick={onDelete}><TrashIcon size={11} /></CardBtn>}
       </div>
 
       {/* icon tile — empty by default; click to assign a Visual Library icon */}
-      <button type="button" onClick={onOpenIcon} title={iconUrl ? "Change icon" : "Add icon from Visual Library"}
+      <button type="button" onClick={onOpenIcon} title={iconUrl ? t("vl.class.changeIcon", "Change icon") : t("vl.class.addIcon", "Add icon from Visual Library")}
         className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
         {busy ? <SpinnerIcon size={18} className="animate-spin text-neutral-400" /> : iconUrl ? (
           // Render the override via a CSS mask so single-tone SVGs (incl.
@@ -359,7 +410,7 @@ function ClassificationCard({
         ) : (
           <span className="flex flex-col items-center gap-1 text-neutral-300">
             <ImageRawIcon size={20} />
-            <span className="text-[8px] font-semibold uppercase tracking-wide">No icon</span>
+            <span className="text-[8px] font-semibold uppercase tracking-wide">{t("vl.class.noIcon", "No icon")}</span>
           </span>
         )}
       </button>
@@ -430,6 +481,7 @@ function Crumb({ label, active, onClick }: { label: string; active: boolean; onC
 type PickerCollection = { id: string; name: string; asset_count?: number };
 
 function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: VlIcon | null) => void }) {
+  const { t } = useTranslation(T);
   const [q, setQ] = useState("");
   const [cols, setCols] = useState<PickerCollection[]>([]);
   const [cats, setCats] = useState<FetchedIconCategory[]>(GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })));
@@ -492,17 +544,17 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 pt-20" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-[var(--text-primary)]">Choose an icon from the Visual Library</span>
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.class.pickTitle", "Choose an icon from the Visual Library")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
         </div>
         {/* Search + category. Typing searches across icons (clears any active
             collection); the category dropdown narrows by icon category. */}
         <div className="flex gap-1.5">
-          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) setActiveCol(null); }} placeholder="Search Visual Library icons…"
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) setActiveCol(null); }} placeholder={t("vl.class.pickSearch", "Search Visual Library icons…")}
             className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
           <select value={activeCat} onChange={(e) => { setActiveCat(e.target.value); if (e.target.value) setActiveCol(null); }}
             className="shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
-            <option value="">All categories</option>
+            <option value="">{t("vl.class.allCategories", "All categories")}</option>
             {cats.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
         </div>
@@ -510,7 +562,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
         {/* Collection filter row */}
         {cols.length > 0 && (
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-            <PickerChip active={activeCol === null && !q && !activeCat} label="All icons" onClick={() => { setQ(""); setActiveCat(""); setActiveCol(null); }} />
+            <PickerChip active={activeCol === null && !q && !activeCat} label={t("vl.class.allIcons", "All icons")} onClick={() => { setQ(""); setActiveCat(""); setActiveCol(null); }} />
             {cols.map((c) => (
               <PickerChip key={c.id} active={activeCol === c.id} label={c.name} count={c.asset_count}
                 onClick={() => { setQ(""); setActiveCat(""); setActiveCol(c.id); }} />
@@ -520,7 +572,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
 
         <div className="mt-2 max-h-[280px] min-h-[120px] overflow-y-auto" onScroll={onScroll}>
           {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
-            : items.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? "No icons found." : "No icons here yet."}</p>
+            : items.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? t("vl.class.noIconsFound", "No icons found.") : t("vl.class.noIconsYet", "No icons here yet.")}</p>
             : (
               <>
                 <div className="grid grid-cols-6 gap-1.5">
@@ -537,8 +589,8 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
             )}
         </div>
         <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5">
-          <span className="text-[10.5px] text-[var(--text-dim)]">{total > 0 ? `Showing ${items.length} of ${total}` : "Icons live in the Visual Library."}</span>
-          <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-rose-400">Clear icon</button>
+          <span className="text-[10.5px] text-[var(--text-dim)]">{total > 0 ? t("vl.class.showing", "Showing {n} of {m}").replace("{n}", String(items.length)).replace("{m}", String(total)) : t("vl.class.iconsLive", "Icons live in the Visual Library.")}</span>
+          <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-rose-400">{t("vl.class.clearIcon", "Clear icon")}</button>
         </div>
       </div>
     </div>

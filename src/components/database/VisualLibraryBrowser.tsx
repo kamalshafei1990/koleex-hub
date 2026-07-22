@@ -28,11 +28,46 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
+import { useTranslation, type Translations } from "@/lib/i18n";
+import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
 
-const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+const T: Translations = {
+  ...VL_LABELS_T,
+  "vl.browse.add-category-failed": { en: "Failed to add category", zh: "添加分类失败", ar: "فشل في إضافة الفئة" },
+  "vl.browse.all-categories":      { en: "All categories", zh: "全部分类", ar: "جميع الفئات" },
+  "vl.browse.category-name":       { en: "Category name…", zh: "分类名称…", ar: "اسم الفئة…" },
+  "vl.browse.add":                 { en: "Add", zh: "添加", ar: "إضافة" },
+  "vl.browse.add-category":        { en: "Add category", zh: "添加分类", ar: "إضافة فئة" },
+  "vl.browse.search-placeholder":  { en: "Search name, code, keyword, synonym…", zh: "搜索名称、编码、关键词、同义词…", ar: "ابحث بالاسم أو الرمز أو الكلمة المفتاحية أو المرادف…" },
+  "vl.browse.grid-view":           { en: "Grid view", zh: "网格视图", ar: "عرض شبكي" },
+  "vl.browse.list-view":           { en: "List view", zh: "列表视图", ar: "عرض قائمة" },
+  "vl.browse.new-entity":          { en: "New entity", zh: "新建条目", ar: "كيان جديد" },
+  "vl.browse.all-states":          { en: "All states", zh: "全部状态", ar: "جميع الحالات" },
+  "vl.browse.all-types":           { en: "All types", zh: "全部类型", ar: "جميع الأنواع" },
+  "vl.browse.allowed-in-context":  { en: "Allowed in context", zh: "允许的使用场景", ar: "مسموح به في السياق" },
+  "vl.browse.any-context":         { en: "Any context", zh: "任意场景", ar: "أي سياق" },
+  "vl.browse.clear":               { en: "Clear", zh: "清除", ar: "مسح" },
+  "vl.browse.count-of":            { en: "{a} of {b}", zh: "{b} 项中的 {a} 项", ar: "{a} من {b}" },
+  "vl.browse.nothing-matches":     { en: "Nothing matches", zh: "没有匹配结果", ar: "لا توجد نتائج مطابقة" },
+  "vl.browse.try-different":       { en: "Try a different category, state, or search term.", zh: "请尝试其他分类、状态或搜索词。", ar: "جرّب فئة أو حالة أو كلمة بحث مختلفة." },
+  "vl.browse.show-more":           { en: "Show more — {a} of {b} remaining", zh: "显示更多 — 剩余 {a} 项（共 {b} 项）", ar: "عرض المزيد — {a} من {b} متبقية" },
+  "vl.browse.n-selected":          { en: "{n} selected", zh: "已选择 {n} 项", ar: "تم تحديد {n}" },
+  "vl.browse.approve":             { en: "Approve", zh: "批准", ar: "اعتماد" },
+  "vl.browse.collection":          { en: "Collection", zh: "合集", ar: "مجموعة" },
+  "vl.browse.archive":             { en: "Archive", zh: "归档", ar: "أرشفة" },
+  "vl.state.missing":              { en: "Missing", zh: "缺失", ar: "مفقود" },
+  "vl.state.draft":                { en: "Draft", zh: "草稿", ar: "مسودة" },
+  "vl.state.pending":              { en: "Pending", zh: "待审核", ar: "قيد الانتظار" },
+  "vl.state.approved":             { en: "Approved", zh: "已批准", ar: "معتمد" },
+  "vl.state.deprecated":           { en: "Deprecated", zh: "已弃用", ar: "مهمل" },
+  "vl.state.archived":             { en: "Archived", zh: "已归档", ar: "مؤرشف" },
+};
+
+const SELECT ="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const STATES: DisplayState[] = ["missing", "draft", "pending", "approved", "deprecated", "archived"];
 
 export default function VisualLibraryBrowser() {
+  const { t } = useTranslation(T);
   const params = useSearchParams();
   const [all, setAll] = useState<VisualAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +103,7 @@ export default function VisualLibraryBrowser() {
       setCategories(await fetchIconCategories());
       setNewCat(""); setAddingCat(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to add category");
+      alert(e instanceof Error ? e.message : t("vl.browse.add-category-failed", "Failed to add category"));
     } finally { setCatBusy(false); }
   };
 
@@ -192,7 +227,7 @@ export default function VisualLibraryBrowser() {
       {/* Category sidebar (desktop) */}
       <aside className="hidden w-52 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">
-          <SidebarItem label="All categories" count={all.length} active={category === ""} onClick={() => setCategory("")} />
+          <SidebarItem label={t("vl.browse.all-categories", "All categories")} count={all.length} active={category === ""} onClick={() => setCategory("")} />
           {categories.map((c) => (
             <SidebarItem key={c.key} label={c.label} count={categoryCounts[c.key] ?? 0} active={category === c.key} onClick={() => setCategory(c.key)} />
           ))}
@@ -200,17 +235,17 @@ export default function VisualLibraryBrowser() {
             <div className="flex items-center gap-1.5 px-1 pt-1.5">
               <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCat(""); } }}
-                placeholder="Category name…"
+                placeholder={t("vl.browse.category-name", "Category name…")}
                 className="min-w-0 flex-1 rounded-md border border-[var(--border-focus)] bg-[var(--bg-card)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none" />
               <button type="button" disabled={catBusy || !newCat.trim()} onClick={addCategory}
                 className="shrink-0 rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[11px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">
-                {catBusy ? "…" : "Add"}
+                {catBusy ? "…" : t("vl.browse.add", "Add")}
               </button>
             </div>
           ) : (
             <button type="button" onClick={() => setAddingCat(true)}
               className="mt-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]">
-              <PlusIcon size={12} /> Add category
+              <PlusIcon size={12} /> {t("vl.browse.add-category", "Add category")}
             </button>
           )}
         </div>
@@ -221,23 +256,23 @@ export default function VisualLibraryBrowser() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, code, keyword, synonym…"
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.browse.search-placeholder", "Search name, code, keyword, synonym…")}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-0.5">
-              <button type="button" onClick={() => setView("grid")} aria-label="Grid view"
+              <button type="button" onClick={() => setView("grid")} aria-label={t("vl.browse.grid-view", "Grid view")}
                 className={`flex h-7 w-7 items-center justify-center rounded-md ${view === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)]"}`}>
                 <LayoutGridIcon size={13} />
               </button>
-              <button type="button" onClick={() => setView("list")} aria-label="List view"
+              <button type="button" onClick={() => setView("list")} aria-label={t("vl.browse.list-view", "List view")}
                 className={`flex h-7 w-7 items-center justify-center rounded-md ${view === "list" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)]"}`}>
                 <ListIcon size={13} />
               </button>
             </div>
             <button type="button" onClick={() => setShowUpload(true)}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-              <PlusIcon size={14} /> New entity
+              <PlusIcon size={14} /> {t("vl.browse.new-entity", "New entity")}
             </button>
           </div>
         </div>
@@ -245,28 +280,28 @@ export default function VisualLibraryBrowser() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
           <select className={`${SELECT} lg:hidden`} value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="">All categories</option>
+            <option value="">{t("vl.browse.all-categories", "All categories")}</option>
             {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
           <select className={SELECT} value={state} onChange={(e) => setState(e.target.value)}>
-            <option value="">All states</option>
-            {STATES.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+            <option value="">{t("vl.browse.all-states", "All states")}</option>
+            {STATES.map((s) => <option key={s} value={s}>{t(`vl.state.${s}`, s[0].toUpperCase() + s.slice(1))}</option>)}
           </select>
           <select className={SELECT} value={assetType} onChange={(e) => setAssetType(e.target.value)}>
-            <option value="">All types</option>
-            {ASSET_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            <option value="">{t("vl.browse.all-types", "All types")}</option>
+            {ASSET_TYPES.map((v) => <option key={v} value={v}>{t(`vl.type.${v}`, v.replace(/_/g, " "))}</option>)}
           </select>
           {contexts.length > 0 && (
-            <select className={SELECT} value={contextSlug} onChange={(e) => setContextSlug(e.target.value)} title="Allowed in context">
-              <option value="">Any context</option>
+            <select className={SELECT} value={contextSlug} onChange={(e) => setContextSlug(e.target.value)} title={t("vl.browse.allowed-in-context", "Allowed in context")}>
+              <option value="">{t("vl.browse.any-context", "Any context")}</option>
               {contexts.map((c) => <option key={c.slug} value={c.slug}>✓ {c.name}</option>)}
             </select>
           )}
           {(category || state || assetType || q || contextSlug) && (
             <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); setContextSlug(""); }}
-              className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+              className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.browse.clear", "Clear")}</button>
           )}
-          <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : `${filtered.length} of ${all.length}`}</span>
+          <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : t("vl.browse.count-of", "{a} of {b}").replace("{a}", String(filtered.length)).replace("{b}", String(all.length))}</span>
         </div>
 
         {/* Results */}
@@ -275,8 +310,8 @@ export default function VisualLibraryBrowser() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
             <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
-            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">Nothing matches</p>
-            <p className="mt-1 text-[12px] text-[var(--text-dim)]">Try a different category, state, or search term.</p>
+            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{t("vl.browse.nothing-matches", "Nothing matches")}</p>
+            <p className="mt-1 text-[12px] text-[var(--text-dim)]">{t("vl.browse.try-different", "Try a different category, state, or search term.")}</p>
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9">
@@ -302,7 +337,7 @@ export default function VisualLibraryBrowser() {
                     <span className="block truncate font-mono text-[10.5px] text-[var(--text-dim)]">{a.visual_asset_code}</span>
                   </span>
                   <span className="hidden shrink-0 text-[11px] text-[var(--text-dim)] sm:block">{a.category}</span>
-                  <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATE_PILL[st] ?? STATE_PILL.draft}`}>{st}</span>
+                  <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATE_PILL[st] ?? STATE_PILL.draft}`}>{t(`vl.state.${st}`, st)}</span>
                 </button>
               );
             })}
@@ -313,7 +348,7 @@ export default function VisualLibraryBrowser() {
           <div className="flex justify-center pt-1">
             <button type="button" onClick={() => setLimit((l) => l + 300)}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]">
-              Show more — {filtered.length - visible.length} of {filtered.length} remaining
+              {t("vl.browse.show-more", "Show more — {a} of {b} remaining").replace("{a}", String(filtered.length - visible.length)).replace("{b}", String(filtered.length))}
             </button>
           </div>
         )}
@@ -321,21 +356,21 @@ export default function VisualLibraryBrowser() {
 
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-4 z-[110] mx-auto flex w-[calc(100%-2rem)] max-w-lg items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 shadow-lg">
-          <span className="text-[12.5px] font-medium text-[var(--text-primary)] tabular-nums">{selected.size} selected</span>
+          <span className="text-[12.5px] font-medium text-[var(--text-primary)] tabular-nums">{t("vl.browse.n-selected", "{n} selected").replace("{n}", String(selected.size))}</span>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("approve")}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-              {bulkBusy ? <SpinnerIcon size={12} className="animate-spin" /> : <BadgeCheckIcon size={12} />} Approve
+              {bulkBusy ? <SpinnerIcon size={12} className="animate-spin" /> : <BadgeCheckIcon size={12} />} {t("vl.browse.approve", "Approve")}
             </button>
             <button type="button" disabled={bulkBusy} onClick={() => setShowBulkCol(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
-              <LayersIcon size={12} /> Collection
+              <LayersIcon size={12} /> {t("vl.browse.collection", "Collection")}
             </button>
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("archive")}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
-              <ArchiveIcon size={12} /> Archive
+              <ArchiveIcon size={12} /> {t("vl.browse.archive", "Archive")}
             </button>
-            <button type="button" onClick={clearSelection} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+            <button type="button" onClick={clearSelection} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.browse.clear", "Clear")}</button>
           </div>
         </div>
       )}

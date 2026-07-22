@@ -18,6 +18,21 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "vl.col.searchPlaceholder": { en: "Search collections…", zh: "搜索合集…", ar: "ابحث في المجموعات…" },
+  "vl.col.newCollection":     { en: "New collection", zh: "新建合集", ar: "مجموعة جديدة" },
+  "vl.col.allGroups":         { en: "All groups", zh: "全部分组", ar: "كل الفئات" },
+  "vl.col.allTypes":          { en: "All types", zh: "全部类型", ar: "كل الأنواع" },
+  "vl.col.allStates":         { en: "All states", zh: "全部状态", ar: "كل الحالات" },
+  "vl.col.sortUpdated":       { en: "Recently updated", zh: "最近更新", ar: "آخر تحديث" },
+  "vl.col.sortCount":         { en: "Most assets", zh: "素材最多", ar: "الأكثر عناصر" },
+  "vl.col.sortName":          { en: "Name", zh: "名称", ar: "الاسم" },
+  "vl.col.count":             { en: "{n} collections", zh: "{n} 个合集", ar: "{n} مجموعة" },
+  "vl.col.emptyTitle":        { en: "No collections yet", zh: "暂无合集", ar: "لا توجد مجموعات بعد" },
+  "vl.col.emptyBody":         { en: "Create your first KOLEEX visual system or icon pack.", zh: "创建您的第一个 KOLEEX 视觉系统或图标包。", ar: "أنشئ أول نظام مرئي أو حزمة أيقونات لـ KOLEEX." },
+};
 
 const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const STATE_PILL: Record<string, string> = {
@@ -29,6 +44,7 @@ const STATE_PILL: Record<string, string> = {
 };
 
 export default function CollectionsBrowser() {
+  const { t } = useTranslation(T);
   const [cols, setCols] = useState<VisualCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -50,7 +66,7 @@ export default function CollectionsBrowser() {
     setCols(json.collections ?? []);
     setLoading(false);
   }, [sort, category, type, status, q]);
-  useEffect(() => { const t = setTimeout(load, 200); return () => clearTimeout(t); }, [load]);
+  useEffect(() => { const timer = setTimeout(load, 200); return () => clearTimeout(timer); }, [load]);
 
   const grouped = useMemo(() => {
     const m: Record<string, VisualCollection[]> = {};
@@ -63,34 +79,34 @@ export default function CollectionsBrowser() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
           <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search collections…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.col.searchPlaceholder", "Search collections…")}
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
         </div>
         <button type="button" onClick={() => setShowCreate(true)}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-          <PlusIcon size={14} /> New collection
+          <PlusIcon size={14} /> {t("vl.col.newCollection", "New collection")}
         </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <select className={SELECT} value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">All groups</option>
+          <option value="">{t("vl.col.allGroups", "All groups")}</option>
           {COLLECTION_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select className={SELECT} value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="">All types</option>
-          {COLLECTION_TYPES.map((t) => <option key={t} value={t}>{COLLECTION_TYPE_LABEL[t]}</option>)}
+          <option value="">{t("vl.col.allTypes", "All types")}</option>
+          {COLLECTION_TYPES.map((ct) => <option key={ct} value={ct}>{COLLECTION_TYPE_LABEL[ct]}</option>)}
         </select>
         <select className={SELECT} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All states</option>
+          <option value="">{t("vl.col.allStates", "All states")}</option>
           {COLLECTION_STATES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
         <select className={SELECT} value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="updated">Recently updated</option>
-          <option value="count">Most assets</option>
-          <option value="name">Name</option>
+          <option value="updated">{t("vl.col.sortUpdated", "Recently updated")}</option>
+          <option value="count">{t("vl.col.sortCount", "Most assets")}</option>
+          <option value="name">{t("vl.col.sortName", "Name")}</option>
         </select>
-        <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : `${cols.length} collections`}</span>
+        <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : t("vl.col.count", "{n} collections").replace("{n}", String(cols.length))}</span>
       </div>
 
       {loading ? (
@@ -98,8 +114,8 @@ export default function CollectionsBrowser() {
       ) : cols.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
           <LayersIcon size={32} className="text-[var(--text-dim)]" />
-          <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">No collections yet</p>
-          <p className="mt-1 text-[12px] text-[var(--text-dim)]">Create your first KOLEEX visual system or icon pack.</p>
+          <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{t("vl.col.emptyTitle", "No collections yet")}</p>
+          <p className="mt-1 text-[12px] text-[var(--text-dim)]">{t("vl.col.emptyBody", "Create your first KOLEEX visual system or icon pack.")}</p>
         </div>
       ) : (sort === "updated" || sort === "count") ? (
         Object.entries(grouped).map(([group, items]) => (

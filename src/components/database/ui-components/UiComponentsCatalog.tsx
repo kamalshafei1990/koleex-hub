@@ -18,6 +18,32 @@ import { useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { UI_COMPONENT_MODULES, UI_COMPONENT_TOTALS } from "./manifest";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+const T: Translations = {
+  "db.uiComp.title":        { en: "UI Components", zh: "界面组件", ar: "مكوّنات الواجهة" },
+  "db.uiComp.subtitle":     {
+    en: "Every UI component in the system, organized by module — built on the KOLEEX design system.",
+    zh: "系统中的全部界面组件，按模块整理 — 基于 KOLEEX 设计系统构建。",
+    ar: "كل مكوّنات الواجهة في النظام، منظمة حسب الوحدة — مبنية على نظام تصميم KOLEEX.",
+  },
+  "db.uiComp.statComponents": { en: "Components", zh: "组件", ar: "مكوّنات" },
+  "db.uiComp.statFiles":      { en: "Files", zh: "文件", ar: "ملفات" },
+  "db.uiComp.statModules":    { en: "Modules", zh: "模块", ar: "وحدات" },
+  "db.uiComp.searchPlaceholder": { en: "Search components by name…", zh: "按名称搜索组件…", ar: "ابحث عن المكوّنات بالاسم…" },
+  "db.uiComp.livePrimitives": { en: "Design system · live primitives", zh: "设计系统 · 实时基础组件", ar: "نظام التصميم · عناصر أساسية حية" },
+  "db.uiComp.renderedForReal": { en: "Rendered for real", zh: "真实渲染", ar: "معروضة فعليًا" },
+  "db.uiComp.cat.foundations": { en: "Foundations & Primitives", zh: "基础与原语", ar: "الأساسيات والعناصر الأولية" },
+  "db.uiComp.cat.workspace":   { en: "Workspace & System", zh: "工作区与系统", ar: "مساحة العمل والنظام" },
+  "db.uiComp.cat.business":    { en: "Business Modules", zh: "业务模块", ar: "وحدات الأعمال" },
+  "db.uiComp.cat.content":     { en: "Content & Knowledge", zh: "内容与知识", ar: "المحتوى والمعرفة" },
+  "db.uiComp.cat.other":       { en: "Other", zh: "其他", ar: "أخرى" },
+  "db.uiComp.footer":       {
+    en: "Inventory generated from the source tree. Component names are the React identifiers used in code.",
+    zh: "清单由源代码树生成。组件名称即代码中使用的 React 标识符。",
+    ar: "تم إنشاء الجرد من شجرة المصدر. أسماء المكوّنات هي معرّفات React المستخدمة في الكود.",
+  },
+};
 
 /* Pretty labels for the raw folder keys. Unknown keys fall back to Title Case. */
 const LABELS: Record<string, string> = {
@@ -39,11 +65,11 @@ const LABELS: Record<string, string> = {
 };
 
 /* Super-categories — an ordered grouping so the catalog reads top-down. */
-const CATEGORIES: { title: string; keys: string[] }[] = [
-  { title: "Foundations & Primitives", keys: ["ui", "icons", "layout"] },
-  { title: "Workspace & System", keys: ["home", "create", "settings", "admin", "ai", "qa", "database", "attachments", "approval", "workflows", "reports", "executive"] },
-  { title: "Business Modules", keys: ["finance", "expenses", "inventory", "sales", "purchase", "invoices", "invoices-doc", "quotations", "hr", "employees", "crm", "contacts", "suppliers", "projects", "operations", "planning", "landed-cost", "price-calculator", "payment", "commercial-policy", "markets"] },
-  { title: "Content & Knowledge", keys: ["knowledge", "product-templates", "product-preview", "notes", "discuss", "website"] },
+const CATEGORIES: { title: string; i18nKey: string; keys: string[] }[] = [
+  { title: "Foundations & Primitives", i18nKey: "db.uiComp.cat.foundations", keys: ["ui", "icons", "layout"] },
+  { title: "Workspace & System", i18nKey: "db.uiComp.cat.workspace", keys: ["home", "create", "settings", "admin", "ai", "qa", "database", "attachments", "approval", "workflows", "reports", "executive"] },
+  { title: "Business Modules", i18nKey: "db.uiComp.cat.business", keys: ["finance", "expenses", "inventory", "sales", "purchase", "invoices", "invoices-doc", "quotations", "hr", "employees", "crm", "contacts", "suppliers", "projects", "operations", "planning", "landed-cost", "price-calculator", "payment", "commercial-policy", "markets"] },
+  { title: "Content & Knowledge", i18nKey: "db.uiComp.cat.content", keys: ["knowledge", "product-templates", "product-preview", "notes", "discuss", "website"] },
 ];
 
 function labelFor(key: string): string {
@@ -156,6 +182,7 @@ function ModuleGroup({ k, components, q, forceOpen }: { k: string; components: s
 }
 
 export default function UiComponentsCatalog() {
+  const { t } = useTranslation(T);
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
 
@@ -169,7 +196,7 @@ export default function UiComponentsCatalog() {
   const categorized = useMemo(() => {
     const used = new Set(CATEGORIES.flatMap((c) => c.keys));
     const others = UI_COMPONENT_MODULES.map((m) => m.key).filter((k) => !used.has(k));
-    return others.length ? [...CATEGORIES, { title: "Other", keys: others }] : CATEGORIES;
+    return others.length ? [...CATEGORIES, { title: "Other", i18nKey: "db.uiComp.cat.other", keys: others }] : CATEGORIES;
   }, []);
 
   const showPrimitives = !query || "buttons kpi card badge pill input select primitive".includes(query);
@@ -179,13 +206,13 @@ export default function UiComponentsCatalog() {
       {/* Summary */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[16px] font-bold text-[var(--text-primary)]">UI Components</h2>
-          <p className="mt-0.5 text-[12.5px] text-[var(--text-dim)]">Every UI component in the system, organized by module — built on the KOLEEX design system.</p>
+          <h2 className="text-[16px] font-bold text-[var(--text-primary)]">{t("db.uiComp.title", "UI Components")}</h2>
+          <p className="mt-0.5 text-[12.5px] text-[var(--text-dim)]">{t("db.uiComp.subtitle", "Every UI component in the system, organized by module — built on the KOLEEX design system.")}</p>
         </div>
         <div className="flex gap-2">
-          <Stat value={UI_COMPONENT_TOTALS.components} label="Components" />
-          <Stat value={UI_COMPONENT_TOTALS.files} label="Files" />
-          <Stat value={UI_COMPONENT_TOTALS.modules} label="Modules" />
+          <Stat value={UI_COMPONENT_TOTALS.components} label={t("db.uiComp.statComponents", "Components")} />
+          <Stat value={UI_COMPONENT_TOTALS.files} label={t("db.uiComp.statFiles", "Files")} />
+          <Stat value={UI_COMPONENT_TOTALS.modules} label={t("db.uiComp.statModules", "Modules")} />
         </div>
       </div>
 
@@ -193,7 +220,7 @@ export default function UiComponentsCatalog() {
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search components by name…"
+        placeholder={t("db.uiComp.searchPlaceholder", "Search components by name…")}
         className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]"
       />
 
@@ -201,8 +228,8 @@ export default function UiComponentsCatalog() {
       {showPrimitives && (
         <div className={card}>
           <div className="mb-3 flex items-center justify-between">
-            <span className={head}>Design system · live primitives</span>
-            <span className="text-[11px] text-[var(--text-dim)]">Rendered for real</span>
+            <span className={head}>{t("db.uiComp.livePrimitives", "Design system · live primitives")}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{t("db.uiComp.renderedForReal", "Rendered for real")}</span>
           </div>
           <LivePrimitives />
         </div>
@@ -218,7 +245,7 @@ export default function UiComponentsCatalog() {
         return (
           <section key={cat.title} className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <span className={head}>{cat.title}</span>
+              <span className={head}>{t(cat.i18nKey, cat.title)}</span>
               <span className="h-px flex-1 bg-[var(--border-faint)]" />
             </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -231,7 +258,7 @@ export default function UiComponentsCatalog() {
       })}
 
       <p className="px-1 pb-2 text-[11px] text-[var(--text-dim)]">
-        Inventory generated from the source tree. Component names are the React identifiers used in code.
+        {t("db.uiComp.footer", "Inventory generated from the source tree. Component names are the React identifiers used in code.")}
       </p>
     </div>
   );
