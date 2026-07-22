@@ -187,15 +187,18 @@ export async function POST(req: Request) {
             }
             acc = fallback.translated;
             controller.enqueue(send({ type: "delta", text: acc }));
-            await writeCache(hash, source, target, auth.tenant_id, text, acc, fallback.provider);
+            /* "end" goes out BEFORE the cache write — the user shouldn't wait
+               on our bookkeeping. The write is still awaited (not fire-and-
+               forget) so the serverless handler can't tear it down. */
             controller.enqueue(send({ type: "end", translated: acc, cached: false }));
+            await writeCache(hash, source, target, auth.tenant_id, text, acc, fallback.provider);
             controller.close();
             return;
           }
 
           const finalText = acc.trim();
-          await writeCache(hash, source, target, auth.tenant_id, text, finalText, "deepseek:stream");
           controller.enqueue(send({ type: "end", translated: finalText, cached: false }));
+          await writeCache(hash, source, target, auth.tenant_id, text, finalText, "deepseek:stream");
           controller.close();
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);

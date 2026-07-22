@@ -45,7 +45,7 @@ import {
 import { IMG_ACCEPT, recognizeImage } from "@/lib/translator-image";
 
 const MAX_CHARS = 5_000;
-const DEBOUNCE_MS = 450;
+const DEBOUNCE_MS = 350;
 const HISTORY_KEY = "kx_translator_history_v1";
 const SAVED_KEY = "kx_translator_saved_v1";
 const PREFS_KEY = "kx_translator_prefs_v1";
@@ -105,6 +105,294 @@ function writeLocal(key: string, value: unknown): void {
   }
 }
 
+/* ── Bounded-concurrency translation pool ────────────────────────────────
+   Documents and websites translate a LIST of blocks. One-at-a-time was
+   correct but slow — a 40-block page paid 40 serial round-trips. Four
+   workers cut that to ~10 round-trips of wall clock without racing the
+   provider's rate limit. Results keep their original order; onProgress
+   fires after every block so the UI fills in as work completes. A failed
+   block falls back to its ORIGINAL text (a document with one untranslated
+   paragraph is still usable) and is counted, so the caller can tell
+   "one paragraph hiccuped" from "the provider is down". */
+const POOL_SIZE = 4;
+async function translatePool(
+  blocks: string[],
+  worker: (block: string) => Promise<string>,
+  isStale: () => boolean,
+  onProgress: (results: Array<string | null>, done: number, failed: number) => void,
+): Promise<void> {
+  const results: Array<string | null> = blocks.map(() => null);
+  let next = 0;
+  let done = 0;
+  let failed = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(POOL_SIZE, blocks.length) }, async () => {
+      for (;;) {
+        const i = next++;
+        if (i >= blocks.length || isStale()) return;
+        let out: string;
+        try {
+          out = await worker(blocks[i]);
+        } catch {
+          out = blocks[i];
+          failed++;
+        }
+        if (isStale()) return;
+        results[i] = out;
+        done++;
+        onProgress(results, done, failed);
+      }
+    }),
+  );
+}
+
+/* ── Language picker + history list (module scope) ───────────────────────
+   These are defined OUTSIDE TranslatorApp on purpose. Defined inside, they
+   were a NEW component type on every render, so React unmounted and
+   remounted their whole subtree each keystroke — the picker's search box
+   dropped focus after every character, its list scroll snapped back to the
+   top, and the language bar churned through pointless DOM work while you
+   typed in the source pane. Module scope keeps the component identity
+   stable; everything they need flows in through props. */
+
+type TFn = (key: string, fallback: string) => string;
+
+interface LangPickerProps {
+  from: string;
+  to: string;
+  detected: string | null;
+  pickerOpen: "from" | "to" | null;
+  setPickerOpen: (v: "from" | "to" | null) => void;
+  pickerQuery: string;
+  setPickerQuery: (v: string) => void;
+  pick: (side: "from" | "to", code: string) => void;
+  ui: UiLang;
+  t: TFn;
+}
+
+function PickerRow({
+  l,
+  current,
+  onPick,
+  ui,
+}: {
+  l: (typeof LANGUAGES)[number];
+  current: string;
+  onPick: (code: string) => void;
+  ui: UiLang;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(l.code)}
+      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+        current === l.code ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+      }`}
+    >
+      <span className="truncate">{l.label[ui]}</span>
+      <span className="shrink-0 text-[11px] text-[var(--text-dim)]">{l.native}</span>
+    </button>
+  );
+}
+
+function LangButton({
+  side,
+  pill = false,
+  from,
+  to,
+  detected,
+  pickerOpen,
+  setPickerOpen,
+  pickerQuery,
+  setPickerQuery,
+  pick,
+  ui,
+  t,
+}: { side: "from" | "to"; pill?: boolean } & LangPickerProps) {
+  const open = pickerOpen === side;
+  const current = side === "from" ? from : to;
+  const pinned = side === "from" ? QUICK_SOURCE : QUICK_TARGET;
+
+  const label =
+    current === "auto"
+      ? detected
+        ? `${t("tr.detect", "Detect language")} · ${langLabel(detected, ui)}`
+        : t("tr.detect", "Detect language")
+      : langLabel(current, ui);
+
+  const q = pickerQuery.trim().toLowerCase();
+  const matches = (l: (typeof LANGUAGES)[number]) =>
+    !q ||
+    l.label[ui].toLowerCase().includes(q) ||
+    l.label.en.toLowerCase().includes(q) ||
+    l.native.toLowerCase().includes(q) ||
+    l.code.includes(q);
+
+  const pinnedList = LANGUAGES.filter((l) => pinned.includes(l.code) && matches(l));
+  const restList = LANGUAGES.filter((l) => !pinned.includes(l.code) && matches(l));
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={() => {
+          setPickerOpen(open ? null : side);
+          setPickerQuery("");
+        }}
+        className={`flex items-center gap-2 font-medium transition-colors ${
+          pill
+            ? "w-full justify-between rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[13px]"
+            : "w-full justify-between rounded-xl px-3 py-2 text-[13px]"
+        } ${
+          open
+            ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+            : "text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+        }`}
+      >
+        <span className="truncate">{label}</span>
+        <VlIcon slug="angle-small-down" size={13} className="text-[var(--text-dim)]" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setPickerOpen(null)} />
+          <div className="absolute inset-x-0 z-[61] mt-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+              <VlIcon slug="search" size={13} className="text-[var(--text-dim)]" />
+              <input
+                autoFocus
+                value={pickerQuery}
+                onChange={(e) => setPickerQuery(e.target.value)}
+                placeholder={t("tr.searchLanguage", "Search language…")}
+                className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+              />
+            </div>
+            <div className="max-h-[46vh] overflow-y-auto py-1">
+              {side === "from" && !q && (
+                <button
+                  type="button"
+                  onClick={() => pick("from", "auto")}
+                  className={`flex w-full items-center px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+                    current === "auto" ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  {t("tr.detect", "Detect language")}
+                </button>
+              )}
+              {pinnedList.map((l) => (
+                <PickerRow key={l.code} l={l} current={current} onPick={(code) => pick(side, code)} ui={ui} />
+              ))}
+              {pinnedList.length > 0 && restList.length > 0 && (
+                <div className="my-1 border-t border-[var(--border-subtle)]" />
+              )}
+              {restList.map((l) => (
+                <PickerRow key={l.code} l={l} current={current} onPick={(code) => pick(side, code)} ui={ui} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* The two language cards + swap button. Shared by every tab so they read as
+   the same app and the columns line up with whatever sits under them.
+   `inPane` = the Text tab, where mobile shows the selectors INSIDE each pane
+   so this row hides below md. */
+function LanguageRow({
+  inPane = false,
+  swap,
+  ...lang
+}: { inPane?: boolean; swap: () => void } & LangPickerProps) {
+  const { t } = lang;
+  return (
+    <div
+      className={`shrink-0 grid-cols-1 gap-2 md:grid md:grid-cols-[1fr_40px_1fr] md:gap-3 ${
+        inPane ? "hidden" : "grid"
+      }`}
+    >
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+        <LangButton side="from" {...lang} />
+      </div>
+      <div className="flex items-center justify-center">
+        <button
+          type="button"
+          onClick={swap}
+          title={t("tr.swap", "Swap languages")}
+          aria-label={t("tr.swap", "Swap languages")}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
+        >
+          <VlIcon slug="exchange" size={16} />
+        </button>
+      </div>
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+        <LangButton side="to" {...lang} />
+      </div>
+    </div>
+  );
+}
+
+function EntryList({
+  items,
+  kind,
+  onReuse,
+  onRemove,
+  t,
+  ui,
+}: {
+  items: Entry[];
+  kind: "history" | "saved";
+  onReuse: (e: Entry) => void;
+  onRemove: (kind: "history" | "saved", id: string) => void;
+  t: TFn;
+  ui: UiLang;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
+        <VlIcon slug="translate" size={28} className="text-[var(--text-dim)]" />
+        <p className="mt-3 text-[13px] text-[var(--text-muted)]">
+          {kind === "history"
+            ? t("tr.historyEmpty", "Your recent translations appear here.")
+            : t("tr.savedEmpty", "Star a translation to keep it here.")}
+        </p>
+        <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("tr.localOnly", "Stored on this device only")}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+      {items.map((e, i) => (
+        <div
+          key={e.id}
+          className={`flex items-start gap-3 px-4 py-3 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}
+        >
+          <button type="button" onClick={() => onReuse(e)} className="min-w-0 flex-1 text-start">
+            <span className="block truncate text-[13px] text-[var(--text-primary)]" dir={isRtl(e.from) ? "rtl" : "ltr"}>
+              {e.source}
+            </span>
+            <span className="mt-0.5 block truncate text-[12.5px] text-[var(--text-muted)]" dir={isRtl(e.to) ? "rtl" : "ltr"}>
+              {e.translated}
+            </span>
+            <span className="mt-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">
+              {e.from === "auto" ? t("tr.detect", "Detect language") : langLabel(e.from, ui)} → {langLabel(e.to, ui)}
+            </span>
+          </button>
+          <button
+            type="button"
+            title={t("tr.remove", "Remove")}
+            onClick={() => onRemove(kind, e.id)}
+            className="shrink-0 rounded-lg p-1.5 text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+          >
+            <VlIcon slug="cross-small" size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TranslatorApp() {
   const { t, lang: uiLang } = useTranslation(translatorT);
   const ui = (uiLang ?? "en") as UiLang;
@@ -127,7 +415,10 @@ export default function TranslatorApp() {
   const [panel, setPanel] = useState<Panel>(null);
 
   /* Document translation state. Kept separate from the text panes so switching
-     tabs never destroys either piece of work. */
+     tabs never destroys either piece of work. `docChunks` keeps the EXTRACTED
+     source so changing the target language can re-translate without re-reading
+     the file. */
+  const [docChunks, setDocChunks] = useState<string[]>([]);
   const [docName, setDocName] = useState<string | null>(null);
   const [docMeta, setDocMeta] = useState<{ pages: number | null; chars: number; truncated: boolean } | null>(null);
   const [docOut, setDocOut] = useState("");
@@ -147,11 +438,17 @@ export default function TranslatorApp() {
   const [imgBusy, setImgBusy] = useState(false);
   const [imgPct, setImgPct] = useState(0);
   const [imgError, setImgError] = useState<string | null>(null);
+  /* Translation-of-recognised-text failure, kept SEPARATE from imgError:
+     imgError replaces the whole text box (OCR failed, nothing to show), but a
+     translate failure must keep the recognised text on screen and editable. */
+  const [imgXlateFailed, setImgXlateFailed] = useState(false);
   const imageRef = useRef<HTMLInputElement | null>(null);
 
-  /* Website state. */
+  /* Website state. `pageBlocks` keeps the extracted source blocks so changing
+     the target language re-translates without re-fetching the page. */
   const [url, setUrl] = useState("");
   const [page, setPage] = useState<{ url: string; title: string | null; truncated: boolean } | null>(null);
+  const [pageBlocks, setPageBlocks] = useState<string[]>([]);
   const [pageRows, setPageRows] = useState<Array<{ source: string; translated: string }>>([]);
   const [pageBusy, setPageBusy] = useState(false);
   const [pageStep, setPageStep] = useState<{ done: number; total: number } | null>(null);
@@ -159,6 +456,7 @@ export default function TranslatorApp() {
   const [showSource, setShowSource] = useState(false);
 
   const reqRef = useRef(0);
+  const pasteRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const sourceRef = useRef<HTMLTextAreaElement | null>(null);
@@ -304,9 +602,13 @@ export default function TranslatorApp() {
       return;
     }
     setBusy(true); // show activity immediately, before the debounce fires
+    // A paste is a complete thought — translate it NOW instead of waiting out
+    // the typing debounce. Typing keeps the debounce.
+    const delay = pasteRef.current ? 0 : DEBOUNCE_MS;
+    pasteRef.current = false;
     const timer = setTimeout(() => {
       void translate(text, from, to);
-    }, DEBOUNCE_MS);
+    }, delay);
     return () => clearTimeout(timer);
   }, [source, from, to, translate]);
 
@@ -401,6 +703,29 @@ export default function TranslatorApp() {
     });
   };
 
+  /* One non-streaming translation. Shared by the Image and Website tabs —
+     both translate a known block of text rather than something being typed,
+     so they want the plain JSON path (and its cache hit) not a token stream. */
+  const translateOnce = useCallback(
+    async (text: string): Promise<string> => {
+      const res = await fetch("/api/translator", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, target_lang: to, source_lang: from }),
+      });
+      // THROW on failure instead of silently returning the original text —
+      // callers decide whether to fail soft (keep the original block) or tell
+      // the user. Silent passthrough made a dead provider look like an app
+      // that "translates" everything to itself.
+      if (!res.ok) throw new Error("translate_failed");
+      const json = (await res.json()) as { translated?: string };
+      if (!json.translated?.trim()) throw new Error("translate_failed");
+      return json.translated;
+    },
+    [from, to],
+  );
+
   /* ── Document translation ────────────────────────────────────────────
      Extraction runs in the BROWSER, so the file itself never leaves the
      device — only its plain text does, and only in chunks. Chunks go through
@@ -412,6 +737,36 @@ export default function TranslatorApp() {
      A run counter guards against a second file being dropped mid-translation
      (the old run must not keep appending to the new one's output). */
   const docRunRef = useRef(0);
+
+  /* Translate the extracted chunks through the pool. Shared by the initial
+     upload and the language-change re-run. The output paints as a contiguous
+     PREFIX of completed chunks — a document must read top-down, never with a
+     translated paragraph 5 floating above an untranslated 3. */
+  const translateDoc = useCallback(
+    async (chunks: string[]) => {
+      const run = ++docRunRef.current;
+      setDocBusy(true);
+      setDocError(null);
+      setDocOut("");
+      setDocStep({ done: 0, total: chunks.length });
+      await translatePool(
+        chunks,
+        translateOnce,
+        () => run !== docRunRef.current,
+        (results, done, failed) => {
+          let prefix = 0;
+          while (prefix < results.length && results[prefix] !== null) prefix++;
+          setDocOut(results.slice(0, prefix).join("\n\n"));
+          setDocStep({ done, total: chunks.length });
+          if (done === chunks.length && failed === chunks.length) {
+            setDocError(t("tr.error", "Translation failed. Try again."));
+          }
+        },
+      );
+      if (run === docRunRef.current) setDocBusy(false);
+    },
+    [translateOnce, t],
+  );
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -445,37 +800,24 @@ export default function TranslatorApp() {
       setDocMeta({ pages: doc.pages, chars: doc.text.length, truncated: doc.truncated });
 
       const chunks = chunkText(doc.text);
-      setDocStep({ done: 0, total: chunks.length });
-
-      const out: string[] = [];
-      for (let i = 0; i < chunks.length; i++) {
-        try {
-          const res = await fetch("/api/translator", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: chunks[i], target_lang: to, source_lang: from }),
-          });
-          const json = (await res.json()) as { translated?: string };
-          if (run !== docRunRef.current) return;
-          // A chunk that fails keeps its ORIGINAL text rather than vanishing —
-          // a document with one untranslated paragraph is still usable.
-          out.push(json.translated?.trim() ? json.translated : chunks[i]);
-        } catch {
-          if (run !== docRunRef.current) return;
-          out.push(chunks[i]);
-        }
-        setDocOut(out.join("\n\n"));
-        setDocStep({ done: i + 1, total: chunks.length });
-      }
-      if (run !== docRunRef.current) return;
-      setDocBusy(false);
+      setDocChunks(chunks);
+      await translateDoc(chunks);
     },
-    [from, to, t],
+    [translateDoc, t],
   );
+
+  /* Changing the language pair re-translates whatever is loaded, exactly like
+     the text tab — before this, a loaded document silently kept the OLD
+     target language and the selector looked broken. Chunks translated once
+     come back from the tenant cache, so a re-run is mostly free. */
+  useEffect(() => {
+    if (docChunks.length > 0) void translateDoc(docChunks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire on language change only
+  }, [from, to]);
 
   const resetDoc = () => {
     docRunRef.current++;          // abandons any run still in flight
+    setDocChunks([]);
     setDocName(null);
     setDocMeta(null);
     setDocOut("");
@@ -506,29 +848,39 @@ export default function TranslatorApp() {
     }
   };
 
-  /* One non-streaming translation. Shared by the Image and Website tabs —
-     both translate a known block of text rather than something being typed,
-     so they want the plain JSON path (and its cache hit) not a token stream. */
-  const translateOnce = useCallback(
-    async (text: string): Promise<string> => {
-      const res = await fetch("/api/translator", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, target_lang: to, source_lang: from }),
-      });
-      const json = (await res.json()) as { translated?: string };
-      return json.translated?.trim() ? json.translated : text;
-    },
-    [from, to],
-  );
-
   /* ── Image (OCR) ─────────────────────────────────────────────────────
      Recognition runs in the browser, so the photo itself never leaves the
      device. The recognised text lands in an editable box first: OCR of a
      worn spec plate is never perfect, and letting someone fix one character
      is far better than translating a typo confidently. */
   const imgRunRef = useRef(0);
+
+  /* Translate the recognised text. Shared by the OCR pipeline, the manual
+     Translate button and the language-change re-run. */
+  const translateImageText = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
+      const run = ++imgRunRef.current;
+      setImgXlateFailed(false);
+      try {
+        const out = await translateOnce(text);
+        if (run === imgRunRef.current) setImgOut(out);
+      } catch {
+        if (run === imgRunRef.current) {
+          setImgOut("");
+          setImgXlateFailed(true);
+        }
+      }
+    },
+    [translateOnce],
+  );
+
+  /* Language change re-translates the recognised text (never re-runs OCR —
+     the text may have been hand-corrected and must not be overwritten). */
+  useEffect(() => {
+    if (imgText.trim() && !imgBusy) void translateImageText(imgText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire on language change only
+  }, [from, to]);
 
   const handleImage = useCallback(
     async (file: File) => {
@@ -554,7 +906,7 @@ export default function TranslatorApp() {
         setImgText(text);
         setImgConfidence(confidence);
         setImgBusy(false);
-        setImgOut(await translateOnce(text));
+        await translateImageText(text);
       } catch (e) {
         if (run !== imgRunRef.current) return;
         const code = e instanceof Error ? e.message : "";
@@ -570,11 +922,12 @@ export default function TranslatorApp() {
         setImgBusy(false);
       }
     },
-    [effectiveFrom, translateOnce, t],
+    [effectiveFrom, translateImageText, t],
   );
 
   const resetImage = () => {
     imgRunRef.current++;
+    setImgXlateFailed(false);
     if (imgPreview) URL.revokeObjectURL(imgPreview);
     setImgPreview(null);
     setImgName(null);
@@ -595,6 +948,34 @@ export default function TranslatorApp() {
      Translation then goes block-by-block through the normal endpoint, so a
      supplier page whose paragraphs were translated before is nearly free. */
   const pageRunRef = useRef(0);
+
+  /* Translate the page blocks through the pool. All rows appear immediately
+     showing their ORIGINAL text dimmed, then each swaps to its translation as
+     it lands — a live skeleton of the page instead of a slow top-down drip. */
+  const translatePage = useCallback(
+    async (blocks: string[]) => {
+      const run = ++pageRunRef.current;
+      setPageBusy(true);
+      setPageError(null);
+      setPageStep({ done: 0, total: blocks.length });
+      setPageRows(blocks.map((b) => ({ source: b, translated: "" })));
+      await translatePool(
+        blocks,
+        translateOnce,
+        () => run !== pageRunRef.current,
+        (results, done, failed) => {
+          setPageRows(blocks.map((b, i) => ({ source: b, translated: results[i] ?? "" })));
+          setPageStep({ done, total: blocks.length });
+          if (done === blocks.length && failed === blocks.length) {
+            setPageError(t("tr.error", "Translation failed. Try again."));
+          }
+        },
+      );
+      if (run === pageRunRef.current) setPageBusy(false);
+    },
+    [translateOnce, t],
+  );
+
 
   const loadPage = useCallback(async () => {
     const target = url.trim();
@@ -641,29 +1022,21 @@ export default function TranslatorApp() {
     setPage({ url: data.url, title: data.title, truncated: data.truncated });
 
     /* Title first so the page identifies itself immediately, then blocks in
-       document order — the reader watches it fill top-down. */
+       document order. */
     const blocks = data.title ? [data.title, ...data.blocks] : data.blocks;
-    setPageStep({ done: 0, total: blocks.length });
+    setPageBlocks(blocks);
+    await translatePage(blocks);
+  }, [url, translatePage, t]);
 
-    const rows: Array<{ source: string; translated: string }> = [];
-    for (let i = 0; i < blocks.length; i++) {
-      let out = blocks[i];
-      try {
-        out = await translateOnce(blocks[i]);
-      } catch {
-        /* keep the original block rather than dropping it */
-      }
-      if (run !== pageRunRef.current) return;
-      rows.push({ source: blocks[i], translated: out });
-      setPageRows([...rows]);
-      setPageStep({ done: i + 1, total: blocks.length });
-    }
-    if (run !== pageRunRef.current) return;
-    setPageBusy(false);
-  }, [url, translateOnce, t]);
+  /* Language change re-translates the loaded page, same as the other tabs. */
+  useEffect(() => {
+    if (pageBlocks.length > 0) void translatePage(pageBlocks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire on language change only
+  }, [from, to]);
 
   const resetPage = () => {
     pageRunRef.current++;
+    setPageBlocks([]);
     setPage(null);
     setPageRows([]);
     setPageError(null);
@@ -682,216 +1055,33 @@ export default function TranslatorApp() {
     requestAnimationFrame(() => sourceRef.current?.focus());
   };
 
-  /* ── Language selector ──────────────────────────────────────────────
-     One button per side (current language + chevron) opening a searchable
-     list. Deliberately NOT a row of quick chips: at 18 languages the chip
-     row wrapped and cramped the bar at every width below ~1400px. The
-     three languages Koleex uses daily are pinned to the top of the list
-     instead, so they stay one tap away without eating the bar.          */
-  /* `pill` is the in-pane selector on mobile: a bordered, fully-rounded
-     control that spans the card so it lines up with the text below it and
-     gives the chevron a fixed home at the far edge. (It hugged its label
-     first — that left a ragged right edge inside a full-width card.) The
-     desktop row keeps the plain button: it already sits in its own bordered
-     card, where a pill would be a border on a border. */
-  const LangButton = ({ side, pill = false }: { side: "from" | "to"; pill?: boolean }) => {
-    const open = pickerOpen === side;
-    const current = side === "from" ? from : to;
-    const pinned = side === "from" ? QUICK_SOURCE : QUICK_TARGET;
-
-    const label =
-      current === "auto"
-        ? detected
-          ? `${t("tr.detect", "Detect language")} · ${langLabel(detected, ui)}`
-          : t("tr.detect", "Detect language")
-        : langLabel(current, ui);
-
-    const q = pickerQuery.trim().toLowerCase();
-    const matches = (l: (typeof LANGUAGES)[number]) =>
-      !q ||
-      l.label[ui].toLowerCase().includes(q) ||
-      l.label.en.toLowerCase().includes(q) ||
-      l.native.toLowerCase().includes(q) ||
-      l.code.includes(q);
-
-    const pinnedList = LANGUAGES.filter((l) => pinned.includes(l.code) && matches(l));
-    const restList = LANGUAGES.filter((l) => !pinned.includes(l.code) && matches(l));
-
-    const Row = ({ l }: { l: (typeof LANGUAGES)[number] }) => (
-      <button
-        type="button"
-        onClick={() => {
-          if (side === "from") setFrom(l.code);
-          else setTo(l.code);
-          setPickerOpen(null);
-        }}
-        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
-          current === l.code ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
-        }`}
-      >
-        <span className="truncate">{l.label[ui]}</span>
-        <span className="shrink-0 text-[11px] text-[var(--text-dim)]">{l.native}</span>
-      </button>
-    );
-
-    return (
-      <div className="relative min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => {
-            setPickerOpen(open ? null : side);
-            setPickerQuery("");
-          }}
-          className={`flex items-center gap-2 font-medium transition-colors ${
-            pill
-              ? "w-full justify-between rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[13px]"
-              : "w-full justify-between rounded-xl px-3 py-2 text-[13px]"
-          } ${
-            open
-              ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
-              : "text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-          }`}
-        >
-          <span className="truncate">{label}</span>
-          <VlIcon slug="angle-small-down" size={13} className="text-[var(--text-dim)]" />
-        </button>
-
-        {open && (
-          <>
-            <div className="fixed inset-0 z-[60]" onClick={() => setPickerOpen(null)} />
-            <div className="absolute inset-x-0 z-[61] mt-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl">
-              <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-                <VlIcon slug="search" size={13} className="text-[var(--text-dim)]" />
-                <input
-                  autoFocus
-                  value={pickerQuery}
-                  onChange={(e) => setPickerQuery(e.target.value)}
-                  placeholder={t("tr.searchLanguage", "Search language…")}
-                  className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
-                />
-              </div>
-              <div className="max-h-[46vh] overflow-y-auto py-1">
-                {side === "from" && !q && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFrom("auto");
-                      setPickerOpen(null);
-                    }}
-                    className={`flex w-full items-center px-3 py-2 text-start text-[12.5px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
-                      current === "auto" ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"
-                    }`}
-                  >
-                    {t("tr.detect", "Detect language")}
-                  </button>
-                )}
-                {pinnedList.map((l) => (
-                  <Row key={l.code} l={l} />
-                ))}
-                {pinnedList.length > 0 && restList.length > 0 && (
-                  <div className="my-1 border-t border-[var(--border-subtle)]" />
-                )}
-                {restList.map((l) => (
-                  <Row key={l.code} l={l} />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  /* The two language cards + swap button. Shared by the Text and Document
-     tabs so both read as the same app and the columns line up with whatever
-     sits under them. */
-  /* `inPane` = the Text tab, where mobile shows the selectors INSIDE each
-     pane (Apple's arrangement) so this row hides below md — a separate
-     two-card bar plus a swap button cost ~200px of vertical space before you
-     reached the text. Document / Image / Website have no pane to host a chip,
-     so they keep this row at every width; hiding it there would leave them
-     with no way to choose a language on a phone at all. */
-  const LanguageRow = ({ inPane = false }: { inPane?: boolean }) => (
-    <div
-      className={`shrink-0 grid-cols-1 gap-2 md:grid md:grid-cols-[1fr_40px_1fr] md:gap-3 ${
-        inPane ? "hidden" : "grid"
-      }`}
-    >
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
-        <LangButton side="from" />
-      </div>
-      <div className="flex items-center justify-center">
-        <button
-          type="button"
-          onClick={swap}
-          title={t("tr.swap", "Swap languages")}
-          aria-label={t("tr.swap", "Swap languages")}
-          /* Fixed 40px box: exactly the width of the grid gutter it sits in,
-             and a proper touch target. */
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
-        >
-          <VlIcon slug="exchange" size={16} />
-        </button>
-      </div>
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
-        <LangButton side="to" />
-      </div>
-    </div>
-  );
-
-  const EntryList = ({ items, kind }: { items: Entry[]; kind: "history" | "saved" }) => {
-    if (items.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
-          <VlIcon slug="translate" size={28} className="text-[var(--text-dim)]" />
-          <p className="mt-3 text-[13px] text-[var(--text-muted)]">
-            {kind === "history"
-              ? t("tr.historyEmpty", "Your recent translations appear here.")
-              : t("tr.savedEmpty", "Star a translation to keep it here.")}
-          </p>
-          <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("tr.localOnly", "Stored on this device only")}</p>
-        </div>
-      );
+  const removeEntry = useCallback((kind: "history" | "saved", id: string) => {
+    if (kind === "history") {
+      setHistory((prev) => {
+        const next = prev.filter((x) => x.id !== id);
+        writeLocal(HISTORY_KEY, next);
+        return next;
+      });
+    } else {
+      setSaved((prev) => {
+        const next = prev.filter((x) => x.id !== id);
+        writeLocal(SAVED_KEY, next);
+        return next;
+      });
     }
-    return (
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
-        {items.map((e, i) => (
-          <div
-            key={e.id}
-            className={`flex items-start gap-3 px-4 py-3 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}
-          >
-            <button type="button" onClick={() => reuse(e)} className="min-w-0 flex-1 text-start">
-              <span className="block truncate text-[13px] text-[var(--text-primary)]" dir={isRtl(e.from) ? "rtl" : "ltr"}>
-                {e.source}
-              </span>
-              <span className="mt-0.5 block truncate text-[12.5px] text-[var(--text-muted)]" dir={isRtl(e.to) ? "rtl" : "ltr"}>
-                {e.translated}
-              </span>
-              <span className="mt-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">
-                {e.from === "auto" ? t("tr.detect", "Detect language") : langLabel(e.from, ui)} → {langLabel(e.to, ui)}
-              </span>
-            </button>
-            <button
-              type="button"
-              title={t("tr.remove", "Remove")}
-              onClick={() => {
-                const next = items.filter((x) => x.id !== e.id);
-                if (kind === "history") {
-                  setHistory(next);
-                  writeLocal(HISTORY_KEY, next);
-                } else {
-                  setSaved(next);
-                  writeLocal(SAVED_KEY, next);
-                }
-              }}
-              className="shrink-0 rounded-lg p-1.5 text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-            >
-              <VlIcon slug="cross-small" size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-    );
+  }, []);
+
+  const pick = useCallback((side: "from" | "to", code: string) => {
+    if (side === "from") setFrom(code);
+    else setTo(code);
+    setPickerOpen(null);
+  }, []);
+
+  /* Everything the hoisted picker components need. A fresh object each render
+     is fine — the component TYPE is stable now, so this is an ordinary
+     re-render, not a remount. */
+  const langProps: LangPickerProps = {
+    from, to, detected, pickerOpen, setPickerOpen, pickerQuery, setPickerQuery, pick, ui, t,
   };
 
   const iconBtn =
@@ -977,7 +1167,7 @@ export default function TranslatorApp() {
               [1fr 40px 1fr] track, so each selector lines up exactly with the
               pane it controls. (One merged bar read as a single unrelated
               toolbar and cramped at narrow widths.) */}
-          <LanguageRow inPane />
+          <LanguageRow inPane swap={swap} {...langProps} />
 
           {/* Panes — same track as the language row above so the columns align.
               min-h-0 on every level is what lets the inner scroll work
@@ -996,7 +1186,7 @@ export default function TranslatorApp() {
               {/* Mobile-only language chip, sitting directly above the text it
                   applies to — you read "English → this box" in one glance. */}
               <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
-                <LangButton side="from" pill />
+                <LangButton side="from" pill {...langProps} />
               </div>
               {/* px-4 py-3.5 EXACTLY matches the result pane. The clear button
                   used to float over the text, forcing pr-11 here only — which
@@ -1007,6 +1197,7 @@ export default function TranslatorApp() {
                 <textarea
                   ref={sourceRef}
                   value={source}
+                  onPaste={() => { pasteRef.current = true; }}
                   onChange={(e) => setSource(e.target.value.slice(0, MAX_CHARS))}
                   placeholder={t("tr.sourcePlaceholder", "Enter text")}
                   dir={isRtl(effectiveFrom) ? "rtl" : "ltr"}
@@ -1073,7 +1264,7 @@ export default function TranslatorApp() {
             {/* Translation */}
             <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
               <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
-                <LangButton side="to" pill />
+                <LangButton side="to" pill {...langProps} />
               </div>
               <div
                 dir={isRtl(to) ? "rtl" : "ltr"}
@@ -1126,7 +1317,7 @@ export default function TranslatorApp() {
            that swaps between drop-zone and result. Extraction happens in the
            browser; only plain text is ever sent. */
         <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
-          <LanguageRow />
+          <LanguageRow swap={swap} {...langProps} />
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
             <input
@@ -1267,7 +1458,7 @@ export default function TranslatorApp() {
            text stays editable — OCR of a worn spec plate is never perfect,
            and one corrected character beats re-shooting the photo. */
         <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
-          <LanguageRow />
+          <LanguageRow swap={swap} {...langProps} />
 
           <input
             ref={imageRef}
@@ -1370,16 +1561,18 @@ export default function TranslatorApp() {
                       <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
                         <button
                           type="button"
-                          onClick={() => { void translateOnce(imgText).then(setImgOut); }}
+                          onClick={() => { void translateImageText(imgText); }}
                           disabled={!imgText.trim()}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
                         >
                           <VlIcon slug="translate" size={13} /> {t("tr.title", "Translator")}
                         </button>
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--text-dim)]">
-                          {imgConfidence !== null && imgConfidence < 70
-                            ? t("tr.imgLowConfidence", "The photo is hard to read — check the text before trusting it.")
-                            : t("tr.imgEditHint", "You can edit the recognised text before translating.")}
+                        <span className={`min-w-0 flex-1 truncate text-[11px] ${imgXlateFailed ? "text-red-300" : "text-[var(--text-dim)]"}`}>
+                          {imgXlateFailed
+                            ? t("tr.imgXlateFailed", "Translation failed — tap Translate to retry.")
+                            : imgConfidence !== null && imgConfidence < 70
+                              ? t("tr.imgLowConfidence", "The photo is hard to read — check the text before trusting it.")
+                              : t("tr.imgEditHint", "You can edit the recognised text before translating.")}
                         </span>
                       </div>
                     </>
@@ -1415,7 +1608,7 @@ export default function TranslatorApp() {
            Reader-style translation of a public page. We never embed or
            re-serve the original site — only its text comes across. */
         <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
-          <LanguageRow />
+          <LanguageRow swap={swap} {...langProps} />
 
           <form
             onSubmit={(e) => { e.preventDefault(); void loadPage(); }}
@@ -1489,12 +1682,12 @@ export default function TranslatorApp() {
                     {pageRows.map((row, i) => (
                       <div key={i}>
                         <p
-                          dir={isRtl(to) ? "rtl" : "ltr"}
-                          className={`whitespace-pre-wrap leading-relaxed text-[var(--text-primary)] ${
+                          dir={row.translated ? (isRtl(to) ? "rtl" : "ltr") : "ltr"}
+                          className={`whitespace-pre-wrap leading-relaxed ${
                             i === 0 && page?.title ? "text-[17px] font-bold" : "text-[14px]"
-                          }`}
+                          } ${row.translated ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}
                         >
-                          {row.translated}
+                          {row.translated || row.source}
                         </p>
                         {showSource && (
                           <p className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-[var(--text-dim)]">
@@ -1568,7 +1761,7 @@ export default function TranslatorApp() {
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]">
-              <EntryList items={panel === "history" ? history : saved} kind={panel} />
+              <EntryList items={panel === "history" ? history : saved} kind={panel} onReuse={reuse} onRemove={removeEntry} t={t} ui={ui} />
             </div>
           </div>
         </div>

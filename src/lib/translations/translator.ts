@@ -123,6 +123,9 @@ export const translatorT: Translations = {
   "tr.imgEditHint":      { en: "You can edit the recognised text before translating.",
                            zh: "翻译前可以修改识别出的文字。",
                            ar: "يمكنك تعديل النص المُتعرَّف عليه قبل الترجمة." },
+  "tr.imgXlateFailed":   { en: "Translation failed — tap Translate to retry.",
+                           zh: "翻译失败 — 点击翻译重试。",
+                           ar: "فشلت الترجمة — اضغط ترجمة للمحاولة مجددًا." },
 
   /* Website translation */
   "tr.website":          { en: "Website",             zh: "网站",             ar: "موقع ويب" },
