@@ -184,7 +184,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
             aria-checked={track}
             onClick={() => setTrack((v) => !v)}
             className={`relative h-5 w-9 rounded-full transition-colors ${
-              track ? "bg-[var(--accent-primary,#3b82f6)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+              track ? "bg-emerald-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
             }`}
           >
             <span
@@ -264,7 +264,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
               aria-checked={trackSerials}
               onClick={() => setTrackSerials((v) => !v)}
               className={`mt-0.5 relative h-5 w-9 rounded-full transition-colors ${
-                trackSerials ? "bg-[var(--accent-primary,#3b82f6)]" : "bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)]"
+                trackSerials ? "bg-emerald-500" : "bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)]"
               }`}
             >
               <span

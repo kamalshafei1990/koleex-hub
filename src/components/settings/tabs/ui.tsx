@@ -63,11 +63,11 @@ export function Segmented<T extends string | number>({ value, onChange, options 
   );
 }
 
-/** iOS-style on/off switch row. `mono` renders the ON state in the theme's
- *  inverted neutral (white on dark, black on light) instead of accent blue —
- *  for pages that follow the strict monochrome brand language. */
-export function SwitchRow({ label, hint, checked, onChange, last, mono }: {
-  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean; mono?: boolean;
+/** iOS-style on/off switch row. ON = emerald green with a white knob — the
+ *  ONE toggle design for the whole system (standing rule): green track when
+ *  on, neutral track when off, white circle always. */
+export function SwitchRow({ label, hint, checked, onChange, last }: {
+  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean;
 }) {
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
@@ -82,12 +82,7 @@ export function SwitchRow({ label, hint, checked, onChange, last, mono }: {
         aria-label={label}
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
-          checked
-            /* mono ON: mid-gray track, NOT full white — the knob stays white
-               (same circle as every other switch) and needs the track to sit
-               a step darker so the state still reads at a glance. */
-            ? mono ? "bg-neutral-400" : "bg-[var(--accent-blue,#0066FF)]"
-            : "bg-[var(--border-color,#6b7280)]"
+          checked ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"
         }`}
       >
         <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />

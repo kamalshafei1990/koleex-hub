@@ -73,14 +73,12 @@ export default function SoundsTab() {
           hint="Master switch — off silences every sound in the Hub."
           checked={prefs.master}
           onChange={(on) => setSoundPrefs({ master: on })}
-          mono
         />
         <SwitchRow
           label="Do not disturb"
           hint="Temporarily silence everything without touching your other settings."
           checked={prefs.dnd}
           onChange={(on) => setSoundPrefs({ dnd: on })}
-          mono
         />
         {/* Volume — released slider previews at the new level so you hear
             what you chose without hunting for a test button. */}
@@ -149,7 +147,6 @@ function CategoryCard({
         hint={muted ? "Currently silenced by the master switch / Do Not Disturb." : undefined}
         checked={cat.enabled}
         onChange={(on) => setSoundPrefs({ [category]: { enabled: on } } as Partial<SoundPrefs>)}
-        mono
       />
       <div className="pt-2">
         <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">

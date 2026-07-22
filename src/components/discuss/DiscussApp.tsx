@@ -3275,7 +3275,7 @@ function TranslateControl({
               aria-checked={prefs.auto}
               onClick={() => onChange({ auto: !prefs.auto })}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                prefs.auto ? "bg-[var(--bg-inverted)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+                prefs.auto ? "bg-emerald-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
               }`}
             >
               <span
