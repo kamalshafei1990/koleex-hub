@@ -954,10 +954,13 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               : <SquareIcon size={20} className="text-[var(--text-ghost)]" />}
           </button>
         )}
-        {/* Done checkbox */}
+        {/* Done checkbox — amber clock while a completion is awaiting the
+            assigner's approval, so the row never reads as "untouched". */}
         <button onClick={onToggle} className="mt-0.5 shrink-0 transition-transform hover:scale-110">
           {task.completed ? (
             <CheckCircleIcon size={20} className="text-green-400" />
+          ) : task.approval_state === "pending" ? (
+            <ClockIcon size={20} className="text-amber-400" />
           ) : (
             <CircleIcon size={20} className="text-[var(--text-ghost)]" />
           )}
@@ -1068,6 +1071,22 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
           <TaskExtrasStrip metadata={task.metadata} />
         </div>
 
+        {/* Approve / Reopen — ALWAYS visible on the row for the assigner when
+            a completion is pending. Previously these lived only inside the
+            expanded detail panel, so a manager had to know to click the row
+            to discover work waiting for their sign-off. */}
+        {task.approval_state === "pending" && task.assigned_by_account_id === currentAccountId && (
+          <div className="shrink-0 flex items-center gap-1">
+            <button onClick={onApprove}
+              className="h-7 px-2.5 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 text-[11px] font-semibold flex items-center gap-1 hover:bg-green-500/25 transition-colors">
+              <CheckCircleIcon size={12} /> {t("approval.confirm")}
+            </button>
+            <button onClick={onReopen}
+              className="h-7 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11px] font-semibold hover:bg-[var(--bg-surface-hover)] transition-colors">
+              {t("approval.reopen")}
+            </button>
+          </div>
+        )}
         {/* Actions — always visible on mobile (no hover), fade-in on desktop */}
         <div className="shrink-0 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button onClick={() => setExpanded(!expanded)} title={t("common.notes")}
@@ -1375,7 +1394,7 @@ export default function TodoPage() {
   const [todos, setTodos] = useState<TodoWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "completed" | "approvals">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   // Source lens: separate a user's own to-dos from what a manager/other
   // assigned them. "mine" = self-authored; "assigned" = given by someone else.
@@ -1650,6 +1669,9 @@ export default function TodoPage() {
 
     if (filter === "active") list = list.filter((t) => !t.completed);
     if (filter === "completed") list = list.filter((t) => t.completed);
+    if (filter === "approvals") list = list.filter(
+      (t) => t.approval_state === "pending" && t.assigned_by_account_id === accountId,
+    );
     // "Assigned to me" = someone else (an admin/manager) assigned it and it reached me.
     // A task is "assigned to me" when someone ELSE assigned it; otherwise it's
     // my own. This cleanly splits the personal list from delegated work.
@@ -1721,7 +1743,13 @@ export default function TodoPage() {
     active: scopedTodos.filter((t) => !t.completed).length,
     completed: scopedTodos.filter((t) => t.completed).length,
     overdue: scopedTodos.filter((t) => !t.completed && isOverdue(t.due_date)).length,
-  }), [scopedTodos]);
+    /* Tasks submitted for MY approval — the manager must see these at a
+       glance; before this count existed, a pending submission looked
+       identical to an untouched task. */
+    approvals: scopedTodos.filter(
+      (t) => t.approval_state === "pending" && t.assigned_by_account_id === accountId,
+    ).length,
+  }), [scopedTodos, accountId]);
 
   // Group: overdue → today → upcoming → no date → completed
   const grouped = useMemo(() => {
@@ -1858,6 +1886,19 @@ export default function TodoPage() {
                 {f === "all" ? `${t("pill.all")} (${stats.total})` : f === "active" ? `${t("pill.active")} (${stats.active})` : `${t("pill.done")} (${stats.completed})`}
               </button>
             ))}
+            {/* Approvals pill — only when tasks are waiting for MY sign-off.
+                Amber so the manager can't miss it; before this, a pending
+                submission was invisible at the list level. */}
+            {stats.approvals > 0 && (
+              <button onClick={() => setFilter(filter === "approvals" ? "all" : "approvals")}
+                className={`h-7 px-3 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
+                  filter === "approvals"
+                    ? "bg-amber-500/25 border-amber-500/50 text-amber-300"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+                }`}>
+                {t("pill.approvals")} ({stats.approvals})
+              </button>
+            )}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
             {PRIORITIES.map((p) => (
               <button key={p.value} onClick={() => setPriorityFilter(priorityFilter === p.value ? "all" : p.value)}

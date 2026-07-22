@@ -129,6 +129,7 @@ export const todoT: Translations = {
 
   /* Approval loop */
   "approval.pending":   { en: "Awaiting approval",         zh: "等待审批",               ar: "بانتظار الموافقة" },
+  "pill.approvals":     { en: "Waiting my approval",       zh: "待我审批",               ar: "بانتظار موافقتي" },
   "approval.submitted": { en: "Submitted — waiting for your manager to confirm.", zh: "已提交，等待经理确认。", ar: "تم الإرسال — بانتظار تأكيد مديرك." },
   "approval.awaitingYou": { en: "Marked done — approve it?", zh: "已标记完成——是否批准？", ar: "تم وضع علامة كمنجز — هل توافق؟" },
   "approval.confirm":   { en: "Confirm",                    zh: "确认",                   ar: "تأكيد" },
