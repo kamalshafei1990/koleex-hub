@@ -1267,9 +1267,15 @@ export default function TranslatorApp() {
               )}
             </div>
           ) : (
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[1fr_40px_1fr]">
-              {/* The photo */}
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto md:overflow-hidden md:grid-cols-[1fr_40px_1fr] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]">
+              {/* On MOBILE this column SCROLLS instead of being squeezed into
+                  the locked viewport. Three stacked cards (photo + recognised
+                  text + translation) inside a fixed height left the two text
+                  panes about one line tall each, with the toolbar overlapping
+                  them — the photo ate everything. Desktop keeps the locked
+                  two-column layout. */}
+              {/* The photo — capped on mobile so it can't crowd out the text. */}
+              <div className="flex max-h-[40vh] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:max-h-none md:min-h-0 md:shrink">
                 <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
                   <VlIcon slug="image" size={15} className="shrink-0 text-[var(--text-dim)]" />
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{imgName}</span>
@@ -1289,7 +1295,7 @@ export default function TranslatorApp() {
 
               {/* Recognised text + translation */}
               <div className="flex min-h-0 flex-col gap-3">
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                <div className="flex min-h-[180px] flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:min-h-0">
                   <div className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 text-[11.5px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
                     {t("tr.imgFound", "Text found in the image")}
                   </div>
@@ -1332,7 +1338,7 @@ export default function TranslatorApp() {
                   )}
                 </div>
 
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                <div className="flex min-h-[150px] flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] md:min-h-0">
                   <div
                     dir={isRtl(to) ? "rtl" : "ltr"}
                     className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[14px] leading-relaxed text-[var(--text-primary)] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
