@@ -5,15 +5,19 @@
 
 import type { ReactNode } from "react";
 
-export function SettingsCard({ title, subtitle, children }: {
-  title: string; subtitle?: string; children: ReactNode;
+export function SettingsCard({ title, subtitle, children, flush }: {
+  title?: string; subtitle?: string; children: ReactNode; flush?: boolean;
 }) {
   return (
     <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-      <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{title}</h2>
+      {title && <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{title}</h2>}
       {subtitle && <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-4">{subtitle}</p>}
-      {!subtitle && <div className="mb-4" />}
-      <div className="space-y-1">{children}</div>
+      {!subtitle && title && <div className="mb-4" />}
+      {/* `flush` = list semantics: rows sit edge-to-edge so each row's
+          bottom border IS the divider to the next one. The default 4px
+          space-y detaches that line from the following row, which reads as
+          a floating hairline once rows also have a hover highlight. */}
+      <div className={flush ? "" : "space-y-1"}>{children}</div>
     </section>
   );
 }

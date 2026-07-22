@@ -83,6 +83,7 @@ export default function SoundsTab() {
   return (
     <div className="space-y-4">
       <SettingsCard
+        flush
         title="Sound"
         subtitle="One switch for everything, plus volume. Changes apply instantly on this device."
       >
@@ -112,7 +113,11 @@ export default function SoundsTab() {
               onChange={(e) => setSoundPrefs({ volume: Number(e.target.value) / 100 })}
               onMouseUp={() => previewSound(prefs.notification.tone)}
               onTouchEnd={() => previewSound(prefs.notification.tone)}
-              className="mt-1.5 w-full accent-[var(--bg-inverted)]"
+              /* Emerald, same as every switch in the system: the filled part
+                 of the track is an "on" indicator and should read as one.
+                 --bg-inverted made it near-black in light mode and pure
+                 white in dark — invisible against one theme or the other. */
+              className="mt-1.5 w-full accent-emerald-500"
             />
           </div>
           <span className="w-10 shrink-0 text-end text-[12px] tabular-nums text-[var(--text-muted)]">
@@ -125,6 +130,7 @@ export default function SoundsTab() {
           The two top-level channels, each with its own on/off and its own
           tone row. Mirrors iOS's "Alerts and System Sounds" block. */}
       <SettingsCard
+        flush
         title="Alerts and sounds"
         subtitle={muted ? "Currently silenced by the master switch / Do Not Disturb." : "Pick a different sound for each kind of alert."}
       >
@@ -158,6 +164,7 @@ export default function SoundsTab() {
           carry its own sound so an approval is audibly different from a task
           reminder. "Default" inherits the notification tone above. */}
       <SettingsCard
+        flush
         title="By activity"
         subtitle="Give any activity its own sound. Default uses the notification tone."
       >
@@ -205,7 +212,9 @@ function NavRow({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center justify-between gap-4 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
+      /* rounded-lg: the highlight has to be a SHAPE, not a full-bleed
+         band with square corners sitting inside a 16px-rounded card. */
+      className={`flex w-full items-center justify-between gap-4 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
         last ? "" : "border-b border-[var(--border-faint)]"
       }`}
     >
@@ -273,7 +282,9 @@ function TonePicker({
 
       {/* Group 1 — the non-tone choices, set apart the way iOS separates
           "None" from the tone list. */}
-      <SettingsCard title={isActivity ? "Use" : "Silence"}>
+      {/* Untitled group, the way iOS sets "None" apart from the tone
+          list without giving it a heading. */}
+      <SettingsCard flush>
         {isActivity && (
           <ToneRow
             label="Default"
@@ -292,12 +303,11 @@ function TonePicker({
       </SettingsCard>
 
       {/* Group 2 — the tones. Tapping plays. */}
-      <SettingsCard title="Alert tones" subtitle="Tap a tone to hear it and select it.">
+      <SettingsCard flush title="Alert tones" subtitle="Tap a tone to hear it and select it.">
         {SOUND_TONES.map((tone, i) => (
           <ToneRow
             key={tone}
             label={TONE_LABELS[tone]}
-            hint={tone === "classic" ? "The original Koleex alert." : undefined}
             selected={current === tone}
             onClick={() => choose(tone)}
             last={i === SOUND_TONES.length - 1}
@@ -326,7 +336,7 @@ function ToneRow({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex w-full items-center justify-between gap-3 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
+      className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
         last ? "" : "border-b border-[var(--border-faint)]"
       }`}
     >
@@ -337,8 +347,11 @@ function ToneRow({
         {hint && <span className="mt-0.5 block text-[11px] text-[var(--text-dim)]">{hint}</span>}
       </span>
       {/* Checkmark marks the selection, iOS-style — no radio dots, no extra
-          preview button, because the row itself plays the tone. */}
-      <span className="w-5 shrink-0 text-center">
+          preview button, because the row itself plays the tone.
+          h-5 + flex, NOT a text-centred inline box: an inline icon sits on
+          the text baseline and its line box made the selected row 4px taller
+          than every other row in the list. */}
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
         {selected && <VlIcon slug="check" size={14} className="text-[var(--text-primary)]" />}
       </span>
     </button>
