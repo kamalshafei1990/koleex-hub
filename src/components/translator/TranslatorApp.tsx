@@ -60,7 +60,12 @@ interface Entry {
   at: number;
 }
 
-type Tab = "text" | "document" | "image" | "website" | "history" | "saved";
+/* Only the four TRANSLATION MODES live in the tab rail. History and Saved are
+   not modes — they're places you look things up — so they sit apart in the
+   header and open over the workspace, the way Google keeps them off its
+   Text/Images/Documents/Websites bar. */
+type Tab = "text" | "document" | "image" | "website";
+type Panel = "history" | "saved" | null;
 
 /* ── Speech helpers (browser-native — no backend, works offline) ── */
 interface SpeechRecognitionLike {
@@ -119,6 +124,7 @@ export default function TranslatorApp() {
   const [saved, setSaved] = useState<Entry[]>([]);
   const [pickerOpen, setPickerOpen] = useState<"from" | "to" | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
+  const [panel, setPanel] = useState<Panel>(null);
 
   /* Document translation state. Kept separate from the text panes so switching
      tabs never destroys either piece of work. */
@@ -672,6 +678,7 @@ export default function TranslatorApp() {
     setSource(e.source);
     setTranslated(e.translated);
     setTab("text");
+    setPanel(null);
     requestAnimationFrame(() => sourceRef.current?.focus());
   };
 
@@ -896,6 +903,34 @@ export default function TranslatorApp() {
           subtitle={t("tr.subtitle", "Translate text between 18 languages")}
           icon={<VlIcon slug="translate" size={20} />}
           backHref="/"
+          /* History and Saved live HERE, not in the tab rail below — they
+             open over the workspace instead of replacing it. Labels are
+             hidden on narrow screens so the hero row never wraps. */
+          action={
+            <div className="flex items-center gap-1.5">
+              {([
+                { key: "history" as const, label: t("tr.history", "History"), slug: "history" as const },
+                { key: "saved" as const, label: t("tr.savedTab", "Saved"), slug: "star" as const },
+              ]).map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setPanel((p) => (p === b.key ? null : b.key))}
+                  title={b.label}
+                  aria-label={b.label}
+                  aria-pressed={panel === b.key}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-xl border px-2.5 text-[12.5px] font-medium transition-colors ${
+                    panel === b.key
+                      ? "border-transparent bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <VlIcon slug={b.slug} size={14} />
+                  <span className="hidden sm:inline">{b.label}</span>
+                </button>
+              ))}
+            </div>
+          }
           tabs={[
             /* Tab icons, like every other icon here, are Visual Library
                assets. `language` (not `translate`) on the text tab so it
@@ -904,8 +939,6 @@ export default function TranslatorApp() {
             { key: "document", label: t("tr.document", "Document"), icon: <VlIcon slug="document" size={14} />, active: tab === "document", onClick: () => setTab("document") },
             { key: "image", label: t("tr.image", "Image"), icon: <VlIcon slug="image" size={14} />, active: tab === "image", onClick: () => setTab("image") },
             { key: "website", label: t("tr.website", "Website"), icon: <VlIcon slug="globe" size={14} />, active: tab === "website", onClick: () => setTab("website") },
-            { key: "history", label: t("tr.history", "History"), icon: <VlIcon slug="history" size={14} />, active: tab === "history", onClick: () => setTab("history") },
-            { key: "saved", label: t("tr.savedTab", "Saved"), icon: <VlIcon slug="star" size={14} />, active: tab === "saved", onClick: () => setTab("saved") },
           ]}
         />
       </div>
@@ -1323,7 +1356,7 @@ export default function TranslatorApp() {
             </div>
           )}
         </div>
-      ) : tab === "website" ? (
+      ) : (
         /* ── Website tab ───────────────────────────────────────────────
            Reader-style translation of a public page. We never embed or
            re-serve the original site — only its text comes across. */
@@ -1438,12 +1471,29 @@ export default function TranslatorApp() {
             )}
           </div>
         </div>
-      ) : (
-        /* History / Saved scroll normally inside the locked shell. */
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-3xl space-y-3 px-4 pb-16 pt-3 sm:px-6">
-            {tab === "history" && history.length > 0 && (
-              <div className="flex justify-end">
+      )}
+
+      {/* ── History / Saved overlay ──────────────────────────────────────
+          Deliberately NOT a tab: these aren't ways to translate, they're
+          places to look something up, and mixing them into the mode rail
+          made the rail read as six equal choices. Opening over the
+          workspace also means the text you were mid-way through typing is
+          still there when you close it. */}
+      {panel && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+          <button
+            type="button"
+            aria-label={t("tr.close", "Close")}
+            onClick={() => setPanel(null)}
+            className="absolute inset-0 bg-black/50"
+          />
+          <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:max-h-[80vh] sm:rounded-2xl">
+            <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+              <VlIcon slug={panel === "history" ? "history" : "star"} size={15} className="text-[var(--text-dim)]" />
+              <h2 className="min-w-0 flex-1 truncate text-[14px] font-bold text-[var(--text-primary)]">
+                {panel === "history" ? t("tr.history", "History") : t("tr.savedTab", "Saved")}
+              </h2>
+              {panel === "history" && history.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1451,13 +1501,18 @@ export default function TranslatorApp() {
                     setHistory([]);
                     writeLocal(HISTORY_KEY, []);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 >
                   <VlIcon slug="trash-xmark" size={13} /> {t("tr.clearHistory", "Clear history")}
                 </button>
-              </div>
-            )}
-            <EntryList items={tab === "history" ? history : saved} kind={tab === "history" ? "history" : "saved"} />
+              )}
+              <button type="button" onClick={() => setPanel(null)} title={t("tr.close", "Close")} aria-label={t("tr.close", "Close")} className={iconBtn}>
+                <VlIcon slug="cross-small" size={15} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]">
+              <EntryList items={panel === "history" ? history : saved} kind={panel} />
+            </div>
           </div>
         </div>
       )}

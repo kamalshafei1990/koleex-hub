@@ -149,6 +149,8 @@ export const translatorT: Translations = {
   "tr.showOriginal":     { en: "Show original",        zh: "显示原文",         ar: "إظهار الأصل" },
   "tr.hideOriginal":     { en: "Hide original",        zh: "隐藏原文",         ar: "إخفاء الأصل" },
 
+  "tr.close":            { en: "Close",               zh: "关闭",             ar: "إغلاق" },
+
   /* History / Saved */
   "tr.history":          { en: "History",             zh: "历史记录",         ar: "السجل" },
   "tr.savedTab":         { en: "Saved",               zh: "收藏",             ar: "المحفوظات" },
