@@ -688,7 +688,12 @@ export default function TranslatorApp() {
      row wrapped and cramped the bar at every width below ~1400px. The
      three languages Koleex uses daily are pinned to the top of the list
      instead, so they stay one tap away without eating the bar.          */
-  const LangButton = ({ side }: { side: "from" | "to" }) => {
+  /* `pill` is the in-pane chip on mobile: a bordered pill that hugs its
+     label, so each half of the workspace clearly owns its own language.
+     Without a border it read as loose text floating above the box. The
+     desktop row keeps the plain full-width button — it already sits in its
+     own bordered card, so a pill inside it would be a border on a border. */
+  const LangButton = ({ side, pill = false }: { side: "from" | "to"; pill?: boolean }) => {
     const open = pickerOpen === side;
     const current = side === "from" ? from : to;
     const pinned = side === "from" ? QUICK_SOURCE : QUICK_TARGET;
@@ -729,14 +734,18 @@ export default function TranslatorApp() {
     );
 
     return (
-      <div className="relative min-w-0 flex-1">
+      <div className={`relative min-w-0 ${pill ? "inline-flex max-w-full" : "flex-1"}`}>
         <button
           type="button"
           onClick={() => {
             setPickerOpen(open ? null : side);
             setPickerQuery("");
           }}
-          className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${
+          className={`flex items-center gap-2 font-medium transition-colors ${
+            pill
+              ? "w-auto max-w-full justify-start rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px]"
+              : "w-full justify-between rounded-xl px-3 py-2 text-[13px]"
+          } ${
             open
               ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
               : "text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
@@ -978,15 +987,15 @@ export default function TranslatorApp() {
               ~82px empty band between the two halves. Pinning the middle row
               to auto keeps the hairline a hairline and lets the two panes
               share the space. */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[1fr_auto_1fr] gap-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:grid-cols-[1fr_40px_1fr] md:grid-rows-none md:gap-3 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent">
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[1fr_auto_1fr] gap-2 md:grid-cols-[1fr_40px_1fr] md:grid-rows-none md:gap-3">
             {/* Source. On mobile this is the TOP HALF of one shared card, so
                 it drops its own border/rounding; on desktop it becomes its
                 own card again. */}
-            <div className="flex min-h-0 flex-col overflow-hidden border-0 bg-transparent md:rounded-2xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-card)] md:focus-within:border-[var(--border-focus)]">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
               {/* Mobile-only language chip, sitting directly above the text it
                   applies to — you read "English → this box" in one glance. */}
               <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
-                <LangButton side="from" />
+                <LangButton side="from" pill />
               </div>
               {/* px-4 py-3.5 EXACTLY matches the result pane. The clear button
                   used to float over the text, forcing pr-11 here only — which
@@ -1048,22 +1057,22 @@ export default function TranslatorApp() {
                 the language selectors above (empty by design). On mobile it
                 becomes the hairline BETWEEN the two halves with the swap
                 button centred on it, the way Apple splits its single card. */}
-            <div className="relative flex h-px items-center justify-center bg-[var(--border-subtle)] md:h-auto md:bg-transparent" aria-hidden={undefined}>
+            <div className="flex items-center justify-center md:block">
               <button
                 type="button"
                 onClick={swap}
                 title={t("tr.swap", "Swap languages")}
                 aria-label={t("tr.swap", "Swap languages")}
-                className="absolute grid h-9 w-9 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)] transition-colors active:bg-[var(--bg-surface-hover)] md:hidden"
+                className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors active:bg-[var(--bg-surface-hover)] md:hidden"
               >
                 <VlIcon slug="exchange" size={15} />
               </button>
             </div>
 
             {/* Translation */}
-            <div className="flex min-h-0 flex-col overflow-hidden border-0 bg-transparent md:rounded-2xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-surface-subtle)]">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
               <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
-                <LangButton side="to" />
+                <LangButton side="to" pill />
               </div>
               <div
                 dir={isRtl(to) ? "rtl" : "ltr"}
