@@ -744,7 +744,7 @@ export default function TranslatorApp() {
           }}
           className={`flex items-center gap-2 font-medium transition-colors ${
             pill
-              ? "w-full justify-between rounded-full border border-[var(--border-subtle)] px-3.5 py-1.5 text-[12.5px]"
+              ? "w-full justify-between rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[13px]"
               : "w-full justify-between rounded-xl px-3 py-2 text-[13px]"
           } ${
             open
