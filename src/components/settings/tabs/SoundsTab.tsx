@@ -114,13 +114,14 @@ export default function SoundsTab() {
               onMouseUp={() => previewSound(prefs.notification.tone)}
               onTouchEnd={() => previewSound(prefs.notification.tone)}
               /* Painted by hand rather than with accent-color, which colours
-                 the track AND the thumb the same green. The system's control
-                 language is a coloured track with a WHITE knob (see the
-                 toggles), so the fill is emerald and the thumb is white. */
+                 the track AND the thumb the same colour. Blue fill + WHITE
+                 thumb, per the owner's call — the green rule is for TOGGLES
+                 (on/off state); a slider is a value control, so it carries
+                 the brand's accent blue instead. */
               style={{
                 background: `linear-gradient(to right, var(--kx-slider-fill) 0 ${Math.round(prefs.volume * 100)}%, var(--kx-slider-rest) ${Math.round(prefs.volume * 100)}% 100%)`,
               }}
-              className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full [--kx-slider-fill:theme(colors.emerald.500)] [--kx-slider-rest:var(--border-color,#6b7280)]
+              className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full [--kx-slider-fill:var(--accent-blue,#0066FF)] [--kx-slider-rest:var(--border-color,#6b7280)]
                 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-black/10 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow
                 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-black/10 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
             />
