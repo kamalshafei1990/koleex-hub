@@ -42,6 +42,7 @@ import {
   chunkText,
   extractDocumentText,
 } from "@/lib/translator-document";
+import { IMG_ACCEPT, recognizeImage } from "@/lib/translator-image";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 450;
@@ -59,7 +60,7 @@ interface Entry {
   at: number;
 }
 
-type Tab = "text" | "document" | "history" | "saved";
+type Tab = "text" | "document" | "image" | "website" | "history" | "saved";
 
 /* ── Speech helpers (browser-native — no backend, works offline) ── */
 interface SpeechRecognitionLike {
@@ -129,6 +130,27 @@ export default function TranslatorApp() {
   const [docError, setDocError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  /* Image (OCR) state. The recognised text is editable before translating —
+     OCR is never perfect and a one-character fix beats re-shooting the photo. */
+  const [imgName, setImgName] = useState<string | null>(null);
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
+  const [imgText, setImgText] = useState("");
+  const [imgOut, setImgOut] = useState("");
+  const [imgConfidence, setImgConfidence] = useState<number | null>(null);
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgPct, setImgPct] = useState(0);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const imageRef = useRef<HTMLInputElement | null>(null);
+
+  /* Website state. */
+  const [url, setUrl] = useState("");
+  const [page, setPage] = useState<{ url: string; title: string | null; truncated: boolean } | null>(null);
+  const [pageRows, setPageRows] = useState<Array<{ source: string; translated: string }>>([]);
+  const [pageBusy, setPageBusy] = useState(false);
+  const [pageStep, setPageStep] = useState<{ done: number; total: number } | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [showSource, setShowSource] = useState(false);
 
   const reqRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -478,6 +500,172 @@ export default function TranslatorApp() {
     }
   };
 
+  /* One non-streaming translation. Shared by the Image and Website tabs —
+     both translate a known block of text rather than something being typed,
+     so they want the plain JSON path (and its cache hit) not a token stream. */
+  const translateOnce = useCallback(
+    async (text: string): Promise<string> => {
+      const res = await fetch("/api/translator", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, target_lang: to, source_lang: from }),
+      });
+      const json = (await res.json()) as { translated?: string };
+      return json.translated?.trim() ? json.translated : text;
+    },
+    [from, to],
+  );
+
+  /* ── Image (OCR) ─────────────────────────────────────────────────────
+     Recognition runs in the browser, so the photo itself never leaves the
+     device. The recognised text lands in an editable box first: OCR of a
+     worn spec plate is never perfect, and letting someone fix one character
+     is far better than translating a typo confidently. */
+  const imgRunRef = useRef(0);
+
+  const handleImage = useCallback(
+    async (file: File) => {
+      const run = ++imgRunRef.current;
+      setImgName(file.name);
+      setImgText("");
+      setImgOut("");
+      setImgConfidence(null);
+      setImgError(null);
+      setImgPct(0);
+      setImgBusy(true);
+
+      setImgPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev);   // don't leak the last preview
+        return URL.createObjectURL(file);
+      });
+
+      try {
+        const { text, confidence } = await recognizeImage(file, effectiveFrom, (pct) => {
+          if (run === imgRunRef.current) setImgPct(pct);
+        });
+        if (run !== imgRunRef.current) return;
+        setImgText(text);
+        setImgConfidence(confidence);
+        setImgBusy(false);
+        setImgOut(await translateOnce(text));
+      } catch (e) {
+        if (run !== imgRunRef.current) return;
+        const code = e instanceof Error ? e.message : "";
+        setImgError(
+          code === "no_text"
+            ? t("tr.imgNoText", "No text found in that image.")
+            : code === "too_large"
+              ? t("tr.imgTooLarge", "That image is too large — max 12 MB.")
+              : code === "unsupported_type"
+                ? t("tr.imgUnsupported", "That file isn't an image.")
+                : t("tr.imgFailed", "Couldn't read that image."),
+        );
+        setImgBusy(false);
+      }
+    },
+    [effectiveFrom, translateOnce, t],
+  );
+
+  const resetImage = () => {
+    imgRunRef.current++;
+    if (imgPreview) URL.revokeObjectURL(imgPreview);
+    setImgPreview(null);
+    setImgName(null);
+    setImgText("");
+    setImgOut("");
+    setImgConfidence(null);
+    setImgError(null);
+    setImgBusy(false);
+    if (imageRef.current) imageRef.current.value = "";
+  };
+
+  // Release the last object URL when the app unmounts.
+  useEffect(() => () => { if (imgPreview) URL.revokeObjectURL(imgPreview); }, [imgPreview]);
+
+  /* ── Website ─────────────────────────────────────────────────────────
+     The server only EXTRACTS text (see /api/translator/website — it never
+     re-serves the remote page, so nothing third-party runs in our origin).
+     Translation then goes block-by-block through the normal endpoint, so a
+     supplier page whose paragraphs were translated before is nearly free. */
+  const pageRunRef = useRef(0);
+
+  const loadPage = useCallback(async () => {
+    const target = url.trim();
+    if (!target) return;
+    const run = ++pageRunRef.current;
+
+    setPageBusy(true);
+    setPageError(null);
+    setPageRows([]);
+    setPage(null);
+    setPageStep(null);
+
+    let data: { url: string; title: string | null; blocks: string[]; truncated: boolean };
+    try {
+      const res = await fetch("/api/translator/website", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: target }),
+      });
+      const json = (await res.json()) as typeof data & { error?: string };
+      if (!res.ok || json.error) {
+        if (run !== pageRunRef.current) return;
+        const code = json.error ?? "fetch_failed";
+        setPageError(
+          code === "bad_url"      ? t("tr.urlBad", "That doesn't look like a valid web address.")
+          : code === "blocked_host" ? t("tr.urlBlocked", "That address can't be opened from the Hub.")
+          : code === "not_html"     ? t("tr.urlNotHtml", "That link isn't a web page. For files, use the Document tab.")
+          : code === "empty_page"   ? t("tr.urlEmpty", "No readable text on that page.")
+          : t("tr.urlFailed", "Couldn't reach that page."),
+        );
+        setPageBusy(false);
+        return;
+      }
+      data = json;
+    } catch {
+      if (run !== pageRunRef.current) return;
+      setPageError(t("tr.urlFailed", "Couldn't reach that page."));
+      setPageBusy(false);
+      return;
+    }
+    if (run !== pageRunRef.current) return;
+
+    setPage({ url: data.url, title: data.title, truncated: data.truncated });
+
+    /* Title first so the page identifies itself immediately, then blocks in
+       document order — the reader watches it fill top-down. */
+    const blocks = data.title ? [data.title, ...data.blocks] : data.blocks;
+    setPageStep({ done: 0, total: blocks.length });
+
+    const rows: Array<{ source: string; translated: string }> = [];
+    for (let i = 0; i < blocks.length; i++) {
+      let out = blocks[i];
+      try {
+        out = await translateOnce(blocks[i]);
+      } catch {
+        /* keep the original block rather than dropping it */
+      }
+      if (run !== pageRunRef.current) return;
+      rows.push({ source: blocks[i], translated: out });
+      setPageRows([...rows]);
+      setPageStep({ done: i + 1, total: blocks.length });
+    }
+    if (run !== pageRunRef.current) return;
+    setPageBusy(false);
+  }, [url, translateOnce, t]);
+
+  const resetPage = () => {
+    pageRunRef.current++;
+    setPage(null);
+    setPageRows([]);
+    setPageError(null);
+    setPageBusy(false);
+    setPageStep(null);
+    setUrl("");
+  };
+
   const reuse = (e: Entry) => {
     setFrom(e.from === "auto" ? "auto" : e.from);
     setTo(e.to);
@@ -714,6 +902,8 @@ export default function TranslatorApp() {
                doesn't duplicate the app icon sitting right above it. */
             { key: "text", label: t("tr.title", "Translator"), icon: <VlIcon slug="language" size={14} />, active: tab === "text", onClick: () => setTab("text") },
             { key: "document", label: t("tr.document", "Document"), icon: <VlIcon slug="document" size={14} />, active: tab === "document", onClick: () => setTab("document") },
+            { key: "image", label: t("tr.image", "Image"), icon: <VlIcon slug="image" size={14} />, active: tab === "image", onClick: () => setTab("image") },
+            { key: "website", label: t("tr.website", "Website"), icon: <VlIcon slug="globe" size={14} />, active: tab === "website", onClick: () => setTab("website") },
             { key: "history", label: t("tr.history", "History"), icon: <VlIcon slug="history" size={14} />, active: tab === "history", onClick: () => setTab("history") },
             { key: "saved", label: t("tr.savedTab", "Saved"), icon: <VlIcon slug="star" size={14} />, active: tab === "saved", onClick: () => setTab("saved") },
           ]}
@@ -986,6 +1176,264 @@ export default function TranslatorApp() {
                     </div>
                   </>
                 )}
+              </>
+            )}
+          </div>
+        </div>
+      ) : tab === "image" ? (
+        /* ── Image tab ─────────────────────────────────────────────────
+           Photo left, recognised text + translation right. The recognised
+           text stays editable — OCR of a worn spec plate is never perfect,
+           and one corrected character beats re-shooting the photo. */
+        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
+          <LanguageRow />
+
+          <input
+            ref={imageRef}
+            type="file"
+            accept={IMG_ACCEPT}
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleImage(f);
+            }}
+          />
+
+          {!imgName ? (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) void handleImage(f);
+              }}
+              className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 text-center transition-colors ${
+                dragging ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] bg-[var(--bg-card)]"
+              }`}
+            >
+              <VlIcon slug="image" size={28} className="text-[var(--text-dim)]" />
+              <div className="text-[14px] font-medium text-[var(--text-primary)]">
+                {t("tr.imgDrop", "Drop a photo or screenshot here")}
+              </div>
+              <div className="max-w-sm text-[12px] text-[var(--text-dim)]">
+                {t("tr.imgTypes", "PNG, JPG or WEBP — a spec plate, a label, a screenshot")}
+              </div>
+              <button
+                type="button"
+                onClick={() => imageRef.current?.click()}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+              >
+                <VlIcon slug="image" size={14} /> {t("tr.docBrowse", "Choose file")}
+              </button>
+              {imgError && (
+                <div className="mt-1 max-w-md rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+                  {imgError}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[1fr_40px_1fr]">
+              {/* The photo */}
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+                  <VlIcon slug="image" size={15} className="shrink-0 text-[var(--text-dim)]" />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{imgName}</span>
+                  <button type="button" onClick={resetImage} title={t("tr.imgAnother", "New image")} aria-label={t("tr.imgAnother", "New image")} className={iconBtn}>
+                    <VlIcon slug="cross-small" size={15} />
+                  </button>
+                </div>
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
+                  {imgPreview && (
+                    /* eslint-disable-next-line @next/next/no-img-element -- local object URL, never a remote asset */
+                    <img src={imgPreview} alt={imgName ?? ""} className="max-h-full max-w-full rounded-lg object-contain" />
+                  )}
+                </div>
+              </div>
+
+              <div className="hidden md:block" aria-hidden />
+
+              {/* Recognised text + translation */}
+              <div className="flex min-h-0 flex-col gap-3">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                  <div className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 text-[11.5px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
+                    {t("tr.imgFound", "Text found in the image")}
+                  </div>
+                  {imgBusy ? (
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+                      <VlIcon slug="spinner" size={16} className="animate-spin text-[var(--text-dim)]" />
+                      <div className="text-[12.5px] text-[var(--text-muted)]">
+                        {t("tr.imgReading", "Reading the image…")} {imgPct > 0 && `${imgPct}%`}
+                      </div>
+                      <div className="max-w-xs text-[11px] text-[var(--text-dim)]">
+                        {t("tr.imgFirstRun", "First run downloads the recognition model — later images are fast.")}
+                      </div>
+                    </div>
+                  ) : imgError ? (
+                    <div className="m-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">{imgError}</div>
+                  ) : (
+                    <>
+                      <textarea
+                        value={imgText}
+                        onChange={(e) => setImgText(e.target.value)}
+                        dir={isRtl(effectiveFrom) ? "rtl" : "ltr"}
+                        className="min-h-0 flex-1 resize-none bg-transparent px-4 py-3 text-[13.5px] leading-relaxed text-[var(--text-primary)] outline-none [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
+                      />
+                      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => { void translateOnce(imgText).then(setImgOut); }}
+                          disabled={!imgText.trim()}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
+                        >
+                          <VlIcon slug="translate" size={13} /> {t("tr.title", "Translator")}
+                        </button>
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--text-dim)]">
+                          {imgConfidence !== null && imgConfidence < 70
+                            ? t("tr.imgLowConfidence", "The photo is hard to read — check the text before trusting it.")
+                            : t("tr.imgEditHint", "You can edit the recognised text before translating.")}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                  <div
+                    dir={isRtl(to) ? "rtl" : "ltr"}
+                    className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[14px] leading-relaxed text-[var(--text-primary)] [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]"
+                  >
+                    {imgOut || <span className="text-[var(--text-dim)]">{t("tr.translation", "Translation")}</span>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-0.5 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { if (imgOut) void navigator.clipboard.writeText(imgOut).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }).catch(() => {}); }}
+                      disabled={!imgOut}
+                      title={copied ? t("tr.copied", "Copied") : t("tr.copy", "Copy")}
+                      aria-label={t("tr.copy", "Copy")}
+                      className={iconBtn}
+                    >
+                      {copied ? <VlIcon slug="check" size={15} /> : <VlIcon slug="copy-alt" size={15} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : tab === "website" ? (
+        /* ── Website tab ───────────────────────────────────────────────
+           Reader-style translation of a public page. We never embed or
+           re-serve the original site — only its text comes across. */
+        <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
+          <LanguageRow />
+
+          <form
+            onSubmit={(e) => { e.preventDefault(); void loadPage(); }}
+            className="flex shrink-0 items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5"
+          >
+            <VlIcon slug="link-alt" size={14} className="ms-2 shrink-0 text-[var(--text-dim)]" />
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder={t("tr.urlPlaceholder", "Paste a web address")}
+              inputMode="url"
+              dir="ltr"
+              className="min-w-0 flex-1 bg-transparent px-1 py-2 text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+            />
+            <button
+              type="submit"
+              disabled={!url.trim() || pageBusy}
+              className="shrink-0 rounded-xl bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
+            >
+              {t("tr.urlGo", "Translate page")}
+            </button>
+          </form>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+            {pageError ? (
+              <div className="m-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">{pageError}</div>
+            ) : !page && !pageBusy ? (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <VlIcon slug="globe" size={28} className="text-[var(--text-dim)]" />
+                <div className="max-w-sm text-[12.5px] text-[var(--text-dim)]">
+                  {t("tr.urlHint", "Reads the page text and translates it. The original site is never embedded.")}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+                  <VlIcon slug="globe" size={15} className="shrink-0 text-[var(--text-dim)]" />
+                  <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--text-muted)]">
+                    {page?.url ?? t("tr.urlFetching", "Reading the page…")}
+                  </span>
+                  {page && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowSource((v) => !v)}
+                        className="hidden shrink-0 rounded-lg px-2 py-1 text-[11.5px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] sm:block"
+                      >
+                        {showSource ? t("tr.hideOriginal", "Hide original") : t("tr.showOriginal", "Show original")}
+                      </button>
+                      {/* rel=noopener/noreferrer: the remote page must not get a
+                          handle on our window or our URL. */}
+                      <a
+                        href={page.url}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        title={t("tr.urlOriginal", "Open original")}
+                        aria-label={t("tr.urlOriginal", "Open original")}
+                        className={iconBtn}
+                      >
+                        <VlIcon slug="link-alt" size={14} />
+                      </a>
+                      <button type="button" onClick={resetPage} title={t("tr.urlAnother", "New page")} aria-label={t("tr.urlAnother", "New page")} className={iconBtn}>
+                        <VlIcon slug="cross-small" size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 [scrollbar-color:var(--border-color)_transparent] [scrollbar-width:thin]">
+                  <div className="mx-auto max-w-3xl space-y-3">
+                    {pageRows.map((row, i) => (
+                      <div key={i}>
+                        <p
+                          dir={isRtl(to) ? "rtl" : "ltr"}
+                          className={`whitespace-pre-wrap leading-relaxed text-[var(--text-primary)] ${
+                            i === 0 && page?.title ? "text-[17px] font-bold" : "text-[14px]"
+                          }`}
+                        >
+                          {row.translated}
+                        </p>
+                        {showSource && (
+                          <p className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-[var(--text-dim)]">
+                            {row.source}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {page?.truncated && !pageBusy && (
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
+                        {t("tr.urlTruncated", "Long page — only the first part was translated.")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-1.5 text-[11px] tabular-nums text-[var(--text-dim)]">
+                  {pageBusy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
+                  {pageStep && pageStep.done < pageStep.total
+                    ? t("tr.docProgress", "Translating {done} of {total}")
+                        .replace("{done}", String(pageStep.done + 1))
+                        .replace("{total}", String(pageStep.total))
+                    : pageStep
+                      ? t("tr.urlBlocks", "{n} sections").replace("{n}", String(pageStep.total))
+                      : t("tr.urlFetching", "Reading the page…")}
+                </div>
               </>
             )}
           </div>
