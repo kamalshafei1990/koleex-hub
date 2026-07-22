@@ -109,6 +109,9 @@ export const todoT: Translations = {
   "rec.monthly":       { en: "Monthly",                    zh: "每月",                   ar: "شهري" },
   "f.recurrence":      { en: "Repeat",                     zh: "重复",                   ar: "التكرار" },
   "f.recurrenceUntil": { en: "Until",                      zh: "截止",                   ar: "حتى" },
+  /* Which run of a repeating task this row is — the thing that tells two
+     occurrences of the same series apart. */
+  "f.occurrence":      { en: "This run",                   zh: "本次",                   ar: "هذه المرة" },
   "f.recurrenceForever": { en: "No end date",              zh: "无截止日期",             ar: "بدون تاريخ انتهاء" },
   "common.clear":      { en: "Clear",                      zh: "清除",                   ar: "مسح" },
 

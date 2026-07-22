@@ -117,6 +117,14 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString("en", { month: "short", day: "numeric" });
 }
 
+/* Which period of a recurring series a row represents ("Today", "Yesterday",
+   "Jul 21"). The stored value is date-only, so it is pinned to local midnight
+   — parsed bare it would be read as UTC and slip a day west of Greenwich. */
+function formatPeriod(period: string | null | undefined): string {
+  if (!period) return "";
+  return formatDate(period.length === 10 ? `${period}T00:00:00` : period);
+}
+
 /* Absolute date / date-time for the expanded task detail panel. */
 function fmtDetailDate(iso: string | null): string {
   if (!iso) return "—";
@@ -1006,9 +1014,15 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
                 <TagsIcon size={9} /> <AutoTranslatedText text={task.label} plain />
               </span>
             )}
-            {task.recurrence && (
+            {/* One badge for the whole series. It carries the period too, so
+                two occurrences of a repeating task read as "Monday's" and
+                "Tuesday's" instead of the same task listed twice. */}
+            {task.series_cadence && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface-active)] px-1.5 py-0.5 rounded">
-                <RefreshCwIcon size={9} /> {t("rec." + task.recurrence)}
+                <RefreshCwIcon size={9} /> {t("rec." + task.series_cadence)}
+                {task.series_period && (
+                  <span className="font-medium text-[var(--text-faint)]">· {formatPeriod(task.series_period)}</span>
+                )}
               </span>
             )}
             {task.approval_state === "pending" && (
@@ -1177,7 +1191,10 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               task.start_date ? { label: t("f.startDate"), value: fmtDetailDate(task.start_date) } : null,
               task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date) } : null,
               task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at) } : null,
-              task.recurrence ? { label: t("f.recurrence"), value: t("rec." + task.recurrence) } : null,
+              task.series_cadence ? { label: t("f.recurrence"), value: t("rec." + task.series_cadence) } : null,
+              task.series_cadence && task.series_period
+                ? { label: t("f.occurrence"), value: formatPeriod(task.series_period) }
+                : null,
               task.label ? { label: t("f.label"), value: <AutoTranslatedText text={task.label} plain /> } : null,
             ].filter(Boolean).map((f, i) => (
               <div key={i}>
@@ -1656,13 +1673,50 @@ export default function TodoPage() {
     t.created_by_account_id === id ||
     t.assigned_by_account_id === id ||
     t.assignees.some((a) => a.account_id === id), []);
+  /* Recurring series: collapse the dead periods.
+
+     A daily/weekly/monthly task is stored as one row per period (the template
+     row is its own first period; the cron spawns one row per period after).
+     Left alone, the list shows the same title once per period and reads as a
+     bug — "why is this task here twice?".
+
+     A period is only worth showing if it is still LIVE (the newest one) or if
+     someone actually touched it — finished it, moved it off "todo", submitted
+     it for approval, or wrote a note. An untouched period that has already
+     been superseded is a day nobody acted on: it carries no information the
+     newest period doesn't, so it is dropped. Nothing with work on it is ever
+     hidden, and nothing is deleted — this is a display rule only. */
+  const seriesTodos = useMemo(() => {
+    const newestPerSeries = new Map<string, string>();
+    todos.forEach((t) => {
+      if (!t.series_cadence) return;
+      const key = t.recurrence_parent_id ?? t.id;
+      const period = t.series_period ?? "";
+      if (period > (newestPerSeries.get(key) ?? "")) newestPerSeries.set(key, period);
+    });
+    if (newestPerSeries.size === 0) return todos;
+
+    const touched = (t: TodoWithRelations) =>
+      t.completed ||
+      (t.status !== null && t.status !== "todo") ||
+      t.approval_state !== null ||
+      t.notes.length > 0;
+
+    return todos.filter((t) => {
+      if (!t.series_cadence) return true;
+      const key = t.recurrence_parent_id ?? t.id;
+      const isNewest = (t.series_period ?? "") === newestPerSeries.get(key);
+      return isNewest || touched(t);
+    });
+  }, [todos]);
+
   const scopedTodos = useMemo(() => {
-    if (!isSA || saView === "all") return todos;
+    if (!isSA || saView === "all") return seriesTodos;
     if (saView === "own") {
-      return todos.filter((t) => t.assign_to_all || (accountId ? involves(t, accountId) : true));
+      return seriesTodos.filter((t) => t.assign_to_all || (accountId ? involves(t, accountId) : true));
     }
-    return todos.filter((t) => involves(t, saView));
-  }, [todos, isSA, saView, accountId, involves]);
+    return seriesTodos.filter((t) => involves(t, saView));
+  }, [seriesTodos, isSA, saView, accountId, involves]);
 
   // Filtering
   const filtered = useMemo(() => {

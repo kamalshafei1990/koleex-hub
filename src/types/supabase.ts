@@ -2078,6 +2078,16 @@ export interface TodoWithRelations extends TodoRow {
     author_full_name: string | null;
     author_avatar_url: string | null;
   })[];
+  /** Derived (not a column): the cadence of the series this row belongs to.
+      On a template it equals `recurrence`; on a spawned instance it is the
+      PARENT's cadence, so the UI can badge an instance as recurring even
+      though its own `recurrence` is null. */
+  series_cadence?: TodoRecurrence;
+  /** Derived (not a column): which period of the series this row IS, as
+      YYYY-MM-DD. Instances carry `recurrence_spawned_for`; the template is
+      its own first period, so it falls back to start_date/created_at. Used to
+      tell two occurrences of the same recurring task apart in the list. */
+  series_period?: string | null;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

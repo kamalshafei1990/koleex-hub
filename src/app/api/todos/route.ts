@@ -208,6 +208,57 @@ export async function GET() {
     return { ...t, assignees: tAssignees, assigner, notes: tNotes };
   });
 
+  /* Recurring series identity.
+
+     A recurring task is stored as a TEMPLATE row (recurrence set) plus one
+     spawned row per later period (recurrence_parent_id → template, recurrence
+     null). Read raw, that reads as the same task listed several times. Tag
+     every row with the cadence of its series and the period it represents so
+     the list can badge them as distinct days of ONE repeating task instead of
+     unexplained duplicates. */
+  // Same objects, just typed loosely enough to read/write the derived fields.
+  const rows = enriched as unknown as Array<Record<string, unknown>>;
+  const cadenceById = new Map<string, string>();
+  rows.forEach((t) => {
+    const rec = t.recurrence as string | null;
+    if (rec) cadenceById.set(t.id as string, rec);
+  });
+  // A parent can be outside the caller's scope (e.g. created by someone else
+  // and only broadcast from this period on) — resolve those directly.
+  const orphanParents = Array.from(
+    new Set(
+      rows
+        .map((t) => t.recurrence_parent_id as string | null)
+        .filter((p): p is string => !!p && !cadenceById.has(p)),
+    ),
+  );
+  if (orphanParents.length > 0) {
+    const { data: parents } = await supabaseServer
+      .from("koleex_todos")
+      .select("id, recurrence")
+      .in("id", orphanParents);
+    (parents ?? []).forEach((p) => {
+      const row = p as { id: string; recurrence: string | null };
+      if (row.recurrence) cadenceById.set(row.id, row.recurrence);
+    });
+  }
+  rows.forEach((t) => {
+    const parent = t.recurrence_parent_id as string | null;
+    const own = t.recurrence as string | null;
+    t.series_cadence = own ?? (parent ? cadenceById.get(parent) ?? null : null);
+    if (t.series_cadence) {
+      // Instances know their period outright; the template IS its own first
+      // period, anchored the same way the spawner anchors it.
+      t.series_period =
+        (t.recurrence_spawned_for as string | null) ??
+        (t.start_date as string | null) ??
+        ((t.created_at as string | null) ?? "").slice(0, 10) ??
+        null;
+    } else {
+      t.series_period = null;
+    }
+  });
+
   /* Same caching posture as /api/accounts / /api/employees — the
      list refreshes on any write via a client-side invalidate, and
      SWR covers the gap between expiry and background refetch. */
