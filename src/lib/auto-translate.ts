@@ -31,6 +31,28 @@ function guessScript(text: string): AppLang | null {
 }
 
 const memCache = new Map<string, string>(); // key = `${targetLang}|${text}`
+
+/* Global concurrency gate. Dense grids (Visual Library renders up to 300
+   asset cards) mount hundreds of <AutoTranslatedText> at once with UNIQUE
+   texts, so the per-key coalescing below can't help — without a cap that's
+   hundreds of simultaneous /api/ai/translate calls (the burst pattern that
+   intermittently 401s the auth layer). Excess requests queue here and drain
+   as slots free up; server+memory caches make later waves mostly no-ops. */
+const MAX_CONCURRENT_TRANSLATES = 6;
+let activeTranslates = 0;
+const translateQueue: Array<() => void> = [];
+function acquireTranslateSlot(): Promise<void> {
+  if (activeTranslates < MAX_CONCURRENT_TRANSLATES) {
+    activeTranslates++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => translateQueue.push(() => { activeTranslates++; resolve(); }));
+}
+function releaseTranslateSlot(): void {
+  activeTranslates--;
+  const next = translateQueue.shift();
+  if (next) next();
+}
 // Coalesce identical concurrent requests. When a page switches language,
 // EVERY <AutoTranslatedText> fires at once; without this, 15 rows sharing the
 // same text (or a cold page) would open 15 sockets and hammer the auth layer,
@@ -56,6 +78,15 @@ async function translateRemote(
   if (existing) return existing;
 
   const run = (async (): Promise<string | null> => {
+    await acquireTranslateSlot();
+    try {
+      return await runAttempts();
+    } finally {
+      releaseTranslateSlot();
+    }
+  })();
+
+  async function runAttempts(): Promise<string | null> {
     const MAX_ATTEMPTS = 3;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
@@ -91,7 +122,7 @@ async function translateRemote(
       }
     }
     return null;
-  })();
+  }
 
   inFlight.set(cacheKey, run);
   try {

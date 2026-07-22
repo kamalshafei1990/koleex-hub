@@ -36,6 +36,7 @@ import UploadIcon from "@/components/icons/ui/UploadIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -251,7 +252,7 @@ export default function VisualAssetDetailDrawer({
         <div className="border-b border-[var(--border-subtle)] px-5 pt-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-[15px] font-semibold text-[var(--text-primary)]">{asset.title}</h3>
+              <h3 className="truncate text-[15px] font-semibold text-[var(--text-primary)]"><AutoTranslatedText text={asset.title} plain /></h3>
               <span className="font-mono text-[10.5px] text-[var(--text-dim)]">{asset.visual_asset_code}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -376,7 +377,7 @@ function OverviewTab({ asset, busy, fileRef, onFile, onPickFile }: {
       <div className="mt-3 divide-y divide-[var(--border-subtle)]">
         <Row label={t("vl.drawer.row.slug", "Slug")} value={<span className="font-mono text-[11.5px]">{asset.slug}</span>} />
         <Row label={t("vl.drawer.row.type", "Type")} value={t(`vl.type.${asset.asset_type}`, asset.asset_type.replace(/_/g, " "))} />
-        <Row label={t("vl.drawer.row.category", "Category")} value={[asset.category, asset.subcategory].filter(Boolean).join(" · ") || "—"} />
+        <Row label={t("vl.drawer.row.category", "Category")} value={[asset.category ? t(`vl.cat.${asset.category}`, asset.category) : null, asset.subcategory].filter(Boolean).join(" · ") || "—"} />
         <Row label={t("vl.drawer.row.style", "Style")} value={asset.style ?? "—"} />
         <Row label={t("vl.drawer.row.version", "Version")} value={`v${asset.version}`} />
         <Row label={t("vl.drawer.row.used", "Used")} value={`${asset.usage_count}×`} />

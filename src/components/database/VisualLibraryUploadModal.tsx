@@ -157,7 +157,7 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
             </div>
             <div><span className={LABEL}>{t("vl.upload.category", "Category")}</span>
               <select className={INPUT} value={category} onChange={(e) => { setCategory(e.target.value); setSubcategory(""); }}>
-                {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                {categories.map((c) => <option key={c.key} value={c.key}>{t(`vl.cat.${c.key}`, c.label)}</option>)}
               </select>
             </div>
           </div>

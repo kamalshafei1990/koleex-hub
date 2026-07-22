@@ -30,6 +30,7 @@ import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -229,7 +230,7 @@ export default function VisualLibraryBrowser() {
         <div className="sticky top-2 space-y-0.5">
           <SidebarItem label={t("vl.browse.all-categories", "All categories")} count={all.length} active={category === ""} onClick={() => setCategory("")} />
           {categories.map((c) => (
-            <SidebarItem key={c.key} label={c.label} count={categoryCounts[c.key] ?? 0} active={category === c.key} onClick={() => setCategory(c.key)} />
+            <SidebarItem key={c.key} label={t(`vl.cat.${c.key}`, c.label)} count={categoryCounts[c.key] ?? 0} active={category === c.key} onClick={() => setCategory(c.key)} />
           ))}
           {addingCat ? (
             <div className="flex items-center gap-1.5 px-1 pt-1.5">
@@ -281,7 +282,7 @@ export default function VisualLibraryBrowser() {
         <div className="flex flex-wrap items-center gap-2">
           <select className={`${SELECT} lg:hidden`} value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">{t("vl.browse.all-categories", "All categories")}</option>
-            {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            {categories.map((c) => <option key={c.key} value={c.key}>{t(`vl.cat.${c.key}`, c.label)}</option>)}
           </select>
           <select className={SELECT} value={state} onChange={(e) => setState(e.target.value)}>
             <option value="">{t("vl.browse.all-states", "All states")}</option>
@@ -333,10 +334,10 @@ export default function VisualLibraryBrowser() {
                     ) : <ImageRawIcon size={14} className="text-neutral-400" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{a.title}</span>
+                    <AutoTranslatedText text={a.title} plain className="block truncate text-[13px] font-medium text-[var(--text-primary)]" />
                     <span className="block truncate font-mono text-[10.5px] text-[var(--text-dim)]">{a.visual_asset_code}</span>
                   </span>
-                  <span className="hidden shrink-0 text-[11px] text-[var(--text-dim)] sm:block">{a.category}</span>
+                  <span className="hidden shrink-0 text-[11px] text-[var(--text-dim)] sm:block">{a.category ? t(`vl.cat.${a.category}`, a.category) : null}</span>
                   <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATE_PILL[st] ?? STATE_PILL.draft}`}>{t(`vl.state.${st}`, st)}</span>
                 </button>
               );

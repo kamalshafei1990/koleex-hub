@@ -12,6 +12,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 const T: Translations = {
   "vl.card.deselect":         { en: "Deselect", zh: "取消选择", ar: "إلغاء التحديد" },
@@ -91,7 +92,7 @@ export default function VisualAssetCard({
 
       <button type="button" onClick={onOpen} className="flex flex-col items-start gap-0.5 border-t border-[var(--border-subtle)] px-2 py-1.5 text-left">
         <div className="flex w-full items-center justify-between gap-1.5">
-          <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">{asset.title}</span>
+          <AutoTranslatedText text={asset.title} plain className="truncate text-[11px] font-medium text-[var(--text-primary)]" />
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state] ?? STATE_DOT.draft}`} title={t(`vl.state.${state}`, state)} />
         </div>
         <span className="truncate font-mono text-[9px] text-[var(--text-dim)]">{asset.visual_asset_code}</span>

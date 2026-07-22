@@ -20,6 +20,29 @@ export const VL_LABELS_T: Translations = {
   "vl.type.feature_graphic":   { en: "feature graphic",   zh: "功能图形", ar: "رسم الميزات" },
   "vl.type.technical_visual":  { en: "technical visual",  zh: "技术图",   ar: "صورة تقنية" },
 
+  /* General Icons categories (canonical keys from taxonomy.ts; tenant-custom
+     categories fall back to their stored label) */
+  "vl.cat.navigation":     { en: "Navigation",             zh: "导航",             ar: "التنقل" },
+  "vl.cat.actions":        { en: "Actions",                zh: "操作",             ar: "الإجراءات" },
+  "vl.cat.status":         { en: "Status & Alerts",        zh: "状态与提醒",       ar: "الحالة والتنبيهات" },
+  "vl.cat.communication":  { en: "Communication",          zh: "沟通",             ar: "التواصل" },
+  "vl.cat.users":          { en: "Users & Identity",       zh: "用户与身份",       ar: "المستخدمون والهوية" },
+  "vl.cat.finance":        { en: "Finance",                zh: "财务",             ar: "المالية" },
+  "vl.cat.inventory":      { en: "Inventory & Logistics",  zh: "库存与物流",       ar: "المخزون واللوجستيات" },
+  "vl.cat.analytics":      { en: "Analytics & Dashboard",  zh: "分析与仪表盘",     ar: "التحليلات ولوحات المعلومات" },
+  "vl.cat.ai":             { en: "AI & Automation",        zh: "AI 与自动化",      ar: "الذكاء الاصطناعي والأتمتة" },
+  "vl.cat.files":          { en: "Files & Media",          zh: "文件与媒体",       ar: "الملفات والوسائط" },
+  "vl.cat.security":       { en: "Security & Permissions", zh: "安全与权限",       ar: "الأمان والصلاحيات" },
+  "vl.cat.business":       { en: "Business & Companies",   zh: "企业与公司",       ar: "الأعمال والشركات" },
+  "vl.cat.commerce":       { en: "Commerce & Orders",      zh: "商务与订单",       ar: "التجارة والطلبات" },
+  "vl.cat.manufacturing":  { en: "Manufacturing",          zh: "制造",             ar: "التصنيع" },
+  "vl.cat.time":           { en: "Time & Scheduling",      zh: "时间与排程",       ar: "الوقت والجدولة" },
+  "vl.cat.devices":        { en: "Devices & Technology",   zh: "设备与技术",       ar: "الأجهزة والتقنية" },
+  "vl.cat.database":       { en: "Database & Systems",     zh: "数据库与系统",     ar: "قواعد البيانات والأنظمة" },
+  "vl.cat.maps":           { en: "Maps & Location",        zh: "地图与位置",       ar: "الخرائط والمواقع" },
+  "vl.cat.documents":      { en: "Documents & Reports",    zh: "文档与报告",       ar: "المستندات والتقارير" },
+  "vl.cat.misc":           { en: "Miscellaneous",          zh: "其他",             ar: "متفرقات" },
+
   /* Relationship types */
   "vl.relType.similar_to":            { en: "Similar to",          zh: "相似于",     ar: "مشابه لـ" },
   "vl.relType.alternative_of":        { en: "Alternative of",      zh: "可替代",     ar: "بديل عن" },
