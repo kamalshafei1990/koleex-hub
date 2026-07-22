@@ -414,7 +414,11 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
            round-trip will hydrate the avatar / username. */
         return [{ ...msg, sender: null } as InboxMessageWithSender, ...prev];
       });
-      playNotificationSound();
+      /* NO chime here. setInboxUnread above raises the count, and the
+         count-watcher effect ("inboxUnread > prev") already chimes for
+         exactly that. Calling it here too made every single inbox
+         notification play the sound TWICE — which is what a double-beep
+         out of nowhere was. One event, one chime. */
 
       /* Verification fetch: after a short delay, reconcile with the DB
          to ensure the count is accurate once replication has settled. */
