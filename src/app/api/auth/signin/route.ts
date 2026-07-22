@@ -13,7 +13,7 @@ import "server-only";
    sets an HttpOnly signed session cookie. No secrets leave the server.
    --------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { setSessionCookie } from "@/lib/server/session";
 import { verifyPassword } from "@/lib/server/password";
@@ -137,7 +137,9 @@ export async function POST(req: Request) {
           outcome: "failure", reason: "invalid_password", wouldBlock, mode: rlMode,
         });
         // Brute-force signal: alert Super Admins when failures for this account
-        // cross a threshold in a short window. Best-effort; never blocks the 401.
+        // cross a threshold in a short window. Runs AFTER the 401 is sent —
+        // it can involve web-push sends, which must never delay a response.
+        after(async () => {
         try {
           const since = new Date(Date.now() - 15 * 60_000).toISOString();
           const { count } = await supabaseServer
@@ -162,6 +164,7 @@ export async function POST(req: Request) {
         } catch {
           /* never block the 401 on the alert path */
         }
+        });
       }
       return NextResponse.json(
         { ok: false, error: "Invalid email/username or password" },
@@ -172,104 +175,89 @@ export async function POST(req: Request) {
     // Success — mint the session cookie. (Unchanged.)
     await setSessionCookie(account.id);
 
-    /* Best-effort side-effects, AWAITED.
-       On Vercel the lambda freezes right after the Response resolves, so
-       un-awaited (fire-and-forget) writes are dropped — confirmed on the
-       S1c preview (login worked but the rehash + last_login + history never
-       persisted). We therefore AWAIT them, but wrap in allSettled + try/catch
-       so a DB hiccup can NEVER block or fail an already-successful login.
+    /* Side-effects — AFTER the response.
+       These were awaited inline and formed a ~10-round-trip tail (rehash,
+       history, rate-limit record, session shadow, activity log, Super-Admin
+       alert incl. WEB-PUSH sends) between "password OK" and the response.
+       Any hiccup — most often a hung push endpoint, which has no natural
+       timeout — stalled the login past the function limit and the client
+       showed "Sign-in service is unreachable" for a CORRECT password.
+       after() hands them to the runtime post-response (backed by waitUntil,
+       same pattern as Discuss notify), so sign-in now answers as soon as the
+       cookie is set. Every block self-guards; none can fail the login. */
+    const verdictNewHash = verdict.needsRehash ? verdict.newHash : null;
+    const verdictNewAlgo = verdict.newAlgo ?? "argon2id";
+    after(async () => {
+      const now = new Date().toISOString();
+      const doRehash = verdictNewHash && process.env.AUTH_LAZY_REHASH !== "off";
+      try {
+        await Promise.allSettled([
+          doRehash
+            ? supabaseServer
+                .from("accounts")
+                .update({
+                  password_hash: verdictNewHash,
+                  password_algo: verdictNewAlgo,
+                  password_changed_at: now,
+                  last_login_at: now,
+                })
+                .eq("id", account.id)
+            : supabaseServer
+                .from("accounts")
+                .update({ last_login_at: now })
+                .eq("id", account.id),
+          supabaseServer.from("account_login_history").insert({
+            account_id: account.id,
+            event_type: "login_success",
+            metadata: { via: "password" },
+          }),
+          /* Retire admin force-logout rows so the next heartbeat starts a
+             clean session (force-logout kicks a live session; it is not a
+             ban — a ban is a disabled account, blocked above). */
+          supabaseServer
+            .from("app_sessions")
+            .update({ status: "offline", ended_at: now })
+            .eq("account_id", account.id)
+            .eq("status", "revoked"),
+        ]);
+      } catch { /* never fail the login on bookkeeping */ }
 
-       Includes the lazy Argon2id upgrade for legacy logins (flag-gated by
-       AUTH_LAZY_REHASH). Never logs the password or hash. */
-    const now = new Date().toISOString();
-    const doRehash =
-      verdict.needsRehash && verdict.newHash && process.env.AUTH_LAZY_REHASH !== "off";
-    try {
-      await Promise.allSettled([
-        doRehash
-          ? supabaseServer
-              .from("accounts")
-              .update({
-                password_hash: verdict.newHash,
-                password_algo: verdict.newAlgo ?? "argon2id",
-                password_changed_at: now,
-                last_login_at: now,
-              })
-              .eq("id", account.id)
-          : supabaseServer
-              .from("accounts")
-              .update({ last_login_at: now })
-              .eq("id", account.id),
-        supabaseServer.from("account_login_history").insert({
-          account_id: account.id,
-          event_type: "login_success",
-          metadata: { via: "password" },
-        }),
-        /* Clear any admin force-logout (revoked presence) for this account.
-           app_sessions rows are keyed by (account_id, device_id) and device_id
-           is a persistent client id, so without this a re-login on the SAME
-           browser would hit the still-"revoked" row — the heartbeat returns
-           revoked:true and bounces the user straight back to /login?revoked=1,
-           an unbreakable loop. A successful password sign-in supersedes the
-           revoke (force-logout kicks a live session; it is not a ban — a ban is
-           a disabled account, blocked above). Retire the revoked rows so the
-           next heartbeat starts a clean session. */
-        supabaseServer
-          .from("app_sessions")
-          .update({ status: "offline", ended_at: now })
-          .eq("account_id", account.id)
-          .eq("status", "revoked"),
-      ]);
-    } catch {
-      /* never block a successful login on a side-effect write */
-    }
+      if (rlActive) {
+        await recordAttempt({
+          ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
+          outcome: "success", reason: "login_success", wouldBlock, mode: rlMode,
+        }).catch(() => undefined);
+      }
 
-    // Observe-mode: record the successful attempt (awaited, self-guarded).
-    if (rlActive) {
-      await recordAttempt({
-        ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
-        outcome: "success", reason: "login_success", wouldBlock, mode: rlMode,
-      });
-    }
+      await recordSessionShadow({
+        accountId: account.id,
+        accountStatus: account.status,
+        req,
+      }).catch(() => undefined);
 
-    /* P1 · S1 — stateful-session SHADOW (write + comparator). SUCCESS ONLY.
-       Flag-gated (SESSION_STATEFUL_SHADOW); log-only; never authoritative.
-       The legacy cookie set above remains the ONLY auth source. Self-guarded
-       so a shadow-write/comparator/DB hiccup can NEVER block an already-
-       successful login. No token is ever returned to the client. */
-    await recordSessionShadow({
-      accountId: account.id,
-      accountStatus: account.status,
-      req,
-    }).catch(() => undefined);
+      await logActivity({
+        account_id: account.id,
+        tenant_id: account.tenant_id,
+        event_type: "login",
+        module: "Auth",
+        title: "Signed in",
+        meta: requestMeta(req),
+        metadata: { via: "password" },
+      }).catch(() => undefined);
 
-    /* Super Admin activity monitoring — record the login in the activity feed.
-       Best-effort + awaited (Vercel freezes the lambda after the response);
-       logActivity self-guards so it can never block a successful login. The
-       client's first heartbeat will register the device with its real id. */
-    await logActivity({
-      account_id: account.id,
-      tenant_id: account.tenant_id,
-      event_type: "login",
-      module: "Auth",
-      title: "Signed in",
-      meta: requestMeta(req),
-      metadata: { via: "password" },
-    }).catch(() => undefined);
-
-    // Super-Admin "user logged in" alert (other admins; never self).
-    const loginMeta = requestMeta(req);
-    await notifySuperAdmins({
-      kind: "login",
-      subject: `${account.username || account.login_email} signed in`,
-      actorName: account.username || account.login_email,
-      action: "Signed in",
-      location: locationLabel(loginMeta),
-      severity: "info",
-      actorAccountId: account.id,
-      tenantId: account.tenant_id,
-      metadata: { username: account.username },
-    }).catch(() => undefined);
+      const loginMeta = requestMeta(req);
+      await notifySuperAdmins({
+        kind: "login",
+        subject: `${account.username || account.login_email} signed in`,
+        actorName: account.username || account.login_email,
+        action: "Signed in",
+        location: locationLabel(loginMeta),
+        severity: "info",
+        actorAccountId: account.id,
+        tenantId: account.tenant_id,
+        metadata: { username: account.username },
+      }).catch(() => undefined);
+    });
 
     return NextResponse.json({
       ok: true,

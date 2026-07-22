@@ -1380,13 +1380,32 @@ export async function verifyAccountLogin(
   // API deliberately returns an indistinguishable 401 for both missing
   // accounts and wrong passwords so attackers can't probe for valid
   // usernames. Collapsing the client too keeps that invariant honest.
+  // One automatic retry on transport failure: sign-in POSTs are exactly the
+  // kind of request flaky networks (and the GFW) kill mid-flight, and a
+  // second attempt usually goes straight through. Each attempt is capped at
+  // 12s so the user never stares at a spinner while a dead socket drains.
+  const attempt = async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+    try {
+      return await fetch("/api/auth/signin", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
-    const res = await fetch("/api/auth/signin", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    let res: Response;
+    try {
+      res = await attempt();
+    } catch {
+      res = await attempt(); // second chance for a transient network kill
+    }
     const json = (await res.json()) as
       | { ok: true; account: { id: string; username: string; login_email: string; user_type: string } }
       | { ok: false; error: string };

@@ -107,11 +107,21 @@ export async function sendPushToAccounts(
   await Promise.all(
     subs.map(async (s) => {
       try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          body,
-          { TTL: 60 * 60 * 24, urgency: "high" },
-        );
+        /* timeout: the push services (FCM/APNs/Mozilla) normally answer in
+           <1s, but a stale endpoint can black-hole the socket with NO
+           default timeout — which once held the sign-in response hostage
+           until the function limit. 8s library timeout + a 10s outer race
+           as the hard backstop. */
+        await Promise.race([
+          webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            body,
+            { TTL: 60 * 60 * 24, urgency: "high", timeout: 8000 },
+          ),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("push_send_timeout")), 10_000),
+          ),
+        ]);
         result.sent += 1;
         await logPush(s.account_id, opts?.actorAccountId, payload, "sent", null, s.endpoint);
       } catch (e: unknown) {
