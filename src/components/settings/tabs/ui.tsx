@@ -83,13 +83,14 @@ export function SwitchRow({ label, hint, checked, onChange, last, mono }: {
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
           checked
-            ? mono ? "bg-[var(--bg-inverted)]" : "bg-[var(--accent-blue,#0066FF)]"
+            /* mono ON: mid-gray track, NOT full white — the knob stays white
+               (same circle as every other switch) and needs the track to sit
+               a step darker so the state still reads at a glance. */
+            ? mono ? "bg-neutral-400" : "bg-[var(--accent-blue,#0066FF)]"
             : "bg-[var(--border-color,#6b7280)]"
         }`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full shadow transition-transform duration-200 ${
-          checked && mono ? "bg-[var(--bg-primary)]" : "bg-white"
-        } ${checked ? "translate-x-5" : ""}`} />
+        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
       </button>
     </div>
   );
