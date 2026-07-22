@@ -126,6 +126,9 @@ export const translatorT: Translations = {
   "tr.imgXlateFailed":   { en: "Translation failed — tap Translate to retry.",
                            zh: "翻译失败 — 点击翻译重试。",
                            ar: "فشلت الترجمة — اضغط ترجمة للمحاولة مجددًا." },
+  /* On-photo overlay toggle */
+  "tr.imgOverlay":       { en: "Show translation",     zh: "显示翻译",         ar: "عرض الترجمة" },
+  "tr.imgOriginal":      { en: "Show original",        zh: "显示原图",         ar: "عرض الأصل" },
 
   /* Website translation */
   "tr.website":          { en: "Website",             zh: "网站",             ar: "موقع ويب" },

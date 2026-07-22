@@ -33,10 +33,19 @@ export function ocrLangsFor(sourceLang: string): string[] {
   }
 }
 
+/** One recognised line with its position in ORIGINAL image pixels — the
+    anchor for painting the translation back onto the photo. */
+export interface OcrLine {
+  text: string;
+  bbox: { x0: number; y0: number; x1: number; y1: number };
+}
+
 export interface OcrResult {
   text: string;
   /** 0–100 mean confidence, for warning about an unreadable photo. */
   confidence: number;
+  /** Real text lines (junk already filtered), for the on-photo overlay. */
+  lines: OcrLine[];
 }
 
 /* Strip the junk lines OCR produces from graphics and decoration — a stylised
@@ -47,26 +56,27 @@ export interface OcrResult {
      · a line that is mostly punctuation is decoration;
      · a line of 3+ tokens where most tokens are single characters is the OCR
        misreading artwork ("3 e N J"), not a sentence or a model code. */
+export function keepOcrLine(line: string): boolean {
+  if (!line) return true; // keep paragraph breaks
+  const substantive = (line.match(/[\p{L}\p{N}]/gu) ?? []).length;
+  if (substantive < 2) return false;
+  const nonSpace = line.replace(/\s+/g, "").length;
+  if (nonSpace - substantive > substantive) return false;
+  const tokens = line.split(/\s+/);
+  if (tokens.length >= 4) {
+    // A CJK "word" IS one character and OCR spaces them apart, so a single
+    // CJK char is normal text — only isolated Latin letters/digits count as
+    // the artwork-misread signature ("3 e N J").
+    const singles = tokens.filter(
+      (t) => !/[⺀-鿿぀-ヿ가-힯]/.test(t) && (t.match(/[\p{L}\p{N}]/gu) ?? []).length <= 1,
+    ).length;
+    if (singles / tokens.length > 0.6) return false;
+  }
+  return true;
+}
+
 export function cleanOcrText(raw: string): string {
-  const lines = raw.split("\n").map((l) => l.trim());
-  const kept = lines.filter((line) => {
-    if (!line) return true; // keep paragraph breaks
-    const substantive = (line.match(/[\p{L}\p{N}]/gu) ?? []).length;
-    if (substantive < 2) return false;
-    const nonSpace = line.replace(/\s+/g, "").length;
-    if (nonSpace - substantive > substantive) return false;
-    const tokens = line.split(/\s+/);
-    if (tokens.length >= 4) {
-      // A CJK "word" IS one character and OCR spaces them apart, so a single
-      // CJK char is normal text — only isolated Latin letters/digits count as
-      // the artwork-misread signature ("3 e N J").
-      const singles = tokens.filter(
-        (t) => !/[⺀-鿿぀-ヿ가-힯]/.test(t) && (t.match(/[\p{L}\p{N}]/gu) ?? []).length <= 1,
-      ).length;
-      if (singles / tokens.length > 0.6) return false;
-    }
-    return true;
-  });
+  const kept = raw.split("\n").map((l) => l.trim()).filter(keepOcrLine);
   // Collapse the blank runs left behind by dropped lines.
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -97,10 +107,32 @@ export async function recognizeImage(
   }
 
   try {
-    const { data } = await worker.recognize(file);
+    // `blocks: true` asks v7 for the layout tree (block → paragraph → line),
+    // which carries the bbox of every recognised line — the anchor points for
+    // the on-photo overlay.
+    const { data } = await worker.recognize(file, {}, { text: true, blocks: true });
     const text = cleanOcrText((data.text ?? "").trim());
     if (!text) throw new Error("no_text");
-    return { text, confidence: Math.round(data.confidence ?? 0) };
+
+    // Flatten the layout tree into junk-filtered lines. Defensive traversal:
+    // if a build ever omits blocks, the overlay is skipped and the plain text
+    // flow still works.
+    const lines: OcrLine[] = [];
+    type TLine = { text?: string; bbox?: { x0: number; y0: number; x1: number; y1: number } };
+    type TPara = { lines?: TLine[] };
+    type TBlock = { paragraphs?: TPara[] };
+    const blocks = (data as { blocks?: TBlock[] | null }).blocks ?? [];
+    for (const b of blocks) {
+      for (const p of b.paragraphs ?? []) {
+        for (const l of p.lines ?? []) {
+          const lineText = (l.text ?? "").trim();
+          if (!lineText || !l.bbox || !keepOcrLine(lineText)) continue;
+          lines.push({ text: lineText, bbox: l.bbox });
+        }
+      }
+    }
+
+    return { text, confidence: Math.round(data.confidence ?? 0), lines };
   } catch (e) {
     if (e instanceof Error && e.message === "no_text") throw e;
     throw new Error("ocr_failed");

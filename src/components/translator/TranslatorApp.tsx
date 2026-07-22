@@ -42,7 +42,7 @@ import {
   chunkText,
   extractDocumentText,
 } from "@/lib/translator-document";
-import { IMG_ACCEPT, recognizeImage } from "@/lib/translator-image";
+import { IMG_ACCEPT, recognizeImage, type OcrLine } from "@/lib/translator-image";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 350;
@@ -442,6 +442,29 @@ export default function TranslatorApp() {
      imgError replaces the whole text box (OCR failed, nothing to show), but a
      translate failure must keep the recognised text on screen and editable. */
   const [imgXlateFailed, setImgXlateFailed] = useState(false);
+  /* On-photo overlay (Google/Apple style): each recognised line keeps its
+     pixel bbox from the OCR, and its translation is painted over the photo at
+     that spot. `imgBox` is the rendered image's offset+scale inside its pane,
+     re-measured on load and resize, so the chips track the photo at any
+     window size. */
+  const [imgLines, setImgLines] = useState<Array<OcrLine & { translated: string | null }> | null>(null);
+  const [overlayOn, setOverlayOn] = useState(true);
+  const [imgBox, setImgBox] = useState<{ left: number; top: number; scale: number } | null>(null);
+  const imgElRef = useRef<HTMLImageElement | null>(null);
+
+  const measureImg = useCallback(() => {
+    const el = imgElRef.current;
+    if (!el || !el.naturalWidth) return;
+    setImgBox({ left: el.offsetLeft, top: el.offsetTop, scale: el.clientWidth / el.naturalWidth });
+  }, []);
+
+  useEffect(() => {
+    const el = imgElRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measureImg);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measureImg, imgPreview]);
   const imageRef = useRef<HTMLInputElement | null>(null);
 
   /* Website state. `pageBlocks` keeps the extracted source blocks so changing
@@ -880,10 +903,42 @@ export default function TranslatorApp() {
     [translateOnce],
   );
 
+  /* Per-LINE translation for the on-photo overlay. Each line keeps its bbox;
+     as translations land they appear both on the photo and in the text pane
+     (joined). The whole-text path above remains the fallback for hand-edited
+     text, where line boundaries no longer match the photo. */
+  const translateImageLines = useCallback(
+    async (lines: Array<OcrLine & { translated: string | null }>) => {
+      const run = ++imgRunRef.current;
+      setImgXlateFailed(false);
+      const sources = lines.map((l) => l.text);
+      await translatePool(
+        sources,
+        translateOnce,
+        () => run !== imgRunRef.current,
+        (results, done, failed) => {
+          setImgLines(lines.map((l, i) => ({ ...l, translated: results[i] })));
+          setImgOut(results.map((r, i) => r ?? sources[i]).join("\n"));
+          if (done === sources.length && failed === sources.length) {
+            setImgOut("");
+            setImgXlateFailed(true);
+          }
+        },
+      );
+    },
+    [translateOnce],
+  );
+
   /* Language change re-translates the recognised text (never re-runs OCR —
-     the text may have been hand-corrected and must not be overwritten). */
+     the text may have been hand-corrected and must not be overwritten).
+     Overlay lines re-run per line so the photo updates too. */
   useEffect(() => {
-    if (imgText.trim() && !imgBusy) void translateImageText(imgText);
+    if (imgBusy) return;
+    if (imgLines?.length && imgText === imgLines.map((l) => l.text).join("\n")) {
+      void translateImageLines(imgLines);
+    } else if (imgText.trim()) {
+      void translateImageText(imgText);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire on language change only
   }, [from, to]);
 
@@ -904,14 +959,26 @@ export default function TranslatorApp() {
       });
 
       try {
-        const { text, confidence } = await recognizeImage(file, effectiveFrom, (pct) => {
+        const { text, confidence, lines } = await recognizeImage(file, effectiveFrom, (pct) => {
           if (run === imgRunRef.current) setImgPct(pct);
         });
         if (run !== imgRunRef.current) return;
-        setImgText(text);
         setImgConfidence(confidence);
         setImgBusy(false);
-        await translateImageText(text);
+        if (lines.length > 0) {
+          // Line-anchored path: the text pane mirrors the lines so the two
+          // views describe the same content, and the photo overlay can paint
+          // each translation at its source position.
+          const withSlots = lines.map((l) => ({ ...l, translated: null }));
+          setImgLines(withSlots);
+          setOverlayOn(true);
+          setImgText(lines.map((l) => l.text).join("\n"));
+          await translateImageLines(withSlots);
+        } else {
+          setImgLines(null);
+          setImgText(text);
+          await translateImageText(text);
+        }
       } catch (e) {
         if (run !== imgRunRef.current) return;
         const code = e instanceof Error ? e.message : "";
@@ -927,12 +994,14 @@ export default function TranslatorApp() {
         setImgBusy(false);
       }
     },
-    [effectiveFrom, translateImageText, t],
+    [effectiveFrom, translateImageText, translateImageLines, t],
   );
 
   const resetImage = () => {
     imgRunRef.current++;
     setImgXlateFailed(false);
+    setImgLines(null);
+    setImgBox(null);
     if (imgPreview) URL.revokeObjectURL(imgPreview);
     setImgPreview(null);
     setImgName(null);
@@ -1523,15 +1592,71 @@ export default function TranslatorApp() {
                 <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
                   <VlIcon slug="image" size={15} className="shrink-0 text-[var(--text-dim)]" />
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{imgName}</span>
+                  {/* Overlay toggle — flips between the translated photo and
+                      the untouched original, same gesture as the website
+                      tab's "Show original". Only offered when the OCR gave
+                      us line positions to paint on. */}
+                  {imgLines && imgLines.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOverlayOn((v) => !v)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-[11.5px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {overlayOn ? t("tr.imgOriginal", "Show original") : t("tr.imgOverlay", "Show translation")}
+                    </button>
+                  )}
                   <button type="button" onClick={resetImage} title={t("tr.imgAnother", "New image")} aria-label={t("tr.imgAnother", "New image")} className={iconBtn}>
                     <VlIcon slug="cross-small" size={15} />
                   </button>
                 </div>
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
+                {/* `relative` makes this pane the offset parent for the
+                    overlay chips, so bbox pixels × scale land exactly on the
+                    rendered photo wherever it sits inside the padding. */}
+                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
                   {imgPreview && (
                     /* eslint-disable-next-line @next/next/no-img-element -- local object URL, never a remote asset */
-                    <img src={imgPreview} alt={imgName ?? ""} className="max-h-full max-w-full rounded-lg object-contain" />
+                    <img
+                      ref={imgElRef}
+                      src={imgPreview}
+                      alt={imgName ?? ""}
+                      onLoad={measureImg}
+                      className="max-h-full max-w-full rounded-lg object-contain"
+                    />
                   )}
+                  {/* The Google/Apple-style in-photo translation: one chip per
+                      recognised line, sitting on the line's own bbox. Chips
+                      scale with the rendered image (percent-of-natural ×
+                      measured scale), so resizing the window keeps them
+                      glued to their text. */}
+                  {overlayOn && imgBox && imgLines?.map((l, i) => {
+                    if (!l.translated) return null;
+                    const rawW = (l.bbox.x1 - l.bbox.x0) * imgBox.scale;
+                    const rawH = (l.bbox.y1 - l.bbox.y0) * imgBox.scale;
+                    if (rawW < 8 || rawH < 6) return null; // too small to read anyway
+                    // Tesseract's line bbox hugs the glyph cores — ascenders,
+                    // descenders and edge glyphs poke past it, so the chip
+                    // grows ~14% each way to actually COVER the original text
+                    // the way Google's overlay does.
+                    const w = rawW * 1.28;
+                    const h = rawH * 1.45;
+                    return (
+                      <div
+                        key={i}
+                        dir={isRtl(to) ? "rtl" : "ltr"}
+                        style={{
+                          position: "absolute",
+                          left: imgBox.left + l.bbox.x0 * imgBox.scale - (w - rawW) / 2,
+                          top: imgBox.top + l.bbox.y0 * imgBox.scale - (h - rawH) / 2,
+                          width: w,
+                          height: h,
+                          fontSize: Math.max(8, Math.min(rawH * 0.68, (w * 1.8) / Math.max(1, l.translated.length))),
+                        }}
+                        className="flex items-center justify-center overflow-hidden rounded bg-black/75 px-0.5 leading-none text-white"
+                      >
+                        <span className="max-w-full truncate">{l.translated}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1566,7 +1691,14 @@ export default function TranslatorApp() {
                       <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-subtle)] px-2.5 py-1.5">
                         <button
                           type="button"
-                          onClick={() => { void translateImageText(imgText); }}
+                          onClick={() => {
+                            if (imgLines?.length && imgText === imgLines.map((l) => l.text).join("\n")) {
+                              void translateImageLines(imgLines);
+                            } else {
+                              setImgLines(null);
+                              void translateImageText(imgText);
+                            }
+                          }}
                           disabled={!imgText.trim()}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
                         >
