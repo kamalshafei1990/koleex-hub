@@ -32,6 +32,7 @@ export const VL_ICON_PATHS = {
   document:           "visual-library/general/documents/document.svg",
   "cloud-upload":     "visual-library/pack/devices/cloud-upload.svg",
   download:           "visual-library/general/actions/download.svg",
+  history:            "visual-library/general/time/history.svg",
 } as const;
 
 export type VlIconSlug = keyof typeof VL_ICON_PATHS;

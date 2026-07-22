@@ -709,10 +709,13 @@ export default function TranslatorApp() {
           icon={<VlIcon slug="translate" size={20} />}
           backHref="/"
           tabs={[
-            { key: "text", label: t("tr.title", "Translator"), active: tab === "text", onClick: () => setTab("text") },
-            { key: "document", label: t("tr.document", "Document"), active: tab === "document", onClick: () => setTab("document") },
-            { key: "history", label: t("tr.history", "History"), active: tab === "history", onClick: () => setTab("history") },
-            { key: "saved", label: t("tr.savedTab", "Saved"), active: tab === "saved", onClick: () => setTab("saved") },
+            /* Tab icons, like every other icon here, are Visual Library
+               assets. `language` (not `translate`) on the text tab so it
+               doesn't duplicate the app icon sitting right above it. */
+            { key: "text", label: t("tr.title", "Translator"), icon: <VlIcon slug="language" size={14} />, active: tab === "text", onClick: () => setTab("text") },
+            { key: "document", label: t("tr.document", "Document"), icon: <VlIcon slug="document" size={14} />, active: tab === "document", onClick: () => setTab("document") },
+            { key: "history", label: t("tr.history", "History"), icon: <VlIcon slug="history" size={14} />, active: tab === "history", onClick: () => setTab("history") },
+            { key: "saved", label: t("tr.savedTab", "Saved"), icon: <VlIcon slug="star" size={14} />, active: tab === "saved", onClick: () => setTab("saved") },
           ]}
         />
       </div>
