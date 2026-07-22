@@ -920,7 +920,7 @@ export default function TranslatorApp() {
       <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-6 sm:px-6">
         <PageHeader
           title={t("tr.title", "Translator")}
-          subtitle={t("tr.subtitle", "Translate text between 18 languages")}
+          subtitle={t("tr.subtitle", "Translate text between {n} languages").replace("{n}", String(LANGUAGES.length))}
           icon={<VlIcon slug="translate" size={20} />}
           backHref="/"
           /* History and Saved live HERE, not in the tab rail below — they

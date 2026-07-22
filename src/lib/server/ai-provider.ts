@@ -49,6 +49,31 @@ export const TRANSLATE_LANG_NAMES: Record<string, string> = {
   ko: "Korean",
   pl: "Polish",
   nl: "Dutch",
+
+  /* Second wave — chosen from where Koleex actually trades rather than by
+     raw speaker count. Garment-manufacturing countries first (Bangladesh,
+     India/Tirupur, Cambodia, Myanmar, Sri Lanka, Ethiopia, Uzbekistan,
+     Malaysia, the Philippines), then Taiwan/HK for machinery, then the
+     European production and buyer markets. */
+  "zh-TW": "Chinese (Traditional)",
+  bn: "Bengali",
+  ta: "Tamil",
+  km: "Khmer",
+  my: "Burmese",
+  si: "Sinhala",
+  am: "Amharic",
+  uz: "Uzbek",
+  ms: "Malay",
+  tl: "Filipino",
+  sw: "Swahili",
+  fa: "Persian",
+  he: "Hebrew",
+  it: "Italian",
+  ro: "Romanian",
+  bg: "Bulgarian",
+  uk: "Ukrainian",
+  cs: "Czech",
+  el: "Greek",
 };
 
 /** Whether a locale code is a translatable target. */

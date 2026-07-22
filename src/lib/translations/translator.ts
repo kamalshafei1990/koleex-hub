@@ -6,9 +6,11 @@ import type { Translations } from "@/lib/i18n";
 
 export const translatorT: Translations = {
   "tr.title":            { en: "Translator",          zh: "翻译",             ar: "المترجم" },
-  "tr.subtitle":         { en: "Translate text between 18 languages",
-                           zh: "在 18 种语言之间翻译文本",
-                           ar: "ترجم النصوص بين 18 لغة" },
+  /* {n} is filled from LANGUAGES.length — a hard-coded count goes stale the
+     moment a language is added, which is exactly what happened at 18. */
+  "tr.subtitle":         { en: "Translate text between {n} languages",
+                           zh: "在 {n} 种语言之间翻译文本",
+                           ar: "ترجم النصوص بين {n} لغة" },
 
   /* Tab labels — "Text" (not "Translator") so the rail reads as four peer
      MODES the way Google and Apple name them: Text · Document · Image ·
