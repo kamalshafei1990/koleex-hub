@@ -212,6 +212,27 @@ export async function PATCH(
       ? (updates.approval_state as "approved" | "rejected")
       : null;
 
+  /* A RETURN MUST CARRY A REASON. Sending work back without saying why just
+     puts the task around the loop again, so the reason is required here and
+     not only in the dialog — the client can be bypassed. Note this rejects
+     the decision, not the task: approval_state goes to "rejected" and the
+     SAME row re-opens (completed false, status in_progress) further down.
+     A return never creates a second task. */
+  if (
+    isOwner &&
+    existing.approval_state === "pending" &&
+    updates.approval_state === "rejected"
+  ) {
+    const reason = (updates.metadata as { rejection?: { reason?: unknown } } | undefined)
+      ?.rejection?.reason;
+    if (typeof reason !== "string" || !reason.trim()) {
+      return NextResponse.json(
+        { error: "A reason is required when returning a task" },
+        { status: 400 },
+      );
+    }
+  }
+
   /* Mention/observer-notify: if this edit sets metadata, capture the prior
      sets first so we only ping people newly added (not on every save). */
   const nextMeta = updates.metadata as
@@ -229,6 +250,17 @@ export async function PATCH(
         .map((o) => o.account_id)
         .filter(Boolean) as string[])
     : [];
+
+  /* Returning re-opens THIS task rather than leaving it parked as done —
+     enforced server-side so the row can never be left completed while its
+     approval reads "rejected". */
+  if (updates.approval_state === "rejected") {
+    updates.completed = false;
+    updates.completed_at = null;
+    if (typeof updates.status !== "string" || updates.status === "done") {
+      updates.status = "in_progress";
+    }
+  }
 
   const { error } = await supabaseServer
     .from("koleex_todos")

@@ -1554,7 +1554,9 @@ export default function TodoPage() {
   /* Reopen = reject the submitted completion. Opens a small dialog first so
      the manager can say WHY (not finished / wrong / needs changes) — the
      reason travels to the assignee via the task banner, their inbox and
-     push. Reason is optional; returning without one is still allowed. */
+     push. The reason is REQUIRED — a return with no explanation just sends
+     the task back around the loop. Returning re-opens THIS task (completed
+     false, status in_progress); it never creates a second one. */
   const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const handleReopen = (id: string) => {
@@ -1566,11 +1568,10 @@ export default function TodoPage() {
     if (!id) return;
     const before = todos.find((t) => t.id === id);
     const reason = rejectReason.trim();
+    if (!reason) return;                       // required — see the dialog
     const meta = {
       ...((before?.metadata as Record<string, unknown>) ?? {}),
-      rejection: reason
-        ? { reason, by: accountId, at: new Date().toISOString() }
-        : undefined,
+      rejection: { reason, by: accountId, at: new Date().toISOString() },
     };
     setRejectTaskId(null);
     setTodos((prev) => prev.map((t) => t.id === id
@@ -2235,8 +2236,13 @@ export default function TodoPage() {
                 className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors">
                 {t("modal.cancel")}
               </button>
+              {/* The reason is REQUIRED. Sending work back without saying why
+                  leaves the assignee guessing what to change, and the server
+                  rejects a reasonless return anyway — so the button stays
+                  disabled rather than failing after the click. */}
               <button onClick={performReject}
-                className="h-9 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[12.5px] font-bold hover:bg-amber-500/30 transition-colors">
+                disabled={!rejectReason.trim()}
+                className="h-9 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[12.5px] font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:hover:bg-amber-500/20">
                 {t("approval.rejectSubmit")}
               </button>
             </div>
