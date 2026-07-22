@@ -588,7 +588,11 @@ export default function TranslatorApp() {
                 onClick={swap}
                 title={t("tr.swap", "Swap languages")}
                 aria-label={t("tr.swap", "Swap languages")}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
+                /* Fixed 40px box: exactly the width of the grid gutter it sits
+                   in, and a proper touch target. Padding-sized before, it gave
+                   a cramped 32px hover square floating between 48px-tall
+                   language cards. */
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
               >
                 <VlIcon slug="exchange" size={16} />
               </button>
