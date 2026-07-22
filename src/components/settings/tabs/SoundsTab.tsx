@@ -19,7 +19,9 @@
 
 import { useEffect, useState } from "react";
 import {
+  SOUND_ACTIVITIES,
   SOUND_TONES,
+  type SoundActivity,
   type SoundCategory,
   type SoundPrefs,
   type SoundTone,
@@ -28,7 +30,7 @@ import {
   setSoundPrefs,
   subscribeSoundPrefs,
 } from "@/lib/notificationSound";
-import { SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
+import { SelectControl, SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 
 const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
@@ -39,6 +41,19 @@ const TONE_LABELS: Record<Exclude<SoundTone, "none">, string> = {
   pop: "Pop",
   glass: "Glass",
   pulse: "Pulse",
+};
+
+/* Same labels as Settings → Notification preferences "By activity", so the
+   two screens read as one system. */
+const ACTIVITY_LABELS: Record<SoundActivity, string> = {
+  mentions: "Mentions and replies",
+  approvals: "Approvals",
+  assignments: "Assignments",
+  tasks_due: "Task reminders",
+  quotation_activity: "Quotation activity",
+  low_stock: "Low stock",
+  qa_reports: "QA reports",
+  price_fx: "Price and FX changes",
 };
 
 export default function SoundsTab() {
@@ -186,6 +201,61 @@ function CategoryCard({
           ))}
         </div>
       </div>
+
+      {/* Per-activity overrides — notifications only. Each activity from
+          Notification preferences can carry its OWN tone, so an approval is
+          audibly different from a task reminder. "Default" inherits the tone
+          selected above. */}
+      {category === "notification" && (
+        <div className="pt-4">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
+            Per-activity tones
+          </div>
+          <p className="mb-2 text-[11px] text-[var(--text-dim)]">
+            Give any activity its own sound. &ldquo;Default&rdquo; uses the tone selected above.
+          </p>
+          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+            {SOUND_ACTIVITIES.map((act, i) => {
+              const override = prefs.notification.activityTones?.[act];
+              const effective = override ?? prefs.notification.tone;
+              return (
+                <div
+                  key={act}
+                  className={`flex items-center gap-2 px-3 py-2 ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}
+                >
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">
+                    {ACTIVITY_LABELS[act]}
+                  </span>
+                  <SelectControl<string>
+                    value={override ?? "default"}
+                    onChange={(v) =>
+                      setSoundPrefs({
+                        notification: {
+                          activityTones: { [act]: v === "default" ? undefined : (v as SoundTone) },
+                        },
+                      })
+                    }
+                    options={[
+                      { value: "default", label: "Default" },
+                      ...SOUND_TONES.map((t) => ({ value: t as string, label: TONE_LABELS[t] })),
+                      { value: "none", label: "Silent" },
+                    ]}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => previewSound(effective)}
+                    title="Preview"
+                    aria-label={`Preview ${ACTIVITY_LABELS[act]} sound`}
+                    className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                  >
+                    ▶
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </SettingsCard>
   );
 }

@@ -48,12 +48,46 @@ export type SoundTone =
 
 export type SoundCategory = "notification" | "message";
 
+/* The same activity keys as Settings → Notification preferences "By
+   activity", so the two screens describe the same events. */
+export const SOUND_ACTIVITIES = [
+  "mentions", "approvals", "assignments", "tasks_due",
+  "quotation_activity", "low_stock", "qa_reports", "price_fx",
+] as const;
+export type SoundActivity = (typeof SOUND_ACTIVITIES)[number];
+
 export interface SoundPrefs {
   master: boolean;                                  // one switch to rule them all
   dnd: boolean;                                     // do not disturb
   volume: number;                                   // 0..1
-  notification: { enabled: boolean; tone: SoundTone }; // inbox / tasks / approvals
+  notification: {
+    enabled: boolean;
+    tone: SoundTone;                                // the default notification tone
+    /** Per-activity overrides — an activity without an entry inherits the
+        default tone above, so "one sound for everything" stays one line of
+        config and specialising is opt-in per activity. */
+    activityTones?: Partial<Record<SoundActivity, SoundTone>>;
+  };
   message: { enabled: boolean; tone: SoundTone };      // Discuss messages
+}
+
+/** Classify an inbox message into an activity key from its metadata.type
+ *  (set by every notifier in the Hub). Unknown/absent → null → default tone. */
+export function classifyInboxActivity(meta: unknown): SoundActivity | null {
+  const type = (meta as { type?: string } | null)?.type ?? "";
+  if (!type) return null;
+  if (type.includes("mention")) return "mentions";
+  if (type.includes("approval")) return "approvals";
+  if (type.includes("assign") || type.includes("observer")) return "assignments";
+  if (
+    type.includes("reminder") || type.includes("overdue") || type.includes("due") ||
+    type.includes("recurring") || type.startsWith("calendar")
+  ) return "tasks_due";
+  if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
+  if (type.includes("stock")) return "low_stock";
+  if (type.startsWith("qa")) return "qa_reports";
+  if (type.includes("price") || type.includes("fx") || type.includes("rate")) return "price_fx";
+  return null;
 }
 
 export const SOUND_TONES: Array<Exclude<SoundTone, "none">> = [
@@ -113,7 +147,14 @@ export function setSoundPrefs(patch: {
     master: patch.master ?? cur.master,
     dnd: patch.dnd ?? cur.dnd,
     volume: patch.volume !== undefined ? Math.min(1, Math.max(0, patch.volume)) : cur.volume,
-    notification: { ...cur.notification, ...(patch.notification ?? {}) },
+    notification: {
+      ...cur.notification,
+      ...(patch.notification ?? {}),
+      activityTones: {
+        ...(cur.notification.activityTones ?? {}),
+        ...(patch.notification?.activityTones ?? {}),
+      },
+    },
     message: { ...cur.message, ...(patch.message ?? {}) },
   };
   prefsCache = next;
@@ -350,12 +391,19 @@ export function primeNotificationSound() {
 /** Play the sound for a CATEGORY, honouring the user's Settings → Sounds
  *  preferences (master switch, do-not-disturb, per-category enable, chosen
  *  tone, volume). This is THE way any part of the Hub makes a sound. */
-export function playAppSound(category: SoundCategory) {
+export function playAppSound(category: SoundCategory, activity?: SoundActivity | null) {
   const prefs = getSoundPrefs();
   if (!prefs.master || prefs.dnd) return;
   const cat = prefs[category];
-  if (!cat.enabled || cat.tone === "none") return;
-  if (cat.tone === "classic") {
+  if (!cat.enabled) return;
+  /* Per-activity override (notifications only) — falls back to the
+     category's default tone when the activity has no override. */
+  const tone: SoundTone =
+    (category === "notification" && activity
+      ? prefs.notification.activityTones?.[activity]
+      : undefined) ?? cat.tone;
+  if (tone === "none") return;
+  if (tone === "classic") {
     playNotificationSound();
     return;
   }
@@ -364,11 +412,11 @@ export function playAppSound(category: SoundCategory) {
   if (!ctx) return;
   if (ctx.state === "suspended") {
     void ctx.resume().then(() => {
-      if (audioCtx?.state === "running") synthTone(audioCtx, cat.tone, prefs.volume);
+      if (audioCtx?.state === "running") synthTone(audioCtx, tone, prefs.volume);
     });
     return;
   }
-  try { synthTone(ctx, cat.tone, prefs.volume); } catch { /* stay silent */ }
+  try { synthTone(ctx, tone, prefs.volume); } catch { /* stay silent */ }
 }
 
 /** Preview a tone at a given volume — used by Settings → Sounds. Ignores

@@ -55,6 +55,7 @@ import { useCurrentAccount } from "@/lib/identity";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
+  classifyInboxActivity,
   playAppSound,
   primeNotificationSound,
 } from "@/lib/notificationSound";
@@ -166,6 +167,10 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   /** Grace-period tracking: after a realtime bump, protect the optimistic
    *  `inboxUnread` from being overwritten by a stale poll result. */
   const lastRealtimeBumpRef = useRef(0);
+  /** Set when the realtime insert handler ALREADY played the (per-activity)
+   *  chime for a bump, so the count-watcher below doesn't play a second,
+   *  generic one for the same event. */
+  const lastRealtimeChimeRef = useRef(0);
 
   /* Discuss unread is derived from the channel list so it stays in
      sync with the dropdown rows the user actually sees. */
@@ -188,7 +193,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   useEffect(() => {
     const prev = prevInboxRef.current;
     prevInboxRef.current = inboxUnread;
-    if (prev !== null && inboxUnread > prev) playAppSound("notification");
+    if (prev !== null && inboxUnread > prev) {
+      /* The realtime handler plays the per-activity tone the moment the row
+         arrives (it knows WHICH activity it is). Only chime here when the
+         rise came from a poll — realtime missed it, activity unknown. */
+      if (Date.now() - lastRealtimeChimeRef.current > 3000) playAppSound("notification");
+    }
   }, [inboxUnread]);
 
   /* Publish the authoritative inbox count to the shared store so the
@@ -414,6 +424,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
          insert), don't bump. Otherwise treat it like a fresh inbound. */
       if (msg.read_at) return;
       lastRealtimeBumpRef.current = Date.now();
+      /* Chime HERE, where the activity type is known, so Settings → Sounds
+         per-activity tones apply (an approval can sound different from a
+         task reminder). The count-watcher sees lastRealtimeChimeRef and
+         stays quiet for this bump — one event, one chime, correct tone. */
+      lastRealtimeChimeRef.current = Date.now();
+      playAppSound("notification", classifyInboxActivity((msg as { metadata?: unknown }).metadata));
       setInboxUnread((n) => n + 1);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
