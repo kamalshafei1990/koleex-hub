@@ -668,6 +668,16 @@ export interface EmployeeRow {
   emergency_contact2_phone: string | null;
   emergency_contact2_relationship: string | null;
 
+  /* WeChat identity, social presence, and scans of the legal IDs.
+     The three *_doc_url values and wechat_qr_url are PATHS inside the private
+     hr-documents bucket — resolve with resolveHrFileUrl, never render it directly. */
+  wechat_id: string | null;
+  wechat_qr_url: string | null;
+  social_accounts: { platform: string; value: string }[] | null;
+  national_id_doc_url: string | null;
+  passport_doc_url: string | null;
+  visa_doc_url: string | null;
+
   created_at: string;
   updated_at: string;
 }

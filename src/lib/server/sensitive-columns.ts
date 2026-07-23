@@ -46,6 +46,11 @@ export const EMPLOYEE_PRIVATE_COLUMNS: readonly string[] = [
   "passport_number",
   "visa_number",
   "visa_expiry_date",
+  /* Scans of the same documents. The number is private, so the image of the
+     document carrying it cannot be less so. */
+  "national_id_doc_url",
+  "passport_doc_url",
+  "visa_doc_url",
 ];
 
 /* ── contacts (customers / suppliers) — commercial & credit terms ──

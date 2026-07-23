@@ -57,6 +57,7 @@ import {
   CHILDREN_OPTIONS, splitMulti, joinMulti,
 } from "@/lib/hr/person-options";
 import { regionsFor, citiesFor } from "@/lib/geo/regions";
+import HrFileField from "@/components/hr/HrFileField";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
@@ -118,6 +119,11 @@ const DRIVING_LICENSE_TYPE_OPTIONS = [
   { value: "E", label: "E — Heavy Vehicle" },
   { value: "international", label: "International" },
 ];
+/* Same platform list the Suppliers app uses (Contacts.tsx) — an employee and a
+   supplier contact reachable on the same network should not be filed under two
+   different spellings of it. */
+const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Other"];
+
 const CURRENCY_OPTIONS = [
   { value: "USD", label: "USD — US Dollar" },
   { value: "EUR", label: "EUR — Euro" },
@@ -1085,6 +1091,21 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
     [],
   );
 
+  /* The wizard state is a flat string map, so social_accounts travels as a
+     JSON string; the editor above wants an array. Parse on read, serialise on
+     write — and never throw on bad stored JSON, which would blank the form. */
+  const socials = useMemo<{ platform: string; value: string }[]>(() => {
+    try {
+      const parsed = JSON.parse(form.social_accounts || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }, [form.social_accounts]);
+  const setSocials = useCallback(
+    (rows: { platform: string; value: string }[]) => set("social_accounts", JSON.stringify(rows)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   /* Divisions for the chosen country, and cities for the chosen division.
      Both recompute from the form, so changing the country above instantly
      re-stocks the two pickers below it. */
@@ -1693,6 +1714,78 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               )}
               <TextInput label="Postal Code" value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder="ZIP" />
             </div>
+
+            {/* ── WeChat ──
+                The primary channel for a China-based team, so it gets its own
+                block rather than a row in the social list. The QR is how a
+                colleague actually adds someone — an ID alone often isn't
+                searchable — so both are offered and either is enough. */}
+            <SubLabel>WeChat</SubLabel>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <TextInput
+                label="WeChat ID / Username"
+                value={form.wechat_id}
+                onChange={(v) => set("wechat_id", v)}
+                placeholder="WeChat ID / handle"
+              />
+              <div>
+                <FieldLabel label="WeChat QR Code" />
+                <HrFileField
+                  value={form.wechat_qr_url}
+                  onChange={(v) => set("wechat_qr_url", v)}
+                  folder="documents"
+                  label="Drag the QR image here or browse"
+                  hint="PNG or JPG, up to 10 MB"
+                  browseLabel="Browse"
+                  removeLabel="Remove"
+                  errorLabel="Upload failed"
+                />
+              </div>
+            </div>
+
+            {/* ── Social accounts (same repeater shape as the Suppliers app) ── */}
+            <SubLabel>Social Accounts</SubLabel>
+            <div className="mt-3 space-y-2.5">
+              {socials.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSocials(socials.filter((_, x) => x !== i))}
+                    aria-label="Remove social account"
+                    className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <CrossIcon size={10} />
+                  </button>
+                  <div className="w-36 shrink-0 sm:w-44">
+                    <select
+                      value={row.platform}
+                      onChange={(e) => setSocials(socials.map((r, x) => x === i ? { ...r, platform: e.target.value } : r))}
+                      className={`${selectBaseCls} border-[var(--border-subtle)]`}
+                      aria-label="Platform"
+                    >
+                      {SOCIAL_PLATFORMS.map((pf) => <option key={pf} value={pf}>{pf}</option>)}
+                    </select>
+                  </div>
+                  <input
+                    value={row.value}
+                    onChange={(e) => setSocials(socials.map((r, x) => x === i ? { ...r, value: e.target.value } : r))}
+                    placeholder="Link, page, or @account"
+                    aria-label="Account"
+                    className={`${inputBaseCls} border border-[var(--border-subtle)] flex-1 min-w-0`}
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setSocials([...socials, { platform: "LinkedIn", value: "" }])}
+                className="flex items-center gap-2 text-[12.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center">
+                  <PlusIcon size={11} />
+                </span>
+                Add social account
+              </button>
+            </div>
           </CollapsibleSection>
 
           {/* ── 3. EMERGENCY CONTACTS (optional, folded) ── */}
@@ -1962,6 +2055,49 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               <TextInput label="Passport Number" value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder="Passport #" />
               <TextInput label="Social Security #" value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder="SSN" />
               <TextInput label="Tax ID" value={form.tax_id} onChange={(v) => set("tax_id", v)} placeholder="Tax ID" />
+            </div>
+
+            {/* ── Scans of the three documents ──
+                Uploaded to the PRIVATE hr-documents bucket, so the stored value
+                is a path and the image is only ever served through a signed,
+                permission-checked link. These columns are in the private
+                registry alongside the numbers themselves — whoever cannot read
+                the passport number cannot read the passport image either. */}
+            <SubLabel>Document Scans</SubLabel>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 mb-4">
+              <div>
+                <FieldLabel label="National ID Photo" />
+                <HrFileField
+                  value={form.national_id_doc_url}
+                  onChange={(v) => set("national_id_doc_url", v)}
+                  folder="documents"
+                  label="Drag the ID here or browse"
+                  hint="Image or PDF, up to 10 MB"
+                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                />
+              </div>
+              <div>
+                <FieldLabel label="Passport Photo" />
+                <HrFileField
+                  value={form.passport_doc_url}
+                  onChange={(v) => set("passport_doc_url", v)}
+                  folder="documents"
+                  label="Drag the passport here or browse"
+                  hint="Image or PDF, up to 10 MB"
+                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                />
+              </div>
+              <div>
+                <FieldLabel label="Visa Photo" />
+                <HrFileField
+                  value={form.visa_doc_url}
+                  onChange={(v) => set("visa_doc_url", v)}
+                  folder="documents"
+                  label="Drag the visa here or browse"
+                  hint="Image or PDF, up to 10 MB"
+                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3 mb-4">

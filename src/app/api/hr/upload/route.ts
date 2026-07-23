@@ -48,8 +48,13 @@ const FOLDERS = new Set(["leave", "documents", "payroll", "training"]);
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAction(auth, "HR", "create");
-  if (deny) return deny;
+  /* Either module may upload here: leave requests come from HR, employee ID
+     scans come from the Employees form. Requiring HR alone locked an Employees
+     admin out of a field on their own form. Still fail-closed — both checks
+     must deny before we do. */
+  const denyHr = await requireModuleAction(auth, "HR", "create");
+  const deny = denyHr ? await requireModuleAction(auth, "Employees", "create") : null;
+  if (denyHr && deny) return deny;
 
   const form = await req.formData();
   const file = form.get("file");

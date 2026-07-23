@@ -133,6 +133,15 @@ export interface EmployeeWizardData {
   bank_iban: string;
   bank_swift: string;
   bank_currency: string;
+  /* WeChat identity + social presence + scans of the legal IDs. */
+  wechat_id: string;
+  wechat_qr_url: string;
+  /** JSON string of [{platform, value}] — the form edits it as an array and
+      serialises here so the rest of the wizard stays a flat string map. */
+  social_accounts: string;
+  national_id_doc_url: string;
+  passport_doc_url: string;
+  visa_doc_url: string;
 
   // Salary at Hire
   initial_salary: string;
@@ -230,6 +239,12 @@ export function emptyWizardData(): EmployeeWizardData {
     bank_iban: "",
     bank_swift: "",
     bank_currency: "CNY",
+    wechat_id: "",
+    wechat_qr_url: "",
+    social_accounts: "[]",
+    national_id_doc_url: "",
+    passport_doc_url: "",
+    visa_doc_url: "",
     initial_salary: "",
     /* KOLEEX bills and pays in CNY — a USD default meant correcting the
        currency on literally every new hire. */
@@ -975,6 +990,14 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
     bank_iban: s(emp.bank_iban),
     bank_swift: s(emp.bank_swift),
     bank_currency: s(emp.bank_currency),
+    wechat_id: s(emp.wechat_id),
+    wechat_qr_url: s(emp.wechat_qr_url),
+    social_accounts: JSON.stringify(
+      Array.isArray(emp.social_accounts) ? emp.social_accounts : [],
+    ),
+    national_id_doc_url: s(emp.national_id_doc_url),
+    passport_doc_url: s(emp.passport_doc_url),
+    visa_doc_url: s(emp.visa_doc_url),
 
     initial_salary: emp.initial_salary == null ? "" : String(emp.initial_salary),
     salary_currency: s(emp.salary_currency),

@@ -61,6 +61,26 @@ function bool(b: Body, k: string): boolean {
   return Boolean(b[k]);
 }
 
+/* social_accounts arrives as a JSON string from the wizard (whose state is a
+   flat string map). Anything that isn't a well-formed array of {platform,
+   value} degrades to [] rather than throwing — a malformed social handle is
+   not a reason to lose an entire employee record. */
+function parseSocials(raw: unknown): { platform: string; value: string }[] {
+  let arr: unknown = raw;
+  if (typeof raw === "string") {
+    try { arr = JSON.parse(raw); } catch { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((x) => ({
+      platform: String(x.platform ?? "").slice(0, 40),
+      value: String(x.value ?? "").slice(0, 500),
+    }))
+    .filter((x) => x.platform && x.value)
+    .slice(0, 20);
+}
+
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -285,6 +305,16 @@ export async function POST(req: Request) {
       identification_id: str(body, "identification_id"),
       passport_number: str(body, "passport_number"),
       visa_number: str(body, "visa_number"),
+      /* WeChat + socials + ID scans. The three *_doc_url values are PATHS in
+         the private hr-documents bucket, never public URLs — they are rendered
+         through a signed link, and sanitizeEmployeeRow strips them from anyone
+         without can_view_private. */
+      wechat_id: str(body, "wechat_id"),
+      wechat_qr_url: str(body, "wechat_qr_url"),
+      social_accounts: parseSocials(body.social_accounts),
+      national_id_doc_url: str(body, "national_id_doc_url"),
+      passport_doc_url: str(body, "passport_doc_url"),
+      visa_doc_url: str(body, "visa_doc_url"),
       visa_expiry_date: str(body, "visa_expiry_date"),
       bank_name: str(body, "bank_name"),
       bank_account_holder: str(body, "bank_account_holder"),
@@ -658,6 +688,16 @@ export async function PUT(req: Request) {
       identification_id: str(body, "identification_id"),
       passport_number: str(body, "passport_number"),
       visa_number: str(body, "visa_number"),
+      /* WeChat + socials + ID scans. The three *_doc_url values are PATHS in
+         the private hr-documents bucket, never public URLs — they are rendered
+         through a signed link, and sanitizeEmployeeRow strips them from anyone
+         without can_view_private. */
+      wechat_id: str(body, "wechat_id"),
+      wechat_qr_url: str(body, "wechat_qr_url"),
+      social_accounts: parseSocials(body.social_accounts),
+      national_id_doc_url: str(body, "national_id_doc_url"),
+      passport_doc_url: str(body, "passport_doc_url"),
+      visa_doc_url: str(body, "visa_doc_url"),
       visa_expiry_date: str(body, "visa_expiry_date"),
       bank_name: str(body, "bank_name"),
       bank_account_holder: str(body, "bank_account_holder"),

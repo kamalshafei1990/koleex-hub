@@ -30,6 +30,7 @@ import KeyIcon from "@/components/icons/ui/KeyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import { resolveHrFileUrl } from "@/components/hr/HrFileField";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   fetchEmployeeProfile,
@@ -176,6 +177,34 @@ function FieldGrid({ rows, empty }: { rows: { label: string; value?: React.React
         </div>
       ))}
     </div>
+  );
+}
+
+/** Opens a private hr-documents file. The stored value is a PATH, not a URL:
+    the bucket is private, so the link is minted on demand and expires. An
+    <img src={path}> would simply 400 — and if it ever rendered, that would mean
+    the bucket had been made public, which is the bug this guards against. */
+function SecureDocLink({ path, label }: { path: string; label: string }) {
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      /* Same resolver HrFileField uses — one signing path for hr-documents, so
+         bucket name and expiry are decided in exactly one place. */
+      const url = await resolveHrFileUrl(path);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+    } finally { setBusy(false); }
+  };
+  return (
+    <button
+      type="button"
+      onClick={open}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] px-2.5 py-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-50"
+    >
+      <DocumentIcon size={12} />
+      {busy ? "Opening…" : label}
+    </button>
   );
 }
 
@@ -348,6 +377,11 @@ export default function EmployeeProfilePage({
 
   const { person, employee, account, department, position } = profile;
   const statusKey = employee.employment_status || "inactive";
+
+  /* Stored as jsonb; a bad row must not blank the page. */
+  const socialAccounts: { platform: string; value: string }[] = Array.isArray(employee.social_accounts)
+    ? (employee.social_accounts as { platform: string; value: string }[]).filter((a) => a?.platform && a?.value)
+    : [];
 
   /* Tenure, computed once — the single fact a manager scans for that no
      column in the table carries. */
@@ -562,8 +596,25 @@ export default function EmployeeProfilePage({
                   { label: "Work phone", value: employee.work_phone },
                   { label: "Address", value: [person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ") },
                   { label: "Postal code", value: person.postal_code },
+                  { label: "WeChat", value: employee.wechat_id },
                 ]}
               />
+              {/* Social handles + the WeChat QR. Both are how you actually
+                  reach this person, so they belong beside the phone number
+                  rather than in a separate tab. */}
+              {(socialAccounts.length > 0 || employee.wechat_qr_url) && (
+                <div className="mt-4 flex flex-wrap items-start gap-2">
+                  {socialAccounts.map((a, i) => (
+                    <span key={`${a.platform}-${i}`} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] px-2.5 py-1 text-[12px]">
+                      <span className="text-[var(--text-faint)]">{a.platform}</span>
+                      <span className="text-[var(--text-primary)] break-all">{a.value}</span>
+                    </span>
+                  ))}
+                  {employee.wechat_qr_url && (
+                    <SecureDocLink path={employee.wechat_qr_url} label="WeChat QR" />
+                  )}
+                </div>
+              )}
             </Sec>
 
             <GroupLabel>{t("grp.employment")}</GroupLabel>
@@ -655,6 +706,13 @@ export default function EmployeeProfilePage({
                   { label: "License expiry", value: employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null },
                 ]}
               />
+              {(employee.national_id_doc_url || employee.passport_doc_url || employee.visa_doc_url) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {employee.national_id_doc_url && <SecureDocLink path={employee.national_id_doc_url} label="National ID scan" />}
+                  {employee.passport_doc_url && <SecureDocLink path={employee.passport_doc_url} label="Passport scan" />}
+                  {employee.visa_doc_url && <SecureDocLink path={employee.visa_doc_url} label="Visa scan" />}
+                </div>
+              )}
             </Sec>
 
             <Sec icon={ShieldIcon} title={t("hr.insurance")}>
