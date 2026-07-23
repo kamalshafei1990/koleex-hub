@@ -547,7 +547,7 @@ export default function EmployeeProfilePage({
                     className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
                   >
                     <PencilIcon size={13} />
-                    <span className="hidden sm:inline">Edit</span>
+                    <span className="hidden sm:inline">{t("p.edit")}</span>
                   </Link>
                 )}
                 {canDelete && (
@@ -557,7 +557,7 @@ export default function EmployeeProfilePage({
                     className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/20"
                   >
                     <TrashIcon size={13} />
-                    <span className="hidden sm:inline">Delete</span>
+                    <span className="hidden sm:inline">{t("p.delete")}</span>
                   </button>
                 )}
               </div>
@@ -687,14 +687,14 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Full name", value: person.full_name },
-                  { label: "Gender", value: employee.gender },
-                  { label: "Nationality", value: employee.nationality },
-                  { label: "Birthday", value: employee.birth_date ? formatDate(employee.birth_date) : null },
-                  { label: "Marital", value: employee.marital_status },
-                  { label: "Languages", value: employee.languages },
-                  { label: "Personal email", value: person.email },
-                  { label: "Personal phone", value: person.phone },
+                  { label: t("p.fullName"), value: person.full_name },
+                  { label: t("f.gender"), value: employee.gender },
+                  { label: t("f.nationality"), value: employee.nationality },
+                  { label: t("p.birthday"), value: employee.birth_date ? formatDate(employee.birth_date) : null },
+                  { label: t("p.marital"), value: employee.marital_status },
+                  { label: t("f.languages"), value: employee.languages },
+                  { label: t("p.personalEmail"), value: person.email },
+                  { label: t("p.personalPhone"), value: person.phone },
                 ]}
               />
             </Sec>
@@ -703,11 +703,11 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Work email", value: employee.work_email },
-                  { label: "Work phone", value: employee.work_phone },
-                  { label: "Address", value: [person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ") },
-                  { label: "Postal code", value: person.postal_code },
-                  { label: "WeChat", value: employee.wechat_id },
+                  { label: t("p.workEmail"), value: employee.work_email },
+                  { label: t("p.workPhone"), value: employee.work_phone },
+                  { label: t("p.address"), value: [person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ") },
+                  { label: t("p.postalCode"), value: person.postal_code },
+                  { label: t("f.wechat.title"), value: employee.wechat_id },
                 ]}
               />
               {/* Social handles + the WeChat QR. Both are how you actually
@@ -722,7 +722,7 @@ export default function EmployeeProfilePage({
                     </span>
                   ))}
                   {employee.wechat_qr_url && (
-                    <SecureDocLink path={employee.wechat_qr_url} label="WeChat QR" />
+                    <SecureDocLink path={employee.wechat_qr_url} label={t("f.wechat.qr")} />
                   )}
                 </div>
               )}
@@ -733,14 +733,14 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Employee #", value: employee.employee_number },
-                  { label: "Type", value: employee.employment_type?.replace(/_/g, " ") },
-                  { label: "Department", value: department?.name },
-                  { label: "Position", value: position?.title },
-                  { label: "Work location", value: employee.work_location },
-                  { label: "Hire date", value: employee.hire_date ? formatDate(employee.hire_date) : null },
-                  { label: "Contract end", value: employee.contract_end_date ? formatDate(employee.contract_end_date) : null },
-                  { label: "Probation end", value: employee.probation_end_date ? formatDate(employee.probation_end_date) : null },
+                  { label: t("p.employeeNo"), value: employee.employee_number },
+                  { label: t("p.type"), value: employee.employment_type?.replace(/_/g, " ") },
+                  { label: t("f.pos.department"), value: department?.name },
+                  { label: t("f.pos.position"), value: position?.title },
+                  { label: t("p.workLocation"), value: employee.work_location },
+                  { label: t("p.hireDate"), value: employee.hire_date ? formatDate(employee.hire_date) : null },
+                  { label: t("p.contractEnd"), value: employee.contract_end_date ? formatDate(employee.contract_end_date) : null },
+                  { label: t("p.probationEnd"), value: employee.probation_end_date ? formatDate(employee.probation_end_date) : null },
                 ]}
               />
             </Sec>
@@ -749,12 +749,12 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Primary", value: employee.emergency_contact_name },
-                  { label: "Phone", value: employee.emergency_contact_phone },
-                  { label: "Relation", value: employee.emergency_contact_relationship },
-                  { label: "Secondary", value: employee.emergency_contact2_name },
-                  { label: "Phone", value: employee.emergency_contact2_phone },
-                  { label: "Relation", value: employee.emergency_contact2_relationship },
+                  { label: t("p.primary"), value: employee.emergency_contact_name },
+                  { label: t("f.em.phone"), value: employee.emergency_contact_phone },
+                  { label: t("p.relation"), value: employee.emergency_contact_relationship },
+                  { label: t("p.secondary"), value: employee.emergency_contact2_name },
+                  { label: t("f.em.phone"), value: employee.emergency_contact2_phone },
+                  { label: t("p.relation"), value: employee.emergency_contact2_relationship },
                 ]}
               />
             </Sec>
@@ -791,13 +791,13 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Initial salary", value: employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null },
-                  { label: "Currency", value: employee.bank_currency },
-                  { label: "Bank", value: employee.bank_name },
-                  { label: "Holder", value: employee.bank_account_holder },
-                  { label: "Account #", value: employee.bank_account_number },
-                  { label: "IBAN", value: employee.bank_iban },
-                  { label: "SWIFT", value: employee.bank_swift },
+                  { label: t("p.initialSalary"), value: employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null },
+                  { label: t("f.comp.currency"), value: employee.bank_currency },
+                  { label: t("p.bank"), value: employee.bank_name },
+                  { label: t("p.holder"), value: employee.bank_account_holder },
+                  { label: t("p.accountNo"), value: employee.bank_account_number },
+                  { label: t("f.comp.iban"), value: employee.bank_iban },
+                  { label: t("f.comp.swift"), value: employee.bank_swift },
                 ]}
               />
             </Sec>
@@ -807,22 +807,22 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "National ID", value: employee.identification_id },
-                  { label: "Passport", value: employee.passport_number },
-                  { label: "SSN", value: employee.social_security_number },
-                  { label: "Tax ID", value: employee.tax_id },
-                  { label: "Visa #", value: employee.visa_number },
-                  { label: "Visa expiry", value: employee.visa_expiry_date ? formatDate(employee.visa_expiry_date) : null },
-                  { label: "License #", value: employee.driving_license_number },
-                  { label: "License expiry", value: employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null },
+                  { label: t("p.natId"), value: employee.identification_id },
+                  { label: t("p.passport"), value: employee.passport_number },
+                  { label: t("p.ssn"), value: employee.social_security_number },
+                  { label: t("p.taxId"), value: employee.tax_id },
+                  { label: t("p.visaNo"), value: employee.visa_number },
+                  { label: t("p.visaExpiry"), value: employee.visa_expiry_date ? formatDate(employee.visa_expiry_date) : null },
+                  { label: t("p.licenseNo"), value: employee.driving_license_number },
+                  { label: t("p.licenseExpiry"), value: employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null },
                 ]}
               />
               {(employee.national_id_doc_url || employee.national_id_back_doc_url || employee.passport_doc_url || employee.visa_doc_url) && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {employee.national_id_doc_url && <SecureDocLink path={employee.national_id_doc_url} label="National ID — front" />}
-                  {employee.national_id_back_doc_url && <SecureDocLink path={employee.national_id_back_doc_url} label="National ID — back" />}
-                  {employee.passport_doc_url && <SecureDocLink path={employee.passport_doc_url} label="Passport scan" />}
-                  {employee.visa_doc_url && <SecureDocLink path={employee.visa_doc_url} label="Visa scan" />}
+                  {employee.national_id_doc_url && <SecureDocLink path={employee.national_id_doc_url} label={t("f.docs.natIdFront")} />}
+                  {employee.national_id_back_doc_url && <SecureDocLink path={employee.national_id_back_doc_url} label={t("f.docs.natIdBack")} />}
+                  {employee.passport_doc_url && <SecureDocLink path={employee.passport_doc_url} label={t("f.docs.passportPhoto")} />}
+                  {employee.visa_doc_url && <SecureDocLink path={employee.visa_doc_url} label={t("f.docs.visaPhoto")} />}
                 </div>
               )}
             </Sec>
@@ -831,10 +831,10 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Provider", value: employee.insurance_provider },
-                  { label: "Policy #", value: employee.insurance_policy_number },
-                  { label: "Class", value: employee.insurance_class },
-                  { label: "Expiry", value: employee.insurance_expiry_date ? formatDate(employee.insurance_expiry_date) : null },
+                  { label: t("p.provider"), value: employee.insurance_provider },
+                  { label: t("p.policyNo"), value: employee.insurance_policy_number },
+                  { label: t("p.class"), value: employee.insurance_class },
+                  { label: t("p.expiry"), value: employee.insurance_expiry_date ? formatDate(employee.insurance_expiry_date) : null },
                 ]}
               />
             </Sec>
@@ -843,10 +843,10 @@ export default function EmployeeProfilePage({
               <FieldGrid
                 empty={t("sec.empty")}
                 rows={[
-                  { label: "Degree", value: employee.education_degree?.replace(/_/g, " ") },
-                  { label: "Institution", value: employee.education_institution },
-                  { label: "Field", value: employee.education_field },
-                  { label: "Graduation", value: employee.education_graduation_year },
+                  { label: t("p.degree"), value: employee.education_degree?.replace(/_/g, " ") },
+                  { label: t("p.institution"), value: employee.education_institution },
+                  { label: t("p.field"), value: employee.education_field },
+                  { label: t("p.graduation"), value: employee.education_graduation_year },
                 ]}
               />
             </Sec>

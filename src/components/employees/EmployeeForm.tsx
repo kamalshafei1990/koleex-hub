@@ -74,55 +74,81 @@ import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
 const TITLE_OPTIONS = ["", "Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Eng."];
 const GENDER_OPTIONS = ["", "Male", "Female", "Other"];
 const MARITAL_OPTIONS = ["", "Single", "Married", "Divorced", "Widowed", "Separated"];
+
+/* ── Option-label localisation ────────────────────────────────────────────
+   The VALUE is what the database stores and the directory filters on, so it
+   never changes; only the visible label is translated. Every lookup carries
+   the English label as fallback, so a newly added enum value degrades to
+   readable English instead of rendering a raw key. */
+const OPT_KEY: Record<string, string> = {
+  "Mr.": "opt.mr", "Mrs.": "opt.mrs", "Ms.": "opt.ms", "Dr.": "opt.dr", "Prof.": "opt.prof", "Eng.": "opt.eng",
+  Male: "opt.male", Female: "opt.female", Other: "opt.other",
+  Single: "opt.single", Married: "opt.married", Divorced: "opt.divorced", Widowed: "opt.widowed", Separated: "opt.separated",
+  Islam: "rel.islam", Christianity: "rel.christianity", Catholicism: "rel.catholicism",
+  "Orthodox Christianity": "rel.orthodox", Protestantism: "rel.protestantism", Judaism: "rel.judaism",
+  Hinduism: "rel.hinduism", Buddhism: "rel.buddhism", Taoism: "rel.taoism", Confucianism: "rel.confucianism",
+  Sikhism: "rel.sikhism", Jainism: "rel.jainism", Shinto: "rel.shinto", Zoroastrianism: "rel.zoroastrianism",
+  "Bahá'í": "rel.bahai", Druze: "rel.druze", Yazidi: "rel.yazidi", "Folk religion": "rel.folk",
+  Agnostic: "rel.agnostic", Atheist: "rel.atheist", None: "rel.none",
+  "Prefer not to say": "rel.preferNot",
+};
+type TFn = (key: string, fallback?: string) => string;
+/** Plain string list → {value,label} with the label translated. */
+const tPlain = (t: TFn, arr: readonly string[]) =>
+  arr.map((v) => ({ value: v, label: v ? t(OPT_KEY[v] ?? v, v) : "—" }));
+/** {value,label,key} list → translated labels, value untouched. */
+const tOpts = (t: TFn, arr: readonly { value: string; label: string; key?: string }[]) =>
+  arr.map((o) => ({ value: o.value, label: o.key ? t(o.key, o.label) : o.label }));
+
 const EMPLOYMENT_TYPE_OPTIONS = [
-  { value: "full_time", label: "Full-time" },
-  { value: "part_time", label: "Part-time" },
-  { value: "contract", label: "Contract" },
-  { value: "intern", label: "Intern" },
-  { value: "freelance", label: "Freelance" },
+  { value: "full_time", label: "Full-time", key: "opt.fullTime" },
+  { value: "part_time", label: "Part-time", key: "opt.partTime" },
+  { value: "contract", label: "Contract", key: "opt.contract" },
+  { value: "intern", label: "Intern", key: "opt.intern" },
+  { value: "freelance", label: "Freelance", key: "opt.freelance" },
 ];
 /* Mirrors koleex_employees.employment_status — the same values the list
    filters on, so a status set here is one the directory can find. */
 const EMPLOYMENT_STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "on_leave", label: "On Leave" },
-  { value: "suspended", label: "Suspended" },
-  { value: "terminated", label: "Terminated" },
-  { value: "resigned", label: "Resigned" },
+  { value: "active", label: "Active", key: "opt.active" },
+  { value: "on_leave", label: "On Leave", key: "opt.onLeave" },
+  { value: "suspended", label: "Suspended", key: "opt.suspended" },
+  { value: "terminated", label: "Terminated", key: "opt.terminated" },
+  { value: "resigned", label: "Resigned", key: "opt.resigned" },
 ];
 
 const WORK_LOCATION_OPTIONS = [
-  { value: "office", label: "Office" },
-  { value: "remote", label: "Remote" },
-  { value: "hybrid", label: "Hybrid" },
+  { value: "office", label: "Office", key: "opt.office" },
+  { value: "remote", label: "Remote", key: "opt.remote" },
+  { value: "hybrid", label: "Hybrid", key: "opt.hybrid" },
 ];
 const BLOOD_TYPE_OPTIONS = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const DEGREE_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "high_school", label: "High School Diploma" },
-  { value: "associate", label: "Associate Degree" },
-  { value: "bachelor", label: "Bachelor's Degree" },
-  { value: "master", label: "Master's Degree" },
-  { value: "doctorate", label: "Doctorate / PhD" },
-  { value: "diploma", label: "Professional Diploma" },
-  { value: "certificate", label: "Certificate" },
-  { value: "other", label: "Other" },
+  { value: "", label: "Select...", key: "f.ph.select" },
+  { value: "high_school", label: "High School Diploma", key: "opt.highSchool" },
+  { value: "associate", label: "Associate Degree", key: "opt.associate" },
+  { value: "bachelor", label: "Bachelor's Degree", key: "opt.bachelor" },
+  { value: "master", label: "Master's Degree", key: "opt.master" },
+  { value: "doctorate", label: "Doctorate / PhD", key: "opt.doctorate" },
+  { value: "diploma", label: "Professional Diploma", key: "opt.diploma" },
+  { value: "certificate", label: "Certificate", key: "opt.certificate" },
+  { value: "other", label: "Other", key: "opt.other" },
 ];
 const INSURANCE_CLASS_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "A", label: "Class A (Premium)" },
-  { value: "B", label: "Class B (Standard)" },
-  { value: "C", label: "Class C (Basic)" },
-  { value: "VIP", label: "VIP" },
+  { value: "", label: "Select...", key: "f.ph.select" },
+  { value: "A", label: "Class A (Premium)", key: "opt.classA" },
+  { value: "B", label: "Class B (Standard)", key: "opt.classB" },
+  { value: "C", label: "Class C (Basic)", key: "opt.classC" },
+  { value: "VIP", label: "VIP", key: "opt.vip" },
 ];
 const DRIVING_LICENSE_TYPE_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "A", label: "A — Motorcycle" },
-  { value: "B", label: "B — Car" },
-  { value: "C", label: "C — Truck" },
-  { value: "D", label: "D — Bus" },
-  { value: "E", label: "E — Heavy Vehicle" },
-  { value: "international", label: "International" },
+  { value: "", label: "Select...", key: "f.ph.select" },
+  { value: "A", label: "A — Motorcycle", key: "opt.licA" },
+  { value: "B", label: "B — Car", key: "opt.licB" },
+  { value: "C", label: "C — Truck", key: "opt.licC" },
+  { value: "D", label: "D — Bus", key: "opt.licD" },
+  { value: "E", label: "E — Heavy Vehicle", key: "opt.licE" },
+  { value: "international", label: "International", key: "opt.licIntl" },
 ];
 /* Same platform list the Suppliers app uses (Contacts.tsx) — an employee and a
    supplier contact reachable on the same network should not be filed under two
@@ -429,6 +455,7 @@ function Combobox({
   ariaLabel?: string;
   name?: string;
 }) {
+  const { t } = useTranslation(employeesT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -502,7 +529,7 @@ function Combobox({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onChange(""); }}
-            aria-label="Clear selection"
+            aria-label={t("f.photo.clear")}
             className="absolute right-8 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text-dim)]"
           >
             <CrossIcon size={12} />
@@ -580,6 +607,7 @@ function DateInput({
   error?: string;
   name?: string;
 }) {
+  const { t } = useTranslation(employeesT);
   const parts = value ? value.split("-") : [];
   const yr = parts[0] || "", mo = parts[1] || "", dy = parts[2] || "";
   const maxDay = daysInMonth(Number(mo), Number(yr));
@@ -616,7 +644,7 @@ function DateInput({
             aria-label={`${label} day`}
             aria-invalid={error ? true : undefined}
           >
-            <option value="">Day</option>
+            <option value="">{t("d.day")}</option>
             {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => (
               <option key={d} value={String(d).padStart(2, "0")}>{d}</option>
             ))}
@@ -638,7 +666,7 @@ function DateInput({
             className={sCls}
             aria-label={`${label} month`}
           >
-            <option value="">Month</option>
+            <option value="">{t("d.month")}</option>
             {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
           </select>
           <AngleDownIcon size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none hidden sm:block" />
@@ -656,7 +684,7 @@ function DateInput({
             className={sCls}
             aria-label={`${label} year`}
           >
-            <option value="">Year</option>
+            <option value="">{t("d.year")}</option>
             {Array.from({ length: yearTo - yearFrom + 1 }, (_, i) => yearTo - i).map((y) => (
               <option key={y} value={String(y)}>{y}</option>
             ))}
@@ -904,14 +932,16 @@ const panelCls =
    stay MOUNTED (hidden, not unmounted) so values and validation hold. */
 type EmpTab = "personal" | "employment" | "skills" | "behavior" | "compensation" | "documents" | "account";
 
+/* Tab labels are translation KEYS — the bar resolves them at render so the
+   strip localises with the rest of the form. */
 const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }[] = [
-  { id: "personal", label: "Personal", icon: UserIcon },
-  { id: "employment", label: "Employment", icon: BriefcaseIcon },
-  { id: "compensation", label: "Compensation", icon: CreditCardIcon },
-  { id: "documents", label: "Documents", icon: DocumentIcon },
-  { id: "skills", label: "Skills", icon: SparklesIcon },
-  { id: "behavior", label: "Behavior", icon: ShieldIcon },
-  { id: "account", label: "Account", icon: KeyIcon },
+  { id: "personal", label: "tab.personal", icon: UserIcon },
+  { id: "employment", label: "tab.employment", icon: BriefcaseIcon },
+  { id: "compensation", label: "tab.compensation", icon: CreditCardIcon },
+  { id: "documents", label: "tab.documents", icon: DocumentIcon },
+  { id: "skills", label: "tab.skills", icon: SparklesIcon },
+  { id: "behavior", label: "tab.behavior", icon: ShieldIcon },
+  { id: "account", label: "tab.account", icon: KeyIcon },
 ];
 
 /* Which tab owns each validated field — error chips and the submit path
@@ -935,6 +965,7 @@ function EmployeeTabBar({ activeTab, onChange, errorTabs }: {
   /* Tabs holding validation errors get a red dot (after a failed save). */
   errorTabs?: Set<EmpTab>;
 }) {
+  const { t } = useTranslation(employeesT);
   return (
     <div className="sticky top-[58px] z-20 -mx-4 md:-mx-6 lg:-mx-10 xl:-mx-16 px-4 md:px-6 lg:px-10 xl:px-16 bg-[var(--bg-primary)] pt-1 pb-2 mb-4">
       <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
@@ -953,7 +984,7 @@ function EmployeeTabBar({ activeTab, onChange, errorTabs }: {
               }`}
             >
               <Icon size={14} className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"} />
-              <span>{label}</span>
+              <span>{t(label)}</span>
               {errorTabs?.has(id) && !active && (
                 <span className="h-1.5 w-1.5 rounded-full bg-red-400" aria-hidden="true" />
               )}
@@ -1389,15 +1420,14 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
         {saved.username && saved.tempPassword && (
           <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-4">
             <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-2">
-              Login credentials
+              {t("cred.title")}
             </p>
             <p className="text-[11px] text-[var(--text-dim)] mb-3">
-              Share these with {saved.name || "the employee"} securely. You won&apos;t see the
-              password again after closing this dialog.
+              {t("cred.shareBefore")} {saved.name || t("cred.theEmployee")} {t("cred.shareAfter")}
             </p>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Username</span>
+                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">{t("cred.username")}</span>
                 <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
                   {saved.username}
                 </code>
@@ -1411,7 +1441,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               </div>
               {saved.loginEmail && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Email</span>
+                  <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">{t("cred.email")}</span>
                   <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
                     {saved.loginEmail}
                   </code>
@@ -1425,7 +1455,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Password</span>
+                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">{t("cred.password")}</span>
                 <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
                   {saved.tempPassword}
                 </code>
@@ -1610,7 +1640,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             {/* Name row — the photo moved to the hero above the tabs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <SelectInput label={t("f.title")} value={form.title} onChange={(v) => set("title", v)}
-                options={TITLE_OPTIONS.map((tt) => ({ value: tt, label: tt || "—" }))} placeholder="—" />
+                options={tPlain(t, TITLE_OPTIONS)} placeholder="—" />
               <TextInput name="first_name" label={t("f.firstName")} value={form.first_name} onChange={(v) => set("first_name", v)} placeholder={t("f.firstName")} required error={errFor("first_name")} />
               <TextInput label={t("f.middleName")} value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder={t("f.middleName")} />
               <TextInput name="last_name" label={t("f.lastName")} value={form.last_name} onChange={(v) => set("last_name", v)} placeholder={t("f.lastName")} required error={errFor("last_name")} />
@@ -1641,7 +1671,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               <SelectInput label={t("f.gender")} value={form.gender} onChange={(v) => set("gender", v)}
-                options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder={t("f.ph.select")} />
+                options={tPlain(t, GENDER_OPTIONS)} placeholder={t("f.ph.select")} />
               <DateInput name="birthday" label={t("f.birthday")} value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} error={errFor("birthday")} />
               <Combobox
                 label={t("f.nationality")}
@@ -1652,13 +1682,13 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 searchPlaceholder="Search 249 countries…"
               />
               <SelectInput label={t("f.marital")} value={form.marital_status} onChange={(v) => set("marital_status", v)}
-                options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder={t("f.ph.select")} />
+                options={tPlain(t, MARITAL_OPTIONS)} placeholder={t("f.ph.select")} />
               <SelectInput name="number_of_children" label={t("f.children")} value={form.number_of_children} onChange={(v) => set("number_of_children", v)}
                 options={CHILDREN_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} error={errFor("number_of_children")} />
               <SelectInput label={t("f.blood")} value={form.blood_type} onChange={(v) => set("blood_type", v)}
                 options={BLOOD_TYPE_OPTIONS.map((b) => ({ value: b, label: b || "—" }))} placeholder="—" />
               <SelectInput label={t("f.religion")} value={form.religion} onChange={(v) => set("religion", v)}
-                options={RELIGION_OPTIONS.map((r) => ({ value: r, label: r }))} placeholder={t("f.ph.select")} />
+                options={tPlain(t, RELIGION_OPTIONS)} placeholder={t("f.ph.select")} />
               <MultiSelectInput label={t("f.languages")} value={form.languages} onChange={(v) => set("languages", v)}
                 options={LANGUAGE_OPTIONS} placeholder={t("f.ph.addLanguage")} />
             </div>
@@ -1839,7 +1869,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   <TextInput label={t("f.em.name")} value={form.emergency_contact_name} onChange={(v) => set("emergency_contact_name", v)} placeholder={t("f.ph.fullName")} />
                   <TextInput label={t("f.em.phone")} value={form.emergency_contact_phone} onChange={(v) => set("emergency_contact_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
                   <SelectInput label={t("f.em.relationship")} value={form.emergency_contact_relationship} onChange={(v) => set("emergency_contact_relationship", v)}
-                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder={t("f.ph.select")} />
+                    options={tPlain(t, RELATIONSHIP_OPTIONS)} placeholder={t("f.ph.select")} />
                 </div>
               </div>
               <div>
@@ -1848,7 +1878,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   <TextInput label={t("f.em.name")} value={form.emergency_contact2_name} onChange={(v) => set("emergency_contact2_name", v)} placeholder={t("f.ph.fullName")} />
                   <TextInput label={t("f.em.phone")} value={form.emergency_contact2_phone} onChange={(v) => set("emergency_contact2_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
                   <SelectInput label={t("f.em.relationship")} value={form.emergency_contact2_relationship} onChange={(v) => set("emergency_contact2_relationship", v)}
-                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder={t("f.ph.select")} />
+                    options={tPlain(t, RELATIONSHIP_OPTIONS)} placeholder={t("f.ph.select")} />
                 </div>
               </div>
             </div>
@@ -1898,7 +1928,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   className={`${inputBaseCls} ${borderFor()}`}
                 />
               </div>
-              <SelectInput label={t("f.emp.type")} value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
+              <SelectInput label={t("f.emp.type")} value={form.employment_type} onChange={(v) => set("employment_type", v)} options={tOpts(t, EMPLOYMENT_TYPE_OPTIONS)} />
               {/* Status is an edit-only control: a new hire is always created
                   active, so offering it on the add form would be a field with
                   exactly one sensible answer. */}
@@ -1907,11 +1937,11 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   label={t("f.emp.status")}
                   value={form.employment_status}
                   onChange={(v) => set("employment_status", v)}
-                  options={EMPLOYMENT_STATUS_OPTIONS}
+                  options={tOpts(t, EMPLOYMENT_STATUS_OPTIONS)}
                 />
               )}
               <DateInput name="hire_date" label={t("f.emp.hireDate")} value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
-              <SelectInput label={t("f.emp.workLocation")} value={form.work_location} onChange={(v) => set("work_location", v)} options={WORK_LOCATION_OPTIONS} />
+              <SelectInput label={t("f.emp.workLocation")} value={form.work_location} onChange={(v) => set("work_location", v)} options={tOpts(t, WORK_LOCATION_OPTIONS)} />
               <Combobox
                 label={t("f.emp.manager")}
                 value={form.manager_id}
@@ -1930,7 +1960,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <Building2Icon size={14} className="text-[var(--text-dim)]" />
-                  <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest">Department & Position</span>
+                  <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest">{t("f.deptPos")}</span>
                 </div>
                 <Link
                   href="/management"
@@ -1948,9 +1978,9 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               ) : departments.length === 0 && !form.create_new_department ? (
                 <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-dashed border-[var(--border-subtle)] text-center">
                   <Building2Icon size={20} className="mx-auto text-[var(--text-faint)] mb-2" />
-                  <p className="text-[13px] text-[var(--text-primary)] font-medium mb-1">No departments yet</p>
+                  <p className="text-[13px] text-[var(--text-primary)] font-medium mb-1">{t("f.dept.empty.title")}</p>
                   <p className="text-[11px] text-[var(--text-dim)] mb-3">
-                    Create your first department in the Management app, or add one inline now.
+                    {t("f.dept.empty.body")}
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     <Link
@@ -2104,7 +2134,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
               <TextInput label={t("f.comp.provider")} value={form.insurance_provider} onChange={(v) => set("insurance_provider", v)} placeholder="e.g. Bupa" />
               <TextInput label={t("f.comp.policy")} value={form.insurance_policy_number} onChange={(v) => set("insurance_policy_number", v)} placeholder={t("f.comp.policy")} />
-              <SelectInput label={t("f.comp.class")} value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
+              <SelectInput label={t("f.comp.class")} value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={tOpts(t, INSURANCE_CLASS_OPTIONS)} />
               <DateInput name="insurance_expiry_date" label={t("f.comp.expiry")} value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
             </div>
           </section>
@@ -2196,7 +2226,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               <div>
                 <SubLabel>{t("f.docs.education")}</SubLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                  <SelectInput label={t("f.docs.degree")} value={form.education_degree} onChange={(v) => set("education_degree", v)} options={DEGREE_OPTIONS} />
+                  <SelectInput label={t("f.docs.degree")} value={form.education_degree} onChange={(v) => set("education_degree", v)} options={tOpts(t, DEGREE_OPTIONS)} />
                   <TextInput label={t("f.docs.institution")} value={form.education_institution} onChange={(v) => set("education_institution", v)} placeholder={t("f.ph.universityName")} />
                   <TextInput label={t("f.docs.field")} value={form.education_field} onChange={(v) => set("education_field", v)} placeholder="e.g. Computer Science" />
                   <TextInput name="education_graduation_year" label={t("f.docs.gradYear")} value={form.education_graduation_year} onChange={(v) => set("education_graduation_year", v)} placeholder="e.g. 2020" type="number" min={1940} max={new Date().getFullYear() + 10} inputMode="numeric" error={errFor("education_graduation_year")} />
@@ -2207,7 +2237,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <SubLabel>{t("f.docs.drivingLicense")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
               <TextInput label={t("f.docs.licenseNum")} value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
-              <SelectInput label={t("f.docs.licenseType")} value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
+              <SelectInput label={t("f.docs.licenseType")} value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={tOpts(t, DRIVING_LICENSE_TYPE_OPTIONS)} />
               <DateInput name="driving_license_expiry" label={t("f.comp.expiry")} value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>
           </section>

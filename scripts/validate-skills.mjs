@@ -103,7 +103,7 @@ check("slider is keyboard-accessible (native range + aria)", section.includes('t
 check("live summary derives from rows (no stored totals)", section.includes("useMemo") && section.includes("summarize("));
 
 const form = readFileSync("src/components/employees/EmployeeForm.tsx", "utf8");
-check("Skills tab exists in the form", form.includes('{ id: "skills", label: "Skills"'));
+check("Skills tab exists in the form", form.includes('{ id: "skills", label: "tab.skills"'));
 check("form passes skills through wizard state", form.includes('value={form.skills}'));
 check("configure gate uses Employees edit permission", form.includes('perms.can("Employees", "edit")'));
 

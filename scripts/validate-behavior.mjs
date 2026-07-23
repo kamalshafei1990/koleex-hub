@@ -115,7 +115,7 @@ const actions = readFileSync("src/app/api/hr/behavior/actions/route.ts", "utf8")
 check("follow-up actions gated by HR", actions.includes('requireModuleAction(auth, "HR", "create")'));
 
 const form = readFileSync("src/components/employees/EmployeeForm.tsx", "utf8");
-check("Behavior tab exists in the form", form.includes('{ id: "behavior", label: "Behavior"'));
+check("Behavior tab exists in the form", form.includes(`{ id: "behavior", label: "tab.behavior"`));
 check("baseline written only on create, best-effort", form.includes('assessment_type: "baseline"') && form.includes("baseline is optional"));
 
 const section = readFileSync("src/components/employees/EmployeeBehaviorSection.tsx", "utf8");

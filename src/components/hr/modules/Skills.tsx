@@ -261,7 +261,7 @@ export default function SkillsModule({ employees, t }: HRModuleProps) {
                   <div className="lg:w-[230px] shrink-0 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[13px] text-[var(--text-primary)] truncate">{skillName.get(a.skill_id) ?? "—"}</span>
-                      {req?.is_mandatory && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">Req</span>}
+                      {req?.is_mandatory && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.sk.req")}</span>}
                     </div>
                     <div className="text-[10.5px] text-[var(--text-faint)]">
                       {skillCat.get(a.skill_id)}{req ? ` · ${t("hr.skills.required")} ${req.required_score}` : ` · ${t("hr.skills.additional")}`}
