@@ -146,11 +146,11 @@ export default function HrFileField({
      square thing — read as a banner. */
   const shapeCls =
     shape === "square" ? "aspect-square max-w-[190px]"
-    : shape === "card" ? "aspect-[1.58/1]"
+    : shape === "card" ? "aspect-[1.58/1] max-w-[340px]"
     : "";
   const previewCls =
     shape === "square" ? "aspect-square max-w-[190px] w-full"
-    : shape === "card" ? "aspect-[1.58/1] w-full"
+    : shape === "card" ? "aspect-[1.58/1] max-w-[340px] w-full"
     : "";
 
   /* ── Uploaded state ── */

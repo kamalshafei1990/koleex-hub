@@ -674,7 +674,8 @@ export interface EmployeeRow {
   wechat_id: string | null;
   wechat_qr_url: string | null;
   social_accounts: { platform: string; value: string }[] | null;
-  national_id_doc_url: string | null;
+  national_id_doc_url: string | null;      // front
+  national_id_back_doc_url: string | null; // back
   passport_doc_url: string | null;
   visa_doc_url: string | null;
 

@@ -2074,17 +2074,30 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             {/* The scan belongs BESIDE the number it pictures, not in a
                 separate "attachments" pile at the bottom — you fill in the
                 passport number and the passport photo in the same breath.
-                Card ratio for the ID (1.58:1, a real ID card), portrait for
-                the passport (a page you photograph upright). */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                An ID card has TWO sides and both carry data (number and photo
+                on the front; address, issuing authority and expiry on the
+                back), so one slot could only ever hold half the document. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
-                <FieldLabel label="National ID Photo" />
+                <FieldLabel label="National ID — Front" />
                 <HrFileField
                   value={form.national_id_doc_url}
                   onChange={(v) => set("national_id_doc_url", v)}
                   folder="documents"
                   shape="card"
-                  label="Drop the ID card"
+                  label="Drop the front"
+                  hint="Image or PDF, up to 10 MB"
+                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                />
+              </div>
+              <div>
+                <FieldLabel label="National ID — Back" />
+                <HrFileField
+                  value={form.national_id_back_doc_url}
+                  onChange={(v) => set("national_id_back_doc_url", v)}
+                  folder="documents"
+                  shape="card"
+                  label="Drop the back"
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
@@ -2102,7 +2115,6 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 />
               </div>
             </div>
-
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3 mb-4">
               <div>
                 <SubLabel>Visa</SubLabel>

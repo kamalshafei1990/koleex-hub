@@ -706,9 +706,10 @@ export default function EmployeeProfilePage({
                   { label: "License expiry", value: employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null },
                 ]}
               />
-              {(employee.national_id_doc_url || employee.passport_doc_url || employee.visa_doc_url) && (
+              {(employee.national_id_doc_url || employee.national_id_back_doc_url || employee.passport_doc_url || employee.visa_doc_url) && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {employee.national_id_doc_url && <SecureDocLink path={employee.national_id_doc_url} label="National ID scan" />}
+                  {employee.national_id_doc_url && <SecureDocLink path={employee.national_id_doc_url} label="National ID — front" />}
+                  {employee.national_id_back_doc_url && <SecureDocLink path={employee.national_id_back_doc_url} label="National ID — back" />}
                   {employee.passport_doc_url && <SecureDocLink path={employee.passport_doc_url} label="Passport scan" />}
                   {employee.visa_doc_url && <SecureDocLink path={employee.visa_doc_url} label="Visa scan" />}
                 </div>

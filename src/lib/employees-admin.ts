@@ -140,6 +140,7 @@ export interface EmployeeWizardData {
       serialises here so the rest of the wizard stays a flat string map. */
   social_accounts: string;
   national_id_doc_url: string;
+  national_id_back_doc_url: string;
   passport_doc_url: string;
   visa_doc_url: string;
 
@@ -243,6 +244,7 @@ export function emptyWizardData(): EmployeeWizardData {
     wechat_qr_url: "",
     social_accounts: "[]",
     national_id_doc_url: "",
+    national_id_back_doc_url: "",
     passport_doc_url: "",
     visa_doc_url: "",
     initial_salary: "",
@@ -996,6 +998,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
       Array.isArray(emp.social_accounts) ? emp.social_accounts : [],
     ),
     national_id_doc_url: s(emp.national_id_doc_url),
+    national_id_back_doc_url: s(emp.national_id_back_doc_url),
     passport_doc_url: s(emp.passport_doc_url),
     visa_doc_url: s(emp.visa_doc_url),
 

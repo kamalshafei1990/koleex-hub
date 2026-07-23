@@ -49,6 +49,7 @@ export const EMPLOYEE_PRIVATE_COLUMNS: readonly string[] = [
   /* Scans of the same documents. The number is private, so the image of the
      document carrying it cannot be less so. */
   "national_id_doc_url",
+  "national_id_back_doc_url",
   "passport_doc_url",
   "visa_doc_url",
 ];
