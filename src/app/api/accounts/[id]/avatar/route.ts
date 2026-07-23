@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { persistAccountAvatar } from "@/lib/server/persist-account-avatar";
 
 /* PATCH /api/accounts/[id]/avatar
    Body: { avatar_url: string | null }
@@ -19,7 +20,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { avatar_url } = (await req.json()) as { avatar_url: string | null };
+  let { avatar_url } = (await req.json()) as { avatar_url: string | null };
+
+  /* Guard: inline base64 must never reach the column — it re-ships per row
+     in every avatar join (inbox feed, headers). Upload to Storage instead;
+     if that fails, reject the write (the previous avatar stays in place). */
+  if (typeof avatar_url === "string" && avatar_url.startsWith("data:")) {
+    try {
+      avatar_url = await persistAccountAvatar(id, avatar_url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Avatar upload failed";
+      console.error("[api/accounts/[id]/avatar] storage", msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
 
   const { error } = await supabaseServer
     .from("accounts")

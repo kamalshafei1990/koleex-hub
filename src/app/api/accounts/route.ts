@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
+import { guardAccountAvatarField } from "@/lib/server/persist-account-avatar";
 
 export async function GET() {
   const _t = stageTimer("accounts.list");
@@ -147,6 +148,16 @@ export async function POST(req: Request) {
         console.error("[api/accounts POST] roles-sync failed:", syncErr.message);
       }
     }
+  }
+
+  // Guard: inline base64 avatars go to Storage, never into the column.
+  // (No account id exists yet — the path is content-hashed anyway.)
+  try {
+    await guardAccountAvatarField("new", payload);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Avatar upload failed";
+    console.error("[api/accounts POST] avatar storage", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   const { data, error } = await supabaseServer

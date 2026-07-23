@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { uploadToStorage } from "./storage-client";
 import type { ScopeContext } from "./scope";
 import type {
   AccountRow, AccountInsert, AccountUpdate, AccountStatus, AccountWithLinks,
@@ -434,16 +435,42 @@ export async function deleteAccount(id: string): Promise<boolean> {
 /**
  * Set (or clear) the avatar on an account.
  *
- * `avatarUrl` is expected to be either a data URL produced by the client-side
- * resizer in AccountDetail (see `fileToResizedDataUrl`) or `null` to remove
- * the current avatar. We deliberately don't validate the string here so the
- * same helper can later accept public Storage object URLs if we migrate off
- * data URLs.
+ * `avatarUrl` may be `null` (remove), a public URL, or a data URL from the
+ * client-side resizers (ProfileTab / AccountDetail). Data URLs are NEVER
+ * stored anymore: three legacy avatars saved this way (8–25 KB of base64 in
+ * accounts.avatar_url) were re-shipped inside every API response that joined
+ * the sender — one inbox feed page measured 137 KB for rows averaging 364
+ * bytes. The guard lives HERE, not in the two upload UIs, so any future
+ * caller inherits it: a data: URI is uploaded to the public `media` bucket
+ * under avatars/ and the row stores the Storage URL instead.
  */
 export async function updateAccountAvatar(
   id: string,
   avatarUrl: string | null,
 ): Promise<boolean> {
+  if (avatarUrl?.startsWith("data:")) {
+    const m = /^data:image\/(\w+);base64,([\s\S]+)$/.exec(avatarUrl);
+    if (!m) {
+      console.error("[Accounts] Update avatar: unsupported data URL");
+      return false;
+    }
+    const [, fmt, b64] = m;
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: `image/${fmt}` });
+    const ext = fmt === "jpeg" ? "jpg" : fmt;
+    /* Timestamped path: the bucket serves long-lived cache headers, so an
+       overwritten fixed path would keep showing the OLD photo until the CDN
+       expired it. A new object per change is instant and costs ~10 KB. */
+    const up = await uploadToStorage("media", `avatars/${id}-${Date.now()}.${ext}`, blob, {
+      cacheControl: "31536000",
+      upsert: true,
+    });
+    if (!up.ok) {
+      console.error("[Accounts] Avatar upload to Storage failed:", up.error);
+      return false;
+    }
+    avatarUrl = up.data.publicUrl;
+  }
   try {
     const res = await fetch("/api/accounts/" + id + "/avatar", {
       method: "PATCH",

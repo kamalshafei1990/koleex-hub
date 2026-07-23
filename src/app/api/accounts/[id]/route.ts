@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { derivePasswordState } from "@/lib/server/password-state";
+import { guardAccountAvatarField } from "@/lib/server/persist-account-avatar";
 
 /* GET    /api/accounts/[id] — fetch single account with person, company,
                                  role, employee, overrides joined.
@@ -144,6 +145,15 @@ export async function PATCH(
   delete patch.tenant_id;
   delete patch.password_hash; // use the dedicated reset endpoint
   delete patch.created_at;
+
+  // Guard: inline base64 avatars go to Storage, never into the column.
+  try {
+    await guardAccountAvatarField(id, patch);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Avatar upload failed";
+    console.error("[api/accounts/[id] PATCH] avatar storage", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
   // Belt + braces: filter update by tenant_id too so a race between
   // existsInTenant() and the UPDATE (or a compromised caller) can't
