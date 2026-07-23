@@ -264,6 +264,30 @@ export const hrT: Translations = {
   "hr.leaveType.unpaid":         { en: "Unpaid Leave",                    zh: "无薪假",                        ar: "إجازة بدون راتب" },
   "hr.leaveType.compassionate":  { en: "Compassionate Leave",             zh: "丧假",                          ar: "إجازة عزاء" },
   "hr.leaveType.study":          { en: "Study Leave",                     zh: "学习假",                        ar: "إجازة دراسية" },
+  /* Full catalogue — every active hr_leave_types row must have a key here or
+     the picker falls back to the raw English name when the UI is zh/ar. */
+  "hr.leaveType.marriage":            { en: "Marriage Leave",            zh: "婚假",             ar: "إجازة زواج" },
+  "hr.leaveType.bereavement":         { en: "Bereavement Leave",         zh: "丧假",             ar: "إجازة وفاة" },
+  "hr.leaveType.parental":            { en: "Parental Leave",            zh: "育儿假",           ar: "إجازة والدية" },
+  "hr.leaveType.adoption":            { en: "Adoption Leave",            zh: "收养假",           ar: "إجازة تبنٍّ" },
+  "hr.leaveType.miscarriage":         { en: "Miscarriage Leave",         zh: "流产假",           ar: "إجازة إجهاض" },
+  "hr.leaveType.prenatal":            { en: "Prenatal Leave",            zh: "产检假",           ar: "إجازة فحص الحمل" },
+  "hr.leaveType.breastfeeding":       { en: "Breastfeeding Leave",       zh: "哺乳假",           ar: "إجازة رضاعة" },
+  "hr.leaveType.menstrual":           { en: "Menstrual Leave",           zh: "痛经假",           ar: "إجازة الدورة الشهرية" },
+  "hr.leaveType.work_injury":         { en: "Work Injury Leave",         zh: "工伤假",           ar: "إجازة إصابة عمل" },
+  "hr.leaveType.medical_appointment": { en: "Medical Appointment Leave", zh: "就医假",           ar: "إجازة موعد طبي" },
+  "hr.leaveType.quarantine":          { en: "Quarantine Leave",          zh: "隔离假",           ar: "إجازة حجر صحي" },
+  "hr.leaveType.time_off_in_lieu":    { en: "Time Off in Lieu",          zh: "调休",             ar: "إجازة بدل عمل إضافي" },
+  "hr.leaveType.home_visit":          { en: "Home Visit Leave",          zh: "探亲假",           ar: "إجازة زيارة الأهل" },
+  "hr.leaveType.emergency":           { en: "Emergency Leave",           zh: "急事假",           ar: "إجازة طارئة" },
+  "hr.leaveType.jury_duty":           { en: "Jury Duty Leave",           zh: "陪审假",           ar: "إجازة أداء واجب المحلفين" },
+  "hr.leaveType.military_service":    { en: "Military Service Leave",    zh: "服兵役假",         ar: "إجازة خدمة عسكرية" },
+  "hr.leaveType.voting":              { en: "Voting Leave",              zh: "选举假",           ar: "إجازة تصويت" },
+  "hr.leaveType.relocation":          { en: "Relocation Leave",          zh: "搬家假",           ar: "إجازة انتقال" },
+  "hr.leaveType.sabbatical":          { en: "Sabbatical Leave",          zh: "公休长假",         ar: "إجازة تفرغ" },
+  "hr.leaveType.childcare":           { en: "Childcare Leave",           zh: "照顾子女假",       ar: "إجازة رعاية طفل" },
+  "hr.leaveType.eldercare":           { en: "Eldercare Leave",           zh: "护理老人假",       ar: "إجازة رعاية مسن" },
+  "hr.leaveType.pilgrimage":          { en: "Pilgrimage Leave",          zh: "朝觐假",           ar: "إجازة حج" },
 
   /* ── Status Labels ── */
   "hr.status.pending":           { en: "Pending",                         zh: "待审批",                        ar: "معلق" },
@@ -360,4 +384,20 @@ export const hrT: Translations = {
   "hr.attachmentHint":           { en: "Optional link to a medical certificate or approval", zh: "可选：医疗证明或批准文件的链接", ar: "اختياري: رابط لشهادة طبية أو موافقة" },
   "hr.openAttachment":           { en: "Open document",                   zh: "打开文件",                      ar: "فتح المستند" },
   "hr.submittedOn":              { en: "Submitted",                       zh: "提交时间",                      ar: "تاريخ التقديم" },
+
+  /* ── Document upload (drag & drop) ── */
+  "hr.dropFileHere":             { en: "Drop a photo or document here, or",  zh: "将照片或文件拖到此处，或",     ar: "أسقط صورة أو مستنداً هنا، أو" },
+  "hr.browseFiles":              { en: "browse",                          zh: "浏览",                          ar: "تصفح" },
+  "hr.removeFile":               { en: "Remove file",                     zh: "移除文件",                      ar: "إزالة الملف" },
+  "hr.uploadFailed":             { en: "Upload failed. Please try again.", zh: "上传失败，请重试。",            ar: "فشل الرفع. حاول مرة أخرى." },
+
+  /* ── Reason translation ── */
+  "hr.translate":                { en: "Translate",                       zh: "翻译",                          ar: "ترجمة" },
+  "hr.showOriginal":             { en: "Show original",                   zh: "显示原文",                      ar: "عرض النص الأصلي" },
+  "hr.machineTranslated":        { en: "Machine translated",              zh: "机器翻译",                      ar: "ترجمة آلية" },
+  "hr.translateFailed":          { en: "Could not translate right now.",  zh: "暂时无法翻译。",                ar: "تعذّرت الترجمة الآن." },
+
+  /* ── Conflict + coverage detail ── */
+  "hr.overlapWarning":           { en: "This overlaps leave already booked for this employee", zh: "与该员工已有的休假重叠", ar: "يتداخل مع إجازة مسجّلة لهذا الموظف" },
+  "hr.teamAway":                 { en: "Also away in the same department", zh: "同部门同期休假",                ar: "غائبون أيضاً في نفس القسم" },
 };

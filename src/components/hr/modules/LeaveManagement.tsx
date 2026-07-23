@@ -25,6 +25,8 @@ import {
   EmployeeLink,
 } from "@/components/hr/shared";
 import EmployeePicker, { EmployeeAvatar, employeeRoleLine } from "@/components/hr/EmployeePicker";
+import HrFileField, { resolveHrFileUrl } from "@/components/hr/HrFileField";
+import TranslatableText from "@/components/hr/TranslatableText";
 import DatePicker from "@/components/ui/DatePicker";
 import PersonName from "@/components/ui/PersonName";
 import {
@@ -175,6 +177,40 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
       setLeaveForm((f) => ({ ...f, half_day: false }));
     }
   }, [isSingleDay, leaveForm.half_day]);
+
+  /* Requests by the same person that overlap the chosen range. Double-booking
+     leave is the mistake this catches, and it costs nothing extra — the list
+     is already loaded. Cancelled/rejected rows don't count as a clash. */
+  const overlapping = useMemo(() => {
+    if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date || dateError) {
+      return [];
+    }
+    return leaveRequests.filter(
+      (r) =>
+        r.employee_id === leaveForm.employee_id &&
+        (r.status === "pending" || r.status === "approved") &&
+        r.start_date <= leaveForm.end_date &&
+        r.end_date >= leaveForm.start_date,
+    );
+  }, [leaveRequests, leaveForm.employee_id, leaveForm.start_date, leaveForm.end_date, dateError]);
+
+  /* Who else from the same department is already off in that window — the
+     question a manager asks before approving, and it was nowhere in the UI. */
+  const teamAway = useMemo(() => {
+    if (!selectedEmployee || !leaveForm.start_date || !leaveForm.end_date || dateError) return [];
+    const dept = selectedEmployee.department_id;
+    if (!dept) return [];
+    const sameDept = new Set(
+      employees.filter((e) => e.department_id === dept && e.id !== selectedEmployee.id).map((e) => e.id),
+    );
+    return leaveRequests.filter(
+      (r) =>
+        sameDept.has(r.employee_id) &&
+        r.status === "approved" &&
+        r.start_date <= leaveForm.end_date &&
+        r.end_date >= leaveForm.start_date,
+    );
+  }, [employees, leaveRequests, selectedEmployee, leaveForm.start_date, leaveForm.end_date, dateError]);
 
   const canSubmitLeave =
     !!leaveForm.employee_id &&
@@ -334,7 +370,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                       </span>
                     )}
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)] shrink-0">
-                      {tLeaveType(req.leave_type_name)}
+                      {tLeaveType(req.leave_type_name, req.leave_type_code)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
@@ -412,7 +448,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             </div>
             <div>
               <FieldLabel>{t("hr.typeLabel")}</FieldLabel>
-              <div className="text-[13px] text-[var(--text-primary)]">{tLeaveType(selectedLeave.leave_type_name)}</div>
+              <div className="text-[13px] text-[var(--text-primary)]">{tLeaveType(selectedLeave.leave_type_name, selectedLeave.leave_type_code)}</div>
             </div>
             <div>
               <FieldLabel>{t("hr.periodLabel")}</FieldLabel>
@@ -427,21 +463,36 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             {selectedLeave.reason && (
               <div>
                 <FieldLabel>{t("hr.reasonLabel")}</FieldLabel>
-                <div className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{selectedLeave.reason}</div>
+                {/* The reviewer often doesn't read the language the reason was
+                    written in — one tap renders it in theirs. */}
+                <TranslatableText
+                  text={selectedLeave.reason}
+                  viewerLang={lang}
+                  className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap"
+                  translateLabel={t("hr.translate")}
+                  showOriginalLabel={t("hr.showOriginal")}
+                  translatedNote={t("hr.machineTranslated")}
+                  failedLabel={t("hr.translateFailed")}
+                />
               </div>
             )}
             {selectedLeave.attachment_url && (
               <div>
                 <FieldLabel>{t("hr.attachment")}</FieldLabel>
-                <a
-                  href={selectedLeave.attachment_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                {/* New uploads are PRIVATE storage paths, not URLs — resolve a
+                    short-lived signed URL on click. resolveHrFileUrl passes a
+                    legacy https:// value straight through. */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = await resolveHrFileUrl(selectedLeave.attachment_url!);
+                    if (url) window.open(url, "_blank", "noopener,noreferrer");
+                  }}
                   className="inline-flex items-center gap-1.5 text-[13px] text-[var(--accent)] hover:underline break-all"
                 >
                   <PaperclipIcon size={13} className="shrink-0" />
                   {t("hr.openAttachment")}
-                </a>
+                </button>
               </div>
             )}
             {selectedLeave.created_at && (
@@ -523,7 +574,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
               <option value="">{t("hr.selectType")}</option>
               {leaveTypes.map((lt) => (
                 <option key={lt.id} value={lt.id}>
-                  {tLeaveType(lt.name)}
+                  {tLeaveType(lt.name, lt.code)}
                 </option>
               ))}
             </select>
@@ -622,6 +673,40 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             </div>
           ) : null}
 
+          {/* Clash with this person's own leave — the mistake worth catching */}
+          {overlapping.length > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-400">
+              <InfoIcon size={13} className="mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">{t("hr.overlapWarning")}</div>
+                <ul className="mt-1 space-y-0.5 text-[11px] opacity-90">
+                  {overlapping.map((r) => (
+                    <li key={r.id}>
+                      {tLeaveType(r.leave_type_name, r.leave_type_code)} ·{" "}
+                      {fmtDate(r.start_date)} — {fmtDate(r.end_date)} · {tStatus(r.status)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Who else in the department is already away — coverage at a glance */}
+          {teamAway.length > 0 && (
+            <div className="px-3.5 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
+                {t("hr.teamAway")}
+              </div>
+              <ul className="space-y-0.5 text-[11px] text-[var(--text-muted)]">
+                {teamAway.map((r) => (
+                  <li key={r.id}>
+                    {r.employee_name} · {fmtDate(r.start_date)} — {fmtDate(r.end_date)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Half day — only meaningful on a single date */}
           <label className={`flex items-center gap-2 ${isSingleDay ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
             <input
@@ -649,19 +734,20 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             />
           </div>
 
-          {/* Supporting document — the attachment_url column existed but the
-              form never offered a way to fill it. */}
+          {/* Supporting document — upload or drag a photo/PDF of the
+              certificate. Lands in the PRIVATE hr-documents bucket. */}
           <div>
             <FieldLabel>{t("hr.attachment")}</FieldLabel>
-            <input
-              type="url"
-              inputMode="url"
-              className={inputCls}
-              placeholder={t("hr.attachmentPlaceholder")}
+            <HrFileField
               value={leaveForm.attachment_url}
-              onChange={(e) => setLeaveForm((f) => ({ ...f, attachment_url: e.target.value }))}
+              onChange={(path) => setLeaveForm((f) => ({ ...f, attachment_url: path }))}
+              folder="leave"
+              label={leaveForm.attachment_url ? t("hr.openAttachment") : t("hr.dropFileHere")}
+              browseLabel={t("hr.browseFiles")}
+              removeLabel={t("hr.removeFile")}
+              errorLabel={t("hr.uploadFailed")}
+              hint={t("hr.attachmentHint")}
             />
-            <div className="mt-1.5 text-[11px] text-[var(--text-dim)]">{t("hr.attachmentHint")}</div>
           </div>
         </div>
       </ModalShell>

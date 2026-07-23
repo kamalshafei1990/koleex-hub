@@ -358,6 +358,10 @@ export interface LeaveRequestFilters {
 export interface LeaveRequestWithName extends LeaveRequestRow {
   employee_name: string;
   leave_type_name: string;
+  /** hr_leave_types.code — translate from this, not from the English name.
+      Deriving a key by lowercasing the name breaks the moment a type is
+      renamed or worded differently. */
+  leave_type_code: string;
 }
 
 /** Fetch leave requests, optionally filtered. Joins employee name + leave type name. */
@@ -393,17 +397,21 @@ export async function fetchLeaveRequests(
   const typeIds = [...new Set(requests.map((r) => r.leave_type_id))];
   const { data: types } = await supabase
     .from(LEAVE_TYPES)
-    .select("id, name")
+    .select("id, name, code")
     .in("id", typeIds);
 
-  const typeMap = new Map<string, string>(
-    (types || []).map((t: any) => [t.id as string, t.name as string]),
+  const typeMap = new Map<string, { name: string; code: string }>(
+    (types || []).map((t: any) => [
+      t.id as string,
+      { name: t.name as string, code: (t.code as string) || "" },
+    ]),
   );
 
   return requests.map((r) => ({
     ...r,
     employee_name: nameMap.get(r.employee_id) || "Unknown",
-    leave_type_name: typeMap.get(r.leave_type_id) || "Unknown",
+    leave_type_name: typeMap.get(r.leave_type_id)?.name || "Unknown",
+    leave_type_code: typeMap.get(r.leave_type_id)?.code || "",
   }));
 }
 

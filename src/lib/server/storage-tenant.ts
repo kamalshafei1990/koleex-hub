@@ -22,6 +22,9 @@
  *  a `${tenant_id}/...` prefix. */
 export const TENANT_SCOPED_BUCKETS = new Set<string>([
   "finance-documents",
+  /* Leave attachments are medical certificates and similar — private and
+     tenant-prefixed, never a public bucket. */
+  "hr-documents",
 ]);
 
 /** Buckets that are private (require signed URLs) but not necessarily
@@ -29,6 +32,7 @@ export const TENANT_SCOPED_BUCKETS = new Set<string>([
 export const PRIVATE_BUCKETS = new Set<string>([
   "discuss-voice",
   "finance-documents",
+  "hr-documents",
 ]);
 
 export function isTenantScoped(bucket: string): boolean {

@@ -296,9 +296,12 @@ export function makeTranslationHelpers(t: (key: string) => string) {
     const v = t(k);
     return v !== k ? v : typ;
   };
-  const tLeaveType = (name: string): string => {
-    const code = name.toLowerCase().replace(/\s+leave$/i, "").replace(/\s+/g, "_");
-    const k = `hr.leaveType.${code}`;
+  /* Prefer the real hr_leave_types.code; fall back to deriving one from the
+     English name for callers that don't carry the code yet. */
+  const tLeaveType = (name: string, code?: string | null): string => {
+    const key = (code || "").trim()
+      || name.toLowerCase().replace(/\s+leave$/i, "").replace(/\s+/g, "_");
+    const k = `hr.leaveType.${key}`;
     const v = t(k);
     return v !== k ? v : name;
   };
