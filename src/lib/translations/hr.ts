@@ -381,7 +381,7 @@ export const hrT: Translations = {
   "hr.noBalanceConfigured":      { en: "No balance set for this leave type this year", zh: "本年度未设置该假期类型的余额", ar: "لا يوجد رصيد محدد لهذا النوع هذا العام" },
   "hr.attachment":               { en: "Supporting document",             zh: "证明文件",                      ar: "مستند داعم" },
   "hr.attachmentPlaceholder":    { en: "https://…",                       zh: "https://…",                     ar: "https://…" },
-  "hr.attachmentHint":           { en: "Optional link to a medical certificate or approval", zh: "可选：医疗证明或批准文件的链接", ar: "اختياري: رابط لشهادة طبية أو موافقة" },
+  "hr.attachmentHint":           { en: "Optional — a photo or PDF of the certificate or approval, up to 10 MB", zh: "可选：证明或批准文件的照片或 PDF，最大 10 MB", ar: "اختياري: صورة أو PDF للشهادة أو الموافقة، حتى 10 ميغابايت" },
   "hr.openAttachment":           { en: "Open document",                   zh: "打开文件",                      ar: "فتح المستند" },
   "hr.submittedOn":              { en: "Submitted",                       zh: "提交时间",                      ar: "تاريخ التقديم" },
 
