@@ -31,7 +31,6 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
-import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import {
   fetchEmployeeProfile,
   fetchEmployeeActivity,
@@ -177,16 +176,6 @@ function FieldGrid({ rows, empty }: { rows: { label: string; value?: React.React
         </div>
       ))}
     </div>
-  );
-}
-
-/** Hero pill — outlined chip under the name. */
-function HeroPill({ icon: Icon, children }: { icon?: React.ComponentType<{ size?: number | string; className?: string }>; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-      {Icon ? <Icon size={11} /> : null}
-      {children}
-    </span>
   );
 }
 
@@ -372,13 +361,15 @@ export default function EmployeeProfilePage({
     return y > 0 ? `${y}${t("unit.year")}${m ? ` ${m}${t("unit.month")}` : ""}` : `${m}${t("unit.month")}`;
   })();
 
+  /* Six cells on purpose: 2 / 3 / 6 columns all divide evenly, so the band
+     never ends in a ragged half-row. Each fact appears HERE and nowhere else
+     in the hero — the pills above used to repeat type, location and number. */
   const metrics: { label: string; value: string; accent?: "emerald" | "amber" }[] = [
-    { label: t("kpi.tenure"), value: tenure ?? "—" },
     { label: t("kpi.employeeNo"), value: employee.employee_number || "—" },
+    { label: t("kpi.tenure"), value: tenure ?? "—" },
     { label: t("kpi.type"), value: employee.employment_type?.replace(/_/g, " ") || "—" },
     { label: t("kpi.location"), value: employee.work_location || "—" },
     { label: t("kpi.hired"), value: employee.hire_date ? formatDate(employee.hire_date) : "—" },
-    { label: t("kpi.activity"), value: activity ? String(activityTotal) : "—" },
     { label: t("kpi.account"), value: account ? t("kpi.linked") : t("kpi.none"), accent: account ? "emerald" : "amber" },
   ];
 
@@ -467,16 +458,12 @@ export default function EmployeeProfilePage({
                 </div>
               )}
 
-              {/* Status · type · location · number */}
+              {/* Status only — everything else the pills used to carry is in
+                  the labelled stat band below, where it can't be misread. */}
               <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
+                <span className={`text-[11px] font-semibold px-3 py-1 rounded-full border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
                   {statusKey.replace(/_/g, " ")}
                 </span>
-                {employee.employment_type && (
-                  <HeroPill icon={BriefcaseIcon}>{employee.employment_type.replace(/_/g, " ")}</HeroPill>
-                )}
-                {employee.work_location && <HeroPill icon={MapPinIcon}>{employee.work_location}</HeroPill>}
-                {employee.employee_number && <HeroPill>{employee.employee_number}</HeroPill>}
               </div>
 
               {/* No login account — stated here, once, where it changes what the
@@ -499,21 +486,25 @@ export default function EmployeeProfilePage({
             </div>
           </div>
 
-          {/* Metric rail — soft pills fused to the bottom edge of the hero */}
-          <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-4 sm:px-6 py-3">
-            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-              {metrics.map((m) => (
-                <span key={m.label} className="inline-flex items-baseline gap-1.5 rounded-full bg-[var(--bg-surface)] px-3 py-1.5 ring-1 ring-[var(--border-subtle)]/60">
-                  <span className={`text-[13px] font-semibold leading-none tabular-nums capitalize ${
-                    m.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
-                    : m.accent === "amber" ? "text-amber-600 dark:text-amber-400"
-                    : "text-[var(--text-primary)]"}`}>
-                    {m.value}
-                  </span>
-                  <span className="text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
-                </span>
-              ))}
-            </div>
+          {/* Stat band — a GRID, not wrapping pills. Seven pills centred by
+              flex-wrap collapsed into ragged 2-2-2-1 rows on a phone, which is
+              exactly the "not organised" complaint. A grid keeps the values in
+              aligned columns at every width. The 1px gap over a tinted parent
+              draws the hairline lattice for free, whatever the row count. */}
+          <div className="border-t border-[var(--border-subtle)] bg-[var(--border-subtle)]/60 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px">
+            {metrics.map((m) => (
+              <div key={m.label} className="bg-[var(--bg-secondary)] px-3 py-3 text-center">
+                <div className={`text-[13.5px] font-semibold leading-tight tabular-nums capitalize truncate ${
+                  m.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
+                  : m.accent === "amber" ? "text-amber-600 dark:text-amber-400"
+                  : "text-[var(--text-primary)]"}`}>
+                  {m.value}
+                </div>
+                <div className="mt-1 text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] truncate">
+                  {m.label}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
