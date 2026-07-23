@@ -58,6 +58,7 @@ import {
 } from "@/lib/hr/person-options";
 import { regionsFor, citiesFor } from "@/lib/geo/regions";
 import HrFileField from "@/components/hr/HrFileField";
+import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
@@ -1716,30 +1717,37 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             </div>
 
             {/* ── WeChat ──
-                The primary channel for a China-based team, so it gets its own
-                block rather than a row in the social list. The QR is how a
-                colleague actually adds someone — an ID alone often isn't
-                searchable — so both are offered and either is enough. */}
+                One card, not two loose fields: the ID and the QR are two ways
+                of reaching the SAME account, so they read as one identity.
+                The QR tile is square because a QR is square — the old
+                full-width dashed banner made a code look like a file drop. */}
             <SubLabel>WeChat</SubLabel>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-              <TextInput
-                label="WeChat ID / Username"
-                value={form.wechat_id}
-                onChange={(v) => set("wechat_id", v)}
-                placeholder="WeChat ID / handle"
-              />
-              <div>
-                <FieldLabel label="WeChat QR Code" />
-                <HrFileField
-                  value={form.wechat_qr_url}
-                  onChange={(v) => set("wechat_qr_url", v)}
-                  folder="documents"
-                  label="Drag the QR image here or browse"
-                  hint="PNG or JPG, up to 10 MB"
-                  browseLabel="Browse"
-                  removeLabel="Remove"
-                  errorLabel="Upload failed"
-                />
+            <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <TextInput
+                    label="WeChat ID / Username"
+                    value={form.wechat_id}
+                    onChange={(v) => set("wechat_id", v)}
+                    placeholder="WeChat ID / handle"
+                  />
+                  <p className="text-[11px] leading-snug text-[var(--text-dim)]">
+                    Add the ID, the QR image, or both — either one is enough to
+                    reach this person.
+                  </p>
+                </div>
+                <div className="sm:w-[190px] shrink-0">
+                  <FieldLabel label="WeChat QR Code" />
+                  <HrFileField
+                    value={form.wechat_qr_url}
+                    onChange={(v) => set("wechat_qr_url", v)}
+                    folder="documents"
+                    shape="square"
+                    label="Drop QR"
+                    hint="PNG / JPG"
+                    browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1756,7 +1764,13 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   >
                     <CrossIcon size={10} />
                   </button>
-                  <div className="w-36 shrink-0 sm:w-44">
+                  {/* The logo is the fastest way to scan a list of handles —
+                      you recognise the mark before you read the name. Same
+                      BrandGlyph the Suppliers app uses. */}
+                  <span className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]">
+                    <BrandGlyph name={row.platform} size={17} />
+                  </span>
+                  <div className="w-32 shrink-0 sm:w-40">
                     <select
                       value={row.platform}
                       onChange={(e) => setSocials(socials.map((r, x) => x === i ? { ...r, platform: e.target.value } : r))}
@@ -2057,21 +2071,20 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               <TextInput label="Tax ID" value={form.tax_id} onChange={(v) => set("tax_id", v)} placeholder="Tax ID" />
             </div>
 
-            {/* ── Scans of the three documents ──
-                Uploaded to the PRIVATE hr-documents bucket, so the stored value
-                is a path and the image is only ever served through a signed,
-                permission-checked link. These columns are in the private
-                registry alongside the numbers themselves — whoever cannot read
-                the passport number cannot read the passport image either. */}
-            <SubLabel>Document Scans</SubLabel>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 mb-4">
+            {/* The scan belongs BESIDE the number it pictures, not in a
+                separate "attachments" pile at the bottom — you fill in the
+                passport number and the passport photo in the same breath.
+                Card ratio for the ID (1.58:1, a real ID card), portrait for
+                the passport (a page you photograph upright). */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <FieldLabel label="National ID Photo" />
                 <HrFileField
                   value={form.national_id_doc_url}
                   onChange={(v) => set("national_id_doc_url", v)}
                   folder="documents"
-                  label="Drag the ID here or browse"
+                  shape="card"
+                  label="Drop the ID card"
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
@@ -2082,18 +2095,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   value={form.passport_doc_url}
                   onChange={(v) => set("passport_doc_url", v)}
                   folder="documents"
-                  label="Drag the passport here or browse"
-                  hint="Image or PDF, up to 10 MB"
-                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
-                />
-              </div>
-              <div>
-                <FieldLabel label="Visa Photo" />
-                <HrFileField
-                  value={form.visa_doc_url}
-                  onChange={(v) => set("visa_doc_url", v)}
-                  folder="documents"
-                  label="Drag the visa here or browse"
+                  shape="page"
+                  label="Drop the passport page"
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
@@ -2106,6 +2109,18 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <TextInput label="Visa Number" value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder="Visa #" />
                   <DateInput name="visa_expiry_date" label="Visa Expiry" value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
+                </div>
+                <div className="mt-3">
+                  <FieldLabel label="Visa Photo" />
+                  <HrFileField
+                    value={form.visa_doc_url}
+                    onChange={(v) => set("visa_doc_url", v)}
+                    folder="documents"
+                    shape="page"
+                    label="Drop the visa page"
+                    hint="Image or PDF, up to 10 MB"
+                    browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                  />
                 </div>
               </div>
               <div>

@@ -62,6 +62,7 @@ export default function HrFileField({
   removeLabel,
   errorLabel,
   disabled,
+  shape = "wide",
 }: {
   /** Storage path (or a legacy URL), "" when empty. */
   value: string;
@@ -75,6 +76,11 @@ export default function HrFileField({
   /** Fallback message when the upload fails for an unnamed reason. */
   errorLabel: string;
   disabled?: boolean;
+  /* The drop zone mirrors the shape of the document that belongs in it, so the
+     operator recognises the slot before reading its label. A QR is square, an
+     ID card is 1.58:1, a passport page is portrait; "wide" keeps the original
+     full-width banner for generic attachments. */
+  shape?: "wide" | "square" | "card" | "page";
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -135,8 +141,54 @@ export default function HrFileField({
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  /* Aspect + max-width per shape. Left unconstrained ("wide") the zone spans
+     its column, which is right for a document list but made a QR code — a
+     square thing — read as a banner. */
+  const shapeCls =
+    shape === "square" ? "aspect-square max-w-[190px]"
+    : shape === "card" ? "aspect-[1.58/1]"
+    : shape === "page" ? "aspect-[1/1.35] max-w-[190px]"
+    : "";
+  const previewCls =
+    shape === "square" ? "aspect-square max-w-[190px] w-full"
+    : shape === "card" ? "aspect-[1.58/1] w-full"
+    : shape === "page" ? "aspect-[1/1.35] max-w-[190px] w-full"
+    : "";
+
   /* ── Uploaded state ── */
   if (value) {
+    /* A shaped field shows the FILE, not a filename row: the whole point of
+       uploading an ID is being able to read it back at a glance. */
+    if (shape !== "wide") {
+      return (
+        <div>
+          <div className={`relative rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] ${previewCls}`}>
+            {preview ? (
+              <button type="button" onClick={open} className="block h-full w-full" title={label}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- signed Storage URL */}
+                <img src={preview} alt={label} className="h-full w-full object-cover" />
+              </button>
+            ) : (
+              <button type="button" onClick={open} className="h-full w-full flex flex-col items-center justify-center gap-1" title={label}>
+                <span className="text-[11px] font-semibold uppercase text-[var(--text-dim)]">{extOf(value) || "file"}</span>
+                <span className="text-[11px] text-[var(--text-muted)] px-2 text-center">{label}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              disabled={disabled}
+              aria-label={removeLabel}
+              title={removeLabel}
+              className="absolute top-1.5 end-1.5 h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-primary)]/85 backdrop-blur-sm border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <CrossIcon size={13} />
+            </button>
+          </div>
+          {hint && <div className="mt-1.5 text-[11px] text-[var(--text-dim)]">{hint}</div>}
+        </div>
+      );
+    }
     return (
       <div>
         <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
@@ -186,7 +238,7 @@ export default function HrFileField({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); }
         }}
-        className={`w-full rounded-xl border border-dashed px-4 py-5 flex flex-col items-center justify-center gap-2 text-center transition-colors ${
+        className={`w-full rounded-xl border border-dashed px-4 py-5 flex flex-col items-center justify-center gap-2 text-center transition-colors ${shapeCls} ${
           disabled
             ? "opacity-50 cursor-not-allowed border-[var(--border-subtle)]"
             : dragging
