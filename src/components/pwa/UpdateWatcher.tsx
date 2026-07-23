@@ -12,9 +12,22 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+
+/* The commit this BUNDLE was compiled from (Vercel exposes it automatically).
+   Comparing against this — rather than against whatever /api/version returned
+   at mount — means a tab that was already open before a deploy is caught on
+   its very first check, not only if it happens to be open across a second one. */
+const BUILD = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "";
+
+const T = {
+  "u.available": { en: "A new version is available", zh: "有新版本可用", ar: "يتوفر إصدار جديد" },
+  "u.refresh":   { en: "Refresh",                    zh: "刷新",       ar: "تحديث" },
+};
 
 export default function UpdateWatcher() {
-  const boot = useRef<string | null>(null);
+  const { t } = useTranslation(T);
+  const boot = useRef<string | null>(BUILD || null);
   const [stale, setStale] = useState(false);
 
   useEffect(() => {
@@ -46,13 +59,13 @@ export default function UpdateWatcher() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
       <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2 py-2 shadow-2xl shadow-black/40">
-        <span className="text-[13px] font-medium">A new version is available</span>
+        <span className="text-[13px] font-medium">{t("u.available")}</span>
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="h-7 px-3 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[12px] font-semibold hover:opacity-90"
         >
-          Refresh
+          {t("u.refresh")}
         </button>
       </div>
     </div>

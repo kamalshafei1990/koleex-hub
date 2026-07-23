@@ -26,6 +26,7 @@ import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
+import UpdateWatcher from "@/components/pwa/UpdateWatcher";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
@@ -237,6 +238,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}
       <ServiceWorkerRegistrar />
+      {/* Offers a one-tap refresh when a NEW build has shipped. Without this
+          an already-open tab keeps running the bundle it booted with — the
+          App Router only soft-navigates, so it never re-downloads JS and a
+          deploy looks like "nothing changed" until a manual hard reload.
+          This was written but never mounted, so it had no effect. */}
+      <UpdateWatcher />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
     </QAInspectorProvider>
