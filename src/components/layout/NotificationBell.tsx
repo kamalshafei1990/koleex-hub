@@ -52,7 +52,7 @@ import {
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { useCurrentAccount } from "@/lib/identity";
-import { activityAllowed } from "@/lib/notification-activity";
+import { activityAllowed, inQuietHours } from "@/lib/notification-activity";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
@@ -209,7 +209,10 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       /* The realtime handler plays the per-activity tone the moment the row
          arrives (it knows WHICH activity it is). Only chime here when the
          rise came from a poll — realtime missed it, activity unknown. */
-      if (Date.now() - lastRealtimeChimeRef.current > 3000) playAppSound("notification");
+      if (Date.now() - lastRealtimeChimeRef.current > 3000
+          && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
+        playAppSound("notification");
+      }
     }
   }, [inboxUnread]);
 
@@ -259,7 +262,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
            EXCEPT on /discuss, where DiscussApp raises its own sound with
            per-channel mute/mention rules for the same event. Both firing
            at once was the "two different sounds per message" bug. */
-        if (!window.location.pathname.startsWith("/discuss")) playAppSound("message");
+        if (!window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
            (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
@@ -375,7 +378,8 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             (s, c) => s + (c.unread_count ?? 0),
             0,
           );
-          if (newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")) {
+          if (newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")
+              && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
             playAppSound("message");
           }
           return rows;
@@ -446,7 +450,8 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
          chose quiet, not blind. Same shared classifier gates the server-side
          push, so one switch controls both channels. */
       const activity = classifyInboxActivity((msg as { metadata?: unknown }).metadata);
-      if (activityAllowed(notifPrefsRef.current, activity)) {
+      const qh = (notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours;
+      if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {
         playAppSound("notification", activity);
       }
       setInboxUnread((n) => n + 1);

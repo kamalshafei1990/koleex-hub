@@ -13,11 +13,17 @@ import type { NotificationPrefs } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { SettingsCard, SwitchRow } from "./ui";
 import { isPushSupported, isIosNeedsInstall, permissionState, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
+import type { QuietHoursPref } from "@/lib/access-control";
+import { inQuietHours } from "@/lib/notification-activity";
+import { fetchMyChannels, setChannelMuted } from "@/lib/discuss";
+import { useCurrentAccount } from "@/lib/identity";
+import type { DiscussChannelWithState } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 
-type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app">;
+type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app" | "quiet_hours">;
 
 const ACTIVITIES: { key: ActivityKey; tKey: string }[] = [
   { key: "mentions", tKey: "act.mentions" },
@@ -98,6 +104,111 @@ function PushEnableCard() {
   );
 }
 
+/* ── Quiet hours ─────────────────────────────────────────────────────────
+   A daily local-time window during which push and chimes stay silent. The
+   IANA zone is snapshotted from THIS browser on every save so the server
+   can evaluate the recipient's clock; badge counts still update. */
+function QuietHoursCard({ value, onChange }: {
+  value: QuietHoursPref;
+  onChange: (next: QuietHoursPref) => void;
+}) {
+  const { t } = useTranslation(settingsT);
+  const active = inQuietHours(value);
+  const patch = (next: Partial<QuietHoursPref>) =>
+    onChange({
+      ...value,
+      ...next,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  return (
+    <SettingsCard title={t("notif.quiet")} subtitle={t("notif.quiet.sub")}>
+      <SwitchRow
+        label={t("notif.quiet.enable")}
+        hint={active && value.enabled ? t("notif.quiet.activeNow") : t("notif.quiet.enable.hint")}
+        checked={value.enabled}
+        onChange={(v) => patch({ enabled: v })}
+        last={!value.enabled}
+      />
+      {value.enabled && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-3">
+          <label className="flex items-center gap-2 text-[12.5px] text-[var(--text-secondary)]">
+            {t("notif.quiet.from")}
+            <input
+              type="time"
+              value={value.start}
+              onChange={(e) => patch({ start: e.target.value || "22:00" })}
+              className="h-8 px-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-[12.5px] text-[var(--text-secondary)]">
+            {t("notif.quiet.to")}
+            <input
+              type="time"
+              value={value.end}
+              onChange={(e) => patch({ end: e.target.value || "08:00" })}
+              className="h-8 px-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </label>
+          <p className="w-full text-[11px] text-[var(--text-faint)]">{t("notif.quiet.crossMidnight")}</p>
+        </div>
+      )}
+    </SettingsCard>
+  );
+}
+
+/* ── Muted conversations ─────────────────────────────────────────────────
+   Surfaces every Discuss conversation the user muted (right-click → Mute in
+   the sidebar) so a forgotten mute is one click away from here — before
+   this, the ONLY way to find them was scanning the sidebar one by one. */
+function MutedConversationsCard() {
+  const { t } = useTranslation(settingsT);
+  const { account } = useCurrentAccount();
+  const [channels, setChannels] = useState<DiscussChannelWithState[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!account?.id) return;
+    fetchMyChannels(account.id)
+      .then((rows) => { if (!cancelled) setChannels(rows.filter((c) => c.muted)); })
+      .catch(() => { if (!cancelled) setChannels([]); });
+    return () => { cancelled = true; };
+  }, [account?.id]);
+
+  async function unmute(id: string) {
+    if (!account?.id) return;
+    setBusyId(id);
+    const ok = await setChannelMuted(id, account.id, false);
+    if (ok) setChannels((prev) => (prev ?? []).filter((c) => c.id !== id));
+    setBusyId(null);
+  }
+
+  const label = (c: DiscussChannelWithState) =>
+    c.name?.trim() || c.other?.full_name || c.other?.username || c.linked_contact?.display_name || t("notif.muted.dm");
+
+  return (
+    <SettingsCard title={t("notif.muted")} subtitle={t("notif.muted.sub")}>
+      {channels === null ? (
+        <div className="flex justify-center py-4"><SpinnerIcon size={14} className="animate-spin text-[var(--text-dim)]" /></div>
+      ) : channels.length === 0 ? (
+        <p className="py-2 text-[12px] text-[var(--text-faint)]">{t("notif.muted.none")}</p>
+      ) : channels.map((c, i) => (
+        <div key={c.id} className={`flex items-center justify-between gap-3 py-2.5 ${i === channels.length - 1 ? "" : "border-b border-[var(--border-faint)]"}`}>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">{label(c)}</span>
+          <button
+            type="button"
+            disabled={busyId === c.id}
+            onClick={() => void unmute(c.id)}
+            className="shrink-0 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+          >
+            {busyId === c.id ? "…" : t("notif.muted.unmute")}
+          </button>
+        </div>
+      ))}
+    </SettingsCard>
+  );
+}
+
 export default function NotificationsTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
@@ -152,6 +263,13 @@ export default function NotificationsTab({ account, onChanged }: {
           />
         ))}
       </SettingsCard>
+
+      <QuietHoursCard
+        value={n.quiet_hours ?? { enabled: false, start: "22:00", end: "08:00" }}
+        onChange={(qh) => patch({ quiet_hours: qh })}
+      />
+
+      <MutedConversationsCard />
 
       {/* Device management page is Super-Admin-only — don't link regular
           users into a lock screen. */}

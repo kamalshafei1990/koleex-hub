@@ -22,7 +22,7 @@ import "server-only";
    callers can gate cheaply without loading the package. */
 import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { activityAllowed, classifyNotificationActivity } from "@/lib/notification-activity";
+import { activityAllowed, classifyNotificationActivity, inQuietHours } from "@/lib/notification-activity";
 
 /** Are the VAPID keys present? Pure env check — does NOT load `web-push`. */
 export function isPushConfigured(): boolean {
@@ -100,23 +100,44 @@ export async function sendPushToAccounts(
      not explicitly opted out. */
   const activity = classifyNotificationActivity(payload.kind);
   let allowedIds = ids;
-  if (activity) {
+  {
     const { data: prefRows } = await supabaseServer
       .from("accounts")
       .select("id, preferences")
       .in("id", ids);
-    const muted = new Set(
-      ((prefRows ?? []) as Array<{ id: string; preferences: { notifications?: Record<string, unknown> } | null }>)
-        .filter((r) => !activityAllowed(r.preferences?.notifications, activity))
+    type PrefRow = { id: string; preferences: { notifications?: Record<string, unknown> } | null };
+    const rows = (prefRows ?? []) as PrefRow[];
+    const now = new Date();
+    const activityMuted = new Set(
+      rows.filter((r) => !activityAllowed(r.preferences?.notifications, activity)).map((r) => r.id),
+    );
+    /* Quiet hours — evaluated on the RECIPIENT's saved local window/zone.
+       Independent of the activity gate: it silences every push kind. */
+    const quiet = new Set(
+      rows
+        .filter((r) => !activityMuted.has(r.id))
+        .filter((r) => inQuietHours(
+          (r.preferences?.notifications as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours,
+          now,
+        ))
         .map((r) => r.id),
     );
-    if (muted.size) {
-      allowedIds = ids.filter((id) => !muted.has(id));
-      result.skipped += muted.size;
+    if (activityMuted.size) {
+      result.skipped += activityMuted.size;
       await logPush(
-        [...muted][0], opts?.actorAccountId, payload, "skipped",
-        `activity_disabled:${activity} (${muted.size})`, null,
+        [...activityMuted][0], opts?.actorAccountId, payload, "skipped",
+        `activity_disabled:${activity} (${activityMuted.size})`, null,
       ).catch(() => undefined);
+    }
+    if (quiet.size) {
+      result.skipped += quiet.size;
+      await logPush(
+        [...quiet][0], opts?.actorAccountId, payload, "skipped",
+        `quiet_hours (${quiet.size})`, null,
+      ).catch(() => undefined);
+    }
+    if (activityMuted.size || quiet.size) {
+      allowedIds = ids.filter((id) => !activityMuted.has(id) && !quiet.has(id));
     }
     if (allowedIds.length === 0) return result;
   }

@@ -248,6 +248,20 @@ export interface NotificationPrefs {
   low_stock?: boolean;
   qa_reports?: boolean;
   price_fx?: boolean;
+  /* Quiet hours — a daily window (recipient-local) during which push and
+     chimes stay silent. `tz` is snapshotted from the browser at save time so
+     the SERVER can evaluate the window without guessing the user's zone.
+     Enforced in sendPushToAccounts and the NotificationBell chime. */
+  quiet_hours?: QuietHoursPref;
+}
+
+export interface QuietHoursPref {
+  enabled: boolean;
+  /** "HH:MM" 24h, recipient-local. Window may cross midnight (22:00→08:00). */
+  start: string;
+  end: string;
+  /** IANA zone captured when the user saved (e.g. "Asia/Shanghai"). */
+  tz?: string;
 }
 
 /* ── Display / appearance / region preferences ──
@@ -408,6 +422,7 @@ export function withDefaults(
       low_stock: p.notifications?.low_stock ?? DEFAULT_PREFERENCES.notifications.low_stock,
       qa_reports: p.notifications?.qa_reports ?? DEFAULT_PREFERENCES.notifications.qa_reports,
       price_fx: p.notifications?.price_fx ?? DEFAULT_PREFERENCES.notifications.price_fx,
+      quiet_hours: p.notifications?.quiet_hours ?? { enabled: false, start: "22:00", end: "08:00" },
     },
     display: {
       text_size: p.display?.text_size ?? DEFAULT_PREFERENCES.display.text_size,

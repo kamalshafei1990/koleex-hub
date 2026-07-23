@@ -50,3 +50,60 @@ export function activityAllowed(
   if (!activity) return true;
   return prefs?.[activity] !== false;
 }
+
+/* ── Quiet hours ─────────────────────────────────────────────────────────
+   A daily silence window stored in preferences.notifications.quiet_hours as
+   {enabled, start:"HH:MM", end:"HH:MM", tz} — tz snapshotted from the browser
+   at save time so the server can evaluate the recipient's LOCAL clock. Used
+   by sendPushToAccounts (skip + log) and the bell chime (mute, badge still
+   updates). Malformed input fails OPEN: a broken pref must never silence
+   someone forever. */
+
+export interface QuietHoursLike {
+  enabled?: boolean;
+  start?: string;
+  end?: string;
+  tz?: string;
+}
+
+function minutesInZone(now: Date, tz: string | undefined): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      ...(tz ? { timeZone: tz } : {}),
+    }).formatToParts(now);
+    const h = Number(parts.find((p) => p.type === "hour")?.value);
+    const m = Number(parts.find((p) => p.type === "minute")?.value);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  } catch {
+    return null; // unknown tz string — fail open
+  }
+}
+
+function parseHHMM(v: unknown): number | null {
+  if (typeof v !== "string") return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v);
+  if (!m) return null;
+  const h = Number(m[1]), min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/** True when `now` falls inside the user's quiet window. Windows may cross
+ *  midnight (22:00→08:00). start === end is treated as disabled, not 24h —
+ *  an accidental equal pair should not mute everything. */
+export function inQuietHours(
+  qh: QuietHoursLike | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!qh?.enabled) return false;
+  const start = parseHHMM(qh.start);
+  const end = parseHHMM(qh.end);
+  if (start == null || end == null || start === end) return false;
+  const cur = minutesInZone(now, qh.tz);
+  if (cur == null) return false;
+  return start < end
+    ? cur >= start && cur < end
+    : cur >= start || cur < end; // crosses midnight
+}

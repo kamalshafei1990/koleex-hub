@@ -368,4 +368,19 @@ export const settingsT: Translations = {
   "push.removeDevice":    { en: "Remove device", zh: "移除设备", ar: "إزالة الجهاز" },
   "push.recent":          { en: "Recent notifications", zh: "最近通知", ar: "الإشعارات الأخيرة" },
   "push.nothingSent":     { en: "Nothing sent yet.", zh: "尚未发送任何通知。", ar: "لم يُرسل شيء بعد." },
+
+  /* ── Quiet hours + muted conversations (Notifications tab) ── */
+  "notif.quiet":               { en: "Quiet hours",  zh: "免打扰时段", ar: "ساعات الهدوء" },
+  "notif.quiet.sub":           { en: "Silence push and sounds on a daily schedule. Badges still update.", zh: "在每日固定时段静音推送和提示音，角标仍会更新。", ar: "كتم الإشعارات والأصوات في فترة يومية محددة — الشارات تستمر بالتحديث." },
+  "notif.quiet.enable":        { en: "Enable quiet hours", zh: "启用免打扰时段", ar: "تفعيل ساعات الهدوء" },
+  "notif.quiet.enable.hint":   { en: "No push or chimes during the window below.", zh: "在下方时段内不发送推送、不播放提示音。", ar: "لا إشعارات ولا نغمات خلال الفترة أدناه." },
+  "notif.quiet.activeNow":     { en: "Quiet hours are active right now.", zh: "免打扰时段当前生效中。", ar: "ساعات الهدوء فعّالة الآن." },
+  "notif.quiet.from":          { en: "From",  zh: "从",   ar: "من" },
+  "notif.quiet.to":            { en: "Until", zh: "到",   ar: "حتى" },
+  "notif.quiet.crossMidnight": { en: "A window ending earlier than it starts runs overnight (e.g. 22:00 → 08:00).", zh: "结束时间早于开始时间时跨夜生效（例如 22:00 → 08:00）。", ar: "إذا كانت النهاية أبكر من البداية تمتد الفترة عبر منتصف الليل (مثل 22:00 ← 08:00)." },
+  "notif.muted":               { en: "Muted conversations", zh: "已静音的会话", ar: "المحادثات المكتومة" },
+  "notif.muted.sub":           { en: "Discuss conversations you muted. Unmute them here.", zh: "您在讨论中静音的会话，可在此取消静音。", ar: "محادثات Discuss التي كتمتها — يمكنك إلغاء الكتم من هنا." },
+  "notif.muted.none":          { en: "No muted conversations.", zh: "没有已静音的会话。", ar: "لا توجد محادثات مكتومة." },
+  "notif.muted.unmute":        { en: "Unmute", zh: "取消静音", ar: "إلغاء الكتم" },
+  "notif.muted.dm":            { en: "Direct message", zh: "私信", ar: "رسالة مباشرة" },
 };
