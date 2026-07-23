@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 /* GET /api/permissions?role_id=X   — list perm rows for a role
    PUT /api/permissions              — upsert (role_id + array of perms)
@@ -13,6 +13,19 @@ import { requireAuth } from "@/lib/server/auth";
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+
+  /* A role's full permission grid maps the tenant's entire access model —
+     reconnaissance gold. It was readable by ANY signed-in user; the actual
+     consumers are all admin surfaces (Roles page = SA-only, Management role
+     detail, Accounts access-rights tab). Require SA or view access to one of
+     those admin modules. */
+  if (!auth.is_super_admin) {
+    const mgmt = await requireModuleAccess(auth, "Management");
+    if (mgmt) {
+      const accounts = await requireModuleAccess(auth, "Accounts");
+      if (accounts) return accounts; // neither module granted → 403
+    }
+  }
 
   const roleId = new URL(req.url).searchParams.get("role_id");
   if (!roleId) {

@@ -29,7 +29,7 @@ export async function GET() {
      Account form because the client filters by `scope` and no row had
      one. Merge here: koleex_roles rows + scope from `roles` matched by
      id, defaulting to "internal" when not found. */
-  const [koleexRes, baseRes] = await Promise.all([
+  const [koleexRes, baseRes, usageRes] = await Promise.all([
     supabaseServer
       .from("koleex_roles")
       .select("*")
@@ -38,11 +38,22 @@ export async function GET() {
       .from("roles")
       .select("id, slug, scope")
       .order("name", { ascending: true }),
+    /* Per-role account usage — lets the Roles admin see which roles are live
+       and explains up front why a delete will be refused (the DELETE route
+       409s while accounts still reference the role). */
+    supabaseServer
+      .from("accounts")
+      .select("role_id"),
   ]);
 
   if (koleexRes.error && baseRes.error) {
     console.error("[api/roles GET]", koleexRes.error.message, baseRes.error.message);
     return NextResponse.json({ error: "Failed to load roles" }, { status: 500 });
+  }
+
+  const usage = new Map<string, number>();
+  for (const r of ((usageRes.data ?? []) as Array<{ role_id: string | null }>)) {
+    if (r.role_id) usage.set(r.role_id, (usage.get(r.role_id) ?? 0) + 1);
   }
 
   type BaseRole = { id: string; slug: string | null; scope: string | null };
@@ -68,6 +79,7 @@ export async function GET() {
     ...row,
     scope: (row.scope as string | null | undefined) ?? scopeById.get(row.id) ?? "internal",
     slug: (row.slug as string | null | undefined) ?? slugById.get(row.id) ?? null,
+    accounts_count: usage.get(row.id) ?? 0,
   }));
 
   /* Roles rarely change during a session — they're admin-edited

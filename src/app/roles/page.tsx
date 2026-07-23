@@ -32,7 +32,9 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { PERMISSION_GROUPS, PERMISSION_MODULES, isOpenAccessModule } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { rolesT } from "@/lib/translations/roles";
@@ -631,6 +633,14 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
 
 export default function RolesPage() {
   const { t } = useTranslation(rolesT);
+  /* SA-only gate. Every write API behind this page already requires Super
+     Admin, and the module is deliberately NOT_GOVERNABLE (a role must never
+     be able to grant itself permission-editing) — so no role can ever hold
+     can_view here and the page itself must enforce the same rule. Follows
+     the PermissionGate contract: a still-loading/failed bootstrap shows a
+     spinner (retryable state), never a false "denied". */
+  const { data: boot, loading: bootLoading } = useMeBootstrap();
+  const isSA = !!boot?.isSuperAdmin;
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -651,7 +661,10 @@ export default function RolesPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadRoles(); }, [loadRoles]);
+  useEffect(() => {
+    if (boot && !isSA) return; // locked screen — don't fetch anything
+    void loadRoles();
+  }, [loadRoles, boot, isSA]);
 
   /* ── Toast ── */
   useEffect(() => {
@@ -699,6 +712,26 @@ export default function RolesPage() {
 
   /* ── Stats ── */
   const totalRoles = roles.length;
+
+  if (bootLoading && !boot) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+      </div>
+    );
+  }
+  if (boot && !isSA) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-10 text-center bg-[var(--bg-primary)]">
+        <LockIcon className="h-10 w-10 text-[var(--text-ghost)]" />
+        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{t("gate.saOnly")}</h2>
+        <p className="text-[13px] text-[var(--text-dim)] max-w-sm">{t("gate.saOnly.sub")}</p>
+        <Link href="/" className="mt-2 h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] inline-flex items-center">
+          {t("gate.backHome")}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -815,8 +848,28 @@ export default function RolesPage() {
                     <ShieldIcon size={16} className="text-[var(--text-muted)]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-[var(--text-primary)]">{role.name}</div>
-                    {role.description && <p className="text-[12px] text-[var(--text-dim)] truncate mt-0.5">{role.description}</p>}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[14px] font-semibold text-[var(--text-primary)]">{role.name}</span>
+                      {/* Dangerous flags must be visible at a glance in the
+                          list — not only inside the edit modal. */}
+                      {role.is_super_admin && (
+                        <span className="h-5 px-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wide inline-flex items-center">
+                          {t("badge.superAdmin")}
+                        </span>
+                      )}
+                      {role.can_view_private && (
+                        <span className="h-5 px-1.5 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-wide inline-flex items-center">
+                          {t("badge.breakGlass")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-[var(--text-dim)] truncate mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                        <UsersIcon size={11} />
+                        {(role.accounts_count ?? 0)} {(role.accounts_count ?? 0) === 1 ? t("row.account.one") : t("row.account.many")}
+                      </span>
+                      {role.description && <span> · {role.description}</span>}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setSelectedRoleId(selectedRoleId === role.id ? null : role.id)}
@@ -835,7 +888,9 @@ export default function RolesPage() {
                       <PencilIcon size={13} className="text-[var(--text-dim)]" />
                     </button>
                     <button onClick={() => setDeleteTarget(role)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-400/10 transition-all" title={t("row.deleteTip")}>
+                      disabled={(role.accounts_count ?? 0) > 0}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-400/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      title={(role.accounts_count ?? 0) > 0 ? t("row.deleteBlockedTip") : t("row.deleteTip")}>
                       <TrashIcon size={13} className="text-red-400/60" />
                     </button>
                   </div>

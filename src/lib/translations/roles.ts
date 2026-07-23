@@ -140,4 +140,14 @@ export const rolesT: Translations = {
   "group.Marketing & Growth": { en: "Marketing & Growth", zh: "营销与增长", ar: "التسويق والنمو" },
   "group.Planning & Knowledge": { en: "Planning & Knowledge", zh: "规划与知识", ar: "التخطيط والمعرفة" },
   "group.System":       { en: "System",          zh: "系统",            ar: "النظام" },
+
+  /* ── SA gate + row badges (roles audit) ── */
+  "gate.saOnly":          { en: "Super Admin only", zh: "仅限超级管理员", ar: "لمشرف النظام الأعلى فقط" },
+  "gate.saOnly.sub":      { en: "Roles & Permissions defines who can access what across the hub — only Super Admins can open it.", zh: "角色与权限定义整个平台的访问控制，仅超级管理员可以打开。", ar: "الأدوار والصلاحيات تحدد من يصل إلى ماذا في المنصة كلها — لا يفتحها إلا مشرف النظام الأعلى." },
+  "gate.backHome":        { en: "Back to home", zh: "返回首页", ar: "العودة للرئيسية" },
+  "badge.superAdmin":     { en: "Super Admin", zh: "超级管理员", ar: "مشرف أعلى" },
+  "badge.breakGlass":     { en: "Private access", zh: "可见私密记录", ar: "وصول للخصوصي" },
+  "row.account.one":      { en: "account", zh: "个账户", ar: "حساب" },
+  "row.account.many":     { en: "accounts", zh: "个账户", ar: "حسابات" },
+  "row.deleteBlockedTip": { en: "In use — reassign its accounts before deleting", zh: "使用中——删除前请先改派其账户", ar: "قيد الاستخدام — أعد إسناد حساباته قبل الحذف" },
 };

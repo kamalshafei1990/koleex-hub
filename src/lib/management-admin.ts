@@ -105,6 +105,8 @@ export interface RoleRow {
   /** Break-glass: when true, the role can read is_private records. Every
    *  such read is audit-logged to koleex_private_access_log. Grant sparingly. */
   can_view_private: boolean;
+  /** Live accounts currently assigned this role (from GET /api/roles). */
+  accounts_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -563,14 +565,12 @@ export async function createRole(
   } catch (e) {
     console.error("[Management] createRole API failed:", e);
   }
-  const { data, error } = await supabaseAdmin
-    .from("koleex_roles")
-    .insert({ ...obj, updated_at: new Date().toISOString() })
-    .select()
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  return { data: data as RoleRow, error: null };
+  /* NO anon-key fallback for role/permission WRITES. The tables are RLS
+     service-role-only, so the old direct-write fallback could never succeed —
+     but it was a loaded gun: any future RLS relaxation would have silently
+     turned "API unreachable" into "any browser can write the permission
+     grid". Security mutations go through the SA-gated API or fail. */
+  return { data: null, error: "Network error — role not created." };
 }
 
 export async function updateRole(
@@ -601,13 +601,7 @@ export async function updateRole(
   } catch (e) {
     console.error("[Management] updateRole API failed:", e);
   }
-  const { error } = await supabaseAdmin
-    .from("koleex_roles")
-    .update({ ...obj, updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  return { ok: false, error: "Network error — role not updated." };
 }
 
 export async function deleteRole(
@@ -630,19 +624,7 @@ export async function deleteRole(
   } catch (e) {
     console.error("[Management] deleteRole API failed:", e);
   }
-  // Unlink positions first
-  await supabaseAdmin
-    .from("koleex_positions")
-    .update({ role_id: null, updated_at: new Date().toISOString() })
-    .eq("role_id", id);
-
-  const { error } = await supabaseAdmin
-    .from("koleex_roles")
-    .delete()
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  return { ok: false, error: "Network error — role not deleted." };
 }
 
 /** Clone a role and copy its permissions. */
@@ -663,40 +645,7 @@ export async function cloneRole(
   } catch (e) {
     console.error("[Management] cloneRole API failed:", e);
   }
-
-  const { data: src, error: fetchErr } = await supabaseAdmin
-    .from("koleex_roles")
-    .select("*")
-    .eq("id", sourceRoleId)
-    .single();
-
-  if (fetchErr || !src) return { data: null, error: fetchErr?.message || "Role not found" };
-
-  const { data: newRole, error: createErr } = await supabaseAdmin
-    .from("koleex_roles")
-    .insert({
-      name: `${src.name} (Copy)`,
-      description: src.description,
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-
-  if (createErr || !newRole) return { data: null, error: createErr?.message || "Failed to create role" };
-
-  // Copy permissions
-  const { data: perms } = await supabaseAdmin
-    .from("koleex_permissions")
-    .select("module_name, can_view, can_create, can_edit, can_delete")
-    .eq("role_id", sourceRoleId);
-
-  if (perms && perms.length > 0) {
-    await supabaseAdmin
-      .from("koleex_permissions")
-      .insert(perms.map((p: Record<string, unknown>) => ({ ...p, role_id: newRole.id })));
-  }
-
-  return { data: newRole as RoleRow, error: null };
+  return { data: null, error: "Network error — role not cloned." };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -762,21 +711,7 @@ export async function upsertPermissions(
   } catch (e) {
     console.error("[Management] upsertPermissions API failed:", e);
   }
-  const rows = perms.map((p) => ({
-    role_id: roleId,
-    module_name: p.module_name,
-    can_view: p.can_view,
-    can_create: p.can_create,
-    can_edit: p.can_edit,
-    can_delete: p.can_delete,
-    data_scope: p.data_scope ?? "all",
-  }));
-  const { error } = await supabaseAdmin
-    .from("koleex_permissions")
-    .upsert(rows, { onConflict: "role_id,module_name" });
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  return { ok: false, error: "Network error — permissions not saved." };
 }
 
 /* ═══════════════════════════════════════════════════
