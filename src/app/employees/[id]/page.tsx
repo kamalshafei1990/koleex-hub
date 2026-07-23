@@ -110,37 +110,57 @@ function formatDate(iso: string | null | undefined) {
 const panelCls =
   "self-start bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5";
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  const empty = value == null || value === "" ||
-    (typeof value === "string" && !value.trim());
+/* ── Detail document ────────────────────────────────────────────────────
+   A person's record is ONE document, not six things. Rendering each section
+   as its own bordered card is what made this page read as a grid of blocks
+   no matter how the grid was tuned — so a section here is a heading and a
+   rule inside a single surface, with no border or background of its own.
+
+   Fields sit in a two-column grid so a wide screen is filled by DATA rather
+   than by one tall ribbon of rows or by empty card gutters. */
+
+function DetailSection({
+  icon: Icon, title, children,
+}: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-baseline gap-3 py-[5px] border-b border-[var(--border-faint)] last:border-0">
-      <span className="text-[11px] text-[var(--text-faint)] uppercase tracking-wide w-[104px] shrink-0">{label}</span>
-      <span className={`text-[13px] flex-1 min-w-0 break-words text-end ${empty ? "text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>
+    <section className="py-5 first:pt-0 last:pb-0 border-b border-[var(--border-subtle)] last:border-0">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={13} className="text-[var(--text-dim)] shrink-0" aria-hidden />
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-[var(--text-muted)]">
+          {title}
+        </h2>
+      </div>
+      <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-10">{children}</dl>
+    </section>
+  );
+}
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  const empty =
+    value == null || value === "" || (typeof value === "string" && !value.trim());
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-[7px] border-b border-[var(--border-faint)] last:border-0">
+      <dt className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] shrink-0">{label}</dt>
+      <dd className={`text-[13px] min-w-0 break-words text-end ${empty ? "text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>
         {empty ? "—" : value}
-      </span>
+      </dd>
     </div>
   );
 }
 
-function SectionHeader({
-  icon: Icon, title, description, action,
-}: {
-  icon: React.ComponentType<{ size?: number | string; className?: string }>;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-}) {
+/** Compact key/value line for the identity rail. */
+function RailFact({ label, value }: { label: string; value: React.ReactNode }) {
+  const empty =
+    value == null || value === "" || (typeof value === "string" && !value.trim());
+  if (empty) return null;
   return (
-    <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-[var(--border-faint)]">
-      <div className="flex items-center gap-2 min-w-0">
-        <Icon size={14} className="text-[var(--text-dim)] shrink-0" aria-hidden />
-        <h2 className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] leading-tight truncate">
-          {title}
-        </h2>
-        {description && <span className="sr-only">{description}</span>}
-      </div>
-      {action}
+    <div className="flex items-baseline justify-between gap-3 py-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] shrink-0">{label}</span>
+      <span className="text-[12.5px] text-[var(--text-primary)] text-end min-w-0 break-words">{value}</span>
     </div>
   );
 }
@@ -358,148 +378,150 @@ export default function EmployeeProfilePage({
           </div>
         </div>
 
-        {/* ── Header card ── */}
-        <section className={`${panelCls} mb-4`}>
-          <div className="flex items-start gap-5">
-            <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={80} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">
-                  {person.full_name}
+        {/* ── Identity rail + detail document ──
+            The page was a grid of equal-weight bordered cards, which is why it
+            kept reading as "blocks" however the grid was tuned. It now has a
+            spine: WHO this is stays pinned on the left, and everything else is
+            one continuous document on the right. */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
+
+          {/* ── Identity rail ── */}
+          <aside className="lg:col-span-4 xl:col-span-3">
+            <div className="lg:sticky lg:top-6 space-y-3">
+              <section className={panelCls}>
+                <div className="flex flex-col items-center text-center pb-4 border-b border-[var(--border-faint)]">
+                  <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={88} />
+                  <h2 className="mt-3 text-[17px] font-bold text-[var(--text-primary)] leading-tight break-words">
+                    {person.full_name}
+                  </h2>
                   {(person as { name_alt?: string | null }).name_alt && (
-                    <span lang="zh" className="ms-2 text-base font-normal text-[var(--text-dim)]">
+                    <p lang="zh" className="text-[13px] text-[var(--text-dim)] leading-tight mt-0.5">
                       {(person as { name_alt?: string | null }).name_alt}
-                    </span>
+                    </p>
                   )}
-                </h2>
-                {employee.employee_number && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-faint)]">
-                    {employee.employee_number}
-                  </span>
-                )}
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
-                  {statusKey.replace(/_/g, " ")}
-                </span>
-              </div>
-              <div className="mt-1 text-[13px] text-[var(--text-dim)]">
-                {position?.title && <span className="text-[var(--text-primary)] font-medium">{position.title}</span>}
-                {position?.title && department?.name && <span className="mx-1.5">·</span>}
-                {department?.name && <span>{department.name}</span>}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] text-[var(--text-dim)]">
-                {employee.work_email && (
-                  <span className="flex items-center gap-1.5"><EnvelopeIcon size={12} /> {employee.work_email}</span>
-                )}
-                {employee.work_phone && (
-                  <span className="flex items-center gap-1.5"><PhoneIcon size={12} /> {employee.work_phone}</span>
-                )}
-                {employee.hire_date && (
-                  <span className="flex items-center gap-1.5"><BriefcaseIcon size={12} /> {t("profile.hired").replace("{date}", formatDate(employee.hire_date))}</span>
-                )}
-              </div>
+                  {(position?.title || department?.name) && (
+                    <p className="mt-1.5 text-[12.5px] text-[var(--text-muted)] leading-snug">
+                      {position?.title}
+                      {position?.title && department?.name && <span className="mx-1">·</span>}
+                      {department?.name}
+                    </p>
+                  )}
+                  <div className="mt-2.5 flex items-center gap-1.5 flex-wrap justify-center">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
+                      {statusKey.replace(/_/g, " ")}
+                    </span>
+                    {employee.employee_number && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-faint)]">
+                        {employee.employee_number}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* The handful of facts you actually came here for — visible
+                    without scrolling, and pinned while you read the rest. */}
+                <div className="pt-3">
+                  <RailFact label="Work email" value={employee.work_email} />
+                  <RailFact label="Work phone" value={employee.work_phone} />
+                  <RailFact label="Location" value={employee.work_location} />
+                  <RailFact label="Type" value={employee.employment_type?.replace(/_/g, " ")} />
+                  <RailFact label="Hired" value={employee.hire_date ? formatDate(employee.hire_date) : null} />
+                </div>
+              </section>
+
+              {/* Account state — a quiet line in the rail rather than a full
+                  banner across the top of the page. */}
+              {!account && (
+                <section className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-start gap-2">
+                    <KeyIcon size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[12px] text-amber-300 font-medium">{t("profile.noAccount.title")}</p>
+                      <p className="text-[11px] text-amber-300/80 mt-0.5 leading-snug">
+                        {t("profile.noAccount.body")}
+                      </p>
+                      <Link
+                        href={`/accounts?person=${person.id}`}
+                        className="mt-2 h-7 px-2.5 rounded-lg text-[11px] font-medium border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 inline-flex items-center transition-colors"
+                      >
+                        {t("profile.noAccount.cta")}
+                      </Link>
+                    </div>
+                  </div>
+                </section>
+              )}
             </div>
-          </div>
+          </aside>
 
-          {/* Account-missing nudge */}
-          {!account && (
-            <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
-              <KeyIcon size={16} className="text-amber-400 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] text-amber-300 font-medium">{t("profile.noAccount.title")}</p>
-                <p className="text-[11px] text-amber-300/80 mt-0.5">
-                  {t("profile.noAccount.body")}
-                </p>
-              </div>
-              <Link
-                href={`/accounts?person=${person.id}`}
-                className="h-8 px-3 rounded-lg text-[11px] font-medium border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 inline-flex items-center transition-colors shrink-0"
-              >
-                {t("profile.noAccount.cta")}
-              </Link>
+          {/* ── Detail column ── */}
+          <div className="lg:col-span-8 xl:col-span-9 min-w-0">
+            {/* Tabs */}
+            <div className="flex items-center gap-1 mb-3 overflow-x-auto">
+              {TABS.map((tabKey) => {
+                const base = tabKey === "overview" ? t("tab.overview")
+                  : tabKey === "activity" ? t("tab.activity")
+                  : t("tab.hr");
+                const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
+                return (
+                  <button
+                    key={tabKey}
+                    onClick={() => setTab(tabKey)}
+                    className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
+                      tab === tabKey
+                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                        : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    }`}
+                    aria-current={tab === tabKey ? "page" : undefined}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </section>
 
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-1 mb-4 overflow-x-auto">
-          {TABS.map((tabKey) => {
-            const base = tabKey === "overview" ? t("tab.overview")
-              : tabKey === "activity" ? t("tab.activity")
-              : t("tab.hr");
-            const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
-            return (
-              <button
-                key={tabKey}
-                onClick={() => setTab(tabKey)}
-                className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
-                  tab === tabKey
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                    : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                }`}
-                aria-current={tab === tabKey ? "page" : undefined}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+            {tab === "overview" && (
+              /* ONE surface. The sections inside are separated by rules, not by
+                 card borders — that difference is the whole point. */
+              <div className={panelCls}>
+                <DetailSection icon={UserIcon} title={t("ov.personal")}>
+                  <Field label="Full name" value={person.full_name} />
+                  <Field label="Gender" value={employee.gender} />
+                  <Field label="Nationality" value={employee.nationality} />
+                  <Field label="Birthday" value={employee.birth_date ? formatDate(employee.birth_date) : null} />
+                  <Field label="Marital" value={employee.marital_status} />
+                  <Field label="Languages" value={employee.languages} />
+                  <Field label="Personal email" value={person.email} />
+                  <Field label="Personal phone" value={person.phone} />
+                </DetailSection>
 
-        {/* ── Panels ── */}
-        {tab === "overview" && (
-          /* 3 columns from xl — at 2 the panels left half the viewport empty on a
-             desktop and pushed Emergency below the fold for no reason. */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-            <section className={panelCls}>
-              <SectionHeader icon={UserIcon} title={t("ov.personal")} description={t("ov.personal.desc")} />
-              <div>
-                <InfoRow label="Full name" value={person.full_name} />
-                <InfoRow label="Gender" value={employee.gender} />
-                <InfoRow label="Nationality" value={employee.nationality} />
-                <InfoRow label="Birthday" value={formatDate(employee.birth_date)} />
-                <InfoRow label="Marital" value={employee.marital_status} />
-                <InfoRow label="Personal email" value={person.email} />
-                <InfoRow label="Personal phone" value={person.phone} />
-                <InfoRow label="Languages" value={employee.languages} />
+                <DetailSection icon={BriefcaseIcon} title={t("ov.employment")}>
+                  <Field label="Employee #" value={employee.employee_number} />
+                  <Field label="Type" value={employee.employment_type?.replace(/_/g, " ")} />
+                  <Field label="Department" value={department?.name} />
+                  <Field label="Position" value={position?.title} />
+                  <Field label="Work location" value={employee.work_location} />
+                  <Field label="Hire date" value={employee.hire_date ? formatDate(employee.hire_date) : null} />
+                  <Field label="Contract end" value={employee.contract_end_date ? formatDate(employee.contract_end_date) : null} />
+                  <Field label="Probation end" value={employee.probation_end_date ? formatDate(employee.probation_end_date) : null} />
+                </DetailSection>
+
+                <DetailSection icon={Building2Icon} title={t("ov.workContact")}>
+                  <Field label="Work email" value={employee.work_email} />
+                  <Field label="Work phone" value={employee.work_phone} />
+                  <Field label="Address" value={[person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ")} />
+                  <Field label="Postal code" value={person.postal_code} />
+                </DetailSection>
+
+                <DetailSection icon={ShieldIcon} title={t("ov.emergency")}>
+                  <Field label="Primary" value={employee.emergency_contact_name} />
+                  <Field label="Phone" value={employee.emergency_contact_phone} />
+                  <Field label="Relation" value={employee.emergency_contact_relationship} />
+                  <Field label="Secondary" value={employee.emergency_contact2_name} />
+                  <Field label="Phone" value={employee.emergency_contact2_phone} />
+                  <Field label="Relation" value={employee.emergency_contact2_relationship} />
+                </DetailSection>
               </div>
-            </section>
-
-            <section className={panelCls}>
-              <SectionHeader icon={BriefcaseIcon} title={t("ov.employment")} description={t("ov.employment.desc")} />
-              <div>
-                <InfoRow label="Employee #" value={employee.employee_number} />
-                <InfoRow label="Department" value={department?.name} />
-                <InfoRow label="Position" value={position?.title} />
-                <InfoRow label="Type" value={employee.employment_type?.replace(/_/g, " ")} />
-                <InfoRow label="Work location" value={employee.work_location} />
-                <InfoRow label="Hire date" value={formatDate(employee.hire_date)} />
-                <InfoRow label="Contract end" value={formatDate(employee.contract_end_date)} />
-                <InfoRow label="Probation end" value={formatDate(employee.probation_end_date)} />
-              </div>
-            </section>
-
-            <section className={panelCls}>
-              <SectionHeader icon={Building2Icon} title={t("ov.workContact")} description={t("ov.workContact.desc")} />
-              <div>
-                <InfoRow label="Work email" value={employee.work_email} />
-                <InfoRow label="Work phone" value={employee.work_phone} />
-                <InfoRow label="Address" value={[person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ")} />
-                <InfoRow label="Postal code" value={person.postal_code} />
-              </div>
-            </section>
-
-            <section className={panelCls}>
-              <SectionHeader icon={ShieldIcon} title={t("ov.emergency")} description={t("ov.emergency.desc")} />
-              <div>
-                <InfoRow label="Primary" value={employee.emergency_contact_name} />
-                <InfoRow label="Phone" value={employee.emergency_contact_phone} />
-                <InfoRow label="Relation" value={employee.emergency_contact_relationship} />
-                <InfoRow label="Secondary" value={employee.emergency_contact2_name} />
-                <InfoRow label="Phone" value={employee.emergency_contact2_phone} />
-                <InfoRow label="Relation" value={employee.emergency_contact2_relationship} />
-              </div>
-            </section>
-          </div>
-        )}
+            )}
 
         {tab === "activity" && (
           <div>
@@ -516,7 +538,7 @@ export default function EmployeeProfilePage({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                   <ActivityCard
                     title="CRM Opportunities"
                     icon={UserIcon}
@@ -587,58 +609,50 @@ export default function EmployeeProfilePage({
         )}
 
         {tab === "hr" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-            <section className={panelCls}>
-              <SectionHeader icon={CreditCardIcon} title={t("hr.compensation")} description={t("hr.compensation.desc")} />
-              <div>
-                <InfoRow
-                  label="Initial salary"
-                  value={employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null}
-                />
-                <InfoRow label="Bank" value={employee.bank_name} />
-                <InfoRow label="Holder" value={employee.bank_account_holder} />
-                <InfoRow label="Account #" value={employee.bank_account_number} />
-                <InfoRow label="IBAN" value={employee.bank_iban} />
-                <InfoRow label="SWIFT" value={employee.bank_swift} />
-                <InfoRow label="Currency" value={employee.bank_currency} />
-              </div>
-            </section>
+          /* Same one-surface document as Overview — HR detail is part of the
+             same record, so it gets the same treatment, not a second grid. */
+          <div className={panelCls}>
+            <DetailSection icon={CreditCardIcon} title={t("hr.compensation")}>
+              <Field
+                label="Initial salary"
+                value={employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null}
+              />
+              <Field label="Currency" value={employee.bank_currency} />
+              <Field label="Bank" value={employee.bank_name} />
+              <Field label="Holder" value={employee.bank_account_holder} />
+              <Field label="Account #" value={employee.bank_account_number} />
+              <Field label="IBAN" value={employee.bank_iban} />
+              <Field label="SWIFT" value={employee.bank_swift} />
+            </DetailSection>
 
-            <section className={panelCls}>
-              <SectionHeader icon={DocumentIcon} title={t("hr.documents")} description={t("hr.documents.desc")} />
-              <div>
-                <InfoRow label="National ID" value={employee.identification_id} />
-                <InfoRow label="Passport" value={employee.passport_number} />
-                <InfoRow label="SSN" value={employee.social_security_number} />
-                <InfoRow label="Tax ID" value={employee.tax_id} />
-                <InfoRow label="Visa #" value={employee.visa_number} />
-                <InfoRow label="Visa expiry" value={formatDate(employee.visa_expiry_date)} />
-                <InfoRow label="License #" value={employee.driving_license_number} />
-                <InfoRow label="License expiry" value={formatDate(employee.driving_license_expiry)} />
-              </div>
-            </section>
+            <DetailSection icon={DocumentIcon} title={t("hr.documents")}>
+              <Field label="National ID" value={employee.identification_id} />
+              <Field label="Passport" value={employee.passport_number} />
+              <Field label="SSN" value={employee.social_security_number} />
+              <Field label="Tax ID" value={employee.tax_id} />
+              <Field label="Visa #" value={employee.visa_number} />
+              <Field label="Visa expiry" value={employee.visa_expiry_date ? formatDate(employee.visa_expiry_date) : null} />
+              <Field label="License #" value={employee.driving_license_number} />
+              <Field label="License expiry" value={employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null} />
+            </DetailSection>
 
-            <section className={panelCls}>
-              <SectionHeader icon={ShieldIcon} title={t("hr.insurance")} description={t("hr.insurance.desc")} />
-              <div>
-                <InfoRow label="Provider" value={employee.insurance_provider} />
-                <InfoRow label="Policy #" value={employee.insurance_policy_number} />
-                <InfoRow label="Class" value={employee.insurance_class} />
-                <InfoRow label="Expiry" value={formatDate(employee.insurance_expiry_date)} />
-              </div>
-            </section>
+            <DetailSection icon={ShieldIcon} title={t("hr.insurance")}>
+              <Field label="Provider" value={employee.insurance_provider} />
+              <Field label="Policy #" value={employee.insurance_policy_number} />
+              <Field label="Class" value={employee.insurance_class} />
+              <Field label="Expiry" value={employee.insurance_expiry_date ? formatDate(employee.insurance_expiry_date) : null} />
+            </DetailSection>
 
-            <section className={panelCls}>
-              <SectionHeader icon={BriefcaseIcon} title={t("hr.education")} description={t("hr.education.desc")} />
-              <div>
-                <InfoRow label="Degree" value={employee.education_degree?.replace(/_/g, " ")} />
-                <InfoRow label="Institution" value={employee.education_institution} />
-                <InfoRow label="Field" value={employee.education_field} />
-                <InfoRow label="Graduation" value={employee.education_graduation_year} />
-              </div>
-            </section>
+            <DetailSection icon={BriefcaseIcon} title={t("hr.education")}>
+              <Field label="Degree" value={employee.education_degree?.replace(/_/g, " ")} />
+              <Field label="Institution" value={employee.education_institution} />
+              <Field label="Field" value={employee.education_field} />
+              <Field label="Graduation" value={employee.education_graduation_year} />
+            </DetailSection>
           </div>
         )}
+          </div>{/* /detail column */}
+        </div>{/* /rail + detail grid */}
       </div>
 
       {/* ── Delete confirm ── */}
