@@ -30,11 +30,9 @@ import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
-import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import DisplayTab from "@/components/settings/tabs/DisplayTab";
 import SoundsTab from "@/components/settings/tabs/SoundsTab";
@@ -60,7 +58,7 @@ import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -139,11 +137,6 @@ function SettingsContent() {
       node: <ProfileTab account={account} onChanged={onChanged} />,
     },
     {
-      id: "preferences", label: t("nav.preferences"), subtitle: t("nav.preferences.sub"),
-      icon: <Settings2Icon className="h-3.5 w-3.5" />,
-      node: <PreferencesTab account={account} onChanged={onChanged} />,
-    },
-    {
       id: "calendar", label: t("nav.calendar"), subtitle: t("nav.calendar.sub"),
       icon: <CalendarIcon className="h-3.5 w-3.5" />,
       node: <CalendarTab account={account} onChanged={onChanged} />,
@@ -204,7 +197,14 @@ function SettingsContent() {
   ];
   const active = sections.find((s) => s.id === tab) ?? sections[0];
   const byId = (id: Tab) => sections.find((s) => s.id === id)!;
-  const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
+  /* "Preferences" was removed on purpose: every control in it was a
+     duplicate with a DIFFERENT store — Language (en/ar only, wrote a dead
+     prefs.language while the real 3-language picker lives in Language &
+     region), Theme (dead prefs.theme; the real switch is in Display), and
+     the notification channel toggles (superseded by Notifications, and
+     saving them wiped the per-activity switches). The admin Accounts app
+     keeps its own copy for account administration. */
+  const personalItems = (["profile", "calendar"] as Tab[]).map(byId);
   const displayItems = (["display", "sounds", "region"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);

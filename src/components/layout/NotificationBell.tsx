@@ -52,6 +52,7 @@ import {
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { useCurrentAccount } from "@/lib/identity";
+import { activityAllowed } from "@/lib/notification-activity";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
@@ -158,6 +159,12 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   useEffect(() => {
     accountIdRef.current = accountId;
   }, [accountId]);
+  /* Live view of the per-activity notification switches. A ref (updated every
+     render) rather than a closure capture: the realtime subscription below
+     re-subscribes only when accountId changes, and must still see preference
+     edits made mid-session. */
+  const notifPrefsRef = useRef<Record<string, unknown> | undefined>(undefined);
+  notifPrefsRef.current = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
 
   const [open, setOpen] = useState(false);
   const [inboxUnread, setInboxUnread] = useState(0);
@@ -434,7 +441,14 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
          task reminder). The count-watcher sees lastRealtimeChimeRef and
          stays quiet for this bump — one event, one chime, correct tone. */
       lastRealtimeChimeRef.current = Date.now();
-      playAppSound("notification", classifyInboxActivity((msg as { metadata?: unknown }).metadata));
+      /* Per-activity mute: honour the Settings → Notifications "By activity"
+         switches. The badge and the dropdown row still update — the user
+         chose quiet, not blind. Same shared classifier gates the server-side
+         push, so one switch controls both channels. */
+      const activity = classifyInboxActivity((msg as { metadata?: unknown }).metadata);
+      if (activityAllowed(notifPrefsRef.current, activity)) {
+        playAppSound("notification", activity);
+      }
       setInboxUnread((n) => n + 1);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;

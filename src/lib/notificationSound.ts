@@ -28,6 +28,8 @@
        backlog chime instead of swallowing it silently.
    --------------------------------------------------------------------------- */
 
+import { classifyNotificationActivity } from "./notification-activity";
+
 const SOUND_URL = "/notification.wav";
 
 /* ── The Koleex tone library ──────────────────────────────────────────────
@@ -110,22 +112,12 @@ export interface SoundPrefs {
 }
 
 /** Classify an inbox message into an activity key from its metadata.type
- *  (set by every notifier in the Hub). Unknown/absent → null → default tone. */
+ *  (set by every notifier in the Hub). Unknown/absent → null → default tone.
+ *  Thin wrapper over the SHARED classifier in lib/notification-activity.ts —
+ *  the server push sender applies the same rules, so muting an activity in
+ *  Settings silences its chime AND its push with one switch. */
 export function classifyInboxActivity(meta: unknown): SoundActivity | null {
-  const type = (meta as { type?: string } | null)?.type ?? "";
-  if (!type) return null;
-  if (type.includes("mention")) return "mentions";
-  if (type.includes("approval")) return "approvals";
-  if (type.includes("assign") || type.includes("observer")) return "assignments";
-  if (
-    type.includes("reminder") || type.includes("overdue") || type.includes("due") ||
-    type.includes("recurring") || type.startsWith("calendar")
-  ) return "tasks_due";
-  if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
-  if (type.includes("stock")) return "low_stock";
-  if (type.startsWith("qa")) return "qa_reports";
-  if (type.includes("price") || type.includes("fx") || type.includes("rate")) return "price_fx";
-  return null;
+  return classifyNotificationActivity((meta as { type?: string } | null)?.type);
 }
 
 /** The built-in tones: the original WAV plus the six synthesized ones.

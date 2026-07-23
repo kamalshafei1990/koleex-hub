@@ -22,6 +22,7 @@ import "server-only";
    callers can gate cheaply without loading the package. */
 import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { activityAllowed, classifyNotificationActivity } from "@/lib/notification-activity";
 
 /** Are the VAPID keys present? Pure env check — does NOT load `web-push`. */
 export function isPushConfigured(): boolean {
@@ -88,10 +89,42 @@ export async function sendPushToAccounts(
     return result;
   }
 
+  /* Per-activity preference gate. The eight "By activity" switches in
+     Settings → Notifications live in accounts.preferences.notifications;
+     until this gate existed they were written but never read, so turning
+     "Task reminders" off changed nothing. Classify the payload kind with the
+     SAME shared rules the client chime uses; recipients who disabled that
+     activity are skipped (logged once as activity_disabled). Kinds outside
+     the eight activities (payments, answers, new-device alerts…) are never
+     gated. Unset keys default to ON, so this cannot silence anyone who has
+     not explicitly opted out. */
+  const activity = classifyNotificationActivity(payload.kind);
+  let allowedIds = ids;
+  if (activity) {
+    const { data: prefRows } = await supabaseServer
+      .from("accounts")
+      .select("id, preferences")
+      .in("id", ids);
+    const muted = new Set(
+      ((prefRows ?? []) as Array<{ id: string; preferences: { notifications?: Record<string, unknown> } | null }>)
+        .filter((r) => !activityAllowed(r.preferences?.notifications, activity))
+        .map((r) => r.id),
+    );
+    if (muted.size) {
+      allowedIds = ids.filter((id) => !muted.has(id));
+      result.skipped += muted.size;
+      await logPush(
+        [...muted][0], opts?.actorAccountId, payload, "skipped",
+        `activity_disabled:${activity} (${muted.size})`, null,
+      ).catch(() => undefined);
+    }
+    if (allowedIds.length === 0) return result;
+  }
+
   const { data } = await supabaseServer
     .from("push_subscriptions")
     .select("id, account_id, endpoint, p256dh, auth")
-    .in("account_id", ids)
+    .in("account_id", allowedIds)
     .eq("is_active", true);
   const subs = (data ?? []) as SubRow[];
   if (subs.length === 0) return result;

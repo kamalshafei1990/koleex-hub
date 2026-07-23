@@ -5,7 +5,7 @@
    Instant-apply, iOS-style. The device/push management stays on the
    dedicated /settings/notifications page. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
@@ -104,15 +104,29 @@ export default function NotificationsTab({ account, onChanged }: {
   const { t } = useTranslation(settingsT);
   const { data: boot } = useMeBootstrap();
   const [n, setN] = useState<NotificationPrefs>(() => withDefaults(account.preferences).notifications as NotificationPrefs);
+  /* What we last wrote — same stale-snapshot guard as DisplayTab/RegionTab.
+     Without it the post-save account refresh could arrive carrying the
+     PRE-save bag, visibly flipping a just-toggled switch back; a user (or a
+     fast double-click) then "corrects" the phantom revert and unknowingly
+     re-saves the OLD value. Verified live before the fix: UI said Approvals
+     ON while the DB kept false. */
+  const savedRef = useRef<string | null>(null);
 
   /* Re-sync when the account refreshes so this tab reflects saves from
      elsewhere and merges onto fresh values. */
   useEffect(() => {
-    setN(withDefaults(account.preferences).notifications as NotificationPrefs);
+    const incoming = withDefaults(account.preferences).notifications as NotificationPrefs;
+    const json = JSON.stringify(incoming);
+    if (savedRef.current !== null) {
+      if (json !== savedRef.current) return;   // still stale — keep the local edit
+      savedRef.current = null;                 // caught up; resume normal syncing
+    }
+    setN(incoming);
   }, [account.preferences]);
 
   function patch(next: Partial<NotificationPrefs>) {
     const merged = { ...n, ...next };
+    savedRef.current = JSON.stringify(merged);
     setN(merged);
     // Persist ONLY the notifications slice; the server merges it onto the rest.
     void updateAccountPreferences(account.id, { notifications: merged }).then((ok) => { if (ok) onChanged(); });

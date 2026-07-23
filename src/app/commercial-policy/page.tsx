@@ -23,10 +23,10 @@ import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
-import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
-import IncotermsManager from "@/components/settings/IncotermsManager";
-import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
-import ShippingDocumentsManager from "@/components/settings/ShippingDocumentsManager";
+import PaymentTermsManager from "@/components/commercial-policy/PaymentTermsManager";
+import IncotermsManager from "@/components/commercial-policy/IncotermsManager";
+import ShippingMethodsManager from "@/components/commercial-policy/ShippingMethodsManager";
+import ShippingDocumentsManager from "@/components/commercial-policy/ShippingDocumentsManager";
 import MarketSegmentation from "@/components/commercial-policy/MarketSegmentation";
 import type {
   CommercialPolicySnapshot,

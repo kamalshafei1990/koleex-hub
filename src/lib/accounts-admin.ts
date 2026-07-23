@@ -1105,7 +1105,25 @@ export async function fetchAccessPresetByRoleId(
    The UI merges stored values with DEFAULT_PREFERENCES for display.
    ============================================================================ */
 
+/* Per-account save chain. The instant-apply Settings tabs fire one PATCH per
+   toggle; two quick clicks meant two CONCURRENT read-merge-write requests on
+   the server, and whichever read first could finish last — verified live: the
+   UI showed Approvals ON while the DB kept false. Serializing per account id
+   makes the last click's request also the last write. Module-level state is
+   fine here: the race only ever comes from the same browser session. */
+const prefsSaveChain = new Map<string, Promise<unknown>>();
+
 export async function updateAccountPreferences(
+  id: string,
+  preferences: AccountPreferences,
+): Promise<boolean> {
+  const prev = prefsSaveChain.get(id) ?? Promise.resolve();
+  const run = prev.then(() => updateAccountPreferencesNow(id, preferences));
+  prefsSaveChain.set(id, run.catch(() => undefined));
+  return run;
+}
+
+async function updateAccountPreferencesNow(
   id: string,
   preferences: AccountPreferences,
 ): Promise<boolean> {

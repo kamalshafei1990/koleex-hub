@@ -1343,19 +1343,18 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     ]
   },
   {
-    "key": "settings",
+    "key": "commercial-policy",
     "fileCount": 5,
     "components": [
+      "CatalogEditorModal",
       "DocCard",
       "IncotermCard",
       "IncotermsManager",
       "PaymentTermsManager",
-      "PricingTiersManager",
       "ShippingDocumentsManager",
       "ShippingMethodCard",
       "ShippingMethodsManager",
-      "TermCard",
-      "TierCard"
+      "TermCard"
     ]
   },
   {

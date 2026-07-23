@@ -149,10 +149,10 @@ export default function PreferencesTab({ account, onChanged }: Props) {
             onChange={(v) =>
               setPrefs({
                 ...prefs,
-                notifications: {
-                  email: v,
-                  in_app: prefs.notifications?.in_app ?? true,
-                },
+                /* Spread the EXISTING bag: the server merge is shallow, so
+                   rebuilding it as {email, in_app} silently wiped the eight
+                   per-activity switches from Settings → Notifications. */
+                notifications: { ...withDefaults(prefs).notifications!, email: v },
               })
             }
           />
@@ -163,10 +163,7 @@ export default function PreferencesTab({ account, onChanged }: Props) {
             onChange={(v) =>
               setPrefs({
                 ...prefs,
-                notifications: {
-                  email: prefs.notifications?.email ?? true,
-                  in_app: v,
-                },
+                notifications: { ...withDefaults(prefs).notifications!, in_app: v },
               })
             }
           />
