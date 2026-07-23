@@ -241,6 +241,7 @@ export type TabId =
   | "attendance"
   | "recruitment"
   | "appraisals"
+  | "skills"
   | "onboarding"
   | "payroll"
   | "training"
@@ -253,6 +254,7 @@ export const TAB_IDS: TabId[] = [
   "attendance",
   "recruitment",
   "appraisals",
+  "skills",
   "onboarding",
   "payroll",
   "training",
@@ -266,6 +268,7 @@ export const TAB_LABEL_KEYS: Record<TabId, string> = {
   attendance:  "hr.tabAttendance",
   recruitment: "hr.tabRecruitment",
   appraisals:  "hr.tabAppraisals",
+  skills:      "hr.tabSkills",
   onboarding:  "hr.tabOnboarding",
   payroll:     "hr.tabPayroll",
   training:    "hr.tabTraining",

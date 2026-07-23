@@ -18,6 +18,7 @@ import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -29,6 +30,7 @@ import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
+import SkillsModule from "./modules/Skills";
 import LeaveModule from "./modules/LeaveManagement";
 import AttendanceModule from "./modules/Attendance";
 import RecruitmentModule from "./modules/Recruitment";
@@ -46,6 +48,7 @@ const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string
   attendance:  ClockIcon,
   recruitment: UserPlusIcon,
   appraisals:  StarIcon,
+  skills:      SparklesIcon,
   onboarding:  CheckCircleIcon,
   payroll:     WalletIcon,
   training:    BookOpenIcon,
@@ -68,6 +71,7 @@ const MODULE_MAP: Record<TabId, ComponentType<HRModuleProps>> = {
   attendance:  AttendanceModule,
   recruitment: RecruitmentModule,
   appraisals:  AppraisalsModule,
+  skills:      SkillsModule,
   onboarding:  OnboardingModule,
   payroll:     PayrollModule,
   training:    TrainingModule,

@@ -906,9 +906,9 @@ type EmpTab = "personal" | "employment" | "skills" | "compensation" | "documents
 const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }[] = [
   { id: "personal", label: "Personal", icon: UserIcon },
   { id: "employment", label: "Employment", icon: BriefcaseIcon },
-  { id: "skills", label: "Skills", icon: SparklesIcon },
   { id: "compensation", label: "Compensation", icon: CreditCardIcon },
   { id: "documents", label: "Documents", icon: DocumentIcon },
+  { id: "skills", label: "Skills", icon: SparklesIcon },
   { id: "account", label: "Account", icon: KeyIcon },
 ];
 

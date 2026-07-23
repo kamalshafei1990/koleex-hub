@@ -115,8 +115,17 @@ async function saveSkillAssessments(
   tenantId: string | null,
   employeeId: string,
   raw: unknown,
+  recordedBy: string | null = null,
 ): Promise<string | null> {
   const rows = parseSkills(raw);
+  /* Snapshot the scores BEFORE the replace-set, so changes land in the
+     append-only history — that log is what powers old-vs-new comparison and
+     the weekly/monthly/annual reports in the HR app. */
+  const { data: prevRows } = await supabaseServer
+    .from("employee_skill_assessments")
+    .select("skill_id, employee_score")
+    .eq("employee_id", employeeId);
+  const prevScore = new Map((prevRows ?? []).map((r) => [r.skill_id as string, r.employee_score as number | null]));
   const { data: owned } = await supabaseServer
     .from("skills").select("id").eq("tenant_id", tenantId).in("id", rows.map((r) => r.skill_id));
   const ownedSet = new Set((owned ?? []).map((s) => s.id));
@@ -139,7 +148,27 @@ async function saveSkillAssessments(
       last_assessed_at: r.employee_score != null ? now : null,
     })),
   );
-  return insErr?.message ?? null;
+  if (insErr) return insErr.message;
+
+  /* History: one row per CHANGED score (new skill with a score counts as a
+     change from nothing). Non-fatal — a missed log line must not fail the
+     save that produced it. */
+  const changed = safe.filter(
+    (r) => r.employee_score != null && prevScore.get(r.skill_id) !== r.employee_score,
+  );
+  if (changed.length) {
+    const { error: histErr } = await supabaseServer.from("employee_skill_history").insert(
+      changed.map((r) => ({
+        tenant_id: tenantId,
+        employee_id: employeeId,
+        skill_id: r.skill_id,
+        employee_score: r.employee_score,
+        recorded_by: recordedBy,
+      })),
+    );
+    if (histErr) console.error("[skills history]", histErr.message);
+  }
+  return null;
 }
 
 /* social_accounts arrives as a JSON string from the wizard (whose state is a
@@ -438,7 +467,7 @@ export async function POST(req: Request) {
 
   /* ── Step 3b: Skill assessments (non-fatal — the hire is already real) ── */
   if (body.skills !== undefined) {
-    const skillErr = await saveSkillAssessments(auth.tenant_id, employee.id, body.skills);
+    const skillErr = await saveSkillAssessments(auth.tenant_id, employee.id, body.skills, auth.account_id ?? null);
     if (skillErr) console.error("[employees/full POST skills]", skillErr);
   }
 
@@ -876,7 +905,7 @@ export async function PUT(req: Request) {
   /* Skills: only touched when the payload carries the key, so older callers
      that don't know about skills can never wipe existing assessments. */
   if (body.skills !== undefined) {
-    const skillErr = await saveSkillAssessments(auth.tenant_id, employeeId, body.skills);
+    const skillErr = await saveSkillAssessments(auth.tenant_id, employeeId, body.skills, auth.account_id ?? null);
     if (skillErr) {
       return NextResponse.json(
         { success: false, error: `Saved, but skills failed: ${skillErr}` },
