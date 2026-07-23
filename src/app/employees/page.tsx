@@ -24,6 +24,7 @@ import UserIcon from "@/components/icons/ui/UserIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import EmployeesIcon from "@/components/icons/EmployeesIcon";
+import KpiCard from "@/components/ui/KpiCard";
 import {
   fetchEmployeeList,
   fetchDepartments as fetchDepts,
@@ -82,6 +83,10 @@ function Avatar({ src, name, size = 40 }: { src?: string | null; name: string; s
   );
 }
 
+/** Warm-start cache key. Bump the suffix if the cached shape changes, so an
+ *  old payload can't be read back into a newer component. */
+const WARM_KEY = "kx:employees:list:v1";
+
 /* ═══════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════ */
@@ -116,13 +121,42 @@ export default function EmployeesPage() {
     setConfirmTarget(null);
   };
 
+  /* Warm start — paint the previous list immediately, then reconcile.
+     Same pattern the Customers app uses. Without it every visit shows a
+     skeleton for the full round-trip even though the directory rarely
+     changes within a session. sessionStorage (not local) so it dies with
+     the tab and can't serve another user's data after a sign-out. */
   useEffect(() => {
+    let cancelled = false;
+
+    try {
+      const cached = sessionStorage.getItem(WARM_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { employees: EmployeeListItem[]; departments: DepartmentRow[] };
+        if (parsed?.employees?.length) {
+          setEmployees(parsed.employees);
+          setDepartments(parsed.departments ?? []);
+          setLoading(false); // show real rows, refresh underneath
+        }
+      }
+    } catch {
+      /* corrupt or unavailable — fall through to the network */
+    }
+
     (async () => {
       const [emps, depts] = await Promise.all([fetchEmployeeList(), fetchDepts()]);
+      if (cancelled) return;
       setEmployees(emps);
       setDepartments(depts);
       setLoading(false);
+      try {
+        sessionStorage.setItem(WARM_KEY, JSON.stringify({ employees: emps, departments: depts }));
+      } catch {
+        /* quota (base64 avatars are big) — the list still works, just cold next time */
+      }
     })();
+
+    return () => { cancelled = true; };
   }, []);
 
   /* ── Filtering ── */
@@ -253,40 +287,23 @@ export default function EmployeesPage() {
           )}
         </div>
 
-        {/* Stats cards */}
+        {/* Stats — canonical <KpiCard>. These were hand-rolled with coloured
+            2px top borders and tinted icon chips (blue/emerald/violet/amber),
+            which is exactly what the shared component exists to stop: the Hub
+            is monochrome-first and colour is reserved for real status. */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-[2px] bg-blue-400" />
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400"><UsersIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("list.all", "Total")}</span>
-            </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{employees.length}</div>
-          </div>
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-[2px] bg-emerald-400" />
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400"><CheckIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("status.active")}</span>
-            </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalActive}</div>
-          </div>
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-[2px] bg-violet-400" />
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-400"><Building2Icon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("list.department")}</span>
-            </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalDepts}</div>
-          </div>
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-[2px] bg-amber-400" />
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400"><BriefcaseIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("status.on_leave")}</span>
-            </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalOnLeave}</div>
-          </div>
+          <KpiCard label={t("list.all", "Total")} value={employees.length} icon={<UsersIcon size={15} />} loading={loading} />
+          <KpiCard label={t("status.active")} value={totalActive} icon={<CheckIcon size={15} />} loading={loading} />
+          <KpiCard label={t("list.department")} value={totalDepts} icon={<Building2Icon size={15} />} loading={loading} />
+          <KpiCard
+            label={t("status.on_leave")}
+            value={totalOnLeave}
+            icon={<BriefcaseIcon size={15} />}
+            loading={loading}
+            /* The only tonal signal kept — people being away is the one number
+               here a manager may need to act on. */
+            tone={totalOnLeave > 0 ? "warning" : "default"}
+          />
         </div>
 
         {/* Employee list */}

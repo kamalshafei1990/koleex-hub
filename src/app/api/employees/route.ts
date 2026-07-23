@@ -22,9 +22,15 @@ export async function GET(req: Request) {
 
   const activeOnly = new URL(req.url).searchParams.get("activeOnly") === "1";
 
+  /* Explicit projection, not select("*"). The list renders 12 fields; the
+     table has far more, and every extra column is bytes over the wire on a
+     request that blocks first paint. Adding a column to the list means adding
+     it here on purpose. */
   let empQ = supabaseServer
     .from("koleex_employees")
-    .select("*")
+    .select(
+      "id, person_id, account_id, employee_number, hire_date, employment_status, employment_type, work_email, work_phone, work_location",
+    )
     .order("created_at", { ascending: false });
   if (activeOnly) empQ = empQ.eq("employment_status", "active");
 
@@ -51,15 +57,30 @@ export async function GET(req: Request) {
   const personIds = emps.map((e) => e.person_id).filter(Boolean) as string[];
   if (personIds.length === 0) return NextResponse.json({ employees: [] });
 
-  const [{ data: people }, { data: assignments }] = await Promise.all([
-    supabaseServer.from("people").select("*").in("id", personIds),
-    supabaseServer
-      .from("koleex_assignments")
-      .select("*")
-      .in("person_id", personIds)
-      .eq("is_active", true)
-      .eq("is_primary", true),
-  ]);
+  /* Stage 2 — people + assignments + the two small reference tables, all in
+     ONE parallel round-trip. Departments and positions used to wait for the
+     assignment rows so they could be filtered by id, which made a third
+     sequential stage; they are tiny lookup tables, so fetching them whole
+     alongside is strictly faster than the extra round-trip that filtering
+     saved.
+
+     `people` is projected explicitly — select("*") dragged every column into
+     a first-paint-blocking response, including base64 `avatar_url` values. */
+  const [{ data: people }, { data: assignments }, { data: departments }, { data: positions }] =
+    await Promise.all([
+      supabaseServer
+        .from("people")
+        .select("id, full_name, name_alt, first_name, last_name, email, phone, mobile, avatar_url")
+        .in("id", personIds),
+      supabaseServer
+        .from("koleex_assignments")
+        .select("id, person_id, department_id, position_id")
+        .in("person_id", personIds)
+        .eq("is_active", true)
+        .eq("is_primary", true),
+      supabaseServer.from("koleex_departments").select("id, name"),
+      supabaseServer.from("koleex_positions").select("id, title"),
+    ]);
 
   type Assignment = {
     id: string;
@@ -68,17 +89,6 @@ export async function GET(req: Request) {
     position_id: string;
   };
   const asList = (assignments as Assignment[] | null) ?? [];
-  const deptIds = [...new Set(asList.map((a) => a.department_id))];
-  const posIds = [...new Set(asList.map((a) => a.position_id))];
-
-  const [{ data: departments }, { data: positions }] = await Promise.all([
-    deptIds.length
-      ? supabaseServer.from("koleex_departments").select("id, name").in("id", deptIds)
-      : Promise.resolve({ data: [] }),
-    posIds.length
-      ? supabaseServer.from("koleex_positions").select("id, title").in("id", posIds)
-      : Promise.resolve({ data: [] }),
-  ]);
 
   type Person = {
     id: string;
