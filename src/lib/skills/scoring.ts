@@ -122,6 +122,13 @@ export interface SkillsSummary {
   below: number;
   unassessed: number;
   mandatoryGaps: number;
+  /** ── Coverage: a position score computed from 2 of 10 required skills is
+     easy to misread as a verdict. The summary always carries how much of the
+     required set has actually been assessed. */
+  positionTotal: number;
+  positionAssessed: number;
+  coveragePct: number | null;
+  mandatoryUnassessed: number;
 }
 
 /** Everything the summary cards show, in one derivation. `overallScore` is a
@@ -132,12 +139,15 @@ export function summarize(
   additionalRows: readonly ScorableSkill[],
 ): SkillsSummary {
   let meets = 0, below = 0, unassessed = 0, mandatoryGaps = 0;
+  let positionAssessed = 0, mandatoryUnassessed = 0;
   for (const r of positionRows) {
+    if (r.score != null) positionAssessed++;
     const g = gapStatus(r);
     if (g === "meets") meets++;
     else if (g === "below") below++;
     else if (g === "unassessed") unassessed++;
     if ((g === "below" || g === "unassessed") && r.isMandatory) mandatoryGaps++;
+    if (r.score == null && r.isMandatory) mandatoryUnassessed++;
   }
   return {
     positionScore: weightedScore(positionRows),
@@ -146,5 +156,9 @@ export function summarize(
     additionalScore: weightedScore(additionalRows),
     overallScore: weightedScore([...positionRows, ...additionalRows]),
     meets, below, unassessed, mandatoryGaps,
+    positionTotal: positionRows.length,
+    positionAssessed,
+    coveragePct: positionRows.length ? Math.round((positionAssessed / positionRows.length) * 100) : null,
+    mandatoryUnassessed,
   };
 }

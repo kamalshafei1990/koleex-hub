@@ -346,8 +346,9 @@ export default function EmployeeBehaviorSection({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SummaryCard label={t("hr.bhv.overallBehavior")} value={summary.overallScore == null ? "—" : String(summary.overallScore)} />
           <SummaryCard label={t("hr.bhv.positionMatch")} value={summary.matchPct == null ? "—" : `${summary.matchPct}%`} tone={summary.matchPct == null ? undefined : summary.matchPct >= 100 ? "good" : summary.matchPct < 70 ? "warn" : undefined} />
-          <SummaryCard label={t("hr.bhv.requiredAvg")} value={summary.requiredScore == null ? "—" : String(summary.requiredScore)} />
+          <SummaryCard label={t("hr.bhv.coverage")} value={summary.coveragePct == null ? "—" : `${summary.coveragePct}%`} tone={summary.coveragePct != null && summary.coveragePct < 100 ? "warn" : undefined} />
           <SummaryCard label={t("hr.bhv.criticalGaps")} value={String(summary.criticalGaps)} tone={summary.criticalGaps > 0 ? "bad" : "good"} />
+          <SummaryCard label={t("hr.bhv.criticalUnassessed")} value={String(summary.criticalUnassessed)} tone={summary.criticalUnassessed > 0 ? "warn" : "good"} />
           <SummaryCard label={t("hr.bhv.meets")} value={String(summary.meets)} tone={summary.meets > 0 ? "good" : undefined} />
           <SummaryCard label={t("hr.bhv.below")} value={String(summary.below)} tone={summary.below > 0 ? "warn" : undefined} />
           <SummaryCard label={t("hr.bhv.mandatoryGaps")} value={String(summary.mandatoryGaps)} tone={summary.mandatoryGaps > 0 ? "warn" : "good"} />

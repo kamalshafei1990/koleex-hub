@@ -245,6 +245,7 @@ export default function SkillsModule({ employees, t }: HRModuleProps) {
               <Card label={t("hr.skills.improved")} value={String(report.improved)} tone={report.improved ? "good" : undefined} />
               <Card label={t("hr.skills.declined")} value={String(report.declined)} tone={report.declined ? "warn" : undefined} />
               <Card label={t("hr.skills.match")} value={report.cur.matchPct == null ? "—" : `${report.cur.matchPct}%`} />
+              <Card label={t("hr.sk.coverage")} value={report.cur.coveragePct == null ? "—" : `${report.cur.coveragePct}%`} tone={report.cur.coveragePct != null && report.cur.coveragePct < 100 ? "warn" : undefined} />
             </div>
           </div>
 

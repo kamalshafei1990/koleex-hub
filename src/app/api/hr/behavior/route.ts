@@ -328,6 +328,14 @@ async function finalizeAssessment(
     .in("id", rows.map((r) => r.behavior_indicator_id));
   const catByInd = new Map((inds ?? []).map((i) => [i.id, i.category_id as string]));
 
+  /* Completeness gate: an assessment must not be frozen with mandatory or
+     critical indicators left unmeasured — a finalized record with unassessed
+     criticals would report "Critical Gaps: 0" while the risk is simply unknown. */
+  const blocking = rows.filter((r) => (r.mandatory_snapshot || r.critical_snapshot) && r.employee_score == null);
+  if (blocking.length) {
+    return "All mandatory and critical indicators must be assessed before finalizing.";
+  }
+
   /* Justification gate: extreme scores and critical gaps must carry a comment
      before an assessment can be finalized. */
   for (const r of rows) {

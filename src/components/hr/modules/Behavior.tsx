@@ -20,7 +20,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import { usePermissions } from "@/lib/permissions";
 import { BehaviorSlider, BehaviorSliderStyles, BehaviorPicker, type BehaviorCategory, type BehaviorIndicator } from "@/components/behavior/BehaviorShared";
-import { summarize, gapStatus, isCriticalGap, requiresJustification, type BehaviorItem } from "@/lib/behavior/scoring";
+import { summarize, gapStatus, isCriticalGap, requiresJustification, canFinalize, criticalStatus, type BehaviorItem } from "@/lib/behavior/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 
 interface AssessmentHeader { id: string; assessment_type: string; status: string; assessment_period_start: string | null; assessment_period_end: string | null; overall_behavior_score: number | null; position_behavior_match: number | null; critical_gap_count: number | null; recommendation: string | null; finalized_at: string | null; created_at: string }
@@ -138,9 +138,12 @@ export default function BehaviorModule({ employees, t }: HRModuleProps) {
 
   const save = async (finalize: boolean) => {
     if (!editing) return;
-    /* Client-side justification gate mirrors the server so the user sees the
-       problem before the round-trip. */
+    /* Client-side gates mirror the server so the user sees the problem before
+       the round-trip: (1) mandatory/critical indicators must all be assessed,
+       (2) extreme scores and critical gaps must carry a justification. */
     if (finalize) {
+      const s = summarize(editing.items.map(toScorable));
+      if (!canFinalize(s)) { setError(t("hr.bhv.finalizeBlocked")); return; }
       const missing = editing.items.find((i) => requiresJustification(toScorable(i), i.comment));
       if (missing) { setError(t("hr.bhv.justError")); return; }
     }
@@ -289,14 +292,23 @@ export default function BehaviorModule({ employees, t }: HRModuleProps) {
             placeholder={t("hr.bhv.summaryPlaceholder")} rows={2}
             className="w-full px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
 
-          {draftSummary && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Card label={t("hr.bhv.overall")} value={draftSummary.overallScore == null ? "—" : String(draftSummary.overallScore)} />
-              <Card label={t("hr.bhv.match")} value={draftSummary.matchPct == null ? "—" : `${draftSummary.matchPct}%`} />
-              <Card label={t("hr.bhv.criticalGaps")} value={String(draftSummary.criticalGaps)} tone={draftSummary.criticalGaps ? "bad" : "good"} />
-              <Card label={t("hr.bhv.mandatoryGaps")} value={String(draftSummary.mandatoryGaps)} tone={draftSummary.mandatoryGaps ? "warn" : "good"} />
-            </div>
-          )}
+          {draftSummary && (() => {
+            const cs = criticalStatus(draftSummary);
+            const csLabel = cs === "clear" ? t("hr.bhv.csClear") : cs === "attention" ? t("hr.bhv.csAttention") : t("hr.bhv.csIncomplete");
+            const csTone: "good" | "warn" | "bad" = cs === "clear" ? "good" : cs === "attention" ? "bad" : "warn";
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Card label={t("hr.bhv.overall")} value={draftSummary.overallScore == null ? "—" : String(draftSummary.overallScore)} />
+                <Card label={t("hr.bhv.match")} value={draftSummary.matchPct == null ? "—" : `${draftSummary.matchPct}%`} />
+                <Card label={t("hr.bhv.coverage")} value={draftSummary.coveragePct == null ? "—" : `${draftSummary.coveragePct}%`} tone={draftSummary.coveragePct != null && draftSummary.coveragePct < 100 ? "warn" : undefined} />
+                <Card label={t("hr.bhv.criticalStatus")} value={csLabel} tone={csTone} />
+                <Card label={t("hr.bhv.criticalGaps")} value={String(draftSummary.criticalGaps)} tone={draftSummary.criticalGaps ? "bad" : "good"} />
+                <Card label={t("hr.bhv.criticalUnassessed")} value={String(draftSummary.criticalUnassessed)} tone={draftSummary.criticalUnassessed ? "warn" : "good"} />
+                <Card label={t("hr.bhv.mandatoryGaps")} value={String(draftSummary.mandatoryGaps)} tone={draftSummary.mandatoryGaps ? "warn" : "good"} />
+                <Card label={t("hr.bhv.mandatoryUnassessed")} value={String(draftSummary.mandatoryUnassessed)} tone={draftSummary.mandatoryUnassessed ? "warn" : "good"} />
+              </div>
+            );
+          })()}
 
           <div className="flex items-center justify-end gap-3">
             {error && <span className="text-[12px] text-rose-400">{error}</span>}

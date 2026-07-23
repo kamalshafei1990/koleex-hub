@@ -62,12 +62,43 @@ check("critical gap: score 0 IS a gap", critGap({ isCritical:true, requiredScore
 check("scoring surfaces critical alerts separately", src.includes("criticalAlerts") && src.includes("isCriticalGap"));
 check("justification required below 40 / above 95 / critical", src.includes("< 40 || row.score > 95") && src.includes("requiresJustification"));
 
+/* Coverage + completeness (P0/P1) — re-implement and cross-check. */
+const coverage = (rows) => rows.length ? Math.round((rows.filter((r) => r.score != null).length / rows.length) * 100) : null;
+const critUnassessed = (rows) => rows.filter((r) => r.score == null && r.isCritical).length;
+const mandUnassessed = (rows) => rows.filter((r) => r.score == null && r.isMandatory).length;
+const critStatus = (rows) => {
+  if (rows.some((r) => critGap(r))) return "attention";
+  if (critUnassessed(rows) > 0 || mandUnassessed(rows) > 0) return "incomplete";
+  return "clear";
+};
+const canFin = (rows) => critUnassessed(rows) === 0 && mandUnassessed(rows) === 0;
+
+check("coverage: 2 of 4 assessed = 50%", coverage([{score:80},{score:60},{score:null},{score:null}]) === 50);
+check("coverage: empty set → null", coverage([]) === null);
+check("critical unassessed counted (score NULL + critical)", critUnassessed([{score:null,isCritical:true},{score:90,isCritical:true},{score:null,isCritical:false}]) === 1);
+check("mandatory unassessed counted", mandUnassessed([{score:null,isMandatory:true},{score:0,isMandatory:true}]) === 1);
+check("critical status: gap → attention", critStatus([{isCritical:true,requiredScore:90,score:40}]) === "attention");
+check("critical status: unmeasured critical → incomplete", critStatus([{isCritical:true,requiredScore:90,score:null}]) === "incomplete");
+check("critical status: all measured, no gap → clear", critStatus([{isCritical:true,requiredScore:60,score:80}]) === "clear");
+check("canFinalize false when critical unassessed", !canFin([{isCritical:true,score:null}]));
+check("canFinalize false when mandatory unassessed", !canFin([{isMandatory:true,score:null}]));
+check("canFinalize true when all mandatory/critical assessed", canFin([{isCritical:true,score:70},{isMandatory:true,score:65},{score:null}]));
+check("scoring.ts exports coverage + completeness helpers", src.includes("coveragePct") && src.includes("criticalUnassessed") && src.includes("mandatoryUnassessed") && src.includes("export function canFinalize") && src.includes("export function criticalStatus"));
+
+/* Min-category-coverage gate for strongest/weakest. */
+const catQualifies = (assessed, total) => assessed >= 3 || (total > 0 && assessed / total >= 0.6);
+check("category with 1/20 assessed does NOT qualify", !catQualifies(1, 20));
+check("category with 3 assessed qualifies", catQualifies(3, 10));
+check("category with 60% coverage qualifies", catQualifies(2, 3));
+check("scoring.ts gates strongest/weakest on category depth", src.includes("categoryQualifies") && src.includes("MIN_CATEGORY_ASSESSED"));
+
 /* ── Half 2: wiring assertions ──────────────────────────────────────── */
 const hr = readFileSync("src/app/api/hr/behavior/route.ts", "utf8");
 check("assessment create needs HR create", hr.includes('requireModuleAction(auth, "HR", "create")'));
 check("assessment edit needs HR edit", hr.includes('requireModuleAction(auth, "HR", "edit")'));
 check("finalized assessments are immutable", hr.includes('"Finalized assessments cannot be edited."') && hr.includes("status === \"finalized\""));
 check("finalize runs the justification gate", hr.includes("requiresJustification") && hr.includes("justification comment is required"));
+check("finalize BLOCKS unassessed mandatory/critical indicators", hr.includes("mandatory_snapshot || r.critical_snapshot") && hr.includes("must be assessed before finalizing"));
 check("items snapshot the requirement", hr.includes("required_score_snapshot") && hr.includes("weight_snapshot") && hr.includes("critical_snapshot"));
 check("totals derived from snapshots at finalize", hr.includes("overall_behavior_score: summary.overallScore") && hr.includes("critical_gap_count: summary.criticalGaps"));
 check("tenant-owns the indicators", hr.includes('.from("behavior_indicators").select("id'));
@@ -95,6 +126,8 @@ const mod = readFileSync("src/components/hr/modules/Behavior.tsx", "utf8");
 check("HR module gates edit vs create", mod.includes('perms.can("HR", "edit")') && mod.includes('perms.can("HR", "create")'));
 check("HR module supports probation recommendation", mod.includes("hr.bhv.probationRec") && mod.includes("editing.type === \"probation\""));
 check("HR module finalizes assessments", mod.includes("save(true)") && mod.includes("Finalize"));
+check("HR module mirrors the completeness gate on the client", mod.includes("canFinalize") && mod.includes("hr.bhv.finalizeBlocked"));
+check("HR module shows coverage + critical status", mod.includes("hr.bhv.coverage") && mod.includes("criticalStatus") && mod.includes("hr.bhv.criticalUnassessed"));
 
 /* Separation invariant — behavior must never IMPORT the skills engine.
    (A comment referencing the deliberate separation is expected and fine;

@@ -439,6 +439,11 @@ export default function EmployeeSkillsSection({
             value={summary.matchPct == null ? "—" : `${summary.matchPct}%`}
             tone={summary.matchPct == null ? undefined : summary.matchPct >= 100 ? "good" : summary.matchPct < 70 ? "warn" : undefined}
           />
+          <SummaryCard
+            label={t("hr.sk.coverage")}
+            value={summary.coveragePct == null ? "—" : `${summary.coveragePct}% (${summary.positionAssessed}/${summary.positionTotal})`}
+            tone={summary.coveragePct != null && summary.coveragePct < 100 ? "warn" : "good"}
+          />
           <SummaryCard label={t("hr.sk.additionalScore")} value={summary.additionalScore == null ? "—" : String(summary.additionalScore)} />
           <SummaryCard label={t("hr.sk.overallScore")} value={summary.overallScore == null ? "—" : String(summary.overallScore)} />
           <SummaryCard label={t("hr.sk.meets")} value={String(summary.meets)} tone={summary.meets > 0 ? "good" : undefined} />

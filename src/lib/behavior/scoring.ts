@@ -125,6 +125,8 @@ export interface CategoryScore {
   categoryId: string;
   score: number | null;
   assessed: number;
+  /** Total indicators of this category present in the assessment. */
+  total: number;
   gaps: number;
   criticalGaps: number;
 }
@@ -141,9 +143,19 @@ export function categoryScores(rows: readonly BehaviorItem[]): CategoryScore[] {
     categoryId,
     score: weightedScore(items),
     assessed: items.filter((i) => i.score != null).length,
+    total: items.length,
     gaps: items.filter((i) => gapStatus(i) === "below").length,
     criticalGaps: items.filter(isCriticalGap).length,
   }));
+}
+
+/** A category is a fair candidate for "strongest/weakest" only when it has
+    enough assessed depth — one indicator scored 100 must not crown a whole
+    category over a thoroughly-assessed one. */
+export const MIN_CATEGORY_ASSESSED = 3;
+export function categoryQualifies(c: CategoryScore): boolean {
+  if (c.score == null) return false;
+  return c.assessed >= MIN_CATEGORY_ASSESSED || (c.total > 0 && c.assessed / c.total >= 0.6);
 }
 
 export interface BehaviorSummary {
@@ -157,6 +169,16 @@ export interface BehaviorSummary {
   criticalGaps: number;
   /** Critical indicators below requirement — the ones that must be surfaced. */
   criticalAlerts: BehaviorItem[];
+  /** ── Coverage: a high average on a handful of indicators is misleading, so
+     the summary always carries how much of the assessment is actually done. */
+  total: number;
+  assessed: number;
+  coveragePct: number | null;
+  /** Critical / mandatory indicators NOT yet assessed. Distinct from gaps: an
+     unassessed critical isn't a failure yet, but "Critical Gaps: 0" while
+     criticals are unmeasured is dangerous — so it is counted separately. */
+  criticalUnassessed: number;
+  mandatoryUnassessed: number;
   strongestCategoryId: string | null;
   weakestCategoryId: string | null;
 }
@@ -164,16 +186,20 @@ export interface BehaviorSummary {
 /** Everything the Behavior Summary cards show, in one derivation. */
 export function summarize(rows: readonly BehaviorItem[]): BehaviorSummary {
   let meets = 0, below = 0, unassessed = 0, mandatoryGaps = 0, criticalGaps = 0;
+  let criticalUnassessed = 0, mandatoryUnassessed = 0, assessed = 0;
   const criticalAlerts: BehaviorItem[] = [];
   for (const r of rows) {
+    if (r.score != null) assessed++;
     const g = gapStatus(r);
     if (g === "meets") meets++;
     else if (g === "below") below++;
     else if (g === "unassessed") unassessed++;
     if ((g === "below" || g === "unassessed") && r.isMandatory) mandatoryGaps++;
     if (isCriticalGap(r)) { criticalGaps++; criticalAlerts.push(r); }
+    if (r.score == null && r.isCritical) criticalUnassessed++;
+    if (r.score == null && r.isMandatory) mandatoryUnassessed++;
   }
-  const cats = categoryScores(rows).filter((c) => c.score != null);
+  const cats = categoryScores(rows).filter(categoryQualifies);
   const strongest = cats.length ? cats.reduce((a, b) => (b.score! > a.score! ? b : a)) : null;
   const weakest = cats.length ? cats.reduce((a, b) => (b.score! < a.score! ? b : a)) : null;
   return {
@@ -181,9 +207,32 @@ export function summarize(rows: readonly BehaviorItem[]): BehaviorSummary {
     requiredScore: requiredScoreAvg(rows),
     matchPct: matchPercentage(rows),
     meets, below, unassessed, mandatoryGaps, criticalGaps, criticalAlerts,
+    total: rows.length,
+    assessed,
+    coveragePct: rows.length ? Math.round((assessed / rows.length) * 100) : null,
+    criticalUnassessed, mandatoryUnassessed,
     strongestCategoryId: strongest?.categoryId ?? null,
     weakestCategoryId: weakest?.categoryId ?? null,
   };
+}
+
+export type CriticalStatus = "clear" | "attention" | "incomplete";
+
+/** Overall critical posture for an assessment. `clear` requires that NO
+    critical indicator is below requirement AND every critical/mandatory
+    indicator has actually been assessed — otherwise the green light would
+    be a false negative. */
+export function criticalStatus(s: BehaviorSummary): CriticalStatus {
+  if (s.criticalGaps > 0) return "attention";
+  if (s.criticalUnassessed > 0 || s.mandatoryUnassessed > 0) return "incomplete";
+  return "clear";
+}
+
+/** Finalize precondition: an assessment must not be frozen with mandatory or
+    critical indicators left unmeasured. Pure predicate — the API enforces it,
+    the client mirrors it. */
+export function canFinalize(s: BehaviorSummary): boolean {
+  return s.criticalUnassessed === 0 && s.mandatoryUnassessed === 0;
 }
 
 /** A justification comment is required when the score is extreme, a critical
