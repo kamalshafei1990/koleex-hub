@@ -422,6 +422,7 @@ export const hrT: Translations = {
 
   "hr.emergencySection":         { en: "Emergency contact",               zh: "紧急联系人",                    ar: "جهة اتصال الطوارئ" },
   "hr.emergencyName":            { en: "Name",                            zh: "姓名",                          ar: "الاسم" },
+  "hr.emergencyNamePlaceholder": { en: "Who to call",                     zh: "紧急时联系谁",                  ar: "بمن نتصل" },
   "hr.emergencyPhone":           { en: "Phone",                           zh: "电话",                          ar: "الهاتف" },
 
   "hr.filedOnBehalf":            { en: "· filed on their behalf",         zh: "· 由他人代为提交",              ar: "· قُدّم نيابةً عنه" },

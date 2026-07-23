@@ -86,7 +86,8 @@
     "runc:revoke": "node --import tsx scripts/discuss-run-c.mts revoke",
     "runc:audit": "node --import tsx scripts/discuss-run-c.mts audit",
     "validate:discuss-read-parallel": "node --import tsx scripts/validate-discuss-read-parallel.mts",
-    "validate:app-registry": "node scripts/validate-app-registry.mjs"
+    "validate:app-registry": "node scripts/validate-app-registry.mjs",
+    "validate:hr-translations": "node scripts/validate-hr-translations.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
