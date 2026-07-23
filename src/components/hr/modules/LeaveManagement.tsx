@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { HRModuleProps } from "@/components/hr/HRApp";
+import { useCurrentAccount } from "@/lib/identity";
 import {
   ModalShell,
   FieldLabel,
@@ -21,6 +22,7 @@ import {
   fmtDate,
   LEAVE_STATUS_MAP,
   makeTranslationHelpers,
+  EmployeeLink,
 } from "@/components/hr/shared";
 import {
   fetchLeaveRequests,
@@ -42,6 +44,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    ═══════════════════════════════════════════════════ */
 
 export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
+  const { account } = useCurrentAccount();
   /* ── Translation helpers ── */
   const { tStatus, tLeaveType } = makeTranslationHelpers(t);
 
@@ -117,7 +120,11 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
 
   const handleReviewLeave = async (id: string, status: "approved" | "rejected") => {
     setSaving(true);
-    await reviewLeaveRequest(id, status, "admin", reviewNotes || undefined);
+    /* reviewed_by is a uuid FK to koleex_employees — the old literal
+       "admin" failed the cast (invisible while writes were RLS-dead). Use
+       the signed-in user's employee record; null-safe because the column
+       is nullable and the server keeps working for non-employee admins. */
+    await reviewLeaveRequest(id, status, account?.employee?.id ?? null, reviewNotes || undefined);
     await reloadRequests();
     setSelectedLeave(null);
     setReviewNotes("");
@@ -208,7 +215,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                      {req.employee_name}
+                      <EmployeeLink id={req.employee_id} name={req.employee_name} />
                     </span>
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)] shrink-0">
                       {tLeaveType(req.leave_type_name)}

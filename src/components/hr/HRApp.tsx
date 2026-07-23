@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback, type ComponentType } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { hrT } from "@/lib/translations/hr";
-import { fetchEmployeeList, type EmployeeListItem } from "@/lib/employees-admin";
+import type { EmployeeListItem } from "@/lib/employees-admin";
+import { cachedEmployeeList } from "@/lib/hr-admin";
 import { type TabId, TAB_IDS, TAB_LABEL_KEYS } from "./shared";
 
 /* ── Icons ── */
@@ -85,15 +86,24 @@ export default function HRApp() {
   /* ── Navigation ── */
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
 
-  /* ── Shared employee list (many modules need it) ── */
-  const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
-  const [empLoading, setEmpLoading] = useState(true);
+  /* ── Shared employee list (many modules need it) ──
+     Warm-start: hydrate instantly from the last session's snapshot so the
+     app paints without a spinner on revisit, then refresh in the
+     background. Same pattern as the Customers list. */
+  const [employees, setEmployees] = useState<EmployeeListItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = sessionStorage.getItem("kx:hr:employees");
+      return raw ? (JSON.parse(raw) as EmployeeListItem[]) : [];
+    } catch { return []; }
+  });
+  const [empLoading, setEmpLoading] = useState(() => employees.length === 0);
 
   const loadEmployees = useCallback(async () => {
-    setEmpLoading(true);
     try {
-      const data = await fetchEmployeeList();
+      const data = await cachedEmployeeList();
       setEmployees(data);
+      try { sessionStorage.setItem("kx:hr:employees", JSON.stringify(data)); } catch { /* full */ }
     } catch (err) {
       console.error("[HR] Employee load error:", err);
     } finally {
@@ -115,7 +125,6 @@ export default function HRApp() {
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
           searchPlaceholder={searchPlaceholder}
-          searchHref="/inventory/search"
           tabs={TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             return {

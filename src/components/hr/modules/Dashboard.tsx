@@ -15,6 +15,7 @@ import {
   fmtDate,
   daysUntil,
   makeTranslationHelpers,
+  EmployeeLink,
 } from "@/components/hr/shared";
 import {
   fetchHrDashboardStats,
@@ -151,7 +152,7 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                      {leave.employee_name}
+                      <EmployeeLink id={leave.employee_id} name={leave.employee_name} />
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-subtle)] font-medium">
@@ -212,7 +213,7 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
                         {item.label}
                       </div>
                       <div className="text-[11px] text-[var(--text-dim)]">
-                        {item.employee_name}
+                        <EmployeeLink id={item.employee_id} name={item.employee_name} />
                       </div>
                     </div>
 

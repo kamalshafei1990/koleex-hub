@@ -3,6 +3,11 @@
 /* ---------------------------------------------------------------------------
    HR Admin — Unified CRUD for the HR management system.
 
+   Data path: every query runs through the permission-gated /api/hr/data
+   gateway (see src/lib/hr-client.ts). The hr_* tables are RLS deny-all, so
+   the old direct anon-key queries always returned empty / failed — the
+   builder below keeps the familiar supabase-js call shape only.
+
    Covers 18 tables across 8 modules:
      1. Leave Management       — leave types, balances, requests
      2. Attendance              — policies, daily records
@@ -14,7 +19,7 @@
      8. Documents               — employee document vault
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
+import { hrdb as supabase } from "./hr-client";
 import { fetchEmployeeList } from "./employees-admin";
 import type {
   LeaveTypeRow,
@@ -79,6 +84,21 @@ const POSITIONS = "koleex_positions";
 
 /* ── Helpers ── */
 
+/** One employee-list fetch per minute, shared by every HR module.
+ *  Without this the Dashboard alone fired three identical /api/employees
+ *  requests (stats + two name maps), and every list view added another. */
+let empCache: { at: number; p: Promise<Awaited<ReturnType<typeof fetchEmployeeList>>> } | null = null;
+export function cachedEmployeeList() {
+  const now = Date.now();
+  if (empCache && now - empCache.at < 60_000) return empCache.p;
+  const p = fetchEmployeeList().catch((e) => {
+    empCache = null;          // a failed fetch must not be memoised for a minute
+    throw e;
+  });
+  empCache = { at: now, p };
+  return p;
+}
+
 /** Build a map of employee_id -> person full_name by joining employees + people. */
 async function buildEmployeeNameMap(
   employeeIds: string[],
@@ -90,7 +110,7 @@ async function buildEmployeeNameMap(
   const map = new Map<string, string>();
   if (employeeIds.length === 0) return map;
   try {
-    const list = await fetchEmployeeList();
+    const list = await cachedEmployeeList();
     const wanted = new Set(employeeIds);
     for (const e of list) {
       if (wanted.has(e.id)) map.set(e.id, e.person.full_name);
@@ -144,7 +164,7 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
   try {
     // Total headcount + status breakdown — same source as the Employees app
     // (the anon koleex_employees read is RLS-blocked and always returned 0).
-    const employees = await fetchEmployeeList();
+    const employees = await cachedEmployeeList();
     stats.headcount = employees.length;
     for (const e of employees) {
       if (e.employment_status === "active") stats.active++;
@@ -376,8 +396,8 @@ export async function fetchLeaveRequests(
     .select("id, name")
     .in("id", typeIds);
 
-  const typeMap = new Map(
-    (types || []).map((t: any) => [t.id, t.name as string]),
+  const typeMap = new Map<string, string>(
+    (types || []).map((t: any) => [t.id as string, t.name as string]),
   );
 
   return requests.map((r) => ({
@@ -421,7 +441,7 @@ export async function createLeaveRequest(
 export async function reviewLeaveRequest(
   id: string,
   status: "approved" | "rejected",
-  reviewedBy: string,
+  reviewedBy: string | null,
   notes?: string,
 ): Promise<boolean> {
   // Get the request first
@@ -509,8 +529,8 @@ export async function fetchLeaveBalances(
     .select("id, name")
     .in("id", typeIds);
 
-  const typeMap = new Map(
-    (types || []).map((t: any) => [t.id, t.name as string]),
+  const typeMap = new Map<string, string>(
+    (types || []).map((t: any) => [t.id as string, t.name as string]),
   );
 
   return balances.map((b) => ({
@@ -768,10 +788,10 @@ export async function fetchJobPostings(
     ? await supabase.from(POSITIONS).select("id, title").in("id", posIds)
     : { data: [] };
 
-  const deptMap = new Map(
+  const deptMap = new Map<string, string>(
     (depts || []).map((d: any) => [d.id, d.name as string]),
   );
-  const posMap = new Map(
+  const posMap = new Map<string, string>(
     (positions || []).map((p: any) => [p.id, p.title as string]),
   );
 
@@ -849,7 +869,7 @@ export async function fetchApplicants(
     .select("id, title")
     .in("id", jobIds);
 
-  const jobMap = new Map(
+  const jobMap = new Map<string, string>(
     (jobs || []).map((j: any) => [j.id, j.title as string]),
   );
 
@@ -1149,7 +1169,7 @@ export async function fetchChecklistInstances(
     .select("id, name")
     .in("id", clIds);
 
-  const clMap = new Map(
+  const clMap = new Map<string, string>(
     (checklists || []).map((c: any) => [c.id, c.name as string]),
   );
 
@@ -1477,7 +1497,7 @@ export async function fetchTrainingRecords(
     .select("id, name")
     .in("id", courseIds);
 
-  const courseMap = new Map(
+  const courseMap = new Map<string, string>(
     (courses || []).map((c: any) => [c.id, c.name as string]),
   );
 

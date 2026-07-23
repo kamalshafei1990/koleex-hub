@@ -5,7 +5,8 @@
    Matches the Koleex Hub admin design system.
    --------------------------------------------------------------------------- */
 
-import { useEffect, type ReactNode, type ComponentType } from "react";
+import { useEffect, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import Link from "next/link";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
 /* ── CSS class constants ── */
@@ -277,4 +278,27 @@ export function makeTranslationHelpers(t: (key: string) => string) {
   };
 
   return { tStatus, tStage, tCat, tEmpType, tLeaveType };
+}
+
+/* ── Cross-app: employee names link to the Employees profile ─────────────
+   HR and the Employees app read the same person record (one SoT via
+   /api/employees); this makes that connection visible — any name in an HR
+   list opens the full profile instead of being dead text. stopPropagation
+   keeps row-level onClick handlers (open drawer etc.) working. */
+export function EmployeeLink({ id, name, className }: {
+  id: string | null | undefined;
+  name: string;
+  className?: string;
+}) {
+  if (!id) return <span className={className}>{name}</span>;
+  return (
+    <Link
+      href={`/employees/${id}`}
+      onClick={(e: MouseEvent) => e.stopPropagation()}
+      className={`${className ?? ""} hover:underline underline-offset-2`}
+      title={name}
+    >
+      {name}
+    </Link>
+  );
 }

@@ -18,6 +18,7 @@ import {
   cancelBtnCls,
   fmtDate,
   makeTranslationHelpers,
+  EmployeeLink,
 } from "@/components/hr/shared";
 import {
   fetchAppraisalCycles,
@@ -265,7 +266,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                      {a.employee_name}
+                      <EmployeeLink id={a.employee_id} name={a.employee_name} />
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="text-[11px] text-[var(--text-dim)]">
