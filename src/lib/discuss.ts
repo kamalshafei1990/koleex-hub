@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { cachedGet, invalidateCachedGet } from "./client-cache";
 import { uploadToStorage } from "./storage-client";
 import { checkDiscussUpload } from "./discuss-upload-policy";
 import { isTransientFetch } from "./util/transient-fetch";
@@ -93,7 +94,11 @@ async function discussMutate<T = unknown>(
       console.error("[Discuss] mutate", action, json.error ?? `HTTP ${res.status}`);
       return { ok: false, error: json.error ?? `HTTP ${res.status}` };
     }
-    return { ok: true, data: json.data };
+/* Any state change (read, pin, mute, hide, send…) may alter the
+       myChannels projection — drop the coalesced copy so the very next
+       recount reads fresh. */
+    invalidateCachedGet("/api/discuss/read?resource=myChannels");
+        return { ok: true, data: json.data };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!isTransientFetch(msg)) console.error("[Discuss] mutate", action, msg);
@@ -240,8 +245,21 @@ export async function fetchMyChannels(
   accountId: string,
 ): Promise<DiscussChannelWithState[]> {
   void accountId; // identity comes from the session server-side
-  const data = await discussRead<DiscussChannelWithState[]>("myChannels");
-  return data ?? [];
+  /* Coalesced: myChannels is the most expensive Discuss read and FIVE
+     consumers request it on one Home load (bell recount, floating panel,
+     home tile badge, realtime resubscribe, focus resync) — measured 5
+     identical calls at 3.5-3.9s each while the burst throttled everything
+     else. Short TTL: realtime pings land more than 8s apart in practice,
+     and every discuss mutate invalidates this key so mark-read / pin /
+     mute never read their own stale snapshot. */
+  try {
+    const json = await cachedGet<{ ok?: boolean; data?: DiscussChannelWithState[] }>(
+      "/api/discuss/read?resource=myChannels", 8_000,
+    );
+    return json?.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { cachedGet, invalidateCachedGet } from "./client-cache";
 import { uploadToStorage } from "./storage-client";
 import { isTransientFetch, warnOnce } from "./util/transient-fetch";
 import type {
@@ -41,7 +42,12 @@ async function inboxMutate(payload: Record<string, unknown>): Promise<{ ok: bool
       body: JSON.stringify(payload),
     });
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (res.ok) return { ok: true, data: j };
+    if (res.ok) {
+      /* markRead / markAllRead / archive / send all change the unread count —
+         drop the coalesced copy so the next recount is fresh. */
+      invalidateCachedGet("/api/inbox/feed"); // unread + unreadTasks + messages
+      return { ok: true, data: j };
+    }
     return { ok: false, error: (j.error as string) || `HTTP ${res.status}` };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Network error" };
@@ -210,6 +216,11 @@ function subscribeInboxBroadcast(accountId: string, onPing: () => void): () => v
     const channel = supabase.channel(topic);
     const created = { channel, listeners: new Set<() => void>() };
     channel.on("broadcast", { event: "changed" }, () => {
+      /* One invalidation per PING (not per listener): the listeners then
+         race into cachedGet together and share a single fresh request —
+         without this, a ping landing inside the coalesce TTL would re-read
+         the pre-ping snapshot and delay the new message until the next poll. */
+      invalidateCachedGet("/api/inbox/feed");
       for (const l of created.listeners) { try { l(); } catch { /* isolate */ } }
     }).subscribe();
     inboxBroadcastSubs.set(topic, created);
@@ -244,7 +255,19 @@ export function subscribeToInboxMessages(
        subscriber (bell + home task badge). The full shape measured 137 KB per
        call because of base64 sender avatars; the diff only needs ids and the
        callback only reads subject/body/category/metadata.type. */
-    const msgs = await inboxFeed<InboxMessageWithSender[]>("messages", { limit: "30", slim: "1" });
+    /* Coalesced with a tiny TTL: the bell and the home task badge are BOTH
+       subscribers, and a broadcast ping reaches them in the same tick — two
+       identical refetches per ping (three on mount, with the primes). 2s is
+       long enough to merge the simultaneous callers and far too short to
+       delay a real update. */
+    const msgs = await (async () => {
+      try {
+        const j = await cachedGet<{ ok?: boolean; data?: InboxMessageWithSender[] }>(
+          "/api/inbox/feed?resource=messages&limit=30&slim=1", 2_000,
+        );
+        return j?.data;
+      } catch { return undefined; }
+    })();
     if (closed || !msgs) return;
     for (const m of [...msgs].reverse()) {
       if (seen.has(m.id)) continue;
@@ -260,8 +283,19 @@ export function subscribeToInboxMessages(
 
 export async function fetchUnreadCount(accountId: string): Promise<number> {
   void accountId; // recipient scope comes from the session server-side
-  const n = await inboxFeed<number>("unread");
-  return n ?? 0;
+  /* Coalesced: four consumers ask for this count on one Home load (bell
+     poll seed, bell realtime verify, home to-do badge, focus resync). The
+     endpoint already serves Cache-Control max-age=15, so a 5s client
+     coalesce adds no staleness — and every inbox mutate invalidates it so
+     mark-read updates the badge immediately. */
+  try {
+    const json = await cachedGet<{ ok?: boolean; data?: number }>(
+      "/api/inbox/feed?resource=unread", 5_000,
+    );
+    return json?.data ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** Count unread (not archived) TO-DO assignment notifications for one account.
@@ -273,8 +307,14 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
     we filter on that to keep the badge strictly to-do related. */
 export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
   void accountId; // recipient scope comes from the session server-side
-  const n = await inboxFeed<number>("unreadTasks");
-  return n ?? 0;
+  try {
+    const json = await cachedGet<{ ok?: boolean; data?: number }>(
+      "/api/inbox/feed?resource=unreadTasks", 5_000,
+    );
+    return json?.data ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function markMessageRead(id: string): Promise<boolean> {

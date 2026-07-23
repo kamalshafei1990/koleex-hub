@@ -841,8 +841,13 @@ export default function HomePage() {
         const a = getApp(id);
         if (!a?.active) continue;
         try { router.prefetch(a.route); } catch { /* ignore */ }
-        const url = APP_DATA_PREFETCH[id];
-        if (url) { try { void fetch(url, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ } }
+        /* Data prefetch REMOVED from the idle tier on evidence: it downloaded
+           full app lists for apps the user may never open (contacts customer
+           1.6 MB + supplier 0.8 MB + products 253 KB measured on one Home
+           load) and that burst competed with Home's own live requests —
+           heartbeat 3.0s, myChannels 3.8s in the same window. Idle now warms
+           only the CHEAP layers (route RSC + app chunk); the data warm still
+           happens on hover, where a click is actually imminent. */
         /* Priority-1: warm the REAL client app chunk (not just the RSC shell)
            for the top 1–2 authorized frequent apps once Home is idle — this is
            what makes the FIRST launch fast (route prefetch alone leaves the
