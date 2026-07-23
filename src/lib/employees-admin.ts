@@ -139,6 +139,8 @@ export interface EmployeeWizardData {
   /** JSON string of [{platform, value}] — the form edits it as an array and
       serialises here so the rest of the wizard stays a flat string map. */
   social_accounts: string;
+  /** JSON string of skill assessment rows — see parseSkills on the server. */
+  skills: string;
   national_id_doc_url: string;
   national_id_back_doc_url: string;
   passport_doc_url: string;
@@ -243,6 +245,7 @@ export function emptyWizardData(): EmployeeWizardData {
     wechat_id: "",
     wechat_qr_url: "",
     social_accounts: "[]",
+    skills: "[]",
     national_id_doc_url: "",
     national_id_back_doc_url: "",
     passport_doc_url: "",
@@ -997,6 +1000,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
     social_accounts: JSON.stringify(
       Array.isArray(emp.social_accounts) ? emp.social_accounts : [],
     ),
+    skills: JSON.stringify(p.skills ?? []),
     national_id_doc_url: s(emp.national_id_doc_url),
     national_id_back_doc_url: s(emp.national_id_back_doc_url),
     passport_doc_url: s(emp.passport_doc_url),

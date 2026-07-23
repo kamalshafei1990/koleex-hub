@@ -61,6 +61,87 @@ function bool(b: Body, k: string): boolean {
   return Boolean(b[k]);
 }
 
+/* Skill assessments arrive as a JSON string (the wizard state is a flat
+   string map). Validation mirrors the DB checks; a malformed payload degrades
+   to [] rather than failing the whole employee save — losing a slider value
+   is recoverable, losing the hire record is not. Dedup by skill_id because
+   UNIQUE(employee_id, skill_id) would otherwise abort the insert. */
+interface SkillAssessmentIn {
+  skill_id: string;
+  source: "position" | "additional";
+  /** null = unassessed — NOT the same fact as 0. */
+  employee_score: number | null;
+  years_of_experience: number | null;
+  notes: string | null;
+}
+function parseSkills(raw: unknown): SkillAssessmentIn[] {
+  let arr: unknown = raw;
+  if (typeof raw === "string") {
+    try { arr = JSON.parse(raw); } catch { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const seen = new Map<string, SkillAssessmentIn>();
+  for (const x of arr) {
+    if (!x || typeof x !== "object") continue;
+    const r = x as Record<string, unknown>;
+    const skillId = typeof r.skill_id === "string" ? r.skill_id : "";
+    if (!skillId) continue;
+    let score: number | null = null;
+    if (r.employee_score != null && r.employee_score !== "") {
+      const n = Math.round(Number(r.employee_score));
+      if (!Number.isFinite(n)) continue;
+      score = Math.min(100, Math.max(0, n));
+    }
+    let years: number | null = null;
+    if (r.years_of_experience != null && r.years_of_experience !== "") {
+      const n = Number(r.years_of_experience);
+      if (Number.isFinite(n) && n >= 0) years = Math.min(80, n);
+    }
+    seen.set(skillId, {
+      skill_id: skillId,
+      source: r.source === "additional" ? "additional" : "position",
+      employee_score: score,
+      years_of_experience: years,
+      notes: typeof r.notes === "string" && r.notes.trim() ? r.notes.trim().slice(0, 1000) : null,
+    });
+  }
+  return [...seen.values()].slice(0, 300);
+}
+
+/* Replace-set the employee's assessments. Tenant safety: only skill ids that
+   exist in THIS tenant's library survive the filter — a cross-tenant id is
+   dropped, never written. */
+async function saveSkillAssessments(
+  tenantId: string | null,
+  employeeId: string,
+  raw: unknown,
+): Promise<string | null> {
+  const rows = parseSkills(raw);
+  const { data: owned } = await supabaseServer
+    .from("skills").select("id").eq("tenant_id", tenantId).in("id", rows.map((r) => r.skill_id));
+  const ownedSet = new Set((owned ?? []).map((s) => s.id));
+  const safe = rows.filter((r) => ownedSet.has(r.skill_id));
+
+  const { error: delErr } = await supabaseServer
+    .from("employee_skill_assessments").delete().eq("employee_id", employeeId);
+  if (delErr) return delErr.message;
+  if (!safe.length) return null;
+  const now = new Date().toISOString();
+  const { error: insErr } = await supabaseServer.from("employee_skill_assessments").insert(
+    safe.map((r) => ({
+      tenant_id: tenantId,
+      employee_id: employeeId,
+      skill_id: r.skill_id,
+      source: r.source,
+      employee_score: r.employee_score,
+      years_of_experience: r.years_of_experience,
+      notes: r.notes,
+      last_assessed_at: r.employee_score != null ? now : null,
+    })),
+  );
+  return insErr?.message ?? null;
+}
+
 /* social_accounts arrives as a JSON string from the wizard (whose state is a
    flat string map). Anything that isn't a well-formed array of {platform,
    value} degrades to [] rather than throwing — a malformed social handle is
@@ -353,6 +434,12 @@ export async function POST(req: Request) {
       { success: false, error: `Failed to create employee: ${empErr?.message}`, personId: person.id },
       { status: 500 },
     );
+  }
+
+  /* ── Step 3b: Skill assessments (non-fatal — the hire is already real) ── */
+  if (body.skills !== undefined) {
+    const skillErr = await saveSkillAssessments(auth.tenant_id, employee.id, body.skills);
+    if (skillErr) console.error("[employees/full POST skills]", skillErr);
   }
 
   /* ── Step 4: Create Assignment ── */
@@ -783,6 +870,18 @@ export async function PUT(req: Request) {
         effective_date: new Date().toISOString().split("T")[0],
         notes: "Updated via employee form",
       });
+    }
+  }
+
+  /* Skills: only touched when the payload carries the key, so older callers
+     that don't know about skills can never wipe existing assessments. */
+  if (body.skills !== undefined) {
+    const skillErr = await saveSkillAssessments(auth.tenant_id, employeeId, body.skills);
+    if (skillErr) {
+      return NextResponse.json(
+        { success: false, error: `Saved, but skills failed: ${skillErr}` },
+        { status: 500 },
+      );
     }
   }
 

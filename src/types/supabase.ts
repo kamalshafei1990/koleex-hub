@@ -782,6 +782,16 @@ export interface PositionHistoryRow {
 export interface EmployeeWithLinks {
   person: PersonRow;
   employee: EmployeeRow;
+  /** Skill assessments (may be absent on older cached payloads). */
+  skills?: {
+    skill_id: string;
+    source: "position" | "additional";
+    employee_score: number | null;
+    years_of_experience: number | null;
+    notes: string | null;
+    is_verified: boolean;
+    last_assessed_at: string | null;
+  }[];
   account: AccountRow | null;
   assignment: AssignmentRow | null;
   department: DepartmentRow | null;

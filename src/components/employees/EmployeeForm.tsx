@@ -32,6 +32,9 @@ import EmployeesIcon from "@/components/icons/EmployeesIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import EmployeeSkillsSection from "@/components/employees/EmployeeSkillsSection";
+import { usePermissions } from "@/lib/permissions";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import {
@@ -898,11 +901,12 @@ const panelCls =
    Supplier form (CustomerTabBar in Contacts.tsx): photo hero up top,
    then the form split into tab panes instead of one long scroll. Panes
    stay MOUNTED (hidden, not unmounted) so values and validation hold. */
-type EmpTab = "personal" | "employment" | "compensation" | "documents" | "account";
+type EmpTab = "personal" | "employment" | "skills" | "compensation" | "documents" | "account";
 
 const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }[] = [
   { id: "personal", label: "Personal", icon: UserIcon },
   { id: "employment", label: "Employment", icon: BriefcaseIcon },
+  { id: "skills", label: "Skills", icon: SparklesIcon },
   { id: "compensation", label: "Compensation", icon: CreditCardIcon },
   { id: "documents", label: "Documents", icon: DocumentIcon },
   { id: "account", label: "Account", icon: KeyIcon },
@@ -1038,6 +1042,7 @@ export interface EmployeeFormProps {
    writing different subsets of columns, so the same employee looked like a
    different record depending on which door you came through. */
 export default function EmployeeForm({ mode = "create", employeeId, initial }: EmployeeFormProps) {
+  const perms = usePermissions();
   const isEdit = mode === "edit";
   const { t } = useTranslation(employeesT);
   const router = useRouter();
@@ -2013,6 +2018,23 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             </div>
           </section>
 
+          </div>
+
+          {/* ── SKILLS TAB ── */}
+          <div className={activeTab === "skills" ? "space-y-4" : "hidden"}>
+            <section className={panelCls}>
+              <SectionHeader
+                icon={SparklesIcon}
+                title="Skills"
+                description="Position requirements load automatically; add anything extra this person can do."
+              />
+              <EmployeeSkillsSection
+                positionId={form.create_new_position ? "" : form.position_id}
+                value={form.skills}
+                onChange={(v) => set("skills", v)}
+                canConfigurePosition={perms.can("Employees", "edit")}
+              />
+            </section>
           </div>
 
           {/* ── COMPENSATION TAB ── */}

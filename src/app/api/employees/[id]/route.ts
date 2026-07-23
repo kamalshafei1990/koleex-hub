@@ -94,8 +94,16 @@ export async function GET(
   /* Column-level policy (shared registry, same rules as Koleex AI):
      · salary / banking / legal-ID columns need can_view_private (or SA)
      · account login secrets (password_hash etc.) never leave the server */
+  /* Skill assessments — needed by the edit form and the profile. Small set,
+     fetched alongside rather than in a second round-trip from the client. */
+  const { data: skillRows } = await supabaseServer
+    .from("employee_skill_assessments")
+    .select("skill_id, source, employee_score, years_of_experience, notes, is_verified, last_assessed_at")
+    .eq("employee_id", id);
+
   return NextResponse.json({
     person,
+    skills: skillRows ?? [],
     employee: sanitizeEmployeeRow(auth, emp as Record<string, unknown>),
     account: sanitizeAccountRow(
       ((accountRes as { data: unknown }).data ?? null) as Record<string, unknown> | null,
