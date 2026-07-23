@@ -52,6 +52,8 @@ import {
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { useCurrentAccount } from "@/lib/identity";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
@@ -69,56 +71,58 @@ import type {
    silently on flaky networks or after mobile Safari kills the tab. */
 const POLL_INTERVAL_MS = 60_000;
 
-function timeAgo(iso: string): string {
+type TFn = (key: string, fallback?: string) => string;
+
+function timeAgo(iso: string, t: TFn): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const diff = Date.now() - then;
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("notif.justNow");
+  if (minutes < 60) return t("notif.minAgo").replace("{n}", String(minutes));
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("notif.hourAgo").replace("{n}", String(hours));
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t("notif.dayAgo").replace("{n}", String(days));
   return new Date(iso).toLocaleDateString();
 }
 
 function categoryStyle(
   category: InboxMessageWithSender["category"],
   dk: boolean,
-): { label: string; className: string } {
+): { labelKey: string; className: string } {
   switch (category) {
     case "membership_request":
       return {
-        label: "Request",
+        labelKey: "notif.cat.request",
         className: dk
           ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
           : "bg-amber-100 text-amber-700 border-amber-200",
       };
     case "system":
       return {
-        label: "System",
+        labelKey: "notif.cat.system",
         className: dk
           ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
           : "bg-sky-100 text-sky-700 border-sky-200",
       };
     case "alert":
       return {
-        label: "Alert",
+        labelKey: "notif.cat.alert",
         className: dk
           ? "bg-red-500/15 text-red-300 border-red-500/30"
           : "bg-red-100 text-red-700 border-red-200",
       };
     case "task":
       return {
-        label: "Task",
+        labelKey: "notif.cat.task",
         className: dk
           ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
           : "bg-emerald-100 text-emerald-700 border-emerald-200",
       };
     default:
       return {
-        label: "Message",
+        labelKey: "notif.cat.message",
         className: dk
           ? "bg-white/[0.06] text-white/70 border-white/[0.1]"
           : "bg-black/[0.04] text-black/70 border-black/[0.1]",
@@ -129,23 +133,24 @@ function categoryStyle(
 /** Resolve the best label for a Discuss channel row, mirroring the
  *  same fallback chain the sidebar uses: explicit name → DM partner's
  *  full name/username → linked CRM contact → "Untitled". */
-function channelLabel(channel: DiscussChannelWithState): string {
+function channelLabel(channel: DiscussChannelWithState, t: TFn): string {
   if (channel.name && channel.name.trim().length > 0) return channel.name;
   if (channel.other) {
     return (
       channel.other.full_name ||
       channel.other.username ||
-      "Direct message"
+      t("notif.dm")
     );
   }
   if (channel.linked_contact) {
     return channel.linked_contact.display_name;
   }
-  return "Untitled";
+  return t("notif.untitled");
 }
 
 export default function NotificationBell({ dk }: { dk: boolean }) {
   const router = useRouter();
+  const { t } = useTranslation(hubT);
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
 
@@ -461,7 +466,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       return;
     }
     setLoadingInbox(true);
-    const rows = await fetchInboxMessages(accountId, { limit: 8 });
+    const rows = await fetchInboxMessages(accountId, { limit: 8, slim: true });
     setMessages(rows);
     setLoadingInbox(false);
     const n = await fetchUnreadCount(accountId);
@@ -492,7 +497,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
        Discuss app will mark-read on its own once the channel opens. */
     setDiscussChannels((prev) =>
       prev.map((c) =>
-        c.id === channelId ? { ...c, unread_count: 0 } : c,
+        c.id === channelId ? { ...c, unread_count: 0, marked_unread: false } : c,
       ),
     );
     router.push(`/discuss?channel=${channelId}`);
@@ -530,9 +535,14 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       void markAllRead(aid);
     }
     if (discussUnread > 0) {
-      const toClear = discussChannels.filter((c) => (c.unread_count ?? 0) > 0);
+      /* Include channels the user manually "marked as unread" (dot, count 0):
+         they contribute to the badge, so leaving them out let the badge stay
+         red after "Mark all read" — the server's markRead clears the flag. */
+      const toClear = discussChannels.filter(
+        (c) => (c.unread_count ?? 0) > 0 || c.marked_unread,
+      );
       setDiscussChannels((prev) =>
-        prev.map((c) => ({ ...c, unread_count: 0 })),
+        prev.map((c) => ({ ...c, unread_count: 0, marked_unread: false })),
       );
       /* Fan out one mark-read per unread channel. Errors are
          swallowed — the next recount will reconcile. */
@@ -546,7 +556,11 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   /* Discuss section: only channels that actually have unread, sorted
      by the most recent activity so the freshest pings are at the top. */
   const discussRows = discussChannels
-    .filter((c) => (c.unread_count ?? 0) > 0)
+    /* Same predicate as the badge sum above. Filtering on unread_count alone
+       hid manually-marked-unread conversations: the badge said "1" while the
+       dropdown said "all caught up" — a phantom notification you could never
+       find. Badge and rows must always agree. */
+    .filter((c) => (c.unread_count ?? 0) > 0 || c.marked_unread)
     .sort((a, b) => {
       const at = a.last_message_at
         ? new Date(a.last_message_at).getTime()
@@ -564,8 +578,8 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         type="button"
         aria-label={
           totalUnread > 0
-            ? `Notifications (${totalUnread} unread)`
-            : "Notifications"
+            ? `${t("notif.title")} (${totalUnread})`
+            : t("notif.title")
         }
         aria-haspopup="menu"
         aria-expanded={open}
@@ -612,7 +626,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   dk ? "text-white" : "text-black"
                 }`}
               >
-                Notifications
+                {t("notif.title")}
               </span>
               {totalUnread > 0 && (
                 <span
@@ -622,7 +636,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                       : "bg-red-100 text-red-700 border-red-200"
                   }`}
                 >
-                  {totalUnread} new
+                  {totalUnread} {t("notif.new")}
                 </span>
               )}
             </div>
@@ -637,7 +651,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
               }`}
             >
               <CheckCheckIcon size={12} />
-              Mark all read
+              {t("notif.markAllRead")}
             </button>
           </div>
 
@@ -652,13 +666,16 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <MessageSquareIcon size={11} />
-                  Discuss
+                  {t("notif.discuss")}
                 </div>
                 <ul className="pb-1">
                   {discussRows.map((channel) => {
-                    const label = channelLabel(channel);
+                    const label = channelLabel(channel, t);
                     const preview =
-                      channel.last_message?.body?.trim() || "New message";
+                      channel.last_message?.body?.trim() ||
+                      ((channel.unread_count ?? 0) > 0
+                        ? t("notif.newMessage")
+                        : t("notif.markedUnread"));
                     const author =
                       channel.last_message?.author_username || null;
                     return (
@@ -692,7 +709,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                                     : "bg-red-100 text-red-700"
                                 }`}
                               >
-                                {channel.unread_count}
+                                {(channel.unread_count ?? 0) > 0 ? channel.unread_count : "•"}
                               </span>
                             </div>
                             <div
@@ -726,7 +743,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <InboxRawIcon size={11} />
-                  Inbox
+                  {t("notif.inbox")}
                 </div>
                 <ul className="py-1">
                   {messages.map((msg) => {
@@ -746,10 +763,22 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                     const isUnread = !msg.read_at;
                     return (
                       <li key={msg.id}>
-                        <button
-                          type="button"
+                        {/* div, not <button>: the row body renders
+                            AutoTranslatedText, whose inline "machine
+                            translation" toggle is itself a <button>. Nested
+                            buttons are invalid HTML and were breaking React
+                            hydration on every open of the dropdown. */}
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleInboxRowClick(msg)}
-                          className={`w-full text-left px-4 py-3 transition-colors flex gap-3 ${
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              void handleInboxRowClick(msg);
+                            }
+                          }}
+                          className={`w-full cursor-pointer text-left px-4 py-3 transition-colors flex gap-3 ${
                             dk
                               ? "hover:bg-white/[0.04]"
                               : "hover:bg-black/[0.03]"
@@ -770,14 +799,14 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                               <span
                                 className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${cat.className}`}
                               >
-                                {cat.label}
+                                {t(cat.labelKey)}
                               </span>
                               <span
                                 className={`text-[10px] ${
                                   dk ? "text-white/40" : "text-black/40"
                                 }`}
                               >
-                                {timeAgo(msg.created_at)}
+                                {timeAgo(msg.created_at, t)}
                               </span>
                             </div>
                             {/* Auto-translate the notification into the reader's
@@ -804,7 +833,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                                 dk ? "text-white/40" : "text-black/40"
                               }`}
                             >
-                              From {senderName}
+                              {t("notif.from")} {senderName}
                               {senderAlt && (
                                 <span lang="zh" className="ms-1">
                                   {senderAlt}
@@ -812,7 +841,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                               )}
                             </div>
                           </div>
-                        </button>
+                        </div>
                       </li>
                     );
                   })}
@@ -841,14 +870,14 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                       dk ? "text-white/60" : "text-black/60"
                     }`}
                   >
-                    You&apos;re all caught up
+                    {t("notif.caughtUp")}
                   </p>
                   <p
                     className={`text-[11px] mt-1 ${
                       dk ? "text-white/35" : "text-black/35"
                     }`}
                   >
-                    New notifications from any app will appear here.
+                    {t("notif.caughtUpHint")}
                   </p>
                 </div>
               )}

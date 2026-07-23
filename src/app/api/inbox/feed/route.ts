@@ -56,21 +56,38 @@ export async function GET(req: Request) {
       case "messages": {
         const includeArchived = url.searchParams.get("archived") === "1";
         const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 200);
+        /* slim=1 — the badge/bell projection. The full shape ships the sender's
+           avatar_url, and several accounts store base64 data-URIs there (25 KB
+           for one user), repeated per row through the join: a limit=30 refresh
+           measured 137 KB where the underlying rows average 364 BYTES. The
+           bell never renders the avatar, and its subscription refetches this
+           list on every broadcast ping × every subscriber (bell + home task
+           badge). Slim drops avatar_url and trims metadata to the one key the
+           sound classifier reads. The /inbox page keeps the full shape. */
+        const slim = url.searchParams.get("slim") === "1";
+        /* Widened to `string` on purpose: supabase-js parses literal select
+           strings at the type level and rejects the slim projection. */
+        const projection: string = slim
+          ? `id, sender_account_id, category, subject, body, link, read_at, archived_at, created_at, metadata, sender:accounts!inbox_messages_sender_account_id_fkey ( id, username, person:people ( full_name, name_alt ) )`
+          : `*, sender:accounts!inbox_messages_sender_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`;
         let q = supabaseServer
           .from(INBOX)
-          .select(
-            `*, sender:accounts!inbox_messages_sender_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`,
-          )
+          .select(projection)
           .eq("recipient_account_id", me)
           .order("created_at", { ascending: false })
           .limit(limit);
         if (!includeArchived) q = q.is("archived_at", null);
         const { data, error } = await q;
         if (error) throw new Error(error.message);
-        const rows = ((data ?? []) as Array<Record<string, unknown> & { sender: SenderJoin }>).map((row) => {
+        const rows = ((data ?? []) as unknown as Array<Record<string, unknown> & { sender: SenderJoin }>).map((row) => {
           const { sender: _s, ...base } = row;
           void _s;
-          return { ...base, sender: flattenSender(row.sender) };
+          if (slim) {
+            const meta = base.metadata as { type?: unknown } | null;
+            base.metadata = meta && typeof meta === "object" && meta.type != null ? { type: meta.type } : {};
+          }
+          const sender = flattenSender(row.sender);
+          return { ...base, sender: sender ? { ...sender, avatar_url: sender.avatar_url ?? null } : null };
         });
         return NextResponse.json({ ok: true, data: rows });
       }

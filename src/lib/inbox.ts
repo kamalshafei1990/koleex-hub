@@ -174,12 +174,16 @@ export async function updateMembershipRequestStatus(
 /** List everything in a user's inbox that isn't archived, newest first. */
 export async function fetchInboxMessages(
   accountId: string,
-  options: { includeArchived?: boolean; limit?: number } = {},
+  options: { includeArchived?: boolean; limit?: number; slim?: boolean } = {},
 ): Promise<InboxMessageWithSender[]> {
-  const { includeArchived = false, limit = 100 } = options;
+  const { includeArchived = false, limit = 100, slim = false } = options;
   void accountId; // recipient scope comes from the session server-side
   const params: Record<string, string> = { limit: String(limit) };
   if (includeArchived) params.archived = "1";
+  /* slim: badge/bell projection — no sender avatar (base64 data-URIs blow the
+     payload ~12×), metadata trimmed to { type }. Use for any surface that does
+     not render the avatar or attachments. */
+  if (slim) params.slim = "1";
   const data = await inboxFeed<InboxMessageWithSender[]>("messages", params);
   return data ?? [];
 }
@@ -236,7 +240,11 @@ export function subscribeToInboxMessages(
   const seen = new Set<string>();
   const refresh = async () => {
     if (closed) return;
-    const msgs = await inboxFeed<InboxMessageWithSender[]>("messages", { limit: "30" });
+    /* Slim projection: this refetch runs on EVERY broadcast ping for EVERY
+       subscriber (bell + home task badge). The full shape measured 137 KB per
+       call because of base64 sender avatars; the diff only needs ids and the
+       callback only reads subject/body/category/metadata.type. */
+    const msgs = await inboxFeed<InboxMessageWithSender[]>("messages", { limit: "30", slim: "1" });
     if (closed || !msgs) return;
     for (const m of [...msgs].reverse()) {
       if (seen.has(m.id)) continue;
