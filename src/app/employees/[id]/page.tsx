@@ -104,16 +104,19 @@ function formatDate(iso: string | null | undefined) {
    REUSABLE BITS
    ═══════════════════════════════════════════════════ */
 
+/* Panels are `self-start` on purpose: in a grid they used to stretch to the
+   tallest row, so a 4-row card sat in an 8-row box and the page read as a
+   sparse wall of blocks. Height now follows content. */
 const panelCls =
-  "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
+  "self-start bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5";
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   const empty = value == null || value === "" ||
     (typeof value === "string" && !value.trim());
   return (
-    <div className="flex items-baseline gap-3 py-1.5 border-b border-[var(--border-faint)] last:border-0">
-      <span className="text-[11px] text-[var(--text-faint)] uppercase tracking-wide w-[120px] shrink-0">{label}</span>
-      <span className={`text-[13px] flex-1 min-w-0 break-words ${empty ? "text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>
+    <div className="flex items-baseline gap-3 py-[5px] border-b border-[var(--border-faint)] last:border-0">
+      <span className="text-[11px] text-[var(--text-faint)] uppercase tracking-wide w-[104px] shrink-0">{label}</span>
+      <span className={`text-[13px] flex-1 min-w-0 break-words text-end ${empty ? "text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>
         {empty ? "—" : value}
       </span>
     </div>
@@ -129,15 +132,13 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-[var(--border-faint)]">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0" aria-hidden>
-          <Icon size={16} />
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-[var(--text-primary)] leading-tight truncate">{title}</h2>
-          {description && <p className="text-[12px] text-[var(--text-dim)] mt-0.5">{description}</p>}
-        </div>
+    <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-[var(--border-faint)]">
+      <div className="flex items-center gap-2 min-w-0">
+        <Icon size={14} className="text-[var(--text-dim)] shrink-0" aria-hidden />
+        <h2 className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] leading-tight truncate">
+          {title}
+        </h2>
+        {description && <span className="sr-only">{description}</span>}
       </div>
       {action}
     </div>
@@ -439,7 +440,9 @@ export default function EmployeeProfilePage({
 
         {/* ── Panels ── */}
         {tab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          /* 3 columns from xl — at 2 the panels left half the viewport empty on a
+             desktop and pushed Emergency below the fold for no reason. */
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
             <section className={panelCls}>
               <SectionHeader icon={UserIcon} title={t("ov.personal")} description={t("ov.personal.desc")} />
               <div>
@@ -578,7 +581,7 @@ export default function EmployeeProfilePage({
         )}
 
         {tab === "hr" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
             <section className={panelCls}>
               <SectionHeader icon={CreditCardIcon} title={t("hr.compensation")} description={t("hr.compensation.desc")} />
               <div>
