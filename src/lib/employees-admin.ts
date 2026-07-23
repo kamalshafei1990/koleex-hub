@@ -229,9 +229,11 @@ export function emptyWizardData(): EmployeeWizardData {
     bank_account_number: "",
     bank_iban: "",
     bank_swift: "",
-    bank_currency: "",
+    bank_currency: "CNY",
     initial_salary: "",
-    salary_currency: "USD",
+    /* KOLEEX bills and pays in CNY — a USD default meant correcting the
+       currency on literally every new hire. */
+    salary_currency: "CNY",
     manager_id: "",
     insurance_provider: "",
     insurance_policy_number: "",

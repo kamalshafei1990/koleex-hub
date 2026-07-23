@@ -52,6 +52,11 @@ import {
 } from "@/lib/accounts-admin";
 import { uploadToStorage } from "@/lib/storage-client";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
+import {
+  RELIGION_OPTIONS, LANGUAGE_OPTIONS, RELATIONSHIP_OPTIONS,
+  CHILDREN_OPTIONS, splitMulti, joinMulti,
+} from "@/lib/hr/person-options";
+import { regionsFor, citiesFor } from "@/lib/geo/regions";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
@@ -85,7 +90,6 @@ const WORK_LOCATION_OPTIONS = [
   { value: "remote", label: "Remote" },
   { value: "hybrid", label: "Hybrid" },
 ];
-const RELATIONSHIP_OPTIONS = ["", "Spouse", "Parent", "Sibling", "Child", "Friend", "Other"];
 const BLOOD_TYPE_OPTIONS = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const DEGREE_OPTIONS = [
   { value: "", label: "Select..." },
@@ -279,6 +283,115 @@ function SelectInput({
         <AngleDownIcon size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
       </div>
       <FieldError msg={error} />
+    </div>
+  );
+}
+
+/* ── Multi-value picker (languages).
+   The column is a single `text`, so this joins on save and splits on load —
+   a free-text box could not express "Arabic AND English" without the operator
+   inventing a separator, and every operator invented a different one. */
+function MultiSelectInput({
+  label, value, onChange, options, placeholder = "Add…", allowCustom = true,
+}: {
+  label: string;
+  /** Comma-joined string, exactly as stored. */
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+  placeholder?: string;
+  allowCustom?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const selected = useMemo(() => splitMulti(value), [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const add = (v: string) => {
+    const item = v.trim();
+    if (!item) return;
+    if (selected.some((x) => x.toLowerCase() === item.toLowerCase())) return;
+    onChange(joinMulti([...selected, item]));
+    setQuery("");
+  };
+  const remove = (v: string) =>
+    onChange(joinMulti(selected.filter((x) => x !== v)));
+
+  const q = query.trim().toLowerCase();
+  const available = options.filter(
+    (o) => !selected.some((x) => x.toLowerCase() === o.toLowerCase()) &&
+           (!q || o.toLowerCase().includes(q)),
+  );
+  /* Offer the typed value when it matches nothing — an employee may speak a
+     language this list doesn't carry, and blocking that is worse than a typo. */
+  const canCreate = allowCustom && q.length > 1 &&
+    !options.some((o) => o.toLowerCase() === q) &&
+    !selected.some((x) => x.toLowerCase() === q);
+
+  return (
+    <div ref={boxRef} className="relative">
+      <FieldLabel label={label} />
+      <div
+        className={`min-h-10 w-full rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] px-2 py-1.5 flex flex-wrap items-center gap-1.5 cursor-text ${open ? "border-[var(--border-focus)]" : ""}`}
+        onClick={() => setOpen(true)}
+      >
+        {selected.map((v) => (
+          <span key={v} className="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] ps-2 pe-1 py-0.5 text-[12px] text-[var(--text-primary)]">
+            {v}
+            <button
+              type="button"
+              aria-label={`Remove ${v}`}
+              onClick={(e) => { e.stopPropagation(); remove(v); }}
+              className="w-4 h-4 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+            >
+              <CrossIcon size={9} />
+            </button>
+          </span>
+        ))}
+        <input
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); add(query); }
+            if (e.key === "Backspace" && !query && selected.length) remove(selected[selected.length - 1]);
+          }}
+          placeholder={selected.length ? "" : placeholder}
+          className="flex-1 min-w-[80px] h-6 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none"
+        />
+      </div>
+
+      {open && (available.length > 0 || canCreate) && (
+        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-xl py-1">
+          {canCreate && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); add(query); }}
+              className="w-full text-start px-3 py-2 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+            >
+              Add “{query.trim()}”
+            </button>
+          )}
+          {available.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); add(o); }}
+              className="w-full text-start px-3 py-2 text-[12.5px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -972,6 +1085,22 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
     [],
   );
 
+  /* Divisions for the chosen country, and cities for the chosen division.
+     Both recompute from the form, so changing the country above instantly
+     re-stocks the two pickers below it. */
+  const stateOptions: ComboOption[] = useMemo(
+    () => regionsFor(form.private_country).map((r) => ({
+      value: r.name,
+      label: r.name,
+      suffix: r.name_alt,
+    })),
+    [form.private_country],
+  );
+  const cityOptions: ComboOption[] = useMemo(
+    () => citiesFor(form.private_country, form.private_state).map((c) => ({ value: c, label: c })),
+    [form.private_country, form.private_state],
+  );
+
   /* Active-only manager picker. Filter in memory because the fetch
      response already trims most rows. */
   const managerOptions: ComboOption[] = useMemo(
@@ -1480,11 +1609,14 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               />
               <SelectInput label="Marital Status" value={form.marital_status} onChange={(v) => set("marital_status", v)}
                 options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder="Select..." />
-              <TextInput name="number_of_children" label="Children" value={form.number_of_children} onChange={(v) => set("number_of_children", v)} type="number" placeholder="0" min={0} max={30} inputMode="numeric" error={errFor("number_of_children")} />
+              <SelectInput name="number_of_children" label="Children" value={form.number_of_children} onChange={(v) => set("number_of_children", v)}
+                options={CHILDREN_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} error={errFor("number_of_children")} />
               <SelectInput label="Blood Type" value={form.blood_type} onChange={(v) => set("blood_type", v)}
                 options={BLOOD_TYPE_OPTIONS.map((b) => ({ value: b, label: b || "—" }))} placeholder="—" />
-              <TextInput label="Religion" value={form.religion} onChange={(v) => set("religion", v)} placeholder="e.g. Islam" />
-              <TextInput label="Languages" value={form.languages} onChange={(v) => set("languages", v)} placeholder="e.g. Arabic, English" />
+              <SelectInput label="Religion" value={form.religion} onChange={(v) => set("religion", v)}
+                options={RELIGION_OPTIONS.map((r) => ({ value: r, label: r }))} placeholder="Select..." />
+              <MultiSelectInput label="Languages" value={form.languages} onChange={(v) => set("languages", v)}
+                options={LANGUAGE_OPTIONS} placeholder="Add a language…" />
             </div>
           </section>
 
@@ -1513,16 +1645,52 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
               <TextInput label="Address Line 1" value={form.private_address_line1} onChange={(v) => set("private_address_line1", v)} placeholder="Street address" />
               <TextInput label="Address Line 2" value={form.private_address_line2} onChange={(v) => set("private_address_line2", v)} placeholder="Apt, suite, unit" />
-              <TextInput label="City" value={form.private_city} onChange={(v) => set("private_city", v)} placeholder="City" />
-              <TextInput label="State / Province" value={form.private_state} onChange={(v) => set("private_state", v)} placeholder="State" />
+              {/* Country → state → city. Ordered country-first because that is
+                  the direction the data flows: picking a country decides which
+                  provinces exist, and picking a province decides which cities.
+                  Countries we don't carry divisions for fall back to typing —
+                  an empty dropdown would read as "broken", not as "no data". */}
               <Combobox
                 label="Country"
                 value={form.private_country}
-                onChange={(v) => set("private_country", v)}
+                onChange={(v) => {
+                  set("private_country", v);
+                  /* Clear the finer levels: a province from the old country is
+                     simply wrong under the new one, and leaving it produces
+                     records like "Zhejiang, Egypt". */
+                  if (v !== form.private_country) { set("private_state", ""); set("private_city", ""); }
+                }}
                 options={countryOptions}
                 placeholder="Select country..."
                 searchPlaceholder="Search 249 countries…"
               />
+              {stateOptions.length > 0 ? (
+                <Combobox
+                  label="State / Province"
+                  value={form.private_state}
+                  onChange={(v) => {
+                    set("private_state", v);
+                    if (v !== form.private_state) set("private_city", "");
+                  }}
+                  options={stateOptions}
+                  placeholder="Select state / province..."
+                  searchPlaceholder="Type to search…"
+                />
+              ) : (
+                <TextInput label="State / Province" value={form.private_state} onChange={(v) => set("private_state", v)} placeholder="State" />
+              )}
+              {cityOptions.length > 0 ? (
+                <Combobox
+                  label="City"
+                  value={form.private_city}
+                  onChange={(v) => set("private_city", v)}
+                  options={cityOptions}
+                  placeholder="Select city..."
+                  searchPlaceholder="Type to search…"
+                />
+              ) : (
+                <TextInput label="City" value={form.private_city} onChange={(v) => set("private_city", v)} placeholder="City" />
+              )}
               <TextInput label="Postal Code" value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder="ZIP" />
             </div>
           </CollapsibleSection>
