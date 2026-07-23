@@ -17,13 +17,13 @@ export async function GET() {
   const [{ data: categories, error: catErr }, { data: indicators, error: indErr }] = await Promise.all([
     supabaseServer
       .from("behavior_categories")
-      .select("id, name, sort_order")
+      .select("id, name, name_zh, name_ar, sort_order")
       .eq("tenant_id", auth.tenant_id)
       .eq("is_active", true)
       .order("sort_order"),
     supabaseServer
       .from("behavior_indicators")
-      .select("id, category_id, name, description, assessor_guidance, is_critical_default, sort_order")
+      .select("id, category_id, name, name_zh, name_ar, description, assessor_guidance, is_critical_default, sort_order")
       .eq("tenant_id", auth.tenant_id)
       .eq("is_active", true)
       .order("sort_order"),

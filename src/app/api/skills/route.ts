@@ -18,13 +18,13 @@ export async function GET() {
   const [{ data: categories, error: catErr }, { data: skills, error: skErr }] = await Promise.all([
     supabaseServer
       .from("skill_categories")
-      .select("id, name, sort_order")
+      .select("id, name, name_zh, name_ar, sort_order")
       .eq("tenant_id", auth.tenant_id)
       .eq("is_active", true)
       .order("sort_order"),
     supabaseServer
       .from("skills")
-      .select("id, category_id, name, sort_order")
+      .select("id, category_id, name, name_zh, name_ar, sort_order")
       .eq("tenant_id", auth.tenant_id)
       .eq("is_active", true)
       .order("sort_order"),

@@ -13,6 +13,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { behaviorLevel, type BehaviorLevel } from "@/lib/behavior/scoring";
 import { useTranslation } from "@/lib/i18n";
+import { localizedName, nameMatches } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
 
 /** Behaviour level → translation key, so the slider label localises. */
@@ -25,8 +26,8 @@ const LEVEL_KEY: Record<BehaviorLevel, string> = {
   Unacceptable: "hr.bhv.lvUnacceptable",
 };
 
-export interface BehaviorCategory { id: string; name: string; sort_order: number }
-export interface BehaviorIndicator { id: string; category_id: string; name: string; description?: string | null; assessor_guidance?: string | null; is_critical_default: boolean; sort_order: number }
+export interface BehaviorCategory { id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number }
+export interface BehaviorIndicator { id: string; category_id: string; name: string; name_zh: string | null; name_ar: string | null; description?: string | null; assessor_guidance?: string | null; is_critical_default: boolean; sort_order: number }
 export interface BehaviorRequirement {
   behavior_indicator_id: string; required_score: number; weight: number;
   is_mandatory: boolean; is_critical: boolean; notes: string | null; sort_order: number;
@@ -110,16 +111,16 @@ export function BehaviorPicker({
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
   const [query, setQuery] = useState("");
   const [catFilter, setCatFilter] = useState("");
-  const q = query.trim().toLowerCase();
   const list = indicators.filter(
     (s) => !excludeIds.has(s.id) &&
       (!catFilter || s.category_id === catFilter) &&
-      (!q || s.name.toLowerCase().includes(q)),
+      /* matches the localised label AND the English original */
+      nameMatches(s, query, lang),
   ).slice(0, 150);
-  const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+  const catName = (id: string) => localizedName(categories.find((c) => c.id === id), lang);
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -140,7 +141,7 @@ export function BehaviorPicker({
           <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} aria-label={t("hr.bhv.allCategories")}
             className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none">
             <option value="">{t("hr.bhv.allCategories")}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{localizedName(c, lang)}</option>)}
           </select>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
@@ -150,7 +151,7 @@ export function BehaviorPicker({
             <button key={s.id} type="button" onClick={() => onPick(s.id)}
               className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start hover:bg-[var(--bg-surface-hover)] transition-colors">
               <span className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[13px] text-[var(--text-primary)] truncate">{s.name}</span>
+                <span className="text-[13px] text-[var(--text-primary)] truncate">{localizedName(s, lang)}</span>
                 {s.is_critical_default && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.bhv.critical")}</span>}
               </span>
               <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">{catName(s.category_id)}</span>
@@ -171,7 +172,7 @@ export function PositionBehaviorConfig({
   indicators: BehaviorIndicator[];
   onClose: () => void;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
   const [reqs, setReqs] = useState<BehaviorRequirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -224,7 +225,7 @@ export function PositionBehaviorConfig({
             <p className="py-6 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.bhv.noRequirements")}</p>
           ) : reqs.map((r) => (
             <div key={r.behavior_indicator_id} className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5">
-              <span className="min-w-[140px] flex-1 text-[13px] text-[var(--text-primary)] truncate">{indById.get(r.behavior_indicator_id)?.name ?? t("hr.bhv.unknown")}</span>
+              <span className="min-w-[140px] flex-1 text-[13px] text-[var(--text-primary)] truncate">{localizedName(indById.get(r.behavior_indicator_id), lang) || t("hr.bhv.unknown")}</span>
               <label className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-faint)]">{t("hr.bhv.required")}
                 <input type="number" min={0} max={100} value={r.required_score}
                   onChange={(e) => upd(r.behavior_indicator_id, { required_score: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}

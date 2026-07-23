@@ -110,6 +110,17 @@ check("configure gate uses Employees edit permission", form.includes('perms.can(
 const admin = readFileSync("src/lib/employees-admin.ts", "utf8");
 check("wizard hydrates skills from profile", admin.includes("JSON.stringify(p.skills ?? [])"));
 
+/* Skill and category names live in the DB, so they localise through
+   name_zh/name_ar (English `name` is the source of truth AND the fallback —
+   product names like Python or Figma stay English by design). */
+const i18nName = readFileSync("src/lib/i18n-name.ts", "utf8");
+check("library API returns the localised name columns", lib.includes("name_zh, name_ar"));
+check("localizedName falls back to English", i18nName.includes("|| row.name"));
+check("skills UI resolves names via localizedName", section.includes("localizedName"));
+check("skill search matches the English original too", section.includes("nameMatches"));
+check("HR Skills module localises library labels",
+  readFileSync("src/components/hr/modules/Skills.tsx", "utf8").includes("localizedName"));
+
 console.log(`\nvalidate:skills — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
 console.log("validate:skills passed");

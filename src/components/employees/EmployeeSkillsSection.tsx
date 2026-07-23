@@ -25,6 +25,7 @@ import {
   levelForScore, gapStatus, summarize, type ScorableSkill,
 } from "@/lib/skills/scoring";
 import { useTranslation } from "@/lib/i18n";
+import { localizedName, nameMatches } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
 
 /** Skill level (from levelForScore) → translation key. */
@@ -38,8 +39,8 @@ const SKILL_LEVEL_KEY: Record<string, string> = {
 };
 
 /* ── Library shapes (from /api/skills) ── */
-export interface SkillCategory { id: string; name: string; sort_order: number }
-export interface Skill { id: string; category_id: string; name: string; sort_order: number }
+export interface SkillCategory { id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number }
+export interface Skill { id: string; category_id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number }
 export interface PositionRequirement {
   skill_id: string; required_score: number; weight: number;
   is_mandatory: boolean; notes: string | null; sort_order: number;
@@ -124,7 +125,8 @@ export default function EmployeeSkillsSection({
   onChange: (v: string) => void;
   canConfigurePosition: boolean;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
+  const nm = useCallback((r: SkillCategory | Skill | undefined) => localizedName(r, lang), [lang]);
   const [categories, setCategories] = useState<SkillCategory[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [requirements, setRequirements] = useState<PositionRequirement[]>([]);
@@ -338,7 +340,7 @@ export default function EmployeeSkillsSection({
                     className="flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/40 px-3.5 py-2.5 text-start hover:bg-[var(--bg-surface-subtle)]/70 transition-colors"
                   >
                     <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
-                      {cat?.name ?? t("hr.sk.other")}
+                      {nm(cat) || t("hr.sk.other")}
                     </span>
                     <span className="flex items-center gap-2 shrink-0 text-[10.5px] text-[var(--text-faint)]">
                       <span>{assessed}/{catRows.length} {t("hr.sk.assessed")}</span>
@@ -359,7 +361,7 @@ export default function EmployeeSkillsSection({
                           <div key={r.skill_id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-3.5 py-2.5">
                             <div className="sm:w-[220px] shrink-0 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[13px] text-[var(--text-primary)] truncate">{sk?.name ?? t("hr.sk.unknownSkill")}</span>
+                                <span className="text-[13px] text-[var(--text-primary)] truncate">{nm(sk) || t("hr.sk.unknownSkill")}</span>
                                 {req?.is_mandatory && (
                                   <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.sk.req")}</span>
                                 )}
@@ -368,7 +370,7 @@ export default function EmployeeSkillsSection({
                                 {t("hr.sk.required")}: {req?.required_score ?? "—"}
                               </div>
                             </div>
-                            <SkillSlider value={r.employee_score} onChange={(v) => setScore(r.skill_id, v)} label={sk?.name ?? "skill"} />
+                            <SkillSlider value={r.employee_score} onChange={(v) => setScore(r.skill_id, v)} label={nm(sk) || "skill"} />
                             <GapBadge row={toScorable(r)} />
                           </div>
                         );
@@ -408,16 +410,16 @@ export default function EmployeeSkillsSection({
               return (
                 <div key={r.skill_id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-3.5 py-2.5">
                   <div className="sm:w-[220px] shrink-0 min-w-0">
-                    <span className="text-[13px] text-[var(--text-primary)] truncate block">{sk?.name ?? t("hr.sk.unknownSkill")}</span>
+                    <span className="text-[13px] text-[var(--text-primary)] truncate block">{nm(sk) || t("hr.sk.unknownSkill")}</span>
                     <span className="text-[10.5px] text-[var(--text-faint)]">
-                      {catById.get(sk?.category_id ?? "")?.name ?? ""}
+                      {nm(catById.get(sk?.category_id ?? ""))}
                     </span>
                   </div>
-                  <SkillSlider value={r.employee_score} onChange={(v) => setScore(r.skill_id, v)} label={sk?.name ?? "skill"} />
+                  <SkillSlider value={r.employee_score} onChange={(v) => setScore(r.skill_id, v)} label={nm(sk) || "skill"} />
                   <button
                     type="button"
                     onClick={() => removeRow(r.skill_id)}
-                    aria-label={`${t("hr.sk.remove")} ${sk?.name ?? ""}`}
+                    aria-label={`${t("hr.sk.remove")} ${nm(sk)}`}
                     className="shrink-0 w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <CrossIcon size={10} />
@@ -483,16 +485,17 @@ function SkillPicker({
   onPick: (skillId: string) => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
   const [query, setQuery] = useState("");
   const [catFilter, setCatFilter] = useState("");
-  const q = query.trim().toLowerCase();
   const list = skills.filter(
     (s) => !excludeIds.has(s.id) &&
       (!catFilter || s.category_id === catFilter) &&
-      (!q || s.name.toLowerCase().includes(q)),
+      /* search the localised label AND the English original, so an Arabic UI
+         still finds "Python" and a Chinese UI still finds "Excel". */
+      nameMatches(s, query, lang),
   ).slice(0, 120);
-  const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+  const catName = (id: string) => localizedName(categories.find((c) => c.id === id), lang);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -523,7 +526,7 @@ function SkillPicker({
             className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none"
           >
             <option value="">{t("hr.sk.allCategories")}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{localizedName(c, lang)}</option>)}
           </select>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
@@ -536,7 +539,7 @@ function SkillPicker({
               onClick={() => onPick(s.id)}
               className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
-              <span className="text-[13px] text-[var(--text-primary)]">{s.name}</span>
+              <span className="text-[13px] text-[var(--text-primary)]">{localizedName(s, lang)}</span>
               <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">{catName(s.category_id)}</span>
             </button>
           ))}
@@ -558,7 +561,7 @@ function PositionSkillsConfig({
   skills: Skill[];
   onClose: () => void;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
   const [reqs, setReqs] = useState<PositionRequirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -619,7 +622,7 @@ function PositionSkillsConfig({
           ) : reqs.map((r) => (
             <div key={r.skill_id} className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5">
               <span className="min-w-[140px] flex-1 text-[13px] text-[var(--text-primary)] truncate">
-                {skillById.get(r.skill_id)?.name ?? t("hr.sk.unknown")}
+                {localizedName(skillById.get(r.skill_id), lang) || t("hr.sk.unknown")}
               </span>
               <label className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-faint)]">
                 {t("hr.sk.required")}

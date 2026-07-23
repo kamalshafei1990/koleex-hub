@@ -22,6 +22,8 @@ import { usePermissions } from "@/lib/permissions";
 import { BehaviorSlider, BehaviorSliderStyles, BehaviorPicker, type BehaviorCategory, type BehaviorIndicator } from "@/components/behavior/BehaviorShared";
 import { summarize, gapStatus, isCriticalGap, requiresJustification, canFinalize, criticalStatus, type BehaviorItem } from "@/lib/behavior/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
+import type { Lang } from "@/lib/i18n";
+import { localizedName } from "@/lib/i18n-name";
 
 interface AssessmentHeader { id: string; assessment_type: string; status: string; assessment_period_start: string | null; assessment_period_end: string | null; overall_behavior_score: number | null; position_behavior_match: number | null; critical_gap_count: number | null; recommendation: string | null; finalized_at: string | null; created_at: string }
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean }
@@ -43,7 +45,9 @@ function Card({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
-export default function BehaviorModule({ employees, t }: HRModuleProps) {
+export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
+  const nm = (r: { name: string; name_zh: string | null; name_ar: string | null } | undefined) =>
+    localizedName(r, lang as Lang);
   const perms = usePermissions();
   const canEdit = perms.can("HR", "edit");
   const canCreate = perms.can("HR", "create");
@@ -232,7 +236,7 @@ export default function BehaviorModule({ employees, t }: HRModuleProps) {
               <div key={catId} className="rounded-xl border border-[var(--border-subtle)] overflow-hidden">
                 <button type="button" onClick={() => toggleCat(catId)} aria-expanded={open}
                   className="flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/40 px-3.5 py-2.5 text-start hover:bg-[var(--bg-surface-subtle)]/70 transition-colors">
-                  <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{catById.get(catId)?.name ?? t("hr.bhv.other")}</span>
+                  <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{nm(catById.get(catId)) || t("hr.bhv.other")}</span>
                   <span className="flex items-center gap-2 shrink-0 text-[10.5px] text-[var(--text-faint)]">
                     {crit > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 font-semibold text-rose-600 dark:text-rose-400">{crit} {t("hr.bhv.criticalChip")}</span>}
                     <AngleDownIcon size={12} className={`transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
@@ -249,13 +253,13 @@ export default function BehaviorModule({ employees, t }: HRModuleProps) {
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                             <div className="sm:w-[240px] shrink-0 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[13px] text-[var(--text-primary)] truncate">{ind?.name ?? "—"}</span>
+                                <span className="text-[13px] text-[var(--text-primary)] truncate">{nm(ind) || "—"}</span>
                                 {i.critical_snapshot && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.bhv.critical")}</span>}
                                 {i.mandatory_snapshot && <span className="shrink-0 rounded bg-amber-500/12 px-1 py-px text-[9px] font-bold uppercase text-amber-700 dark:text-amber-400">{t("hr.bhv.req")}</span>}
                               </div>
                               <div className="text-[10.5px] text-[var(--text-faint)]">{i.required_score_snapshot != null ? `${t("hr.bhv.required")}: ${i.required_score_snapshot}` : t("hr.bhv.additional")}</div>
                             </div>
-                            <BehaviorSlider value={i.employee_score} onChange={(v) => setItem(i.behavior_indicator_id, { employee_score: v })} label={ind?.name ?? "indicator"} disabled={!canEdit && !canCreate} />
+                            <BehaviorSlider value={i.employee_score} onChange={(v) => setItem(i.behavior_indicator_id, { employee_score: v })} label={nm(ind) || "indicator"} disabled={!canEdit && !canCreate} />
                             {i.source === "additional" && (
                               <button type="button" onClick={() => removeItem(i.behavior_indicator_id)} aria-label={t("hr.bhv.remove")}
                                 className="shrink-0 w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
@@ -383,7 +387,7 @@ export default function BehaviorModule({ employees, t }: HRModuleProps) {
               {viewing.items.map((i) => (
                 <div key={i.behavior_indicator_id} className="flex items-center justify-between gap-3 py-2">
                   <span className="text-[12.5px] text-[var(--text-primary)] truncate flex items-center gap-1.5">
-                    {indById.get(i.behavior_indicator_id)?.name ?? "—"}
+                    {nm(indById.get(i.behavior_indicator_id)) || "—"}
                     {i.critical_snapshot && isCriticalGap(toScorable(i)) && <TriangleWarningIcon size={12} className="text-rose-500 shrink-0" />}
                   </span>
                   <span className="text-[12.5px] tabular-nums text-[var(--text-primary)] shrink-0">{i.employee_score ?? "—"}{i.required_score_snapshot != null && <span className="text-[var(--text-faint)]"> / {i.required_score_snapshot}</span>}</span>

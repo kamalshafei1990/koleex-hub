@@ -137,6 +137,16 @@ check("Behavior does NOT merge with Skills scoring",
   !importsSkills(section) && !importsSkills(mod) && !importsSkills(src));
 check("scoring.ts documents the deliberate separation", src.includes("SEPARATE from src/lib/skills/scoring.ts"));
 
+/* Library names are DB-stored, so they localise through name_zh/name_ar with
+   English as the fallback — not through the translation dictionaries. */
+check("library API returns the localised name columns",
+  lib.includes("name_zh, name_ar"));
+check("behavior UI resolves names via localizedName",
+  readFileSync("src/components/behavior/BehaviorShared.tsx", "utf8").includes("localizedName")
+  && section.includes("localizedName") && mod.includes("localizedName"));
+check("indicator search matches the English original too",
+  readFileSync("src/components/behavior/BehaviorShared.tsx", "utf8").includes("nameMatches"));
+
 console.log(`\nvalidate:behavior — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
 console.log("validate:behavior passed");

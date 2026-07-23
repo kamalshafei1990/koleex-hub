@@ -18,17 +18,19 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { usePermissions } from "@/lib/permissions";
 import { levelForScore, summarize, gapStatus, type ScorableSkill } from "@/lib/skills/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
+import type { Lang } from "@/lib/i18n";
+import { localizedName } from "@/lib/i18n-name";
 
 interface Assessment { skill_id: string; source: string; employee_score: number | null; last_assessed_at: string | null }
 interface HistoryRow { skill_id: string; employee_score: number | null; recorded_at: string }
 interface Requirement { skill_id: string; required_score: number; weight: number; is_mandatory: boolean }
-interface LibSkill { id: string; category_id: string; name: string }
-interface LibCategory { id: string; name: string }
+interface LibSkill { id: string; category_id: string; name: string; name_zh: string | null; name_ar: string | null }
+interface LibCategory { id: string; name: string; name_zh: string | null; name_ar: string | null }
 
 type Period = "weekly" | "monthly" | "annual";
 const PERIOD_DAYS: Record<Period, number> = { weekly: 7, monthly: 30, annual: 365 };
 
-export default function SkillsModule({ employees, t }: HRModuleProps) {
+export default function SkillsModule({ employees, t, lang }: HRModuleProps) {
   const perms = usePermissions();
   const canEdit = perms.can("HR", "edit");
 
@@ -75,11 +77,15 @@ export default function SkillsModule({ employees, t }: HRModuleProps) {
 
   useEffect(() => { if (employeeId) void load(employeeId); }, [employeeId, load]);
 
-  const skillName = useMemo(() => new Map(libSkills.map((s) => [s.id, s.name])), [libSkills]);
+  /* Library labels resolve to the active language, English as fallback. */
+  const skillName = useMemo(
+    () => new Map(libSkills.map((s) => [s.id, localizedName(s, lang as Lang)])),
+    [libSkills, lang],
+  );
   const skillCat = useMemo(() => {
-    const catName = new Map(libCats.map((c) => [c.id, c.name]));
+    const catName = new Map(libCats.map((c) => [c.id, localizedName(c, lang as Lang)]));
     return new Map(libSkills.map((s) => [s.id, catName.get(s.category_id) ?? ""]));
-  }, [libSkills, libCats]);
+  }, [libSkills, libCats, lang]);
   const reqBySkill = useMemo(() => new Map(requirements.map((r) => [r.skill_id, r])), [requirements]);
 
   /* Baseline per skill = latest history row AT OR BEFORE the period start.

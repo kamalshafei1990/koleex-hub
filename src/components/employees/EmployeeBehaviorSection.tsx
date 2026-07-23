@@ -28,6 +28,7 @@ import {
 } from "@/components/behavior/BehaviorShared";
 import { summarize, gapStatus, isCriticalGap, type BehaviorItem } from "@/lib/behavior/scoring";
 import { useTranslation } from "@/lib/i18n";
+import { localizedName } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
 
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean; sort_order: number }
@@ -61,7 +62,8 @@ export default function EmployeeBehaviorSection({
   onChange: (v: string) => void;
   canConfigurePosition: boolean;
 }) {
-  const { t } = useTranslation(hrT);
+  const { t, lang } = useTranslation(hrT);
+  const nm = (r: BehaviorCategory | BehaviorIndicator | undefined) => localizedName(r, lang);
   const [categories, setCategories] = useState<BehaviorCategory[]>([]);
   const [indicators, setIndicators] = useState<BehaviorIndicator[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -265,7 +267,7 @@ export default function EmployeeBehaviorSection({
                 <div key={catId} className="rounded-xl border border-[var(--border-subtle)] overflow-hidden">
                   <button type="button" onClick={() => toggleCat(catId)} aria-expanded={open}
                     className="flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/40 px-3.5 py-2.5 text-start hover:bg-[var(--bg-surface-subtle)]/70 transition-colors">
-                    <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{cat?.name ?? t("hr.bhv.other")}</span>
+                    <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{nm(cat) || t("hr.bhv.other")}</span>
                     <span className="flex items-center gap-2 shrink-0 text-[10.5px] text-[var(--text-faint)]">
                       <span>{assessed}/{catRows.length}</span>
                       {crit > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 font-semibold text-rose-600 dark:text-rose-400">{crit} {t("hr.bhv.criticalChip")}</span>}
@@ -284,13 +286,13 @@ export default function EmployeeBehaviorSection({
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                               <div className="sm:w-[240px] shrink-0 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[13px] text-[var(--text-primary)] truncate">{ind?.name ?? "—"}</span>
+                                  <span className="text-[13px] text-[var(--text-primary)] truncate">{nm(ind) || "—"}</span>
                                   {req?.is_critical && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.bhv.critical")}</span>}
                                   {req?.is_mandatory && <span className="shrink-0 rounded bg-amber-500/12 px-1 py-px text-[9px] font-bold uppercase text-amber-700 dark:text-amber-400">{t("hr.bhv.req")}</span>}
                                 </div>
                                 <div className="text-[10.5px] text-[var(--text-faint)]">{t("hr.bhv.required")}: {req?.required_score ?? "—"}</div>
                               </div>
-                              <BehaviorSlider value={r.employee_score} onChange={(v) => setScore(r.behavior_indicator_id, v)} label={ind?.name ?? "indicator"} />
+                              <BehaviorSlider value={r.employee_score} onChange={(v) => setScore(r.behavior_indicator_id, v)} label={nm(ind) || "indicator"} />
                             </div>
                             {critGap && (
                               <input value={r.comment ?? ""} onChange={(e) => setComment(r.behavior_indicator_id, e.target.value)}
@@ -326,10 +328,10 @@ export default function EmployeeBehaviorSection({
               return (
                 <div key={r.behavior_indicator_id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-3.5 py-2.5">
                   <div className="sm:w-[240px] shrink-0 min-w-0">
-                    <span className="text-[13px] text-[var(--text-primary)] truncate block">{ind?.name ?? "—"}</span>
-                    <span className="text-[10.5px] text-[var(--text-faint)]">{catById.get(ind?.category_id ?? "")?.name ?? ""}</span>
+                    <span className="text-[13px] text-[var(--text-primary)] truncate block">{nm(ind) || "—"}</span>
+                    <span className="text-[10.5px] text-[var(--text-faint)]">{nm(catById.get(ind?.category_id ?? ""))}</span>
                   </div>
-                  <BehaviorSlider value={r.employee_score} onChange={(v) => setScore(r.behavior_indicator_id, v)} label={ind?.name ?? "indicator"} />
+                  <BehaviorSlider value={r.employee_score} onChange={(v) => setScore(r.behavior_indicator_id, v)} label={nm(ind) || "indicator"} />
                   <button type="button" onClick={() => removeRow(r.behavior_indicator_id)} aria-label={t("hr.bhv.remove")}
                     className="shrink-0 w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                     <CrossIcon size={10} />
@@ -352,7 +354,7 @@ export default function EmployeeBehaviorSection({
           <SummaryCard label={t("hr.bhv.meets")} value={String(summary.meets)} tone={summary.meets > 0 ? "good" : undefined} />
           <SummaryCard label={t("hr.bhv.below")} value={String(summary.below)} tone={summary.below > 0 ? "warn" : undefined} />
           <SummaryCard label={t("hr.bhv.mandatoryGaps")} value={String(summary.mandatoryGaps)} tone={summary.mandatoryGaps > 0 ? "warn" : "good"} />
-          <SummaryCard label={t("hr.bhv.strongest")} value={summary.strongestCategoryId ? (catById.get(summary.strongestCategoryId)?.name ?? "—").split(" ")[0] : "—"} />
+          <SummaryCard label={t("hr.bhv.strongest")} value={summary.strongestCategoryId ? (nm(catById.get(summary.strongestCategoryId)) || "—").split(" ")[0] : "—"} />
         </div>
       )}
 
