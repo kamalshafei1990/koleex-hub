@@ -89,11 +89,11 @@ check("baseline written only on create, best-effort", form.includes('assessment_
 
 const section = readFileSync("src/components/employees/EmployeeBehaviorSection.tsx", "utf8");
 check("form uses one behavior scoring engine", section.includes('from "@/lib/behavior/scoring"'));
-check("critical alerts surfaced in the form", section.includes("criticalAlerts") && section.includes("Attention Required"));
+check("critical alerts surfaced in the form", section.includes("criticalAlerts") && section.includes("hr.bhv.createAlert"));
 
 const mod = readFileSync("src/components/hr/modules/Behavior.tsx", "utf8");
 check("HR module gates edit vs create", mod.includes('perms.can("HR", "edit")') && mod.includes('perms.can("HR", "create")'));
-check("HR module supports probation recommendation", mod.includes("Probation Recommendation") && mod.includes("editing.type === \"probation\""));
+check("HR module supports probation recommendation", mod.includes("hr.bhv.probationRec") && mod.includes("editing.type === \"probation\""));
 check("HR module finalizes assessments", mod.includes("save(true)") && mod.includes("Finalize"));
 
 /* Separation invariant — behavior must never IMPORT the skills engine.

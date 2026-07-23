@@ -27,8 +27,12 @@ interface AssessmentHeader { id: string; assessment_type: string; status: string
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean }
 interface DraftItem { behavior_indicator_id: string; source: "position" | "additional"; employee_score: number | null; comment: string | null; evidence: string | null; required_score_snapshot: number | null; weight_snapshot: number | null; mandatory_snapshot: boolean; critical_snapshot: boolean }
 
-const TYPES = [["manager","Manager"],["hr_review","HR Review"],["probation","Probation"],["periodic","Periodic"],["annual","Annual"],["quarterly","Quarterly"],["incident","Incident"]] as const;
-const RECS = [["confirm","Confirm employment"],["extend","Extend probation"],["develop","Development required"],["escalate","Escalate for HR review"]] as const;
+const TYPES = [["manager","hr.bhv.typeManager"],["hr_review","hr.bhv.typeHrReview"],["probation","hr.bhv.typeProbation"],["periodic","hr.bhv.typePeriodic"],["annual","hr.bhv.typeAnnual"],["quarterly","hr.bhv.typeQuarterly"],["incident","hr.bhv.typeIncident"]] as const;
+const RECS = [["confirm","hr.bhv.recConfirm"],["extend","hr.bhv.recExtend"],["develop","hr.bhv.recDevelop"],["escalate","hr.bhv.recEscalate"]] as const;
+/* assessment_type / status → translation key, for labels rendered from data. */
+const TYPE_KEY: Record<string, string> = { manager: "hr.bhv.typeManager", hr_review: "hr.bhv.typeHrReview", probation: "hr.bhv.typeProbation", periodic: "hr.bhv.typePeriodic", annual: "hr.bhv.typeAnnual", quarterly: "hr.bhv.typeQuarterly", incident: "hr.bhv.typeIncident", baseline: "hr.bhv.typeManager", self: "hr.bhv.typeManager", peer: "hr.bhv.typeManager" };
+const STATUS_KEY: Record<string, string> = { draft: "hr.bhv.draft", reviewed: "hr.bhv.reviewed", finalized: "hr.bhv.finalized" };
+const REC_KEY: Record<string, string> = { confirm: "hr.bhv.recConfirm", extend: "hr.bhv.recExtend", develop: "hr.bhv.recDevelop", escalate: "hr.bhv.recEscalate" };
 
 function Card({ label, value, tone }: { label: string; value: string; tone?: "good" | "warn" | "bad" }) {
   return (
@@ -39,7 +43,7 @@ function Card({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
-export default function BehaviorModule({ employees }: HRModuleProps) {
+export default function BehaviorModule({ employees, t }: HRModuleProps) {
   const perms = usePermissions();
   const canEdit = perms.can("HR", "edit");
   const canCreate = perms.can("HR", "create");
@@ -138,7 +142,7 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
        problem before the round-trip. */
     if (finalize) {
       const missing = editing.items.find((i) => requiresJustification(toScorable(i), i.comment));
-      if (missing) { setError("A justification comment is required for extreme scores and critical gaps before finalizing."); return; }
+      if (missing) { setError(t("hr.bhv.justError")); return; }
     }
     setSaving(true); setError(null);
     try {
@@ -157,7 +161,7 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
         });
       }
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(json.error || "Save failed"); return; }
+      if (!res.ok) { setError(json.error || t("hr.bhv.saveFailed")); return; }
       setEditing(null);
       await load(employeeId);
     } finally { setSaving(false); }
@@ -182,23 +186,23 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
       {/* Reports strip */}
       {reports && (
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Behavior Overview</h3>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">{t("hr.bhv.overview")}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            <Card label="Assessed" value={String(reports.assessedEmployees)} />
-            <Card label="Avg Score" value={reports.averageBehaviorScore == null ? "—" : String(reports.averageBehaviorScore)} />
-            <Card label="Avg Match" value={reports.averagePositionMatch == null ? "—" : `${reports.averagePositionMatch}%`} />
-            <Card label="Critical Gaps" value={String(reports.withCriticalGaps)} tone={reports.withCriticalGaps ? "bad" : "good"} />
-            <Card label="Below Acceptable" value={String(reports.belowAcceptable)} tone={reports.belowAcceptable ? "warn" : undefined} />
-            <Card label="Awaiting Review" value={String(reports.awaitingReview)} tone={reports.awaitingReview ? "warn" : undefined} />
+            <Card label={t("hr.bhv.assessed")} value={String(reports.assessedEmployees)} />
+            <Card label={t("hr.bhv.avgScore")} value={reports.averageBehaviorScore == null ? "—" : String(reports.averageBehaviorScore)} />
+            <Card label={t("hr.bhv.avgMatch")} value={reports.averagePositionMatch == null ? "—" : `${reports.averagePositionMatch}%`} />
+            <Card label={t("hr.bhv.criticalGaps")} value={String(reports.withCriticalGaps)} tone={reports.withCriticalGaps ? "bad" : "good"} />
+            <Card label={t("hr.bhv.belowAcceptable")} value={String(reports.belowAcceptable)} tone={reports.belowAcceptable ? "warn" : undefined} />
+            <Card label={t("hr.bhv.awaitingReview")} value={String(reports.awaitingReview)} tone={reports.awaitingReview ? "warn" : undefined} />
           </div>
         </div>
       )}
 
       {/* Employee picker */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
-        <label className="block text-[11px] font-medium text-[var(--text-dim)] mb-1">Employee</label>
+        <label className="block text-[11px] font-medium text-[var(--text-dim)] mb-1">{t("hr.bhv.employee")}</label>
         <EmployeePicker employees={employees} value={employeeId} onChange={setEmployeeId}
-          placeholder="Select an employee to assess…" searchPlaceholder="Search employees…" emptyLabel="—" />
+          placeholder={t("hr.bhv.selectEmployee")} searchPlaceholder={t("hr.bhv.searchEmployees")} emptyLabel="—" />
       </div>
 
       {!employeeId ? null : loading ? (
@@ -207,14 +211,14 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
         /* ── Draft editor ── */
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[14px] font-bold text-[var(--text-primary)] capitalize">{editing.type.replace(/_/g, " ")} Assessment</h3>
-            <button type="button" onClick={() => setEditing(null)} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
+            <h3 className="text-[14px] font-bold text-[var(--text-primary)]">{t(TYPE_KEY[editing.type] ?? "hr.bhv.typeManager")} · {t("hr.bhv.assessmentSuffix")}</h3>
+            <button type="button" onClick={() => setEditing(null)} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("hr.bhv.cancel")}</button>
           </div>
 
           {draftSummary && draftSummary.criticalAlerts.length > 0 && (
             <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/[0.08] px-3.5 py-2.5">
               <TriangleWarningIcon size={15} className="mt-0.5 shrink-0 text-rose-500" />
-              <p className="text-[12px] text-rose-600 dark:text-rose-300">Attention Required — {draftSummary.criticalGaps} critical behavior{draftSummary.criticalGaps > 1 ? "s" : ""} below requirement. A high overall score does not clear this.</p>
+              <p className="text-[12px] text-rose-600 dark:text-rose-300">{t("hr.bhv.attentionPrefix")} — {draftSummary.criticalGaps} {t("hr.bhv.attentionBody")}</p>
             </div>
           )}
 
@@ -225,9 +229,9 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
               <div key={catId} className="rounded-xl border border-[var(--border-subtle)] overflow-hidden">
                 <button type="button" onClick={() => toggleCat(catId)} aria-expanded={open}
                   className="flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/40 px-3.5 py-2.5 text-start hover:bg-[var(--bg-surface-subtle)]/70 transition-colors">
-                  <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{catById.get(catId)?.name ?? "Other"}</span>
+                  <span className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{catById.get(catId)?.name ?? t("hr.bhv.other")}</span>
                   <span className="flex items-center gap-2 shrink-0 text-[10.5px] text-[var(--text-faint)]">
-                    {crit > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 font-semibold text-rose-600 dark:text-rose-400">{crit} critical</span>}
+                    {crit > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 font-semibold text-rose-600 dark:text-rose-400">{crit} {t("hr.bhv.criticalChip")}</span>}
                     <AngleDownIcon size={12} className={`transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
                   </span>
                 </button>
@@ -243,19 +247,19 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
                             <div className="sm:w-[240px] shrink-0 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[13px] text-[var(--text-primary)] truncate">{ind?.name ?? "—"}</span>
-                                {i.critical_snapshot && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">Critical</span>}
-                                {i.mandatory_snapshot && <span className="shrink-0 rounded bg-amber-500/12 px-1 py-px text-[9px] font-bold uppercase text-amber-700 dark:text-amber-400">Req</span>}
+                                {i.critical_snapshot && <span className="shrink-0 rounded bg-rose-500/12 px-1 py-px text-[9px] font-bold uppercase text-rose-600 dark:text-rose-400">{t("hr.bhv.critical")}</span>}
+                                {i.mandatory_snapshot && <span className="shrink-0 rounded bg-amber-500/12 px-1 py-px text-[9px] font-bold uppercase text-amber-700 dark:text-amber-400">{t("hr.bhv.req")}</span>}
                               </div>
-                              <div className="text-[10.5px] text-[var(--text-faint)]">{i.required_score_snapshot != null ? `Required: ${i.required_score_snapshot}` : "Additional"}</div>
+                              <div className="text-[10.5px] text-[var(--text-faint)]">{i.required_score_snapshot != null ? `${t("hr.bhv.required")}: ${i.required_score_snapshot}` : t("hr.bhv.additional")}</div>
                             </div>
                             <BehaviorSlider value={i.employee_score} onChange={(v) => setItem(i.behavior_indicator_id, { employee_score: v })} label={ind?.name ?? "indicator"} disabled={!canEdit && !canCreate} />
                             {i.source === "additional" && (
-                              <button type="button" onClick={() => removeItem(i.behavior_indicator_id)} aria-label="Remove"
+                              <button type="button" onClick={() => removeItem(i.behavior_indicator_id)} aria-label={t("hr.bhv.remove")}
                                 className="shrink-0 w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
                             )}
                           </div>
                           <input value={i.comment ?? ""} onChange={(e) => setItem(i.behavior_indicator_id, { comment: e.target.value })}
-                            placeholder={critGap ? "Justification required for critical gap…" : "Comment / evidence (optional)"}
+                            placeholder={critGap ? t("hr.bhv.justPlaceholder") : t("hr.bhv.commentPlaceholder")}
                             className={`mt-2 w-full h-8 px-2.5 rounded-lg bg-[var(--bg-primary)] border text-[12px] text-[var(--text-primary)] outline-none ${needsJust ? "border-rose-500/50 placeholder:text-rose-400/70" : "border-[var(--border-subtle)] placeholder:text-[var(--text-faint)]"}`} />
                         </div>
                       );
@@ -267,37 +271,37 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
           })}
 
           <button type="button" onClick={() => setPickerOpen(true)} className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-            <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center"><PlusIcon size={11} /></span>Add indicator
+            <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center"><PlusIcon size={11} /></span>{t("hr.bhv.addIndicator")}
           </button>
 
           {editing.type === "probation" && (
             <div>
-              <label className="block text-[11px] font-medium text-[var(--text-dim)] mb-1">Probation Recommendation</label>
+              <label className="block text-[11px] font-medium text-[var(--text-dim)] mb-1">{t("hr.bhv.probationRec")}</label>
               <select value={editing.recommendation} onChange={(e) => setEditing({ ...editing, recommendation: e.target.value })}
                 className="h-9 px-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none">
-                <option value="">— select —</option>
-                {RECS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                <option value="">{t("hr.bhv.select")}</option>
+                {RECS.map(([v, k]) => <option key={v} value={v}>{t(k)}</option>)}
               </select>
             </div>
           )}
 
           <textarea value={editing.summary} onChange={(e) => setEditing({ ...editing, summary: e.target.value })}
-            placeholder="Overall summary…" rows={2}
+            placeholder={t("hr.bhv.summaryPlaceholder")} rows={2}
             className="w-full px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
 
           {draftSummary && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Card label="Overall" value={draftSummary.overallScore == null ? "—" : String(draftSummary.overallScore)} />
-              <Card label="Match" value={draftSummary.matchPct == null ? "—" : `${draftSummary.matchPct}%`} />
-              <Card label="Critical Gaps" value={String(draftSummary.criticalGaps)} tone={draftSummary.criticalGaps ? "bad" : "good"} />
-              <Card label="Mandatory Gaps" value={String(draftSummary.mandatoryGaps)} tone={draftSummary.mandatoryGaps ? "warn" : "good"} />
+              <Card label={t("hr.bhv.overall")} value={draftSummary.overallScore == null ? "—" : String(draftSummary.overallScore)} />
+              <Card label={t("hr.bhv.match")} value={draftSummary.matchPct == null ? "—" : `${draftSummary.matchPct}%`} />
+              <Card label={t("hr.bhv.criticalGaps")} value={String(draftSummary.criticalGaps)} tone={draftSummary.criticalGaps ? "bad" : "good"} />
+              <Card label={t("hr.bhv.mandatoryGaps")} value={String(draftSummary.mandatoryGaps)} tone={draftSummary.mandatoryGaps ? "warn" : "good"} />
             </div>
           )}
 
           <div className="flex items-center justify-end gap-3">
             {error && <span className="text-[12px] text-rose-400">{error}</span>}
-            <button type="button" onClick={() => save(false)} disabled={saving} className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50">Save draft</button>
-            <button type="button" onClick={() => save(true)} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Finalize"}</button>
+            <button type="button" onClick={() => save(false)} disabled={saving} className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50">{t("hr.bhv.saveDraft")}</button>
+            <button type="button" onClick={() => save(true)} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-50">{saving ? t("hr.bhv.saving") : t("hr.bhv.finalize")}</button>
           </div>
 
           {pickerOpen && (
@@ -313,22 +317,22 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
             const latest = assessments.find((a) => a.status === "finalized") ?? assessments[0];
             return latest ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Card label="Behavior Score" value={latest.overall_behavior_score == null ? "—" : String(Math.round(latest.overall_behavior_score))} />
-                <Card label="Position Match" value={latest.position_behavior_match == null ? "—" : `${Math.round(latest.position_behavior_match)}%`} />
-                <Card label="Critical Gaps" value={String(latest.critical_gap_count ?? 0)} tone={(latest.critical_gap_count ?? 0) > 0 ? "bad" : "good"} />
-                <Card label="Latest" value={latest.status === "finalized" ? "Finalized" : "Draft"} />
+                <Card label={t("hr.bhv.behaviorScore")} value={latest.overall_behavior_score == null ? "—" : String(Math.round(latest.overall_behavior_score))} />
+                <Card label={t("hr.bhv.positionMatch")} value={latest.position_behavior_match == null ? "—" : `${Math.round(latest.position_behavior_match)}%`} />
+                <Card label={t("hr.bhv.criticalGaps")} value={String(latest.critical_gap_count ?? 0)} tone={(latest.critical_gap_count ?? 0) > 0 ? "bad" : "good"} />
+                <Card label={t("hr.bhv.latest")} value={latest.status === "finalized" ? t("hr.bhv.finalized") : t("hr.bhv.draft")} />
               </div>
             ) : (
-              <p className="rounded-xl bg-[var(--bg-surface-subtle)]/60 px-4 py-6 text-center text-[12.5px] text-[var(--text-faint)]">No assessments yet. Start one below.</p>
+              <p className="rounded-xl bg-[var(--bg-surface-subtle)]/60 px-4 py-6 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.bhv.noAssessments")}</p>
             );
           })()}
 
           {canCreate && (
             <div className="flex flex-wrap items-center gap-2">
-              {TYPES.map(([v, l]) => (
+              {TYPES.map(([v, k]) => (
                 <button key={v} type="button" onClick={() => startNew(v)}
                   className="h-9 px-3.5 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-                  + {l}
+                  + {t(k)}
                 </button>
               ))}
             </div>
@@ -340,14 +344,14 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
                 <button key={a.id} type="button" onClick={() => openDraft(a)}
                   className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-start hover:bg-[var(--bg-surface-hover)] transition-colors">
                   <div className="min-w-0">
-                    <span className="text-[12.5px] text-[var(--text-primary)] capitalize">{a.assessment_type.replace(/_/g, " ")}</span>
+                    <span className="text-[12.5px] text-[var(--text-primary)]">{t(TYPE_KEY[a.assessment_type] ?? "hr.bhv.typeManager")}</span>
                     <span className="ms-2 text-[10.5px] text-[var(--text-faint)]">{(a.finalized_at ?? a.created_at)?.slice(0, 10)}</span>
-                    {a.recommendation && <span className="ms-2 text-[10.5px] text-[var(--text-muted)] capitalize">· {a.recommendation}</span>}
+                    {a.recommendation && <span className="ms-2 text-[10.5px] text-[var(--text-muted)]">· {t(REC_KEY[a.recommendation] ?? a.recommendation)}</span>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {(a.critical_gap_count ?? 0) > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">{a.critical_gap_count} critical</span>}
+                    {(a.critical_gap_count ?? 0) > 0 && <span className="rounded-full bg-rose-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">{a.critical_gap_count} {t("hr.bhv.criticalChip")}</span>}
                     <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{a.overall_behavior_score == null ? "—" : Math.round(a.overall_behavior_score)}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${a.status === "finalized" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>{a.status}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${a.status === "finalized" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>{t(STATUS_KEY[a.status] ?? a.status)}</span>
                   </div>
                 </button>
               ))}
@@ -360,8 +364,8 @@ export default function BehaviorModule({ employees }: HRModuleProps) {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewing(null)}>
           <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[14px] font-bold text-[var(--text-primary)] capitalize">{viewing.header.assessment_type.replace(/_/g, " ")} · Finalized</h3>
-              <button type="button" onClick={() => setViewing(null)} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={13} /></button>
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">{t(TYPE_KEY[viewing.header.assessment_type] ?? "hr.bhv.typeManager")} · {t("hr.bhv.finalized")}</h3>
+              <button type="button" onClick={() => setViewing(null)} aria-label={t("hr.bhv.close")} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={13} /></button>
             </div>
             <div className="divide-y divide-[var(--border-faint)]">
               {viewing.items.map((i) => (
