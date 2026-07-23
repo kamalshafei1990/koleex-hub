@@ -29,6 +29,9 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import {
   fetchEmployeeProfile,
   fetchEmployeeActivity,
@@ -110,58 +113,80 @@ function formatDate(iso: string | null | undefined) {
 const panelCls =
   "self-start bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5";
 
-/* ── Detail document ────────────────────────────────────────────────────
-   A person's record is ONE document, not six things. Rendering each section
-   as its own bordered card is what made this page read as a grid of blocks
-   no matter how the grid was tuned — so a section here is a heading and a
-   rule inside a single surface, with no border or background of its own.
+/* ── Record-page grammar ───────────────────────────────────────────────
+   Same shell the Supplier 360 uses, so a KOLEEX record always looks like a
+   KOLEEX record: a centered hero card with a metric rail fused to its bottom
+   edge, then GROUP bands, then one bordered card per section with an icon
+   chip and a label-above-value field grid. */
 
-   Fields sit in a two-column grid so a wide screen is filled by DATA rather
-   than by one tall ribbon of rows or by empty card gutters. */
+/** Uppercase band that clusters the sections below it into a named group. */
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-4 md:mx-6 mt-6 mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-faint)]">
+      {children}
+    </div>
+  );
+}
 
-function DetailSection({
-  icon: Icon, title, children,
+/** One section card — icon chip + title header, collapsible, body below. */
+function Sec({
+  icon: Icon, title, children, defaultOpen = true,
 }: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   title: string;
   children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="py-5 first:pt-0 last:pb-0 border-b border-[var(--border-subtle)] last:border-0">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={13} className="text-[var(--text-dim)] shrink-0" aria-hidden />
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-[var(--text-muted)]">
-          {title}
-        </h2>
-      </div>
-      <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-10">{children}</dl>
-    </section>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  const empty =
-    value == null || value === "" || (typeof value === "string" && !value.trim());
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-[7px] border-b border-[var(--border-faint)] last:border-0">
-      <dt className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] shrink-0">{label}</dt>
-      <dd className={`text-[13px] min-w-0 break-words text-end ${empty ? "text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>
-        {empty ? "—" : value}
-      </dd>
+    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3 text-start transition-colors hover:bg-[var(--bg-surface-subtle)]/60 ${open ? "" : "border-b-transparent"}`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+            <Icon size={15} />
+          </span>
+          <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{title}</h3>
+        </div>
+        <AngleDownIcon className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
+      </button>
+      {open ? <div className="px-4 md:px-5 py-4">{children}</div> : null}
     </div>
   );
 }
 
-/** Compact key/value line for the identity rail. */
-function RailFact({ label, value }: { label: string; value: React.ReactNode }) {
-  const empty =
-    value == null || value === "" || (typeof value === "string" && !value.trim());
-  if (empty) return null;
+/** Label-above-value grid. Empty rows are dropped, so a section shows what
+    exists rather than a column of em-dashes; if nothing exists it says so. */
+function FieldGrid({ rows, empty }: { rows: { label: string; value?: React.ReactNode }[]; empty: string }) {
+  const filled = rows.filter(
+    (r) => r.value != null && r.value !== "" && !(typeof r.value === "string" && !r.value.trim()),
+  );
+  if (!filled.length) {
+    return <p className="text-[12px] text-[var(--text-faint)]">{empty}</p>;
+  }
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] shrink-0">{label}</span>
-      <span className="text-[12.5px] text-[var(--text-primary)] text-end min-w-0 break-words">{value}</span>
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-3.5">
+      {filled.map((r) => (
+        <div key={r.label} className="min-w-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{r.label}</span>
+          <p className="text-sm text-[var(--text-primary)] break-words">{r.value}</p>
+        </div>
+      ))}
     </div>
+  );
+}
+
+/** Hero pill — outlined chip under the name. */
+function HeroPill({ icon: Icon, children }: { icon?: React.ComponentType<{ size?: number | string; className?: string }>; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+      {Icon ? <Icon size={11} /> : null}
+      {children}
+    </span>
   );
 }
 
@@ -335,324 +360,337 @@ export default function EmployeeProfilePage({
   const { person, employee, account, department, position } = profile;
   const statusKey = employee.employment_status || "inactive";
 
-  return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* The Hub's canonical page container — the same one the Employees
-          list and ~10 other pages use. This page was the odd one out with
-          `lg:px-10 xl:px-16` and NO max-width: the fatter padding ate 128px
-          of content width (sections were cramped on a normal screen), while
-          the missing max-w meant `mx-auto` did nothing and the page stretched
-          edge-to-edge on a wide monitor. Both wrong in opposite directions. */}
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+  /* Tenure, computed once — the single fact a manager scans for that no
+     column in the table carries. */
+  const tenure = (() => {
+    if (!employee.hire_date) return null;
+    const from = new Date(employee.hire_date);
+    if (Number.isNaN(from.getTime())) return null;
+    const months = Math.max(0, Math.round((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+    const y = Math.floor(months / 12);
+    const m = months % 12;
+    return y > 0 ? `${y}${t("unit.year")}${m ? ` ${m}${t("unit.month")}` : ""}` : `${m}${t("unit.month")}`;
+  })();
 
-        {/* ── Back + actions ── */}
-        <div className="flex items-center gap-3 mb-5">
-          <Link
-            href="/employees"
-            className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-            aria-label={t("back.toList")}
-          >
-            <ArrowLeftIcon size={16} />
-          </Link>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)] flex-1 min-w-0 truncate">{t("app.profile")}</h1>
-          <div className="flex items-center gap-2 shrink-0">
-            {canEdit && (
+  const metrics: { label: string; value: string; accent?: "emerald" | "amber" }[] = [
+    { label: t("kpi.tenure"), value: tenure ?? "—" },
+    { label: t("kpi.employeeNo"), value: employee.employee_number || "—" },
+    { label: t("kpi.type"), value: employee.employment_type?.replace(/_/g, " ") || "—" },
+    { label: t("kpi.location"), value: employee.work_location || "—" },
+    { label: t("kpi.hired"), value: employee.hire_date ? formatDate(employee.hire_date) : "—" },
+    { label: t("kpi.activity"), value: activity ? String(activityTotal) : "—" },
+    { label: t("kpi.account"), value: account ? t("kpi.linked") : t("kpi.none"), accent: account ? "emerald" : "amber" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-primary)] pb-24">
+      <div className="max-w-[1500px] mx-auto">
+
+        {/* ═══ HERO ═══════════════════════════════════════════════════════
+            The record announces itself once, centered, then hands over to the
+            sections. Same shell as the Supplier 360 so every KOLEEX record
+            reads the same way. */}
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+          <div className="px-5 sm:px-8 md:px-10 pt-5 md:pt-6">
+
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-3">
               <Link
-                href={`/employees/${id}/edit`}
-                className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all"
+                href="/employees"
+                aria-label={t("back.toList")}
+                title={t("back.toList")}
+                className="flex items-center gap-1.5 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
               >
-                <PencilIcon size={13} />
-                Edit
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+                <span className="hidden sm:inline">{t("app.title")}</span>
               </Link>
-            )}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => { setDeleteError(null); setConfirmDelete(true); }}
-                className="h-9 px-3.5 rounded-xl border border-red-500/30 text-red-400 text-[12.5px] font-semibold flex items-center gap-2 hover:bg-red-500/10 transition-colors"
-              >
-                <TrashIcon size={13} />
-                Delete
-              </button>
-            )}
+              <div className="flex items-center gap-1.5">
+                {canEdit && (
+                  <Link
+                    href={`/employees/${id}/edit`}
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+                  >
+                    <PencilIcon size={13} />
+                    <span className="hidden sm:inline">Edit</span>
+                  </Link>
+                )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => { setDeleteError(null); setConfirmDelete(true); }}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/20"
+                  >
+                    <TrashIcon size={13} />
+                    <span className="hidden sm:inline">Delete</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Centered identity */}
+            <div className="flex flex-col items-center text-center pt-1 pb-7 md:pb-8">
+              <div className="w-24 h-24 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center">
+                <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={96} />
+              </div>
+
+              <h1 className="mt-4 max-w-2xl text-2xl md:text-[28px] font-semibold leading-tight tracking-tight text-[var(--text-primary)]">
+                {person.full_name}
+              </h1>
+              {(person as { name_alt?: string | null }).name_alt && (
+                <p lang="zh" className="mt-1 text-[14px] text-[var(--text-faint)]">
+                  {(person as { name_alt?: string | null }).name_alt}
+                </p>
+              )}
+
+              {/* Position › department, read as a path like the supplier taxonomy */}
+              {(position?.title || department?.name) && (
+                <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                  {position?.title && (
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-secondary)]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                        <BriefcaseIcon size={12} className="text-[var(--text-faint)]" />
+                      </span>
+                      {position.title}
+                    </span>
+                  )}
+                  {position?.title && department?.name && (
+                    <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" />
+                  )}
+                  {department?.name && (
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-secondary)]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                        <Building2Icon size={12} className="text-[var(--text-faint)]" />
+                      </span>
+                      {department.name}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Status · type · location · number */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
+                  {statusKey.replace(/_/g, " ")}
+                </span>
+                {employee.employment_type && (
+                  <HeroPill icon={BriefcaseIcon}>{employee.employment_type.replace(/_/g, " ")}</HeroPill>
+                )}
+                {employee.work_location && <HeroPill icon={MapPinIcon}>{employee.work_location}</HeroPill>}
+                {employee.employee_number && <HeroPill>{employee.employee_number}</HeroPill>}
+              </div>
+
+              {/* No login account — stated here, once, where it changes what the
+                  reader can expect from the Activity tab below. */}
+              {!account && (
+                <div className="mt-3.5 mx-auto flex max-w-xl items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] px-3.5 py-2.5 text-start">
+                  <KeyIcon size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold text-amber-600 dark:text-amber-300">{t("profile.noAccount.title")}</p>
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-amber-600/85 dark:text-amber-300/80">{t("profile.noAccount.body")}</p>
+                    <Link
+                      href={`/accounts?person=${person.id}`}
+                      className="mt-2 inline-flex h-7 items-center rounded-lg border border-amber-400/40 px-2.5 text-[11px] font-medium text-amber-600 transition-colors hover:bg-amber-400/10 dark:text-amber-300"
+                    >
+                      {t("profile.noAccount.cta")}
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Metric rail — soft pills fused to the bottom edge of the hero */}
+          <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-4 sm:px-6 py-3">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+              {metrics.map((m) => (
+                <span key={m.label} className="inline-flex items-baseline gap-1.5 rounded-full bg-[var(--bg-surface)] px-3 py-1.5 ring-1 ring-[var(--border-subtle)]/60">
+                  <span className={`text-[13px] font-semibold leading-none tabular-nums capitalize ${
+                    m.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
+                    : m.accent === "amber" ? "text-amber-600 dark:text-amber-400"
+                    : "text-[var(--text-primary)]"}`}>
+                    {m.value}
+                  </span>
+                  <span className="text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ── Identity rail + detail document ──
-            The page was a grid of equal-weight bordered cards, which is why it
-            kept reading as "blocks" however the grid was tuned. It now has a
-            spine: WHO this is stays pinned on the left, and everything else is
-            one continuous document on the right. */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
+        {/* ═══ Tabs — full-width opaque strip so content scrolls behind it ═══ */}
+        <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
+          <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none">
+            {TABS.map((tabKey) => {
+              const base = tabKey === "overview" ? t("tab.overview")
+                : tabKey === "activity" ? t("tab.activity")
+                : t("tab.hr");
+              const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  onClick={() => setTab(tabKey)}
+                  aria-current={tab === tabKey ? "page" : undefined}
+                  className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors ${
+                    tab === tabKey
+                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-          {/* ── Identity rail ── */}
-          <aside className="lg:col-span-4 xl:col-span-3">
-            <div className="lg:sticky lg:top-6 space-y-3">
-              <section className={panelCls}>
-                <div className="flex flex-col items-center text-center pb-4 border-b border-[var(--border-faint)]">
-                  <Avatar src={fpAvatar(person.avatar_url)} name={person.full_name} size={88} />
-                  <h2 className="mt-3 text-[17px] font-bold text-[var(--text-primary)] leading-tight break-words">
-                    {person.full_name}
-                  </h2>
-                  {(person as { name_alt?: string | null }).name_alt && (
-                    <p lang="zh" className="text-[13px] text-[var(--text-dim)] leading-tight mt-0.5">
-                      {(person as { name_alt?: string | null }).name_alt}
-                    </p>
-                  )}
-                  {(position?.title || department?.name) && (
-                    <p className="mt-1.5 text-[12.5px] text-[var(--text-muted)] leading-snug">
-                      {position?.title}
-                      {position?.title && department?.name && <span className="mx-1">·</span>}
-                      {department?.name}
-                    </p>
-                  )}
-                  <div className="mt-2.5 flex items-center gap-1.5 flex-wrap justify-center">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border capitalize ${STATUS_COLORS[statusKey] || STATUS_COLORS.inactive}`}>
-                      {statusKey.replace(/_/g, " ")}
-                    </span>
-                    {employee.employee_number && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-faint)]">
-                        {employee.employee_number}
-                      </span>
-                    )}
-                  </div>
-                </div>
+        {tab === "overview" && (
+          <>
+            <GroupLabel>{t("grp.identity")}</GroupLabel>
+            <Sec icon={UserIcon} title={t("ov.personal")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Full name", value: person.full_name },
+                  { label: "Gender", value: employee.gender },
+                  { label: "Nationality", value: employee.nationality },
+                  { label: "Birthday", value: employee.birth_date ? formatDate(employee.birth_date) : null },
+                  { label: "Marital", value: employee.marital_status },
+                  { label: "Languages", value: employee.languages },
+                  { label: "Personal email", value: person.email },
+                  { label: "Personal phone", value: person.phone },
+                ]}
+              />
+            </Sec>
 
-                {/* The handful of facts you actually came here for — visible
-                    without scrolling, and pinned while you read the rest. */}
-                <div className="pt-3">
-                  <RailFact label="Work email" value={employee.work_email} />
-                  <RailFact label="Work phone" value={employee.work_phone} />
-                  <RailFact label="Location" value={employee.work_location} />
-                  <RailFact label="Type" value={employee.employment_type?.replace(/_/g, " ")} />
-                  <RailFact label="Hired" value={employee.hire_date ? formatDate(employee.hire_date) : null} />
-                </div>
-              </section>
+            <Sec icon={EnvelopeIcon} title={t("ov.workContact")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Work email", value: employee.work_email },
+                  { label: "Work phone", value: employee.work_phone },
+                  { label: "Address", value: [person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ") },
+                  { label: "Postal code", value: person.postal_code },
+                ]}
+              />
+            </Sec>
 
-              {/* Account state — a quiet line in the rail rather than a full
-                  banner across the top of the page. */}
-              {!account && (
-                <section className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-start gap-2">
-                    <KeyIcon size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[12px] text-amber-300 font-medium">{t("profile.noAccount.title")}</p>
-                      <p className="text-[11px] text-amber-300/80 mt-0.5 leading-snug">
-                        {t("profile.noAccount.body")}
-                      </p>
-                      <Link
-                        href={`/accounts?person=${person.id}`}
-                        className="mt-2 h-7 px-2.5 rounded-lg text-[11px] font-medium border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 inline-flex items-center transition-colors"
-                      >
-                        {t("profile.noAccount.cta")}
-                      </Link>
-                    </div>
-                  </div>
-                </section>
-              )}
-            </div>
-          </aside>
+            <GroupLabel>{t("grp.employment")}</GroupLabel>
+            <Sec icon={BriefcaseIcon} title={t("ov.employment")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Employee #", value: employee.employee_number },
+                  { label: "Type", value: employee.employment_type?.replace(/_/g, " ") },
+                  { label: "Department", value: department?.name },
+                  { label: "Position", value: position?.title },
+                  { label: "Work location", value: employee.work_location },
+                  { label: "Hire date", value: employee.hire_date ? formatDate(employee.hire_date) : null },
+                  { label: "Contract end", value: employee.contract_end_date ? formatDate(employee.contract_end_date) : null },
+                  { label: "Probation end", value: employee.probation_end_date ? formatDate(employee.probation_end_date) : null },
+                ]}
+              />
+            </Sec>
 
-          {/* ── Detail column ── */}
-          <div className="lg:col-span-8 xl:col-span-9 min-w-0">
-            {/* Tabs */}
-            <div className="flex items-center gap-1 mb-3 overflow-x-auto">
-              {TABS.map((tabKey) => {
-                const base = tabKey === "overview" ? t("tab.overview")
-                  : tabKey === "activity" ? t("tab.activity")
-                  : t("tab.hr");
-                const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
-                return (
-                  <button
-                    key={tabKey}
-                    onClick={() => setTab(tabKey)}
-                    className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
-                      tab === tabKey
-                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                        : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                    }`}
-                    aria-current={tab === tabKey ? "page" : undefined}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {tab === "overview" && (
-              /* ONE surface. The sections inside are separated by rules, not by
-                 card borders — that difference is the whole point. */
-              <div className={panelCls}>
-                <DetailSection icon={UserIcon} title={t("ov.personal")}>
-                  <Field label="Full name" value={person.full_name} />
-                  <Field label="Gender" value={employee.gender} />
-                  <Field label="Nationality" value={employee.nationality} />
-                  <Field label="Birthday" value={employee.birth_date ? formatDate(employee.birth_date) : null} />
-                  <Field label="Marital" value={employee.marital_status} />
-                  <Field label="Languages" value={employee.languages} />
-                  <Field label="Personal email" value={person.email} />
-                  <Field label="Personal phone" value={person.phone} />
-                </DetailSection>
-
-                <DetailSection icon={BriefcaseIcon} title={t("ov.employment")}>
-                  <Field label="Employee #" value={employee.employee_number} />
-                  <Field label="Type" value={employee.employment_type?.replace(/_/g, " ")} />
-                  <Field label="Department" value={department?.name} />
-                  <Field label="Position" value={position?.title} />
-                  <Field label="Work location" value={employee.work_location} />
-                  <Field label="Hire date" value={employee.hire_date ? formatDate(employee.hire_date) : null} />
-                  <Field label="Contract end" value={employee.contract_end_date ? formatDate(employee.contract_end_date) : null} />
-                  <Field label="Probation end" value={employee.probation_end_date ? formatDate(employee.probation_end_date) : null} />
-                </DetailSection>
-
-                <DetailSection icon={Building2Icon} title={t("ov.workContact")}>
-                  <Field label="Work email" value={employee.work_email} />
-                  <Field label="Work phone" value={employee.work_phone} />
-                  <Field label="Address" value={[person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ")} />
-                  <Field label="Postal code" value={person.postal_code} />
-                </DetailSection>
-
-                <DetailSection icon={ShieldIcon} title={t("ov.emergency")}>
-                  <Field label="Primary" value={employee.emergency_contact_name} />
-                  <Field label="Phone" value={employee.emergency_contact_phone} />
-                  <Field label="Relation" value={employee.emergency_contact_relationship} />
-                  <Field label="Secondary" value={employee.emergency_contact2_name} />
-                  <Field label="Phone" value={employee.emergency_contact2_phone} />
-                  <Field label="Relation" value={employee.emergency_contact2_relationship} />
-                </DetailSection>
-              </div>
-            )}
+            <Sec icon={ShieldIcon} title={t("ov.emergency")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Primary", value: employee.emergency_contact_name },
+                  { label: "Phone", value: employee.emergency_contact_phone },
+                  { label: "Relation", value: employee.emergency_contact_relationship },
+                  { label: "Secondary", value: employee.emergency_contact2_name },
+                  { label: "Phone", value: employee.emergency_contact2_phone },
+                  { label: "Relation", value: employee.emergency_contact2_relationship },
+                ]}
+              />
+            </Sec>
+          </>
+        )}
 
         {tab === "activity" && (
-          <div>
+          <>
+            <GroupLabel>{t("grp.activity")}</GroupLabel>
             {!activity ? (
               <div className="flex items-center justify-center py-16">
                 <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
               </div>
             ) : (
-              <>
-                {activity.missingAccount && (
-                  <div className="mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-300">
-                    Most activity buckets are empty because this employee doesn&apos;t have a login account yet.
-                    HR leave records still show below.
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  <ActivityCard
-                    title="CRM Opportunities"
-                    icon={UserIcon}
-                    bucket={activity.crmOpportunities}
-                    appHref="/crm"
-                    emptyHint="No opportunities owned yet"
-                  />
-                  <ActivityCard
-                    title="Quotations"
-                    icon={DocumentIcon}
-                    bucket={activity.quotations}
-                    appHref="/quotations"
-                    emptyHint="No quotations created yet"
-                  />
-                  <ActivityCard
-                    title="Invoices"
-                    icon={CreditCardIcon}
-                    bucket={activity.invoices}
-                    appHref="/invoices"
-                    emptyHint="No invoices created yet"
-                  />
-                  <ActivityCard
-                    title="Projects Managed"
-                    icon={BriefcaseIcon}
-                    bucket={activity.projectsManaged}
-                    appHref="/projects"
-                    emptyHint="Not managing any projects"
-                  />
-                  <ActivityCard
-                    title="Open Tasks"
-                    icon={CheckIcon}
-                    bucket={activity.tasksAssigned}
-                    appHref="/projects"
-                    emptyHint="No tasks assigned"
-                  />
-                  <ActivityCard
-                    title="Todos"
-                    icon={CheckIcon}
-                    bucket={activity.todosAssigned}
-                    appHref="/todo"
-                    emptyHint="No open todos"
-                  />
-                  <ActivityCard
-                    title="Leave Requests"
-                    icon={ShieldIcon}
-                    bucket={activity.leaveRequests}
-                    appHref="/hr"
-                    emptyHint="No leave history"
-                  />
-                  <ActivityCard
-                    title="Calendar"
-                    icon={BriefcaseIcon}
-                    bucket={activity.calendarEvents}
-                    appHref="/calendar"
-                    emptyHint="No recent events"
-                  />
-                  <ActivityCard
-                    title="Notes"
-                    icon={DocumentIcon}
-                    bucket={activity.notes}
-                    appHref="/notes"
-                    emptyHint="No notes yet"
-                  />
-                </div>
-              </>
+              <div className="mx-4 md:mx-6 my-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <ActivityCard title="CRM Opportunities" icon={UserIcon} bucket={activity.crmOpportunities} appHref="/crm" emptyHint="No opportunities owned yet" />
+                <ActivityCard title="Quotations" icon={DocumentIcon} bucket={activity.quotations} appHref="/quotations" emptyHint="No quotations created yet" />
+                <ActivityCard title="Invoices" icon={CreditCardIcon} bucket={activity.invoices} appHref="/invoices" emptyHint="No invoices created yet" />
+                <ActivityCard title="Projects Managed" icon={BriefcaseIcon} bucket={activity.projectsManaged} appHref="/projects" emptyHint="Not managing any projects" />
+                <ActivityCard title="Open Tasks" icon={CheckIcon} bucket={activity.tasksAssigned} appHref="/projects" emptyHint="No tasks assigned" />
+                <ActivityCard title="Todos" icon={CheckIcon} bucket={activity.todosAssigned} appHref="/todo" emptyHint="No open todos" />
+                <ActivityCard title="Leave Requests" icon={ShieldIcon} bucket={activity.leaveRequests} appHref="/hr" emptyHint="No leave history" />
+                <ActivityCard title="Calendar" icon={BriefcaseIcon} bucket={activity.calendarEvents} appHref="/calendar" emptyHint="No recent events" />
+                <ActivityCard title="Notes" icon={DocumentIcon} bucket={activity.notes} appHref="/notes" emptyHint="No notes yet" />
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {tab === "hr" && (
-          /* Same one-surface document as Overview — HR detail is part of the
-             same record, so it gets the same treatment, not a second grid. */
-          <div className={panelCls}>
-            <DetailSection icon={CreditCardIcon} title={t("hr.compensation")}>
-              <Field
-                label="Initial salary"
-                value={employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null}
+          <>
+            <GroupLabel>{t("grp.compensation")}</GroupLabel>
+            <Sec icon={CreditCardIcon} title={t("hr.compensation")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Initial salary", value: employee.initial_salary != null ? formatCurrency(employee.initial_salary, employee.salary_currency) : null },
+                  { label: "Currency", value: employee.bank_currency },
+                  { label: "Bank", value: employee.bank_name },
+                  { label: "Holder", value: employee.bank_account_holder },
+                  { label: "Account #", value: employee.bank_account_number },
+                  { label: "IBAN", value: employee.bank_iban },
+                  { label: "SWIFT", value: employee.bank_swift },
+                ]}
               />
-              <Field label="Currency" value={employee.bank_currency} />
-              <Field label="Bank" value={employee.bank_name} />
-              <Field label="Holder" value={employee.bank_account_holder} />
-              <Field label="Account #" value={employee.bank_account_number} />
-              <Field label="IBAN" value={employee.bank_iban} />
-              <Field label="SWIFT" value={employee.bank_swift} />
-            </DetailSection>
+            </Sec>
 
-            <DetailSection icon={DocumentIcon} title={t("hr.documents")}>
-              <Field label="National ID" value={employee.identification_id} />
-              <Field label="Passport" value={employee.passport_number} />
-              <Field label="SSN" value={employee.social_security_number} />
-              <Field label="Tax ID" value={employee.tax_id} />
-              <Field label="Visa #" value={employee.visa_number} />
-              <Field label="Visa expiry" value={employee.visa_expiry_date ? formatDate(employee.visa_expiry_date) : null} />
-              <Field label="License #" value={employee.driving_license_number} />
-              <Field label="License expiry" value={employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null} />
-            </DetailSection>
+            <GroupLabel>{t("grp.records")}</GroupLabel>
+            <Sec icon={DocumentIcon} title={t("hr.documents")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "National ID", value: employee.identification_id },
+                  { label: "Passport", value: employee.passport_number },
+                  { label: "SSN", value: employee.social_security_number },
+                  { label: "Tax ID", value: employee.tax_id },
+                  { label: "Visa #", value: employee.visa_number },
+                  { label: "Visa expiry", value: employee.visa_expiry_date ? formatDate(employee.visa_expiry_date) : null },
+                  { label: "License #", value: employee.driving_license_number },
+                  { label: "License expiry", value: employee.driving_license_expiry ? formatDate(employee.driving_license_expiry) : null },
+                ]}
+              />
+            </Sec>
 
-            <DetailSection icon={ShieldIcon} title={t("hr.insurance")}>
-              <Field label="Provider" value={employee.insurance_provider} />
-              <Field label="Policy #" value={employee.insurance_policy_number} />
-              <Field label="Class" value={employee.insurance_class} />
-              <Field label="Expiry" value={employee.insurance_expiry_date ? formatDate(employee.insurance_expiry_date) : null} />
-            </DetailSection>
+            <Sec icon={ShieldIcon} title={t("hr.insurance")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Provider", value: employee.insurance_provider },
+                  { label: "Policy #", value: employee.insurance_policy_number },
+                  { label: "Class", value: employee.insurance_class },
+                  { label: "Expiry", value: employee.insurance_expiry_date ? formatDate(employee.insurance_expiry_date) : null },
+                ]}
+              />
+            </Sec>
 
-            <DetailSection icon={BriefcaseIcon} title={t("hr.education")}>
-              <Field label="Degree" value={employee.education_degree?.replace(/_/g, " ")} />
-              <Field label="Institution" value={employee.education_institution} />
-              <Field label="Field" value={employee.education_field} />
-              <Field label="Graduation" value={employee.education_graduation_year} />
-            </DetailSection>
-          </div>
+            <Sec icon={BriefcaseIcon} title={t("hr.education")}>
+              <FieldGrid
+                empty={t("sec.empty")}
+                rows={[
+                  { label: "Degree", value: employee.education_degree?.replace(/_/g, " ") },
+                  { label: "Institution", value: employee.education_institution },
+                  { label: "Field", value: employee.education_field },
+                  { label: "Graduation", value: employee.education_graduation_year },
+                ]}
+              />
+            </Sec>
+          </>
         )}
-          </div>{/* /detail column */}
-        </div>{/* /rail + detail grid */}
       </div>
 
       {/* ── Delete confirm ── */}
