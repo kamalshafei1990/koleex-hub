@@ -477,3 +477,272 @@ export async function POST(req: Request) {
     error: partialMsg,
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PUT /api/employees/full — update an existing employee from the SAME
+   EmployeeWizardData shape the create form posts.
+
+   Why it exists: the edit screen used to be its own smaller form writing a
+   different subset of columns, so "edit" and "add" disagreed about what an
+   employee record even contains. Both now drive one form, and this is the
+   write side of it — the field mapping below is deliberately the mirror of
+   the POST above. Keep the two in step.
+
+   Not handled here (on purpose): account creation and passwords. Editing a
+   person must never mint or reset a login — that lives in the Account tab
+   and has its own audit trail.
+   ══════════════════════════════════════════════════════════════════════ */
+export async function PUT(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Employees", "edit");
+  if (deny) return deny;
+
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid JSON." }, { status: 400 });
+  }
+
+  const employeeId = str(body, "employee_id");
+  if (!employeeId) {
+    return NextResponse.json({ success: false, error: "employee_id is required." }, { status: 400 });
+  }
+
+  /* ── Resolve the record we're editing ── */
+  const { data: existing, error: exErr } = await supabaseServer
+    .from(EMPLOYEES)
+    .select("id, person_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (exErr || !existing?.person_id) {
+    return NextResponse.json({ success: false, error: "Employee not found." }, { status: 404 });
+  }
+  const personId = existing.person_id as string;
+
+  /* ── Uniqueness, excluding self ── */
+  const employeeNumber = str(body, "employee_number");
+  if (employeeNumber) {
+    const { data: dup } = await supabaseServer
+      .from(EMPLOYEES)
+      .select("id")
+      .eq("employee_number", employeeNumber)
+      .neq("id", employeeId)
+      .maybeSingle();
+    if (dup) {
+      return NextResponse.json(
+        { success: false, error: `Employee number ${employeeNumber} already exists.` },
+        { status: 409 },
+      );
+    }
+  }
+  const primaryEmail = str(body, "personal_email");
+  if (primaryEmail) {
+    const { data: dupP } = await supabaseServer
+      .from(PEOPLE)
+      .select("id")
+      .eq("email", primaryEmail)
+      .neq("id", personId)
+      .maybeSingle();
+    if (dupP) {
+      return NextResponse.json(
+        { success: false, error: `A person with email ${primaryEmail} already exists.` },
+        { status: 409 },
+      );
+    }
+  }
+
+  /* ── Person ── */
+  const title = str(body, "title");
+  const firstName = str(body, "first_name");
+  const middleName = str(body, "middle_name");
+  const lastName = str(body, "last_name");
+  const fullName = [title, firstName, middleName, lastName].filter(Boolean).join(" ");
+  const firstNameAlt = str(body, "first_name_alt");
+  const lastNameAlt = str(body, "last_name_alt");
+
+  const { error: personErr } = await supabaseServer
+    .from(PEOPLE)
+    .update({
+      full_name: fullName,
+      display_name: `${firstName ?? ""} ${lastName ?? ""}`.trim(),
+      first_name: firstName,
+      last_name: lastName,
+      first_name_alt: firstNameAlt,
+      last_name_alt: lastNameAlt,
+      name_alt: [firstNameAlt, lastNameAlt].filter(Boolean).join(" ") || null,
+      email: str(body, "personal_email"),
+      phone: str(body, "personal_phone"),
+      avatar_url: str(body, "photo_url"),
+      address_line1: str(body, "private_address_line1"),
+      address_line2: str(body, "private_address_line2"),
+      city: str(body, "private_city"),
+      state: str(body, "private_state"),
+      country: str(body, "private_country"),
+      postal_code: str(body, "private_postal_code"),
+    })
+    .eq("id", personId);
+  if (personErr) {
+    return NextResponse.json(
+      { success: false, error: `Failed to update person: ${personErr.message}` },
+      { status: 500 },
+    );
+  }
+
+  /* ── Department / position, incl. inline creation (same as POST) ── */
+  let departmentId = str(body, "department_id");
+  let positionId = str(body, "position_id");
+
+  if (bool(body, "create_new_department") && str(body, "department_name")) {
+    const { data: dept, error: deptErr } = await supabaseServer
+      .from(DEPARTMENTS)
+      .insert({
+        name: str(body, "department_name"),
+        description: null, icon: "building2", icon_type: "icon", icon_value: null,
+        parent_id: null, sort_order: 0, is_active: true,
+      })
+      .select()
+      .single();
+    if (deptErr || !dept) {
+      return NextResponse.json(
+        { success: false, error: `Failed to create department: ${deptErr?.message}` },
+        { status: 500 },
+      );
+    }
+    departmentId = dept.id;
+  }
+
+  if (bool(body, "create_new_position") && str(body, "position_title") && departmentId) {
+    const { data: pos, error: posErr } = await supabaseServer
+      .from(POSITIONS)
+      .insert({
+        title: str(body, "position_title"), department_id: departmentId,
+        reports_to_position_id: null, level: 4, description: null, role_id: null,
+        responsibilities: null, requirements: null, is_active: true, sort_order: 0,
+      })
+      .select()
+      .single();
+    if (posErr || !pos) {
+      return NextResponse.json(
+        { success: false, error: `Failed to create position: ${posErr?.message}` },
+        { status: 500 },
+      );
+    }
+    positionId = pos.id;
+  }
+
+  /* ── Employee record — mirror of the POST field list ── */
+  const { error: empErr } = await supabaseServer
+    .from(EMPLOYEES)
+    .update({
+      employee_number: employeeNumber,
+      hire_date: str(body, "hire_date"),
+      /* Editable here (unlike create, where a new hire is always active). */
+      employment_status: str(body, "employment_status") || "active",
+      employment_type: str(body, "employment_type") || "full_time",
+      contract_end_date: str(body, "contract_end_date"),
+      probation_end_date: str(body, "probation_end_date"),
+      work_email: str(body, "work_email"),
+      work_phone: str(body, "work_phone"),
+      work_location: str(body, "work_location") || "office",
+      manager_id: str(body, "manager_id"),
+      emergency_contact_name: str(body, "emergency_contact_name"),
+      emergency_contact_phone: str(body, "emergency_contact_phone"),
+      emergency_contact_relationship: str(body, "emergency_contact_relationship"),
+      birth_date: str(body, "birthday"),
+      marital_status: str(body, "marital_status"),
+      nationality: str(body, "nationality"),
+      gender: str(body, "gender"),
+      number_of_children: toIntOrNull(body.number_of_children),
+      identification_id: str(body, "identification_id"),
+      passport_number: str(body, "passport_number"),
+      visa_number: str(body, "visa_number"),
+      visa_expiry_date: str(body, "visa_expiry_date"),
+      bank_name: str(body, "bank_name"),
+      bank_account_holder: str(body, "bank_account_holder"),
+      bank_account_number: str(body, "bank_account_number"),
+      bank_iban: str(body, "bank_iban"),
+      bank_swift: str(body, "bank_swift"),
+      bank_currency: str(body, "bank_currency"),
+      initial_salary: toNumOrNull(body.initial_salary),
+      salary_currency: str(body, "salary_currency"),
+      insurance_provider: str(body, "insurance_provider"),
+      insurance_policy_number: str(body, "insurance_policy_number"),
+      insurance_class: str(body, "insurance_class"),
+      insurance_expiry_date: str(body, "insurance_expiry_date"),
+      social_security_number: str(body, "social_security_number"),
+      tax_id: str(body, "tax_id"),
+      education_degree: str(body, "education_degree"),
+      education_institution: str(body, "education_institution"),
+      education_field: str(body, "education_field"),
+      education_graduation_year: toIntOrNull(body.education_graduation_year),
+      driving_license_number: str(body, "driving_license_number"),
+      driving_license_type: str(body, "driving_license_type"),
+      driving_license_expiry: str(body, "driving_license_expiry"),
+      blood_type: str(body, "blood_type"),
+      religion: str(body, "religion"),
+      languages: str(body, "languages"),
+      emergency_contact2_name: str(body, "emergency_contact2_name"),
+      emergency_contact2_phone: str(body, "emergency_contact2_phone"),
+      emergency_contact2_relationship: str(body, "emergency_contact2_relationship"),
+    })
+    .eq("id", employeeId);
+  if (empErr) {
+    return NextResponse.json(
+      { success: false, error: `Failed to update employee: ${empErr.message}` },
+      { status: 500 },
+    );
+  }
+
+  /* ── Org assignment — only touched when it actually changed, so an
+        unrelated edit doesn't write a spurious "transferred" history row. ── */
+  if (departmentId && positionId) {
+    const { data: current } = await supabaseServer
+      .from(ASSIGNMENTS)
+      .select("id, department_id, position_id")
+      .eq("person_id", personId)
+      .eq("is_active", true)
+      .eq("is_primary", true)
+      .maybeSingle();
+
+    const changed =
+      !current || current.department_id !== departmentId || current.position_id !== positionId;
+
+    if (changed) {
+      if (current) {
+        await supabaseServer
+          .from(ASSIGNMENTS)
+          .update({ is_active: false, end_date: new Date().toISOString().split("T")[0] })
+          .eq("id", current.id);
+      }
+      const { error: assignErr } = await supabaseServer.from(ASSIGNMENTS).insert({
+        person_id: personId,
+        position_id: positionId,
+        department_id: departmentId,
+        is_primary: true,
+        start_date: new Date().toISOString().split("T")[0],
+        end_date: null,
+        is_active: true,
+      });
+      if (assignErr) {
+        return NextResponse.json(
+          { success: false, error: `Saved, but re-assignment failed: ${assignErr.message}` },
+          { status: 500 },
+        );
+      }
+      await supabaseServer.from(HISTORY).insert({
+        position_id: positionId,
+        person_id: personId,
+        department_id: departmentId,
+        action: current ? "transferred" : "assigned",
+        from_position_id: current?.position_id ?? null,
+        to_position_id: positionId,
+        effective_date: new Date().toISOString().split("T")[0],
+        notes: "Updated via employee form",
+      });
+    }
+  }
+
+  return NextResponse.json({ success: true, employeeId, personId });
+}

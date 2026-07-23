@@ -90,6 +90,9 @@ export interface EmployeeWizardData {
   employee_number: string;
   hire_date: string;
   employment_type: string;
+  /** active | on_leave | terminated | … Only meaningful when editing — a new
+      hire is always created active, so the create form doesn't show it. */
+  employment_status: string;
   contract_end_date: string;
   probation_end_date: string;
   work_email: string;
@@ -196,6 +199,7 @@ export function emptyWizardData(): EmployeeWizardData {
     employee_number: "",
     hire_date: new Date().toISOString().split("T")[0],
     employment_type: "full_time",
+    employment_status: "active",
     contract_end_date: "",
     probation_end_date: "",
     work_email: "",
@@ -862,4 +866,149 @@ export async function createPosition(
 
   if (error) { console.error("[Position] Create:", error.message); return null; }
   return data as PositionRow;
+}
+
+/* ═══════════════════════════════════════════════════
+   EDIT — the write + read halves that let the edit screen reuse the
+   create form. Before this, editing had its own smaller form writing a
+   different subset of columns, so the two screens disagreed about what an
+   employee record contains.
+   ═══════════════════════════════════════════════════ */
+
+/** Save the full wizard payload over an existing employee.
+ *  Mirrors createFullEmployee(); the server route is the mirror of POST. */
+export async function updateFullEmployee(
+  employeeId: string,
+  data: EmployeeWizardData,
+): Promise<CreateEmployeeResult> {
+  try {
+    const res = await fetch("/api/employees/full", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, employee_id: employeeId }),
+    });
+    try {
+      return (await res.json()) as CreateEmployeeResult;
+    } catch {
+      return { success: false, error: `Server returned ${res.status}.` };
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+/** Dates arrive as full timestamps; the date inputs want YYYY-MM-DD. */
+function dateOnly(v: unknown): string {
+  return typeof v === "string" && v ? v.slice(0, 10) : "";
+}
+/** Every wizard field is a controlled string — null/undefined would flip the
+ *  inputs from controlled to uncontrolled and React would warn. */
+function s(v: unknown): string {
+  return v == null ? "" : String(v);
+}
+
+/** Profile record → the exact shape the create form edits.
+ *  Anything absent falls back to emptyWizardData()'s default, so a field the
+ *  DB has never held still renders as an empty control rather than blowing up. */
+export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData {
+  const base = emptyWizardData();
+  const person = p.person as unknown as Record<string, unknown>;
+  const emp = p.employee as unknown as Record<string, unknown>;
+
+  return {
+    ...base,
+    photo_url: (person.avatar_url as string | null) ?? null,
+    title: base.title,
+    first_name: s(person.first_name),
+    middle_name: base.middle_name,
+    last_name: s(person.last_name),
+    first_name_alt: s(person.first_name_alt),
+    last_name_alt: s(person.last_name_alt),
+    gender: s(emp.gender),
+    birthday: dateOnly(emp.birth_date),
+    nationality: s(emp.nationality),
+    marital_status: s(emp.marital_status),
+    number_of_children: emp.number_of_children == null ? "" : String(emp.number_of_children),
+    personal_phone: s(person.phone),
+    personal_email: s(person.email),
+
+    employee_number: s(emp.employee_number),
+    hire_date: dateOnly(emp.hire_date),
+    employment_type: s(emp.employment_type) || "full_time",
+    employment_status: s(emp.employment_status) || "active",
+    contract_end_date: dateOnly(emp.contract_end_date),
+    probation_end_date: dateOnly(emp.probation_end_date),
+    work_email: s(emp.work_email),
+    work_phone: s(emp.work_phone),
+    work_location: s(emp.work_location) || "office",
+
+    department_id: p.assignment?.department_id ?? "",
+    position_id: p.assignment?.position_id ?? "",
+    department_name: "",
+    position_title: "",
+    create_new_department: false,
+    create_new_position: false,
+
+    /* Home address lives on the person record (identity consolidation). */
+    private_address_line1: s(person.address_line1),
+    private_address_line2: s(person.address_line2),
+    private_city: s(person.city),
+    private_state: s(person.state),
+    private_country: s(person.country),
+    private_postal_code: s(person.postal_code),
+
+    emergency_contact_name: s(emp.emergency_contact_name),
+    emergency_contact_phone: s(emp.emergency_contact_phone),
+    emergency_contact_relationship: s(emp.emergency_contact_relationship),
+
+    identification_id: s(emp.identification_id),
+    passport_number: s(emp.passport_number),
+    visa_number: s(emp.visa_number),
+    visa_expiry_date: dateOnly(emp.visa_expiry_date),
+
+    bank_name: s(emp.bank_name),
+    bank_account_holder: s(emp.bank_account_holder),
+    bank_account_number: s(emp.bank_account_number),
+    bank_iban: s(emp.bank_iban),
+    bank_swift: s(emp.bank_swift),
+    bank_currency: s(emp.bank_currency),
+
+    initial_salary: emp.initial_salary == null ? "" : String(emp.initial_salary),
+    salary_currency: s(emp.salary_currency),
+    manager_id: s(emp.manager_id),
+
+    insurance_provider: s(emp.insurance_provider),
+    insurance_policy_number: s(emp.insurance_policy_number),
+    insurance_class: s(emp.insurance_class),
+    insurance_expiry_date: dateOnly(emp.insurance_expiry_date),
+
+    social_security_number: s(emp.social_security_number),
+    tax_id: s(emp.tax_id),
+
+    education_degree: s(emp.education_degree),
+    education_institution: s(emp.education_institution),
+    education_field: s(emp.education_field),
+    education_graduation_year:
+      emp.education_graduation_year == null ? "" : String(emp.education_graduation_year),
+
+    driving_license_number: s(emp.driving_license_number),
+    driving_license_type: s(emp.driving_license_type),
+    driving_license_expiry: dateOnly(emp.driving_license_expiry),
+
+    blood_type: s(emp.blood_type),
+    religion: s(emp.religion),
+    languages: s(emp.languages),
+
+    emergency_contact2_name: s(emp.emergency_contact2_name),
+    emergency_contact2_phone: s(emp.emergency_contact2_phone),
+    emergency_contact2_relationship: s(emp.emergency_contact2_relationship),
+
+    /* Account creation is never part of an edit — the Account tab owns it. */
+    create_account: false,
+    username: "",
+    login_email: "",
+    temp_password: "",
+    role_id: "",
+  };
 }
