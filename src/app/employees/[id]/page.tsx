@@ -317,7 +317,13 @@ export default function EmployeeProfilePage({
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
+      {/* The Hub's canonical page container — the same one the Employees
+          list and ~10 other pages use. This page was the odd one out with
+          `lg:px-10 xl:px-16` and NO max-width: the fatter padding ate 128px
+          of content width (sections were cramped on a normal screen), while
+          the missing max-w meant `mx-auto` did nothing and the page stretched
+          edge-to-edge on a wide monitor. Both wrong in opposite directions. */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ── Back + actions ── */}
         <div className="flex items-center gap-3 mb-5">
@@ -442,7 +448,7 @@ export default function EmployeeProfilePage({
         {tab === "overview" && (
           /* 3 columns from xl — at 2 the panels left half the viewport empty on a
              desktop and pushed Emergency below the fold for no reason. */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             <section className={panelCls}>
               <SectionHeader icon={UserIcon} title={t("ov.personal")} description={t("ov.personal.desc")} />
               <div>
@@ -581,7 +587,7 @@ export default function EmployeeProfilePage({
         )}
 
         {tab === "hr" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             <section className={panelCls}>
               <SectionHeader icon={CreditCardIcon} title={t("hr.compensation")} description={t("hr.compensation.desc")} />
               <div>
