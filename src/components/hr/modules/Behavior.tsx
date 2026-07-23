@@ -23,7 +23,7 @@ import { BehaviorSlider, BehaviorSliderStyles, BehaviorPicker, type BehaviorCate
 import { summarize, gapStatus, isCriticalGap, requiresJustification, canFinalize, criticalStatus, type BehaviorItem } from "@/lib/behavior/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import type { Lang } from "@/lib/i18n";
-import { localizedName } from "@/lib/i18n-name";
+import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
 
 interface AssessmentHeader { id: string; assessment_type: string; status: string; assessment_period_start: string | null; assessment_period_end: string | null; overall_behavior_score: number | null; position_behavior_match: number | null; critical_gap_count: number | null; recommendation: string | null; finalized_at: string | null; created_at: string }
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean }
@@ -74,7 +74,7 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
   useEffect(() => {
     (async () => {
       const [lib, rep] = await Promise.all([
-        fetch("/api/behavior", { credentials: "include" }).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/behavior?v=${LIBRARY_PAYLOAD_VERSION}`, { credentials: "include" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/hr/behavior/reports", { credentials: "include" }).then((r) => r.json()).catch(() => null),
       ]);
       setCategories(lib.categories ?? []);

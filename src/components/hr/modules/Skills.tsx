@@ -19,7 +19,7 @@ import { usePermissions } from "@/lib/permissions";
 import { levelForScore, summarize, gapStatus, type ScorableSkill } from "@/lib/skills/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import type { Lang } from "@/lib/i18n";
-import { localizedName } from "@/lib/i18n-name";
+import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
 
 interface Assessment { skill_id: string; source: string; employee_score: number | null; last_assessed_at: string | null }
 interface HistoryRow { skill_id: string; employee_score: number | null; recorded_at: string }
@@ -53,7 +53,7 @@ export default function SkillsModule({ employees, t, lang }: HRModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/skills", { credentials: "include" });
+      const res = await fetch(`/api/skills?v=${LIBRARY_PAYLOAD_VERSION}`, { credentials: "include" });
       const json = await res.json().catch(() => ({}));
       if (cancelled) return;
       setLibSkills(json.skills ?? []);

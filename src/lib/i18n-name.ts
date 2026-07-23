@@ -14,6 +14,18 @@ import type { Lang } from "@/lib/i18n";
    no refetch; resolution happens here, at render time.
    --------------------------------------------------------------------------- */
 
+/* Cache-buster for the library endpoints (/api/skills, /api/behavior).
+
+   Those responses are cached `private, max-age=300, stale-while-revalidate=3600`
+   because the library changes rarely — which means a browser can keep serving a
+   body fetched BEFORE a shape change for up to an hour. Adding name_zh/name_ar
+   was exactly such a change: the columns shipped, the DB had the translations,
+   and clients still rendered English from their cached pre-i18n payload.
+
+   A new value here is a new URL, hence a new cache entry. BUMP IT whenever the
+   library payload gains or loses a field. */
+export const LIBRARY_PAYLOAD_VERSION = "2";
+
 export interface NamedRow {
   name: string;
   name_zh?: string | null;

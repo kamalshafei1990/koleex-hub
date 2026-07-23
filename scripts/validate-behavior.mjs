@@ -146,6 +146,8 @@ check("behavior UI resolves names via localizedName",
   && section.includes("localizedName") && mod.includes("localizedName"));
 check("indicator search matches the English original too",
   readFileSync("src/components/behavior/BehaviorShared.tsx", "utf8").includes("nameMatches"));
+check("library fetches carry the payload version",
+  section.includes("LIBRARY_PAYLOAD_VERSION") && mod.includes("LIBRARY_PAYLOAD_VERSION"));
 
 console.log(`\nvalidate:behavior — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

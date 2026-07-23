@@ -120,6 +120,11 @@ check("skills UI resolves names via localizedName", section.includes("localizedN
 check("skill search matches the English original too", section.includes("nameMatches"));
 check("HR Skills module localises library labels",
   readFileSync("src/components/hr/modules/Skills.tsx", "utf8").includes("localizedName"));
+/* The library response is cached for an hour; a shape change MUST be served
+   from a new URL or clients keep rendering the pre-i18n body. */
+check("library fetches carry the payload version",
+  section.includes("LIBRARY_PAYLOAD_VERSION")
+  && readFileSync("src/components/hr/modules/Skills.tsx", "utf8").includes("LIBRARY_PAYLOAD_VERSION"));
 
 console.log(`\nvalidate:skills — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

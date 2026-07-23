@@ -28,7 +28,7 @@ import {
 } from "@/components/behavior/BehaviorShared";
 import { summarize, gapStatus, isCriticalGap, type BehaviorItem } from "@/lib/behavior/scoring";
 import { useTranslation } from "@/lib/i18n";
-import { localizedName } from "@/lib/i18n-name";
+import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
 
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean; sort_order: number }
@@ -88,7 +88,7 @@ export default function EmployeeBehaviorSection({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const lib = await fetch("/api/behavior", { credentials: "include" }).then((r) => r.json()).catch(() => ({}));
+      const lib = await fetch(`/api/behavior?v=${LIBRARY_PAYLOAD_VERSION}`, { credentials: "include" }).then((r) => r.json()).catch(() => ({}));
       if (cancelled) return;
       setCategories(lib.categories ?? []);
       setIndicators(lib.indicators ?? []);

@@ -25,7 +25,7 @@ import {
   levelForScore, gapStatus, summarize, type ScorableSkill,
 } from "@/lib/skills/scoring";
 import { useTranslation } from "@/lib/i18n";
-import { localizedName, nameMatches } from "@/lib/i18n-name";
+import { LIBRARY_PAYLOAD_VERSION, localizedName, nameMatches } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
 
 /** Skill level (from levelForScore) → translation key. */
@@ -155,7 +155,7 @@ export default function EmployeeSkillsSection({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/skills", { credentials: "include" });
+        const res = await fetch(`/api/skills?v=${LIBRARY_PAYLOAD_VERSION}`, { credentials: "include" });
         const json = await res.json();
         if (cancelled) return;
         setCategories(json.categories ?? []);
