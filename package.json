@@ -88,7 +88,8 @@
     "validate:discuss-read-parallel": "node --import tsx scripts/validate-discuss-read-parallel.mts",
     "validate:app-registry": "node scripts/validate-app-registry.mjs",
     "validate:hr-translations": "node scripts/validate-hr-translations.mjs",
-    "validate:skills": "node scripts/validate-skills.mjs"
+    "validate:skills": "node scripts/validate-skills.mjs",
+    "validate:behavior": "node scripts/validate-behavior.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

@@ -288,6 +288,117 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
+/* ── Behavior & Conduct standing (read-only) ──────────────────────────────
+   Surfaces the LATEST FINALIZED behavior assessment for this employee, plus a
+   count of drafts awaiting review and a deep-link into the HR › Behavior tab.
+   Fetches the HR-gated endpoint; a viewer without HR read simply sees nothing
+   (graceful) — behavior standing is not exposed to non-HR profile viewers.
+   Skills and Behavior are shown as separate, never-combined signals. */
+interface BehaviorAssessmentRow {
+  id: string;
+  assessment_type: string;
+  status: string;
+  finalized_at: string | null;
+  overall_behavior_score: number | null;
+  position_behavior_match: number | null;
+  critical_gap_count: number | null;
+  recommendation: string | null;
+  created_at: string;
+}
+
+const BEHAVIOR_LEVEL_COLOR: Record<string, string> = {
+  Exemplary: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  Strong: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  Acceptable: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  "Needs Improvement": "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  Poor: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  Unacceptable: "text-red-400 bg-red-400/10 border-red-400/20",
+};
+
+function behaviorBand(score: number): string {
+  if (score >= 90) return "Exemplary";
+  if (score >= 75) return "Strong";
+  if (score >= 60) return "Acceptable";
+  if (score >= 40) return "Needs Improvement";
+  if (score >= 20) return "Poor";
+  return "Unacceptable";
+}
+
+function BehaviorStanding({ employeeId, t }: { employeeId: string; t: (k: string) => string }) {
+  const [rows, setRows] = useState<BehaviorAssessmentRow[] | null>(null);
+  const [forbidden, setForbidden] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/hr/behavior?employee_id=${encodeURIComponent(employeeId)}`, { credentials: "include" });
+        if (!alive) return;
+        if (res.status === 403 || res.status === 401) { setForbidden(true); return; }
+        if (!res.ok) { setRows([]); return; }
+        const data = await res.json();
+        setRows((data.assessments ?? []) as BehaviorAssessmentRow[]);
+      } catch { if (alive) setRows([]); }
+    })();
+    return () => { alive = false; };
+  }, [employeeId]);
+
+  /* Non-HR viewers (or no data yet) — render nothing rather than an empty shell. */
+  if (forbidden || rows === null || rows.length === 0) return null;
+
+  const latest = rows.find((r) => r.status === "finalized" && r.overall_behavior_score != null) ?? null;
+  const draftCount = rows.filter((r) => r.status === "draft").length;
+  const score = latest?.overall_behavior_score != null ? Math.round(Number(latest.overall_behavior_score)) : null;
+  const band = score != null ? behaviorBand(score) : null;
+
+  return (
+    <Sec icon={ShieldIcon} title={t("hr.behaviorConduct")}>
+      {latest ? (
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold text-[var(--text-primary)] tabular-nums">{score}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">/ 100</span>
+          </div>
+          {band && (
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${BEHAVIOR_LEVEL_COLOR[band] ?? ""}`}>
+              {band}
+            </span>
+          )}
+          {latest.position_behavior_match != null && (
+            <div className="text-[12px] text-[var(--text-dim)]">
+              {t("hr.behaviorMatch")}: <span className="font-semibold text-[var(--text-primary)]">{Math.round(Number(latest.position_behavior_match))}%</span>
+            </div>
+          )}
+          {(latest.critical_gap_count ?? 0) > 0 && (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-md border text-red-400 bg-red-400/10 border-red-400/20">
+              {latest.critical_gap_count} {t("hr.behaviorCriticalGaps")}
+            </span>
+          )}
+          <div className="text-[11px] text-[var(--text-dim)]">
+            {t("hr.behaviorAsOf")} {latest.finalized_at ? formatDate(latest.finalized_at) : formatDate(latest.created_at)}
+          </div>
+        </div>
+      ) : (
+        <div className="text-[13px] text-[var(--text-dim)]">{t("hr.behaviorNoFinal")}</div>
+      )}
+      <div className="mt-4 flex items-center gap-3">
+        {draftCount > 0 && (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
+            {draftCount} {t("hr.behaviorDrafts")}
+          </span>
+        )}
+        <Link
+          href={`/hr?tab=behavior&employee=${encodeURIComponent(employeeId)}`}
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {t("hr.behaviorOpenHr")}
+          <ArrowRightIcon size={12} />
+        </Link>
+      </div>
+    </Sec>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════ */
@@ -739,6 +850,9 @@ export default function EmployeeProfilePage({
                 ]}
               />
             </Sec>
+
+            <GroupLabel>{t("grp.performance")}</GroupLabel>
+            <BehaviorStanding employeeId={employee.id} t={t} />
           </>
         )}
       </div>

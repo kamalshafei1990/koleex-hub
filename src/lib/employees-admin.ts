@@ -141,6 +141,9 @@ export interface EmployeeWizardData {
   social_accounts: string;
   /** JSON string of skill assessment rows — see parseSkills on the server. */
   skills: string;
+  /** JSON string of baseline behavior items — written as a baseline
+      assessment on CREATE only (edit manages behavior in the HR app). */
+  behavior_baseline: string;
   national_id_doc_url: string;
   national_id_back_doc_url: string;
   passport_doc_url: string;
@@ -246,6 +249,7 @@ export function emptyWizardData(): EmployeeWizardData {
     wechat_qr_url: "",
     social_accounts: "[]",
     skills: "[]",
+    behavior_baseline: "[]",
     national_id_doc_url: "",
     national_id_back_doc_url: "",
     passport_doc_url: "",
@@ -1001,6 +1005,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
       Array.isArray(emp.social_accounts) ? emp.social_accounts : [],
     ),
     skills: JSON.stringify(p.skills ?? []),
+    behavior_baseline: "[]",  // baseline is a create-time concept; edit uses HR
     national_id_doc_url: s(emp.national_id_doc_url),
     national_id_back_doc_url: s(emp.national_id_back_doc_url),
     passport_doc_url: s(emp.passport_doc_url),

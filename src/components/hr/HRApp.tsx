@@ -19,6 +19,7 @@ import ClockIcon from "@/components/icons/ui/ClockIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -31,6 +32,7 @@ import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
 import SkillsModule from "./modules/Skills";
+import BehaviorModule from "./modules/Behavior";
 import LeaveModule from "./modules/LeaveManagement";
 import AttendanceModule from "./modules/Attendance";
 import RecruitmentModule from "./modules/Recruitment";
@@ -49,6 +51,7 @@ const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string
   recruitment: UserPlusIcon,
   appraisals:  StarIcon,
   skills:      SparklesIcon,
+  behavior:    ShieldIcon,
   onboarding:  CheckCircleIcon,
   payroll:     WalletIcon,
   training:    BookOpenIcon,
@@ -72,6 +75,7 @@ const MODULE_MAP: Record<TabId, ComponentType<HRModuleProps>> = {
   recruitment: RecruitmentModule,
   appraisals:  AppraisalsModule,
   skills:      SkillsModule,
+  behavior:    BehaviorModule,
   onboarding:  OnboardingModule,
   payroll:     PayrollModule,
   training:    TrainingModule,
@@ -88,7 +92,14 @@ export default function HRApp() {
   const searchPlaceholder = useSearchPlaceholder("hr");
 
   /* ── Navigation ── */
-  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
+  /* Deep links (e.g. the employee edit form's "Assess in HR › Behavior")
+     pass ?tab=behavior; honour it on first paint. */
+  const initialTab = ((): TabId => {
+    if (typeof window === "undefined") return "dashboard";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return (TAB_IDS as string[]).includes(t ?? "") ? (t as TabId) : "dashboard";
+  })();
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
   /* ── Shared employee list (many modules need it) ──
      Warm-start: hydrate instantly from the last session's snapshot so the

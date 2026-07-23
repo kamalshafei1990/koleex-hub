@@ -34,6 +34,7 @@ import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import EmployeeSkillsSection from "@/components/employees/EmployeeSkillsSection";
+import EmployeeBehaviorSection from "@/components/employees/EmployeeBehaviorSection";
 import { usePermissions } from "@/lib/permissions";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
@@ -901,7 +902,7 @@ const panelCls =
    Supplier form (CustomerTabBar in Contacts.tsx): photo hero up top,
    then the form split into tab panes instead of one long scroll. Panes
    stay MOUNTED (hidden, not unmounted) so values and validation hold. */
-type EmpTab = "personal" | "employment" | "skills" | "compensation" | "documents" | "account";
+type EmpTab = "personal" | "employment" | "skills" | "behavior" | "compensation" | "documents" | "account";
 
 const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }[] = [
   { id: "personal", label: "Personal", icon: UserIcon },
@@ -909,6 +910,7 @@ const EMP_TABS: { id: EmpTab; label: string; icon: React.ComponentType<{ size?: 
   { id: "compensation", label: "Compensation", icon: CreditCardIcon },
   { id: "documents", label: "Documents", icon: DocumentIcon },
   { id: "skills", label: "Skills", icon: SparklesIcon },
+  { id: "behavior", label: "Behavior", icon: ShieldIcon },
   { id: "account", label: "Account", icon: KeyIcon },
 ];
 
@@ -1317,6 +1319,21 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
       router.push(`/employees/${employeeId}`);
       return;
     }
+    /* Baseline behavior — recorded as the first assessment for the new hire,
+       ONLY if scores were entered. Best-effort: a failed baseline (e.g. the
+       operator lacks HR create) must not undo the successful hire. Never a
+       "fake finalized" record — it is an honest baseline, labelled as such. */
+    try {
+      const items = JSON.parse(form.behavior_baseline || "[]");
+      if (Array.isArray(items) && items.some((i) => i?.employee_score != null)) {
+        await fetch("/api/hr/behavior", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employee_id: result.employeeId, assessment_type: "baseline", items }),
+        });
+      }
+    } catch { /* baseline is optional */ }
+
     setSaved({
       id: result.employeeId!,
       name: `${form.first_name} ${form.last_name}`.trim(),
@@ -2032,6 +2049,25 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 positionId={form.create_new_position ? "" : form.position_id}
                 value={form.skills}
                 onChange={(v) => set("skills", v)}
+                canConfigurePosition={perms.can("Employees", "edit")}
+              />
+            </section>
+          </div>
+
+          {/* ── BEHAVIOR TAB ── */}
+          <div className={activeTab === "behavior" ? "space-y-4" : "hidden"}>
+            <section className={panelCls}>
+              <SectionHeader
+                icon={ShieldIcon}
+                title="Behavior & Conduct"
+                description="How this person conducts themselves at work — separate from skills, never combined."
+              />
+              <EmployeeBehaviorSection
+                mode={mode}
+                employeeId={employeeId}
+                positionId={form.create_new_position ? "" : form.position_id}
+                value={form.behavior_baseline}
+                onChange={(v) => set("behavior_baseline", v)}
                 canConfigurePosition={perms.can("Employees", "edit")}
               />
             </section>

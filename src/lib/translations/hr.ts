@@ -9,6 +9,7 @@ export const hrT: Translations = {
   "hr.tabLeave":                 { en: "Leave",                           zh: "请假",                          ar: "الإجازات" },
   "hr.tabAttendance":            { en: "Attendance",                      zh: "考勤",                          ar: "الحضور" },
   "hr.tabRecruitment":           { en: "Recruitment",                     zh: "招聘",                          ar: "التوظيف" },
+  "hr.tabBehavior":              { en: "Behavior",                        zh: "行为",                          ar: "السلوك" },
   "hr.tabSkills":                { en: "Skills",                          zh: "技能",                          ar: "المهارات" },
   "hr.skills.employee":          { en: "Employee",                        zh: "员工",                          ar: "الموظف" },
   "hr.skills.reportPeriod":      { en: "Report Period",                   zh: "报告周期",                      ar: "فترة التقرير" },
