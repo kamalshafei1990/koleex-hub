@@ -58,9 +58,16 @@ export async function GET(
      one, but `.maybeSingle()` protects us from bad data. */
   const [{ data: person }, accountRes, { data: assignment }] = await Promise.all([
     supabaseServer.from("people").select("*").eq("id", emp.person_id).maybeSingle(),
+    /* Resolve by account_id when it's set, otherwise fall back to the PERSON
+       link. `accounts.person_id` and `koleex_employees.account_id` are two
+       records of the same fact and they drift: an account created outside the
+       add-employee flow sets person_id but never back-fills account_id, and
+       the profile then told the user "no login account linked" about someone
+       who could sign in perfectly well. people is the identity SoT, so the
+       person link is the authority and account_id is the shortcut. */
     emp.account_id
       ? supabaseServer.from("accounts").select("*").eq("id", emp.account_id).maybeSingle()
-      : Promise.resolve({ data: null }),
+      : supabaseServer.from("accounts").select("*").eq("person_id", emp.person_id).maybeSingle(),
     supabaseServer
       .from("koleex_assignments")
       .select("*")

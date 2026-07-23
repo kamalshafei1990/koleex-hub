@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
      `people` is projected explicitly — select("*") dragged every column into
      a first-paint-blocking response, including base64 `avatar_url` values. */
-  const [{ data: people }, { data: assignments }, { data: departments }, { data: positions }] =
+  const [{ data: people }, { data: assignments }, { data: departments }, { data: positions }, { data: personAccounts }] =
     await Promise.all([
       supabaseServer
         .from("people")
@@ -80,6 +80,11 @@ export async function GET(req: Request) {
         .eq("is_primary", true),
       supabaseServer.from("koleex_departments").select("id, name"),
       supabaseServer.from("koleex_positions").select("id, title"),
+      /* has_account used to read koleex_employees.account_id alone, which
+         drifts from accounts.person_id — an account created outside the
+         add-employee flow sets person_id and never back-fills account_id, so
+         the directory reported "no account" for people who could sign in. */
+      supabaseServer.from("accounts").select("id, person_id").in("person_id", personIds),
     ]);
 
   type Assignment = {
@@ -105,6 +110,11 @@ export async function GET(req: Request) {
   const assignMap = new Map(asList.map((a) => [a.person_id, a]));
   const deptMap = new Map(((departments ?? []) as { id: string; name: string }[]).map((d) => [d.id, d.name]));
   const posMap = new Map(((positions ?? []) as { id: string; title: string }[]).map((p) => [p.id, p.title]));
+  const accountByPerson = new Map(
+    ((personAccounts ?? []) as { id: string; person_id: string | null }[])
+      .filter((a) => a.person_id)
+      .map((a) => [a.person_id as string, a.id]),
+  );
 
   const items = emps
     .filter((e) => e.person_id && personMap.has(e.person_id))
@@ -135,8 +145,8 @@ export async function GET(req: Request) {
         position_title: assignment ? posMap.get(assignment.position_id) || null : null,
         department_id: assignment?.department_id || null,
         position_id: assignment?.position_id || null,
-        has_account: !!e.account_id,
-        account_id: e.account_id,
+        has_account: !!e.account_id || accountByPerson.has(e.person_id!),
+        account_id: e.account_id ?? accountByPerson.get(e.person_id!) ?? null,
       };
     });
 
