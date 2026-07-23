@@ -5,7 +5,8 @@
    Matches the Koleex Hub admin design system.
    --------------------------------------------------------------------------- */
 
-import { useEffect, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import { useEffect, useState, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
@@ -137,6 +138,16 @@ export function ModalShell({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  /* Portal target. The HR modules render inside `.kx-tab-in`, whose entrance
+     animation applies a transform — and a transformed ancestor becomes the
+     containing block for `position: fixed`, so this overlay was positioned
+     and stacked INSIDE the tab pane instead of the viewport. The result: the
+     modal's own title bar and first fields slid up underneath the app header
+     and tab strip. Rendering into <body> escapes any such ancestor for good,
+     whatever a parent does with transform/filter/contain later. */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -144,9 +155,23 @@ export function ModalShell({
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onTouchMove={(e) => e.stopPropagation()}>
+  /* Escape closes — expected of every dialog, and it was missing. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open || !mounted) return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onTouchMove={(e) => e.stopPropagation()}
+    >
       <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" onClick={onClose} />
       <div className={`relative w-full ${width || "max-w-[520px]"} bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl flex flex-col max-h-[85vh]`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
@@ -158,7 +183,8 @@ export function ModalShell({
         <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
         {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-color)] shrink-0">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

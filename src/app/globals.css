@@ -694,8 +694,14 @@ input[type="number"]:not(.kx-spinner) {
   to   { opacity: 1; transform: translateY(0); }
 }
 .kx-tab-in {
-  animation: kx-tab-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
+  /* fill-mode is `backwards`, NOT `both`, and there is deliberately no
+     `will-change`. Either one leaves a transform applied after the animation
+     ends, and a transformed element becomes the containing block for every
+     `position: fixed` descendant — which silently drags modals inside the tab
+     pane and under the app header. `backwards` still prevents the opening
+     flash; once the 0.32s is up the element returns to its natural styles,
+     which are visually identical to the final keyframe. */
+  animation: kx-tab-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .kx-tab-in { animation: none; }
