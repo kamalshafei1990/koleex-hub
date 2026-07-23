@@ -24,20 +24,52 @@ import {
   makeTranslationHelpers,
   EmployeeLink,
 } from "@/components/hr/shared";
+import EmployeePicker, { EmployeeAvatar, employeeRoleLine } from "@/components/hr/EmployeePicker";
+import DatePicker from "@/components/ui/DatePicker";
+import PersonName from "@/components/ui/PersonName";
 import {
   fetchLeaveRequests,
   fetchLeaveTypes,
+  fetchLeaveBalances,
   createLeaveRequest,
   reviewLeaveRequest,
   type LeaveRequestWithName,
 } from "@/lib/hr-admin";
-import type { LeaveTypeRow } from "@/types/supabase";
+import type { LeaveTypeRow, LeaveBalanceRow } from "@/types/supabase";
 
 /* ── Icons ── */
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+
+/* ── Date maths for the live request summary ──
+   Mirrors computeBusinessDays() in hr-admin (the value the server actually
+   stores) so the operator sees the same number before submitting. Dates are
+   parsed as LOCAL midnight — new Date("2026-07-23") is UTC and rolls back a
+   day in negative offsets, which would silently shift every count. */
+function parseLocal(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+
+function countDays(start: string, end: string): { working: number; calendar: number } | null {
+  const s = parseLocal(start);
+  const e = parseLocal(end);
+  if (!s || !e || e < s) return null;
+  let working = 0;
+  let calendar = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    calendar++;
+    const d = cur.getDay();
+    if (d !== 0 && d !== 6) working++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { working, calendar };
+}
 
 /* ═══════════════════════════════════════════════════
    LEAVE MANAGEMENT MODULE
@@ -60,7 +92,10 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     end_date: "",
     reason: "",
     half_day: false,
+    attachment_url: "",
   });
+  const [balances, setBalances] = useState<(LeaveBalanceRow & { leave_type_name: string })[] | null>(null);
+  const [balancesLoading, setBalancesLoading] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequestWithName | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [loading, setLoading] = useState(true);
@@ -85,6 +120,69 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
+  /* ── Selected employee's balances for this year ──
+     Loaded only once someone is picked (and only in the create modal), so the
+     module still opens with a single round-trip. */
+  useEffect(() => {
+    const empId = leaveForm.employee_id;
+    if (!showLeaveModal || !empId) { setBalances(null); return; }
+    let cancelled = false;
+    setBalancesLoading(true);
+    fetchLeaveBalances(empId, new Date().getFullYear()).then((rows) => {
+      if (cancelled) return;
+      setBalances(rows);
+      setBalancesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [showLeaveModal, leaveForm.employee_id]);
+
+  /* ── Live request maths (mirrors what the server will store) ── */
+  const selectedEmployee = useMemo(
+    () => employees.find((e) => e.id === leaveForm.employee_id) ?? null,
+    [employees, leaveForm.employee_id],
+  );
+
+  const dateError =
+    !!leaveForm.start_date && !!leaveForm.end_date && leaveForm.end_date < leaveForm.start_date;
+
+  const isSingleDay =
+    !!leaveForm.start_date && leaveForm.start_date === leaveForm.end_date;
+
+  const span = useMemo(
+    () => (dateError ? null : countDays(leaveForm.start_date, leaveForm.end_date)),
+    [leaveForm.start_date, leaveForm.end_date, dateError],
+  );
+
+  /* half_day makes the request 0.5 days — only meaningful on a single date.
+     The old form let it be ticked on a two-week range, which silently booked
+     half a day off for the whole period. */
+  const requestedDays = leaveForm.half_day && isSingleDay ? 0.5 : span?.working ?? 0;
+
+  const selectedBalance = useMemo(
+    () => balances?.find((b) => b.leave_type_id === leaveForm.leave_type_id) ?? null,
+    [balances, leaveForm.leave_type_id],
+  );
+
+  const balanceRemaining = selectedBalance
+    ? selectedBalance.entitled + selectedBalance.carried_over + selectedBalance.adjustment - selectedBalance.used
+    : null;
+  const balanceAfter = balanceRemaining === null ? null : balanceRemaining - requestedDays;
+
+  /* Untick half day as soon as the range stops being a single date, so the
+     checkbox never sits on while having no effect. */
+  useEffect(() => {
+    if (!isSingleDay && leaveForm.half_day) {
+      setLeaveForm((f) => ({ ...f, half_day: false }));
+    }
+  }, [isSingleDay, leaveForm.half_day]);
+
+  const canSubmitLeave =
+    !!leaveForm.employee_id &&
+    !!leaveForm.leave_type_id &&
+    !!leaveForm.start_date &&
+    !!leaveForm.end_date &&
+    !dateError;
+
   /* ── Filtering ── */
   const filteredLeaves = useMemo(
     () =>
@@ -100,8 +198,14 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     setLeaveRequests(requests);
   };
 
+  const resetLeaveForm = () =>
+    setLeaveForm({
+      employee_id: "", leave_type_id: "", start_date: "", end_date: "",
+      reason: "", half_day: false, attachment_url: "",
+    });
+
   const handleCreateLeave = async () => {
-    if (!leaveForm.employee_id || !leaveForm.leave_type_id || !leaveForm.start_date || !leaveForm.end_date) return;
+    if (!canSubmitLeave) return;
     setSaving(true);
     await createLeaveRequest({
       employee_id: leaveForm.employee_id,
@@ -109,11 +213,13 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
       start_date: leaveForm.start_date,
       end_date: leaveForm.end_date,
       reason: leaveForm.reason || null,
-      half_day: leaveForm.half_day,
-      attachment_url: null,
+      /* Never send half_day on a multi-day range — the server would store
+         0.5 days for the whole period. */
+      half_day: leaveForm.half_day && isSingleDay,
+      attachment_url: leaveForm.attachment_url.trim() || null,
     });
     await reloadRequests();
-    setLeaveForm({ employee_id: "", leave_type_id: "", start_date: "", end_date: "", reason: "", half_day: false });
+    resetLeaveForm();
     setShowLeaveModal(false);
     setSaving(false);
   };
@@ -191,6 +297,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
           {filteredLeaves.map((req) => {
             const days = req.days;
             const isPending = req.status === "pending";
+            const emp = employees.find((e) => e.id === req.employee_id) ?? null;
 
             return (
               <button
@@ -206,10 +313,14 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                   isPending ? "hover:bg-[var(--bg-surface)] cursor-pointer" : "cursor-default"
                 }`}
               >
-                {/* Avatar */}
-                <div className="h-9 w-9 rounded-full bg-[var(--bg-surface)] flex items-center justify-center shrink-0">
-                  <UserIcon size={16} className="text-[var(--text-dim)]" />
-                </div>
+                {/* Avatar — the real photo when the person is in the list */}
+                {emp ? (
+                  <EmployeeAvatar employee={emp} size={36} />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-[var(--bg-surface)] flex items-center justify-center shrink-0">
+                    <UserIcon size={16} className="text-[var(--text-dim)]" />
+                  </div>
+                )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
@@ -217,6 +328,11 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                     <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">
                       <EmployeeLink id={req.employee_id} name={req.employee_name} />
                     </span>
+                    {emp?.person.name_alt && (
+                      <span lang="zh" className="text-[12px] text-[var(--text-dim)] truncate shrink-0">
+                        {emp.person.name_alt}
+                      </span>
+                    )}
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)] shrink-0">
                       {tLeaveType(req.leave_type_name)}
                     </span>
@@ -272,7 +388,27 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
           <div className="space-y-3">
             <div>
               <FieldLabel>{t("hr.employeeLabel")}</FieldLabel>
-              <div className="text-[13px] text-[var(--text-primary)]">{selectedLeave.employee_name}</div>
+              {(() => {
+                const emp = employees.find((e) => e.id === selectedLeave.employee_id) ?? null;
+                if (!emp) {
+                  return <div className="text-[13px] text-[var(--text-primary)]">{selectedLeave.employee_name}</div>;
+                }
+                const role = employeeRoleLine(emp);
+                return (
+                  <div className="flex items-center gap-2.5">
+                    <EmployeeAvatar employee={emp} size={34} />
+                    <div className="min-w-0">
+                      <PersonName
+                        name={emp.person.full_name}
+                        alt={emp.person.name_alt}
+                        nameClassName="text-[13px] font-medium text-[var(--text-primary)] truncate block"
+                        altClassName="text-[11px] text-[var(--text-dim)] truncate block"
+                      />
+                      {role && <div className="text-[11px] text-[var(--text-dim)] truncate">{role}</div>}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div>
               <FieldLabel>{t("hr.typeLabel")}</FieldLabel>
@@ -291,7 +427,27 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             {selectedLeave.reason && (
               <div>
                 <FieldLabel>{t("hr.reasonLabel")}</FieldLabel>
-                <div className="text-[13px] text-[var(--text-primary)]">{selectedLeave.reason}</div>
+                <div className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{selectedLeave.reason}</div>
+              </div>
+            )}
+            {selectedLeave.attachment_url && (
+              <div>
+                <FieldLabel>{t("hr.attachment")}</FieldLabel>
+                <a
+                  href={selectedLeave.attachment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[13px] text-[var(--accent)] hover:underline break-all"
+                >
+                  <PaperclipIcon size={13} className="shrink-0" />
+                  {t("hr.openAttachment")}
+                </a>
+              </div>
+            )}
+            {selectedLeave.created_at && (
+              <div>
+                <FieldLabel>{t("hr.submittedOn")}</FieldLabel>
+                <div className="text-[13px] text-[var(--text-primary)]">{fmtDate(selectedLeave.created_at)}</div>
               </div>
             )}
             <div>
@@ -313,6 +469,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
         open={showLeaveModal}
         onClose={() => setShowLeaveModal(false)}
         title={t("hr.newLeaveRequest")}
+        width="max-w-[580px]"
         footer={
           <>
             <button className={cancelBtnCls} onClick={() => setShowLeaveModal(false)}>
@@ -320,7 +477,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             </button>
             <button
               className={primaryBtnCls}
-              disabled={saving || !leaveForm.employee_id || !leaveForm.leave_type_id || !leaveForm.start_date || !leaveForm.end_date}
+              disabled={saving || !canSubmitLeave}
               onClick={handleCreateLeave}
             >
               {t("hr.submit")}
@@ -329,24 +486,33 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
         }
       >
         <div className="space-y-4">
-          {/* Employee select */}
+          {/* Employee — photo + English and native name + role */}
           <div>
             <FieldLabel>{t("hr.employee")}</FieldLabel>
-            <select
-              className={selectCls}
+            <EmployeePicker
+              employees={employees}
               value={leaveForm.employee_id}
-              onChange={(e) => setLeaveForm((f) => ({ ...f, employee_id: e.target.value }))}
-            >
-              <option value="">{t("hr.selectEmployee")}</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.person.full_name}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => setLeaveForm((f) => ({ ...f, employee_id: id }))}
+              placeholder={t("hr.selectEmployee")}
+              searchPlaceholder={t("hr.searchEmployees")}
+              emptyLabel={t("hr.noEmployeesFound")}
+            />
+            {selectedEmployee && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-dim)]">
+                {employeeRoleLine(selectedEmployee) && (
+                  <span>{employeeRoleLine(selectedEmployee)}</span>
+                )}
+                {selectedEmployee.employee_number && (
+                  <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)]">
+                    {selectedEmployee.employee_number}
+                  </span>
+                )}
+                {selectedEmployee.work_email && <span>{selectedEmployee.work_email}</span>}
+              </div>
+            )}
           </div>
 
-          {/* Leave type select */}
+          {/* Leave type */}
           <div>
             <FieldLabel>{t("hr.leaveType")}</FieldLabel>
             <select
@@ -363,27 +529,113 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             </select>
           </div>
 
-          {/* Start date */}
-          <div>
-            <FieldLabel>{t("hr.startDate")}</FieldLabel>
-            <input
-              type="date"
-              className={inputCls}
-              value={leaveForm.start_date}
-              onChange={(e) => setLeaveForm((f) => ({ ...f, start_date: e.target.value }))}
-            />
+          {/* Dates — side by side on desktop, stacked on mobile.
+              The end picker cannot go before the start date. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            <div>
+              <FieldLabel>{t("hr.startDate")}</FieldLabel>
+              <DatePicker
+                value={leaveForm.start_date}
+                onChange={(iso) =>
+                  setLeaveForm((f) => ({
+                    ...f,
+                    start_date: iso,
+                    /* Keep the range coherent: an end date that now sits
+                       before the new start is cleared rather than left wrong. */
+                    end_date: f.end_date && iso && f.end_date < iso ? "" : f.end_date,
+                  }))
+                }
+                placeholder={t("hr.pickDate")}
+                lang={lang}
+                heightCls="h-10"
+              />
+            </div>
+            <div>
+              <FieldLabel>{t("hr.endDate")}</FieldLabel>
+              <DatePicker
+                value={leaveForm.end_date}
+                onChange={(iso) => setLeaveForm((f) => ({ ...f, end_date: iso }))}
+                placeholder={t("hr.pickDate")}
+                lang={lang}
+                min={leaveForm.start_date || undefined}
+                heightCls="h-10"
+              />
+            </div>
           </div>
 
-          {/* End date */}
-          <div>
-            <FieldLabel>{t("hr.endDate")}</FieldLabel>
+          {/* Live summary — what will actually be booked */}
+          {dateError ? (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">
+              <InfoIcon size={13} className="mt-0.5 shrink-0" />
+              <span>{t("hr.endBeforeStart")}</span>
+            </div>
+          ) : span ? (
+            <div className="px-3.5 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">
+                  {t("hr.duration")}
+                </span>
+                <span className="text-[15px] font-semibold text-[var(--text-primary)]">
+                  {requestedDays} {requestedDays === 1 ? t("hr.day") : t("hr.days")}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-[var(--text-dim)]">
+                {fmtDate(leaveForm.start_date)} — {fmtDate(leaveForm.end_date)} ·{" "}
+                {span.calendar} {t("hr.calendarDays")} ·{" "}
+                {span.working} {span.working === 1 ? t("hr.workingDay") : t("hr.workingDays")}
+              </div>
+
+              {/* Balance for the chosen type */}
+              {leaveForm.leave_type_id && (
+                <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                  {balancesLoading ? (
+                    <div className="text-[11px] text-[var(--text-dim)]">{t("hr.loadingBalance")}</div>
+                  ) : selectedBalance && balanceRemaining !== null ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">{t("hr.entitled")}</div>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                            {selectedBalance.entitled + selectedBalance.carried_over + selectedBalance.adjustment}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">{t("hr.used")}</div>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">{selectedBalance.used}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">{t("hr.remaining")}</div>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">{balanceRemaining}</div>
+                        </div>
+                      </div>
+                      <div className={`mt-2 text-[11px] ${balanceAfter !== null && balanceAfter < 0 ? "text-amber-400" : "text-[var(--text-dim)]"}`}>
+                        {balanceAfter !== null && balanceAfter < 0
+                          ? t("hr.exceedsBalance")
+                          : `${t("hr.afterThisRequest")}: ${balanceAfter}`}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-[11px] text-[var(--text-dim)]">{t("hr.noBalanceConfigured")}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* Half day — only meaningful on a single date */}
+          <label className={`flex items-center gap-2 ${isSingleDay ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
             <input
-              type="date"
-              className={inputCls}
-              value={leaveForm.end_date}
-              onChange={(e) => setLeaveForm((f) => ({ ...f, end_date: e.target.value }))}
+              type="checkbox"
+              disabled={!isSingleDay}
+              checked={leaveForm.half_day}
+              onChange={(e) => setLeaveForm((f) => ({ ...f, half_day: e.target.checked }))}
+              className="h-4 w-4 rounded border-[var(--border-subtle)] accent-[var(--bg-inverted)]"
             />
-          </div>
+            <span className="text-[13px] text-[var(--text-primary)]">{t("hr.halfDayLabel")}</span>
+            {!isSingleDay && (
+              <span className="text-[11px] text-[var(--text-dim)]">— {t("hr.halfDaySingleDayOnly")}</span>
+            )}
+          </label>
 
           {/* Reason */}
           <div>
@@ -397,16 +649,20 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             />
           </div>
 
-          {/* Half day checkbox */}
-          <label className="flex items-center gap-2 cursor-pointer">
+          {/* Supporting document — the attachment_url column existed but the
+              form never offered a way to fill it. */}
+          <div>
+            <FieldLabel>{t("hr.attachment")}</FieldLabel>
             <input
-              type="checkbox"
-              checked={leaveForm.half_day}
-              onChange={(e) => setLeaveForm((f) => ({ ...f, half_day: e.target.checked }))}
-              className="h-4 w-4 rounded border-[var(--border-subtle)] accent-[var(--bg-inverted)]"
+              type="url"
+              inputMode="url"
+              className={inputCls}
+              placeholder={t("hr.attachmentPlaceholder")}
+              value={leaveForm.attachment_url}
+              onChange={(e) => setLeaveForm((f) => ({ ...f, attachment_url: e.target.value }))}
             />
-            <span className="text-[13px] text-[var(--text-primary)]">{t("hr.halfDayLabel")}</span>
-          </label>
+            <div className="mt-1.5 text-[11px] text-[var(--text-dim)]">{t("hr.attachmentHint")}</div>
+          </div>
         </div>
       </ModalShell>
     </div>

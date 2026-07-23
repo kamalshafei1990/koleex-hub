@@ -18,11 +18,28 @@ import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+/* Labels per language. Hardcoded rather than Intl so the English output stays
+   byte-identical to what shipped (Intl's en-GB gives 3-letter weekdays), and
+   so Arabic keeps Latin digits — an Arabic-Indic numbered date field reads
+   wrong next to the rest of the Hub's numbers. */
+const WEEKDAYS_BY_LANG: Record<string, string[]> = {
+  en: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+  zh: ["日", "一", "二", "三", "四", "五", "六"],
+  ar: ["ح", "ن", "ث", "ر", "خ", "ج", "س"],
+};
+const MONTHS_BY_LANG: Record<string, string[]> = {
+  en: ["January", "February", "March", "April", "May", "June",
+       "July", "August", "September", "October", "November", "December"],
+  zh: ["1月", "2月", "3月", "4月", "5月", "6月",
+       "7月", "8月", "9月", "10月", "11月", "12月"],
+  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+       "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+};
+const TODAY_BY_LANG: Record<string, string> = { en: "Today", zh: "今天", ar: "اليوم" };
+const CLEAR_BY_LANG: Record<string, string> = { en: "Clear", zh: "清除", ar: "مسح" };
+
+const WEEKDAYS = WEEKDAYS_BY_LANG.en;
+const MONTHS = MONTHS_BY_LANG.en;
 
 /* Parse / format "YYYY-MM-DD" in LOCAL time (no UTC shift — new Date("YYYY-MM-DD")
    is parsed as UTC midnight which can roll back a day in negative offsets). */
@@ -34,10 +51,13 @@ function parseISO(v: string): { y: number; m: number; d: number } | null {
 function toISO(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
-function fmtDisplay(v: string): string {
+function fmtDisplay(v: string, lang = "en"): string {
   const p = parseISO(v);
   if (!p) return "";
-  return `${String(p.d).padStart(2, "0")} ${MONTHS[p.m].slice(0, 3)} ${p.y}`;
+  if (lang === "zh") return `${p.y}年${p.m + 1}月${p.d}日`;
+  const months = MONTHS_BY_LANG[lang] ?? MONTHS;
+  const month = lang === "en" ? months[p.m].slice(0, 3) : months[p.m];
+  return `${String(p.d).padStart(2, "0")} ${month} ${p.y}`;
 }
 
 export default function DatePicker({
@@ -46,12 +66,23 @@ export default function DatePicker({
   placeholder = "Select date",
   className = "",
   id,
+  lang = "en",
+  min,
+  max,
+  heightCls = "h-11",
 }: {
   value: string;
   onChange: (iso: string) => void;
   placeholder?: string;
   className?: string;
   id?: string;
+  /** "en" | "zh" | "ar" — month, weekday and action labels. */
+  lang?: string;
+  /** Inclusive ISO bound. Days outside it are shown but not selectable. */
+  min?: string;
+  max?: string;
+  /** Trigger height, so the field can line up with the form around it. */
+  heightCls?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -108,13 +139,26 @@ export default function DatePicker({
     });
   };
 
+  /* Out-of-range days stay visible (so the month keeps its shape) but are not
+     selectable — that is what stops an end date landing before its start. */
+  const outOfRange = (d: number): boolean => {
+    const iso = toISO(view.y, view.m, d);
+    if (min && iso < min) return true;
+    if (max && iso > max) return true;
+    return false;
+  };
+
   const pick = (d: number) => {
+    if (outOfRange(d)) return;
     onChange(toISO(view.y, view.m, d));
     setOpen(false);
   };
 
+  const months = MONTHS_BY_LANG[lang] ?? MONTHS;
+  const weekdays = WEEKDAYS_BY_LANG[lang] ?? WEEKDAYS;
+
   const trigger =
-    "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none transition-all flex items-center justify-between gap-2 text-start";
+    `w-full ${heightCls} px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none transition-all flex items-center justify-between gap-2 text-start`;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -127,7 +171,7 @@ export default function DatePicker({
         aria-expanded={open}
       >
         <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}>
-          {value ? fmtDisplay(value) : placeholder}
+          {value ? fmtDisplay(value, lang) : placeholder}
         </span>
         <CalendarRawIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
       </button>
@@ -150,7 +194,7 @@ export default function DatePicker({
               <AngleLeftIcon className="h-4 w-4" />
             </button>
             <span className="text-[13px] font-semibold text-[var(--text-primary)]">
-              {MONTHS[view.m]} {view.y}
+              {lang === "zh" ? `${view.y}年${months[view.m]}` : `${months[view.m]} ${view.y}`}
             </span>
             <button
               type="button"
@@ -164,7 +208,7 @@ export default function DatePicker({
 
           {/* Weekday header */}
           <div className="grid grid-cols-7 gap-0.5 mb-1">
-            {WEEKDAYS.map((w) => (
+            {weekdays.map((w) => (
               <div key={w} className="h-7 flex items-center justify-center text-[10px] font-semibold text-[var(--text-ghost)] uppercase">
                 {w}
               </div>
@@ -178,17 +222,21 @@ export default function DatePicker({
               const isSelected =
                 !!selected && selected.y === view.y && selected.m === view.m && selected.d === d;
               const isToday = today.y === view.y && today.m === view.m && today.d === d;
+              const disabled = outOfRange(d);
               return (
                 <button
                   key={d}
                   type="button"
                   onClick={() => pick(d)}
+                  disabled={disabled}
                   className={`h-8 rounded-lg text-[12px] font-medium transition-colors ${
-                    isSelected
-                      ? "bg-[var(--accent)] text-white"
-                      : isToday
-                        ? "text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/40 hover:bg-[var(--bg-inverted)]/[0.06]"
-                        : "text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06]"
+                    disabled
+                      ? "text-[var(--text-ghost)] cursor-not-allowed"
+                      : isSelected
+                        ? "bg-[var(--accent)] text-white"
+                        : isToday
+                          ? "text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/40 hover:bg-[var(--bg-inverted)]/[0.06]"
+                          : "text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06]"
                   }`}
                 >
                   {d}
@@ -199,20 +247,28 @@ export default function DatePicker({
 
           {/* Footer actions */}
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
-            <button
-              type="button"
-              onClick={() => { onChange(toISO(today.y, today.m, today.d)); setOpen(false); }}
-              className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
-            >
-              Today
-            </button>
+            {/* Hidden when today itself is outside the allowed range — a
+                shortcut that produces an invalid value is worse than none. */}
+            {(() => {
+              const iso = toISO(today.y, today.m, today.d);
+              if ((min && iso < min) || (max && iso > max)) return <span />;
+              return (
+                <button
+                  type="button"
+                  onClick={() => { onChange(iso); setOpen(false); }}
+                  className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
+                >
+                  {TODAY_BY_LANG[lang] ?? TODAY_BY_LANG.en}
+                </button>
+              );
+            })()}
             {value && (
               <button
                 type="button"
                 onClick={() => { onChange(""); setOpen(false); }}
                 className="text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               >
-                Clear
+                {CLEAR_BY_LANG[lang] ?? CLEAR_BY_LANG.en}
               </button>
             )}
           </div>

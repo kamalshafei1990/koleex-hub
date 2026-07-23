@@ -41,6 +41,11 @@ export interface EmployeeListItem {
   person_id: string;
   person: {
     full_name: string;
+    /** Native / alternate name (people.name_alt — e.g. the Chinese name).
+        /api/employees has always returned it; the type omitted it, so every
+        surface that wanted the second line had to cast. Render via
+        <PersonName name={...} alt={...} />. */
+    name_alt: string | null;
     first_name: string | null;
     last_name: string | null;
     email: string | null;
