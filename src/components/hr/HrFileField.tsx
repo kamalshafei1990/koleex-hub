@@ -78,9 +78,9 @@ export default function HrFileField({
   disabled?: boolean;
   /* The drop zone mirrors the shape of the document that belongs in it, so the
      operator recognises the slot before reading its label. A QR is square, an
-     ID card is 1.58:1, a passport page is portrait; "wide" keeps the original
-     full-width banner for generic attachments. */
-  shape?: "wide" | "square" | "card" | "page";
+     identity document is a 1.58:1 card; "wide" keeps the original full-width
+     banner for generic attachments. */
+  shape?: "wide" | "square" | "card";
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -147,12 +147,10 @@ export default function HrFileField({
   const shapeCls =
     shape === "square" ? "aspect-square max-w-[190px]"
     : shape === "card" ? "aspect-[1.58/1]"
-    : shape === "page" ? "aspect-[1/1.35] max-w-[190px]"
     : "";
   const previewCls =
     shape === "square" ? "aspect-square max-w-[190px] w-full"
     : shape === "card" ? "aspect-[1.58/1] w-full"
-    : shape === "page" ? "aspect-[1/1.35] max-w-[190px] w-full"
     : "";
 
   /* ── Uploaded state ── */

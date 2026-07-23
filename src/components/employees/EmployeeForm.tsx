@@ -2095,7 +2095,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   value={form.passport_doc_url}
                   onChange={(v) => set("passport_doc_url", v)}
                   folder="documents"
-                  shape="page"
+                  shape="card"
                   label="Drop the passport page"
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
@@ -2116,7 +2116,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                     value={form.visa_doc_url}
                     onChange={(v) => set("visa_doc_url", v)}
                     folder="documents"
-                    shape="page"
+                    shape="card"
                     label="Drop the visa page"
                     hint="Image or PDF, up to 10 MB"
                     browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
