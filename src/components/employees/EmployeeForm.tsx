@@ -1518,12 +1518,12 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
         {/* ── Photo hero — same centered uploader as the Customer form ── */}
         <div className="flex flex-col items-center mb-5">
-          <label className="block cursor-pointer group" aria-label="Upload employee photo">
+          <label className="block cursor-pointer group" aria-label={t("f.photo.upload")}>
             <input
               type="file"
               accept="image/*"
               className="hidden"
-              aria-label="Photo file"
+              aria-label={t("f.photo.file")}
               onChange={(e) => handlePhotoSelect(e.target.files?.[0])}
             />
             <div className="relative h-28 w-28 rounded-2xl border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center overflow-hidden group-hover:border-[var(--border-focus)] transition-colors">
@@ -1535,13 +1535,13 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               ) : (
                 <div className="text-center">
                   <CameraIcon size={22} className="mx-auto text-[var(--text-faint)] group-hover:text-[var(--text-dim)] transition-colors" />
-                  <span className="block text-[10px] text-[var(--text-faint)] mt-1">Add Photo</span>
+                  <span className="block text-[10px] text-[var(--text-faint)] mt-1">{t("f.photo.add")}</span>
                 </div>
               )}
             </div>
           </label>
           <p className="text-[11px] text-[var(--text-faint)] mt-2">
-            Shown on the profile, directory, and across the Hub.
+            {t("f.photo.help")}
           </p>
           {photoError && (
             <p className="text-[11px] text-red-400 mt-1" role="alert">{photoError}</p>
@@ -1609,23 +1609,23 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
             {/* Name row — the photo moved to the hero above the tabs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <SelectInput label="Title" value={form.title} onChange={(v) => set("title", v)}
-                options={TITLE_OPTIONS.map((t) => ({ value: t, label: t || "—" }))} placeholder="—" />
-              <TextInput name="first_name" label="First Name" value={form.first_name} onChange={(v) => set("first_name", v)} placeholder="First name" required error={errFor("first_name")} />
-              <TextInput label="Middle Name" value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder="Middle name" />
-              <TextInput name="last_name" label="Last Name" value={form.last_name} onChange={(v) => set("last_name", v)} placeholder="Last name" required error={errFor("last_name")} />
+              <SelectInput label={t("f.title")} value={form.title} onChange={(v) => set("title", v)}
+                options={TITLE_OPTIONS.map((tt) => ({ value: tt, label: tt || "—" }))} placeholder="—" />
+              <TextInput name="first_name" label={t("f.firstName")} value={form.first_name} onChange={(v) => set("first_name", v)} placeholder={t("f.firstName")} required error={errFor("first_name")} />
+              <TextInput label={t("f.middleName")} value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder={t("f.middleName")} />
+              <TextInput name="last_name" label={t("f.lastName")} value={form.last_name} onChange={(v) => set("last_name", v)} placeholder={t("f.lastName")} required error={errFor("last_name")} />
             </div>
 
             {/* Alternate name */}
             <div className="mb-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-faint)]">
               <div className="flex items-center gap-2 mb-2.5">
                 <LanguagesIcon size={12} className="text-[var(--text-faint)]" />
-                <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest">Alternate Name</span>
-                <span className="text-[10px] text-[var(--text-faint)]">e.g. Chinese official name</span>
+                <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest">{t("f.altName.title")}</span>
+                <span className="text-[10px] text-[var(--text-faint)]">{t("f.altName.eg")}</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <TextInput label="First Name (Alt)" value={form.first_name_alt} onChange={(v) => set("first_name_alt", v)} placeholder="e.g. 明" />
-                <TextInput label="Last Name (Alt)" value={form.last_name_alt} onChange={(v) => set("last_name_alt", v)} placeholder="e.g. 李" />
+                <TextInput label={t("f.firstNameAlt")} value={form.first_name_alt} onChange={(v) => set("first_name_alt", v)} placeholder="e.g. 明" />
+                <TextInput label={t("f.lastNameAlt")} value={form.last_name_alt} onChange={(v) => set("last_name_alt", v)} placeholder="e.g. 李" />
               </div>
             </div>
 
@@ -1640,27 +1640,27 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              <SelectInput label="Gender" value={form.gender} onChange={(v) => set("gender", v)}
-                options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder="Select..." />
-              <DateInput name="birthday" label="Date of Birth" value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} error={errFor("birthday")} />
+              <SelectInput label={t("f.gender")} value={form.gender} onChange={(v) => set("gender", v)}
+                options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder={t("f.ph.select")} />
+              <DateInput name="birthday" label={t("f.birthday")} value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} error={errFor("birthday")} />
               <Combobox
-                label="Nationality"
+                label={t("f.nationality")}
                 value={form.nationality}
                 onChange={(v) => set("nationality", v)}
                 options={countryOptions}
-                placeholder="Select country..."
+                placeholder={t("f.ph.selectCountry")}
                 searchPlaceholder="Search 249 countries…"
               />
-              <SelectInput label="Marital Status" value={form.marital_status} onChange={(v) => set("marital_status", v)}
-                options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder="Select..." />
-              <SelectInput name="number_of_children" label="Children" value={form.number_of_children} onChange={(v) => set("number_of_children", v)}
+              <SelectInput label={t("f.marital")} value={form.marital_status} onChange={(v) => set("marital_status", v)}
+                options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder={t("f.ph.select")} />
+              <SelectInput name="number_of_children" label={t("f.children")} value={form.number_of_children} onChange={(v) => set("number_of_children", v)}
                 options={CHILDREN_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} error={errFor("number_of_children")} />
-              <SelectInput label="Blood Type" value={form.blood_type} onChange={(v) => set("blood_type", v)}
+              <SelectInput label={t("f.blood")} value={form.blood_type} onChange={(v) => set("blood_type", v)}
                 options={BLOOD_TYPE_OPTIONS.map((b) => ({ value: b, label: b || "—" }))} placeholder="—" />
-              <SelectInput label="Religion" value={form.religion} onChange={(v) => set("religion", v)}
-                options={RELIGION_OPTIONS.map((r) => ({ value: r, label: r }))} placeholder="Select..." />
-              <MultiSelectInput label="Languages" value={form.languages} onChange={(v) => set("languages", v)}
-                options={LANGUAGE_OPTIONS} placeholder="Add a language…" />
+              <SelectInput label={t("f.religion")} value={form.religion} onChange={(v) => set("religion", v)}
+                options={RELIGION_OPTIONS.map((r) => ({ value: r, label: r }))} placeholder={t("f.ph.select")} />
+              <MultiSelectInput label={t("f.languages")} value={form.languages} onChange={(v) => set("languages", v)}
+                options={LANGUAGE_OPTIONS} placeholder={t("f.ph.addLanguage")} />
             </div>
           </section>
 
@@ -1673,10 +1673,10 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             onToggle={() => toggleSection("contact")}
           >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <TextInput label="Personal Phone" value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-              <TextInput name="personal_email" label="Personal Email" value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
-              <TextInput label="Work Phone" value={form.work_phone} onChange={(v) => set("work_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-              <TextInput name="work_email" label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")}
+              <TextInput label={t("f.personalPhone")} value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
+              <TextInput name="personal_email" label={t("f.personalEmail")} value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
+              <TextInput label={t("f.workPhone")} value={form.work_phone} onChange={(v) => set("work_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
+              <TextInput name="work_email" label={t("f.workEmail")} value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")}
                 onBlur={() => {
                   // Mirror into the login email while it's still untouched.
                   if (form.create_account && !form.login_email && form.work_email) {
@@ -1685,17 +1685,17 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 }} />
             </div>
 
-            <SubLabel>Home Address</SubLabel>
+            <SubLabel>{t("f.addr.home")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-              <TextInput label="Address Line 1" value={form.private_address_line1} onChange={(v) => set("private_address_line1", v)} placeholder="Street address" />
-              <TextInput label="Address Line 2" value={form.private_address_line2} onChange={(v) => set("private_address_line2", v)} placeholder="Apt, suite, unit" />
+              <TextInput label={t("f.addr.line1")} value={form.private_address_line1} onChange={(v) => set("private_address_line1", v)} placeholder={t("f.ph.street")} />
+              <TextInput label={t("f.addr.line2")} value={form.private_address_line2} onChange={(v) => set("private_address_line2", v)} placeholder={t("f.ph.aptSuite")} />
               {/* Country → state → city. Ordered country-first because that is
                   the direction the data flows: picking a country decides which
                   provinces exist, and picking a province decides which cities.
                   Countries we don't carry divisions for fall back to typing —
                   an empty dropdown would read as "broken", not as "no data". */}
               <Combobox
-                label="Country"
+                label={t("f.addr.country")}
                 value={form.private_country}
                 onChange={(v) => {
                   set("private_country", v);
@@ -1705,37 +1705,37 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   if (v !== form.private_country) { set("private_state", ""); set("private_city", ""); }
                 }}
                 options={countryOptions}
-                placeholder="Select country..."
+                placeholder={t("f.ph.selectCountry")}
                 searchPlaceholder="Search 249 countries…"
               />
               {stateOptions.length > 0 ? (
                 <Combobox
-                  label="State / Province"
+                  label={t("f.addr.state")}
                   value={form.private_state}
                   onChange={(v) => {
                     set("private_state", v);
                     if (v !== form.private_state) set("private_city", "");
                   }}
                   options={stateOptions}
-                  placeholder="Select state / province..."
+                  placeholder={t("f.ph.selectState")}
                   searchPlaceholder="Type to search…"
                 />
               ) : (
-                <TextInput label="State / Province" value={form.private_state} onChange={(v) => set("private_state", v)} placeholder="State" />
+                <TextInput label={t("f.addr.state")} value={form.private_state} onChange={(v) => set("private_state", v)} placeholder={t("f.addr.state")} />
               )}
               {cityOptions.length > 0 ? (
                 <Combobox
-                  label="City"
+                  label={t("f.addr.city")}
                   value={form.private_city}
                   onChange={(v) => set("private_city", v)}
                   options={cityOptions}
-                  placeholder="Select city..."
+                  placeholder={t("f.ph.selectCity")}
                   searchPlaceholder="Type to search…"
                 />
               ) : (
-                <TextInput label="City" value={form.private_city} onChange={(v) => set("private_city", v)} placeholder="City" />
+                <TextInput label={t("f.addr.city")} value={form.private_city} onChange={(v) => set("private_city", v)} placeholder={t("f.addr.city")} />
               )}
-              <TextInput label="Postal Code" value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder="ZIP" />
+              <TextInput label={t("f.addr.postal")} value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder={t("f.addr.postal")} />
             </div>
 
             {/* ── WeChat ──
@@ -1743,15 +1743,15 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 of reaching the SAME account, so they read as one identity.
                 The QR tile is square because a QR is square — the old
                 full-width dashed banner made a code look like a file drop. */}
-            <SubLabel>WeChat</SubLabel>
+            <SubLabel>{t("f.wechat.title")}</SubLabel>
             <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="min-w-0 flex-1 space-y-3">
                   <TextInput
-                    label="WeChat ID / Username"
+                    label={t("f.wechat.id")}
                     value={form.wechat_id}
                     onChange={(v) => set("wechat_id", v)}
-                    placeholder="WeChat ID / handle"
+                    placeholder={t("f.ph.wechatHandle")}
                   />
                   <p className="text-[11px] leading-snug text-[var(--text-dim)]">
                     Add the ID, the QR image, or both — either one is enough to
@@ -1759,13 +1759,13 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   </p>
                 </div>
                 <div className="sm:w-[190px] shrink-0">
-                  <FieldLabel label="WeChat QR Code" />
+                  <FieldLabel label={t("f.wechat.qr")} />
                   <HrFileField
                     value={form.wechat_qr_url}
                     onChange={(v) => set("wechat_qr_url", v)}
                     folder="documents"
                     shape="square"
-                    label="Drop QR"
+                    label={t("f.drop.qr")}
                     hint="PNG / JPG"
                     browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                   />
@@ -1774,14 +1774,14 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             </div>
 
             {/* ── Social accounts (same repeater shape as the Suppliers app) ── */}
-            <SubLabel>Social Accounts</SubLabel>
+            <SubLabel>{t("sec.social")}</SubLabel>
             <div className="mt-3 space-y-2.5">
               {socials.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSocials(socials.filter((_, x) => x !== i))}
-                    aria-label="Remove social account"
+                    aria-label={t("f.social.remove")}
                     className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <CrossIcon size={10} />
@@ -1797,7 +1797,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       value={row.platform}
                       onChange={(e) => setSocials(socials.map((r, x) => x === i ? { ...r, platform: e.target.value } : r))}
                       className={`${selectBaseCls} border-[var(--border-subtle)]`}
-                      aria-label="Platform"
+                      aria-label={t("f.social.platform")}
                     >
                       {SOCIAL_PLATFORMS.map((pf) => <option key={pf} value={pf}>{pf}</option>)}
                     </select>
@@ -1805,8 +1805,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   <input
                     value={row.value}
                     onChange={(e) => setSocials(socials.map((r, x) => x === i ? { ...r, value: e.target.value } : r))}
-                    placeholder="Link, page, or @account"
-                    aria-label="Account"
+                    placeholder={t("f.ph.socialLink")}
+                    aria-label={t("f.social.account")}
                     className={`${inputBaseCls} border border-[var(--border-subtle)] flex-1 min-w-0`}
                   />
                 </div>
@@ -1819,7 +1819,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center">
                   <PlusIcon size={11} />
                 </span>
-                Add social account
+                {t("f.social.add")}
               </button>
             </div>
           </CollapsibleSection>
@@ -1834,21 +1834,21 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
           >
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3">
               <div>
-                <SubLabel>Primary Contact</SubLabel>
+                <SubLabel>{t("f.em.primary")}</SubLabel>
                 <div className="grid grid-cols-3 gap-3 mt-3">
-                  <TextInput label="Name" value={form.emergency_contact_name} onChange={(v) => set("emergency_contact_name", v)} placeholder="Full name" />
-                  <TextInput label="Phone" value={form.emergency_contact_phone} onChange={(v) => set("emergency_contact_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-                  <SelectInput label="Relationship" value={form.emergency_contact_relationship} onChange={(v) => set("emergency_contact_relationship", v)}
-                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder="Select..." />
+                  <TextInput label={t("f.em.name")} value={form.emergency_contact_name} onChange={(v) => set("emergency_contact_name", v)} placeholder={t("f.ph.fullName")} />
+                  <TextInput label={t("f.em.phone")} value={form.emergency_contact_phone} onChange={(v) => set("emergency_contact_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
+                  <SelectInput label={t("f.em.relationship")} value={form.emergency_contact_relationship} onChange={(v) => set("emergency_contact_relationship", v)}
+                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder={t("f.ph.select")} />
                 </div>
               </div>
               <div>
-                <SubLabel>Secondary Contact</SubLabel>
+                <SubLabel>{t("f.em.secondary")}</SubLabel>
                 <div className="grid grid-cols-3 gap-3 mt-3">
-                  <TextInput label="Name" value={form.emergency_contact2_name} onChange={(v) => set("emergency_contact2_name", v)} placeholder="Full name" />
-                  <TextInput label="Phone" value={form.emergency_contact2_phone} onChange={(v) => set("emergency_contact2_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-                  <SelectInput label="Relationship" value={form.emergency_contact2_relationship} onChange={(v) => set("emergency_contact2_relationship", v)}
-                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder="Select..." />
+                  <TextInput label={t("f.em.name")} value={form.emergency_contact2_name} onChange={(v) => set("emergency_contact2_name", v)} placeholder={t("f.ph.fullName")} />
+                  <TextInput label={t("f.em.phone")} value={form.emergency_contact2_phone} onChange={(v) => set("emergency_contact2_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
+                  <SelectInput label={t("f.em.relationship")} value={form.emergency_contact2_relationship} onChange={(v) => set("emergency_contact2_relationship", v)}
+                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r, label: r || "—" }))} placeholder={t("f.ph.select")} />
                 </div>
               </div>
             </div>
@@ -1876,7 +1876,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   button fetches a fresh suggestion from the server. */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <FieldLabel label="Employee Number" />
+                  <FieldLabel label={t("f.emp.number")} />
                   <button
                     type="button"
                     onClick={async () => {
@@ -1884,9 +1884,9 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       set("employee_number", next);
                     }}
                     className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] -mt-1 transition-colors"
-                    title="Fetch next available number"
+                    title={t("f.emp.fetchNext")}
                   >
-                    Regenerate
+                    {t("f.acct.regenerate")}
                   </button>
                 </div>
                 <input
@@ -1898,31 +1898,31 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   className={`${inputBaseCls} ${borderFor()}`}
                 />
               </div>
-              <SelectInput label="Employment Type" value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
+              <SelectInput label={t("f.emp.type")} value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
               {/* Status is an edit-only control: a new hire is always created
                   active, so offering it on the add form would be a field with
                   exactly one sensible answer. */}
               {isEdit && (
                 <SelectInput
-                  label="Employment Status"
+                  label={t("f.emp.status")}
                   value={form.employment_status}
                   onChange={(v) => set("employment_status", v)}
                   options={EMPLOYMENT_STATUS_OPTIONS}
                 />
               )}
-              <DateInput name="hire_date" label="Hire Date" value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
-              <SelectInput label="Work Location" value={form.work_location} onChange={(v) => set("work_location", v)} options={WORK_LOCATION_OPTIONS} />
+              <DateInput name="hire_date" label={t("f.emp.hireDate")} value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
+              <SelectInput label={t("f.emp.workLocation")} value={form.work_location} onChange={(v) => set("work_location", v)} options={WORK_LOCATION_OPTIONS} />
               <Combobox
-                label="Manager / Supervisor"
+                label={t("f.emp.manager")}
                 value={form.manager_id}
                 onChange={(v) => set("manager_id", v)}
                 options={managerOptions}
-                placeholder={managerOptions.length ? "Select..." : "No active employees yet"}
+                placeholder={managerOptions.length ? t("f.ph.select") : t("f.ph.noActiveEmp")}
                 searchPlaceholder="Search employees…"
                 emptyText="No employees match"
               />
-              <DateInput name="contract_end_date" label="Contract End" value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />
-              <DateInput name="probation_end_date" label="Probation End" value={form.probation_end_date} onChange={(v) => set("probation_end_date", v)} yearFrom={2024} yearTo={2030} error={errFor("probation_end_date")} />
+              <DateInput name="contract_end_date" label={t("f.emp.contractEnd")} value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />
+              <DateInput name="probation_end_date" label={t("f.emp.probationEnd")} value={form.probation_end_date} onChange={(v) => set("probation_end_date", v)} yearFrom={2024} yearTo={2030} error={errFor("probation_end_date")} />
             </div>
 
             {/* Department & Position */}
@@ -1976,16 +1976,16 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       {!form.create_new_department ? (
                         <SelectInput
                           name="department_id"
-                          label="Department"
+                          label={t("f.pos.department")}
                           value={form.department_id}
                           onChange={(v) => { set("department_id", v); set("position_id", ""); }}
                           options={departments.map((d) => ({ value: d.id, label: d.name }))}
-                          placeholder="Select..."
+                          placeholder={t("f.ph.select")}
                           required
                           error={errFor("department_id")}
                         />
                       ) : (
-                        <TextInput name="department_name" label="New Department" value={form.department_name} onChange={(v) => set("department_name", v)} placeholder="e.g. Engineering" required error={errFor("department_name")} />
+                        <TextInput name="department_name" label={t("f.dept.new")} value={form.department_name} onChange={(v) => set("department_name", v)} placeholder="e.g. Engineering" required error={errFor("department_name")} />
                       )}
                     </div>
                     <button type="button" onClick={() => {
@@ -1994,7 +1994,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       if (next) { set("department_id", ""); set("position_id", ""); }
                     }}
                       className="flex items-center gap-1 h-10 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                      <PlusIcon size={12} />{form.create_new_department ? "Existing" : "New"}
+                      <PlusIcon size={12} />{form.create_new_department ? t("f.dept.existing") : t("f.dept.newShort")}
                     </button>
                   </div>
                   {/* Position */}
@@ -2003,22 +2003,22 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       {!form.create_new_position ? (
                         <SelectInput
                           name="position_id"
-                          label="Position"
+                          label={t("f.pos.position")}
                           value={form.position_id}
                           onChange={(v) => set("position_id", v)}
                           options={positions.map((p) => ({ value: p.id, label: p.title }))}
                           placeholder={
                             !form.department_id && !form.create_new_department
-                              ? "Select dept first..."
+                              ? t("f.pos.selectDept")
                               : positions.length === 0
-                              ? "No positions — use New"
-                              : "Select..."
+                              ? t("f.pos.noPositions")
+                              : t("f.ph.select")
                           }
                           required
                           error={errFor("position_id")}
                         />
                       ) : (
-                        <TextInput name="position_title" label="New Position" value={form.position_title} onChange={(v) => set("position_title", v)} placeholder="e.g. Software Engineer" required error={errFor("position_title")} />
+                        <TextInput name="position_title" label={t("f.pos.new")} value={form.position_title} onChange={(v) => set("position_title", v)} placeholder="e.g. Software Engineer" required error={errFor("position_title")} />
                       )}
                     </div>
                     <button type="button" onClick={() => {
@@ -2027,7 +2027,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                       if (next) set("position_id", "");
                     }}
                       className="flex items-center gap-1 h-10 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                      <PlusIcon size={12} />{form.create_new_position ? "Existing" : "New"}
+                      <PlusIcon size={12} />{form.create_new_position ? t("f.dept.existing") : t("f.dept.newShort")}
                     </button>
                   </div>
                 </div>
@@ -2042,8 +2042,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <section className={panelCls}>
               <SectionHeader
                 icon={SparklesIcon}
-                title="Skills"
-                description="Position requirements load automatically; add anything extra this person can do."
+                title={t("sec.skills")}
+                description={t("sec.skills.desc")}
               />
               <EmployeeSkillsSection
                 positionId={form.create_new_position ? "" : form.position_id}
@@ -2059,8 +2059,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <section className={panelCls}>
               <SectionHeader
                 icon={ShieldIcon}
-                title="Behavior & Conduct"
-                description="How this person conducts themselves at work — separate from skills, never combined."
+                title={t("sec.behavior")}
+                description={t("sec.behavior.desc")}
               />
               <EmployeeBehaviorSection
                 mode={mode}
@@ -2084,28 +2084,28 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               description={t("sec.compensation.desc")}
             />
 
-            <SubLabel>Salary</SubLabel>
+            <SubLabel>{t("f.comp.salary")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4 max-w-md">
-              <TextInput name="initial_salary" label="Initial Salary" value={form.initial_salary} onChange={(v) => set("initial_salary", v)} placeholder="e.g. 5000" type="number" min={0} inputMode="decimal" error={errFor("initial_salary")} />
-              <SelectInput label="Currency" value={form.salary_currency} onChange={(v) => set("salary_currency", v)} options={CURRENCY_OPTIONS} />
+              <TextInput name="initial_salary" label={t("f.comp.initSalary")} value={form.initial_salary} onChange={(v) => set("initial_salary", v)} placeholder="e.g. 5000" type="number" min={0} inputMode="decimal" error={errFor("initial_salary")} />
+              <SelectInput label={t("f.comp.currency")} value={form.salary_currency} onChange={(v) => set("salary_currency", v)} options={CURRENCY_OPTIONS} />
             </div>
 
-            <SubLabel>Bank Account</SubLabel>
+            <SubLabel>{t("f.comp.bank")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3 mb-4">
-              <TextInput label="Bank Name" value={form.bank_name} onChange={(v) => set("bank_name", v)} placeholder="e.g. HSBC" />
-              <TextInput label="Account Holder" value={form.bank_account_holder} onChange={(v) => set("bank_account_holder", v)} placeholder="Name on account" />
-              <TextInput label="Account Number" value={form.bank_account_number} onChange={(v) => set("bank_account_number", v)} placeholder="Account #" />
-              <TextInput label="IBAN" value={form.bank_iban} onChange={(v) => set("bank_iban", v)} placeholder="IBAN" />
-              <TextInput label="SWIFT / BIC" value={form.bank_swift} onChange={(v) => set("bank_swift", v)} placeholder="SWIFT code" />
-              <SelectInput label="Currency" value={form.bank_currency} onChange={(v) => set("bank_currency", v)} options={BANK_CURRENCY_OPTIONS} />
+              <TextInput label={t("f.comp.bankName")} value={form.bank_name} onChange={(v) => set("bank_name", v)} placeholder="e.g. HSBC" />
+              <TextInput label={t("f.comp.holder")} value={form.bank_account_holder} onChange={(v) => set("bank_account_holder", v)} placeholder={t("f.ph.nameOnAccount")} />
+              <TextInput label={t("f.comp.accNum")} value={form.bank_account_number} onChange={(v) => set("bank_account_number", v)} placeholder={t("f.comp.accNum")} />
+              <TextInput label={t("f.comp.iban")} value={form.bank_iban} onChange={(v) => set("bank_iban", v)} placeholder={t("f.comp.iban")} />
+              <TextInput label={t("f.comp.swift")} value={form.bank_swift} onChange={(v) => set("bank_swift", v)} placeholder={t("f.ph.swiftCode")} />
+              <SelectInput label={t("f.comp.currency")} value={form.bank_currency} onChange={(v) => set("bank_currency", v)} options={BANK_CURRENCY_OPTIONS} />
             </div>
 
-            <SubLabel>Insurance</SubLabel>
+            <SubLabel>{t("f.comp.insurance")}</SubLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
-              <TextInput label="Provider" value={form.insurance_provider} onChange={(v) => set("insurance_provider", v)} placeholder="e.g. Bupa" />
-              <TextInput label="Policy Number" value={form.insurance_policy_number} onChange={(v) => set("insurance_policy_number", v)} placeholder="Policy #" />
-              <SelectInput label="Class" value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
-              <DateInput name="insurance_expiry_date" label="Expiry" value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
+              <TextInput label={t("f.comp.provider")} value={form.insurance_provider} onChange={(v) => set("insurance_provider", v)} placeholder="e.g. Bupa" />
+              <TextInput label={t("f.comp.policy")} value={form.insurance_policy_number} onChange={(v) => set("insurance_policy_number", v)} placeholder={t("f.comp.policy")} />
+              <SelectInput label={t("f.comp.class")} value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
+              <DateInput name="insurance_expiry_date" label={t("f.comp.expiry")} value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
             </div>
           </section>
           </div>
@@ -2121,12 +2121,12 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               description={t("sec.docs.desc")}
             />
 
-            <SubLabel>Identification</SubLabel>
+            <SubLabel>{t("f.docs.identification")}</SubLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3 mb-4">
-              <TextInput label="National ID" value={form.identification_id} onChange={(v) => set("identification_id", v)} placeholder="ID number" />
-              <TextInput label="Passport Number" value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder="Passport #" />
-              <TextInput label="Social Security #" value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder="SSN" />
-              <TextInput label="Tax ID" value={form.tax_id} onChange={(v) => set("tax_id", v)} placeholder="Tax ID" />
+              <TextInput label={t("f.docs.natId")} value={form.identification_id} onChange={(v) => set("identification_id", v)} placeholder={t("f.ph.idNumber")} />
+              <TextInput label={t("f.docs.passport")} value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder="Passport #" />
+              <TextInput label={t("f.docs.ssn")} value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder="SSN" />
+              <TextInput label={t("f.docs.tax")} value={form.tax_id} onChange={(v) => set("tax_id", v)} placeholder={t("f.docs.tax")} />
             </div>
 
             {/* The scan belongs BESIDE the number it pictures, not in a
@@ -2137,37 +2137,37 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 back), so one slot could only ever hold half the document. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
-                <FieldLabel label="National ID — Front" />
+                <FieldLabel label={t("f.docs.natIdFront")} />
                 <HrFileField
                   value={form.national_id_doc_url}
                   onChange={(v) => set("national_id_doc_url", v)}
                   folder="documents"
                   shape="card"
-                  label="Drop the front"
+                  label={t("f.drop.front")}
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
               </div>
               <div>
-                <FieldLabel label="National ID — Back" />
+                <FieldLabel label={t("f.docs.natIdBack")} />
                 <HrFileField
                   value={form.national_id_back_doc_url}
                   onChange={(v) => set("national_id_back_doc_url", v)}
                   folder="documents"
                   shape="card"
-                  label="Drop the back"
+                  label={t("f.drop.back")}
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
               </div>
               <div>
-                <FieldLabel label="Passport Photo" />
+                <FieldLabel label={t("f.docs.passportPhoto")} />
                 <HrFileField
                   value={form.passport_doc_url}
                   onChange={(v) => set("passport_doc_url", v)}
                   folder="documents"
                   shape="card"
-                  label="Drop the passport page"
+                  label={t("f.drop.passport")}
                   hint="Image or PDF, up to 10 MB"
                   browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                 />
@@ -2175,40 +2175,40 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3 mb-4">
               <div>
-                <SubLabel>Visa</SubLabel>
+                <SubLabel>{t("f.docs.visa")}</SubLabel>
                 <div className="grid grid-cols-2 gap-3 mt-3">
-                  <TextInput label="Visa Number" value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder="Visa #" />
-                  <DateInput name="visa_expiry_date" label="Visa Expiry" value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
+                  <TextInput label={t("f.docs.visaNum")} value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder="Visa #" />
+                  <DateInput name="visa_expiry_date" label={t("f.docs.visaExp")} value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
                 </div>
                 <div className="mt-3">
-                  <FieldLabel label="Visa Photo" />
+                  <FieldLabel label={t("f.docs.visaPhoto")} />
                   <HrFileField
                     value={form.visa_doc_url}
                     onChange={(v) => set("visa_doc_url", v)}
                     folder="documents"
                     shape="card"
-                    label="Drop the visa page"
+                    label={t("f.drop.visa")}
                     hint="Image or PDF, up to 10 MB"
                     browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
                   />
                 </div>
               </div>
               <div>
-                <SubLabel>Education</SubLabel>
+                <SubLabel>{t("f.docs.education")}</SubLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                  <SelectInput label="Degree" value={form.education_degree} onChange={(v) => set("education_degree", v)} options={DEGREE_OPTIONS} />
-                  <TextInput label="Institution" value={form.education_institution} onChange={(v) => set("education_institution", v)} placeholder="University name" />
-                  <TextInput label="Field of Study" value={form.education_field} onChange={(v) => set("education_field", v)} placeholder="e.g. Computer Science" />
-                  <TextInput name="education_graduation_year" label="Graduation Year" value={form.education_graduation_year} onChange={(v) => set("education_graduation_year", v)} placeholder="e.g. 2020" type="number" min={1940} max={new Date().getFullYear() + 10} inputMode="numeric" error={errFor("education_graduation_year")} />
+                  <SelectInput label={t("f.docs.degree")} value={form.education_degree} onChange={(v) => set("education_degree", v)} options={DEGREE_OPTIONS} />
+                  <TextInput label={t("f.docs.institution")} value={form.education_institution} onChange={(v) => set("education_institution", v)} placeholder={t("f.ph.universityName")} />
+                  <TextInput label={t("f.docs.field")} value={form.education_field} onChange={(v) => set("education_field", v)} placeholder="e.g. Computer Science" />
+                  <TextInput name="education_graduation_year" label={t("f.docs.gradYear")} value={form.education_graduation_year} onChange={(v) => set("education_graduation_year", v)} placeholder="e.g. 2020" type="number" min={1940} max={new Date().getFullYear() + 10} inputMode="numeric" error={errFor("education_graduation_year")} />
                 </div>
               </div>
             </div>
 
-            <SubLabel>Driving License</SubLabel>
+            <SubLabel>{t("f.docs.drivingLicense")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-              <TextInput label="License Number" value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
-              <SelectInput label="Type" value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
-              <DateInput name="driving_license_expiry" label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
+              <TextInput label={t("f.docs.licenseNum")} value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
+              <SelectInput label={t("f.docs.licenseType")} value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
+              <DateInput name="driving_license_expiry" label={t("f.comp.expiry")} value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>
           </section>
           </div>
@@ -2246,7 +2246,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 }}
                 role="switch"
                 aria-checked={form.create_account}
-                aria-label="Create login account"
+                aria-label={t("f.acct.toggle")}
                 className={`relative w-11 h-6 rounded-full transition-colors ${form.create_account ? "bg-emerald-500" : "bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${form.create_account ? "translate-x-5" : "translate-x-0"}`} />
@@ -2266,7 +2266,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             {form.create_account && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <TextInput
-                  label="Username"
+                  label={t("f.acct.username")}
                   value={form.username}
                   onChange={(v) => set("username", v)}
                   placeholder="e.g. john.doe"
@@ -2281,7 +2281,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 />
                 <TextInput
                   name="login_email"
-                  label="Login Email"
+                  label={t("f.acct.loginEmail")}
                   value={form.login_email}
                   onChange={(v) => set("login_email", v)}
                   placeholder="login@company.com"
@@ -2292,13 +2292,13 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 />
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <FieldLabel label="Temporary Password" />
+                    <FieldLabel label={t("f.acct.tempPassword")} />
                     <button
                       type="button"
                       onClick={() => set("temp_password", generateTemporaryPassword())}
                       className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] -mt-1 transition-colors"
                     >
-                      Regenerate
+                      {t("f.acct.regenerate")}
                     </button>
                   </div>
                   <div className="relative">
@@ -2311,7 +2311,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={showPassword ? t("f.acct.hidePw") : t("f.acct.showPw")}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text-dim)] transition-colors"
                     >
                       {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
@@ -2319,11 +2319,11 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   </div>
                 </div>
                 <SelectInput
-                  label="Role"
+                  label={t("f.acct.role")}
                   value={form.role_id}
                   onChange={(v) => set("role_id", v)}
                   options={roles.map((r) => ({ value: r.id, label: r.name }))}
-                  placeholder="Select role..."
+                  placeholder={t("f.acct.selectRole")}
                 />
               </div>
             )}
