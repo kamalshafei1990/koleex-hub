@@ -2139,10 +2139,41 @@ export interface LeaveRequestRow {
   reviewed_at: string | null;
   review_notes: string | null;
   attachment_url: string | null;
+  /* ── Request detail (migration hr_leave_request_details, all nullable) ── */
+  /** How to reach them while away, and where they will be. */
+  contact_phone: string | null;
+  contact_address: string | null;
+  destination: string | null;
+  /** Who covers the work. FK → koleex_employees, ON DELETE SET NULL. */
+  handover_to: string | null;
+  handover_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  /** "morning" | "afternoon" — only meaningful when half_day is true.
+      CHECK-constrained in the DB, so don't widen this without a migration. */
+  half_day_period: string | null;
+  /** Who filed it — self-service vs HR acting on someone's behalf. */
+  requested_by: string | null;
   created_at: string;
   updated_at: string;
 }
 export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at">;
+
+/** The optional detail block. Every field is nullable in the DB, so callers
+ *  may omit the whole thing — used to keep createLeaveRequest's signature
+ *  from demanding nine nulls at every call site. */
+export type LeaveRequestDetails = Pick<
+  LeaveRequestRow,
+  | "contact_phone"
+  | "contact_address"
+  | "destination"
+  | "handover_to"
+  | "handover_notes"
+  | "emergency_contact_name"
+  | "emergency_contact_phone"
+  | "half_day_period"
+  | "requested_by"
+>;
 
 /* ── Attendance ── */
 export interface AttendancePolicyRow {

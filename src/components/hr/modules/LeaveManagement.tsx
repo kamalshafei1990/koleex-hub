@@ -94,7 +94,15 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     end_date: "",
     reason: "",
     half_day: false,
+    half_day_period: "",
     attachment_url: "",
+    contact_phone: "",
+    contact_address: "",
+    destination: "",
+    handover_to: "",
+    handover_notes: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
   });
   const [balances, setBalances] = useState<(LeaveBalanceRow & { leave_type_name: string })[] | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(false);
@@ -237,8 +245,15 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
   const resetLeaveForm = () =>
     setLeaveForm({
       employee_id: "", leave_type_id: "", start_date: "", end_date: "",
-      reason: "", half_day: false, attachment_url: "",
+      reason: "", half_day: false, half_day_period: "", attachment_url: "",
+      contact_phone: "", contact_address: "", destination: "",
+      handover_to: "", handover_notes: "",
+      emergency_contact_name: "", emergency_contact_phone: "",
     });
+
+  /** "" → null, so an untouched optional field stays NULL rather than empty
+   *  string — the difference between "not provided" and "provided as blank". */
+  const orNull = (v: string) => v.trim() || null;
 
   const handleCreateLeave = async () => {
     if (!canSubmitLeave) return;
@@ -252,7 +267,18 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
       /* Never send half_day on a multi-day range — the server would store
          0.5 days for the whole period. */
       half_day: leaveForm.half_day && isSingleDay,
-      attachment_url: leaveForm.attachment_url.trim() || null,
+      half_day_period:
+        leaveForm.half_day && isSingleDay ? orNull(leaveForm.half_day_period) : null,
+      attachment_url: orNull(leaveForm.attachment_url),
+      contact_phone: orNull(leaveForm.contact_phone),
+      contact_address: orNull(leaveForm.contact_address),
+      destination: orNull(leaveForm.destination),
+      handover_to: leaveForm.handover_to || null,
+      handover_notes: orNull(leaveForm.handover_notes),
+      emergency_contact_name: orNull(leaveForm.emergency_contact_name),
+      emergency_contact_phone: orNull(leaveForm.emergency_contact_phone),
+      /* Who filed it — the signed-in employee, not the person it is for. */
+      requested_by: account?.employee?.id ?? null,
     });
     await reloadRequests();
     resetLeaveForm();
@@ -456,7 +482,13 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                 {fmtDate(selectedLeave.start_date)} — {fmtDate(selectedLeave.end_date)}{" "}
                 ({selectedLeave.days} {selectedLeave.days === 1 ? t("hr.day") : t("hr.days")})
                 {selectedLeave.half_day && (
-                  <span className="ml-2 text-blue-400">({t("hr.halfDayLabel")})</span>
+                  <span className="ml-2 text-blue-400">
+                    ({t("hr.halfDayLabel")}
+                    {selectedLeave.half_day_period
+                      ? ` — ${t(`hr.${selectedLeave.half_day_period}`)}`
+                      : ""}
+                    )
+                  </span>
                 )}
               </div>
             </div>
@@ -495,10 +527,67 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                 </button>
               </div>
             )}
+            {/* Cover — who is picking the work up */}
+            {(selectedLeave.handover_to || selectedLeave.handover_notes) && (
+              <div>
+                <FieldLabel>{t("hr.coverSection")}</FieldLabel>
+                {selectedLeave.handover_to && (() => {
+                  const cover = employees.find((e) => e.id === selectedLeave.handover_to);
+                  return (
+                    <div className="text-[13px] text-[var(--text-primary)]">
+                      {cover
+                        ? <PersonName name={cover.person.full_name} alt={cover.person.name_alt} />
+                        : t("hr.handoverUnknown")}
+                    </div>
+                  );
+                })()}
+                {selectedLeave.handover_notes && (
+                  <div className="mt-1 text-[12px] text-[var(--text-muted)] whitespace-pre-wrap">
+                    {selectedLeave.handover_notes}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reachability — the answers to "where are they / how do I call" */}
+            {(selectedLeave.contact_phone || selectedLeave.destination || selectedLeave.contact_address) && (
+              <div>
+                <FieldLabel>{t("hr.whileAwaySection")}</FieldLabel>
+                <div className="text-[13px] text-[var(--text-primary)] space-y-0.5">
+                  {selectedLeave.contact_phone && <div>{selectedLeave.contact_phone}</div>}
+                  {selectedLeave.destination && <div>{selectedLeave.destination}</div>}
+                  {selectedLeave.contact_address && (
+                    <div className="text-[12px] text-[var(--text-muted)]">{selectedLeave.contact_address}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(selectedLeave.emergency_contact_name || selectedLeave.emergency_contact_phone) && (
+              <div>
+                <FieldLabel>{t("hr.emergencySection")}</FieldLabel>
+                <div className="text-[13px] text-[var(--text-primary)]">
+                  {[selectedLeave.emergency_contact_name, selectedLeave.emergency_contact_phone]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+            )}
+
             {selectedLeave.created_at && (
               <div>
                 <FieldLabel>{t("hr.submittedOn")}</FieldLabel>
-                <div className="text-[13px] text-[var(--text-primary)]">{fmtDate(selectedLeave.created_at)}</div>
+                <div className="text-[13px] text-[var(--text-primary)]">
+                  {fmtDate(selectedLeave.created_at)}
+                  {/* Whether the person filed it themselves or HR did it for
+                      them — relevant when chasing up a request. */}
+                  {selectedLeave.requested_by &&
+                    selectedLeave.requested_by !== selectedLeave.employee_id && (
+                      <span className="ms-2 text-[11px] text-[var(--text-dim)]">
+                        {t("hr.filedOnBehalf")}
+                      </span>
+                    )}
+                </div>
               </div>
             )}
             <div>
@@ -722,6 +811,26 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
             )}
           </label>
 
+          {/* Which half — "0.5 days" alone cannot be rostered against */}
+          {leaveForm.half_day && isSingleDay && (
+            <div className="flex items-center gap-2">
+              {(["morning", "afternoon"] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setLeaveForm((f) => ({ ...f, half_day_period: p }))}
+                  className={`h-8 px-3.5 rounded-lg text-[12px] font-medium transition-colors ${
+                    leaveForm.half_day_period === p
+                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {t(`hr.${p}`)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Reason */}
           <div>
             <FieldLabel>{t("hr.reason")}</FieldLabel>
@@ -732,6 +841,105 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
               value={leaveForm.reason}
               onChange={(e) => setLeaveForm((f) => ({ ...f, reason: e.target.value }))}
             />
+          </div>
+
+          {/* ── Cover ── who picks the work up, and what they need to know.
+              A leave request that doesn't say this leaves the manager to
+              work it out by asking around. */}
+          <div className="pt-1 border-t border-[var(--border-subtle)]">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] pt-3 pb-2">
+              {t("hr.coverSection")}
+            </div>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel>{t("hr.handoverTo")}</FieldLabel>
+                <EmployeePicker
+                  employees={employees.filter((e) => e.id !== leaveForm.employee_id)}
+                  value={leaveForm.handover_to}
+                  onChange={(id) => setLeaveForm((f) => ({ ...f, handover_to: id }))}
+                  placeholder={t("hr.handoverNobody")}
+                  searchPlaceholder={t("hr.searchEmployees")}
+                  emptyLabel={t("hr.noEmployeesFound")}
+                />
+              </div>
+              <div>
+                <FieldLabel>{t("hr.handoverNotes")}</FieldLabel>
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  placeholder={t("hr.handoverNotesPlaceholder")}
+                  value={leaveForm.handover_notes}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, handover_notes: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Reachability ── where they are and how to reach them */}
+          <div className="pt-1 border-t border-[var(--border-subtle)]">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] pt-3 pb-2">
+              {t("hr.whileAwaySection")}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>{t("hr.contactPhone")}</FieldLabel>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  className={inputCls}
+                  placeholder={t("hr.contactPhonePlaceholder")}
+                  value={leaveForm.contact_phone}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, contact_phone: e.target.value }))}
+                />
+              </div>
+              <div>
+                <FieldLabel>{t("hr.destination")}</FieldLabel>
+                <input
+                  className={inputCls}
+                  placeholder={t("hr.destinationPlaceholder")}
+                  value={leaveForm.destination}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, destination: e.target.value }))}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <FieldLabel>{t("hr.contactAddress")}</FieldLabel>
+                <input
+                  className={inputCls}
+                  placeholder={t("hr.contactAddressPlaceholder")}
+                  value={leaveForm.contact_address}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, contact_address: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Emergency contact ── matters on long and medical absences */}
+          <div className="pt-1 border-t border-[var(--border-subtle)]">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] pt-3 pb-2">
+              {t("hr.emergencySection")}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>{t("hr.emergencyName")}</FieldLabel>
+                <input
+                  className={inputCls}
+                  placeholder={t("hr.emergencyNamePlaceholder")}
+                  value={leaveForm.emergency_contact_name}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, emergency_contact_name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <FieldLabel>{t("hr.emergencyPhone")}</FieldLabel>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  className={inputCls}
+                  placeholder={t("hr.contactPhonePlaceholder")}
+                  value={leaveForm.emergency_contact_phone}
+                  onChange={(e) => setLeaveForm((f) => ({ ...f, emergency_contact_phone: e.target.value }))}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Supporting document — upload or drag a photo/PDF of the

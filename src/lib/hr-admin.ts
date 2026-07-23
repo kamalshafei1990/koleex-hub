@@ -43,6 +43,7 @@ import type {
   LeaveTypeInsert,
   LeaveBalanceInsert,
   LeaveRequestInsert,
+  LeaveRequestDetails,
   AttendanceRecordInsert,
   JobPostingInsert,
   ApplicantInsert,
@@ -417,9 +418,15 @@ export async function fetchLeaveRequests(
 
 /** Create a leave request. Auto-computes days from start/end dates. */
 export async function createLeaveRequest(
-  input: Omit<LeaveRequestInsert, "days" | "status" | "reviewed_by" | "reviewed_at" | "review_notes"> & {
-    days?: number;
-  },
+  input: Omit<
+    LeaveRequestInsert,
+    "days" | "status" | "reviewed_by" | "reviewed_at" | "review_notes" | keyof LeaveRequestDetails
+  > &
+    /* Detail fields are all nullable — omit them entirely and the row is
+       created exactly as before. */
+    Partial<LeaveRequestDetails> & {
+      days?: number;
+    },
 ): Promise<LeaveRequestRow | null> {
   const days =
     input.days ??

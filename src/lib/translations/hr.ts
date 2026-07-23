@@ -400,4 +400,29 @@ export const hrT: Translations = {
   /* ── Conflict + coverage detail ── */
   "hr.overlapWarning":           { en: "This overlaps leave already booked for this employee", zh: "与该员工已有的休假重叠", ar: "يتداخل مع إجازة مسجّلة لهذا الموظف" },
   "hr.teamAway":                 { en: "Also away in the same department", zh: "同部门同期休假",                ar: "غائبون أيضاً في نفس القسم" },
+
+  /* ── Request detail sections (migration hr_leave_request_details) ── */
+  "hr.morning":                  { en: "Morning",                         zh: "上午",                          ar: "صباحاً" },
+  "hr.afternoon":                { en: "Afternoon",                       zh: "下午",                          ar: "بعد الظهر" },
+
+  "hr.coverSection":             { en: "Cover",                           zh: "工作交接",                      ar: "التغطية" },
+  "hr.handoverTo":               { en: "Work handed over to",             zh: "工作交接给",                    ar: "تسليم العمل إلى" },
+  "hr.handoverNobody":           { en: "Nobody assigned",                 zh: "未指定",                        ar: "لم يُسنَد لأحد" },
+  "hr.handoverUnknown":          { en: "No longer an employee",           zh: "已离职",                        ar: "لم يعد موظفاً" },
+  "hr.handoverNotes":            { en: "Handover notes",                  zh: "交接说明",                      ar: "ملاحظات التسليم" },
+  "hr.handoverNotesPlaceholder": { en: "Open tasks, deadlines, who to contact…", zh: "待办事项、截止日期、联系人…", ar: "المهام المفتوحة، المواعيد، جهة الاتصال…" },
+
+  "hr.whileAwaySection":         { en: "While away",                      zh: "休假期间",                      ar: "أثناء الغياب" },
+  "hr.contactPhone":             { en: "Contact number",                  zh: "联系电话",                      ar: "رقم التواصل" },
+  "hr.contactPhonePlaceholder":  { en: "+86 …",                           zh: "+86 …",                         ar: "+86 …" },
+  "hr.destination":              { en: "Destination",                     zh: "前往地点",                      ar: "الوجهة" },
+  "hr.destinationPlaceholder":   { en: "City or country",                 zh: "城市或国家",                    ar: "المدينة أو الدولة" },
+  "hr.contactAddress":           { en: "Address while away",              zh: "休假期间住址",                  ar: "العنوان أثناء الغياب" },
+  "hr.contactAddressPlaceholder":{ en: "Optional",                        zh: "可选",                          ar: "اختياري" },
+
+  "hr.emergencySection":         { en: "Emergency contact",               zh: "紧急联系人",                    ar: "جهة اتصال الطوارئ" },
+  "hr.emergencyName":            { en: "Name",                            zh: "姓名",                          ar: "الاسم" },
+  "hr.emergencyPhone":           { en: "Phone",                           zh: "电话",                          ar: "الهاتف" },
+
+  "hr.filedOnBehalf":            { en: "· filed on their behalf",         zh: "· 由他人代为提交",              ar: "· قُدّم نيابةً عنه" },
 };
