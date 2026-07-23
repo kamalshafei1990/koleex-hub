@@ -22,6 +22,7 @@
    --------------------------------------------------------------------------- */
 
 import { invalidateMeBootstrap } from "@/lib/me-bootstrap";
+import { invalidateCachedGet } from "./client-cache";
 import { clearScopeContextCache } from "@/lib/scope";
 
 /* Prefixes of keys that hold tenant/account-scoped server data or the SA tenant
@@ -51,6 +52,9 @@ function clearByPrefix(store: Storage): void {
 export function clearSessionScopedCaches(): void {
   try { invalidateMeBootstrap(); } catch { /* ignore */ }
   try { clearScopeContextCache(); } catch { /* ignore */ }
+  /* Coalesced reference payloads (/api/me/permissions, departments, ...) are
+     account-scoped — a second sign-in must never read the first one's. */
+  try { invalidateCachedGet(); } catch { /* ignore */ }
   if (typeof window === "undefined") return;
   clearByPrefix(window.localStorage);
   clearByPrefix(window.sessionStorage);

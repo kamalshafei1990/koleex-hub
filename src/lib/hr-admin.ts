@@ -163,9 +163,42 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
   };
 
   try {
-    // Total headcount + status breakdown — same source as the Employees app
-    // (the anon koleex_employees read is RLS-blocked and always returned 0).
-    const employees = await cachedEmployeeList();
+    /* All four reads are INDEPENDENT — none needs a previous result. They used
+       to run strictly sequentially, and because every one is a full round trip
+       through the permission-gated /api/hr/data gateway (auth + module check
+       per call), that turned the dashboard into a 4-stage waterfall: measured
+       as a distinct second wave of requests that only started once the first
+       had drained. Issue them together; the dashboard now costs one round trip
+       instead of four. */
+    const in30 = new Date();
+    in30.setDate(in30.getDate() + 30);
+    const today = new Date().toISOString().split("T")[0];
+    const in30Str = in30.toISOString().split("T")[0];
+
+    const [employees, pendingRes, docRes, absenceRes] = await Promise.all([
+      // Total headcount + status breakdown — same source as the Employees app
+      // (the anon koleex_employees read is RLS-blocked and always returned 0).
+      cachedEmployeeList(),
+      // Pending leave requests
+      supabase
+        .from(LEAVE_REQUESTS)
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      // Documents expiring within 30 days
+      supabase
+        .from(HR_DOCUMENTS)
+        .select("id", { count: "exact", head: true })
+        .gte("expiry_date", today)
+        .lte("expiry_date", in30Str),
+      // Today's absences (approved leave requests covering today)
+      supabase
+        .from(LEAVE_REQUESTS)
+        .select("id", { count: "exact", head: true })
+        .eq("status", "approved")
+        .lte("start_date", today)
+        .gte("end_date", today),
+    ]);
+
     stats.headcount = employees.length;
     for (const e of employees) {
       if (e.employment_status === "active") stats.active++;
@@ -173,49 +206,16 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
       else if (e.employment_status === "inactive") stats.inactive++;
     }
 
-    // Pending leave requests
-    const { count: pendingCount, error: leaveErr } = await supabase
-      .from(LEAVE_REQUESTS)
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
+    /* Each count is reported independently: one failing query must not blank
+       the other three tiles. */
+    if (pendingRes.error) console.error("[HR Dashboard] Pending leaves:", pendingRes.error.message);
+    else stats.pending_leave_requests = pendingRes.count || 0;
 
-    if (leaveErr) {
-      console.error("[HR Dashboard] Pending leaves:", leaveErr.message);
-    } else {
-      stats.pending_leave_requests = pendingCount || 0;
-    }
+    if (docRes.error) console.error("[HR Dashboard] Expiring docs:", docRes.error.message);
+    else stats.expiring_documents = docRes.count || 0;
 
-    // Documents expiring within 30 days
-    const in30 = new Date();
-    in30.setDate(in30.getDate() + 30);
-    const today = new Date().toISOString().split("T")[0];
-    const in30Str = in30.toISOString().split("T")[0];
-
-    const { count: docCount, error: docErr } = await supabase
-      .from(HR_DOCUMENTS)
-      .select("id", { count: "exact", head: true })
-      .gte("expiry_date", today)
-      .lte("expiry_date", in30Str);
-
-    if (docErr) {
-      console.error("[HR Dashboard] Expiring docs:", docErr.message);
-    } else {
-      stats.expiring_documents = docCount || 0;
-    }
-
-    // Today's absences (approved leave requests covering today)
-    const { count: absenceCount, error: absErr } = await supabase
-      .from(LEAVE_REQUESTS)
-      .select("id", { count: "exact", head: true })
-      .eq("status", "approved")
-      .lte("start_date", today)
-      .gte("end_date", today);
-
-    if (absErr) {
-      console.error("[HR Dashboard] Absences:", absErr.message);
-    } else {
-      stats.today_absences = absenceCount || 0;
-    }
+    if (absenceRes.error) console.error("[HR Dashboard] Absences:", absenceRes.error.message);
+    else stats.today_absences = absenceRes.count || 0;
   } catch (err: any) {
     console.error("[HR Dashboard] Unexpected:", err.message);
   }

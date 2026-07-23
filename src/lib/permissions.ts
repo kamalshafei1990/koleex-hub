@@ -27,6 +27,7 @@ import { useCurrentAccount } from "./identity";
 import { supabaseAdmin } from "./supabase-admin";
 import type { OrgPermissionRow, DataScope } from "@/types/supabase";
 import { isOpenAccessModule } from "./permission-modules";
+import { cachedGet } from "./client-cache";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -156,6 +157,10 @@ export function usePermissions(): PermissionState {
   };
 }
 
+/** Matches AUTH_CTX_TTL_MS in src/lib/server/auth.ts — a role edit already
+ *  took up to this long to propagate, so reusing the body adds no staleness. */
+const PERMISSIONS_TTL_MS = 15_000;
+
 /* ═══════════════════════════════════════════════════
    DATA FETCHERS
    ═══════════════════════════════════════════════════ */
@@ -163,14 +168,17 @@ export function usePermissions(): PermissionState {
 async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]> {
   // API-first: /api/me/permissions returns the caller's perms + depts
   // via service_role. The anon-key path is blocked by RLS now.
+  //
+  // Coalesced: usePermissions() is a hook, so every consumer on a page runs
+  // this effect, and the department fetch below hits the SAME endpoint. Six
+  // identical requests per /employees load, measured. cachedGet collapses
+  // them into one. TTL matches the server-side auth micro-cache (15s), so a
+  // permission change still propagates within the same window as before.
   try {
-    const res = await fetch("/api/me/permissions", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        permissions: OrgPermissionRow[];
-      };
-      return json.permissions;
-    }
+    const json = await cachedGet<{ permissions: OrgPermissionRow[] }>(
+      "/api/me/permissions", PERMISSIONS_TTL_MS,
+    );
+    return json.permissions;
   } catch (e) {
     console.error("[permissions] /api/me/permissions failed:", e);
   }
@@ -184,13 +192,14 @@ async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]>
 }
 
 async function fetchPersonDepartments(personId: string): Promise<string[]> {
-  // API-first: included in /api/me/permissions response
+  // API-first: included in the SAME /api/me/permissions response the role
+  // fetch above reads — hence the shared coalescing cache rather than a
+  // second identical round-trip.
   try {
-    const res = await fetch("/api/me/permissions", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as { departments: string[] };
-      return json.departments;
-    }
+    const json = await cachedGet<{ departments: string[] }>(
+      "/api/me/permissions", PERMISSIONS_TTL_MS,
+    );
+    return json.departments;
   } catch (e) {
     console.error("[permissions] /api/me/permissions failed:", e);
   }

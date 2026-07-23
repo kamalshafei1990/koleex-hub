@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin } from "./supabase-admin";
+import { invalidateCachedGet } from "./client-cache";
 import { uploadToStorage } from "./storage-client";
 
 const BUCKET = "media";
@@ -228,6 +229,9 @@ export async function createDepartment(
     .single();
 
   if (error) return { data: null, error: error.message };
+  /* The employees wizard reuses the department list for a minute; a new
+     department must not wait that long to become pickable. */
+  invalidateCachedGet("/api/management/departments");
   return { data: data as DepartmentRow, error: null };
 }
 
@@ -245,6 +249,7 @@ export async function updateDepartment(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+  invalidateCachedGet("/api/management/departments");
   return { ok: true, error: null };
 }
 
@@ -257,6 +262,7 @@ export async function deleteDepartment(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+  invalidateCachedGet("/api/management/departments");
   return { ok: true, error: null };
 }
 

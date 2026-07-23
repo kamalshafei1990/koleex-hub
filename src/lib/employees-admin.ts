@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { cachedGet, invalidateCachedGet } from "./client-cache";
 import {
   generateTemporaryPassword,
   suggestUsername,
@@ -318,19 +319,24 @@ export async function generateEmployeeNumber(): Promise<string> {
   }
 }
 
+/** Departments are org structure — they change on the scale of months, not
+ *  page loads. A minute of reuse is invisible to users and removes the burst. */
+const DEPARTMENTS_TTL_MS = 60_000;
+
 /** Fetch all departments for picker.
  *  Routed through /api/management/departments so the request runs
  *  under the service-role client and respects tenant scoping —
  *  RLS on koleex_departments otherwise returns an empty list and
  *  leaves the Add Employee wizard stuck on "Loading…". */
 export async function fetchDepartments(): Promise<DepartmentRow[]> {
+  /* Coalesced: the Employees page, the wizard and the picker each ask for
+     the department list on mount — three identical requests per load, and
+     under that burst this endpoint went from 71ms to 10.2s and started
+     returning 500s. It is 23 rows of reference data; one request is enough. */
   try {
-    const res = await fetch("/api/management/departments", { credentials: "include", cache: "no-store" });
-    if (!res.ok) {
-      console.error("[Departments] HTTP", res.status);
-      return [];
-    }
-    const json = (await res.json()) as { departments?: DepartmentRow[] };
+    const json = await cachedGet<{ departments?: DepartmentRow[] }>(
+      "/api/management/departments", DEPARTMENTS_TTL_MS,
+    );
     return (json.departments ?? []).filter((d) => d.is_active !== false);
   } catch (e) {
     console.error("[Departments] fetch failed:", e);
