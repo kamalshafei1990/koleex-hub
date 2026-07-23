@@ -33,6 +33,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { PERMISSION_GROUPS, PERMISSION_MODULES, isOpenAccessModule } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { rolesT } from "@/lib/translations/roles";
 import {
@@ -45,18 +46,11 @@ import {
    CONSTANTS
    ═══════════════════════════════════════════════════ */
 
-const PERMISSION_GROUPS: { label: string; modules: string[] }[] = [
-  { label: "Operations", modules: ["Products", "Inventory", "Purchase", "Landed Cost", "Catalogs", "Documents"] },
-  { label: "Commercial", modules: ["Sales", "CRM", "Quotations", "Invoices", "Customers", "Suppliers", "Contacts", "Markets"] },
-  { label: "Finance", modules: ["Finance", "Expenses"] },
-  { label: "People", modules: ["Management", "Employees", "Recruitment", "Appraisals", "Attendance"] },
-  { label: "Communication", modules: ["Discuss", "Calendar", "To-do", "Koleex Mail"] },
-  { label: "Marketing & Growth", modules: ["Website", "Marketing", "Events"] },
-  { label: "Planning & Knowledge", modules: ["Planning", "Projects", "Knowledge", "AI"] },
-  { label: "System", modules: ["Accounts", "Settings", "Brands", "Price Calculator", "Dashboard"] },
-];
+/* Module list is DERIVED from the app registry (src/lib/permission-modules)
+   so shipping an app automatically makes it grantable here. It used to be a
+   hand-written array, which is why the Translator never showed up. */
 
-const PERMISSION_MODULES = PERMISSION_GROUPS.flatMap((g) => g.modules);
+
 
 const getAppIcon = (moduleName: string) => {
   const app = APP_REGISTRY.find((a) =>

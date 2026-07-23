@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentAccount } from "./identity";
 import { supabaseAdmin } from "./supabase-admin";
 import type { OrgPermissionRow, DataScope } from "@/types/supabase";
+import { isOpenAccessModule } from "./permission-modules";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -110,7 +111,10 @@ export function usePermissions(): PermissionState {
       if (!account) return false;
 
       const perm = permMap.get(module);
-      if (!perm) return false;
+      /* No row yet. Deny-by-default is right for anything holding company
+         records, but an openAccess tool (see AppDef.openAccess) is available
+         until an admin says otherwise — an explicit row below still wins. */
+      if (!perm) return isOpenAccessModule(module);
 
       switch (action) {
         case "view": return perm.can_view;

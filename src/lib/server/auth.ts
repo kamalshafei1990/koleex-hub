@@ -23,6 +23,7 @@ import {
   getViewAsRoleId,
 } from "./session";
 import type { ScopeContext } from "../scope";
+import { isOpenAccessModule } from "@/lib/permission-modules";
 import {
   runDualReadShadow,
   sessionStatefulValidateShadowEnabled,
@@ -472,6 +473,14 @@ export async function requireModuleAction(
   const row = rolePermRes.data as
     | { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean }
     | null;
+
+  /* No row for this module. Deny-by-default protects anything holding company
+     records, but an openAccess tool (AppDef.openAccess) stays usable until an
+     admin configures it — otherwise a newly shipped utility is dead for every
+     role until someone grants it one by one. A hide-override was already
+     honoured above, and any explicit row falls through to the checks below. */
+  if (!row && isOpenAccessModule(moduleName)) return null;
+
   const col =
     action === "create" ? row?.can_create
     : action === "edit" ? row?.can_edit

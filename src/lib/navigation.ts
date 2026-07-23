@@ -111,6 +111,21 @@ export interface AppDef {
   superAdminOnly?: boolean;
 
   /**
+   * OPEN ACCESS — a general-purpose tool that carries no company data of its
+   * own, so it is available to everyone by DEFAULT.
+   *
+   * The permission system is otherwise deny-by-default: a module with no row
+   * in koleex_permissions is blocked. That's right for anything holding real
+   * records, but wrong for a utility like the Translator, where the effect is
+   * that nobody can open it until an admin grants every role individually.
+   *
+   * With this flag the module still appears in Roles & Permissions, and an
+   * explicit row ALWAYS wins — so an admin can still restrict or hide it.
+   * The flag only decides what happens when nothing has been said yet.
+   */
+  openAccess?: boolean;
+
+  /**
    * ISO-date (YYYY-MM-DD) marking when the app was first launched.
    * While `today - newSince <= 3 days`, a "NEW" badge is shown on
    * the app tile. After that, the badge disappears automatically.
@@ -217,7 +232,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "calendar",         tKey: "app.calendar",         name: "Calendar",          icon: CalendarIcon,  route: "/calendar",         active: true  },
   { id: "todo",             tKey: "app.todo",             name: "To-do",             icon: TodoIcon,      route: "/todo",             active: true  },
   { id: "notes",            tKey: "app.notes",            name: "Notes",             icon: NotesIcon,     route: "/notes",            active: true  },
-  { id: "translator",       tKey: "app.translator",       name: "Translator",        icon: TranslatorIcon, route: "/translator",      active: true,  newSince: "2026-07-22" },
+  { id: "translator",       tKey: "app.translator",       name: "Translator",        icon: TranslatorIcon, route: "/translator",      active: true,  newSince: "2026-07-22", openAccess: true },
 
   /* ── Marketing & Growth ── */
   { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
