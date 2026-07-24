@@ -204,6 +204,13 @@ export async function fetchProducts(): Promise<ProductRow[]> {
   const json = await jget<{ products?: ProductRow[] }>("/api/products", {});
   return json.products ?? [];
 }
+/** Slim 14-column list projection (?view=list) — for pickers and grids that
+ *  only render identity fields. The full fetchProducts() above is a ~1.3 MB
+ *  payload (705 models × 80 columns); this is ~250 KB. */
+export async function fetchProductsSlim(): Promise<ProductRow[]> {
+  const json = await jget<{ products?: ProductRow[] }>("/api/products?view=list", {});
+  return json.products ?? [];
+}
 export async function fetchProductById(id: string): Promise<ProductRow | null> {
   if (!id) return null;
   const json = await jget<{ product?: ProductRow }>(`/api/products/${encodeURIComponent(id)}`, {});

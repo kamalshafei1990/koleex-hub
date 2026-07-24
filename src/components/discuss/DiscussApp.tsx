@@ -148,7 +148,7 @@ import {
 } from "./CustomerChatModal";
 import { ThreadPane } from "./ThreadPane";
 import { SearchPanel } from "./SearchPanel";
-import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
+import { fetchProductsSlim, fetchProductMainImages } from "@/lib/products-admin";
 import { initialsOf } from "@/lib/discuss/initials";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
@@ -753,13 +753,33 @@ export default function DiscussApp() {
     if (!accountLoading) void loadChannels();
   }, [accountLoading, loadChannels]);
 
-  /* Cache the product catalog + recipient directory once — small tables
-     that rarely change, avoids a spinner every time the user opens the
-     product/mention/DM picker. */
+  /* Recipient directory once (2 KB). The product catalog is deliberately
+     NOT loaded here anymore: the old eager fetchProducts() pulled the FULL
+     80-column catalog (~1.3 MB — measured ×4 on one /discuss open, ~5 MB)
+     for a picker most sessions never open, and that burst was a big part of
+     "Discuss is slow". It now lazy-loads the slim ?view=list projection on
+     first picker open (see openProductPicker). */
   useEffect(() => {
-    void fetchProducts().then(setProductCatalog);
-    void fetchProductMainImages().then(setProductImages);
     void fetchMessageableAccounts().then(setRecipients);
+  }, []);
+
+  /* Lazy product catalog: fetched once, on first open of the product picker.
+     productCatalogLoadedRef guards re-entry; state stays warm for the rest
+     of the session. */
+  const productCatalogLoadedRef = useRef(false);
+  const [productCatalogLoading, setProductCatalogLoading] = useState(false);
+  const openProductPicker = useCallback(() => {
+    setProductPickerOpen(true);
+    if (productCatalogLoadedRef.current) return;
+    productCatalogLoadedRef.current = true;
+    setProductCatalogLoading(true);
+    void Promise.all([fetchProductsSlim(), fetchProductMainImages()])
+      .then(([prods, imgs]) => {
+        setProductCatalog(prods);
+        setProductImages(imgs);
+      })
+      .catch(() => { productCatalogLoadedRef.current = false; })
+      .finally(() => setProductCatalogLoading(false));
   }, []);
 
   /* Keep sidebar in sync in real-time. Previously we refetched the
@@ -2647,7 +2667,7 @@ export default function DiscussApp() {
                 sending={sending}
                 onSend={handleSend}
                 onPickFile={() => fileInputRef.current?.click()}
-                onOpenProductPicker={() => setProductPickerOpen(true)}
+                onOpenProductPicker={openProductPicker}
                 onOpenMentionPicker={() => setMentionPickerOpen(true)}
                 onOpenEmojiPicker={() => setEmojiPickerOpen(true)}
                 placeholder={
@@ -2850,6 +2870,7 @@ export default function DiscussApp() {
         <ProductPicker
           products={productCatalog}
           images={productImages}
+          loading={productCatalogLoading}
           onCancel={() => setProductPickerOpen(false)}
           onSelect={handleAddProduct}
           t={t}
@@ -4881,12 +4902,15 @@ function NewDmModal({
 function ProductPicker({
   products,
   images,
+  loading = false,
   onCancel,
   onSelect,
   t,
 }: {
   products: ProductRow[];
   images: Record<string, string>;
+  /** True while the lazy catalog fetch (first open) is in flight. */
+  loading?: boolean;
   onCancel: () => void;
   onSelect: (p: ProductRow) => void;
   t: (key: string, fallback?: string) => string;
@@ -4928,7 +4952,11 @@ function ProductPicker({
             className="flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
           />
         </div>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="p-10 flex justify-center">
+            <SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-[11px] text-[var(--text-dim)]">
             {t("search.noResults")}
           </div>
