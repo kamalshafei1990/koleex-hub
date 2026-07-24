@@ -40,7 +40,7 @@ const SKILL_LEVEL_KEY: Record<string, string> = {
 
 /* ── Library shapes (from /api/skills) ── */
 export interface SkillCategory { id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number }
-export interface Skill { id: string; category_id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number }
+export interface Skill { id: string; category_id: string; name: string; name_zh: string | null; name_ar: string | null; sort_order: number; usage_count?: number }
 export interface PositionRequirement {
   skill_id: string; required_score: number; weight: number;
   is_mandatory: boolean; notes: string | null; sort_order: number;
@@ -461,6 +461,11 @@ export default function EmployeeSkillsSection({
           excludeIds={new Set(rows.map((r) => r.skill_id))}
           onPick={(id) => { addSkill(id); }}
           onClose={() => setPickerOpen(false)}
+          suggestedCategoryIds={new Set(
+            requirements
+              .map((r) => skillById.get(r.skill_id)?.category_id)
+              .filter((x): x is string => !!x),
+          )}
         />
       )}
       {configOpen && positionId && (
@@ -477,13 +482,17 @@ export default function EmployeeSkillsSection({
 
 /* ═══ Skill picker modal — search + category filter over the library ═══ */
 function SkillPicker({
-  categories, skills, excludeIds, onPick, onClose,
+  categories, skills, excludeIds, onPick, onClose, suggestedCategoryIds,
 }: {
   categories: SkillCategory[];
   skills: Skill[];
   excludeIds: Set<string>;
   onPick: (skillId: string) => void;
   onClose: () => void;
+  /** Categories of the POSITION's required skills — the picker leads with
+   *  skills from the same domains, so "add skill" starts from what is
+   *  relevant to the chair instead of a flat 400-item library. */
+  suggestedCategoryIds?: Set<string>;
 }) {
   const { t, lang } = useTranslation(hrT);
   const [query, setQuery] = useState("");
@@ -496,6 +505,42 @@ function SkillPicker({
       nameMatches(s, query, lang),
   ).slice(0, 120);
   const catName = (id: string) => localizedName(categories.find((c) => c.id === id), lang);
+
+  /* Guided sections — only on the DEFAULT view (no search, no filter).
+     Searching or filtering falls back to the flat list below. */
+  const browsing = !query.trim() && !catFilter;
+  const available = skills.filter((s) => !excludeIds.has(s.id));
+  const suggested = browsing && suggestedCategoryIds?.size
+    ? available
+        .filter((s) => suggestedCategoryIds.has(s.category_id))
+        .sort((a2, b2) => (b2.usage_count ?? 0) - (a2.usage_count ?? 0) || a2.name.localeCompare(b2.name))
+        .slice(0, 15)
+    : [];
+  const suggestedIds = new Set(suggested.map((s) => s.id));
+  const popular = browsing
+    ? available
+        .filter((s) => (s.usage_count ?? 0) > 0 && !suggestedIds.has(s.id))
+        .sort((a2, b2) => (b2.usage_count ?? 0) - (a2.usage_count ?? 0))
+        .slice(0, 10)
+    : [];
+
+  const Row = ({ s }: { s: Skill }) => (
+    <button
+      key={s.id}
+      type="button"
+      onClick={() => onPick(s.id)}
+      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start hover:bg-[var(--bg-surface-hover)] transition-colors"
+    >
+      <span className="text-[13px] text-[var(--text-primary)]">{localizedName(s, lang)}</span>
+      <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">
+        {(s.usage_count ?? 0) > 0 && <span className="me-2 text-[var(--text-dim)]">×{s.usage_count}</span>}
+        {catName(s.category_id)}
+      </span>
+    </button>
+  );
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{children}</p>
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -530,19 +575,24 @@ function SkillPicker({
           </select>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
+          {browsing && suggested.length > 0 && (
+            <>
+              <SectionLabel>{t("hr.sk.pick.suggested")}</SectionLabel>
+              {suggested.map((s) => <Row key={s.id} s={s} />)}
+            </>
+          )}
+          {browsing && popular.length > 0 && (
+            <>
+              <SectionLabel>{t("hr.sk.pick.popular")}</SectionLabel>
+              {popular.map((s) => <Row key={s.id} s={s} />)}
+            </>
+          )}
+          {browsing && (suggested.length > 0 || popular.length > 0) && (
+            <SectionLabel>{t("hr.sk.pick.all")}</SectionLabel>
+          )}
           {list.length === 0 ? (
             <p className="px-3 py-8 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.sk.noMatching")}</p>
-          ) : list.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onPick(s.id)}
-              className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start hover:bg-[var(--bg-surface-hover)] transition-colors"
-            >
-              <span className="text-[13px] text-[var(--text-primary)]">{localizedName(s, lang)}</span>
-              <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">{catName(s.category_id)}</span>
-            </button>
-          ))}
+          ) : list.map((s) => <Row key={s.id} s={s} />)}
         </div>
       </div>
     </div>

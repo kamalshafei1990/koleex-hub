@@ -24,7 +24,7 @@ import type { Lang } from "@/lib/i18n";
 
    A new value here is a new URL, hence a new cache entry. BUMP IT whenever the
    library payload gains or loses a field. */
-export const LIBRARY_PAYLOAD_VERSION = "2";
+export const LIBRARY_PAYLOAD_VERSION = "3"; // v3: skills carry usage_count
 
 export interface NamedRow {
   name: string;

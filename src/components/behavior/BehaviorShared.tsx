@@ -122,6 +122,14 @@ export function BehaviorPicker({
   ).slice(0, 150);
   const catName = (id: string) => localizedName(categories.find((c) => c.id === id), lang);
 
+  /* Default view leads with the CRITICAL indicators (safety/integrity items
+     flagged in the library) not yet added — the ones that actually gate
+     finalization — before the full 300-item browse. */
+  const browsing = !query.trim() && !catFilter;
+  const critical = browsing
+    ? indicators.filter((s) => !excludeIds.has(s.id) && s.is_critical_default).slice(0, 20)
+    : [];
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
@@ -145,6 +153,23 @@ export function BehaviorPicker({
           </select>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
+          {critical.length > 0 && (
+            <>
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{t("hr.bhv.pick.critical")}</p>
+              {critical.map((s) => (
+                <button
+                  key={`crit-${s.id}`}
+                  type="button"
+                  onClick={() => onPick(s.id)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start hover:bg-[var(--bg-surface-hover)] transition-colors"
+                >
+                  <span className="text-[13px] text-[var(--text-primary)] truncate">{localizedName(s, lang)}</span>
+                  <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">{catName(s.category_id)}</span>
+                </button>
+              ))}
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{t("hr.bhv.pick.all")}</p>
+            </>
+          )}
           {list.length === 0 ? (
             <p className="px-3 py-8 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.bhv.noMatching")}</p>
           ) : list.map((s) => (

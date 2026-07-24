@@ -614,4 +614,11 @@ export const hrT: Translations = {
   "hr.emergencyPhone":           { en: "Phone",                           zh: "电话",                          ar: "الهاتف" },
 
   "hr.filedOnBehalf":            { en: "· filed on their behalf",         zh: "· 由他人代为提交",              ar: "· قُدّم نيابةً عنه" },
+
+  /* ── Guided picker sections ── */
+  "hr.sk.pick.suggested": { en: "Suggested for this position", zh: "该职位推荐", ar: "مقترَح لهذا المنصب" },
+  "hr.sk.pick.popular":   { en: "Popular in your company",     zh: "公司常用",   ar: "الأكثر استخداماً في شركتك" },
+  "hr.sk.pick.all":       { en: "All skills",                  zh: "全部技能",   ar: "كل المهارات" },
+  "hr.bhv.pick.critical": { en: "Critical indicators",         zh: "关键指标",   ar: "المؤشرات الحرجة" },
+  "hr.bhv.pick.all":      { en: "All indicators",              zh: "全部指标",   ar: "كل المؤشرات" },
 };
