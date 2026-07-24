@@ -12,6 +12,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/server/auth";
+import { supabaseServer } from "@/lib/server/supabase-server";
 import { requestMeta, heartbeat, touchDevice, locationLabel } from "@/lib/server/activity";
 import { routeToModule } from "@/lib/activity/modules";
 import { notifySuperAdmins } from "@/lib/server/sa-notify";
@@ -62,6 +63,25 @@ export async function POST(req: Request) {
     }),
     touchDevice({ account_id: accountId, tenant_id: auth.tenant_id, device_id: deviceId, meta }),
   ]);
+
+  /* Usage accounting: an ACTIVE beat means the user was interacting for the
+     last heartbeat interval, so credit it to today's usage_daily row (atomic
+     SQL increment — no read, no row-lock contention; the 2026-07-20 write
+     storm was read-modify-write presence rows, not this). Idle/hidden beats
+     (which also arrive on the slow 120s cadence) are deliberately NOT usage.
+     Best-effort: usage must never block presence. */
+  if (status === "active") {
+    void supabaseServer
+      .rpc("increment_usage", {
+        p_account: accountId,
+        p_tenant: auth.tenant_id,
+        p_day: new Date().toISOString().slice(0, 10),
+        p_seconds: 30,
+      })
+      .then(({ error }) => {
+        if (error) console.error("[heartbeat] increment_usage:", error.message);
+      });
+  }
 
   // First time we've seen this browser for the account → "new device" alert.
   if (dev.isNew) {

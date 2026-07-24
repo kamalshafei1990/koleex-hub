@@ -355,6 +355,106 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
   );
 }
 
+/* ── Usage per user (hours) ──────────────────────────────────────────────
+   Answers "how long has each person actually used the system". Accurate
+   seconds come from usage_daily (heartbeat-fed, active beats only); days
+   before that coverage carry an event-stitched ESTIMATE, shown separately
+   with a ~ so nobody mistakes reconstruction for measurement. */
+interface UsageRow {
+  account_id: string;
+  username: string;
+  name: string | null;
+  avatar_url: string | null;
+  today_s: number;
+  last7_s: number;
+  last30_s: number;
+  estimated_s: number;
+  first_accurate_day: string | null;
+}
+
+function fmtHours(seconds: number): string {
+  if (seconds <= 0) return "—";
+  const h = seconds / 3600;
+  if (h < 1) return `${Math.round(seconds / 60)}m`;
+  return `${h >= 10 ? Math.round(h) : h.toFixed(1)}h`;
+}
+
+function UsageSection({ onOpenUser }: { onOpenUser: (id: string) => void }) {
+  const [rows, setRows] = useState<UsageRow[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/super-admin/usage", { credentials: "include" });
+        if (!res.ok) return;
+        const j = (await res.json()) as { users: UsageRow[] };
+        if (!cancelled) setRows(j.users);
+      } catch { /* transient */ }
+    };
+    void load();
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 60_000);
+    return () => { cancelled = true; window.clearInterval(t); };
+  }, []);
+
+  const max7 = Math.max(1, ...(rows ?? []).map((r) => r.last7_s));
+
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2">
+          <MonitorIcon className="h-4 w-4 text-[var(--text-dim)]" />
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Usage per user</h3>
+        </div>
+        <span className="text-[10.5px] text-[var(--text-ghost)]">active time · idle excluded · ~ = estimated from events</span>
+      </div>
+      {rows === null ? (
+        <div className="h-28 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+      ) : rows.length === 0 ? (
+        <p className="h-28 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No usage recorded yet — accurate tracking starts with the first active heartbeat after this deploy.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] border-b border-[var(--border-faint)]">
+                <th className="text-start font-medium px-4 py-2">User</th>
+                <th className="text-end font-medium px-3 py-2">Today</th>
+                <th className="text-end font-medium px-3 py-2">7 days</th>
+                <th className="text-end font-medium px-3 py-2">30 days</th>
+                <th className="text-end font-medium px-3 py-2" title="Reconstructed from activity events for days before accurate tracking began">Earlier ~</th>
+                <th className="text-start font-medium px-4 py-2 w-[30%]">Last 7 days</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-faint)]">
+              {rows.map((r) => (
+                <tr key={r.account_id} className="hover:bg-[var(--bg-surface)] transition-colors cursor-pointer" onClick={() => onOpenUser(r.account_id)}>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar a={{ account_id: r.account_id, email: null, name: r.name, username: r.username, role: null, avatar_url: r.avatar_url }} size={26} />
+                      <span className="font-medium text-[var(--text-primary)] truncate">{r.name || r.username}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-primary)] font-semibold">{fmtHours(r.today_s)}</td>
+                  <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-secondary)]">{fmtHours(r.last7_s)}</td>
+                  <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-secondary)]">{fmtHours(r.last30_s)}</td>
+                  <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-dim)]">{r.estimated_s > 0 ? `~${fmtHours(r.estimated_s)}` : "—"}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, (r.last7_s / max7) * 100)}%` }} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function SuperAdminActivityPage() {
   const { data: boot, loading: bootLoading } = useMeBootstrap();
   const isSA = !!boot?.isSuperAdmin;
@@ -511,6 +611,9 @@ export default function SuperAdminActivityPage() {
 
         {/* ── Live activity load graph (full-width, always moving) ── */}
         <LiveActivityGraph kpis={kpis} />
+
+        {/* ── Per-user usage hours ── */}
+        <UsageSection onOpenUser={setDrawerId} />
 
         {/* ── Two-column: live users + activity feed ── */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
