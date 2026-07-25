@@ -127,6 +127,7 @@ import {
   DISCUSS_ACCEPT_ATTR,
   DISCUSS_MEDIA_MAX_BYTES,
   mb,
+  DISCUSS_TRANSPORT_MAX_BYTES,
 } from "@/lib/discuss-upload-policy";
 import { record as perfRecord, event as perfEvent, count as perfCount } from "@/lib/perf/client";
 import PerfPanelGate from "@/components/perf/PerfPanelGate";
@@ -1512,7 +1513,7 @@ export default function DiscussApp() {
          `if (rec) uploaded.push(rec)` — a rejected file just disappeared with
          no explanation. Surface the first reason instead; the filename is
          deliberately not echoed into the toast. */
-      let rejection: "type" | "size" | "failed" | null = null;
+      let rejection: "type" | "size" | "transport" | "failed" | null = null;
       const previewKey = ensurePendingKey();
       for (const f of Array.from(files)) {
         const res = await uploadDiscussAttachment(f);
@@ -1535,6 +1536,13 @@ export default function DiscussApp() {
           t("upload.rejectedSize", "File is too large (max {max}MB)").replace(
             "{max}",
             mb(DISCUSS_MEDIA_MAX_BYTES),
+          ),
+        );
+      else if (rejection === "transport")
+        showToast(
+          t("upload.rejectedTransport", "File is over the {max}MB upload limit — send it as a link instead").replace(
+            "{max}",
+            mb(DISCUSS_TRANSPORT_MAX_BYTES),
           ),
         );
       else if (rejection === "failed") showToast(t("upload.failed", "Upload failed. Please try again"));
@@ -3885,7 +3893,7 @@ function ReplyPreviewPill({
       <div className="w-[3px] rounded-full bg-[var(--text-dim)] shrink-0" />
       <div className="min-w-0">
         <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
-          {t("reply.replyingTo", "Replying to")} {author}
+          {t("reply.replyingTo", "Replying to {name}").replace("{name}", author ?? "")}
         </div>
         <div className="text-[11px] text-[var(--text-dim)] truncate italic">
           {body}
@@ -4131,10 +4139,10 @@ function Composer({
           <div className="w-[3px] self-stretch rounded-full bg-[var(--text-primary)] shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-semibold text-[var(--text-secondary)]">
-              {t("reply.replyingTo", "Replying to")}{" "}
-              {replyTarget.author?.full_name ||
-                replyTarget.author?.username ||
-                "Unknown"}
+              {t("reply.replyingTo", "Replying to {name}").replace(
+                "{name}",
+                replyTarget.author?.full_name || replyTarget.author?.username || "…",
+              )}
             </div>
             <div className="text-[11px] text-[var(--text-muted)] truncate">
               {(replyTarget.body ?? "").slice(0, 140) || "(no text)"}

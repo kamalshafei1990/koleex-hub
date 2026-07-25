@@ -68,6 +68,13 @@ export const DISCUSS_VOICE_MIME: readonly string[] = [
 
 /** 50MB — the `discuss-media` bucket limit. */
 export const DISCUSS_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
+/** 4MB — the TRANSPORT limit. Uploads travel through /api/storage/upload on
+ *  Vercel, whose request-body hard cap is 4.5MB: a larger file uploads for
+ *  minutes on a slow uplink and is then killed by the platform — the
+ *  "uploading forever, then it just disappeared" report. The composer
+ *  compresses images under this first; anything still above it is refused
+ *  IMMEDIATELY with a clear message instead of failing after the wait. */
+export const DISCUSS_TRANSPORT_MAX_BYTES = 4 * 1024 * 1024;
 /** 25MB — the pre-existing `discuss-voice` bucket limit, retained. */
 export const DISCUSS_VOICE_MAX_BYTES = 25 * 1024 * 1024;
 

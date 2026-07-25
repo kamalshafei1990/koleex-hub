@@ -39,11 +39,26 @@ export async function uploadToStorage(
   if (options.cacheControl) form.append("cacheControl", options.cacheControl);
   if (options.contentType) form.append("contentType", options.contentType);
 
-  const res = await fetch("/api/storage/upload", {
-    method: "POST",
-    credentials: "include",
-    body: form,
-  });
+  /* Hard timeout: a stalled socket on a bad network used to keep callers in
+     "Uploading…" forever with no resolution — the promise simply never
+     settled. 90s is generous for a ≤4MB body on a slow uplink; past that the
+     upload is dead and the user deserves the failure toast + retry. */
+  let res: Response;
+  try {
+    res = await fetch("/api/storage/upload", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof DOMException && e.name === "TimeoutError"
+        ? "Upload timed out"
+        : "Network error during upload",
+    };
+  }
   if (res.ok) {
     return { ok: true, data: (await res.json()) as UploadResult };
   }

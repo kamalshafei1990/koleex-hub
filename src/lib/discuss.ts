@@ -19,7 +19,7 @@
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { cachedGet, invalidateCachedGet } from "./client-cache";
 import { uploadToStorage } from "./storage-client";
-import { checkDiscussUpload } from "./discuss-upload-policy";
+import { checkDiscussUpload, DISCUSS_TRANSPORT_MAX_BYTES } from "./discuss-upload-policy";
 import { isTransientFetch } from "./util/transient-fetch";
 import type {
   DiscussAttachment,
@@ -487,22 +487,66 @@ export async function clearDraft(
  *  a private bucket makes the path unguessable-by-default, and the display
  *  name is carried in metadata where it belongs. Returns a typed rejection so
  *  the composer can show WHY (localized) instead of a bare failure. */
+/* Chat-grade image compression (the WeChat approach). A Retina screenshot or
+   phone photo is 4–15MB of pixels nobody needs at chat size; on a slow uplink
+   that is minutes of "Uploading…" — and past the 4.5MB Vercel body cap it then
+   DIES after the wait. Downscale to ≤2000px and re-encode JPEG q0.82 before
+   the bytes ever leave the machine. GIFs are exempt (re-encoding kills the
+   animation); small images pass through untouched; any decode/encode failure
+   falls back to the original file — compression must never LOSE a photo. */
+const IMAGE_COMPRESS_THRESHOLD = 900 * 1024;
+const IMAGE_MAX_DIM = 2000;
+
+async function compressImageForChat(file: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+  if (file.size <= IMAGE_COMPRESS_THRESHOLD) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, IMAGE_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
+    if (!blob || blob.size === 0 || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.(png|webp|jpeg|jpg)$/i, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 export async function uploadDiscussAttachment(
   file: File,
 ): Promise<
   | { ok: true; attachment: DiscussAttachment }
-  | { ok: false; reason: "type" | "size" | "failed" }
+  | { ok: false; reason: "type" | "size" | "transport" | "failed" }
 > {
   /* Client-side preflight: UX only — /api/storage/upload enforces the same
      policy authoritatively, and the bucket refuses violations a third time. */
   const verdict = checkDiscussUpload("discuss-media", file);
   if (!verdict.ok) return { ok: false, reason: verdict.reason };
 
-  const ext = (file.name.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1] ?? "bin").toLowerCase();
+  /* Shrink images BEFORE the transport check — a 10MB screenshot becomes a
+     few hundred KB and sails through. */
+  const payload = await compressImageForChat(file);
+
+  /* Refuse over-transport files NOW, not after minutes of doomed uploading:
+     the platform kills request bodies past ~4.5MB, so waiting can only end
+     in the silent failure users reported. */
+  if (payload.size > DISCUSS_TRANSPORT_MAX_BYTES) {
+    return { ok: false, reason: "transport" };
+  }
+
+  const ext = (payload.name.match(/\.([a-zA-Z0-9]{1,8})$/)?.[1] ?? "bin").toLowerCase();
   const filePath = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`;
-  const result = await uploadToStorage("discuss-media", filePath, file, {
+  const result = await uploadToStorage("discuss-media", filePath, payload, {
     cacheControl: "3600",
-    contentType: file.type || "application/octet-stream",
+    contentType: payload.type || "application/octet-stream",
   });
   if (!result.ok) {
     // Never log the filename or path — this is conversation-linkable.
@@ -512,10 +556,10 @@ export async function uploadDiscussAttachment(
   return {
     ok: true,
     attachment: {
-      name: file.name,
+      name: payload.name,
       file_path: result.data.path,
-      size: file.size,
-      type: file.type || "application/octet-stream",
+      size: payload.size,
+      type: payload.type || "application/octet-stream",
     },
   };
 }

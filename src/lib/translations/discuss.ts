@@ -293,6 +293,7 @@ export const discussT: Translations = {
   "thread.reply.placeholder":{ en: "Reply in thread…",        zh: "在话题中回复...",        ar: "رد في السلسلة..." },
   "thread.viewThread":       { en: "View thread",             zh: "查看话题",              ar: "عرض السلسلة" },
   "reply.replyingTo":        { en: "Replying to {name}",      zh: "回复 {name}",           ar: "الرد على {name}" },
+  "upload.rejectedTransport": { en: "File is over the {max}MB upload limit — send it as a link instead", zh: "文件超过 {max}MB 上传限制——请改用链接发送", ar: "الملف يتجاوز حدّ الرفع {max} ميغابايت — أرسله كرابط بدلاً من ذلك" },
   "reply.cancel":            { en: "Cancel reply",            zh: "取消回复",              ar: "إلغاء الرد" },
   "reply.deletedParent":     { en: "Original message deleted", zh: "原始消息已删除",         ar: "تم حذف الرسالة الأصلية" },
 
