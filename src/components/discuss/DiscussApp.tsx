@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useScrollLock } from "@/hooks/useScrollLock";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import { cdnImage } from "@/lib/cdn";
 import {
   memo,
@@ -5212,6 +5213,45 @@ function NewDmModal({
    PRODUCT PICKER MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/** "industrial-sewing-machines" → "Industrial Sewing Machines". The taxonomy
+ *  is stored as slugs; nobody should have to read a slug in a picker. */
+function humanizeSlug(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((w) => (w.length <= 2 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+/** One filter chip: label + count. Monochrome; the active chip is the only
+ *  inverted surface in the rail (Koleex brand — colour is functional only). */
+function FacetChip({
+  label, count, active = false, onClick,
+}: {
+  label: string;
+  count: number;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`shrink-0 h-7 px-2.5 rounded-full border text-[11px] font-medium inline-flex items-center gap-1.5 transition-colors ${
+        active
+          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+          : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+      }`}
+    >
+      <span className="max-w-[150px] truncate">{label}</span>
+      <span className={`tabular-nums text-[10px] ${active ? "opacity-70" : "text-[var(--text-faint)]"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
 function ProductPicker({
   products,
   images,
@@ -5229,6 +5269,18 @@ function ProductPicker({
   t: (key: string, fallback?: string) => string;
 }) {
   const [search, setSearch] = useState("");
+  /* ── Classification drill-down ──────────────────────────────────────────
+     ONE row of chips at a time, never a stack. Tapping a category REPLACES
+     the row with that category's subcategories behind a back chip, so the
+     filter never grows past a single line no matter how deep the taxonomy is.
+
+     A level is shown only when it actually discriminates: this catalogue has
+     700 of 706 products in ONE division, so a division row would be a single
+     dead chip. The row is derived from the data rather than hardcoded to
+     division > category > subcategory, so it stays right if that changes. */
+  const [drill, setDrill] = useState<{ category: string | null; subcategory: string | null }>(
+    { category: null, subcategory: null },
+  );
 
   // Full-text haystack per product (built once): name, code, brand, the whole
   // classification path, tags, copy, compliance, specs — everything. Lets the
@@ -5239,6 +5291,24 @@ function ProductPicker({
     return m;
   }, [products]);
 
+  /* Counts for the current level. Derived from the products actually in
+     scope, so a chip never promises results it cannot deliver. */
+  const facets = useMemo(() => {
+    const scope = drill.category
+      ? products.filter((p) => p.category_slug === drill.category)
+      : products;
+    const key = drill.category ? "subcategory_slug" : "category_slug";
+    const counts = new Map<string, number>();
+    for (const p of scope) {
+      const v = (p as unknown as Record<string, string | null>)[key];
+      if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    return {
+      scopeTotal: scope.length,
+      items: [...counts.entries()].sort((x, y) => y[1] - x[1]),
+    };
+  }, [products, drill.category]);
+
   /* Browse order. The default used to be raw API order — newest first — and
      of the newest 60 exactly ONE had a photo, so the picker looked both empty
      of images and (capped at 60) missing most of the catalogue. Ordering by
@@ -5246,12 +5316,17 @@ function ProductPicker({
      is still reachable by scrolling or search. */
   const ordered = useMemo(() => {
     const withImg = (p: ProductRow) => (images[p.id] ? 0 : 1);
-    return [...products].sort(
+    const scoped = products.filter(
+      (p) =>
+        (!drill.category || p.category_slug === drill.category) &&
+        (!drill.subcategory || p.subcategory_slug === drill.subcategory),
+    );
+    return [...scoped].sort(
       (a2, b2) =>
         withImg(a2) - withImg(b2) ||
         stripHtmlText(a2.product_name).localeCompare(stripHtmlText(b2.product_name)),
     );
-  }, [products, images]);
+  }, [products, images, drill.category, drill.subcategory]);
 
   const filtered = useMemo(() => {
     const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -5269,7 +5344,7 @@ function ProductPicker({
      product is reachable, and the first paint stays cheap. */
   const PAGE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE);
-  useEffect(() => { setVisibleCount(PAGE); }, [search]);
+  useEffect(() => { setVisibleCount(PAGE); }, [search, drill.category, drill.subcategory]);
   const shown = filtered.slice(0, visibleCount);
 
   return (
@@ -5299,6 +5374,65 @@ function ProductPicker({
              white photo area (object-contain so machines aren't cropped),
              model code first, product name beneath. */
           <>
+          {/* ── One-line classification rail ──────────────────────────────
+              Horizontally scrollable, monochrome (Koleex brand: the active
+              state is the ONLY inverted element — no colour is spent on
+              decoration). Shows counts so the user knows what a chip costs
+              before tapping it. When drilled in, the first chip walks back
+              out — the trail never occupies a second row. */}
+          {facets.items.length > 1 && (
+            <div className="-mx-1 px-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+              {drill.category ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setDrill({ category: null, subcategory: null })}
+                    className="shrink-0 h-7 ps-1.5 pe-2.5 rounded-full border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] inline-flex items-center gap-1 transition-colors"
+                  >
+                    <AngleLeftIcon className="h-3 w-3 rtl:rotate-180" />
+                    {humanizeSlug(drill.category)}
+                  </button>
+                  <FacetChip
+                    label={t("picker.all", "All")}
+                    count={facets.scopeTotal}
+                    active={!drill.subcategory}
+                    onClick={() => setDrill((d) => ({ ...d, subcategory: null }))}
+                  />
+                  {facets.items.map(([slug, n]) => (
+                    <FacetChip
+                      key={slug}
+                      label={humanizeSlug(slug)}
+                      count={n}
+                      active={drill.subcategory === slug}
+                      onClick={() =>
+                        setDrill((d) => ({
+                          ...d,
+                          subcategory: d.subcategory === slug ? null : slug,
+                        }))
+                      }
+                    />
+                  ))}
+                </>
+              ) : (
+                <>
+                  <FacetChip
+                    label={t("picker.all", "All")}
+                    count={products.length}
+                    active
+                    onClick={() => setDrill({ category: null, subcategory: null })}
+                  />
+                  {facets.items.map(([slug, n]) => (
+                    <FacetChip
+                      key={slug}
+                      label={humanizeSlug(slug)}
+                      count={n}
+                      onClick={() => setDrill({ category: slug, subcategory: null })}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
           <p className="text-[10.5px] text-[var(--text-faint)] -mt-1">
             {t("composer.productCount", "Showing {n} of {total}")
               .replace("{n}", String(shown.length))

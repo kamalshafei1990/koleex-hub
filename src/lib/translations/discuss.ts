@@ -293,6 +293,7 @@ export const discussT: Translations = {
   "thread.reply.placeholder":{ en: "Reply in thread…",        zh: "在话题中回复...",        ar: "رد في السلسلة..." },
   "thread.viewThread":       { en: "View thread",             zh: "查看话题",              ar: "عرض السلسلة" },
   "reply.replyingTo":        { en: "Replying to {name}",      zh: "回复 {name}",           ar: "الرد على {name}" },
+  "picker.all":              { en: "All", zh: "全部", ar: "الكل" },
   "composer.productCount":   { en: "Showing {n} of {total}", zh: "显示 {n} / 共 {total}", ar: "عرض {n} من {total}" },
   "composer.dropHere":       { en: "Drop files to attach", zh: "拖放文件以添加附件", ar: "أفلت الملفات لإرفاقها" },
   "photo.expand":            { en: "Open photo",           zh: "打开图片",           ar: "فتح الصورة" },
