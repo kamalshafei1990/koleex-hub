@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { cdnImage } from "@/lib/cdn";
 import {
   memo,
   useCallback,
@@ -776,18 +777,24 @@ export default function DiscussApp() {
      of the session. */
   const productCatalogLoadedRef = useRef(false);
   const [productCatalogLoading, setProductCatalogLoading] = useState(false);
+  /* Stale-while-revalidate, so the picker is BOTH instant and in sync with the
+     Products app. First open fetches (spinner); every later open renders the
+     cached copy immediately AND refetches in the background — so a product
+     added, renamed or deleted in Products shows up here on the next open
+     without a page reload. Only the spinner is conditional; the refetch is
+     unconditional, which is what "connected to Products" actually requires. */
   const openProductPicker = useCallback(() => {
     setProductPickerOpen(true);
-    if (productCatalogLoadedRef.current) return;
+    const isFirst = !productCatalogLoadedRef.current;
     productCatalogLoadedRef.current = true;
-    setProductCatalogLoading(true);
+    if (isFirst) setProductCatalogLoading(true);
     void Promise.all([fetchProductsSlim(), fetchProductMainImages()])
       .then(([prods, imgs]) => {
         setProductCatalog(prods);
         setProductImages(imgs);
       })
-      .catch(() => { productCatalogLoadedRef.current = false; })
-      .finally(() => setProductCatalogLoading(false));
+      .catch(() => { if (isFirst) productCatalogLoadedRef.current = false; })
+      .finally(() => { if (isFirst) setProductCatalogLoading(false); });
   }, []);
 
   /* Keep sidebar in sync in real-time. Previously we refetched the
@@ -5213,17 +5220,38 @@ function ProductPicker({
     return m;
   }, [products]);
 
+  /* Browse order. The default used to be raw API order — newest first — and
+     of the newest 60 exactly ONE had a photo, so the picker looked both empty
+     of images and (capped at 60) missing most of the catalogue. Ordering by
+     "has a photo" then name puts the recognisable products first; everything
+     is still reachable by scrolling or search. */
+  const ordered = useMemo(() => {
+    const withImg = (p: ProductRow) => (images[p.id] ? 0 : 1);
+    return [...products].sort(
+      (a2, b2) =>
+        withImg(a2) - withImg(b2) ||
+        stripHtmlText(a2.product_name).localeCompare(stripHtmlText(b2.product_name)),
+    );
+  }, [products, images]);
+
   const filtered = useMemo(() => {
     const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return products.slice(0, 60);
+    if (tokens.length === 0) return ordered;
     // Every token must appear (AND) so multi-word queries narrow results.
-    return products
-      .filter((p) => {
-        const h = haystacks.get(p.id) ?? "";
-        return tokens.every((tok) => h.includes(tok));
-      })
-      .slice(0, 120);
-  }, [products, search, haystacks]);
+    return ordered.filter((p) => {
+      const h = haystacks.get(p.id) ?? "";
+      return tokens.every((tok) => h.includes(tok));
+    });
+  }, [ordered, search, haystacks]);
+
+  /* Progressive reveal instead of a hard cap: 706 cards mounted at once is a
+     long frame, but a 60-item CEILING is what made most of the catalogue
+     unreachable. Render a window and grow it as the user scrolls — every
+     product is reachable, and the first paint stays cheap. */
+  const PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
+  useEffect(() => { setVisibleCount(PAGE); }, [search]);
+  const shown = filtered.slice(0, visibleCount);
 
   return (
     <ModalShell title={t("composer.product")} onCancel={onCancel} width={640}>
@@ -5251,8 +5279,22 @@ function ProductPicker({
           /* Grid of photo cards — same grammar as the To-do product picker:
              white photo area (object-contain so machines aren't cropped),
              model code first, product name beneath. */
-          <div className="max-h-[420px] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 p-0.5">
-            {filtered.map((p) => (
+          <>
+          <p className="text-[10.5px] text-[var(--text-faint)] -mt-1">
+            {t("composer.productCount", "Showing {n} of {total}")
+              .replace("{n}", String(shown.length))
+              .replace("{total}", String(filtered.length))}
+          </p>
+          <div
+            className="max-h-[420px] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 p-0.5"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+                setVisibleCount((n) => (n < filtered.length ? n + PAGE : n));
+              }
+            }}
+          >
+            {shown.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -5264,8 +5306,16 @@ function ProductPicker({
                   {images[p.id] ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={images[p.id]}
+                      /* Thumbnail-sized + first-party: the raw storage URL is a
+                         full-resolution product photo (hundreds of KB each,
+                         and *.supabase.co is unreliable from mainland China).
+                         cdnImage serves a 256px variant through our origin —
+                         orders of magnitude less to paint a grid. Lazy so
+                         off-screen cards cost nothing until scrolled to. */
+                      src={cdnImage(images[p.id], { width: 256, quality: 75 })}
                       alt={stripHtmlText(p.product_name)}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-full max-w-full object-contain"
                     />
                   ) : (
@@ -5283,6 +5333,7 @@ function ProductPicker({
               </button>
             ))}
           </div>
+          </>
         )}
       </div>
     </ModalShell>
