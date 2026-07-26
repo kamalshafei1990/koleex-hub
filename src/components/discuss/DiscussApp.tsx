@@ -3508,15 +3508,18 @@ function MessageBubble({
      deletion means the message has chrome to carry and keeps its card. */
   /* Images in this message — drives the "Save image" menu entries. */
   const photoMedia = attachmentMedia.filter((m) => m.type.startsWith("image/"));
+  const noChrome =
+    !isDeleted && !isEditing && !msg.body?.trim() && !voiceMedia && !msg.reply_preview;
   const isPhotoOnly =
-    !isDeleted &&
-    !isEditing &&
-    !msg.body?.trim() &&
-    !voiceMedia &&
-    !msg.reply_preview &&
+    noChrome &&
     !(meta.products && meta.products.length > 0) &&
     attachmentMedia.length > 0 &&
     attachmentMedia.every((m) => m.type.startsWith("image/"));
+  /* A shared product is already a bordered card — wrapping it in a bubble
+     draws a second frame around the first. Same rule as photos: when the
+     card IS the message, the message has no surface of its own. */
+  const isProductOnly =
+    noChrome && attachmentMedia.length === 0 && !!meta.products?.length;
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
@@ -3641,7 +3644,7 @@ function MessageBubble({
 
         {/* T2 surface — own messages only. The author header stays OUTSIDE it:
             the panel marks the utterance, not the attribution. */}
-        <MessageSurface isSelf={isSelf} bare={isPhotoOnly}>
+        <MessageSurface isSelf={isSelf} bare={isPhotoOnly || isProductOnly}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
           <ReplyPreviewPill preview={msg.reply_preview} t={t} />
@@ -3739,7 +3742,7 @@ function MessageBubble({
 
             {/* Product refs */}
             {meta.products && meta.products.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-2">
+              <div className={`flex flex-wrap gap-2 ${isProductOnly ? "" : "mt-1.5"}`}>
                 {meta.products.map((p, i) => (
                   <ProductChip key={`${msg.id}-p-${i}`} product={p} />
                 ))}
@@ -4196,30 +4199,46 @@ function AttachmentChip({
   );
 }
 
+/* A shared product is a CARD, not a filename-sized row: a real photo the
+   recipient can actually judge the machine from, the name, the model code,
+   and an explicit "View product" affordance. The old 32px thumbnail in a
+   48px strip showed a machine as a dark smudge — useless for the one thing
+   sharing a product is for. Photo area is white + object-contain so a
+   machine on a white studio background is never cropped or tinted, and the
+   image rides cdnImage() (first-party, 384px) so it paints fast and stays
+   reachable from mainland China. */
 function ProductChip({ product }: { product: DiscussProductRef }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-color)] transition-colors max-w-[280px]"
+      className="group block w-[260px] max-w-full rounded-xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors"
     >
-      <div className="h-8 w-8 shrink-0 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
+      <div className="aspect-[4/3] w-full bg-white flex items-center justify-center overflow-hidden p-2">
         {product.image ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={product.image}
+            src={cdnImage(product.image, { width: 384, quality: 75 })}
             alt={product.name}
-            className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+            className="max-h-full max-w-full object-contain"
           />
         ) : (
-          <PackageIcon className="h-4 w-4 text-[var(--text-muted)]" />
+          <PackageIcon className="h-10 w-10 text-black/15" />
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
+      <div className="px-3 py-2.5 border-t border-[var(--border-subtle)]">
+        <div className="text-[12.5px] font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug">
           {product.name}
         </div>
-        <div className="text-[10.5px] text-[var(--text-secondary)] truncate">
-          {product.slug}
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="text-[10.5px] font-medium text-[var(--text-secondary)] truncate">
+            {product.slug}
+          </span>
+          <span className="shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors">
+            <PackageIcon className="h-3 w-3" />
+            View
+          </span>
         </div>
       </div>
     </Link>
