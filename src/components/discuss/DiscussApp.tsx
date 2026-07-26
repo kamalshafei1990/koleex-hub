@@ -392,6 +392,12 @@ export default function DiscussApp() {
 
   /* ── Composer state ───────────────────────────────────────────── */
   const [composerBody, setComposerBody] = useState("");
+  /* Sender-local thumbnail per composer attachment (same object URLs the
+     pending-message preview uses). Parallel to composerAttachments — every
+     mutation of one must mutate the other, or thumbnails drift onto the
+     wrong chip after a removal. Never serialized: blob: URLs must not reach
+     message metadata. */
+  const [composerPreviews, setComposerPreviews] = useState<(string | null)[]>([]);
   const [composerAttachments, setComposerAttachments] = useState<
     DiscussAttachment[]
   >([]);
@@ -1369,6 +1375,7 @@ export default function DiscussApp() {
       else setComposerBody("");
       /* Reset side-payloads since drafts currently store text only. */
       setComposerAttachments([]);
+    setComposerPreviews([]);
       setComposerProducts([]);
       setComposerMentions([]);
     });
@@ -1508,6 +1515,7 @@ export default function DiscussApp() {
       if (!files || files.length === 0) return;
       setUploading(true);
       const uploaded: DiscussAttachment[] = [];
+      const newPreviews: (string | null)[] = [];
       /* Unit 2: uploads can now be REFUSED (unsupported type / over 50MB) by
          the client preflight, the API, or the bucket itself. The old code did
          `if (rec) uploaded.push(rec)` — a rejected file just disappeared with
@@ -1525,11 +1533,15 @@ export default function DiscussApp() {
              URL lives ONLY in the manager — it is never put on the attachment
              record, so it cannot reach the API payload or another user. */
           const slot = composerAttachments.length + uploaded.length;
-          createPreviewUrl(previewKey, slot, f);
+          const previewUrl = createPreviewUrl(previewKey, slot, f);
           uploaded.push(res.attachment);
+          newPreviews.push(previewUrl);
         } else if (!rejection) rejection = res.reason;
       }
-      if (uploaded.length) setComposerAttachments((prev) => [...prev, ...uploaded]);
+      if (uploaded.length) {
+        setComposerAttachments((prev) => [...prev, ...uploaded]);
+        setComposerPreviews((prev) => [...prev, ...newPreviews]);
+      }
       if (rejection === "type") showToast(t("upload.rejectedType", "That file type isn't supported"));
       else if (rejection === "size")
         showToast(
@@ -1659,6 +1671,7 @@ export default function DiscussApp() {
     requestAnimationFrame(() => perfRecord("discuss.send.optimistic_ms", performance.now() - kxT0));
     setComposerBody("");
     setComposerAttachments([]);
+    setComposerPreviews([]);
     setComposerProducts([]);
     setComposerMentions([]);
     setReplyTarget(null);
@@ -2654,12 +2667,12 @@ export default function DiscussApp() {
                 onChange={handleComposerChange}
                 onKeyDown={handleKeyDown}
                 attachments={composerAttachments}
+                attachmentPreviews={composerPreviews}
                 products={composerProducts}
-                onRemoveAttachment={(i) =>
-                  setComposerAttachments((prev) =>
-                    prev.filter((_, idx) => idx !== i),
-                  )
-                }
+                onRemoveAttachment={(i) => {
+                  setComposerAttachments((prev) => prev.filter((_, idx) => idx !== i));
+                  setComposerPreviews((prev) => prev.filter((_, idx) => idx !== i));
+                }}
                 onRemoveProduct={(i) =>
                   setComposerProducts((prev) =>
                     prev.filter((_, idx) => idx !== i),
@@ -4069,6 +4082,7 @@ function Composer({
   attachments,
   products,
   onRemoveAttachment,
+  attachmentPreviews,
   onRemoveProduct,
   replyTarget,
   onCancelReply,
@@ -4095,6 +4109,10 @@ function Composer({
   attachments: DiscussAttachment[];
   products: DiscussProductRef[];
   onRemoveAttachment: (index: number) => void;
+  /** Sender-local blob: URLs, index-aligned with `attachments`. Image slots
+   *  with a URL render as a real thumbnail (WeChat-style); everything else
+   *  keeps the filename chip. */
+  attachmentPreviews?: (string | null)[];
   onRemoveProduct: (index: number) => void;
   replyTarget: DiscussMessageWithAuthor | null;
   onCancelReply: () => void;
@@ -4186,7 +4204,34 @@ function Composer({
       {/* Attached chips */}
       {(attachments.length > 0 || products.length > 0) && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {attachments.map((a, i) => (
+          {attachments.map((a, i) => {
+            const preview = a.type.startsWith("image/") ? attachmentPreviews?.[i] ?? null : null;
+            if (preview) {
+              /* Photo → a real thumbnail, not a filename. The blob: URL is
+                 sender-local and lives only in this strip. */
+              return (
+                <div key={`ca-${i}`} className="relative group/thumb">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={preview}
+                    alt={a.name}
+                    className="h-20 w-20 rounded-xl object-cover border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                  />
+                  <span className="absolute bottom-1 start-1 rounded-md bg-black/60 px-1 py-px text-[9px] tabular-nums text-white">
+                    {formatBytes(a.size)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachment(i)}
+                    aria-label={t("composer.removeAttachment", "Remove attachment")}
+                    className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
+                  >
+                    <CrossIcon className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              );
+            }
+            return (
             <div
               key={`ca-${i}`}
               className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
@@ -4210,7 +4255,8 @@ function Composer({
                 <CrossIcon className="h-3 w-3" />
               </button>
             </div>
-          ))}
+            );
+          })}
           {products.map((p, i) => (
             <div
               key={`cp-${i}`}
