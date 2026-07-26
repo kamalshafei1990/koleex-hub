@@ -3402,11 +3402,23 @@ type MessageBubbleProps = {
    use, so inheritance is a no-op for children. */
 function MessageSurface({
   isSelf,
+  bare = false,
   children,
 }: {
   isSelf: boolean;
+  /** Photo-only message: the picture IS the message, so it gets no card —
+   *  no background, border, padding or shadow. WeChat/iMessage do the same;
+   *  a chrome frame around an image adds nothing and only shrinks it. */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
+  if (bare) {
+    return (
+      <div className="inline-block text-start max-w-[min(78%,62ch)] text-[13px]">
+        {children}
+      </div>
+    );
+  }
   return (
     <div
       className={
@@ -3478,6 +3490,18 @@ function MessageBubble({
   const localPreviews = previewUrlsFor(msg.client_msg_id);
   const attachmentMedia = media.filter((m) => m.kind === "attachment");
   const voiceMedia = media.find((m) => m.kind === "voice") ?? null;
+  /* A message that is NOTHING but photos: the picture is the whole payload,
+     so it renders without a bubble. Any text, product, voice, quote, edit or
+     deletion means the message has chrome to carry and keeps its card. */
+  const isPhotoOnly =
+    !isDeleted &&
+    !isEditing &&
+    !msg.body?.trim() &&
+    !voiceMedia &&
+    !msg.reply_preview &&
+    !(meta.products && meta.products.length > 0) &&
+    attachmentMedia.length > 0 &&
+    attachmentMedia.every((m) => m.type.startsWith("image/"));
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
@@ -3602,7 +3626,7 @@ function MessageBubble({
 
         {/* T2 surface — own messages only. The author header stays OUTSIDE it:
             the panel marks the utterance, not the attribution. */}
-        <MessageSurface isSelf={isSelf}>
+        <MessageSurface isSelf={isSelf} bare={isPhotoOnly}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
           <ReplyPreviewPill preview={msg.reply_preview} t={t} />
@@ -3683,7 +3707,7 @@ function MessageBubble({
                 `m.index` is the authority (voice may share the list), so we
                 pass it through rather than the array position. */}
             {attachmentMedia.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-2">
+              <div className={`flex flex-wrap gap-2 ${isPhotoOnly ? "" : "mt-1.5"}`}>
                 {attachmentMedia.map((m) => (
                   <AttachmentChip
                     key={`${msg.id}-a-${m.index}`}
@@ -3691,6 +3715,7 @@ function MessageBubble({
                     messageId={msg.id}
                     index={m.index}
                     localPreviewUrl={localPreviews?.[m.index] ?? null}
+                    bare={isPhotoOnly}
                   />
                 ))}
               </div>
@@ -3932,6 +3957,7 @@ function AttachmentChip({
   messageId,
   index,
   localPreviewUrl,
+  bare = false,
 }: {
   /** Client-safe media item — display fields + canonical index. Never a
    *  storage record: it has no url, no path and no bucket to leak. */
@@ -3939,6 +3965,10 @@ function AttachmentChip({
   messageId: string;
   index: number;
   localPreviewUrl?: string | null;
+  /** Rendered as the whole message (no surrounding bubble): drop the frame
+   *  and show the picture UNCROPPED — object-cover inside a max-height is
+   *  what was slicing the top and bottom off tall photos. */
+  bare?: boolean;
 }) {
   const isImage = attachment.type.startsWith("image/");
   const href = discussAttachmentUrl(messageId, index);
@@ -3951,11 +3981,16 @@ function AttachmentChip({
       <img
         src={imgSrc ?? undefined}
         alt={attachment.name}
-        className="w-full h-auto max-h-[260px] object-cover"
+        className={
+          bare
+            ? "block w-auto max-w-full max-h-[380px] h-auto object-contain"
+            : "w-full h-auto max-h-[260px] object-cover"
+        }
       />
     );
-    const cls =
-      "block max-w-[320px] rounded-lg overflow-hidden border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors";
+    const cls = bare
+      ? "block max-w-[320px] rounded-xl overflow-hidden"
+      : "block max-w-[320px] rounded-lg overflow-hidden border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors";
     /* Pending (local preview only): show the image but do not link — the
        protected URL does not exist yet and we will not link to the public one. */
     if (!href) return <div className={cls}>{imgSrc ? img : null}</div>;
