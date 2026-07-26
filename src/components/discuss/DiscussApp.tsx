@@ -60,6 +60,7 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import KoleexOrb from "@/components/ai/KoleexOrb";
 import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
@@ -1561,6 +1562,10 @@ export default function DiscussApp() {
       setUploading(false);
       /* Reset the input so the same file can be re-picked. */
       if (fileInputRef.current) fileInputRef.current.value = "";
+      /* Put the caret back in the composer. Without this, focus stays on the
+         paperclip BUTTON that opened the picker — so the next Enter "clicks"
+         it and re-opens the file dialog instead of sending. */
+      composerRef.current?.focus();
     },
     [showToast, t, composerAttachments.length, ensurePendingKey],
   );
@@ -2688,6 +2693,7 @@ export default function DiscussApp() {
                 sending={sending}
                 onSend={handleSend}
                 onPickFile={() => fileInputRef.current?.click()}
+                onDropFiles={(files) => void handleFilePick(files)}
                 onOpenProductPicker={openProductPicker}
                 onOpenMentionPicker={() => setMentionPickerOpen(true)}
                 onOpenEmojiPicker={() => setEmojiPickerOpen(true)}
@@ -3493,6 +3499,8 @@ function MessageBubble({
   /* A message that is NOTHING but photos: the picture is the whole payload,
      so it renders without a bubble. Any text, product, voice, quote, edit or
      deletion means the message has chrome to carry and keeps its card. */
+  /* Images in this message — drives the "Save image" menu entries. */
+  const photoMedia = attachmentMedia.filter((m) => m.type.startsWith("image/"));
   const isPhotoOnly =
     !isDeleted &&
     !isEditing &&
@@ -3716,6 +3724,7 @@ function MessageBubble({
                     index={m.index}
                     localPreviewUrl={localPreviews?.[m.index] ?? null}
                     bare={isPhotoOnly}
+                    t={t}
                   />
                 ))}
               </div>
@@ -3856,6 +3865,30 @@ function MessageBubble({
                 closeMenu();
               }}
             />
+            {/* Photos: save to disk. The packaged desktop shell has no native
+                image context menu, so the action has to be offered here — and
+                it belongs in the message's OWN menu rather than a second one
+                stacked on top of it. Downloads via the authorized route with
+                ?download=1, so membership is re-checked at save time. */}
+            {photoMedia.map((m) => (
+              <MessageMenuItem
+                key={`save-${m.index}`}
+                icon={<DownloadIcon className="h-4 w-4" />}
+                label={t("photo.save", "Save image")}
+                onClick={() => {
+                  const href = discussAttachmentUrl(msg.id, m.index, { download: true });
+                  if (href) {
+                    const a = document.createElement("a");
+                    a.href = href;
+                    a.download = m.name || "photo";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                  }
+                  closeMenu();
+                }}
+              />
+            ))}
             {isSelf && (
               <>
                 <MessageMenuItem
@@ -3952,13 +3985,114 @@ function ReplyPreviewPill({
    It is never persisted and never reaches another user. When neither URL is
    available the chip renders non-interactive rather than falling back to the
    public URL. (Discuss Stabilization Unit 2 — P0.) */
+/* ── Full-screen photo viewer ─────────────────────────────────────────────
+   Replaces "open the image in a new tab". In the desktop shell a new tab has
+   no chrome and therefore NO WAY BACK — the user is stranded on the picture.
+   This is an in-app overlay instead:
+     · click ANYWHERE outside the picture → close (the backdrop owns the click;
+       the image stops propagation so clicking the photo itself never closes);
+     · Escape → close;
+     · right-click the photo → Save image (the native menu is unavailable in
+       the packaged app, so the action is provided explicitly);
+     · the picture is shown at its natural size, capped to the viewport. */
+function PhotoLightbox({
+  src,
+  downloadHref,
+  name,
+  onClose,
+  t,
+}: {
+  src: string;
+  downloadHref: string | null;
+  name: string;
+  onClose: () => void;
+  t: (key: string, fallback?: string) => string;
+}) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const save = () => {
+    setMenu(null);
+    const a = document.createElement("a");
+    a.href = downloadHref ?? src;
+    a.download = name || "photo";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6"
+      onClick={onClose}
+      onContextMenu={(e) => { e.preventDefault(); onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={name}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("common.close", "Close")}
+        className="absolute top-4 end-4 h-9 w-9 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+      >
+        <CrossIcon className="h-4 w-4" />
+      </button>
+
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={name}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY });
+        }}
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl select-none"
+        draggable={false}
+      />
+
+      {menu && (
+        <div
+          className="fixed z-[101] min-w-[160px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl py-1"
+          style={{ left: Math.min(menu.x, window.innerWidth - 180), top: Math.min(menu.y, window.innerHeight - 60) }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={save}
+            className="w-full text-start px-3 py-2 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+          >
+            {t("photo.save", "Save image")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AttachmentChip({
   attachment,
   messageId,
   index,
   localPreviewUrl,
   bare = false,
+  t,
 }: {
+  t: (key: string, fallback?: string) => string;
   /** Client-safe media item — display fields + canonical index. Never a
    *  storage record: it has no url, no path and no bucket to leak. */
   attachment: DiscussMediaPublic;
@@ -3974,6 +4108,7 @@ function AttachmentChip({
   const href = discussAttachmentUrl(messageId, index);
   const downloadHref = discussAttachmentUrl(messageId, index, { download: true });
   const imgSrc = href ?? localPreviewUrl ?? null;
+  const [expanded, setExpanded] = useState(false);
 
   if (isImage) {
     const img = (
@@ -3995,9 +4130,31 @@ function AttachmentChip({
        protected URL does not exist yet and we will not link to the public one. */
     if (!href) return <div className={cls}>{imgSrc ? img : null}</div>;
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={cls}>
-        {img}
-      </a>
+      <>
+        {/* Not an <a target="_blank"> any more: in the packaged desktop app a
+            new tab has no back affordance, so tapping a photo used to strand
+            the user. Opens the in-app viewer instead. */}
+        {/* Right-click is NOT handled here: the message bubble already owns a
+            context menu, and a second one stacking on top of it is worse than
+            none. "Save image" is added to THAT menu instead. */}
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label={t("photo.expand", "Open photo")}
+          className={`${cls} cursor-zoom-in`}
+        >
+          {img}
+        </button>
+        {expanded && (
+          <PhotoLightbox
+            src={href}
+            downloadHref={downloadHref}
+            name={attachment.name}
+            onClose={() => setExpanded(false)}
+            t={t}
+          />
+        )}
+      </>
     );
   }
 
@@ -4117,6 +4274,7 @@ function Composer({
   attachments,
   products,
   onRemoveAttachment,
+  onDropFiles,
   attachmentPreviews,
   onRemoveProduct,
   replyTarget,
@@ -4144,6 +4302,8 @@ function Composer({
   attachments: DiscussAttachment[];
   products: DiscussProductRef[];
   onRemoveAttachment: (index: number) => void;
+  /** Files dropped onto the composer — same path as the paperclip picker. */
+  onDropFiles?: (files: FileList) => void;
   /** Sender-local blob: URLs, index-aligned with `attachments`. Image slots
    *  with a URL render as a real thumbnail (WeChat-style); everything else
    *  keeps the filename chip. */
@@ -4177,15 +4337,53 @@ function Composer({
     !uploading &&
     (body.trim().length > 0 || attachments.length > 0 || products.length > 0);
 
+  /* Drag & drop. dragDepth counts enter/leave pairs: a drag crossing a CHILD
+     element fires leave-then-enter, so a naive boolean flickers the overlay
+     off and on across the whole composer. */
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
+  const hasFiles = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
   return (
     <div
-      className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] p-3"
+      className="relative shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] p-3"
+      onDragEnter={(e) => {
+        if (!onDropFiles || !hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(e) => {
+        if (!onDropFiles || !hasFiles(e)) return;
+        e.preventDefault();           // required, or the browser opens the file
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={() => {
+        if (!onDropFiles) return;
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!onDropFiles || !hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        if (e.dataTransfer.files?.length) onDropFiles(e.dataTransfer.files);
+      }}
       style={{
         /* Respect the iPhone home-indicator so the composer sits above
            the rounded bottom edge instead of being partially hidden. */
         paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
       }}
     >
+      {dragging && (
+        <div className="absolute inset-2 z-10 rounded-xl border-2 border-dashed border-[var(--border-focus)] bg-[var(--bg-primary)]/85 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <span className="text-[12.5px] font-medium text-[var(--text-secondary)]">
+            {t("composer.dropHere", "Drop files to attach")}
+          </span>
+        </div>
+      )}
       {/* Reply-to banner */}
       {replyTarget && (
         <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]">
