@@ -8,6 +8,8 @@
    <b>/<font> tags that must never reach the sheet).
    --------------------------------------------------------------------------- */
 
+import { cdnImage } from "./cdn";
+
 export interface DocColumn {
   header: string;
   /** Column width in character units. */
@@ -27,6 +29,11 @@ export interface DocTotal {
 }
 
 export interface DocExport {
+  /** Optional label overrides so the sheet follows the DOCUMENT's language
+   *  (docLang) — defaults keep the historical English strings. */
+  fromLabel?: string;
+  toLabel?: string;
+  termsTitle?: string;
   /** Big title shown right of the logo, e.g. "COMMERCIAL INVOICE" / "QUOTATION". */
   docTitle: string;
   /** Used for the download filename. */
@@ -284,8 +291,8 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   ws.getRow(blockHeaderRow).height = 16;
   ws.mergeCells(`A${blockHeaderRow}:${MIDL}${blockHeaderRow}`);
   ws.mergeCells(`${MIDR}${blockHeaderRow}:${LAST}${blockHeaderRow}`);
-  ws.getCell(`A${blockHeaderRow}`).value = "FROM";
-  ws.getCell(`${MIDR}${blockHeaderRow}`).value = "INVOICE TO";
+  ws.getCell(`A${blockHeaderRow}`).value = doc.fromLabel ?? "FROM";
+  ws.getCell(`${MIDR}${blockHeaderRow}`).value = doc.toLabel ?? "INVOICE TO";
   [`A${blockHeaderRow}`, `${MIDR}${blockHeaderRow}`].forEach((addr) => {
     ws.getCell(addr).font = { bold: true, size: 9.5, color: { argb: WHITE } };
     ws.getCell(addr).alignment = { vertical: "middle", horizontal: "left", indent: 1 };
@@ -339,8 +346,11 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   const picCol = doc.columns.findIndex((c) => c.image);
   const imageIds: (number | null)[] = [];
   if (picCol >= 0 && doc.images && doc.images.length) {
+    /* 256px first-party variants: the raw storage URL is the FULL product
+       photo (hundreds of KB each) — 20 rows of those made the .xlsx tens of
+       MB and the export crawl. The cell shows ~64px; 256 is already 4x. */
     const fetched = await Promise.all(
-      doc.images.map((u) => (u ? fetchImageBase64(u) : Promise.resolve(null))),
+      doc.images.map((u) => (u ? fetchImageBase64(cdnImage(u, { width: 256, quality: 75 })) : Promise.resolve(null))),
     );
     fetched.forEach((f, idx) => {
       imageIds[idx] = f ? wb.addImage({ base64: f.base64, extension: f.ext }) : null;
@@ -447,7 +457,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
     ws.getRow(r).height = 8;
     r += 1;
     ws.mergeCells(`A${r}:${LAST}${r}`);
-    ws.getCell(`A${r}`).value = "TERMS & CONDITIONS";
+    ws.getCell(`A${r}`).value = doc.termsTitle ?? "TERMS & CONDITIONS";
     ws.getCell(`A${r}`).font = { bold: true, size: 10, color: { argb: WHITE } };
     fillCell(`A${r}`, BLACK);
     ws.getCell(`A${r}`).alignment = { vertical: "middle", horizontal: "left", indent: 1 };
@@ -479,82 +489,4 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-}
-
-/* ---------------------------------------------------------------------------
-   downloadDocSnapshotXlsx — PIXEL-PERFECT export. Renders the real A4 print
-   page (the same route Export PDF uses) inside a hidden iframe, captures it to
-   a high-resolution PNG with html2canvas, and embeds that image into an .xlsx
-   sized to A4. The result opens in Excel looking EXACTLY like the document
-   (it is a faithful raster of it). Falls back to throwing so the caller can
-   offer the structured export instead.
-   --------------------------------------------------------------------------- */
-const A4_PX_W = 794; // 210mm @ ~96dpi
-
-export async function downloadDocSnapshotXlsx(filename: string, printPath: string): Promise<void> {
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText = `position:fixed;left:-12000px;top:0;width:${A4_PX_W}px;height:1123px;border:0;background:#ffffff;`;
-  document.body.appendChild(iframe);
-  try {
-    await new Promise<void>((resolve, reject) => {
-      iframe.addEventListener("load", () => resolve(), { once: true });
-      iframe.addEventListener("error", () => reject(new Error("print page failed to load")), { once: true });
-      iframe.src = `${printPath}${printPath.includes("?") ? "&" : "?"}_t=${Date.now()}`;
-    });
-    const idoc = iframe.contentDocument;
-    if (!idoc || !idoc.body) throw new Error("print document unavailable");
-    // Let fonts + images settle.
-    try {
-      const f = (idoc as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
-      if (f?.ready) await f.ready;
-    } catch { /* ignore */ }
-    await new Promise((r) => setTimeout(r, 1400));
-
-    const html2canvas = (await import("html2canvas")).default;
-    const root = idoc.body;
-    const fullH = Math.max(root.scrollHeight, idoc.documentElement.scrollHeight, 1123);
-    iframe.style.height = `${fullH}px`;
-    const canvas = await html2canvas(root, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: A4_PX_W,
-      windowWidth: A4_PX_W,
-      height: fullH,
-      windowHeight: fullH,
-    });
-    const base64 = canvas.toDataURL("image/png").split(",")[1];
-    if (!base64) throw new Error("capture produced no image");
-
-    const ExcelJSmod = await import("exceljs");
-    const ExcelJS = (ExcelJSmod as unknown as { default?: typeof ExcelJSmod }).default ?? ExcelJSmod;
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Document", {
-      views: [{ showGridLines: false }],
-      pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0, right: 0, top: 0, bottom: 0, header: 0, footer: 0 } },
-    });
-    // Display the image at A4 width; preserve aspect from the captured canvas.
-    const dispW = A4_PX_W;
-    const dispH = Math.round((dispW * canvas.height) / canvas.width);
-    const imgId = wb.addImage({ base64, extension: "png" });
-    ws.addImage(imgId, { tl: { col: 0, row: 0 }, ext: { width: dispW, height: dispH }, editAs: "oneCell" });
-    // Make the grid roughly fit the image so it reads cleanly.
-    ws.getColumn(1).width = A4_PX_W / 7;
-
-    const out = await wb.xlsx.writeBuffer();
-    const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const dl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = dl;
-    a.download = filename.toLowerCase().endsWith(".xlsx") ? filename : `${filename}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(dl);
-  } finally {
-    iframe.remove();
-  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { docLabels } from "@/lib/doc-labels";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -10,7 +11,7 @@ import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
-import { downloadDocXlsx, downloadDocSnapshotXlsx, money } from "@/lib/excel-export";
+import { downloadDocXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -1199,20 +1200,8 @@ export default function Quotations() {
      items, and totals (matching computeGrandTotal). Numbers stay numeric. */
   const handleExportExcel = useCallback(async () => {
     if (!current) return;
-    // Pixel-perfect first: save, then capture the real print page into the .xlsx
-    // so it looks EXACTLY like the document. Fall back to the structured sheet.
-    const snapBase = `invoice-${(current.invoiceNo || current.id).replace(/[^\w-]+/g, "_")}`;
-    try {
-      let id = current.id;
-      const saved = await saveInvoiceRemote({ ...current, updatedAt: new Date().toISOString() });
-      if (saved && saved.id.length === 36) { id = saved.id; setCurrent(saved); }
-      if (id && id.length === 36) {
-        await downloadDocSnapshotXlsx(snapBase, `/invoices/${encodeURIComponent(id)}/print`);
-        return;
-      }
-    } catch {
-      /* fall through to the structured cell-based sheet */
-    }
+    /* Structured cells ONLY — the html2canvas "screenshot in a sheet" path is
+       gone; see Quotations.tsx for the full rationale. */
     const q = current;
     const cur = q.currency || "USD";
     const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
@@ -1229,13 +1218,14 @@ export default function Quotations() {
     });
     const images: (string | null)[] = q.items.map((it) => it.image || null);
 
+    const TL = docLabels(q.docLang);
     const totals = [
-      { label: "Subtotal", value: subtotal },
-      ...(taxPct ? [{ label: `Tax (${taxPct}%)`, value: taxAmt }] : []),
-      ...(Number(q.shipping) ? [{ label: "Shipping", value: Number(q.shipping) }] : []),
+      { label: TL("sum.subtotal"), value: subtotal },
+      ...(taxPct ? [{ label: `${TL("sum.tax")} (${taxPct}%)`, value: taxAmt }] : []),
+      ...(Number(q.shipping) ? [{ label: TL("sum.shipping"), value: Number(q.shipping) }] : []),
       ...(Number(q.others) ? [{ label: "Others", value: Number(q.others) }] : []),
-      ...(discPct ? [{ label: `Discount (${discPct}%)`, value: -(base * discPct) / 100 }] : []),
-      { label: `GRAND TOTAL (${cur})`, value: grand, strong: true },
+      ...(discPct ? [{ label: `${TL("sum.discount")} (${discPct}%)`, value: -(base * discPct) / 100 }] : []),
+      { label: `${TL("sum.total").toUpperCase()} (${cur})`, value: grand, strong: true },
     ];
 
     const incoterm = q.incotermCode
@@ -1253,24 +1243,28 @@ export default function Quotations() {
     ].filter((l) => l.trim() !== "");
 
     const fileBase = `invoice-${(q.invoiceNo || q.id).replace(/[^\w-]+/g, "_")}`;
+    const XL = docLabels(q.docLang);
     await downloadDocXlsx(fileBase, {
-      docTitle: "COMMERCIAL INVOICE",
+      docTitle: XL("title.invoice"),
       number: q.invoiceNo || q.id,
       metaStrip: [
-        ["DATE", q.date || ""],
-        ["INVOICE NO", q.invoiceNo || ""],
-        ["CLIENT NO", q.clientNo || ""],
+        [XL("meta.date").toUpperCase(), q.date || ""],
+        [XL("meta.invoiceNo").toUpperCase(), q.invoiceNo || ""],
+        [XL("meta.clientNo").toUpperCase(), q.clientNo || ""],
         ["DUE", q.validTill || ""],
       ],
+      fromLabel: XL("party.from").toUpperCase(),
+      toLabel: XL("party.invoiceTo").toUpperCase(),
+      termsTitle: XL("terms.title").toUpperCase(),
       toLines,
       columns: [
-        { header: "NO.", width: 5, align: "center" },
-        { header: "ITEM", width: 40 },
-        { header: "MODEL", width: 16 },
-        { header: "PICTURE", width: 12, align: "center", image: true },
-        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 15, money: true },
-        { header: "QTY", width: 7, align: "center" },
-        { header: `TOTAL (${cur})`, width: 15, money: true },
+        { header: XL("col.no"), width: 5, align: "center" },
+        { header: XL("col.item"), width: 40 },
+        { header: XL("col.model"), width: 16 },
+        { header: XL("col.picture"), width: 12, align: "center", image: true },
+        { header: `${XL("col.unitPrice")} (${incoterm ? incoterm + ", " : ""}${cur})`, width: 15, money: true },
+        { header: XL("col.qty"), width: 7, align: "center" },
+        { header: `${XL("col.total")} (${cur})`, width: 15, money: true },
       ],
       rows,
       images,
