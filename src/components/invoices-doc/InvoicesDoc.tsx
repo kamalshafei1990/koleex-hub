@@ -88,6 +88,8 @@ export interface Invoice {
   /* Document currency code (ISO 4217-ish). Drives the money symbols,
      the amount-in-words, and the currency-conditional bank block. */
   currency?: string;
+  /** Document language — fixed template labels render in this (en default). */
+  docLang?: "en" | "zh";
   tax: number;
   /* Tax as a PERCENTAGE of the subtotal (10 = 10%). Mirrors the
      Quotation model — the shared Tax row writes this. Legacy flat
@@ -255,6 +257,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
        then USD. Without this the editor dropped the saved currency on
        every load and reverted to USD. */
     currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
+    docLang: (doc as { docLang?: string }).docLang === "zh" ? ("zh" as const) : undefined,
     tax: Number(doc.tax ?? 0),
     taxPct: typeof doc.taxPct === "number" ? doc.taxPct : undefined,
     shipping: Number(doc.shipping ?? 0),

@@ -129,6 +129,8 @@ export interface Quotation {
      without it render as USD, which is also the default for new
      quotes. */
   currency?: string;
+  /** Document language — fixed template labels render in this (en default). */
+  docLang?: "en" | "zh";
   /* INTERNAL: shared Stand & Table cost used by every line whose
      costMode is "complete". One machine stand/table costs the same
      regardless of the head on it, so the operator sets this once per
@@ -347,6 +349,9 @@ export function fromRow(row: RemoteDocRow): Quotation {
     /* Doc payload wins; fall back to the row column (older docs were
        always saved with row.currency = USD), then USD. */
     currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
+    /* Hydration here is FIELD-BY-FIELD (not a spread) — a field missing from
+       this list silently vanishes on reload even though it saved fine. */
+    docLang: doc.docLang === "zh" ? "zh" : undefined,
     standTablePrice: Number(doc.standTablePrice ?? 0),
     fxRate: typeof doc.fxRate === "number" ? doc.fxRate : undefined,
     defaultPricingMethod: doc.defaultPricingMethod === "fixed" ? "fixed" : doc.defaultPricingMethod === "margin" ? "margin" : undefined,

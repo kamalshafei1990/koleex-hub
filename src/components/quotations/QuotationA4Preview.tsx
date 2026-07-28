@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { docLabels, type DocLang } from "@/lib/doc-labels";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -97,6 +98,13 @@ export interface Quotation {
      symbol on every money cell and the amount-in-words line. Optional
      for back-compat; missing = USD. */
   currency?: string;
+  /* The DOCUMENT's language (not the operator's UI language): every fixed
+     template label — title, table headers, totals, bank, signatures —
+     renders in this language, and it persists in the doc payload so a
+     Chinese quotation stays Chinese for everyone who opens or prints it.
+     Free-form content (descriptions, typed terms) is untouched. Optional
+     for back-compat; missing = English. */
+  docLang?: DocLang;
   /* INTERNAL: shared Stand & Table cost applied to every "complete set"
      line. Set once per quotation; editor gutter only — never printed. */
   standTablePrice?: number;
@@ -450,6 +458,8 @@ export default function QuotationA4Preview({
      picked yet so the column still reads sensibly. */
   const cur = (current.currency || "USD").toUpperCase();
   const curSym = CURRENCY_SYMBOLS[cur] ?? cur;
+  /* Template label resolver in the DOCUMENT's language. */
+  const L = docLabels(current.docLang);
   /* Tax is a PERCENTAGE of the subtotal. taxAmount feeds both the Tax
      row (computed value display) and the discount base. */
   const taxPctVal = Math.max(0, Math.min(100, Number(current.taxPct) || 0));
@@ -694,7 +704,7 @@ export default function QuotationA4Preview({
               letterSpacing: "0.08em",
             }}
           >
-            {docKind === "invoice" ? "COMMERCIAL INVOICE" : "QUOTATION"}
+            {L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
           </div>
         </div>
 
@@ -780,7 +790,7 @@ export default function QuotationA4Preview({
           }}
         >
           <MetaStripCell
-            label="Date"
+            label={L("meta.date")}
             isFirst
           >
             <input
@@ -789,7 +799,7 @@ export default function QuotationA4Preview({
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>
-          <MetaStripCell label={docKind === "invoice" ? "Invoice No" : "Quotation No"}>
+          <MetaStripCell label={L(docKind === "invoice" ? "meta.invoiceNo" : "meta.quotationNo")}>
             <span
               data-quote-no={current.invoiceNo || undefined}
               style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}
@@ -798,7 +808,7 @@ export default function QuotationA4Preview({
             </span>
           </MetaStripCell>
           {docKind !== "invoice" && (
-            <MetaStripCell label="Valid Till">
+            <MetaStripCell label={L("meta.validTill")}>
               <input
                 value={current.validTill}
                 onChange={(e) => setMeta("validTill", e.target.value)}
@@ -807,7 +817,7 @@ export default function QuotationA4Preview({
               />
             </MetaStripCell>
           )}
-          <MetaStripCell label="Client No" isLast>
+          <MetaStripCell label={L("meta.clientNo")} isLast>
             <input
               value={current.clientNo}
               onChange={(e) => setMeta("clientNo", e.target.value)}
@@ -845,7 +855,7 @@ export default function QuotationA4Preview({
                 textTransform: "uppercase",
               }}
             >
-              From
+              {L("party.from")}
             </div>
             <div style={{ padding: "10px 14px" }}>
               <div
@@ -878,13 +888,13 @@ export default function QuotationA4Preview({
                   fontSize: 10,
                 }}
               >
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Phone</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.phone")}</span>
                 <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 0576 8892 7796</span>
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Mobile</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.mobile")}</span>
                 <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 130 7380 0720</span>
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.email")}</span>
                 <span style={{ color: T.ink }}>info@koleexgroup.com</span>
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Web</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.web")}</span>
                 <span style={{ color: T.ink }}>www.koleexgroup.com</span>
               </div>
             </div>
@@ -919,7 +929,7 @@ export default function QuotationA4Preview({
                 gap: 8,
               }}
             >
-              <span>{docKind === "invoice" ? "Invoice To" : "Quotation To"}</span>
+              <span>{L(docKind === "invoice" ? "party.invoiceTo" : "party.quotationTo")}</span>
               {/* Link-to-CRM button. Editor-only (`.no-print`) so the
                   black header strip stays clean on the printed PDF. */}
               {onPickCustomer && (
@@ -1010,7 +1020,7 @@ export default function QuotationA4Preview({
                     after the quote is preserved into the invoice. */}
                 {docKind === "invoice" && (
                   <>
-                    <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>ACID No.</span>
+                    <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.acid")}</span>
                     <input
                       value={current.toAcid ?? ""}
                       onChange={(e) => setMeta("toAcid", e.target.value)}
@@ -1026,28 +1036,28 @@ export default function QuotationA4Preview({
                   placeholder="Contact person"
                   style={{ ...inputResetStyle, fontWeight: 700, color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Phone</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.phone")}</span>
                 <input
                   value={current.toPhone ?? ""}
                   onChange={(e) => setMeta("toPhone", e.target.value)}
                   placeholder="—"
                   style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Mobile</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.mobile")}</span>
                 <input
                   value={current.toMobile ?? ""}
                   onChange={(e) => setMeta("toMobile", e.target.value)}
                   placeholder="—"
                   style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Email</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.email")}</span>
                 <input
                   value={current.toEmail ?? ""}
                   onChange={(e) => setMeta("toEmail", e.target.value)}
                   placeholder="email@example.com"
                   style={{ ...inputResetStyle, color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Web</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.web")}</span>
                 <input
                   value={current.toWebsite ?? ""}
                   onChange={(e) => setMeta("toWebsite", e.target.value)}
@@ -1115,18 +1125,18 @@ export default function QuotationA4Preview({
                   · UPRC  14% — "(FOB NINGBO)" subtitle
                   · QTY    7% — up to 3 digits
                   · TOTAL 16% — line totals */}
-              <Th width="5%"  align="center" isFirst>NO.</Th>
-              <Th width="28%" align="center">ITEM</Th>
-              <Th width="15%" align="center">MODEL</Th>
-              <Th width="15%" align="center">PICTURE</Th>
+              <Th width="5%"  align="center" isFirst>{L("col.no")}</Th>
+              <Th width="28%" align="center">{L("col.item")}</Th>
+              <Th width="15%" align="center">{L("col.model")}</Th>
+              <Th width="15%" align="center">{L("col.picture")}</Th>
               <Th width="14%" align="center">
-                <div>UNIT PRICE</div>
+                <div>{L("col.unitPrice")}</div>
                 <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
                   {priceTypeSubtitle}
                 </div>
               </Th>
-              <Th width="7%"  align="center">QTY</Th>
-              <Th width="16%" align="center" isLast>TOTAL</Th>
+              <Th width="7%"  align="center">{L("col.qty")}</Th>
+              <Th width="16%" align="center" isLast>{L("col.total")}</Th>
             </tr>
           </thead>
           )}
@@ -1823,8 +1833,9 @@ export default function QuotationA4Preview({
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", border: "none" }}>
                   <tbody>
-                    <TotalsRow label="Subtotal" value={`${fmt(subTotal)} ${curSym}`} muted />
+                    <TotalsRow label={L("sum.subtotal")} value={`${fmt(subTotal)} ${curSym}`} muted />
                     <TaxRow
+                      label={L("sum.tax")}
                       curSym={curSym}
                       pct={current.taxPct ?? 0}
                       amount={taxAmount}
@@ -1832,7 +1843,7 @@ export default function QuotationA4Preview({
                       fmt={fmt}
                     />
                     <TotalsRow
-                      label="Shipping"
+                      label={L("sum.shipping")}
                       editable
                       rawValue={current.shipping}
                       onCommit={(v) => setMeta("shipping", v)}
@@ -1849,6 +1860,7 @@ export default function QuotationA4Preview({
                         amount in red so the operator sees the
                         impact of the % they typed. */}
                     <DiscountRow
+                      label={L("sum.discount")}
                       curSym={curSym}
                       pct={current.discountPct ?? 0}
                       base={subTotal + taxAmount + current.shipping + current.others}
@@ -1870,7 +1882,7 @@ export default function QuotationA4Preview({
                           textTransform: "uppercase",
                         }}
                       >
-                        Total
+                        {L("sum.total")}
                       </td>
                       <td
                         className="pq-tv"
@@ -1914,7 +1926,7 @@ export default function QuotationA4Preview({
                           padding: "6px 12px",
                         }}
                       >
-                        Total in Letters
+                        {L("sum.totalInLetters")}
                       </td>
                       <td
                         className="pq-tv pq-tv-words"
@@ -2127,7 +2139,7 @@ export default function QuotationA4Preview({
                 textTransform: "uppercase",
               }}
             >
-              Authorised Stamp
+              {L("sig.authorisedStamp")}
             </div>
             <div style={{ padding: 12 }}>
               {/* Stamp area — 150 px square ≈ 40 mm at 96 dpi which is
@@ -2175,7 +2187,7 @@ export default function QuotationA4Preview({
                 textTransform: "uppercase",
               }}
             >
-              Authorised Signature
+              {L("sig.authorisedSignature")}
             </div>
             <div
               style={{
@@ -2245,7 +2257,7 @@ export default function QuotationA4Preview({
                   textTransform: "uppercase",
                 }}
               >
-                Customer Stamp
+                {L("sig.customerStamp")}
               </div>
               <div style={{ padding: 12 }}>
                 <StampSignatureBox
@@ -2278,7 +2290,7 @@ export default function QuotationA4Preview({
                   textTransform: "uppercase",
                 }}
               >
-                Customer Signature
+                {L("sig.customerSignature")}
               </div>
               <div
                 style={{
@@ -2327,7 +2339,9 @@ export default function QuotationA4Preview({
           >
             {cur === "CNY"
               ? "开票资料 · Receiving Chinese Yuan Payment At"
-              : "Receiving U.S Dollar Payment At"}
+              : current.docLang === "zh"
+                ? "美元收款账户 · Receiving U.S Dollar Payment At"
+                : "Receiving U.S Dollar Payment At"}
           </div>
           <table
             className="pq-bank"
@@ -2348,13 +2362,16 @@ export default function QuotationA4Preview({
                 </>
               ) : (
                 <>
-                  <BankRow label="Beneficiary Bank" value="AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH" />
-                  <BankRow label="SWIFT Code" value="ABOCCNBJ110" mono />
-                  <BankRow label="Beneficiary Name" value="KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD." />
-                  <BankRow label="Beneficiary A/C No." value="19905814040007205" mono />
-                  <BankRow label="Bank Address" value="100 JIANGJIN ROAD, SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG, CHINA" />
+                  {/* Bilingual labels in the Chinese document — the VALUES stay
+                      exactly as the bank holds them (a SWIFT payment field must
+                      match the account records letter-for-letter). */}
+                  <BankRow label={current.docLang === "zh" ? "开户银行 / Beneficiary Bank" : "Beneficiary Bank"} value="AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH" />
+                  <BankRow label={current.docLang === "zh" ? "SWIFT 代码" : "SWIFT Code"} value="ABOCCNBJ110" mono />
+                  <BankRow label={current.docLang === "zh" ? "收款人名称 / Beneficiary Name" : "Beneficiary Name"} value="KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD." />
+                  <BankRow label={current.docLang === "zh" ? "收款账号 / A\u002FC No." : "Beneficiary A/C No."} value="19905814040007205" mono />
+                  <BankRow label={current.docLang === "zh" ? "银行地址 / Bank Address" : "Bank Address"} value="100 JIANGJIN ROAD, SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG, CHINA" />
                   <BankRow
-                    label="Beneficiary Address"
+                    label={current.docLang === "zh" ? "收款人地址 / Beneficiary Address" : "Beneficiary Address"}
                     value="ROOM 206, BUILDING 88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA"
                   />
                 </>
@@ -2392,7 +2409,7 @@ export default function QuotationA4Preview({
               color: T.inkGhost,
             }}
           >
-            Thank you for choosing Koleex
+            {L("footer.thanks")}
           </span>
         </div>
         </>)}
@@ -7946,12 +7963,14 @@ function Td({
    but ADDS to the bill: the right cell shows the computed tax amount with
    a "+". The % is the editable field; the amount is derived. */
 function TaxRow({
+  label = "Tax",
   pct,
   amount,
   onCommit,
   fmt,
   curSym = "$",
 }: {
+  label?: string;
   pct: number;
   amount: number;
   onCommit: (val: number) => void;
@@ -7968,7 +7987,7 @@ function TaxRow({
           border: `1px solid ${T.border}`, padding: "6px 12px", color: T.ink,
         }}
       >
-        Tax
+        {label}
       </td>
       <td
         className="pq-tv"
@@ -8006,12 +8025,14 @@ function TaxRow({
 }
 
 function DiscountRow({
+  label = "Discount",
   pct,
   base,
   onCommit,
   fmt,
   curSym = "$",
 }: {
+  label?: string;
   pct: number;
   base: number;
   onCommit: (val: number) => void;
@@ -8035,7 +8056,7 @@ function DiscountRow({
           color: T.ink,
         }}
       >
-        Discount
+        {label}
       </td>
       <td
         className="pq-tv"
@@ -8569,6 +8590,32 @@ function DocSettingsCard({
       }}
     >
       <div style={labelCss}>Document settings</div>
+      {/* Document language — EN / 中文. Persisted on the doc payload, so a
+          Chinese quotation stays Chinese wherever it is opened or printed. */}
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Document language</span>
+        <div style={{ display: "flex", gap: 4 }}>
+          {(["en", "zh"] as const).map((lng) => {
+            const active = (current.docLang ?? "en") === lng;
+            return (
+              <button
+                key={lng}
+                type="button"
+                onClick={() => setCurrent((prev) => (prev ? { ...prev, docLang: lng } : prev))}
+                style={{
+                  flex: 1, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  cursor: "pointer", letterSpacing: "0.04em",
+                  border: active ? "1px solid transparent" : "1px solid #2D2D2D",
+                  background: active ? "#F5F5F5" : "transparent",
+                  color: active ? "#111" : "rgba(255,255,255,0.65)",
+                }}
+              >
+                {lng === "en" ? "EN" : "中文"}
+              </button>
+            );
+          })}
+        </div>
+      </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Currency</span>
         <select
