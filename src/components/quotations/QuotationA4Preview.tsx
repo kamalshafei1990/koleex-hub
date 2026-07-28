@@ -26,7 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { docLabels, type DocLang } from "@/lib/doc-labels";
+import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-labels";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -1979,7 +1979,7 @@ export default function QuotationA4Preview({
                       justifyContent: "space-between",
                     }}
                   >
-                    <span>Terms &amp; Conditions</span>
+                    <span>{L("terms.title")}</span>
                     <span
                       className="no-print"
                       style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
@@ -2044,6 +2044,7 @@ export default function QuotationA4Preview({
           <ShipmentDetailsCard
             terms={current.terms ?? ""}
             totalQty={totalQty}
+            docLang={current.docLang}
             onEdit={() => openQuickFill("shipment")}
             onCommit={(canonical, v) => {
               /* Inline cell edit: write through the same alias
@@ -5300,31 +5301,37 @@ type ShipmentDetailRow = {
    Details card. Payment Terms and Price Type are deliberately
    omitted -- they're commercial contract clauses and render in
    the Terms & Conditions card instead. */
-const SHIPMENT_DETAIL_LABELS: Record<string, string> = {
-  "Loading port":       "Loading Port",
-  "Discharge port":     "Discharge Port",
-  "Sent by":            "Sent By",
-  "Container type":     "Container Type",
-  "Shipping marks":     "Shipping Marks",
-  "Lead time":          "Lead Time",
-  "Delivery time":      "Delivery Time",
-  "Country of Origin":  "Country of Origin",
-  "Net Weight":         "Net Weight",
-  "Gross Weight":       "Gross Weight",
-  "CBM":                "CBM",
-  "Number of Packages": "No. of Packages",
-  "Documents Provided": "Documents",
-  "Total Qty":          "Total Qty",
+/* Canonical term key → doc-label key. Display text comes from doc-labels so
+   the card follows the DOCUMENT's language; the canonical keys themselves
+   never change — they are the storage/alias identity inside current.terms. */
+const SHIPMENT_DETAIL_LABEL_KEYS: Record<string, DocLabelKey> = {
+  "Loading port":       "ship.loadingPort",
+  "Discharge port":     "ship.dischargePort",
+  "Sent by":            "ship.sentBy",
+  "Container type":     "ship.containerType",
+  "Shipping marks":     "ship.shippingMarks",
+  "Lead time":          "ship.leadTime",
+  "Delivery time":      "ship.deliveryTime",
+  "Country of Origin":  "ship.countryOfOrigin",
+  "Net Weight":         "ship.netWeight",
+  "Gross Weight":       "ship.grossWeight",
+  "CBM":                "ship.cbm",
+  "Number of Packages": "ship.packages",
+  "Documents Provided": "ship.documents",
+  "Total Qty":          "ship.totalQty",
 };
 
 function ShipmentDetailsCard({
   terms,
   totalQty,
+  docLang,
   onEdit,
   onCommit,
 }: {
   terms: string;
   totalQty: number;
+  /** The DOCUMENT's language — drives the printed row labels. */
+  docLang?: DocLang;
   onEdit: () => void;
   /* Commits an inline edit of a single row's value. The parent
      uses applyQuickFillToTerms to write the new value back into
@@ -5342,13 +5349,13 @@ function ShipmentDetailsCard({
      row order in the editor) so the card is always laid out
      consistently. */
   const rows: ShipmentDetailRow[] = useMemo(() => {
-    const order = Object.keys(SHIPMENT_DETAIL_LABELS);
+    const order = Object.keys(SHIPMENT_DETAIL_LABEL_KEYS);
     return order.map((canonical) => ({
       canonical,
-      label: SHIPMENT_DETAIL_LABELS[canonical],
+      label: docLabel(docLang, SHIPMENT_DETAIL_LABEL_KEYS[canonical]),
       value: getTermValue(rendered, canonical),
     }));
-  }, [rendered]);
+  }, [rendered, docLang]);
 
   const filledCount = rows.filter((r) => r.value.trim() !== "").length;
 
@@ -5381,7 +5388,7 @@ function ShipmentDetailsCard({
           justifyContent: "space-between",
         }}
       >
-        <span>Shipment &amp; Delivery Details</span>
+        <span>{docLabel(docLang, "terms.shipmentDetails")}</span>
         <span
           className="no-print"
           style={{
