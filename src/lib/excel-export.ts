@@ -165,6 +165,42 @@ async function loadLogoBase64(): Promise<string | null> {
   }
 }
 
+/** Downscale an already-fetched image to a ≤256px JPEG thumbnail via canvas.
+ *  This is the SIZE GUARANTEE: whatever the source was — the 256px optimizer
+ *  variant or a multi-MB original fetched as fallback — what gets embedded is
+ *  a thumbnail. Without it, one export where the optimizer hiccuped fell back
+ *  to full-resolution originals and produced a 19.6MB workbook. Any decode
+ *  failure returns the input unchanged (an oversized picture beats a missing
+ *  one). PNG stays PNG when small (transparency); big sources become JPEG. */
+async function downscaleForCell(
+  img: { base64: string; ext: "png" | "jpeg" | "gif" },
+): Promise<{ base64: string; ext: "png" | "jpeg" | "gif" }> {
+  try {
+    if (img.ext === "gif") return img;                       // keep animation
+    if (img.base64.length < 80_000) return img;              // ~60KB — already small
+    const blob = await (await fetch(`data:image/${img.ext};base64,${img.base64}`)).blob();
+    const bmp = await createImageBitmap(blob);
+    const scale = Math.min(1, 256 / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return img;
+    /* Product shots sit on white in the sheet cell — flatten transparency
+       to white so JPEG re-encoding cannot turn it black. */
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const out = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+    if (!out || out.length >= img.base64.length) return img;
+    return { base64: out, ext: "jpeg" };
+  } catch {
+    return img;
+  }
+}
+
 /** Fetch a product image URL → { base64, ext } for embedding. null on failure. */
 async function fetchImageBase64(url: string): Promise<{ base64: string; ext: "png" | "jpeg" | "gif" } | null> {
   try {
@@ -259,14 +295,17 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
 
   /* ── Meta strip: boxed cells (DATE · NO · CLIENT NO) ── */
   const strip = doc.metaStrip.slice(0, nCols);
-  const cellSpan = Math.max(1, Math.floor(nCols / strip.length));
+  /* Distribute the strip cells EVENLY across the table columns. The old
+     floor(nCols/len) span parked the first pair on column A alone — the
+     5-character NO. column — so "DATE" printed as "DAT" and the date as
+     "14/". round(i·n/len) boundaries give every pair a fair share. */
   const labelRow = 7;
   const valueRow = 8;
   ws.getRow(labelRow).height = 15;
   ws.getRow(valueRow).height = 16;
   strip.forEach((pair, idx) => {
-    const startC = idx * cellSpan + 1;
-    const endC = idx === strip.length - 1 ? nCols : startC + cellSpan - 1;
+    const startC = Math.round((idx * nCols) / strip.length) + 1;
+    const endC = Math.round(((idx + 1) * nCols) / strip.length);
     const a = colLetter(startC);
     const b = colLetter(endC);
     ws.mergeCells(`${a}${labelRow}:${b}${labelRow}`);
@@ -332,7 +371,13 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   /* ── Items table ── */
   r += 1;
   const hdr = ws.getRow(r);
-  hdr.height = 22;
+  /* Tall enough for the longest wrapped header — "UNIT PRICE (FOB · Ningbo,
+     China → Port Said…)" needs three lines, and a fixed 22 clipped it. */
+  const hdrLines = Math.max(
+    1,
+    ...doc.columns.map((c) => Math.ceil(c.header.length / Math.max(6, Math.floor(c.width * 0.95)))),
+  );
+  hdr.height = Math.min(46, 10 + hdrLines * 12);
   doc.columns.forEach((c, i) => {
     const cell = hdr.getCell(i + 1);
     cell.value = c.header;
@@ -350,7 +395,18 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
        photo (hundreds of KB each) — 20 rows of those made the .xlsx tens of
        MB and the export crawl. The cell shows ~64px; 256 is already 4x. */
     const fetched = await Promise.all(
-      doc.images.map((u) => (u ? fetchImageBase64(cdnImage(u, { width: 256, quality: 75 })) : Promise.resolve(null))),
+      doc.images.map(async (u) => {
+        if (!u) return null;
+        /* Thumbnail first; if the optimizer refuses this source (format,
+           upstream hiccup) fall back to the original so a picture the
+           document shows is never silently missing from the sheet. Either
+           way the result passes through downscaleForCell — the embedded
+           bytes are ALWAYS thumbnail-sized. */
+        const raw =
+          (await fetchImageBase64(cdnImage(u, { width: 256, quality: 75 }))) ??
+          (await fetchImageBase64(u));
+        return raw ? downscaleForCell(raw) : null;
+      }),
     );
     fetched.forEach((f, idx) => {
       imageIds[idx] = f ? wb.addImage({ base64: f.base64, extension: f.ext }) : null;
