@@ -697,14 +697,26 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className={`absolute top-full end-0 mt-2 w-[360px] max-w-[92vw] rounded-xl border shadow-2xl overflow-hidden z-50 ${
-            dk
-              ? "border-white/[0.08] bg-[#0f0f0f]"
-              : "border-black/[0.08] bg-white"
-          }`}
-        >
+        <>
+          {/* Dim + blur backdrop (standing rule: every floating surface blurs
+              what's behind it). Clicking it closes the panel — which is also
+              the touch-friendly close path on mobile. */}
+          <div
+            aria-hidden
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm"
+          />
+          {/* Mobile: a fixed sheet spanning the viewport width just below the
+              header (var-driven — never a hardcoded top). Desktop (md+): the
+              familiar dropdown anchored to the bell. */}
+          <div
+            role="menu"
+            className={`fixed inset-x-2 top-[calc(var(--kx-header-h)+6px)] w-auto md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] rounded-xl border shadow-2xl overflow-hidden z-50 ${
+              dk
+                ? "border-white/[0.08] bg-[#0f0f0f]"
+                : "border-black/[0.08] bg-white"
+            }`}
+          >
           {/* Header */}
           <div
             className={`flex items-center justify-between px-4 py-3 border-b ${
@@ -782,8 +794,9 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             })}
           </div>
 
-          {/* Body */}
-          <div className="max-h-[460px] overflow-y-auto">
+          {/* Body — on mobile the sheet may be taller than 460px is useful
+              for; cap to the space under the header instead. */}
+          <div className="max-h-[calc(100dvh-var(--kx-header-h)-96px)] md:max-h-[460px] overflow-y-auto">
             {/* Discuss section */}
             {discussVisible && discussRows.length > 0 && (
               <div>
@@ -1058,7 +1071,8 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                 </div>
               )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
