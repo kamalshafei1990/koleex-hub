@@ -15,6 +15,9 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { SPEC_I18N, SPEC_DESC_I18N } from "@/lib/product-schema/spec-i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { createPortal } from "react-dom";
 import type {
   ProductSchemaDefinition,
@@ -193,16 +196,19 @@ const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" 
   );
 };
 
-const FieldBadges = ({ f }: { f: SpecField }) => (
+const FieldBadges = ({ f }: { f: SpecField }) => {
+  const { t: fbT } = useTranslation(PRODUCTS_UI_I18N);
+  return (
   <span className="inline-flex items-center gap-1">
     {f.internalOnly ? (
-      <VisBadge label="Internal" tone="internal" />
+      <VisBadge label={fbT("specs.visInternal", "Internal")} tone="internal" />
     ) : f.publicVisible ? (
-      <VisBadge label="Public" tone="public" />
+      <VisBadge label={fbT("specs.visPublic", "Public")} tone="public" />
     ) : null}
     {f.aiReadable ? <VisBadge label="AI" tone="ai" /> : null}
   </span>
-);
+  );
+};
 
 /* ── the per-field input ───────────────────────────────────────── */
 
@@ -335,13 +341,16 @@ function FieldInput({
   value: unknown;
   onSet: (v: unknown) => void;
 }) {
+  const { t: tb } = useTranslation(PRODUCTS_UI_I18N);
+  const boolYes = tb("specs.yes", "Yes");
+  const boolNo = tb("specs.no", "No");
   const ft = field.fieldType;
 
   /* boolean — tri-state segmented (Yes / No / —) */
   if (ft === "boolean") {
     const opts: { label: string; val: boolean | undefined }[] = [
-      { label: "Yes", val: true },
-      { label: "No", val: false },
+      { label: boolYes, val: true },
+      { label: boolNo, val: false },
       { label: "—", val: undefined },
     ];
     return (
@@ -557,6 +566,15 @@ function GroupCard({
   values: Record<string, unknown>;
   setField: (key: string, v: unknown) => void;
 }) {
+  const { t: ts, lang: specLang } = useTranslation(SPEC_I18N);
+  const { t: tui } = useTranslation(PRODUCTS_UI_I18N);
+  /* Localize what the operator SEES; schema keys/values stay canonical. */
+  const locField = (f: SpecField): SpecField => ({
+    ...f,
+    label: ts(`f:${f.key}`, f.label),
+    options: f.options?.map((o) => ({ ...o, label: ts(`o:${o.value}`, o.label) })),
+  });
+
   const [open, setOpen] = useState(true);
 
   const fields = useMemo(
@@ -576,7 +594,7 @@ function GroupCard({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-            {group.title}
+            {ts(`g:${group.title}`, group.title)}
           </span>
           <span className="text-[10px] font-mono text-[var(--text-ghost)] shrink-0">
             {filled}/{total}
@@ -601,25 +619,25 @@ function GroupCard({
             <div key={f.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <label className="text-[11px] font-semibold text-[var(--text-secondary)] inline-flex items-center gap-1.5">
-                  {f.label}
+                  {ts(`f:${f.key}`, f.label)}
                   {f.required ? <span className="text-red-500">*</span> : null}
                 </label>
                 <FieldBadges f={f} />
               </div>
               <FieldInput
-                field={f}
+                field={locField(f)}
                 value={values[f.key]}
                 onSet={(v) => setField(f.key, v)}
               />
               {f.computed ? (
                 <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
-                  <span aria-hidden>↻</span> Auto-fills from{" "}
-                  {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the linked field"} — you can also type it manually.
+                  <span aria-hidden>↻</span> {tui("specs.autoFillsFrom", "Auto-fills from")}{" "}
+                  {(() => { const src = group.fields.find((x) => x.key === f.computed!.from); return src ? ts(`f:${src.key}`, src.label) : tui("specs.linkedField", "the linked field"); })()} — {tui("specs.canTypeManually", "you can also type it manually.")}
                 </p>
               ) : null}
               {f.description ? (
                 <p className="text-[10px] text-[var(--text-ghost)] leading-relaxed">
-                  {f.description}
+                  {(specLang !== "en" && SPEC_DESC_I18N[f.description]?.[specLang as "zh" | "ar"]) || f.description}
                 </p>
               ) : null}
             </div>
@@ -633,6 +651,7 @@ function GroupCard({
 /* ── main editor ───────────────────────────────────────────────── */
 
 export default function SchemaSpecsSection({ schema, values, onChange, hideHeader }: Props) {
+  const { t: tui2 } = useTranslation(PRODUCTS_UI_I18N);
   /* source field key → the computed fields that derive from it. Lets a single
      edit (e.g. Packing Dimensions) recompute its dependants (e.g. CBM). */
   const derivedBySource = useMemo(() => {
@@ -708,12 +727,10 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
         <div className="flex items-start justify-between gap-3 flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-4 py-3">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold text-[var(--text-primary)]">
-              {schema.name} — structured specs
+              {schema.name} — {tui2("specs.structuredSpecs", "structured specs")}
             </p>
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed max-w-xl">
-              These power the public product page, quotations, brochures, and the AI
-              layer. Each field shows where it appears (Public / Internal / AI).
-              Choices over free text wherever possible.
+              {tui2("specs.introBody", "These power the public product page, quotations, brochures, and the AI layer. Each field shows where it appears (Public / Internal / AI). Choices over free text wherever possible.")}
             </p>
           </div>
           {reqTotal > 0 ? (
@@ -722,7 +739,7 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
                 {reqFilled}/{reqTotal}
               </div>
               <div className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)]">
-                Required
+                {tui2("specs.required", "Required")}
               </div>
             </div>
           ) : null}

@@ -172,24 +172,34 @@ interface WizardStep {
    StepNav + jump chips localize without `getSteps` ever calling a hook. */
 const STEP_LABEL_KEY: Record<string, string> = {
   classify: "step.classification",
+  supplier: "step.supplierSourcing",
   identity: "step.identity",
   description: "step.description",
+  specs: "step.specifications",
   "sewing-specs": "step.machineSpecs",
   commercial: "step.modelsVariants",
   pricing: "step.costPrice",
   logistics: "step.logisticsCustoms",
+  compliance: "step.complianceWarranty",
   technical: "step.technical",
-  media: "step.media",
+  media: "step.mediaDocuments",
+  knowledge: "step.knowledgeRel",
   finalize: "step.reviewPublish",
 };
 const STEP_SHORT_KEY: Record<string, string> = {
   classify: "step.classify",
+  supplier: "step.supplier",
   identity: "step.hero",
   description: "step.description",
+  specs: "step.specs",
   "sewing-specs": "step.specs",
   commercial: "step.models",
+  pricing: "step.price",
+  logistics: "step.logistics",
+  compliance: "step.compliance",
   technical: "step.technical",
   media: "step.media",
+  knowledge: "step.knowledge",
   finalize: "step.review",
 };
 
@@ -2470,7 +2480,7 @@ export default function ProductForm({ productId }: Props) {
               One-page → scrolling section index. Legacy → numbered stepper. */}
         {tabbed ? (
           <SectionTabs
-            items={steps.map((s, i) => ({ index: i, id: s.id, label: s.shortLabel || s.label }))}
+            items={steps.map((s, i) => ({ index: i, id: s.id, label: t(STEP_SHORT_KEY[s.id] ?? "", s.shortLabel || s.label) }))}
             activeIndex={currentStep}
             onSelect={goToStep}
           />

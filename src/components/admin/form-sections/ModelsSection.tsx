@@ -15,6 +15,8 @@ import WarehouseIcon from "@/components/icons/ui/WarehouseIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import CrownIcon from "@/components/icons/ui/CrownIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
@@ -116,6 +118,7 @@ function ModelCard({
      One click copies it here — the SAME data must never be typed twice. */
   productPacking?: ProductPackingDefaults | null;
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [open, setOpen] = useState(defaultOpen);
 
   const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -211,7 +214,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-                {model.model_name || "Untitled Variant"}
+                {model.model_name || t("mv.untitled", "Untitled Variant")}
               </span>
               {isPrimary && !solo && (
                 <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
@@ -237,7 +240,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
             disabled={idx === 0}
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Move up"
+            title={t("mv.moveUp", "Move up")}
           >
             <ArrowUpIcon className="h-3.5 w-3.5" />
           </button>
@@ -245,7 +248,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
             disabled={idx === total - 1}
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Move down"
+            title={t("mv.moveDown", "Move down")}
           >
             <ArrowDownIcon className="h-3.5 w-3.5" />
           </button>
@@ -332,28 +335,28 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     made-to-order vs sold-out). Two independent facts. */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={lbl}>Status</label>
+                  <label className={lbl}>{t("mv.status", "Status")}</label>
                   <select
                     value={model.status}
                     onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
                     className={inp}
                   >
-                    <option value="active">Active</option>
-                    <option value="discontinued">Discontinued</option>
+                    <option value="active">{t("mv.stActive", "Active")}</option>
+                    <option value="discontinued">{t("mv.stDiscontinued", "Discontinued")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Stock Status</label>
+                  <label className={lbl}>{t("mv.stockStatus", "Stock Status")}</label>
                   <select
                     value={model.stock_status}
                     onChange={(e) => onUpdate({ stock_status: e.target.value })}
                     className={inp}
                   >
                     <option value="">— Not specified —</option>
-                    <option value="in_stock">In stock</option>
-                    <option value="made_to_order">Made to order</option>
-                    <option value="pre_order">Pre-order</option>
-                    <option value="sold_out">Sold out</option>
+                    <option value="in_stock">{t("mv.ssInStock", "In stock")}</option>
+                    <option value="made_to_order">{t("mv.ssMto", "Made to order")}</option>
+                    <option value="pre_order">{t("mv.ssPreOrder", "Pre-order")}</option>
+                    <option value="sold_out">{t("mv.ssSoldOut", "Sold out")}</option>
                   </select>
                 </div>
               </div>
@@ -361,14 +364,14 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Operational Pricing">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={lbl}>Head-Only Price</label>
+                    <label className={lbl}>{t("mv.headOnlyPrice", "Head-Only Price")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                       <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Complete Set Price</label>
+                    <label className={lbl}>{t("mv.completeSetPrice", "Complete Set Price")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                       <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
@@ -386,7 +389,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               {/* Identity row — fully editable on secondary variants */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
-                  <label className={lbl}>Variant Name *</label>
+                  <label className={lbl}>{t("mv.variantName", "Variant Name")} *</label>
                   <input
                     type="text"
                     value={model.model_name}
@@ -396,7 +399,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   />
                 </div>
                 <div>
-                  <label className={lbl}>Slug / SKU</label>
+                  <label className={lbl}>{t("mv.slugSku", "Slug / SKU")}</label>
                   <input
                     type="text"
                     value={model.slug}
@@ -405,39 +408,39 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   />
                 </div>
                 <div>
-                  <label className={lbl}>Status</label>
+                  <label className={lbl}>{t("mv.status", "Status")}</label>
                   <select
                     value={model.status}
                     onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
                     className={inp}
                   >
-                    <option value="active">Active</option>
-                    <option value="discontinued">Discontinued</option>
+                    <option value="active">{t("mv.stActive", "Active")}</option>
+                    <option value="discontinued">{t("mv.stDiscontinued", "Discontinued")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Stock Status</label>
+                  <label className={lbl}>{t("mv.stockStatus", "Stock Status")}</label>
                   <select
                     value={model.stock_status}
                     onChange={(e) => onUpdate({ stock_status: e.target.value })}
                     className={inp}
                   >
                     <option value="">—</option>
-                    <option value="in_stock">In stock</option>
-                    <option value="made_to_order">Made to order</option>
-                    <option value="pre_order">Pre-order</option>
-                    <option value="sold_out">Sold out</option>
+                    <option value="in_stock">{t("mv.ssInStock", "In stock")}</option>
+                    <option value="made_to_order">{t("mv.ssMto", "Made to order")}</option>
+                    <option value="pre_order">{t("mv.ssPreOrder", "Pre-order")}</option>
+                    <option value="sold_out">{t("mv.ssSoldOut", "Sold out")}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className={lbl}>Tagline</label>
+                <label className={lbl}>{t("mv.tagline", "Tagline")}</label>
                 <input
                   type="text"
                   value={model.tagline}
                   onChange={(e) => onUpdate({ tagline: e.target.value })}
-                  placeholder="Short sub-title shown under the model name"
+                  placeholder={t("mv.phTagline", "Short sub-title shown under the model name")}
                   className={inp}
                 />
               </div>
@@ -446,33 +449,33 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Supplier & Pricing">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className={lbl}>Supplier</label>
+                    <label className={lbl}>{t("mv.supplier", "Supplier")}</label>
                     {suppliers ? (
                       <SelectWithCreate
                         value={model.supplier}
                         options={suppliers.map((s) => ({ value: s.name, label: s.name, icon: s.logo }))}
                         onChange={(val) => onUpdate({ supplier: val })}
                         onClickCreate={onClickCreateSupplier}
-                        placeholder="Select supplier..."
+                        placeholder={t("mv.phSupplier", "Select supplier...")}
                         createLabel="Create Supplier"
                         className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-surface-subtle)]/70"
                       />
                     ) : (
-                      <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+                      <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder={t("mv.phSupplierName", "Supplier name")} className={inp} />
                     )}
                   </div>
                   <div>
-                    <label className={lbl}>Supplier Reference Model</label>
+                    <label className={lbl}>{t("mv.supplierRef", "Supplier Reference Model")}</label>
                     <input
                       type="text"
                       value={model.reference_model}
                       onChange={(e) => onUpdate({ reference_model: e.target.value })}
-                      placeholder="e.g. Factory model code"
+                      placeholder={t("mv.phFactoryCode", "e.g. Factory model code")}
                       className={inp}
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Cost Price (CNY)</label>
+                    <label className={lbl}>{t("mv.costCny", "Cost Price (CNY)")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">¥</span>
                       <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
@@ -481,21 +484,21 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                   <div>
-                    <label className={lbl}>Global Selling Price (USD)</label>
+                    <label className={lbl}>{t("mv.sellUsd", "Global Selling Price (USD)")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                       <input type="number" step="0.01" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Head-Only Price</label>
+                    <label className={lbl}>{t("mv.headOnlyPrice", "Head-Only Price")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                       <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Complete Set Price</label>
+                    <label className={lbl}>{t("mv.completeSetPrice", "Complete Set Price")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                       <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
@@ -530,7 +533,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
             <>
             <div className="flex items-center justify-between mb-3">
               <p className="text-[10px] text-[var(--text-ghost)] italic">
-                Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
+                {t("mv.packingIntro", "Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.")}
               </p>
               <div className="flex items-center gap-3 shrink-0 ml-2">
                 {productPacking && Object.values(productPacking).some(Boolean) && (
@@ -543,12 +546,12 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     }}
                     className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   >
-                    ⤓ Copy from product Logistics
+                    {t("mv.copyFromLogistics", "⤓ Copy from product Logistics")}
                   </button>
                 )}
                 {canInherit && (
                   <button type="button" onClick={revertLogistics} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                    Use primary variant&apos;s packing
+                    {t("mv.usePrimaryPacking", "Use primary variant's packing")}
                   </button>
                 )}
               </div>
@@ -558,11 +561,11 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                 product-level Logistics tab. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className={lbl}>Packing Type</label>
-                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder="e.g. Wooden crate" className={inp} />
+                <label className={lbl}>{t("mv.packingType", "Packing Type")}</label>
+                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder={t("mv.phPackingType", "e.g. Wooden crate")} className={inp} />
               </div>
               <div>
-                <label className={lbl}>Carton Dimensions (L × W × H)</label>
+                <label className={lbl}>{t("mv.cartonDims", "Carton Dimensions (L × W × H)")}</label>
                 <input
                   type="text"
                   value={model.carton_dimensions}
@@ -576,15 +579,15 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                       onUpdate({ carton_dimensions: v });
                     }
                   }}
-                  placeholder="e.g. 60 × 50 × 65 cm"
+                  placeholder={t("mv.phCarton", "e.g. 60 × 50 × 65 cm")}
                   className={inp}
                 />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Fills CBM + container loading automatically (cm).</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintDims", "↻ Fills CBM + container loading automatically (cm).")}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
               <div>
-                <label className={lbl}>Packed CBM (m³)</label>
+                <label className={lbl}>{t("mv.packedCbm", "Packed CBM (m³)")}</label>
                 <input
                   type="number"
                   step="0.0001"
@@ -602,27 +605,27 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   placeholder="0.0000"
                   className={inp}
                 />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from carton dims — you can also type it manually.</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAutoCbm", "↻ Auto from carton dims — you can also type it manually.")}</p>
               </div>
               <div>
-                <label className={lbl}>Net Weight (kg)</label>
+                <label className={lbl}>{t("mv.netWeight", "Net Weight (kg)")}</label>
                 <input type="number" step="0.1" value={model.net_weight} onChange={(e) => onUpdate({ net_weight: e.target.value })} placeholder="0.0" className={inp} />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">Bare machine, no packaging.</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintBare", "Bare machine, no packaging.")}</p>
               </div>
               <div>
-                <label className={lbl}>Gross Weight (kg)</label>
+                <label className={lbl}>{t("mv.grossWeight", "Gross Weight (kg)")}</label>
                 <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">Includes crate + accessories.</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintGross", "Includes crate + accessories.")}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
               <div>
-                <label className={lbl}>Box Includes</label>
-                <input type="text" value={model.box_include} onChange={(e) => onUpdate({ box_include: e.target.value })} placeholder="e.g. Main unit, cable, manual" className={inp} />
+                <label className={lbl}>{t("mv.boxIncludes", "Box Includes")}</label>
+                <input type="text" value={model.box_include} onChange={(e) => onUpdate({ box_include: e.target.value })} placeholder={t("mv.phBoxIncludes", "e.g. Main unit, cable, manual")} className={inp} />
               </div>
               <div>
-                <label className={lbl}>Extra Accessories</label>
-                <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder="e.g. Spare parts kit" className={inp} />
+                <label className={lbl}>{t("mv.extraAccessories", "Extra Accessories")}</label>
+                <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder={t("mv.phExtras", "e.g. Spare parts kit")} className={inp} />
               </div>
             </div>
             </>
@@ -633,22 +636,22 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
           <details className="group">
             <summary className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-subtle)]/50 transition-colors list-none">
               <WarehouseIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Advanced · Fulfillment &amp; Codes</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("mv.advanced", "Advanced · Fulfillment & Codes")}</span>
               <AngleDownIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] ml-auto transition-transform group-open:rotate-180" />
             </summary>
             <div className="pt-3 px-1 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className={lbl}>MOQ (Min Order Qty)</label>
+                  <label className={lbl}>{t("mv.moq", "MOQ (Min Order Qty)")}</label>
                   <input type="number" value={model.moq} onChange={(e) => onUpdate({ moq: e.target.value })} placeholder="e.g. 10" className={inp} />
                 </div>
                 <div>
-                  <label className={lbl}>Lead Time</label>
-                  <input type="text" value={model.lead_time} onChange={(e) => onUpdate({ lead_time: e.target.value })} placeholder="e.g. 7-14 days" className={inp} />
+                  <label className={lbl}>{t("mv.leadTime", "Lead Time")}</label>
+                  <input type="text" value={model.lead_time} onChange={(e) => onUpdate({ lead_time: e.target.value })} placeholder={t("mv.phLeadTime", "e.g. 7-14 days")} className={inp} />
                 </div>
                 <div>
-                  <label className={lbl}>Barcode Override</label>
-                  <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder="Leave empty = auto from SKU" className={`${inp} font-mono`} />
+                  <label className={lbl}>{t("mv.barcodeOverride", "Barcode Override")}</label>
+                  <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder={t("mv.phBarcode", "Leave empty = auto from SKU")} className={`${inp} font-mono`} />
                 </div>
               </div>
               {/* Container loading — units that fit in standard
@@ -656,23 +659,23 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   team to quote FCL pricing. Inherited from the primary
                   variant when packing is inherited. */}
               {inheritingLogistics ? (
-                <p className="text-[11px] text-[var(--text-ghost)] italic">Container loading inherited from the primary variant.</p>
+                <p className="text-[11px] text-[var(--text-ghost)] italic">{t("mv.containerInherited", "Container loading inherited from the primary variant.")}</p>
               ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className={lbl}>Container 20&apos; (units)</label>
+                  <label className={lbl}>{t("mv.c20", "Container 20' (units)")}</label>
                   <input type="number" value={model.container_20ft_qty} onChange={(e) => onUpdate({ container_20ft_qty: e.target.value })} placeholder="e.g. 120" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM — overtype if units stack.</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAuto20", "↻ Auto from CBM — overtype if units stack.")}</p>
                 </div>
                 <div>
-                  <label className={lbl}>Container 40&apos; (units)</label>
+                  <label className={lbl}>{t("mv.c40", "Container 40' (units)")}</label>
                   <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM (standard 40&apos;).</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAuto40", "↻ Auto from CBM (standard 40').")}</p>
                 </div>
                 <div>
-                  <label className={lbl}>Container 40&apos;HQ (units)</label>
+                  <label className={lbl}>{t("mv.c40hq", "Container 40'HQ (units)")}</label>
                   <input type="number" value={model.container_40hq_qty} onChange={(e) => onUpdate({ container_40hq_qty: e.target.value })} placeholder="e.g. 320" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM (High-Cube).</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAutoHq", "↻ Auto from CBM (High-Cube).")}</p>
                 </div>
               </div>
               )}
@@ -680,7 +683,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
           </details>
 
           {/* Auto-generated codes panel */}
-          <Panel icon={<ScanLineIcon className="h-3.5 w-3.5" />} title="Auto-Generated Codes">
+          <Panel icon={<ScanLineIcon className="h-3.5 w-3.5" />} title={t("mv.autoCodes", "Auto-Generated Codes")}>
             <BarcodeQRDisplay value={barcodeValue} label={model.model_name} qrPayload={qrPayload} />
           </Panel>
         </div>
@@ -690,6 +693,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
 }
 
 export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking }: Props) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
      which Safari renders with a system dialog that clashes with
@@ -756,8 +760,8 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
           </div>
           <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
             {hidePrimary
-              ? "Primary model is entered in the Hero. Add extra variants only when needed."
-              : "SKU is auto-generated on save. Barcode & QR codes are generated automatically."}
+              ? t("mv.primaryInHero", "Primary model is entered in the Hero. Add extra variants only when needed.")
+              : t("mv.skuAutoHint", "SKU is auto-generated on save. Barcode & QR codes are generated automatically.")}
           </p>
         </div>
         <button
@@ -775,7 +779,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
             {hidePrimary ? "No additional variants" : "No variants yet"}
           </p>
           <p className="text-[11px] text-[var(--text-ghost)] mt-1">
-            {hidePrimary ? "Add a variant when this product has multiple versions" : "Add your first variant"}
+            {hidePrimary ? t("mv.addWhenMultiple", "Add a variant when this product has multiple versions") : t("mv.addFirstVariant", "Add your first variant")}
           </p>
         </div>
       ) : (
