@@ -1,5 +1,9 @@
 "use client";
 
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { localizedName } from "@/lib/i18n-name";
+import { mkName, mkDesc } from "@/lib/machine-kinds-i18n";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type { ProductFormState } from "@/types/product-form";
 import { useMemo, useState, useEffect } from "react";
@@ -112,6 +116,7 @@ export default function ClassificationSection({
   machineKindSlug = "",
   onMachineKindChange,
 }: Props) {
+  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === data.division_slug)?.id, [divisions, data.division_slug]);
   const filteredCats = useMemo(() => selectedDivId ? categories.filter(c => c.division_id === selectedDivId) : [], [categories, selectedDivId]);
   const selectedCatId = useMemo(() => categories.find(c => c.slug === data.category_slug)?.id, [categories, data.category_slug]);
@@ -257,7 +262,7 @@ export default function ClassificationSection({
                 {iconOverrides?.kind?.[selectedKind.slug]
                   ? <MonoIcon src={iconOverrides.kind[selectedKind.slug]} className="h-3 w-3" />
                   : <selectedKind.icon size={12} />}
-                {selectedKind.name}
+                {mkName(selectedKind.slug, selectedKind.name, lang)}
               </button>
             </>
           )}
@@ -267,7 +272,7 @@ export default function ClassificationSection({
       {/* ═══════ Step 0: Pick Division ═══════ */}
       {step === 0 && (
         <div>
-          <p className="text-[12px] font-medium text-[var(--text-subtle)] mb-3">Select Division</p>
+          <p className="text-[12px] font-medium text-[var(--text-subtle)] mb-3">{t("cls.selectDivision", "Select Division")}</p>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
             {orderedDivisions.map((div) => {
               const DivIcon = getDivisionIcon(div.slug);
@@ -288,7 +293,7 @@ export default function ClassificationSection({
                 >
                   {isFlagship && (
                     <span className="absolute top-2.5 right-2.5 inline-flex items-center h-5 px-2 rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[9px] font-bold uppercase tracking-wider">
-                      Flagship
+                      {t("cls.flagship", "Flagship")}
                     </span>
                   )}
                   {iconOverrides?.division?.[div.slug] ? (
@@ -300,7 +305,7 @@ export default function ClassificationSection({
                         : "h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
                     }`} />
                   ) : logo ? (
-                    <Image src={logo} alt={div.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
+                    <Image src={logo} alt={localizedName(div, lang)} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                   ) : (
                     <LayersIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                   )}
@@ -309,7 +314,7 @@ export default function ClassificationSection({
                       isFlagship
                         ? "text-[15px] font-semibold text-[var(--text-primary)]"
                         : "text-[12px] font-medium text-[var(--text-primary)]"
-                    }`}>{div.name}</span>
+                    }`}>{localizedName(div, lang)}</span>
                     {div.tagline && <span className="text-[10px] text-[var(--text-ghost)] leading-tight line-clamp-1 mt-0.5 block">{div.tagline}</span>}
                   </div>
                 </button>
@@ -321,7 +326,7 @@ export default function ClassificationSection({
                 className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
               >
                 <PlusIcon className="h-8 w-8" />
-                <span className="text-[11px] font-medium">New Division</span>
+                <span className="text-[11px] font-medium">{t("cls.newDivision", "New Division")}</span>
               </button>
             )}
           </div>
@@ -338,10 +343,10 @@ export default function ClassificationSection({
             >
               <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
-            <p className="text-[12px] font-medium text-[var(--text-subtle)]">Select Category in <span className="text-[var(--text-primary)]">{selectedDiv?.name}</span></p>
+            <p className="text-[12px] font-medium text-[var(--text-subtle)]">{t("cls.selectCategoryIn", "Select Category in")} <span className="text-[var(--text-primary)]">{selectedDiv ? localizedName(selectedDiv, lang) : ''}</span></p>
           </div>
           {filteredCats.length === 0 && !onClickCreateCategory ? (
-            <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">No categories in this division</p>
+            <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">{t("cls.noCategories", "No categories in this division")}</p>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredCats.map((cat) => {
@@ -356,11 +361,11 @@ export default function ClassificationSection({
                     {ovr ? (
                       <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
                     ) : logo ? (
-                      <Image src={logo} alt={cat.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
+                      <Image src={logo} alt={localizedName(cat, lang)} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
                       <FolderTreeIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                     )}
-                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{cat.name}</span>
+                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{localizedName(cat, lang)}</span>
                   </button>
                 );
               })}
@@ -370,7 +375,7 @@ export default function ClassificationSection({
                   className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
                   <PlusIcon className="h-8 w-8" />
-                  <span className="text-[11px] font-medium">New Category</span>
+                  <span className="text-[11px] font-medium">{t("cls.newCategory", "New Category")}</span>
                 </button>
               )}
             </div>
@@ -388,10 +393,10 @@ export default function ClassificationSection({
             >
               <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
-            <p className="text-[12px] font-medium text-[var(--text-subtle)]">Select Subcategory in <span className="text-[var(--text-primary)]">{selectedCat?.name}</span></p>
+            <p className="text-[12px] font-medium text-[var(--text-subtle)]">{t("cls.selectSubcategoryIn", "Select Subcategory in")} <span className="text-[var(--text-primary)]">{selectedCat ? localizedName(selectedCat, lang) : ''}</span></p>
           </div>
           {filteredSubs.length === 0 && !onClickCreateSubcategory ? (
-            <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">No subcategories in this category</p>
+            <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">{t("cls.noSubcategories", "No subcategories in this category")}</p>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredSubs.map((sub) => {
@@ -427,11 +432,11 @@ export default function ClassificationSection({
                     {ovr ? (
                       <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
                     ) : logo ? (
-                      <Image src={logo} alt={sub.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
+                      <Image src={logo} alt={localizedName(sub, lang)} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
                       <TagsIcon className="h-8 w-8 text-[var(--text-ghost)]" />
                     )}
-                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{sub.name}</span>
+                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{localizedName(sub, lang)}</span>
                   </button>
                 );
               })}
@@ -441,7 +446,7 @@ export default function ClassificationSection({
                   className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
                   <PlusIcon className="h-8 w-8" />
-                  <span className="text-[11px] font-medium">New Subcategory</span>
+                  <span className="text-[11px] font-medium">{t("cls.newSubcategory", "New Subcategory")}</span>
                 </button>
               )}
             </div>
@@ -464,7 +469,7 @@ export default function ClassificationSection({
             </button>
             <div className="flex-1">
               <p className="text-[12px] font-medium text-[var(--text-subtle)]">
-                Select Machine Kind in <span className="text-[var(--text-primary)]">{selectedSub?.name}</span>
+                {t("cls.selectKindIn", "Select Machine Kind in")} <span className="text-[var(--text-primary)]">{selectedSub ? localizedName(selectedSub, lang) : ''}</span>
               </p>
               <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
                 Optional — refines the spec fields. Pick one, or skip.
@@ -504,10 +509,10 @@ export default function ClassificationSection({
                     />
                   )}
                   <span className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">
-                    {k.name}
+                    {mkName(k.slug, k.name, lang)}
                   </span>
                   <span className="text-[9px] text-[var(--text-ghost)] leading-snug line-clamp-2">
-                    {k.description}
+                    {mkDesc(k.slug, k.description, lang)}
                   </span>
                 </button>
               );
@@ -520,7 +525,7 @@ export default function ClassificationSection({
       {step === 4 && (
         <div className="space-y-2">
           <p className="text-[11px] text-emerald-400/70 font-medium">
-            Classification complete. Click any chip above to change.
+            {t("cls.complete", "Classification complete. Click any chip above to change.")}
           </p>
           {/* Explain why a Kind wasn't asked for when the chosen
               subcategory has no machine kinds in the catalog. Without
@@ -529,8 +534,8 @@ export default function ClassificationSection({
               4th stage but their flow didn't. */}
           {selectedSub && !hasKindStage && availableKinds.length === 0 && (
             <p className="text-[11px] text-[var(--text-ghost)]">
-              <span className="text-[var(--text-dim)]">Machine Kind</span>{" "}
-              doesn&apos;t apply to this subcategory — you can move on.
+              <span className="text-[var(--text-dim)]">{t("cls.kindLabel", "Machine Kind")}</span>{" "}
+              {t("cls.kindNa", "doesn\u2019t apply to this subcategory — you can move on.")}
             </p>
           )}
           {/* Kinds exist for this subcategory but none was picked (skipped).

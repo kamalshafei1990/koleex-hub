@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
+import { localizedName } from "@/lib/i18n-name";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -496,7 +497,7 @@ export default function ProductForm({ productId }: Props) {
      actually in — mirrors ProductList's baseRoute logic so the
      list → form → back loop never jumps apps. */
   const baseRoute = (pathname || "").startsWith("/product-data") ? "/product-data" : "/products";
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   const isEdit = !!productId;
 
   /* P0 #3 · Draft Autosave — one localStorage slot per product
@@ -5012,7 +5013,7 @@ export default function ProductForm({ productId }: Props) {
           updateProduct_({ category_slug: row.slug, subcategory_slug: "" });
         }}
         divisionId={divisions.find(d => d.slug === product.division_slug)?.id || ""}
-        divisionName={divisions.find(d => d.slug === product.division_slug)?.name || ""}
+        divisionName={localizedName(divisions.find(d => d.slug === product.division_slug), lang)}
         existingCount={categories.length}
       />
 
@@ -5024,8 +5025,8 @@ export default function ProductForm({ productId }: Props) {
           updateProduct_({ subcategory_slug: row.slug });
         }}
         categoryId={categories.find(c => c.slug === product.category_slug)?.id || ""}
-        categoryName={categories.find(c => c.slug === product.category_slug)?.name || ""}
-        divisionName={divisions.find(d => d.slug === product.division_slug)?.name || ""}
+        categoryName={localizedName(categories.find(c => c.slug === product.category_slug), lang)}
+        divisionName={localizedName(divisions.find(d => d.slug === product.division_slug), lang)}
         existingCount={subcategories.length}
       />
 

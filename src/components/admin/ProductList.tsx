@@ -8,6 +8,7 @@ import { currentScopeKey } from "@/lib/me-bootstrap";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
+import { localizedName } from "@/lib/i18n-name";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -112,7 +113,7 @@ function ClassMonoIcon({ src, className }: { src?: string; className?: string })
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   /* "internal" when the same component is rendered under /product-data.
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */
@@ -400,16 +401,16 @@ export default function ProductList() {
      here (not inside the memo) so they're shared with section
      headers downstream. */
   const divNameBySlug = useMemo(
-    () => Object.fromEntries(divisions.map(d => [d.slug, d.name.toLowerCase()])),
-    [divisions],
+    () => Object.fromEntries(divisions.map(d => [d.slug, localizedName(d, lang).toLowerCase()])),
+    [divisions, lang],
   );
   const catNameBySlug = useMemo(
-    () => Object.fromEntries(categories.map(c => [c.slug, c.name.toLowerCase()])),
-    [categories],
+    () => Object.fromEntries(categories.map(c => [c.slug, localizedName(c, lang).toLowerCase()])),
+    [categories, lang],
   );
   const subNameBySlug = useMemo(
-    () => Object.fromEntries(subcategories.map(s => [s.slug, s.name.toLowerCase()])),
-    [subcategories],
+    () => Object.fromEntries(subcategories.map(s => [s.slug, localizedName(s, lang).toLowerCase()])),
+    [subcategories, lang],
   );
 
   /* Pre-build the per-product search haystack ONCE so each keystroke
@@ -586,8 +587,8 @@ export default function ProductList() {
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
   const subMap = useMemo(
-    () => Object.fromEntries(subcategories.map(s => [s.slug, s.name])),
-    [subcategories],
+    () => Object.fromEntries(subcategories.map(s => [s.slug, localizedName(s, lang)])),
+    [subcategories, lang],
   );
 
   /* TWO-LEVEL grouping: Category → Subcategory → Products.
@@ -640,7 +641,7 @@ export default function ProductList() {
       });
       const subSections = subSlugs.map(subSlug => ({
         slug: subSlug,
-        name: subMap[subSlug] || (subSlug === "_uncategorized" ? "Other" : subSlug),
+        name: subMap[subSlug] || (subSlug === "_uncategorized" ? t("list.other", "Other") : subSlug),
         products: catBuckets[catSlug][subSlug],
       }));
       const total = subSections.reduce((a, s) => a + s.products.length, 0);
@@ -922,21 +923,21 @@ export default function ProductList() {
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
                   <select value={filterDiv} onChange={(e) => { setFilterDiv(e.target.value); setFilterCat(""); setFilterSub(""); }} className={selectClass + " w-full"}>
                     <option value="">{t("list.allOption")}</option>
-                    {orderedDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
+                    {orderedDivisions.map(d => <option key={d.slug} value={d.slug}>{localizedName(d, lang)}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.category")}</label>
                   <select value={filterCat} onChange={(e) => { setFilterCat(e.target.value); setFilterSub(""); }} className={selectClass + " w-full"} disabled={!filterDiv}>
                     <option value="">{t("list.allOption")}</option>
-                    {filteredCats.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                    {filteredCats.map(c => <option key={c.slug} value={c.slug}>{localizedName(c, lang)}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.subcategory")}</label>
                   <select value={filterSub} onChange={(e) => setFilterSub(e.target.value)} className={selectClass + " w-full"} disabled={!filterCat}>
                     <option value="">{t("list.allOption")}</option>
-                    {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
+                    {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{localizedName(s, lang)}</option>)}
                   </select>
                 </div>
                 {/* Supplier filter is an internal concept — hide on
@@ -1089,7 +1090,7 @@ export default function ProductList() {
                     {savedIcon
                       ? <ClassMonoIcon src={savedIcon} className="h-4 w-4 shrink-0" />
                       : <DivIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />}
-                    {d.name}
+                    {localizedName(d, lang)}
                   </button>
                 );
               })}
@@ -1235,7 +1236,7 @@ export default function ProductList() {
                     </h2>
                   </div>
                   <span className="shrink-0 text-[11px] font-medium text-[var(--text-ghost)] tabular-nums whitespace-nowrap">
-                    {cat.total} {cat.total === 1 ? "product" : "products"}
+                    {cat.total} {cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}
                   </span>
                 </div>
                 <div className="mt-3 h-px bg-[var(--border-subtle)]" />

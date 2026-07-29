@@ -228,6 +228,8 @@ export type ProductMediaType =
 export interface DivisionRow {
   id: string;
   name: string;
+  name_zh?: string | null;
+  name_ar?: string | null;
   slug: string;
   tagline: string | null;
   description: string | null;
@@ -239,6 +241,8 @@ export interface CategoryRow {
   id: string;
   division_id: string;
   name: string;
+  name_zh?: string | null;
+  name_ar?: string | null;
   slug: string;
   description: string | null;
   order: number;
@@ -249,6 +253,8 @@ export interface SubcategoryRow {
   id: string;
   category_id: string;
   name: string;
+  name_zh?: string | null;
+  name_ar?: string | null;
   slug: string;
   description: string | null;
   order: number;

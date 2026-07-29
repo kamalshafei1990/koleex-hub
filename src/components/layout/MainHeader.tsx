@@ -50,7 +50,7 @@ type Lang = "en" | "zh" | "ar";
 const languages: { code: Lang; label: string; short: string }[] = [
   { code: "en", label: "English", short: "EN" },
   { code: "zh", label: "中文", short: "中文" },
-  { code: "ar", label: "العربية", short: "عر" },
+  { code: "ar", label: "العربية", short: "عربي" },
 ];
 
 export default function MainHeader() {
