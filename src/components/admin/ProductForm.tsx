@@ -3867,9 +3867,17 @@ export default function ProductForm({ productId }: Props) {
               </div>
             ))}
 
-            {/* Purchase Options — unique to this step (not on Hero).
-                Visibility / Featured / Warranty / Level moved up to
-                Hero when we redesigned Hero as the publishing hub. */}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP N: MODELS & VARIANTS
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "commercial") && (
+          <div id="sec-commercial" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {/* Purchase Options — which configurations (head-only / complete set)
+                customers can order. Lives WITH the variants it governs
+                (owner tab-cleanup: Specs stays purely technical). */}
             {!isAccessory && !purchaseCoveredBySchema && (
             <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title={t("technical.purchaseOptions", "Purchase Options")} badge={t("technical.purchaseBadge", "Head-only · Complete set")}>
               <div className="space-y-3">
@@ -3881,14 +3889,7 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
             )}
-          </div>
-        )}
 
-        {/* ═══════════════════════════════════════════════════════════
-           STEP N: MODELS & VARIANTS
-           ═══════════════════════════════════════════════════════════ */}
-        {(onePage || steps[currentStep]?.id === "commercial") && (
-          <div id="sec-commercial" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* The redundant "Primary Model reminder" banner used to
                 live here. It said "Identity & pricing entered in the
                 Hero" — which was true but misleading, because the
