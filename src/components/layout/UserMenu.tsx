@@ -265,7 +265,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         }`}
       >
         <span
-          className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-full overflow-hidden text-[10px] md:text-[12px] font-semibold transition-all ring-1 ${
+          className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full overflow-hidden text-[10px] md:text-[12px] font-semibold transition-all ring-1 ${
             dk
               ? "bg-white text-black ring-white/20 group-hover:ring-white/40"
               : "bg-black text-white ring-black/15 group-hover:ring-black/30"

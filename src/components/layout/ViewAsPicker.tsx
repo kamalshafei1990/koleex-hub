@@ -429,16 +429,16 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         onMouseEnter={handleTriggerHover}
-        className={`h-7 w-7 px-0 justify-center sm:w-auto sm:px-3 md:h-9 rounded-md md:rounded-xl border text-[12px] font-medium flex items-center sm:gap-2 transition-all ${
+        className={`h-8 w-8 px-0 justify-center sm:w-auto sm:px-3 md:h-9 rounded-lg md:rounded-xl border text-[12px] font-medium flex items-center sm:gap-2 transition-all ${
           dk
             ? "bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
             : "bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"
         }`}
         title="Super Admin — view the system as another user or role"
       >
-        <UsersIcon size={13} className="shrink-0" />
+        <UsersIcon size={14} className="shrink-0" />
         <span className="max-w-[120px] truncate hidden sm:inline">View as</span>
-        <AngleDownIcon size={11} className="shrink-0 opacity-60" />
+        <AngleDownIcon size={11} className="shrink-0 opacity-60 hidden sm:block" />
       </button>
 
       {open && (

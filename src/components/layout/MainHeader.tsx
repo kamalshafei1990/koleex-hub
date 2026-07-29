@@ -16,7 +16,7 @@ import UserMenu from "./UserMenu";
    EVERY page; the icon slot is reserved so nothing shifts. */
 const NotificationBell = dynamic(() => import("./NotificationBell"), {
   ssr: false,
-  loading: () => <div className="w-7 h-7 md:w-9 md:h-9" aria-hidden />,
+  loading: () => <div className="w-8 h-8 md:w-9 md:h-9" aria-hidden />,
 });
 import TenantPicker from "./TenantPicker";
 import ViewAsPicker from "./ViewAsPicker";
@@ -172,7 +172,7 @@ export default function MainHeader() {
       </div>
 
       {/* Right: Language + Theme + Notifications + Account */}
-      <div className="flex items-center gap-1 min-[400px]:gap-1.5 md:gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 min-[400px]:gap-2 md:gap-2 shrink-0">
         {/* Language — desktop pill bar */}
         <div
           className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${
@@ -204,7 +204,7 @@ export default function MainHeader() {
         <div ref={langRef} className="relative md:hidden">
           <button
             onClick={() => setLangOpen(!langOpen)}
-            className={`flex items-center gap-0.5 h-7 px-2 rounded-md border text-[10px] font-semibold transition-colors ${
+            className={`flex items-center gap-1 h-8 px-2.5 rounded-lg border text-[11px] font-semibold transition-colors ${
               dk
                 ? "border-white/[0.08] bg-white/[0.04] text-white/70"
                 : "border-black/[0.08] bg-black/[0.04] text-black/70"
@@ -262,7 +262,7 @@ export default function MainHeader() {
             setTheme(next);
           }}
           aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
-          className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
+          className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg border transition-all ${
             dk
               ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
               : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
