@@ -3877,39 +3877,6 @@ export default function ProductForm({ productId }: Props) {
                 <AccessoryOptionsSection rows={accessoryOptions} onChange={(r) => { setAccessoryOptions(r); setDirty(true); }} subcategorySlug={product.subcategory_slug || null} />
               </Section>
             )}
-            {/* ── Hero-ownership note ──
-                  Visibility (Visible/Featured), Marketing (Level,
-                  Warranty), and URL basics (Slug, Made-in) used to
-                  appear as full form widgets inside Technical —
-                  duplicating Hero's editors and causing desync
-                  risk identical to the one we closed on Models.
-                  Removed them entirely; a compact banner points
-                  admins at Hero when they need those fields. */}
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-              <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
-                <SparklesIcon className="h-3 w-3" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium text-[var(--text-primary)]">
-                  {t("technical.heroNoticeTitle", "Publishing & marketing fields live on the Hero step.")}
-                </p>
-                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">
-                  {t("technical.heroNoticeBody", "Visibility, Featured, Level, Warranty, Slug, and Made-in are edited on Hero — the single source of truth for customer-facing identity. This step focuses on electrical / physical specs and internal operations.")}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const heroIdx = steps.findIndex((s) => s.id === "identity");
-                    if (heroIdx >= 0) goToStep(heroIdx);
-                  }}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 transition-colors mt-2"
-                >
-                  <ArrowUpRightIcon className="h-3 w-3" />
-                  {t("technical.jumpToHero", "Jump to Hero")}
-                </button>
-              </div>
-            </div>
-
             {!isAccessory && (technicalHasVisibleField ? (
               <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
                 <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} hiddenFields={schemaCoveredCols} />
