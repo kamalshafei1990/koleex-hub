@@ -107,7 +107,22 @@ function ModelCard({
   const [open, setOpen] = useState(defaultOpen);
 
   const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
-  const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1.5";
+  /* ── Variant packing auto-derivation (mirrors the product-level Logistics
+   behaviour): carton dims (cm) → CBM → container quantities. Every derived
+   field stays editable — typing over a computed value wins. Practical usable
+   volumes (28 / 58 m³), not brochure volumes. */
+const cbmFromCartonCm = (raw: string): number | null => {
+  const nums = (raw.match(/\d+(?:\.\d+)?/g) ?? []).map(Number).filter((n) => n > 0);
+  if (nums.length < 3) return null;
+  const cbm = (nums[0] * nums[1] * nums[2]) / 1_000_000; // cm³ → m³
+  return Number.isFinite(cbm) && cbm > 0 ? Math.round(cbm * 10000) / 10000 : null;
+};
+const containerQtysFromCbm = (cbm: number) => ({
+  c20: Math.max(0, Math.floor(28 / cbm)),
+  c40: Math.max(0, Math.floor(58 / cbm)),
+});
+
+const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1.5";
 
   const isActive = model.status === "active";
   const barcodeValue = model.barcode || model.slug || model.model_name;
@@ -510,7 +525,57 @@ function ModelCard({
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Entry order mirrors real packing logic: HOW it's packed →
+                carton size → volume (auto) → weights. Same sequence as the
+                product-level Logistics tab. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Packing Type</label>
+                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder="e.g. Wooden crate" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Carton Dimensions (L × W × H)</label>
+                <input
+                  type="text"
+                  value={model.carton_dimensions}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const cbm = cbmFromCartonCm(v);
+                    if (cbm != null) {
+                      const q = containerQtysFromCbm(cbm);
+                      onUpdate({ carton_dimensions: v, cbm: String(cbm), container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40) });
+                    } else {
+                      onUpdate({ carton_dimensions: v });
+                    }
+                  }}
+                  placeholder="e.g. 60 × 50 × 65 cm"
+                  className={inp}
+                />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Fills CBM + container loading automatically (cm).</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div>
+                <label className={lbl}>Packed CBM (m³)</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={model.cbm}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const n = Number(v);
+                    if (Number.isFinite(n) && n > 0) {
+                      const q = containerQtysFromCbm(n);
+                      onUpdate({ cbm: v, container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40) });
+                    } else {
+                      onUpdate({ cbm: v });
+                    }
+                  }}
+                  placeholder="0.0000"
+                  className={inp}
+                />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from carton dims — you can also type it manually.</p>
+              </div>
               <div>
                 <label className={lbl}>Net Weight (kg)</label>
                 <input type="number" step="0.1" value={model.net_weight} onChange={(e) => onUpdate({ net_weight: e.target.value })} placeholder="0.0" className={inp} />
@@ -520,20 +585,6 @@ function ModelCard({
                 <label className={lbl}>Gross Weight (kg)</label>
                 <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
                 <p className="text-[10px] text-[var(--text-ghost)] mt-1">Includes crate + accessories.</p>
-              </div>
-              <div>
-                <label className={lbl}>Packed CBM (m³)</label>
-                <input type="number" step="0.0001" value={model.cbm} onChange={(e) => onUpdate({ cbm: e.target.value })} placeholder="0.0000" className={inp} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-              <div>
-                <label className={lbl}>Carton Dimensions (L × W × H)</label>
-                <input type="text" value={model.carton_dimensions} onChange={(e) => onUpdate({ carton_dimensions: e.target.value })} placeholder="e.g. 60 × 50 × 65 cm" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>Packing Type</label>
-                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder="e.g. Wooden crate" className={inp} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
@@ -583,10 +634,12 @@ function ModelCard({
                 <div>
                   <label className={lbl}>Container 20&apos; (units)</label>
                   <input type="number" value={model.container_20ft_qty} onChange={(e) => onUpdate({ container_20ft_qty: e.target.value })} placeholder="e.g. 120" className={inp} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM — overtype if units stack.</p>
                 </div>
                 <div>
                   <label className={lbl}>Container 40&apos; (units)</label>
                   <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM (standard 40&apos;).</p>
                 </div>
               </div>
               )}
