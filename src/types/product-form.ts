@@ -150,6 +150,7 @@ export interface ModelFormState {
      "pre_order" | "sold_out". */
   container_20ft_qty: string;
   container_40ft_qty: string;
+  container_40hq_qty: string;
   stock_status: string;
   order: number;
   visible: boolean;
@@ -405,6 +406,7 @@ export function createEmptyModel(): ModelFormState {
     extra_accessories: "",
     container_20ft_qty: "",
     container_40ft_qty: "",
+    container_40hq_qty: "",
     stock_status: "",
     order: 0,
     visible: true,

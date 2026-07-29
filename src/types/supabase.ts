@@ -396,6 +396,7 @@ export interface ProductModelRow {
   /* Logistics + availability — added in the Technical+Models v2 audit. */
   container_20ft_qty: number | null;
   container_40ft_qty: number | null;
+  container_40hq_qty: number | null;
   stock_status: string | null;
   order: number;
   visible: boolean;

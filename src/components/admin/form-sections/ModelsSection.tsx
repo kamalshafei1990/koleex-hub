@@ -120,6 +120,7 @@ const cbmFromCartonCm = (raw: string): number | null => {
 const containerQtysFromCbm = (cbm: number) => ({
   c20: Math.max(0, Math.floor(28 / cbm)),
   c40: Math.max(0, Math.floor(58 / cbm)),
+  c40hq: Math.max(0, Math.floor(68 / cbm)),
 });
 
 const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1.5";
@@ -140,7 +141,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
      that's a genuinely different size. */
   const LOGI_KEYS = [
     "net_weight", "weight", "cbm", "carton_dimensions", "packing_type",
-    "box_include", "extra_accessories", "container_20ft_qty", "container_40ft_qty",
+    "box_include", "extra_accessories", "container_20ft_qty", "container_40ft_qty", "container_40hq_qty",
   ] as const;
   const canInherit = !isPrimary && !solo && !!primaryModel;
   /* Override is explicit state (not just "has values") so Customize works
@@ -173,7 +174,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
     if (pm.cbm) parts.push(`${pm.cbm} m³`);
     if (pm.carton_dimensions) parts.push(pm.carton_dimensions);
     if (pm.packing_type) parts.push(pm.packing_type);
-    if (pm.container_20ft_qty || pm.container_40ft_qty) parts.push(`${pm.container_20ft_qty || "–"}/${pm.container_40ft_qty || "–"} per 20'/40'`);
+    if (pm.container_20ft_qty || pm.container_40ft_qty || pm.container_40hq_qty) parts.push(`${pm.container_20ft_qty || "–"}/${pm.container_40ft_qty || "–"}/${pm.container_40hq_qty || "–"} per 20'/40'/40HQ`);
     return parts.join(" · ");
   })();
 
@@ -543,7 +544,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     const cbm = cbmFromCartonCm(v);
                     if (cbm != null) {
                       const q = containerQtysFromCbm(cbm);
-                      onUpdate({ carton_dimensions: v, cbm: String(cbm), container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40) });
+                      onUpdate({ carton_dimensions: v, cbm: String(cbm), container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40), container_40hq_qty: String(q.c40hq) });
                     } else {
                       onUpdate({ carton_dimensions: v });
                     }
@@ -566,7 +567,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     const n = Number(v);
                     if (Number.isFinite(n) && n > 0) {
                       const q = containerQtysFromCbm(n);
-                      onUpdate({ cbm: v, container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40) });
+                      onUpdate({ cbm: v, container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40), container_40hq_qty: String(q.c40hq) });
                     } else {
                       onUpdate({ cbm: v });
                     }
@@ -630,7 +631,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               {inheritingLogistics ? (
                 <p className="text-[11px] text-[var(--text-ghost)] italic">Container loading inherited from the primary variant.</p>
               ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className={lbl}>Container 20&apos; (units)</label>
                   <input type="number" value={model.container_20ft_qty} onChange={(e) => onUpdate({ container_20ft_qty: e.target.value })} placeholder="e.g. 120" className={inp} />
@@ -640,6 +641,11 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   <label className={lbl}>Container 40&apos; (units)</label>
                   <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
                   <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM (standard 40&apos;).</p>
+                </div>
+                <div>
+                  <label className={lbl}>Container 40&apos;HQ (units)</label>
+                  <input type="number" value={model.container_40hq_qty} onChange={(e) => onUpdate({ container_40hq_qty: e.target.value })} placeholder="e.g. 320" className={inp} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">↻ Auto from CBM (High-Cube).</p>
                 </div>
               </div>
               )}
