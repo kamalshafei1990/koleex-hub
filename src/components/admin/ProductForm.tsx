@@ -1258,6 +1258,35 @@ export default function ProductForm({ productId }: Props) {
     (g) => g.fields?.some((f) => f.key === "certifications"),
   );
 
+  /* Product-level packing (Logistics tab, schema_specs) → offered to variant
+     cards as a one-click copy. mm → cm for carton dims; enum → readable. */
+  const productPackingDefaults = (() => {
+    if (!activeSpecsSchema) return null;
+    const sp = (product.schema_specs || {}) as Record<string, unknown>;
+    const str = (v: unknown) => (v === undefined || v === null || v === "" ? undefined : String(v));
+    const dims = (() => {
+      const d = sp.packing_dimensions;
+      if (d && typeof d === "object" && !Array.isArray(d)) {
+        const o = d as { length?: number; width?: number; height?: number };
+        if (o.length && o.width && o.height) return `${o.length / 10} × ${o.width / 10} × ${o.height / 10} cm`;
+      }
+      return undefined;
+    })();
+    const readable = typeof sp.packing_type === "string"
+      ? sp.packing_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : undefined;
+    return {
+      packing_type: readable,
+      carton_dimensions: dims,
+      cbm: str(sp.cbm),
+      net_weight: str(sp.net_weight),
+      gross_weight: str(sp.gross_weight),
+      container_20ft_qty: str(sp.container_20ft_qty),
+      container_40ft_qty: str(sp.container_40ft_qty),
+      container_40hq_qty: str(sp.container_40hq_qty),
+    };
+  })();
+
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
   const updatePrimaryModel = useCallback((updates: Partial<ModelFormState>) => {
@@ -3992,6 +4021,7 @@ export default function ProductForm({ productId }: Props) {
               badge={t("models.countBadge", `${models.length} models`).replace("{n}", String(models.length))}
             >
               <ModelsSection
+                productPacking={productPackingDefaults}
                 models={models}
                 onChange={setModels}
                 suppliers={suppliers}

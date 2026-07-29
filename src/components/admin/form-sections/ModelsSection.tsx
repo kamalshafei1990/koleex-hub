@@ -34,6 +34,9 @@ interface Props {
      source of truth. Optional because other callers of the section
      (if any land later) don't need it. */
   onEditInHero?: () => void;
+  /* Product-level packing defaults (schema products) — offered as a
+     one-click copy on every variant card's packing panel. */
+  productPacking?: ProductPackingDefaults | null;
 }
 
 /* ── Visual grouped panel ── */
@@ -79,10 +82,16 @@ function ReadOnlyField({
   );
 }
 
+export type ProductPackingDefaults = {
+  packing_type?: string; carton_dimensions?: string; cbm?: string;
+  net_weight?: string; gross_weight?: string;
+  container_20ft_qty?: string; container_40ft_qty?: string; container_40hq_qty?: string;
+};
+
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
-  onEditInHero, primaryModel,
+  onEditInHero, primaryModel, productPacking,
 }: {
   model: ModelFormState; idx: number; total: number;
   /* The product's primary variant (models[0]). Non-primary variants
@@ -103,6 +112,9 @@ function ModelCard({
   /* Callback for the primary model's "Edit in Hero" jump — see Props
      comment on ModelsSection. Ignored for non-primary variants. */
   onEditInHero?: () => void;
+  /* Product-level packing entered on the Logistics tab (schema products).
+     One click copies it here — the SAME data must never be typed twice. */
+  productPacking?: ProductPackingDefaults | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -520,11 +532,26 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               <p className="text-[10px] text-[var(--text-ghost)] italic">
                 Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
               </p>
-              {canInherit && (
-                <button type="button" onClick={revertLogistics} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ml-2">
-                  Use primary variant&apos;s packing
-                </button>
-              )}
+              <div className="flex items-center gap-3 shrink-0 ml-2">
+                {productPacking && Object.values(productPacking).some(Boolean) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const u: Record<string, string> = {};
+                      for (const [k, v] of Object.entries(productPacking)) if (v) u[k] = v;
+                      onUpdate(u as Partial<ModelFormState>);
+                    }}
+                    className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  >
+                    ⤓ Copy from product Logistics
+                  </button>
+                )}
+                {canInherit && (
+                  <button type="button" onClick={revertLogistics} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                    Use primary variant&apos;s packing
+                  </button>
+                )}
+              </div>
             </div>
             {/* Entry order mirrors real packing logic: HOW it's packed →
                 carton size → volume (auto) → weights. Same sequence as the
@@ -662,7 +689,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
   );
 }
 
-export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero }: Props) {
+export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking }: Props) {
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
      which Safari renders with a system dialog that clashes with
@@ -757,6 +784,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
             const trueIdx = startIndex + i;
             return (
               <ModelCard
+                productPacking={productPacking}
                 key={m._tempId}
                 model={m}
                 idx={trueIdx}
