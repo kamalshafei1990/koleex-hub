@@ -129,6 +129,10 @@ export const PRODUCTS_UI_I18N: Translations = {
   "list.productData": { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
   "list.search": { en: "Search products…", zh: "搜索产品…", ar: "ابحث عن المنتجات…" },
   "list.allDivisions": { en: "All divisions", zh: "全部事业部", ar: "كل الأقسام" },
+  "list.filters": { en: "Filters", zh: "筛选", ar: "التصفية" },
+  "list.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
+  "list.modelOne": { en: "model", zh: "个型号", ar: "موديل" },
+  "list.modelMany": { en: "models", zh: "个型号", ar: "موديلات" },
   "list.allCategories": { en: "All categories", zh: "全部类别", ar: "كل الفئات" },
   "list.resultsCount": { en: "{n} product(s)", zh: "{n} 个产品", ar: "{n} منتج" },
 
@@ -929,6 +933,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "cls.kindLabel": { en: "Machine Kind", zh: "机器类型", ar: "نوع الماكينة" },
   "cls.noCategories": { en: "No categories in this division", zh: "此事业部暂无类别", ar: "لا توجد فئات في هذا القسم" },
   "cls.noSubcategories": { en: "No subcategories in this category", zh: "此类别暂无子类别", ar: "لا توجد فئات فرعية في هذه الفئة" },
+  "cls.kindOptional": { en: "Optional — refines the spec fields. Pick one, or skip.", zh: "可选——用于细化规格字段。选择一个或跳过。", ar: "اختياري — يضبط حقول المواصفات بدقة. اختر واحداً أو تخطَّ." },
+  "cls.optionOne": { en: "option", zh: "个选项", ar: "خيار" },
+  "cls.optionMany": { en: "options", zh: "个选项", ar: "خيارات" },
+  "cls.skip": { en: "Skip", zh: "跳过", ar: "تخطّي" },
+  "cls.addKind": { en: "Add machine kind (optional)", zh: "添加机器类型(可选)", ar: "إضافة نوع الماكينة (اختياري)" },
   "cls.kindNa": { en: "doesn\u2019t apply to this subcategory — you can move on.", zh: "不适用于此子类别——可以继续下一步。", ar: "لا ينطبق على هذه الفئة الفرعية — يمكنك المتابعة." },
   "list.needsName": { en: "Needs name", zh: "缺名称", ar: "يحتاج اسماً" },
 };

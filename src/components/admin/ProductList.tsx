@@ -389,7 +389,7 @@ export default function ProductList() {
     const rest = divisions.filter(d => d.slug !== FLAGSHIP_DIVISION_SLUG);
     return [...flagship, ...rest];
   }, [divisions]);
-  const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.slug, c.name])), [categories]);
+  const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.slug, localizedName(c, lang)])), [categories, lang]);
 
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === filterDiv)?.id, [divisions, filterDiv]);
   const filteredCats = useMemo(() => selectedDivId ? categories.filter(c => c.division_id === selectedDivId) : categories, [categories, selectedDivId]);
@@ -899,7 +899,7 @@ export default function ProductList() {
               }`}
             >
               <FilterIcon className="h-3.5 w-3.5" />
-              Filters
+              {t("list.filters", "Filters")}
               {activeFilterCount > 0 && (
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold flex items-center justify-center">
                   {activeFilterCount}
@@ -1064,7 +1064,7 @@ export default function ProductList() {
                 }`}
               >
                 <LayoutGridIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
-                All divisions
+                {t("list.allDivisions", "All divisions")}
               </button>
 
               {orderedDivisions.map((d) => {
@@ -1306,7 +1306,7 @@ export default function ProductList() {
                     <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
                       {p.featured && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-                          <StarIcon className="h-2.5 w-2.5" /> Featured
+                          <StarIcon className="h-2.5 w-2.5" /> {t("list.featured", "Featured")}
                         </span>
                       )}
                       {p.level && (
@@ -1414,7 +1414,7 @@ export default function ProductList() {
                         const st = (p.status || "draft");
                         return (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${stColors[st] || stColors.draft}`}>
-                            {st}
+                            {t(`status.${st}`, st)}
                           </span>
                         );
                       })()}
@@ -1424,7 +1424,7 @@ export default function ProductList() {
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-                        <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? "model" : "models"}
+                        <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}
                       </span>
                     </div>
 
@@ -1536,7 +1536,7 @@ export default function ProductList() {
                           </>
                         )}
                         <span className="text-[var(--text-ghost)]">·</span>
-                        <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? "model" : "models"}</span>
+                        <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
                       </div>
                       {/* Desktop: supplier line — internal only */}
                       {isInternal && suppliers.length > 0 && (
@@ -1590,7 +1590,7 @@ export default function ProductList() {
                         const st = (p.status || "draft");
                         return (
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${stColors[st] || stColors.draft}`}>
-                            {st}
+                            {t(`status.${st}`, st)}
                           </span>
                         );
                       })()}

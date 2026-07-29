@@ -181,7 +181,7 @@ export default function ClassificationSection({
                 if (divisionLogos?.[selectedDiv.slug]) return <Image src={divisionLogos[selectedDiv.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
                 return null;
               })()}
-              {selectedDiv.name}
+              {localizedName(selectedDiv, lang)}
             </button>
           )}
           {selectedCat && (
@@ -194,7 +194,7 @@ export default function ClassificationSection({
                 {categoryLogos?.[selectedCat.slug] && (
                   <Image src={categoryLogos[selectedCat.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />
                 )}
-                {selectedCat.name}
+                {localizedName(selectedCat, lang)}
               </button>
             </>
           )}
@@ -228,12 +228,12 @@ export default function ClassificationSection({
                   }}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
                 >
-                  {selectedSub.name}
+                  {localizedName(selectedSub, lang)}
                 </button>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400">
                   <CheckIcon className="h-3 w-3" />
-                  {selectedSub.name}
+                  {localizedName(selectedSub, lang)}
                 </span>
               )}
             </>
@@ -472,19 +472,19 @@ export default function ClassificationSection({
                 {t("cls.selectKindIn", "Select Machine Kind in")} <span className="text-[var(--text-primary)]">{selectedSub ? localizedName(selectedSub, lang) : ''}</span>
               </p>
               <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
-                Optional — refines the spec fields. Pick one, or skip.
+                {t("cls.kindOptional", "Optional — refines the spec fields. Pick one, or skip.")}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[10px] font-medium text-[var(--text-ghost)] uppercase tracking-wider">
-                {availableKinds.length} {availableKinds.length === 1 ? "option" : "options"}
+                {availableKinds.length} {availableKinds.length === 1 ? t("cls.optionOne", "option") : t("cls.optionMany", "options")}
               </span>
               <button
                 type="button"
                 onClick={() => setKindSkipped(true)}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
               >
-                Skip
+                {t("cls.skip", "Skip")}
               </button>
             </div>
           </div>
@@ -547,7 +547,7 @@ export default function ClassificationSection({
               className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
             >
               <PlusIcon className="h-3 w-3" />
-              Add machine kind (optional)
+              {t("cls.addKind", "Add machine kind (optional)")}
             </button>
           )}
         </div>
