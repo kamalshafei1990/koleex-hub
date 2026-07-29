@@ -1,9 +1,21 @@
 import { LOCKSTITCH_SCHEMA } from "./schemas/lockstitch";
 import { SPREADING_MACHINES_SCHEMA } from "./schemas/spreading-machines";
+import { FABRIC_RELAXING_SCHEMA } from "./schemas/fabric-relaxing";
+import { FABRIC_INSPECTION_SCHEMA } from "./schemas/fabric-inspection";
+import { FABRIC_ROLLING_SCHEMA } from "./schemas/fabric-rolling";
+import { FABRIC_CUTTING_TABLE_SCHEMA } from "./schemas/fabric-cutting-table";
+import { FABRIC_PRESHRINK_SCHEMA } from "./schemas/fabric-preshrink";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
 registerSchema(SPREADING_MACHINES_SCHEMA);
+/* XPR fabric-preparation family — owner's XPR templates, organized (see
+   docs/product-data-v2/spec-templates/xpr-fabric-preparation-spec-templates.md) */
+registerSchema(FABRIC_RELAXING_SCHEMA);
+registerSchema(FABRIC_INSPECTION_SCHEMA);
+registerSchema(FABRIC_ROLLING_SCHEMA);
+registerSchema(FABRIC_CUTTING_TABLE_SCHEMA);
+registerSchema(FABRIC_PRESHRINK_SCHEMA);
 
 export {
   registerSchema,
