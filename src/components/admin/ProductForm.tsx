@@ -804,7 +804,14 @@ export default function ProductForm({ productId }: Props) {
       setCategories(cats);
       setSubcategories(subs);
       setSuppliers(supplierList);
-      setBrands(brandList);
+      /* Case-insensitive dedupe: one stray product typed "KOLEEX" while 452
+         say "Koleex" — the union of brand strings then shows the same brand
+         twice in the picker. First (registry) casing wins. */
+      setBrands(
+        brandList.filter(
+          (b, i) => brandList.findIndex((x) => x.toLowerCase() === b.toLowerCase()) === i,
+        ),
+      );
       setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
