@@ -887,3 +887,14 @@ input[type="number"]:not(.kx-spinner) {
   from { transform: translateY(28px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
+
+/* Floating-card entrance for the bell panel — drops in from the header. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-drop-in {
+    animation: kx-drop-down 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+@keyframes kx-drop-down {
+  from { transform: translateY(-14px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}

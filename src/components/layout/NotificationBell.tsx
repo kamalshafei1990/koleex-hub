@@ -706,23 +706,17 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             onClick={() => setOpen(false)}
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
-          {/* Mobile: an iOS-style BOTTOM SHEET — slides up from the bottom
-              edge, rounded top corners, grab handle, safe-area padding.
+          {/* Mobile: a floating card dropping in right under the header —
+              side margins, fully rounded, never touching the screen edges.
               Desktop (md+): the familiar dropdown anchored to the bell. */}
           <div
             role="menu"
-            className={`kx-sheet-in fixed inset-x-0 bottom-0 w-auto rounded-t-2xl border border-b-0 pb-[env(safe-area-inset-bottom)] md:absolute md:inset-x-auto md:bottom-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] md:rounded-xl md:border-b md:pb-0 shadow-2xl overflow-hidden z-50 ${
+            className={`kx-drop-in fixed inset-x-3 top-[calc(var(--kx-header-h)+8px)] w-auto rounded-2xl border md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] md:rounded-xl shadow-2xl overflow-hidden z-50 ${
               dk
                 ? "border-white/[0.08] bg-[#0f0f0f]"
                 : "border-black/[0.08] bg-white"
             }`}
           >
-          {/* Grab handle — mobile sheet affordance only */}
-          <div className="md:hidden pt-2 flex justify-center" aria-hidden>
-            <div
-              className={`h-1 w-9 rounded-full ${dk ? "bg-white/20" : "bg-black/20"}`}
-            />
-          </div>
           {/* Header */}
           <div
             className={`flex items-center justify-between px-4 py-3 border-b ${
@@ -802,7 +796,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
 
           {/* Body — on mobile the sheet may be taller than 460px is useful
               for; cap to the space under the header instead. */}
-          <div className="max-h-[62dvh] md:max-h-[460px] overflow-y-auto">
+          <div className="max-h-[calc(100dvh-var(--kx-header-h)-170px)] md:max-h-[460px] overflow-y-auto">
             {/* Discuss section */}
             {discussVisible && discussRows.length > 0 && (
               <div>
