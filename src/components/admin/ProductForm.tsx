@@ -3881,48 +3881,6 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
             )}
-
-            {/* Fulfillment Defaults — collapsed by default. Slug and
-                Country of Origin moved to Hero; this section now
-                only holds the product-level MOQ + Lead Time that
-                cascade to new variants. */}
-            {!fulfillmentCoveredBySchema && (
-            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} badge={t("technical.fulfillmentBadge", "MOQ · Lead Time")} defaultOpen={false}>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
-                    <input
-                      type="number"
-                      value={product.moq}
-                      onChange={(e) => updateProduct_({ moq: e.target.value })}
-                      placeholder={t("technical.moqPlaceholder", "e.g. 10")}
-                      className={inp}
-                    />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.moqOverrideHint", "Per-model MOQ in the Models step overrides this.")}</p>
-                  </div>
-                  <div>
-                    <label className={lbl}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
-                    <input
-                      type="text"
-                      value={product.lead_time}
-                      onChange={(e) => updateProduct_({ lead_time: e.target.value })}
-                      placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")}
-                      className={inp}
-                    />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.leadTimeOverrideHint", "Per-model Lead Time in the Models step overrides this.")}</p>
-                  </div>
-                </div>
-              </div>
-            </Section>
-            )}
-
-            {/* INV-H1 — Stock Profile (tenant-scoped inventory_items row). */}
-            {productId && (
-              <Section id="stock-profile" icon={<BoxIcon className="h-4 w-4" />} title={t("technical.stockProfile", "Stock Profile")} badge={t("technical.stockBadge", "Inventory")} defaultOpen={false}>
-                <ProductStockProfile productId={productId} />
-              </Section>
-            )}
           </div>
         )}
 
@@ -4191,6 +4149,47 @@ export default function ProductForm({ productId }: Props) {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* Fulfillment Defaults — MOQ + Lead Time cascade to new variants.
+                Lives on the LOGISTICS tab with the rest of the order/shipping
+                data (owner: keep Specs purely technical). */}
+            {!fulfillmentCoveredBySchema && (
+            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} badge={t("technical.fulfillmentBadge", "MOQ · Lead Time")} defaultOpen={false}>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lbl}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
+                    <input
+                      type="number"
+                      value={product.moq}
+                      onChange={(e) => updateProduct_({ moq: e.target.value })}
+                      placeholder={t("technical.moqPlaceholder", "e.g. 10")}
+                      className={inp}
+                    />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.moqOverrideHint", "Per-model MOQ in the Models step overrides this.")}</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
+                    <input
+                      type="text"
+                      value={product.lead_time}
+                      onChange={(e) => updateProduct_({ lead_time: e.target.value })}
+                      placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")}
+                      className={inp}
+                    />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.leadTimeOverrideHint", "Per-model Lead Time in the Models step overrides this.")}</p>
+                  </div>
+                </div>
+              </div>
+            </Section>
+            )}
+
+            {/* INV-H1 — Stock Profile (tenant-scoped inventory_items row). */}
+            {productId && (
+              <Section id="stock-profile" icon={<BoxIcon className="h-4 w-4" />} title={t("technical.stockProfile", "Stock Profile")} badge={t("technical.stockBadge", "Inventory")} defaultOpen={false}>
+                <ProductStockProfile productId={productId} />
+              </Section>
             )}
           </div>
         )}
