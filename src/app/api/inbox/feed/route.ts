@@ -55,7 +55,9 @@ export async function GET(req: Request) {
     switch (resource) {
       case "messages": {
         const includeArchived = url.searchParams.get("archived") === "1";
-        const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 200);
+        /* 300 cap serves the bell's "Show all" view — slim rows are ~200B
+           each, so the worst case stays ~60KB. */
+        const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 300);
         /* slim=1 — the badge/bell projection. The full shape ships the sender's
            avatar_url, and several accounts store base64 data-URIs there (25 KB
            for one user), repeated per row through the join: a limit=30 refresh

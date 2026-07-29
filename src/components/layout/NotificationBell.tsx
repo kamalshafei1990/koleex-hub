@@ -55,6 +55,9 @@ import { useCurrentAccount } from "@/lib/identity";
 import { activityAllowed, inQuietHours } from "@/lib/notification-activity";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+/* Filter-chip labels come from the SAME dictionary Settings uses for its
+   "By activity" switches — one label per activity, everywhere. */
+import { settingsT } from "@/lib/translations/settings";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
@@ -71,6 +74,43 @@ import type {
    also polls every 15s as a safety net since the WebSocket can drop
    silently on flaky networks or after mobile Safari kills the tab. */
 const POLL_INTERVAL_MS = 60_000;
+
+/* First open loads a fast slim page; "Show all" (or picking a type filter)
+   widens to the server's cap so the filter searches the whole history, not
+   just the first screen. */
+const INITIAL_FEED_LIMIT = 8;
+const FULL_FEED_LIMIT = 300;
+
+/* Type-filter chips. `discuss` covers the chat section; the eight activity
+   keys mirror classifyInboxActivity() exactly — same classifier that routes
+   sounds and push, so a notification always lands under the same chip that
+   its Settings switch controls. `other` catches unclassified system mail. */
+type NotifFilter =
+  | "all"
+  | "discuss"
+  | "mentions"
+  | "approvals"
+  | "assignments"
+  | "tasks_due"
+  | "quotation_activity"
+  | "low_stock"
+  | "qa_reports"
+  | "price_fx"
+  | "other";
+
+const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: string }> = [
+  { key: "all", hubKey: "notif.filter.all" },
+  { key: "discuss", hubKey: "notif.discuss" },
+  { key: "mentions", settingsKey: "act.mentions" },
+  { key: "approvals", settingsKey: "act.approvals" },
+  { key: "assignments", settingsKey: "act.assignments" },
+  { key: "tasks_due", settingsKey: "act.tasksDue" },
+  { key: "quotation_activity", settingsKey: "act.quotation" },
+  { key: "low_stock", settingsKey: "act.lowStock" },
+  { key: "qa_reports", settingsKey: "act.qa" },
+  { key: "price_fx", settingsKey: "act.priceFx" },
+  { key: "other", hubKey: "notif.filter.other" },
+];
 
 type TFn = (key: string, fallback?: string) => string;
 
@@ -170,6 +210,10 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   const [inboxUnread, setInboxUnread] = useState(0);
   const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
   const [loadingInbox, setLoadingInbox] = useState(false);
+  const [feedLimit, setFeedLimit] = useState(INITIAL_FEED_LIMIT);
+  const [filter, setFilter] = useState<NotifFilter>("all");
+  /* Chip labels for the eight activities live in the Settings dictionary. */
+  const { t: tAct } = useTranslation(settingsT);
 
   const [discussChannels, setDiscussChannels] = useState<
     DiscussChannelWithState[]
@@ -485,19 +529,33 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       return;
     }
     setLoadingInbox(true);
-    const rows = await fetchInboxMessages(accountId, { limit: 8, slim: true });
+    const rows = await fetchInboxMessages(accountId, { limit: feedLimit, slim: true });
     setMessages(rows);
     setLoadingInbox(false);
     const n = await fetchUnreadCount(accountId);
     setInboxUnread(n);
-  }, [accountId]);
+  }, [accountId, feedLimit]);
 
   useEffect(() => {
     if (open) {
       void loadInbox();
       void recountDiscuss();
+    } else {
+      /* Closing resets to the compact "All" view — next open is a fast slim
+         page again, and a filter left behind can't hide fresh notifications. */
+      setFilter("all");
+      setFeedLimit(INITIAL_FEED_LIMIT);
     }
   }, [open, loadInbox, recountDiscuss]);
+
+  /* Selecting any specific type widens the fetch to the full history first —
+     filtering only the first 8 rows would silently hide older matches. */
+  function applyFilter(next: NotifFilter) {
+    setFilter(next);
+    if (next !== "all" && feedLimit < FULL_FEED_LIMIT) {
+      setFeedLimit(FULL_FEED_LIMIT); // loadInbox re-runs via its dependency
+    }
+  }
 
   /* Close on outside click. */
   useEffect(() => {
@@ -574,7 +632,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
 
   /* Discuss section: only channels that actually have unread, sorted
      by the most recent activity so the freshest pings are at the top. */
-  const discussRows = discussChannels
+  const allDiscussRows = discussChannels
     /* Same predicate as the badge sum above. Filtering on unread_count alone
        hid manually-marked-unread conversations: the badge said "1" while the
        dropdown said "all caught up" — a phantom notification you could never
@@ -588,8 +646,26 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         ? new Date(b.last_message_at).getTime()
         : 0;
       return bt - at;
-    })
-    .slice(0, 6);
+    });
+  /* The 6-row cap only applies to the compact "All" view; the Discuss chip
+     and the widened feed show every unread channel. */
+  const showingAll = feedLimit >= FULL_FEED_LIMIT;
+  const discussRows =
+    filter === "discuss" || showingAll ? allDiscussRows : allDiscussRows.slice(0, 6);
+  const discussVisible = filter === "all" || filter === "discuss";
+
+  /* Inbox rows through the type filter. Same classifier as sounds/push. */
+  const visibleMessages =
+    filter === "all"
+      ? messages
+      : filter === "discuss"
+        ? []
+        : messages.filter((m) => {
+            const a = classifyInboxActivity((m as { metadata?: unknown }).metadata);
+            return filter === "other" ? a === null : a === filter;
+          });
+  /* Offer "Show all" while the compact page might be truncating history. */
+  const canShowAll = !showingAll && filter === "all" && messages.length >= feedLimit;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -674,10 +750,42 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             </button>
           </div>
 
+          {/* Type filter chips — horizontally scrollable, monochrome pills.
+              Active chip inverts (black-on-white / white-on-black). */}
+          <div
+            className={`flex gap-1.5 px-3 py-2 overflow-x-auto border-b ${
+              dk ? "border-white/[0.06]" : "border-black/[0.06]"
+            }`}
+            style={{ scrollbarWidth: "none" }}
+          >
+            {FILTER_CHIPS.map((chip) => {
+              const active = filter === chip.key;
+              const label = chip.hubKey ? t(chip.hubKey) : tAct(chip.settingsKey!);
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => applyFilter(chip.key)}
+                  className={`shrink-0 text-[10.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                    active
+                      ? dk
+                        ? "bg-white text-black border-white"
+                        : "bg-black text-white border-black"
+                      : dk
+                        ? "bg-white/[0.04] text-white/60 border-white/[0.1] hover:text-white"
+                        : "bg-black/[0.03] text-black/60 border-black/[0.1] hover:text-black"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Body */}
           <div className="max-h-[460px] overflow-y-auto">
             {/* Discuss section */}
-            {discussRows.length > 0 && (
+            {discussVisible && discussRows.length > 0 && (
               <div>
                 <div
                   className={`px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
@@ -748,10 +856,10 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             )}
 
             {/* Inbox section */}
-            {messages.length > 0 && (
+            {visibleMessages.length > 0 && (
               <div
                 className={
-                  discussRows.length > 0
+                  discussVisible && discussRows.length > 0
                     ? `border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`
                     : ""
                 }
@@ -765,7 +873,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   {t("notif.inbox")}
                 </div>
                 <ul className="py-1">
-                  {messages.map((msg) => {
+                  {visibleMessages.map((msg) => {
                     const cat = categoryStyle(msg.category, dk);
                     const senderName =
                       msg.sender?.full_name ||
@@ -868,9 +976,46 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
               </div>
             )}
 
+            {/* "Show all" — widens the compact first page to the full feed. */}
+            {canShowAll && !loadingInbox && (
+              <div
+                className={`border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setFeedLimit(FULL_FEED_LIMIT)}
+                  className={`w-full py-2.5 text-[11.5px] font-semibold transition-colors ${
+                    dk
+                      ? "text-white/70 hover:text-white hover:bg-white/[0.04]"
+                      : "text-black/70 hover:text-black hover:bg-black/[0.03]"
+                  }`}
+                >
+                  {t("notif.showAll")}
+                </button>
+              </div>
+            )}
+
+            {/* Filtered-empty state: this TYPE has nothing (the feed itself
+                may not be empty — different message from "all caught up"). */}
+            {filter !== "all" &&
+              (discussVisible ? discussRows.length === 0 : true) &&
+              visibleMessages.length === 0 &&
+              !loadingInbox && (
+                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                  <p
+                    className={`text-[12px] font-medium ${
+                      dk ? "text-white/50" : "text-black/50"
+                    }`}
+                  >
+                    {t("notif.noneOfType")}
+                  </p>
+                </div>
+              )}
+
             {/* Empty state — show only when both sections have nothing
                 AND we're not still loading the inbox fetch. */}
-            {discussRows.length === 0 &&
+            {filter === "all" &&
+              discussRows.length === 0 &&
               messages.length === 0 &&
               !loadingInbox && (
                 <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
