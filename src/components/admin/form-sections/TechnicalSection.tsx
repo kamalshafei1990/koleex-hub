@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -78,6 +80,7 @@ function ChipInput({
   suggestions?: string[];
   icon?: React.ReactNode;
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -145,7 +148,7 @@ function ChipInput({
                 <PlusIcon className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
               </button>
             ) : available.length === 0 ? (
-              <div className="px-3 py-3 text-[11px] text-white/25 text-center">All options selected</div>
+              <div className="px-3 py-3 text-[11px] text-white/25 text-center">{t("tech.allSelected", "All options selected")}</div>
             ) : (
               available.map(s => (
                 <button key={s} type="button" onClick={() => add(s)} className="w-full flex items-center px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.04] hover:text-white transition-colors text-left">
@@ -198,6 +201,7 @@ function ColorChipInput({
   onChange: (v: string[]) => void;
   suggestions?: string[];
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -225,7 +229,7 @@ function ColorChipInput({
 
   return (
     <div ref={ref}>
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Colors</label>
+      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">{t("tech.colors", "Colors")}</label>
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {values.map(v => {
@@ -275,7 +279,7 @@ function ColorChipInput({
                 <PlusIcon className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
               </button>
             ) : available.length === 0 ? (
-              <div className="px-3 py-3 text-[11px] text-white/25 text-center">All options selected</div>
+              <div className="px-3 py-3 text-[11px] text-white/25 text-center">{t("tech.allSelected", "All options selected")}</div>
             ) : (
               available.map(s => {
                 const sw = colorToSwatch(s);
@@ -299,6 +303,7 @@ function ColorChipInput({
 
 /* ── Watt dropdown ── */
 function WattInput({ value, onChange, suggestions }: { value: string; onChange: (v: string) => void; suggestions?: string[] }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const available = (suggestions || []).filter(s => !value || s.toLowerCase().includes(value.toLowerCase()));
@@ -313,7 +318,7 @@ function WattInput({ value, onChange, suggestions }: { value: string; onChange: 
 
   return (
     <div ref={ref}>
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Watt</label>
+      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">{t("tech.watt", "Watt")}</label>
       <div className="relative">
         <input type="text" value={value} onChange={(e) => { onChange(e.target.value); if (hasSuggestions) setOpen(true); }} onFocus={() => { if (hasSuggestions) setOpen(true); }} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} placeholder="e.g. 500W" className="w-full h-10 px-4 pr-9 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
         {hasSuggestions && <button type="button" onClick={() => setOpen(!open)} className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-muted)]"><AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
@@ -335,6 +340,7 @@ function PlugTypeSelector({
   onChange: (v: string[]) => void;
   options: PlugTypeOption[];
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const toggle = (name: string) => {
     if (values.includes(name)) onChange(values.filter(v => v !== name));
     else onChange([...values, name]);
@@ -344,7 +350,7 @@ function PlugTypeSelector({
 
   return (
     <div>
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-2">Plug Types</label>
+      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-2">{t("tech.plugTypes", "Plug Types")}</label>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
         {options.map(opt => {
           const selected = values.includes(opt.name);
@@ -561,6 +567,7 @@ function ToggleRow({
 }
 
 export default function TechnicalSection({ data, onChange, suggestions, hiddenFields }: Props) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const hasPlugCards = suggestions?.plug_types && suggestions.plug_types.length > 0;
   const hidden = (k: string) => hiddenFields?.has(k) ?? false;
   const elecVisible = ["voltage", "frequency_hz", "motor_power_w", "power_consumption_w", "phase", "plug_types", "pneumatic_supply"].some((k) => !hidden(k));
@@ -596,7 +603,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {!hidden("voltage") && (
           <ChipInput
-            label="Voltage Options"
+            label={t("tech.voltage", "Voltage Options")}
             icon={<ZapIcon className="h-3.5 w-3.5" />}
             values={data.voltage}
             onChange={(v) => onChange({ voltage: v })}
@@ -606,7 +613,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("frequency_hz") && (
           <ChipInput
-            label="Frequency (Hz)"
+            label={t("tech.frequency", "Frequency (Hz)")}
             icon={<RefreshCwIcon className="h-3.5 w-3.5" />}
             values={data.frequency_hz}
             onChange={(v) => onChange({ frequency_hz: v })}
@@ -618,7 +625,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {!hidden("motor_power_w") && (
           <NumberUnit
-            label="Motor Power"
+            label={t("tech.motorPower", "Motor Power")}
             icon={<PowerIcon className="h-3.5 w-3.5" />}
             value={data.motor_power_w}
             unit="W"
@@ -629,7 +636,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("power_consumption_w") && (
           <NumberUnit
-            label="Power Consumption"
+            label={t("tech.powerConsumption", "Power Consumption")}
             icon={<GaugeIcon className="h-3.5 w-3.5" />}
             value={data.power_consumption_w}
             unit="W"
@@ -640,15 +647,15 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("phase") && (
           <div>
-            <FieldLabel icon={<LayersIcon className="h-3.5 w-3.5" />}>Phase</FieldLabel>
+            <FieldLabel icon={<LayersIcon className="h-3.5 w-3.5" />}>{t("tech.phase", "Phase")}</FieldLabel>
             <select
               value={data.phase}
               onChange={(e) => onChange({ phase: e.target.value })}
               className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors"
             >
               <option value="">Select…</option>
-              <option value="single">Single phase</option>
-              <option value="three">Three phase</option>
+              <option value="single">{t("tech.singlePhase", "Single phase")}</option>
+              <option value="three">{t("tech.threePhase", "Three phase")}</option>
             </select>
             <p className="text-[10px] text-[var(--text-ghost)] mt-1">
               Three phase typical for 380V industrial machines.
@@ -664,7 +671,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           />
         ) : (
           <ChipInput
-            label="Plug Types"
+            label={t("tech.plugTypes", "Plug Types")}
             icon={<BadgeCheckIcon className="h-3.5 w-3.5" />}
             values={data.plug_types}
             onChange={(v) => onChange({ plug_types: v })}
@@ -679,7 +686,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
         {!hidden("pneumatic_supply") && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
           <ToggleRow
-            label="Pneumatic Supply Required"
+            label={t("tech.pneumatic", "Pneumatic Supply Required")}
             icon={<ZapIcon className="h-3.5 w-3.5" />}
             helpText="Machine needs an external air-compressor line to operate."
             value={data.pneumatic_supply}
@@ -706,7 +713,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           {!hidden("machine_dimensions") && (
           <div>
             <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
-              Machine Dimensions (L × W × H)
+              {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
             </FieldLabel>
             <input
               type="text"
@@ -722,7 +729,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("machine_weight_kg") && (
           <NumberUnit
-            label="Machine Weight"
+            label={t("tech.machineWeight", "Machine Weight")}
             icon={<ScaleIcon className="h-3.5 w-3.5" />}
             value={data.machine_weight_kg}
             unit="kg"
@@ -752,7 +759,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {!hidden("hs_code") && (
           <div>
-            <FieldLabel icon={<HashtagIcon className="h-3.5 w-3.5" />}>HS Code</FieldLabel>
+            <FieldLabel icon={<HashtagIcon className="h-3.5 w-3.5" />}>{t("logistics.hsCode", "HS Code")}</FieldLabel>
             <input
               type="text"
               value={data.hs_code}
@@ -767,7 +774,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("ip_rating") && (
           <div>
-            <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>IP Rating</FieldLabel>
+            <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>{t("tech.ipRating", "IP Rating")}</FieldLabel>
             <input
               type="text"
               value={data.ip_rating}
@@ -782,7 +789,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           )}
           {!hidden("operating_temp") && (
           <div>
-            <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>Operating Temperature</FieldLabel>
+            <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>{t("tech.operatingTemp", "Operating Temperature")}</FieldLabel>
             <input
               type="text"
               value={data.operating_temp}
@@ -808,7 +815,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
               filter retrofit. */}
           {!hidden("oil_mist_filter") && (
           <ToggleRow
-            label="Oil-Mist Filter"
+            label={t("tech.oilMist", "Oil-Mist Filter")}
             icon={<DropletsIcon className="h-3.5 w-3.5" />}
             helpText="Air-purify / mist filter — keeps oil mist out of cleanroom + light-fabric environments."
             value={data.oil_mist_filter}

@@ -630,7 +630,7 @@ export default function ProductList() {
       return ai - bi;
     });
     return catSlugs.map(catSlug => {
-      const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? "Uncategorized" : catSlug);
+      const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? t("list.uncategorized", "Uncategorized") : catSlug);
       const subSlugs = Object.keys(catBuckets[catSlug]).sort((a, b) => {
         const ai = subOrder.indexOf(a); const bi = subOrder.indexOf(b);
         if (ai === -1 && bi === -1) return 0;
@@ -1374,7 +1374,7 @@ export default function ProductList() {
                           </h3>
                           {isInternal && (
                             <p className="mt-0.5 text-[10px] font-medium text-amber-400/80">
-                              Needs name
+                              {t("list.needsName", "Needs name")}
                             </p>
                           )}
                         </>

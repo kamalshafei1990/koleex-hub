@@ -404,13 +404,13 @@ export const SPEC_I18N: Translations = {
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
-  "s:lockstitch": { en: "Lockstitch Machine", zh: "平缝机", ar: "ماكينة الغرزة المقفلة" },
-  "s:spreading": { en: "Fully Automatic Fabric Spreader", zh: "全自动铺布机", ar: "ماكينة فرد قماش أوتوماتيكية" },
-  "s:relaxing": { en: "Fabric Relaxing Machine", zh: "松布机", ar: "ماكينة إرخاء القماش" },
-  "s:inspection": { en: "Fabric Inspection Machine", zh: "验布机", ar: "ماكينة فحص القماش" },
-  "s:rolling": { en: "Fabric Rolling / Winding Machine", zh: "卷布机", ar: "ماكينة لف القماش" },
-  "s:cutting-table": { en: "Fabric Spreading / Cutting Table", zh: "铺布/裁剪台", ar: "طاولة فرد/قص القماش" },
-  "s:preshrink": { en: "Fabric Handling / Pre-shrinking System", zh: "面料预缩系统", ar: "نظام معالجة/تعييش القماش" },
+  "s:lockstitch.standard-single-needle.v1": { en: "Lockstitch Machine", zh: "平缝机", ar: "ماكينة الغرزة المقفلة" },
+  "s:spreading-machines.fully-automatic.v1": { en: "Fully Automatic Fabric Spreader", zh: "全自动铺布机", ar: "ماكينة فرد قماش أوتوماتيكية" },
+  "s:fabric-relaxing.v1": { en: "Fabric Relaxing Machine", zh: "松布机", ar: "ماكينة إرخاء القماش" },
+  "s:fabric-inspection.v1": { en: "Fabric Inspection Machine", zh: "验布机", ar: "ماكينة فحص القماش" },
+  "s:fabric-rolling.v1": { en: "Fabric Rolling / Winding Machine", zh: "卷布机", ar: "ماكينة لف القماش" },
+  "s:fabric-cutting-table.v1": { en: "Fabric Spreading / Cutting Table", zh: "铺布/裁剪台", ar: "طاولة فرد/قص القماش" },
+  "s:fabric-preshrink.v1": { en: "Fabric Handling / Pre-shrinking System", zh: "面料预缩系统", ar: "نظام معالجة/تعييش القماش" },
 };
 
 /* ── Field descriptions, keyed by the exact English sentence ── */

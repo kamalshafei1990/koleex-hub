@@ -16,7 +16,7 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { SPEC_I18N, SPEC_DESC_I18N } from "@/lib/product-schema/spec-i18n";
+import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "@/lib/product-schema/spec-i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { createPortal } from "react-dom";
 import type {
@@ -652,6 +652,7 @@ function GroupCard({
 
 export default function SchemaSpecsSection({ schema, values, onChange, hideHeader }: Props) {
   const { t: tui2 } = useTranslation(PRODUCTS_UI_I18N);
+  const { t: tName } = useTranslation(SPEC_NAME_I18N);
   /* source field key → the computed fields that derive from it. Lets a single
      edit (e.g. Packing Dimensions) recompute its dependants (e.g. CBM). */
   const derivedBySource = useMemo(() => {
@@ -727,7 +728,7 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
         <div className="flex items-start justify-between gap-3 flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-4 py-3">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold text-[var(--text-primary)]">
-              {schema.name} — {tui2("specs.structuredSpecs", "structured specs")}
+              {tName(`s:${schema.id}`, schema.name)} — {tui2("specs.structuredSpecs", "structured specs")}
             </p>
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed max-w-xl">
               {tui2("specs.introBody", "These power the public product page, quotations, brochures, and the AI layer. Each field shows where it appears (Public / Internal / AI). Choices over free text wherever possible.")}
