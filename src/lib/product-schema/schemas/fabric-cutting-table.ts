@@ -232,20 +232,6 @@ export const FABRIC_CUTTING_TABLE_SCHEMA: ProductSchemaDefinition = {
           comparable: true,
           visualRenderType: "spec_card",
         },
-        {
-          id: "max_load",
-          key: "max_load",
-          label: "Max Distributed Load",
-          order: 90,
-          fieldType: "unit_number",
-          dataType: "number",
-          unit: "kg/m²",
-          required: false,
-          description: "Load capacity of the surface (fabric rolls + machine).",
-          suggestions: [100, 150, 200, 300],
-          ...tech,
-          visualRenderType: "spec_card",
-        },
       ],
     },
 
@@ -398,6 +384,7 @@ export const FABRIC_CUTTING_TABLE_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Net shipping weight on the packing list.",
           ...pub,
+          computed: { from: "weight_per_section", formula: "copy_number" },
           visualRenderType: "spec_card",
         },
         {

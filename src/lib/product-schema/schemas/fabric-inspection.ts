@@ -329,8 +329,8 @@ export const FABRIC_INSPECTION_SCHEMA: ProductSchemaDefinition = {
           visualRenderType: "spec_card",
         },
         {
-          id: "power_consumption_kw",
-          key: "power_consumption_kw",
+          id: "power_consumption_w",
+          key: "power_consumption_w",
           label: "Power",
           order: 40,
           fieldType: "unit_number",
@@ -469,6 +469,7 @@ export const FABRIC_INSPECTION_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Net shipping weight on the packing list.",
           ...pub,
+          computed: { from: "machine_weight_kg", formula: "copy_number" },
           visualRenderType: "spec_card",
         },
         {

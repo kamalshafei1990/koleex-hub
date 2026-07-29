@@ -159,6 +159,10 @@ const computeDerivedValue = (
       return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40);
     case "qty_per_40hq_from_cbm":
       return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40hq);
+    case "copy_number": {
+      const n = typeof sourceRaw === "number" ? sourceRaw : Number(sourceRaw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
     default:
       return null;
   }

@@ -342,8 +342,8 @@ export const FABRIC_PRESHRINK_SCHEMA: ProductSchemaDefinition = {
       order: 40,
       fields: [
         {
-          id: "total_installed_power",
-          key: "total_installed_power",
+          id: "power_consumption_w",
+          key: "power_consumption_w",
           label: "Total Installed Power",
           order: 10,
           fieldType: "unit_number",
@@ -525,6 +525,7 @@ export const FABRIC_PRESHRINK_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Net shipping weight on the packing list.",
           ...pub,
+          computed: { from: "machine_weight_kg", formula: "copy_number" },
           visualRenderType: "spec_card",
         },
         {

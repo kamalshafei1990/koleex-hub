@@ -233,16 +233,29 @@ const SCHEMA_KEY_TO_COLUMN: Record<string, string> = {
 
 /* Build the set of typed columns the active schema covers (so the Technical
    block can hide those fields). Empty set when no schema is resolved. */
+/* One schema key can retire MULTIPLE legacy columns — e.g. the schema's
+   power_consumption_w is THE power input, so the legacy "Motor Power" column
+   must hide too; a bar-valued air_pressure supersedes the yes/no
+   pneumatic_supply toggle. Pure de-duplication: one meaning, one input. */
+const SCHEMA_KEY_COVERS_EXTRA: Record<string, string[]> = {
+  power_consumption_w: ["motor_power_w"],
+  air_pressure: ["pneumatic_supply"],
+};
+
 function computeSchemaCoveredColumns(
   schema: { groups?: { fields?: { key: string }[] }[] } | null | undefined,
 ): Set<string> {
   if (!schema?.groups) return new Set();
   const keys = new Set(schema.groups.flatMap((g) => (g.fields ?? []).map((f) => f.key)));
-  return new Set(
+  const covered = new Set(
     Object.entries(SCHEMA_KEY_TO_COLUMN)
       .filter(([sk]) => keys.has(sk))
       .map(([, col]) => col),
   );
+  for (const [sk, cols] of Object.entries(SCHEMA_KEY_COVERS_EXTRA)) {
+    if (keys.has(sk)) for (const c of cols) covered.add(c);
+  }
+  return covered;
 }
 
 /* Derive typed-column values from schema_specs for the overlap set, with the
@@ -269,6 +282,11 @@ function schemaColumnMirror(
       out[col] = v;
     }
   }
+  /* air_pressure isn't in the column map (different shapes) but a positive
+     bar value means the machine needs compressed air — keep the legacy
+     boolean truthful for its remaining readers. */
+  const air = specs["air_pressure"];
+  if (typeof air === "number" && air > 0) out["pneumatic_supply"] = true;
   return out;
 }
 

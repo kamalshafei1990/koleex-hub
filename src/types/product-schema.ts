@@ -151,7 +151,8 @@ export interface SpecField extends VisibilityFlags {
       | 'cbm_m3_from_mm_dimensions'
       | 'qty_per_20ft_from_cbm'
       | 'qty_per_40ft_from_cbm'
-      | 'qty_per_40hq_from_cbm';
+      | 'qty_per_40hq_from_cbm'
+      | 'copy_number';
   };
   /** Suggested values offered as a dropdown (datalist) on a free-entry
    *  number/text field. The operator can pick one OR type any other value —

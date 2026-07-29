@@ -298,8 +298,8 @@ export const FABRIC_ROLLING_SCHEMA: ProductSchemaDefinition = {
           visualRenderType: "technical_badge",
         },
         {
-          id: "motor_power_kw",
-          key: "motor_power_kw",
+          id: "power_consumption_w",
+          key: "power_consumption_w",
           label: "Motor Power",
           order: 30,
           fieldType: "unit_number",
@@ -437,6 +437,7 @@ export const FABRIC_ROLLING_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Net shipping weight on the packing list.",
           ...pub,
+          computed: { from: "machine_weight_kg", formula: "copy_number" },
           visualRenderType: "spec_card",
         },
         {

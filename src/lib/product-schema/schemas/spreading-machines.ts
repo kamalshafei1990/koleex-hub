@@ -740,6 +740,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Net shipping weight on the packing list.",
           ...pub,
+          computed: { from: "machine_weight_kg", formula: "copy_number" },
           visualRenderType: "spec_card",
         },
         {
