@@ -145,7 +145,14 @@ export interface SpecField extends VisibilityFlags {
      an operator can override. Currently supported formula:
        'cbm_m3_from_mm_dimensions' — parses the source (an "L×W×H" string in mm,
         any separator) and returns cubic metres = L·W·H / 1e9. */
-  computed?: { from: string; formula: 'cbm_m3_from_mm_dimensions' };
+  computed?: {
+    from: string;
+    formula:
+      | 'cbm_m3_from_mm_dimensions'
+      | 'qty_per_20ft_from_cbm'
+      | 'qty_per_40ft_from_cbm'
+      | 'qty_per_40hq_from_cbm';
+  };
   /** Suggested values offered as a dropdown (datalist) on a free-entry
    *  number/text field. The operator can pick one OR type any other value —
    *  it never restricts input. Use for common-but-not-fixed specs (e.g. cloth

@@ -133,6 +133,19 @@ const cbmFromMmDimensions = (raw: unknown): number | null => {
   return Math.round(cbm * 1000) / 1000;
 };
 
+/* PRACTICAL loading capacity (m³), not the brochure volume: real stuffing of
+   crated machinery loses space to crate shape, dunnage and door clearance.
+   Industry rule-of-thumb usable volumes — the operator can always override
+   the result by typing (e.g. when units stack or interlock). */
+const CONTAINER_USABLE_CBM = { c20: 28, c40: 58, c40hq: 68 } as const;
+
+const qtyFromCbm = (raw: unknown, capacity: number): number | null => {
+  const cbm = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(cbm) || cbm <= 0) return null;
+  const qty = Math.floor(capacity / cbm);
+  return qty >= 1 ? qty : 0;
+};
+
 const computeDerivedValue = (
   formula: NonNullable<SpecField["computed"]>["formula"],
   sourceRaw: unknown,
@@ -140,6 +153,12 @@ const computeDerivedValue = (
   switch (formula) {
     case "cbm_m3_from_mm_dimensions":
       return cbmFromMmDimensions(sourceRaw);
+    case "qty_per_20ft_from_cbm":
+      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c20);
+    case "qty_per_40ft_from_cbm":
+      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40);
+    case "qty_per_40hq_from_cbm":
+      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40hq);
     default:
       return null;
   }
@@ -632,10 +651,18 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
       }
     };
     setOne(key, v);
-    // Recompute any fields derived from the one just edited.
-    for (const d of derivedBySource[key] ?? []) {
-      setOne(d.target, computeDerivedValue(d.formula, next[key]));
-    }
+    /* Recompute derived fields — RECURSIVELY, so dims → CBM → per-container
+       quantities update from one edit. `visited` guards against cycles. */
+    const visited = new Set<string>();
+    const cascade = (srcKey: string) => {
+      if (visited.has(srcKey)) return;
+      visited.add(srcKey);
+      for (const d of derivedBySource[srcKey] ?? []) {
+        setOne(d.target, computeDerivedValue(d.formula, next[srcKey]));
+        cascade(d.target);
+      }
+    };
+    cascade(key);
     onChange(next);
   };
 

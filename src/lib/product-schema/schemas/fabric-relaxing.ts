@@ -529,6 +529,7 @@ export const FABRIC_RELAXING_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "How many units load into one 20ft container.",
           ...pub,
+          computed: { from: "cbm", formula: "qty_per_20ft_from_cbm" },
           visualRenderType: "spec_card",
         },
         {
@@ -542,6 +543,7 @@ export const FABRIC_RELAXING_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "How many units load into one 40ft STANDARD container.",
           ...pub,
+          computed: { from: "cbm", formula: "qty_per_40ft_from_cbm" },
           visualRenderType: "spec_card",
         },
         {
@@ -555,6 +557,7 @@ export const FABRIC_RELAXING_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "How many units load into one 40ft High-Cube container.",
           ...pub,
+          computed: { from: "cbm", formula: "qty_per_40hq_from_cbm" },
           visualRenderType: "spec_card",
         },
       ],
