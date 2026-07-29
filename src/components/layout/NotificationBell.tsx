@@ -75,11 +75,10 @@ import type {
    silently on flaky networks or after mobile Safari kills the tab. */
 const POLL_INTERVAL_MS = 60_000;
 
-/* First open loads a fast slim page; "Show all" (or picking a type filter)
-   widens to the server's cap so the filter searches the whole history, not
-   just the first screen. */
-const INITIAL_FEED_LIMIT = 8;
-const FULL_FEED_LIMIT = 300;
+/* One slim fetch covers the whole feed (rows are ~250B without avatars),
+   so the filter chips can carry accurate per-type counts and nothing is
+   ever hidden behind a "show more". Server caps at 300. */
+const FEED_LIMIT = 300;
 
 /* Type-filter chips. `discuss` covers the chat section; the eight activity
    keys mirror classifyInboxActivity() exactly — same classifier that routes
@@ -210,7 +209,6 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   const [inboxUnread, setInboxUnread] = useState(0);
   const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
   const [loadingInbox, setLoadingInbox] = useState(false);
-  const [feedLimit, setFeedLimit] = useState(INITIAL_FEED_LIMIT);
   const [filter, setFilter] = useState<NotifFilter>("all");
   /* Chip labels for the eight activities live in the Settings dictionary. */
   const { t: tAct } = useTranslation(settingsT);
@@ -529,33 +527,24 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       return;
     }
     setLoadingInbox(true);
-    const rows = await fetchInboxMessages(accountId, { limit: feedLimit, slim: true });
+    const rows = await fetchInboxMessages(accountId, { limit: FEED_LIMIT, slim: true });
     setMessages(rows);
     setLoadingInbox(false);
     const n = await fetchUnreadCount(accountId);
     setInboxUnread(n);
-  }, [accountId, feedLimit]);
+  }, [accountId]);
 
   useEffect(() => {
     if (open) {
       void loadInbox();
       void recountDiscuss();
     } else {
-      /* Closing resets to the compact "All" view — next open is a fast slim
-         page again, and a filter left behind can't hide fresh notifications. */
+      /* Closing resets the filter so one left behind can't hide fresh
+         notifications on the next open. */
       setFilter("all");
-      setFeedLimit(INITIAL_FEED_LIMIT);
     }
   }, [open, loadInbox, recountDiscuss]);
 
-  /* Selecting any specific type widens the fetch to the full history first —
-     filtering only the first 8 rows would silently hide older matches. */
-  function applyFilter(next: NotifFilter) {
-    setFilter(next);
-    if (next !== "all" && feedLimit < FULL_FEED_LIMIT) {
-      setFeedLimit(FULL_FEED_LIMIT); // loadInbox re-runs via its dependency
-    }
-  }
 
   /* Close on outside click. */
   useEffect(() => {
@@ -648,11 +637,30 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       return bt - at;
     });
   /* The 6-row cap only applies to the compact "All" view; the Discuss chip
-     and the widened feed show every unread channel. */
-  const showingAll = feedLimit >= FULL_FEED_LIMIT;
+     shows every unread channel. */
   const discussRows =
-    filter === "discuss" || showingAll ? allDiscussRows : allDiscussRows.slice(0, 6);
+    filter === "discuss" ? allDiscussRows : allDiscussRows.slice(0, 6);
   const discussVisible = filter === "all" || filter === "discuss";
+
+  /* Per-type counts over the WHOLE loaded feed — they drive which chips are
+     shown (only types that actually have something) and the count badges. */
+  const typeCounts = new Map<NotifFilter, number>();
+  for (const m of messages) {
+    const a =
+      classifyInboxActivity((m as { metadata?: unknown }).metadata) ?? "other";
+    typeCounts.set(a, (typeCounts.get(a) ?? 0) + 1);
+  }
+  const chipCount = (key: NotifFilter): number =>
+    key === "all"
+      ? messages.length + allDiscussRows.length
+      : key === "discuss"
+        ? allDiscussRows.length
+        : (typeCounts.get(key) ?? 0);
+  /* A chip earns its place by having content — except "All", and except the
+     currently-selected type (so the active chip can never vanish under you). */
+  const visibleChips = FILTER_CHIPS.filter(
+    (c) => c.key === "all" || c.key === filter || chipCount(c.key) > 0,
+  );
 
   /* Inbox rows through the type filter. Same classifier as sounds/push. */
   const visibleMessages =
@@ -664,8 +672,6 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             const a = classifyInboxActivity((m as { metadata?: unknown }).metadata);
             return filter === "other" ? a === null : a === filter;
           });
-  /* Offer "Show all" while the compact page might be truncating history. */
-  const canShowAll = !showingAll && filter === "all" && messages.length >= feedLimit;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -762,23 +768,24 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             </button>
           </div>
 
-          {/* Type filter chips — horizontally scrollable, monochrome pills.
-              Active chip inverts (black-on-white / white-on-black). */}
+          {/* Type filter chips — only types that actually have items, each
+              with its count, WRAPPING onto extra lines so nothing hides
+              behind a horizontal scroll. Active chip inverts. */}
           <div
-            className={`flex gap-1.5 px-3 py-2 overflow-x-auto border-b ${
+            className={`flex flex-wrap gap-1.5 px-3 py-2 border-b ${
               dk ? "border-white/[0.06]" : "border-black/[0.06]"
             }`}
-            style={{ scrollbarWidth: "none" }}
           >
-            {FILTER_CHIPS.map((chip) => {
+            {visibleChips.map((chip) => {
               const active = filter === chip.key;
               const label = chip.hubKey ? t(chip.hubKey) : tAct(chip.settingsKey!);
+              const n = chipCount(chip.key);
               return (
                 <button
                   key={chip.key}
                   type="button"
-                  onClick={() => applyFilter(chip.key)}
-                  className={`shrink-0 text-[10.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                  onClick={() => setFilter(chip.key)}
+                  className={`shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
                     active
                       ? dk
                         ? "bg-white text-black border-white"
@@ -789,6 +796,21 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   }`}
                 >
                   {label}
+                  {n > 0 && (
+                    <span
+                      className={`text-[9px] font-bold px-1 rounded-full ${
+                        active
+                          ? dk
+                            ? "bg-black/15 text-black/70"
+                            : "bg-white/25 text-white/90"
+                          : dk
+                            ? "bg-white/[0.1] text-white/50"
+                            : "bg-black/[0.08] text-black/50"
+                      }`}
+                    >
+                      {n > 99 ? "99+" : n}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -986,25 +1008,6 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                     );
                   })}
                 </ul>
-              </div>
-            )}
-
-            {/* "Show all" — widens the compact first page to the full feed. */}
-            {canShowAll && !loadingInbox && (
-              <div
-                className={`border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setFeedLimit(FULL_FEED_LIMIT)}
-                  className={`w-full py-2.5 text-[11.5px] font-semibold transition-colors ${
-                    dk
-                      ? "text-white/70 hover:text-white hover:bg-white/[0.04]"
-                      : "text-black/70 hover:text-black hover:bg-black/[0.03]"
-                  }`}
-                >
-                  {t("notif.showAll")}
-                </button>
               </div>
             )}
 
