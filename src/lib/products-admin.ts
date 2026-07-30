@@ -493,6 +493,11 @@ export async function fetchUniqueBrands(): Promise<string[]> {
   return json.brands ?? [];
 }
 
+export async function fetchUniqueFamilies(): Promise<string[]> {
+  const json = await jget<{ families?: string[] }>("/api/products/facets", {});
+  return json.families ?? [];
+}
+
 // ── Taxonomy logos (storage proxy — no secrets, unchanged) ──
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {
   return memoFetch(`logos:${folder}`, async () => {

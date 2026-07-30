@@ -50,6 +50,7 @@ import {
   fetchProductCertifications, saveProductCertifications,
   fetchProductDocuments, saveProductDocuments,
   fetchSupplierNames, fetchUniqueBrands,
+  fetchUniqueFamilies,
   fetchBrandLogos,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
@@ -513,6 +514,7 @@ export default function ProductForm({ productId }: Props) {
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null; email?: string | null; phone?: string | null; website?: string | null; wechat?: string | null; location?: string | null; primary_contact?: { name: string | null; role: string | null; email: string | null; mobile: string | null } | null; rating?: number | null; sample_status?: string | null; employees?: string | null; year_established?: string | null; categories?: string[] | null; certifications?: string[] | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
+  const [families, setFamilies] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
@@ -802,12 +804,13 @@ export default function ProductForm({ productId }: Props) {
       ]);
     (async () => {
      try {
-      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
+      const [divs, cats, subs, supplierList, brandList, familyList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
         guard(fetchDivisions(), [] as Awaited<ReturnType<typeof fetchDivisions>>),
         guard(fetchCategories(), [] as Awaited<ReturnType<typeof fetchCategories>>),
         guard(fetchSubcategories(), [] as Awaited<ReturnType<typeof fetchSubcategories>>),
         guard(fetchSupplierNames(), [] as Awaited<ReturnType<typeof fetchSupplierNames>>),
         guard(fetchUniqueBrands(), [] as Awaited<ReturnType<typeof fetchUniqueBrands>>),
+        guard(fetchUniqueFamilies(), [] as Awaited<ReturnType<typeof fetchUniqueFamilies>>),
         guard(fetchBrandLogos(), {} as Awaited<ReturnType<typeof fetchBrandLogos>>),
         guard(fetchAttributeConfig(), { voltage: [], plug_types: [], colors: [], watt: [], levels: [], tags: [], tag_colors: {} } as Awaited<ReturnType<typeof fetchAttributeConfig>>),
         guard(fetchDivisionLogos(), {} as Awaited<ReturnType<typeof fetchDivisionLogos>>),
@@ -828,6 +831,7 @@ export default function ProductForm({ productId }: Props) {
           (b, i) => brandList.findIndex((x) => x.toLowerCase() === b.toLowerCase()) === i,
         ),
       );
+      setFamilies(familyList.filter((f, i) => familyList.findIndex((x) => x.toLowerCase() === f.toLowerCase()) === i));
       setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
@@ -3464,7 +3468,14 @@ export default function ProductForm({ productId }: Props) {
                         onChange={(e) => updateProduct_({ family: e.target.value })}
                         placeholder={t("hero.familyPlaceholder", "e.g. Pro Line")}
                         className={inp}
+                        list="family-suggestions"
                       />
+                      {/* Existing families as suggestions — free text still
+                          allowed, but reusing a name beats inventing near-
+                          duplicates (Pro Line / ProLine / pro-line). */}
+                      <datalist id="family-suggestions">
+                        {families.map((f) => <option key={f} value={f} />)}
+                      </datalist>
                     </div>
                     {/* Country of Origin moved to the Logistics tab; Warranty
                         moved to the dedicated Compliance & Warranty tab — both
@@ -3654,6 +3665,10 @@ export default function ProductForm({ productId }: Props) {
             {/* Phase 5 — Identity identifiers + lifecycle. The KOLEEX
                 primary model + per-model barcode/SKU live elsewhere; these
                 are the manufacturer's identifiers + market lifecycle. */}
+            {/* Trimmed 2026-07-31 (owner): Internal SKU / GTIN / Model year /
+                Available-from / Last-order removed from the UI — 0 usage across
+                the catalog and covered by the KOLEEX code + lifecycle core.
+                Columns and any legacy data remain untouched. */}
             <Section id="identifiers" icon={<PackageIcon className="h-4 w-4" />} title={t("identity.identifiers", "Identifiers & Lifecycle")} badge={t("identity.identifiersBadge", "MPN · GTIN · Lifecycle")} defaultOpen={false}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
@@ -3667,28 +3682,6 @@ export default function ProductForm({ productId }: Props) {
                     onChange={(e) => updateProduct_({ mpn: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>GTIN / EAN / UPC<FieldHelp {...IDENTIFIER_HELP.gtin} /></label>
-                  <input className={inp} value={product.gtin} placeholder={`${t("sup.eg", "e.g.")} 6970000000001`}
-                    onChange={(e) => updateProduct_({ gtin: e.target.value })} />
-                  {(() => {
-                    const g = product.gtin.replace(/\s/g, "");
-                    if (!g) return null;
-                    const ok = /^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(g) && (() => {
-                      const d = g.split("").map(Number); const cd = d.pop()!;
-                      const sum = d.reverse().reduce((a, n, i) => a + n * (i % 2 === 0 ? 3 : 1), 0);
-                      return (10 - (sum % 10)) % 10 === cd;
-                    })();
-                    return ok ? null : (
-                      <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">{t("idf.gtinInvalid", "Check the GTIN — not a valid 8/12/13/14-digit barcode.")}</p>
-                    );
-                  })()}
-                </div>
-                <div>
-                  <label className={lbl}>{t("idf.internalSku", "Internal SKU")}<FieldHelp {...IDENTIFIER_HELP.internalSku} /></label>
-                  <input className={inp} value={product.internal_sku} placeholder={t("idf.internalSkuPh", "KOLEEX internal stock code")}
-                    onChange={(e) => updateProduct_({ internal_sku: e.target.value })} />
-                </div>
-                <div>
                   <label className={lbl}>{t("idf.generation", "Generation / version")}<FieldHelp {...IDENTIFIER_HELP.generation} /></label>
                   <input className={inp} value={product.generation} placeholder={`${t("sup.eg", "e.g.")} Gen 2 / v3`}
                     onChange={(e) => updateProduct_({ generation: e.target.value })} />
@@ -3696,11 +3689,6 @@ export default function ProductForm({ productId }: Props) {
                 {/* Old model / legacy code intentionally NOT here — it is edited
                     once, in the hero identity block next to the KOLEEX code
                     (same product.legacy_code column). One meaning = one input. */}
-                <div>
-                  <label className={lbl}>{t("idf.modelYear", "Model year")}<FieldHelp {...IDENTIFIER_HELP.modelYear} /></label>
-                  <input className={inp} value={product.model_year} placeholder={`${t("sup.eg", "e.g.")} 2025`}
-                    onChange={(e) => updateProduct_({ model_year: e.target.value })} />
-                </div>
                 <div>
                   <label className={lbl}>{t("idf.launchDate", "Launch date")}<FieldHelp {...IDENTIFIER_HELP.launchDate} /></label>
                   <input type="date" className={inp} value={product.launch_date}
@@ -3713,18 +3701,6 @@ export default function ProductForm({ productId }: Props) {
                   {product.launch_date && product.eol_date && product.eol_date <= product.launch_date && (
                     <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">{t("idf.eolBeforeLaunch", "End-of-life is on or before the launch date.")}</p>
                   )}
-                </div>
-                <div>
-                  <label className={lbl}>{t("idf.availableFrom", "Available from")}<FieldHelp {...IDENTIFIER_HELP.availableFrom} /></label>
-                  <input type="date" className={inp} value={product.available_from}
-                    onChange={(e) => updateProduct_({ available_from: e.target.value })} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("idf.orderWindowOpens", "Order window opens.")}</p>
-                </div>
-                <div>
-                  <label className={lbl}>{t("idf.lastOrderDate", "Last-order date")}<FieldHelp {...IDENTIFIER_HELP.lastOrderDate} /></label>
-                  <input type="date" className={inp} value={product.last_order_date}
-                    onChange={(e) => updateProduct_({ last_order_date: e.target.value })} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("idf.orderCutoff", "Order cut-off (before EOL).")}</p>
                 </div>
                 <div>
                   <label className={lbl}>{t("idf.statusReason", "Status reason")}<FieldHelp {...IDENTIFIER_HELP.statusReason} /></label>
