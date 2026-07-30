@@ -129,3 +129,97 @@ export const IDENTIFIER_HELP: Record<string, { en: string; zh: string }> = {
     zh: "别名 / 其他名称 — 人们对该产品的其他叫法（市场俗称、供应商名称、常见错拼）。提升全平台搜索和匹配的命中率。",
   },
 };
+
+/* Bilingual help for the product↔supplier link card (Supplier tab in the
+   product form — the fields that appear after a supplier is linked).
+   Same voice as the Quotations Quick Fill helps. */
+export const SUPPLIER_LINK_HELP: Record<string, { en: string; zh: string }> = {
+  productName: {
+    en: "Supplier product name — What THIS supplier calls the product in their own catalog. Often differs from the KOLEEX name; keeping it makes their quotes, manuals and spare-part lists easy to match.",
+    zh: "供应商产品名称 — 该供应商在自己目录中对此产品的叫法，常与 KOLEEX 名称不同。记录后便于核对其报价单、说明书和配件表。",
+  },
+  modelNumber: {
+    en: "Supplier model number — The supplier's own model/part code for this product. Used on their quotations and shipping documents; the KOLEEX code stays our official identity.",
+    zh: "供应商型号 — 供应商自己的型号/编码，出现在其报价单和出货单上。KOLEEX 编码仍是我们的正式标识。",
+  },
+  costPrice: {
+    en: "Cost price (CNY) — The factory unit cost this supplier quoted, always entered in CNY: the pricing engine and all margin levels calculate from this number.",
+    zh: "成本价（人民币）— 该供应商报的出厂单价，一律以人民币录入：定价引擎和所有利润级别都以此数计算。",
+  },
+  costIncludes: {
+    en: "Cost includes — What's already inside the quoted price: full delivered-to-KOLEEX, packing only, or bare ex-works. Costs on different bases are NOT directly comparable.",
+    zh: "成本包含 — 报价中已含的内容：全含送达 KOLEEX、仅含包装、或纯出厂价。不同口径的成本不能直接比较。",
+  },
+  taxVat: {
+    en: "Tax (VAT) — Whether the quoted cost includes Chinese VAT. A tax-excluded quote looks cheaper than it is; the toggle keeps margins honest.",
+    zh: "税（增值税）— 报价是否含增值税。不含税的报价看起来更便宜；此开关保证利润计算真实。",
+  },
+  quotedOn: {
+    en: "Quoted on — The date the supplier issued this price. Old quotes drift from reality; the date tells you when to re-confirm.",
+    zh: "报价日期 — 供应商给出该价格的日期。旧报价会失真，此日期提醒何时需要重新确认。",
+  },
+  validUntil: {
+    en: "Valid until — The expiry date of the quotation. After it, the badge turns red and the price must be re-confirmed before quoting customers.",
+    zh: "有效期至 — 报价的到期日。过期后标记变红，向客户报价前必须与供应商重新确认。",
+  },
+  volumePricing: {
+    en: "Volume pricing — Price breaks by quantity (e.g. 10+ → lower unit price). Lets quotations pick the right tier automatically for bigger orders.",
+    zh: "批量定价 — 按数量的价格阶梯（如 10 台以上单价更低）。报价时可按订单量自动匹配档位。",
+  },
+  quoteFile: {
+    en: "Quotation / spec file — The supplier's original quotation PDF or spec sheet, attached as evidence for the numbers entered here.",
+    zh: "报价单/规格文件 — 供应商的原始报价 PDF 或规格表，作为此处所填数据的凭证。",
+  },
+  incoterms: {
+    en: "Incoterms — International trade term for this supplier's price: EXW = you collect at factory; FOB = supplier delivers to the port; CIF/CFR = supplier pays freight (CIF adds insurance); DAP/DDP = delivered to you (DDP includes duties).",
+    zh: "贸易术语 — 该供应商价格对应的国际贸易条款：EXW 工厂自提；FOB 供方送至装运港；CIF/CFR 供方付运费（CIF 含保险）；DAP/DDP 送达目的地（DDP 含关税）。",
+  },
+  sampleCost: {
+    en: "Sample cost — What the supplier charges for one sample unit (often refunded against a bulk order). Blank = not discussed yet.",
+    zh: "样品费用 — 供应商单件样品的收费（常在批量下单后返还）。留空 = 尚未谈及。",
+  },
+  warrantyMonths: {
+    en: "Supplier warranty (months) — How long the SUPPLIER covers defects toward us. Independent of the warranty KOLEEX offers customers (Compliance tab).",
+    zh: "供应商保修（月）— 供应商对我们承担质保的时长。与 KOLEEX 向客户提供的保修（合规页）互相独立。",
+  },
+  sourcingStatus: {
+    en: "Sourcing status — This supplier's role for THIS product: Preferred = default choice; Backup = alternative kept warm; Trial = being evaluated; Phasing out = orders winding down.",
+    zh: "采购状态 — 该供应商对此产品的定位：首选=默认下单对象；备选=保持联系的替代方案；试用=考察中；逐步淘汰=订单收尾。",
+  },
+  whyThisSupplier: {
+    en: "Why this supplier — One line of reasoning (best price / quality / lead time) so the next buyer understands the choice without asking around.",
+    zh: "选择原因 — 一句话说明（价格最优/质量最好/交期最快），让接手的采购不用四处打听就明白当初的选择。",
+  },
+  minOrderValue: {
+    en: "Min order value (CNY) — The smallest order amount this supplier accepts. Below it they may refuse or add surcharges.",
+    zh: "最低订单金额（人民币）— 供应商接受的最小订单金额。低于此数可能拒单或加收费用。",
+  },
+  toolingOwner: {
+    en: "Tooling / mold owner — Who owns the molds or special tooling: KOLEEX-owned means we can move production to another factory; supplier-owned means switching costs money.",
+    zh: "工装/模具归属 — 模具或专用工装归谁：KOLEEX 所有则可随时转厂生产；供应商所有则更换供应商需要重新开模。",
+  },
+  toolingCost: {
+    en: "Tooling / mold cost — One-time cost of the molds/tooling for this product, usually amortised over the first orders.",
+    zh: "工装/模具费用 — 此产品模具/工装的一次性费用，通常在首批订单中摊销。",
+  },
+  notes: {
+    en: "Notes — Sourcing remarks specific to this product-supplier pair: packaging quirks, negotiation history, quality incidents.",
+    zh: "备注 — 针对该产品-供应商组合的采购备注：包装细节、谈判历史、质量事件等。",
+  },
+  moq: {
+    en: "MOQ — Minimum Order Quantity: the smallest number of units the supplier will produce per order.",
+    zh: "MOQ — 最小起订量：供应商每单愿意生产的最少台数/件数。",
+  },
+  leadTime: {
+    en: "Lead time — Days from order confirmation (or deposit) until the goods are ready at the factory.",
+    zh: "交货周期 — 从确认订单（或收到定金）到工厂备好货物所需的天数。",
+  },
+  paymentTerms: {
+    en: "Payment terms — How this supplier is paid, e.g. 30% deposit + 70% before shipment, or T/T against B/L copy.",
+    zh: "付款条件 — 与该供应商的结算方式，如 30% 定金 + 70% 发货前付清，或凭提单副本电汇。",
+  },
+  supplyType: {
+    en: "Supply type — Whether this partner is the actual manufacturer or a trading company. Affects pricing room, spare parts and quality control.",
+    zh: "供应类型 — 该伙伴是实际制造商还是贸易公司。影响议价空间、配件供应与品控。",
+  },
+};
