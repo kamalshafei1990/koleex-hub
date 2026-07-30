@@ -398,10 +398,8 @@ export default function ClassificationSection({
           {filteredSubs.length === 0 && !onClickCreateSubcategory ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">{t("cls.noSubcategories", "No subcategories in this category")}</p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2.5">
               {filteredSubs.map((sub) => {
-                const ovr = iconOverrides?.subcategory?.[sub.slug];
-                const logo = subcategoryLogos?.[sub.slug];
                 return (
                   <button
                     key={sub.id}
@@ -427,25 +425,18 @@ export default function ClassificationSection({
                         });
                       }
                     }}
-                    className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                    className="group flex items-center justify-center min-h-[56px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
-                    {ovr ? (
-                      <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
-                    ) : logo ? (
-                      <Image src={logo} alt={localizedName(sub, lang)} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
-                    ) : (
-                      <TagsIcon className="h-8 w-8 text-[var(--text-ghost)]" />
-                    )}
-                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{localizedName(sub, lang)}</span>
+                    <span className="text-[12.5px] font-medium text-[var(--text-primary)] leading-snug">{localizedName(sub, lang)}</span>
                   </button>
                 );
               })}
               {onClickCreateSubcategory && (
                 <button
                   onClick={onClickCreateSubcategory}
-                  className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
+                  className="flex items-center justify-center gap-2 min-h-[56px] px-4 py-3 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
-                  <PlusIcon className="h-8 w-8" />
+                  <PlusIcon className="h-4 w-4" />
                   <span className="text-[11px] font-medium">{t("cls.newSubcategory", "New Subcategory")}</span>
                 </button>
               )}
