@@ -29,6 +29,8 @@ import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import { uploadProductFile, fetchSupplierNames } from "@/lib/products-admin";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
@@ -723,6 +725,10 @@ function SupplierPhoto({
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [drag, setDrag] = useState(false);
+  /* WeChat-style region capture (shared with Quotations): freeze a frame
+     of the chosen screen/window, drag to crop, and the crop lands here as
+     a normal file upload. Clipboard paste works inside the modal too. */
+  const [shotOpen, setShotOpen] = useState(false);
   const take = (files: FileList | null) => {
     const f = files?.[0];
     if (f && f.type.startsWith("image/")) onPick(f);
@@ -775,6 +781,24 @@ function SupplierPhoto({
           <CrossIcon className="h-2.5 w-2.5" />
         </button>
       )}
+
+      {/* Screenshot capture — mark a region of the screen (or paste a
+          clipboard screenshot) and it uploads like a picked file. */}
+      {!uploading && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShotOpen(true); }}
+          title={t("sup.screenshotTitle", "Capture part of the screen (or paste a screenshot)")}
+          className="absolute left-1/2 -translate-x-1/2 -bottom-3.5 h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] shadow-sm transition-colors whitespace-nowrap"
+        >
+          <CameraIcon className="h-3 w-3" /> {t("sup.screenshot", "Screenshot")}
+        </button>
+      )}
+      <ScreenshotCaptureModal
+        open={shotOpen}
+        onCapture={(file) => onPick(file)}
+        onClose={() => setShotOpen(false)}
+      />
     </div>
   );
 }

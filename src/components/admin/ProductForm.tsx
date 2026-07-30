@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { localizedName } from "@/lib/i18n-name";
+import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/FieldHelp";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -586,6 +587,10 @@ export default function ProductForm({ productId }: Props) {
      translation already exists, e.g. when editing). */
   const [showNameTr, setShowNameTr] = useState(false);
   const [showExcerptTr, setShowExcerptTr] = useState(false);
+  const [showTaglineTr, setShowTaglineTr] = useState(false);
+  const [heroTaglineLocale, setHeroTaglineLocale] = useState<string>("zh");
+  const [translatingHeroTagline, setTranslatingHeroTagline] = useState(false);
+  const [heroTaglineMsg, setHeroTaglineMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
 
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
@@ -1433,6 +1438,64 @@ export default function ProductForm({ productId }: Props) {
       ];
     });
   }, []);
+
+  /* ── Hero localized tagline helpers ── (same shape as the excerpt
+     helpers, writing product_translations.tagline). */
+  const heroLocaleTagline = (locale: string): string =>
+    translations.find((tr) => tr.locale === locale)?.tagline ?? "";
+
+  const setHeroLocaleTagline = useCallback((locale: string, value: string) => {
+    setTranslations((prev) => {
+      const i = prev.findIndex((tr) => tr.locale === locale);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], tagline: value };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          _tempId: `tr_${locale}_${prev.length}`,
+          locale,
+          product_name: "",
+          tagline: value,
+          excerpt: "",
+          description: "",
+        },
+      ];
+    });
+  }, []);
+
+  const autoTranslateHeroTagline = useCallback(async () => {
+    const source = (primaryModel?.tagline || "").trim();
+    if (!source) return;
+    setTranslatingHeroTagline(true);
+    setHeroTaglineMsg(null);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: source, target_lang: heroTaglineLocale, source_lang: "en" }),
+      });
+      const data = (await res.json()) as { translated?: string; fallback?: boolean; reason?: string };
+      if (!res.ok || data?.fallback || !data?.translated) {
+        const why =
+          data?.reason === "no_provider"
+            ? t("hero.translateNoProvider", "Auto-translate is off — no translation service is configured. Type the name manually for now.")
+            : t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually.");
+        setHeroTaglineMsg({ kind: "error", text: why });
+        return;
+      }
+      setHeroLocaleTagline(heroTaglineLocale, data.translated);
+      setHeroTaglineMsg({ kind: "ok", text: t("hero.translateDone", "Translated — review before saving.") });
+    } catch {
+      setHeroTaglineMsg({ kind: "error", text: t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually.") });
+    } finally {
+      setTranslatingHeroTagline(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroTaglineLocale, setHeroLocaleTagline, t, models]);
 
   const autoTranslateHeroExcerpt = useCallback(async () => {
     const source = product.excerpt.trim();
@@ -2544,11 +2607,11 @@ export default function ProductForm({ productId }: Props) {
                   <input type="text" className={`${inp} flex-1`} value={product.hero_poster_url} placeholder="Paste poster image URL, or upload →"
                     onChange={(e) => updateProduct_({ hero_poster_url: e.target.value })} />
                   <label className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
-                    <CameraIcon className="h-3.5 w-3.5" /> Upload
+                    <CameraIcon className="h-3.5 w-3.5" /> {t("idf.upload", "Upload")}
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadIdentityImage(e.target.files, "hero_poster_url")} />
                   </label>
                   {product.hero_poster_url && (
-                    <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
+                    <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">{t("idf.clear", "Clear")}</button>
                   )}
                 </div>
                 <p className="text-[10px] text-[var(--text-ghost)] mt-1.5"><strong className="text-[var(--text-muted)] font-semibold">Size: 2520 × 1080 px (21:9), under 8 MB.</strong> Keep the product centered/right — the bottom-left is overlaid with the name, tagline &amp; button. Leave empty to auto-build the hero from the product photo, name &amp; tagline.</p>
@@ -3275,6 +3338,70 @@ export default function ProductForm({ productId }: Props) {
                       maxLength={80}
                       className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
                     />
+
+                    {/* Localized tagline — same language picker + Auto-translate
+                        control as the name/short description, writing per-locale
+                        into product_translations.tagline. */}
+                    {(() => {
+                      const isRtl = heroTaglineLocale === "ar" || heroTaglineLocale === "ur";
+                      const localeName = LOCALES.find((l) => l.code === heroTaglineLocale)?.name ?? heroTaglineLocale;
+                      const hasTaglineTr = translations.some((tr) => (tr.tagline || "").trim().length > 0);
+                      if (!showTaglineTr && !hasTaglineTr) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowTaglineTr(true)}
+                            className="mt-2 text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                          >
+                            + {t("hero.addLanguage", "Add another language")}
+                          </button>
+                        );
+                      }
+                      return (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                                {t("hero.nameOtherLang", "Other language")}
+                              </span>
+                              <select
+                                value={heroTaglineLocale}
+                                onChange={(e) => { setHeroTaglineLocale(e.target.value); setHeroTaglineMsg(null); }}
+                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
+                              >
+                                {LOCALES.map((l) => (
+                                  <option key={l.code} value={l.code}>{l.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={autoTranslateHeroTagline}
+                              disabled={!(primaryModel?.tagline || "").trim() || translatingHeroTagline}
+                              className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                            >
+                              {translatingHeroTagline
+                                ? t("hero.translating", "Translating…")
+                                : t("hero.autoTranslate", "Auto-translate")}
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            dir={isRtl ? "rtl" : "ltr"}
+                            value={heroLocaleTagline(heroTaglineLocale)}
+                            onChange={(e) => setHeroLocaleTagline(heroTaglineLocale, e.target.value)}
+                            placeholder={t("hero.taglineInLangPlaceholder", "Tagline in {lang}").replace("{lang}", localeName)}
+                            maxLength={80}
+                            className={`w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all ${isRtl ? "text-right" : ""}`}
+                          />
+                        </div>
+                      );
+                    })()}
+                    {heroTaglineMsg && (
+                      <p className={`mt-1.5 text-[11px] leading-relaxed ${heroTaglineMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>
+                        {heroTaglineMsg.text}
+                      </p>
+                    )}
                   </div>
 
                   {/* Slug / URL preview — SEO-friendly URL that can be
@@ -3530,18 +3657,18 @@ export default function ProductForm({ productId }: Props) {
             <Section id="identifiers" icon={<PackageIcon className="h-4 w-4" />} title={t("identity.identifiers", "Identifiers & Lifecycle")} badge={t("identity.identifiersBadge", "MPN · GTIN · Lifecycle")} defaultOpen={false}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className={lbl}>Manufacturer (OEM)</label>
-                  <input className={inp} value={product.manufacturer} placeholder="Actual maker, if rebranded"
+                  <label className={lbl}>{t("idf.manufacturer", "Manufacturer (OEM)")}<FieldHelp {...IDENTIFIER_HELP.manufacturer} /></label>
+                  <input className={inp} value={product.manufacturer} placeholder={t("idf.manufacturerPh", "Actual maker, if rebranded")}
                     onChange={(e) => updateProduct_({ manufacturer: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>MPN (manufacturer part no.)</label>
-                  <input className={inp} value={product.mpn} placeholder="e.g. JK-9500"
+                  <label className={lbl}>{t("idf.mpn", "MPN (manufacturer part no.)")}<FieldHelp {...IDENTIFIER_HELP.mpn} /></label>
+                  <input className={inp} value={product.mpn} placeholder={`${t("sup.eg", "e.g.")} JK-9500`}
                     onChange={(e) => updateProduct_({ mpn: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>GTIN / EAN / UPC</label>
-                  <input className={inp} value={product.gtin} placeholder="e.g. 6970000000001"
+                  <label className={lbl}>GTIN / EAN / UPC<FieldHelp {...IDENTIFIER_HELP.gtin} /></label>
+                  <input className={inp} value={product.gtin} placeholder={`${t("sup.eg", "e.g.")} 6970000000001`}
                     onChange={(e) => updateProduct_({ gtin: e.target.value })} />
                   {(() => {
                     const g = product.gtin.replace(/\s/g, "");
@@ -3552,65 +3679,65 @@ export default function ProductForm({ productId }: Props) {
                       return (10 - (sum % 10)) % 10 === cd;
                     })();
                     return ok ? null : (
-                      <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">Check the GTIN — not a valid 8/12/13/14-digit barcode.</p>
+                      <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">{t("idf.gtinInvalid", "Check the GTIN — not a valid 8/12/13/14-digit barcode.")}</p>
                     );
                   })()}
                 </div>
                 <div>
-                  <label className={lbl}>Internal SKU</label>
-                  <input className={inp} value={product.internal_sku} placeholder="KOLEEX internal stock code"
+                  <label className={lbl}>{t("idf.internalSku", "Internal SKU")}<FieldHelp {...IDENTIFIER_HELP.internalSku} /></label>
+                  <input className={inp} value={product.internal_sku} placeholder={t("idf.internalSkuPh", "KOLEEX internal stock code")}
                     onChange={(e) => updateProduct_({ internal_sku: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Generation / version</label>
-                  <input className={inp} value={product.generation} placeholder="e.g. Gen 2 / v3"
+                  <label className={lbl}>{t("idf.generation", "Generation / version")}<FieldHelp {...IDENTIFIER_HELP.generation} /></label>
+                  <input className={inp} value={product.generation} placeholder={`${t("sup.eg", "e.g.")} Gen 2 / v3`}
                     onChange={(e) => updateProduct_({ generation: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Old model no. / legacy code</label>
-                  <input className={`${inp} font-mono`} value={product.legacy_code} placeholder="Pre-KOLEEX code (cross-reference)"
+                  <label className={lbl}>{t("idf.legacyCode", "Old model no. / legacy code")}<FieldHelp {...IDENTIFIER_HELP.legacyCode} /></label>
+                  <input className={`${inp} font-mono`} value={product.legacy_code} placeholder={t("idf.legacyCodePh", "Pre-KOLEEX code (cross-reference)")}
                     onChange={(e) => updateProduct_({ legacy_code: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Model year</label>
-                  <input className={inp} value={product.model_year} placeholder="e.g. 2025"
+                  <label className={lbl}>{t("idf.modelYear", "Model year")}<FieldHelp {...IDENTIFIER_HELP.modelYear} /></label>
+                  <input className={inp} value={product.model_year} placeholder={`${t("sup.eg", "e.g.")} 2025`}
                     onChange={(e) => updateProduct_({ model_year: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Launch date</label>
+                  <label className={lbl}>{t("idf.launchDate", "Launch date")}<FieldHelp {...IDENTIFIER_HELP.launchDate} /></label>
                   <input type="date" className={inp} value={product.launch_date}
                     onChange={(e) => updateProduct_({ launch_date: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>End-of-life date</label>
+                  <label className={lbl}>{t("idf.eolDate", "End-of-life date")}<FieldHelp {...IDENTIFIER_HELP.eolDate} /></label>
                   <input type="date" className={inp} value={product.eol_date}
                     onChange={(e) => updateProduct_({ eol_date: e.target.value })} />
                   {product.launch_date && product.eol_date && product.eol_date <= product.launch_date && (
-                    <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">End-of-life is on or before the launch date.</p>
+                    <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">{t("idf.eolBeforeLaunch", "End-of-life is on or before the launch date.")}</p>
                   )}
                 </div>
                 <div>
-                  <label className={lbl}>Available from</label>
+                  <label className={lbl}>{t("idf.availableFrom", "Available from")}<FieldHelp {...IDENTIFIER_HELP.availableFrom} /></label>
                   <input type="date" className={inp} value={product.available_from}
                     onChange={(e) => updateProduct_({ available_from: e.target.value })} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Order window opens.</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("idf.orderWindowOpens", "Order window opens.")}</p>
                 </div>
                 <div>
-                  <label className={lbl}>Last-order date</label>
+                  <label className={lbl}>{t("idf.lastOrderDate", "Last-order date")}<FieldHelp {...IDENTIFIER_HELP.lastOrderDate} /></label>
                   <input type="date" className={inp} value={product.last_order_date}
                     onChange={(e) => updateProduct_({ last_order_date: e.target.value })} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Order cut-off (before EOL).</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("idf.orderCutoff", "Order cut-off (before EOL).")}</p>
                 </div>
                 <div>
-                  <label className={lbl}>Status reason</label>
-                  <input className={inp} value={product.status_reason} placeholder="e.g. Replaced by XSL-9100"
+                  <label className={lbl}>{t("idf.statusReason", "Status reason")}<FieldHelp {...IDENTIFIER_HELP.statusReason} /></label>
+                  <input className={inp} value={product.status_reason} placeholder={`${t("sup.eg", "e.g.")} Replaced by XSL-9100`}
                     onChange={(e) => updateProduct_({ status_reason: e.target.value })} />
                 </div>
 
                 {/* Brand mark / logo override — falls back to the brand's logo
                     on the public page when left empty. */}
                 <div className="md:col-span-3">
-                  <label className={lbl}>Brand mark / logo override</label>
+                  <label className={lbl}>{t("idf.brandMark", "Brand mark / logo override")}<FieldHelp {...IDENTIFIER_HELP.brandMark} /></label>
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                       {product.brand_mark_url ? (
@@ -3620,7 +3747,7 @@ export default function ProductForm({ productId }: Props) {
                         <ImageRawIcon className="h-5 w-5 text-[var(--text-ghost)]" />
                       )}
                     </div>
-                    <input type="text" className={`${inp} flex-1`} value={product.brand_mark_url} placeholder="Paste image URL, or upload →"
+                    <input type="text" className={`${inp} flex-1`} value={product.brand_mark_url} placeholder={t("idf.brandMarkPh", "Paste image URL, or upload →")}
                       onChange={(e) => updateProduct_({ brand_mark_url: e.target.value })} />
                     <label className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
                       <CameraIcon className="h-3.5 w-3.5" /> Upload
@@ -3635,24 +3762,24 @@ export default function ProductForm({ productId }: Props) {
                 {/* Revision / version history — small inline log. */}
                 <div className="md:col-span-3">
                   <div className="flex items-center justify-between mb-2">
-                    <label className={lbl}>Revision history</label>
+                    <label className={lbl}>{t("idf.revisionHistory", "Revision history")}<FieldHelp {...IDENTIFIER_HELP.revisionHistory} /></label>
                     <button type="button"
                       onClick={() => updateProduct_({ revision_history: [...product.revision_history, { version: "", date: "", note: "" }] })}
                       className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1">
-                      <PlusIcon className="h-3 w-3" /> Add revision
+                      <PlusIcon className="h-3 w-3" /> {t("idf.addRevision", "Add revision")}
                     </button>
                   </div>
                   {product.revision_history.length === 0 ? (
-                    <p className="text-[10px] text-[var(--text-ghost)]">No revisions logged.</p>
+                    <p className="text-[10px] text-[var(--text-ghost)]">{t("idf.noRevisions", "No revisions logged.")}</p>
                   ) : (
                     <div className="space-y-2">
                       {product.revision_history.map((r, i) => (
                         <div key={i} className="grid grid-cols-1 md:grid-cols-[120px_140px_1fr_auto] gap-2 items-center">
-                          <input className={inp} value={r.version} placeholder="v / rev"
+                          <input className={inp} value={r.version} placeholder={t("idf.revVersionPh", "v / rev")}
                             onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], version: e.target.value }; updateProduct_({ revision_history: next }); }} />
                           <input type="date" className={inp} value={r.date}
                             onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], date: e.target.value }; updateProduct_({ revision_history: next }); }} />
-                          <input className={inp} value={r.note} placeholder="What changed"
+                          <input className={inp} value={r.note} placeholder={t("idf.revNotePh", "What changed")}
                             onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], note: e.target.value }; updateProduct_({ revision_history: next }); }} />
                           <button type="button" onClick={() => updateProduct_({ revision_history: product.revision_history.filter((_, j) => j !== i) })}
                             className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] transition-colors">
@@ -3665,14 +3792,14 @@ export default function ProductForm({ productId }: Props) {
                 </div>
 
                 <div className="md:col-span-3">
-                  <label className={lbl}>Alternate names / aliases</label>
+                  <label className={lbl}>{t("idf.alternateNames", "Alternate names / aliases")}<FieldHelp {...IDENTIFIER_HELP.alternateNames} /></label>
                   <TagsInput
                     tags={product.alternate_names}
                     onChange={(alternate_names) => updateProduct_({ alternate_names })}
                     suggestions={[]}
                     t={t}
                   />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Helps search + matching. Press Enter or comma to add each alias.</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("idf.aliasHint", "Helps search + matching. Press Enter or comma to add each alias.")}</p>
                 </div>
               </div>
             </Section>
