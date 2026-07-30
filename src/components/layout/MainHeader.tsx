@@ -150,7 +150,16 @@ export default function MainHeader() {
           aria-label="Koleex Hub"
           className={`shrink-0 flex items-center ${dk ? "text-white" : "text-black"}`}
         >
-          <KoleexLogo className="w-auto h-4 md:h-[18px]" />
+          {/* Hub logo v2 (owner-approved option B) — the script "hub" makes
+              the lockup taller than the bare wordmark, so the img runs larger
+              to keep KOLEEX at its familiar optical size. Theme-matched PNGs
+              from public/brand/hub-logo. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.png" : "/brand/hub-logo/koleex-hub-logo-for-light.png"}
+            alt="Koleex Hub"
+            className="w-auto h-5 md:h-8"
+          />
         </Link>
         {appName && (
           <>
