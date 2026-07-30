@@ -3,7 +3,8 @@
    These mirror the DB row types but are optimized for form editing.
    --------------------------------------------------------------------------- */
 
-import type { ProductMediaType } from "./supabase";
+import type {
+  FeatureCard, ProductMediaType } from "./supabase";
 
 export type ProductStatus = "draft" | "active" | "archived";
 export type ModelStatus = "active" | "discontinued";
@@ -46,6 +47,7 @@ export interface ProductFormState {
   /* 3-5 bullet strings rendered on the public product hero
      ("Max 5000 SPM", "Auto thread trimmer", "2-year warranty"). */
   highlights: string[];
+  feature_cards: FeatureCard[];
   description: string;
   specs: Record<string, string>;
   supports_head_only: boolean;
@@ -334,6 +336,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   tags: [],
   excerpt: "",
   highlights: [],
+  feature_cards: [],
   description: "",
   specs: {},
   supports_head_only: false,

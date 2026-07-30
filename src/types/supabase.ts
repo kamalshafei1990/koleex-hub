@@ -265,7 +265,17 @@ export interface SubcategoryRow {
   code: string | null;
 }
 
+/** One "Main Devices & Functions" photo card — universal across all
+ *  categories: photo + title + short description, shown as a card grid
+ *  on the public product page. */
+export interface FeatureCard {
+  image_url: string;
+  title: string;
+  description: string;
+}
+
 export interface ProductRow {
+  feature_cards?: FeatureCard[] | null;
   id: string;
   product_name: string;
   slug: string;

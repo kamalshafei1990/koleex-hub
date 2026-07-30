@@ -1903,6 +1903,42 @@ export default function LegacyProductView() {
         </section>
       )}
 
+      {/* ── SECTION 4.4 — MAIN DEVICES & FUNCTIONS ──────────────────
+          Catalog-style photo cards: one card per device/function/part
+          (photo + title + short description), authored per product in
+          the admin form. Universal across categories — renders only
+          when cards exist. */}
+      {product.feature_cards && product.feature_cards.length > 0 && (
+        <section id="devices" className="bg-[var(--bg-card)]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 md:py-28">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)] text-center">
+              Main Devices & Functions
+            </p>
+            <h2 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-[-0.018em] leading-[1.12] text-[var(--text-primary)] text-center">
+              What makes it work.
+            </h2>
+            <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {product.feature_cards.map((c, i) => (
+                <div key={i} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+                  {c.image_url && (
+                    <div className="w-full aspect-[16/10] bg-[var(--bg-surface)] overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.image_url} alt={c.title} className="h-full w-full object-contain p-2" loading="lazy" decoding="async" />
+                    </div>
+                  )}
+                  <div className="p-5">
+                    <h3 className="text-[15px] font-semibold text-[var(--text-primary)] leading-snug">{c.title}</h3>
+                    {c.description && (
+                      <p className="mt-1.5 text-[13px] text-[var(--text-muted)] leading-relaxed">{c.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── SECTION 4.5 — MODELS / VARIANTS ─────────────────────────
           Renders only when the product has 2+ visible models. Each
           model card carries its own image (model-scoped media if
