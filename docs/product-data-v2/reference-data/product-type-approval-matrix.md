@@ -69,6 +69,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 |---|---|---|---|---|---|---|
 | Fabric Relaxing | XPRR | **Confirmed** | fabric_suit, method | plaiter | knits | live |
 | Tubular Opening/Slitting | XPRK | Proposed | tubular_width, method | plaiter | knit T-shirt | new |
+| Pre-shrinking / Sponging | XPRP | **Confirmed** | fabric_suitability, heating_method | cooling_zone | pre-cut stabilising | CL-0014 sign-off 2026-07-31; live subcategory |
 | Fabric Inspection | XPRI | **Confirmed** | width, method | ai_defect | all | live |
 | Fabric Winding/Rolling | XPRL | **Confirmed** | width, roll_capacity | counter | all | live |
 | Fabric Spreading | XPRS | **Confirmed** | width, automation | edge_align, end_cutter | all | live |
@@ -248,6 +249,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Cloth Notcher | — | XCN | Approve | No |
 | Fabric Relaxing | XPRR | XPRR | Freeze | No |
 | Tubular Opening/Slitting | — | XPRK | Approve | No |
+| Pre-shrinking / Sponging | — | XPRP | **Approved (CL-0014)** | No |
 | Fabric Inspection | XPRI | XPRI | Freeze | No |
 | Fabric Winding/Rolling | XPRL | XPRL | Freeze | No |
 | Fabric Spreading | XPRS | XPRS | Freeze | No |

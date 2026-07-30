@@ -410,7 +410,7 @@ export const SPEC_NAME_I18N: Translations = {
   "s:fabric-inspection.v1": { en: "Fabric Inspection Machine", zh: "验布机", ar: "ماكينة فحص القماش" },
   "s:fabric-rolling.v1": { en: "Fabric Rolling / Winding Machine", zh: "卷布机", ar: "ماكينة لف القماش" },
   "s:fabric-cutting-table.v1": { en: "Fabric Spreading / Cutting Table", zh: "铺布/裁剪台", ar: "طاولة فرد/قص القماش" },
-  "s:fabric-preshrink.v1": { en: "Fabric Handling / Pre-shrinking System", zh: "面料预缩系统", ar: "نظام معالجة/تعييش القماش" },
+  "s:fabric-preshrink.v1": { en: "Fabric Pre-shrinking Machine", zh: "面料预缩定型机", ar: "ماكينة تكميش الأقمشة" },
 };
 
 /* ── Field descriptions, keyed by the exact English sentence ── */

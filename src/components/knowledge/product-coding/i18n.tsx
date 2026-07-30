@@ -878,6 +878,8 @@ const LBL: Record<string, Record<Lang, string>> = {
   // ── Subcategories ────────────────────────────────────────────
   // XPR
   "Spreading Machines": { en: "Spreading Machines", zh: "铺布机", ar: "آلات النشر" },
+  "Fabric Shrinking Machines": { en: "Fabric Shrinking Machines", zh: "面料预缩定型机", ar: "ماكينات تكميش الأقمشة" },
+  "Fusing Machines": { en: "Fusing Machines", zh: "粘合机", ar: "ماكينات اللصق الحراري" },
   "Fabric Relaxing Machines": { en: "Fabric Relaxing Machines", zh: "面料松弛机", ar: "آلات استرخاء القماش" },
   "Fabric Inspection Machines": { en: "Fabric Inspection Machines", zh: "面料检验机", ar: "آلات فحص القماش" },
   "Fabric Rolling Machines": { en: "Fabric Rolling Machines", zh: "面料卷绕机", ar: "آلات لفّ القماش" },

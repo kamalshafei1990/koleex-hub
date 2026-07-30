@@ -30,7 +30,7 @@ Field marks: `[KEPT]` owner's field, unchanged in meaning · `[FIXED]` owner's f
 | XPRI 面料检验机 (Inspection machine) | **✅ XPRI — Fabric Inspection Machine** | Match. |
 | XPRL 面料卷绕机 (“Looping machine”) | **✅ XPRL — Fabric Winding / Rolling Machine** | “Looping” was a mistranslation of 卷绕 (winding). |
 | XPRT 裁布台 (Cutting table) | **✅ XPRT — Fabric Spreading/Cutting Table** | Match. |
-| XPRH 面料处理系统 (Processing system) | **▲ XPRP — Fabric Pre-shrinking / Sponging Machine (PROPOSED)** | **XPRH is already taken** (Calender / Rotary Heat Press, types-master §Transfer). The steam-relax + cool pre-shrink tunnel needs its own token → XPRP proposed. |
+| XPRH 面料处理系统 (Processing system) | **✅ XPRP — Fabric Pre-shrinking / Sponging Machine (APPROVED, CL-0014 · 2026-07-31)** | XPRP signed off; live DB subcategory `fabric-shrinking-machines` (code XPRP) created under fabric-preparation and the fabric-preshrink spec template re-keyed to it. XPRH-for-Handling stopgap retired. |
 
 ## 2. Canonical terminology (one token per concept)
 
@@ -51,7 +51,7 @@ The collected lists used several names for the same concept. Canonical picks:
 |---|---|
 | 1 | **[HELD]** XPRS field 「故障换阻抗ZP / fault impedance replacement ZP」 — garbled translation. What was meant? (photo-electric edge sensor? power-failure protection?) Field is parked, not lost. |
 | 2 | `max_width` is required by types-master §D but absent from the facet dictionary (which has `working_width`). Decide: alias `max_width → working_width`, or add `max_width` as its own dictionary entry. Templates below use `max_width` pending the call. |
-| 3 | ▲ **XPRP** type sign-off (change-log entry drafted; approval-matrix row follows sign-off). |
+| 3 | ✅ **XPRP** signed off (CL-0014 · 2026-07-31); approval-matrix + types-master rows added; live subcategory created. |
 
 ---
 
@@ -173,7 +173,7 @@ Sections: A · **B below** · C · D · E · F · G
 | sectioned_vacuum | 分段吸风 | boolean | — | [ADDED — comparison facet] |
 | spreader_rails_compat | 铺布机导轨兼容 | boolean/text | — | [ADDED — device compatibility] |
 
-### 5.6 ▲ XPRP — Fabric Pre-shrinking / Sponging Machine 面料预缩机 (PROPOSED)
+### 5.6 ✅ XPRP — Fabric Pre-shrinking / Sponging Machine 面料预缩机 (APPROVED · CL-0014)
 *(the owner's 「XPRH 面料处理系统」 — renamed per §1; all fields kept)*
 | Field | 中文 | Type | Unit | Mark |
 |---|---|---|---|---|

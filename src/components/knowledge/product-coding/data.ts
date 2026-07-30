@@ -94,6 +94,8 @@ export const CATEGORIES: Category[] = [
       { code: "XPRL", label: "Fabric Rolling Machines" },
       { code: "XPRT", label: "Fabric Cutting Tables" },
       { code: "XPRH", label: "Fabric Handling Systems" },
+      { code: "XPRP", label: "Fabric Shrinking Machines" },
+      { code: "XFFP", label: "Fusing Machines" },
     ],
   },
   {

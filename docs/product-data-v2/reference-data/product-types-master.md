@@ -75,6 +75,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XPRT | Fabric Spreading/Cutting Table | surface_type, length, width | surface_type, length, sectioned_vacuum | conveyor_top, spreader_rails |
 | ▲ XPRSR| Fabric Roll Storage/Racking System | system_type, roll_capacity, max_roll_weight | system_type, roll_capacity | automated_retrieval, inventory_tracking |
 | ▲ XPRCF| Fabric Cradle/Feeding System | feed_type, max_roll_weight, motorized | feed_type, motorized | motorized_letoff, turntable, splice_table |
+| ✅ XPRP | Fabric Pre-shrinking / Sponging Machine | fabric_suitability, max_width, heating_method | heating_method, cooling_method, max_working_speed | steam_generator, edge_alignment, cooling_zone |
 
 ## E. Finishing Equipment  (Category XF)
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |

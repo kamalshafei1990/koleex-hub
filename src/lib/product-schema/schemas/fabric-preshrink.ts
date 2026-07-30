@@ -1,13 +1,10 @@
 /**
- * Fabric Handling / Pre-shrinking Systems — subcategory code XPRH (v1)
+ * Fabric Pre-shrinking / Sponging Machines — subcategory code XPRP (v1)
  *
- * The owner's 「面料处理系统」 (steam pre-shrink + cooling tunnel). NOTE on the
- * code: the live DB subcategory under fabric-preparation is "XPRH — Fabric
- * Handling Systems"; the types-master reserves XPRH for the Rotary Heat Press
- * (different category), and ▲ XPRP is the PROPOSED replacement token — the
- * resolver keys on division|category|subcategory so the reuse is unambiguous
- * here. When governance renames the subcategory to XPRP, only
- * `subcategoryCode` below changes. Templates only — no values here.
+ * The owner's 「面料预缩定型机」 (steam pre-shrink + cooling tunnel). XPRP was
+ * approved 2026-07-31 (CL-0014) as its own subcategory under fabric
+ * preparation — this schema now keys on it directly; the old XPRH
+ * (Fabric Handling) stopgap is retired. Templates only — no values here.
  */
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
@@ -23,8 +20,8 @@ export const FABRIC_PRESHRINK_SCHEMA: ProductSchemaDefinition = {
   id: "fabric-preshrink.v1",
   divisionCode: "garment-machinery",
   categoryCode: "fabric-preparation",
-  subcategoryCode: "XPRH",
-  name: "Fabric Handling / Pre-shrinking System",
+  subcategoryCode: "XPRP",
+  name: "Fabric Pre-shrinking Machine",
   version: "1.0.0",
   appliesTo: {
     description:
