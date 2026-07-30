@@ -63,7 +63,6 @@ import CommercialSidebarIcon from "@/components/icons/CommercialSidebarIcon";
 import FinanceSidebarIcon from "@/components/icons/FinanceSidebarIcon";
 import PeopleSidebarIcon from "@/components/icons/PeopleSidebarIcon";
 import CommunicationSidebarIcon from "@/components/icons/CommunicationSidebarIcon";
-import MarketingSidebarIcon from "@/components/icons/MarketingSidebarIcon";
 import PlanningSidebarIcon from "@/components/icons/PlanningSidebarIcon";
 import KnowledgeSidebarIcon from "@/components/icons/KnowledgeSidebarIcon";
 import SystemSidebarIcon from "@/components/icons/SystemSidebarIcon";
@@ -282,7 +281,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["sales", "crm", "quotations", "invoices", "customers", "suppliers", "contacts", "markets"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",
@@ -296,22 +295,19 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.people",
     label: "People",
     icon: PeopleSidebarIcon,
-    appIds: ["management", "employees", "hr"],
+    appIds: ["hr", "employees", "management"],
   },
   {
     id: "communication",
     tKey: "cat.communication",
     label: "Communication",
     icon: CommunicationSidebarIcon,
-    appIds: ["discuss", "calendar", "todo", "notes", "translator"],
+    appIds: ["todo", "discuss", "calendar", "notes"],
   },
-  {
-    id: "marketing",
-    tKey: "cat.marketing",
-    label: "Marketing & Growth",
-    icon: MarketingSidebarIcon,
-    appIds: ["website", "marketing", "marketing-cards", "events"],
-  },
+  /* "Marketing & Growth" group dissolved 2026-07-31 (owner-approved): it
+     rendered a single live item (Website, ~7 events/30d). Website now lives
+     under Commercial as a commercial channel; marketing/marketing-cards/
+     events return with their own group when they actually ship. */
   {
     id: "planning",
     tKey: "cat.planning",
@@ -324,7 +320,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.knowledge",
     label: "Knowledge",
     icon: KnowledgeSidebarIcon,
-    appIds: ["knowledge", "database", "ai"],
+    appIds: ["knowledge", "database", "ai", "translator"],
   },
   {
     id: "system",

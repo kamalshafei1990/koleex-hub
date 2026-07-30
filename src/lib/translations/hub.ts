@@ -80,7 +80,7 @@ export const hubT: Translations = {
   "app.planning":        { en: "Planning",         zh: "规划",              ar: "التخطيط" },
   "app.projects":        { en: "Projects",         zh: "项目",              ar: "المشاريع" },
   "app.knowledge":       { en: "Knowledge",        zh: "知识库",            ar: "قاعدة المعرفة" },
-  "app.database":        { en: "Database",         zh: "数据库",            ar: "قاعدة البيانات" },
+  "app.database":        { en: "Visual Library",   zh: "视觉资料库",         ar: "المكتبة البصرية" },
   "app.ai":              { en: "Koleex AI",        zh: "Koleex AI",        ar: "Koleex AI" },
   "app.settings":        { en: "Settings",         zh: "设置",              ar: "الإعدادات" },
   "app.accounts":        { en: "Accounts",         zh: "账户管理",          ar: "الحسابات" },
