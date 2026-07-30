@@ -34,7 +34,6 @@ import CameraIcon from "@/components/icons/ui/CameraIcon";
 import { FieldHelp, SUPPLIER_LINK_HELP as H } from "@/components/admin/form-sections/FieldHelp";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
-const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
 const SOURCING_STATUS: { value: string; label: string }[] = [
   { value: "preferred", label: "Preferred" },
   { value: "backup", label: "Backup" },
@@ -424,13 +423,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
 
                 {/* Per-product link fields (product-specific — not on the supplier record) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className={lbl}>{t("sup.incoterms", "Incoterms")}<FieldHelp {...H.incoterms} /></label>
-                    <select className={inp} value={l.incoterms} onChange={(e) => update(l._tempId, { incoterms: e.target.value })}>
-                      <option value="">—</option>
-                      {INCOTERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
+                  {/* Incoterms intentionally removed (owner, 2026-07-31):
+                      it duplicated the "Cost includes" basis the pricing
+                      engine reads, and domestic-China sourcing doesn't use
+                      trade terms — they live on the customer side in
+                      Quotations. Column kept; reintroduce per-supplier if
+                      overseas sourcing ever starts. */}
                   <div>
                     <label className={lbl}>{t("sup.sampleCost", "Sample cost")}<FieldHelp {...H.sampleCost} /></label>
                     <input className={inp} value={l.sample_cost} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 200`}
