@@ -290,8 +290,9 @@ export const accountsT: Translations = {
   "acc.access.group.people":         { en: "People",                                                             zh: "人员",                                                               ar: "الأشخاص" },
   "acc.access.group.communication":  { en: "Communication",                                                      zh: "沟通",                                                               ar: "التواصل" },
   "acc.access.group.marketing":      { en: "Marketing & Growth",                                                 zh: "营销与增长",                                                          ar: "التسويق والنمو" },
-  "acc.access.group.planning":       { en: "Planning & Knowledge",                                               zh: "规划与知识",                                                          ar: "التخطيط والمعرفة" },
+  "acc.access.group.planning":       { en: "Planning",                                                           zh: "规划",                                                               ar: "التخطيط" },
   "acc.access.group.system":         { en: "System",                                                             zh: "系统",                                                               ar: "النظام" },
+  "acc.access.group.knowledge":      { en: "Knowledge",                                                          zh: "知识",                                                               ar: "المعرفة" },
 
   /* ── Preferences tab ── */
   "acc.prefs.general":               { en: "General",                                                            zh: "常规",                                                               ar: "عام" },
@@ -520,6 +521,13 @@ export const accountsT: Translations = {
   "acc.shared.reset":                { en: "Reset",                                                              zh: "重置",                                                               ar: "إعادة تعيين" },
 
   /* ── Access Rights — Module names ── */
+  "acc.mod.Product Data":          { en: "Product Data",                zh: "产品数据",           ar: "بيانات المنتجات" },
+  "acc.mod.Purchases":             { en: "Purchases",                   zh: "采购",              ar: "المشتريات" },
+  "acc.mod.Notes":                 { en: "Notes",                       zh: "笔记",              ar: "الملاحظات" },
+  "acc.mod.Translator":            { en: "Translator",                  zh: "翻译",              ar: "المترجم" },
+  "acc.mod.Database":              { en: "Database",                    zh: "数据库",             ar: "قاعدة البيانات" },
+  "acc.mod.Commercial Policy":     { en: "Commercial Policy",           zh: "商务政策",           ar: "السياسة التجارية" },
+  "acc.mod.Mail":                  { en: "Mail",                        zh: "邮件",              ar: "البريد" },
   "acc.mod.Products":              { en: "Products",                    zh: "产品",              ar: "المنتجات" },
   "acc.mod.Products > Categories": { en: "Product categories & subcategories", zh: "产品分类与子分类", ar: "فئات المنتجات والفئات الفرعية" },
   "acc.mod.Products > Brands":     { en: "Brand management",            zh: "品牌管理",           ar: "إدارة العلامات التجارية" },

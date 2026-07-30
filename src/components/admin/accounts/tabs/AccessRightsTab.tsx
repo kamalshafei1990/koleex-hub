@@ -37,6 +37,7 @@ import { replacePermissionOverrides, fetchRoles } from "@/lib/accounts-admin";
 import { createRole, upsertPermissions } from "@/lib/management-admin";
 import { fetchPermissions, type PermissionRow } from "@/lib/management-admin";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { PERMISSION_GROUPS as REGISTRY_PERMISSION_GROUPS } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
 import {
@@ -59,71 +60,25 @@ interface ModuleWithSubs {
   subs?: SubModule[];
 }
 
-const PERMISSION_GROUPS: { key: string; label: string; modules: ModuleWithSubs[] }[] = [
-  {
-    key: "operations",
-    label: "Operations",
-    modules: [
-      { name: "Products", subs: [
-        { name: "Products > Categories", description: "Product categories & subcategories" },
-        { name: "Products > Brands", description: "Brand management" },
-        { name: "Products > Cost Price", description: "View cost/supplier pricing" },
-      ]},
-      { name: "Inventory" },
-      { name: "Purchase" },
-      { name: "Landed Cost" },
-      { name: "Catalogs" },
-      { name: "Documents" },
-    ],
-  },
-  {
-    key: "commercial",
-    label: "Commercial",
-    modules: [
-      { name: "Sales" },
-      { name: "CRM" },
-      { name: "Quotations" },
-      { name: "Invoices" },
-      { name: "Customers" },
-      { name: "Suppliers" },
-      { name: "Contacts" },
-      { name: "Markets" },
-    ],
-  },
-  { key: "finance", label: "Finance", modules: [{ name: "Finance" }, { name: "Expenses" }] },
-  {
-    key: "people",
-    label: "People",
-    modules: [
-      { name: "Management" },
-      { name: "Employees" },
-      { name: "HR" },
-      { name: "Recruitment" },
-      { name: "Appraisals" },
-      { name: "Attendance" },
-    ],
-  },
-  {
-    key: "communication",
-    label: "Communication",
-    modules: [{ name: "Discuss" }, { name: "Calendar" }, { name: "To-do" }, { name: "Koleex Mail" }],
-  },
-  {
-    key: "marketing",
-    label: "Marketing & Growth",
-    modules: [{ name: "Website" }, { name: "Marketing" }, { name: "Events" }],
-  },
-  {
-    key: "planning",
-    label: "Planning & Knowledge",
-    modules: [{ name: "Planning" }, { name: "Projects" }, { name: "Knowledge" }, { name: "AI" }],
-  },
-  {
-    key: "system",
-    label: "System",
-    modules: [{ name: "Accounts" }, { name: "Settings" }, { name: "Brands" }, { name: "Price Calculator" }, { name: "Dashboard" }],
-  },
-];
+/* One source of truth: the registry-derived module list shared with the
+   Roles page (lib/permission-modules). The tab used to carry its own
+   hand-written copy, so newly shipped apps (Product Data, Translator, …)
+   never appeared here even though Roles could govern them. Sub-modules
+   are a per-module refinement this tab and Roles both render. */
+const MODULE_SUBS: Record<string, SubModule[]> = {
+  Products: [
+    { name: "Products > Categories", description: "Product categories & subcategories" },
+    { name: "Products > Brands", description: "Brand management" },
+    { name: "Products > Cost Price", description: "View cost/supplier pricing" },
+  ],
+};
+
+const PERMISSION_GROUPS: { key: string; label: string; modules: ModuleWithSubs[] }[] =
+  REGISTRY_PERMISSION_GROUPS.map((g) => ({
+    key: g.id,
+    label: g.label,
+    modules: g.modules.map((name) => ({ name, subs: MODULE_SUBS[name] })),
+  }));
 
 // Flat list of all module names including sub-modules
 const ALL_MODULES: string[] = PERMISSION_GROUPS.flatMap((g) =>
@@ -550,7 +505,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
           {!isSub && AppIcon && <AppIcon size={13} className={`shrink-0 ${any ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`} />}
           {isSub && <span className="text-[var(--text-faint)] text-[10px]">↳</span>}
           <span className={`text-[12px] font-medium truncate ${any ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`}>
-            {isSub ? t(`acc.mod.${mod}`) : t(`acc.mod.${mod}`)}
+            {t(`acc.mod.${mod}`, mod)}
           </span>
           {overridden && (
             <span className="px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-sky-500/15 text-sky-300 border border-sky-500/30 shrink-0">
@@ -704,21 +659,21 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
       )}
 
       {/* Permission groups */}
-      {PERMISSION_GROUPS.map((group) => {
+      {PERMISSION_GROUPS.map((group, groupIdx) => {
         const collapsed = collapsedGroups.has(group.key);
         const stats = getGroupStats(group);
         const allMods = group.modules.flatMap((m) => [m.name, ...(m.subs?.map((s) => s.name) || [])]);
         const allGroupOn = allMods.every((m) => isFullAccess(perms[m] || EMPTY_PERMS));
 
         return (
-          <section key={group.key} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] overflow-hidden min-w-0">
+          <section key={`${group.key}-${groupIdx}`} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] overflow-hidden min-w-0">
             {/* Group header */}
             <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-surface-subtle)]">
               <button onClick={() => toggleGroupCollapse(group.key)}
                 className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface)]">
                 {collapsed ? <AngleRightIcon size={12} className="text-[var(--text-dim)]" /> : <AngleDownIcon size={12} className="text-[var(--text-dim)]" />}
               </button>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">{t(`acc.access.group.${group.key}`)}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">{t(`acc.access.group.${group.key}`, group.label)}</span>
               <span className="text-[10px] font-medium text-[var(--text-faint)] mr-2">{stats.pct}%</span>
               <button onClick={() => toggleGroupAll(group)}
                 className={`h-6 px-2 rounded-md text-[10px] font-semibold border transition-all ${
@@ -767,7 +722,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
                             </button>
                           )}
                           {AppIcon && <AppIcon size={13} className={`shrink-0 ${any ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`} />}
-                          <span className={`text-[12px] font-medium truncate ${any ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`}>{t(`acc.mod.${mod.name}`)}</span>
+                          <span className={`text-[12px] font-medium truncate ${any ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`}>{t(`acc.mod.${mod.name}`, mod.name)}</span>
                           {overridden && (
                             <span className="px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-sky-500/15 text-sky-300 border border-sky-500/30 shrink-0">
                               {t("acc.access.override")}
