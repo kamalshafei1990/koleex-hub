@@ -569,7 +569,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 </span>
                 {str(s, "country") ? (
                   <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
-                    <MapPinIcon className="h-3 w-3" /> {[str(s, "city"), str(s, "country")].filter(Boolean).join(", ")}
+                    <MapPinIcon className="h-3 w-3" /> {[str(s, "city"), str(s, "province"), str(s, "country")].filter(Boolean).join(", ")}
                   </span>
                 ) : null}
                 {(() => {
