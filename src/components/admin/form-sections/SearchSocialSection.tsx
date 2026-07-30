@@ -10,6 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import SearchIcon from "@/components/icons/ui/SearchIcon";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 
@@ -25,7 +27,6 @@ interface Props {
   primaryImageUrl?: string;
   primaryModel?: string;
   categoryName?: string;
-  onExcerptChange: (v: string) => void;
   /* Stored SEO overrides — blank falls back to the derived
      title / excerpt / main image. */
   metaTitle?: string;
@@ -50,7 +51,6 @@ export default function SearchSocialSection({
   primaryImageUrl,
   primaryModel,
   categoryName,
-  onExcerptChange,
   metaTitle: metaTitleOverride,
   metaDescription: metaDescriptionOverride,
   ogImageUrl: ogImageOverride,
@@ -58,7 +58,8 @@ export default function SearchSocialSection({
   onMetaDescriptionChange,
   onOgImageUrlChange,
 }: Props) {
-  const name = productName.trim() || "Product name";
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const name = productName.trim() || t("seo.productNameFallback", "Product name");
   const derivedTitle = `${name}${brand ? ` | ${brand}` : ""}`;
   const metaTitle = (metaTitleOverride || "").trim() || derivedTitle;
   const desc = ((metaDescriptionOverride || "").trim() || excerpt.trim());
@@ -67,7 +68,7 @@ export default function SearchSocialSection({
      Social/OG image URL still wins when the operator explicitly sets one. */
   const customOg = (ogImageOverride || "").trim();
   const modelCode = (primaryModel || "").trim();
-  const previewDesc = desc || "Add a short description to control how this product reads in search results and shared links.";
+  const previewDesc = desc || t("seo.previewDescFallback", "Add a short description to control how this product reads in search results and shared links.");
   const path = slug ? `products › ${slug}` : "products › product-slug";
   const editable = !!(onMetaTitleChange || onMetaDescriptionChange || onOgImageUrlChange);
 
@@ -78,16 +79,14 @@ export default function SearchSocialSection({
   return (
     <div className="space-y-5">
       <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">
-        Auto-generated from the product name, brand, slug and short description.
-        Edit those fields on the Identity tab — this is a live preview of how the
-        product appears in search and when shared.
+        {t("seo.intro", "Auto-generated from the product name, brand, slug and short description. Edit those fields on the Identity tab — this is a live preview of how the product appears in search and when shared.")}
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ── Google result preview ── */}
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-1.5 mb-3 text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">
-            <SearchIcon className="h-3 w-3" /> Search result
+            <SearchIcon className="h-3 w-3" /> {t("seo.searchResult", "Search result")}
           </div>
           <div className="space-y-0.5">
             <div className="text-[11px] text-[var(--text-muted)] truncate">{SITE} › {path}</div>
@@ -99,7 +98,7 @@ export default function SearchSocialSection({
         {/* ── Social / share card preview ── */}
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-1.5 mb-3 text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">
-            <Share2Icon className="h-3 w-3" /> Social card
+            <Share2Icon className="h-3 w-3" /> {t("seo.socialCard", "Social card")}
           </div>
           <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)]">
             <div className="aspect-[1.91/1] overflow-hidden">
@@ -150,32 +149,30 @@ export default function SearchSocialSection({
       {/* ── Length signals ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-muted)]">Title length</span>
+          <span className="text-[11px] text-[var(--text-muted)]">{t("seo.titleLength", "Title length")}</span>
           <span className={`text-[11px] font-medium ${titleOver ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-secondary)]"}`}>
-            {metaTitle.length} / {TITLE_MAX}{titleOver ? " · long" : ""}
+            {metaTitle.length} / {TITLE_MAX}{titleOver ? ` · ${t("seo.long", "long")}` : ""}
           </span>
         </div>
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-muted)]">Description length</span>
+          <span className="text-[11px] text-[var(--text-muted)]">{t("seo.descLength", "Description length")}</span>
           <span className={`text-[11px] font-medium ${descOver ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-secondary)]"}`}>
-            {descLen} / {DESC_MAX}{descOver ? " · long" : descLen === 0 ? " · empty" : ""}
+            {descLen} / {DESC_MAX}{descOver ? ` · ${t("seo.long", "long")}` : descLen === 0 ? ` · ${t("seo.empty", "empty")}` : ""}
           </span>
         </div>
       </div>
 
-      {/* ── Inline excerpt editor (same field as Identity › Short description) ── */}
+      {/* ── Short description (read-only mirror) — the ONE editor for this
+          field is the hero "Short Description" block above; showing a second
+          editable copy here made the same field editable twice on one tab. */}
       <div>
         <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-          Short description <span className="text-[var(--text-ghost)] font-normal">· drives the search & social description</span>
+          {t("seo.shortDesc", "Short description")} <span className="text-[var(--text-ghost)] font-normal">· {t("seo.shortDescDrives", "drives the search & social description")}</span>
         </label>
-        <textarea
-          value={excerpt}
-          onChange={(e) => onExcerptChange(e.target.value)}
-          rows={2}
-          placeholder="One or two sentences describing this product…"
-          className="w-full px-3 py-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] resize-y"
-        />
-        <p className="text-[10px] text-[var(--text-ghost)] mt-1">{categoryName ? `Category: ${categoryName}. ` : ""}Synced with the Short description on the Identity tab.</p>
+        <p className={`w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/60 border border-dashed border-[var(--border-subtle)] text-[13px] leading-relaxed ${excerpt.trim() ? "text-[var(--text-secondary)]" : "text-[var(--text-ghost)] italic"}`}>
+          {excerpt.trim() || t("seo.shortDescEmpty", "Not written yet.")}
+        </p>
+        <p className="text-[10px] text-[var(--text-ghost)] mt-1">{categoryName ? `${t("seo.category", "Category")}: ${categoryName}. ` : ""}{t("seo.editAbove", "Edited in the Short Description field above — one field, shown here as it will be used.")}</p>
       </div>
 
       {/* ── SEO overrides (optional, stored) ──
@@ -183,9 +180,9 @@ export default function SearchSocialSection({
           shown in the previews above. */}
       {editable && (
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-4 space-y-3">
-          <p className="text-[11px] font-semibold text-[var(--text-muted)]">SEO overrides <span className="font-normal text-[var(--text-ghost)]">· leave blank to use the auto-derived values above</span></p>
+          <p className="text-[11px] font-semibold text-[var(--text-muted)]">{t("seo.overrides", "SEO overrides")} <span className="font-normal text-[var(--text-ghost)]">· {t("seo.overridesHint", "leave blank to use the auto-derived values above")}</span></p>
           <div>
-            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Meta title</label>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">{t("seo.metaTitle", "Meta title")}</label>
             <input
               type="text"
               value={metaTitleOverride || ""}
@@ -195,22 +192,22 @@ export default function SearchSocialSection({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Meta description</label>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">{t("seo.metaDesc", "Meta description")}</label>
             <textarea
               value={metaDescriptionOverride || ""}
               onChange={(e) => onMetaDescriptionChange?.(e.target.value)}
               rows={2}
-              placeholder={excerpt.trim() || "Falls back to the short description"}
+              placeholder={excerpt.trim() || t("seo.fallbackShortDesc", "Falls back to the short description")}
               className="w-full px-3 py-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] resize-y"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Social / OG image URL</label>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">{t("seo.ogImage", "Social / OG image URL")}</label>
             <input
               type="text"
               value={ogImageOverride || ""}
               onChange={(e) => onOgImageUrlChange?.(e.target.value)}
-              placeholder="Falls back to the main product image"
+              placeholder={t("seo.fallbackMainImage", "Falls back to the main product image")}
               className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
             />
           </div>

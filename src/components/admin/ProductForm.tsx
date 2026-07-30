@@ -3189,7 +3189,7 @@ export default function ProductForm({ productId }: Props) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-                        <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("hero.oldModel", "Old Model")}</span>
+                        <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("hero.oldModel", "Old Model")}<FieldHelp {...IDENTIFIER_HELP.legacyCode} /></span>
                       </label>
                       <input
                         type="text"
@@ -3693,11 +3693,9 @@ export default function ProductForm({ productId }: Props) {
                   <input className={inp} value={product.generation} placeholder={`${t("sup.eg", "e.g.")} Gen 2 / v3`}
                     onChange={(e) => updateProduct_({ generation: e.target.value })} />
                 </div>
-                <div>
-                  <label className={lbl}>{t("idf.legacyCode", "Old model no. / legacy code")}<FieldHelp {...IDENTIFIER_HELP.legacyCode} /></label>
-                  <input className={`${inp} font-mono`} value={product.legacy_code} placeholder={t("idf.legacyCodePh", "Pre-KOLEEX code (cross-reference)")}
-                    onChange={(e) => updateProduct_({ legacy_code: e.target.value })} />
-                </div>
+                {/* Old model / legacy code intentionally NOT here — it is edited
+                    once, in the hero identity block next to the KOLEEX code
+                    (same product.legacy_code column). One meaning = one input. */}
                 <div>
                   <label className={lbl}>{t("idf.modelYear", "Model year")}<FieldHelp {...IDENTIFIER_HELP.modelYear} /></label>
                   <input className={inp} value={product.model_year} placeholder={`${t("sup.eg", "e.g.")} 2025`}
@@ -3823,7 +3821,6 @@ export default function ProductForm({ productId }: Props) {
                 primaryImageUrl={mainImageSrc || undefined}
                 primaryModel={primaryModel?.primary_model || primaryModel?.model_name || ""}
                 categoryName={categoryName}
-                onExcerptChange={(v) => updateProduct_({ excerpt: v })}
                 metaTitle={product.meta_title}
                 metaDescription={product.meta_description}
                 ogImageUrl={product.og_image_url}
