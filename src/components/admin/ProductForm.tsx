@@ -593,6 +593,11 @@ export default function ProductForm({ productId }: Props) {
   const [heroTaglineLocale, setHeroTaglineLocale] = useState<string>("zh");
   const [translatingHeroTagline, setTranslatingHeroTagline] = useState(false);
   const [heroTaglineMsg, setHeroTaglineMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  /* ── AI copy suggestions (tagline / excerpt / highlights / tags) ──
+     One in-flight request at a time; aiBusy holds the field being drafted.
+     Suggestions land in form state only — the operator reviews, edits, saves. */
+  const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [aiMsg, setAiMsg] = useState<{ field: string; kind: "error" | "ok"; text: string } | null>(null);
 
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
@@ -1442,6 +1447,65 @@ export default function ProductForm({ productId }: Props) {
       ];
     });
   }, []);
+
+  /* Build the fact sheet the AI writes from: identity + classification +
+     flattened structured specs + plain-text description. English canonical
+     names on purpose — the copy targets the public (English) page. */
+  const buildAiContext = () => {
+    const specs: Record<string, string> = {};
+    for (const [k, v] of Object.entries(product.schema_specs || {})) {
+      if (v === null || v === undefined || v === "") continue;
+      if (typeof v === "object") continue;
+      specs[k] = String(v);
+      if (Object.keys(specs).length >= 40) break;
+    }
+    return {
+      name: product.product_name,
+      brand: product.brand,
+      family: product.family,
+      division: divisions.find(d => d.slug === product.division_slug)?.name,
+      category: categories.find(c => c.slug === product.category_slug)?.name,
+      subcategory: subcategories.find(x => x.slug === product.subcategory_slug)?.name,
+      models: models.map(m => m.primary_model || m.model_name).filter(Boolean).slice(0, 6),
+      specs,
+      description: (product.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500),
+    };
+  };
+
+  const aiSuggest = async (field: "tagline" | "excerpt" | "highlights" | "tags") => {
+    if (aiBusy) return;
+    setAiBusy(field);
+    setAiMsg(null);
+    try {
+      const res = await fetch("/api/ai/product-copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ field, context: buildAiContext() }),
+      });
+      const data = (await res.json()) as { value?: string; values?: string[]; fallback?: boolean; reason?: string; error?: string };
+      if (!res.ok || data.fallback || (!data.value && !data.values)) {
+        const why = data.reason === "no_provider"
+          ? t("ai.noProvider", "AI is off — no provider configured.")
+          : t("ai.failed", "Couldn't draft right now — try again.");
+        setAiMsg({ field, kind: "error", text: why });
+        return;
+      }
+      if (field === "tagline" && data.value) updatePrimaryModel({ tagline: data.value.slice(0, 80) });
+      if (field === "excerpt" && data.value) updateProduct_({ excerpt: data.value });
+      if (field === "highlights" && data.values) updateProduct_({ highlights: data.values.slice(0, 5) });
+      if (field === "tags" && data.values) {
+        const merged = [...product.tags];
+        for (const tag of data.values) if (!merged.some(x => x.toLowerCase() === tag.toLowerCase())) merged.push(tag);
+        updateProduct_({ tags: merged });
+      }
+      setAiMsg({ field, kind: "ok", text: t("ai.done", "Drafted — review before saving.") });
+    } catch {
+      setAiMsg({ field, kind: "error", text: t("ai.failed", "Couldn't draft right now — try again.") });
+    } finally {
+      setAiBusy(null);
+    }
+  };
 
   /* ── Hero localized tagline helpers ── (same shape as the excerpt
      helpers, writing product_translations.tagline). */
@@ -3237,9 +3301,19 @@ export default function ProductForm({ productId }: Props) {
                       into product_translations.excerpt. Sits after the model
                       codes, before the tagline. */}
                   <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-                      <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.shortDesc", "Short Description")}</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.shortDesc", "Short Description")}</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => aiSuggest("excerpt")}
+                        disabled={aiBusy !== null}
+                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        {aiBusy === "excerpt" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
+                      </button>
+                    </div>
                     <textarea
                       value={product.excerpt}
                       onChange={(e) => updateProduct_({ excerpt: e.target.value })}
@@ -3308,6 +3382,9 @@ export default function ProductForm({ productId }: Props) {
                         </div>
                       );
                     })()}
+                    {aiMsg?.field === "excerpt" && (
+                      <p className={`mt-1.5 text-[11px] ${aiMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{aiMsg.text}</p>
+                    )}
                     {heroExcerptMsg && (
                       <p
                         className={`mt-1.5 text-[11px] leading-relaxed ${
@@ -3330,9 +3407,19 @@ export default function ProductForm({ productId }: Props) {
                       <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
                         <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.tagline", "Tagline")}</span>
                       </label>
-                      <span className="text-[10px] text-[var(--text-ghost)]">
-                        {t("hero.taglineMeta").replace("{n}", String((primaryModel?.tagline || "").length))}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-[var(--text-ghost)]">
+                          {t("hero.taglineMeta").replace("{n}", String((primaryModel?.tagline || "").length))}
+                        </span>
+                        <button
+                        type="button"
+                        onClick={() => aiSuggest("tagline")}
+                        disabled={aiBusy !== null}
+                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        {aiBusy === "tagline" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
+                      </button>
+                      </div>
                     </div>
                     <input
                       type="text"
@@ -3401,6 +3488,9 @@ export default function ProductForm({ productId }: Props) {
                         </div>
                       );
                     })()}
+                    {aiMsg?.field === "tagline" && (
+                      <p className={`mt-1.5 text-[11px] ${aiMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{aiMsg.text}</p>
+                    )}
                     {heroTaglineMsg && (
                       <p className={`mt-1.5 text-[11px] leading-relaxed ${heroTaglineMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>
                         {heroTaglineMsg.text}
@@ -3614,6 +3704,19 @@ export default function ProductForm({ productId }: Props) {
               title={t("hero.keyHighlights", "Key Highlights")}
               badge={`${product.highlights.length} / 5`}
             >
+              <div className="flex items-center justify-end mb-2 gap-2">
+                {aiMsg?.field === "highlights" && (
+                  <span className={`text-[10px] ${aiMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{aiMsg.text}</span>
+                )}
+                <button
+                        type="button"
+                        onClick={() => aiSuggest("highlights")}
+                        disabled={aiBusy !== null}
+                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        {aiBusy === "highlights" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
+                      </button>
+              </div>
               <HighlightsEditor
                 highlights={product.highlights}
                 onChange={(highlights) => updateProduct_({ highlights })}
@@ -3623,6 +3726,19 @@ export default function ProductForm({ productId }: Props) {
 
             {/* Tags */}
             <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title={t("hero.tagsTitle", "Tags & Keywords")}>
+              <div className="flex items-center justify-end mb-2 gap-2">
+                {aiMsg?.field === "tags" && (
+                  <span className={`text-[10px] ${aiMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{aiMsg.text}</span>
+                )}
+                <button
+                        type="button"
+                        onClick={() => aiSuggest("tags")}
+                        disabled={aiBusy !== null}
+                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        {aiBusy === "tags" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
+                      </button>
+              </div>
               <TagsInput
                 tags={product.tags}
                 onChange={(tags) => updateProduct_({ tags })}
