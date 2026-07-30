@@ -27,6 +27,8 @@ import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import { uploadProductFile, fetchSupplierNames } from "@/lib/products-admin";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
@@ -70,6 +72,7 @@ const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
 export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -169,7 +172,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
     <div className="space-y-3">
       {links.length === 0 ? (
         <p className="text-[12px] text-[var(--text-ghost)] py-5 text-center border border-dashed border-[var(--border-subtle)] rounded-xl">
-          No supplier linked yet. Link a supplier from the Suppliers app below.
+          {t("sup.noneLinked", "No supplier linked yet. Link a supplier from the Suppliers app below.")}
         </p>
       ) : (
         <div className="space-y-3">
@@ -182,7 +185,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                   <button
                     type="button"
                     onClick={() => setInfoId(l.supplier_id)}
-                    title="View supplier details"
+                    title={t("sup.viewDetails", "View supplier details")}
                     className="group flex items-center gap-3 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-[var(--bg-inverted)]/[0.04] transition-colors"
                   >
                     <div className="h-11 w-11 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
@@ -201,7 +204,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       {nameCnOf(l.supplier_id) && (
                         <div className="text-[12px] text-[var(--text-muted)] truncate">{nameCnOf(l.supplier_id)}</div>
                       )}
-                      <div className="text-[10px] text-[var(--text-ghost)]">Supplier · tap for details · managed in the Suppliers app</div>
+                      <div className="text-[10px] text-[var(--text-ghost)]">{t("sup.identityHint", "Supplier · tap for details · managed in the Suppliers app")}</div>
                     </div>
                   </button>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -209,19 +212,19 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       type="button"
                       onClick={() => setPrimary(l._tempId)}
                       aria-pressed={l.is_primary}
-                      title={l.is_primary ? "Primary supplier" : "Make primary"}
+                      title={l.is_primary ? t("sup.primaryTitle", "Primary supplier") : t("sup.makePrimary", "Make primary")}
                       className={`h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors ${
                         l.is_primary
                           ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                           : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      <StarIcon className="h-3 w-3" /> {l.is_primary ? "Primary" : "Make primary"}
+                      <StarIcon className="h-3 w-3" /> {l.is_primary ? t("sup.primary", "Primary") : t("sup.makePrimary", "Make primary")}
                     </button>
                     <button
                       type="button"
                       onClick={() => remove(l._tempId)}
-                      aria-label="Remove supplier link"
+                      aria-label={t("sup.removeLink", "Remove supplier link")}
                       className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] border border-[var(--border-subtle)] hover:border-[var(--state-error,#FF3333)]/40 transition-colors"
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
@@ -246,25 +249,25 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
 
                   <div className="space-y-3">
                     <div>
-                      <label className={lbl}>Product name</label>
+                      <label className={lbl}>{t("sup.productName", "Product name")}</label>
                       <input
                         className="w-full h-11 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[16px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-dim)] placeholder:font-normal outline-none focus:border-[var(--border-focus)]"
                         value={l.supplier_product_name}
-                        placeholder="What the supplier calls this product"
+                        placeholder={t("sup.productNamePh", "What the supplier calls this product")}
                         onChange={(e) => update(l._tempId, { supplier_product_name: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className={lbl}>Model number</label>
-                      <input className={inp} value={l.supplier_product_code} placeholder="e.g. JK-58420"
+                      <label className={lbl}>{t("sup.modelNumber", "Model number")}</label>
+                      <input className={inp} value={l.supplier_product_code} placeholder={`${t("sup.eg", "e.g.")} JK-58420`}
                         onChange={(e) => update(l._tempId, { supplier_product_code: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>Cost price</label>
+                      <label className={lbl}>{t("sup.costPrice", "Cost price")}</label>
                       <div className="flex gap-1.5">
-                        <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
+                        <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 1850`}
                           onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.">
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title={t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}>
                           CNY
                         </div>
                       </div>
@@ -276,20 +279,20 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       told apart so it isn't silently mis-leveled. */}
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className={lbl}>Cost includes</label>
+                      <label className={lbl}>{t("sup.costIncludes", "Cost includes")}</label>
                       <select className={inp} value={l.cost_basis}
                         onChange={(e) => update(l._tempId, { cost_basis: e.target.value as ProductSupplierFormState["cost_basis"] })}>
-                        <option value="delivered">Delivered to Koleex (full landed)</option>
-                        <option value="packing">+ Packing (no delivery)</option>
-                        <option value="factory_only">Factory only (ex-works)</option>
+                        <option value="delivered">{t("sup.costDelivered", "Delivered to Koleex (full landed)")}</option>
+                        <option value="packing">{t("sup.costPacking", "+ Packing (no delivery)")}</option>
+                        <option value="factory_only">{t("sup.costFactory", "Factory only (ex-works)")}</option>
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>Tax (VAT)</label>
+                      <label className={lbl}>{t("sup.taxVat", "Tax (VAT)")}</label>
                       <button type="button"
                         onClick={() => update(l._tempId, { cost_includes_tax: !l.cost_includes_tax })}
                         className={`h-9 w-full px-3 rounded-lg border text-[12px] font-medium flex items-center justify-between transition-colors ${l.cost_includes_tax ? "border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.05] text-[var(--text-primary)]" : "border-amber-500/40 bg-amber-500/[0.06] text-amber-400"}`}>
-                        <span>{l.cost_includes_tax ? "Tax included" : "Tax NOT included"}</span>
+                        <span>{l.cost_includes_tax ? t("sup.taxIncluded", "Tax included") : t("sup.taxNotIncluded", "Tax NOT included")}</span>
                         <span className={`h-4 w-7 rounded-full relative transition-colors ${l.cost_includes_tax ? "bg-[var(--accent)]" : "bg-[var(--border-strong)]"}`}>
                           <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${l.cost_includes_tax ? "left-3.5" : "left-0.5"}`} />
                         </span>
@@ -298,7 +301,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                   </div>
                   {(l.cost_basis !== "delivered" || !l.cost_includes_tax) && (
                     <p className="mt-2 text-[10.5px] leading-relaxed text-amber-400/90">
-                      ⚠ This cost is <b>not</b> full-landed/tax-in. Its margin isn&apos;t directly comparable to delivered costs — add the missing {l.cost_basis === "factory_only" ? "packing + delivery" : l.cost_basis === "packing" ? "delivery" : "components"}{!l.cost_includes_tax ? " + VAT" : ""} before relying on the auto-detected level.
+                      ⚠ {t("sup.costWarnA", "This cost is NOT full-landed/tax-in. Its margin isn\u2019t directly comparable to delivered costs — add the missing")} {l.cost_basis === "factory_only" ? t("sup.missPackDelivery", "packing + delivery") : l.cost_basis === "packing" ? t("sup.missDelivery", "delivery") : t("sup.missComponents", "components")}{!l.cost_includes_tax ? " + VAT" : ""} {t("sup.costWarnB", "before relying on the auto-detected level.")}
                     </p>
                   )}
                 </div>
@@ -307,17 +310,17 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                 {(() => {
                   const sup = supOf(l.supplier_id);
                   const facts: { label: string; value: string | null | undefined }[] = [
-                    { label: "Supply type", value: sup?.supply_type },
+                    { label: t("sup.supplyType", "Supply type"), value: sup?.supply_type },
                     { label: "MOQ", value: sup?.moq },
-                    { label: "Lead time", value: sup?.lead_time },
-                    { label: "Payment terms", value: sup?.payment_terms },
-                    { label: "Currency", value: sup?.currency },
+                    { label: t("sup.leadTime", "Lead time"), value: sup?.lead_time },
+                    { label: t("sup.paymentTerms", "Payment terms"), value: sup?.payment_terms },
+                    { label: t("sup.currency", "Currency"), value: sup?.currency },
                   ];
                   return (
                     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">From the supplier</span>
-                        <span className="text-[10px] text-[var(--text-ghost)]">edit in the Suppliers app</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.fromSupplier", "From the supplier")}</span>
+                        <span className="text-[10px] text-[var(--text-ghost)]">{t("sup.editInSuppliers", "edit in the Suppliers app")}</span>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
                         {facts.map((f) => (
@@ -334,13 +337,13 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                 {/* Quotation & volume pricing — per product, from this supplier */}
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">Quotation &amp; volume pricing</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.quoteVolume", "Quotation & volume pricing")}</span>
                     {l.price_valid_until && (() => {
                       const expired = new Date(l.price_valid_until) < new Date(new Date().toDateString());
                       return (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)]"
                           style={{ color: expired ? "var(--state-error,#FF3333)" : "var(--state-success,#00CC66)" }}>
-                          {expired ? "Quote expired" : "Quote valid"}
+                          {expired ? t("sup.quoteExpired", "Quote expired") : t("sup.quoteValid", "Quote valid")}
                         </span>
                       );
                     })()}
@@ -349,12 +352,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                   {/* Quote dates */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={lbl}>Quoted on</label>
+                      <label className={lbl}>{t("sup.quotedOn", "Quoted on")}</label>
                       <input type="date" className={inp} value={l.price_quoted_on}
                         onChange={(e) => update(l._tempId, { price_quoted_on: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>Valid until</label>
+                      <label className={lbl}>{t("sup.validUntil", "Valid until")}</label>
                       <input type="date" className={inp} value={l.price_valid_until}
                         onChange={(e) => update(l._tempId, { price_valid_until: e.target.value })} />
                     </div>
@@ -362,16 +365,16 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
 
                   {/* Volume price tiers */}
                   <div>
-                    <label className={lbl}>Volume pricing (qty → unit price)</label>
+                    <label className={lbl}>{t("sup.volumePricing", "Volume pricing (qty → unit price)")}</label>
                     <div className="space-y-1.5">
                       {l.price_tiers.map((tier, ti) => (
                         <div key={ti} className="flex items-center gap-1.5">
-                          <input className={`${inp} flex-1`} inputMode="numeric" placeholder="Min qty (e.g. 10)" value={tier.min_qty}
+                          <input className={`${inp} flex-1`} inputMode="numeric" placeholder={t("sup.minQtyPh", "Min qty (e.g. 10)")} value={tier.min_qty}
                             onChange={(e) => update(l._tempId, { price_tiers: l.price_tiers.map((t, i) => i === ti ? { ...t, min_qty: e.target.value.replace(/[^0-9]/g, "") } : t) })} />
                           <span className="text-[var(--text-ghost)] text-[12px]">→</span>
-                          <input className={`${inp} flex-1`} inputMode="decimal" placeholder="Unit price" value={tier.price}
+                          <input className={`${inp} flex-1`} inputMode="decimal" placeholder={t("sup.unitPricePh", "Unit price")} value={tier.price}
                             onChange={(e) => update(l._tempId, { price_tiers: l.price_tiers.map((t, i) => i === ti ? { ...t, price: e.target.value.replace(/[^0-9.]/g, "") } : t) })} />
-                          <button type="button" aria-label="Remove tier"
+                          <button type="button" aria-label={t("sup.removeTier", "Remove tier")}
                             onClick={() => update(l._tempId, { price_tiers: l.price_tiers.filter((_, i) => i !== ti) })}
                             className="h-9 w-8 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)]">
                             <CrossIcon className="h-3.5 w-3.5" />
@@ -381,27 +384,27 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       <button type="button"
                         onClick={() => update(l._tempId, { price_tiers: [...l.price_tiers, { min_qty: "", price: "" }] })}
                         className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-ghost)] transition-colors">
-                        <PlusIcon className="h-3 w-3" /> Add price tier
+                        <PlusIcon className="h-3 w-3" /> {t("sup.addTier", "Add price tier")}
                       </button>
                     </div>
                   </div>
 
                   {/* Supplier quotation file */}
                   <div>
-                    <label className={lbl}>Supplier quotation / spec file</label>
+                    <label className={lbl}>{t("sup.quoteFile", "Supplier quotation / spec file")}</label>
                     {l.quotation_file_url ? (
                       <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                         <a href={l.quotation_file_url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">
-                          {l.quotation_file_name || "View quotation"}
+                          {l.quotation_file_name || t("sup.viewQuote", "View quotation")}
                         </a>
-                        <button type="button" aria-label="Remove file" onClick={() => update(l._tempId, { quotation_file_url: "", quotation_file_name: "" })}
+                        <button type="button" aria-label={t("sup.removeFile", "Remove file")} onClick={() => update(l._tempId, { quotation_file_url: "", quotation_file_name: "" })}
                           className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)]">
                           <CrossIcon className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ) : (
                       <label className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] hover:border-[var(--text-ghost)] transition-colors">
-                        {uploadingQuoteId === l._tempId ? "Uploading…" : (<><UploadIcon className="h-3.5 w-3.5" /> Upload quotation (PDF/image)</>)}
+                        {uploadingQuoteId === l._tempId ? t("sup.uploading", "Uploading…") : (<><UploadIcon className="h-3.5 w-3.5" /> {t("sup.uploadQuote", "Upload quotation (PDF/image)")}</>)}
                         <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" disabled={uploadingQuoteId === l._tempId}
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
@@ -419,20 +422,20 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                 {/* Per-product link fields (product-specific — not on the supplier record) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
-                    <label className={lbl}>Incoterms</label>
+                    <label className={lbl}>{t("sup.incoterms", "Incoterms")}</label>
                     <select className={inp} value={l.incoterms} onChange={(e) => update(l._tempId, { incoterms: e.target.value })}>
                       <option value="">—</option>
                       {INCOTERMS.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className={lbl}>Sample cost</label>
-                    <input className={inp} value={l.sample_cost} inputMode="decimal" placeholder="e.g. 200"
+                    <label className={lbl}>{t("sup.sampleCost", "Sample cost")}</label>
+                    <input className={inp} value={l.sample_cost} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 200`}
                       onChange={(e) => update(l._tempId, { sample_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
                   </div>
                   <div>
-                    <label className={lbl}>Supplier warranty (months)</label>
-                    <input className={inp} value={l.supplier_warranty_months} inputMode="numeric" placeholder="e.g. 12"
+                    <label className={lbl}>{t("sup.warrantyMonths", "Supplier warranty (months)")}</label>
+                    <input className={inp} value={l.supplier_warranty_months} inputMode="numeric" placeholder={`${t("sup.eg", "e.g.")} 12`}
                       onChange={(e) => update(l._tempId, { supplier_warranty_months: e.target.value.replace(/[^0-9]/g, "") })} />
                   </div>
                   <div className="flex items-end pb-0.5">
@@ -444,54 +447,54 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                           : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
                       }`}>
                       <span className={`h-2 w-2 rounded-full ${l.sample_available ? "bg-[var(--state-success,#00CC66)]" : "bg-[var(--text-ghost)]"}`} />
-                      Sample {l.sample_available ? "available" : "not available"}
+                      {l.sample_available ? t("sup.sampleAvailable", "Sample available") : t("sup.sampleNotAvailable", "Sample not available")}
                     </button>
                   </div>
                 </div>
                 {/* Sourcing strategy — how this supplier is positioned for THIS product */}
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">Sourcing strategy</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.sourcingStrategy", "Sourcing strategy")}</span>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
-                      <label className={lbl}>Sourcing status</label>
+                      <label className={lbl}>{t("sup.sourcingStatus", "Sourcing status")}</label>
                       <select className={inp} value={l.sourcing_status} onChange={(e) => update(l._tempId, { sourcing_status: e.target.value })}>
                         <option value="">—</option>
-                        {SOURCING_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        {SOURCING_STATUS.map((s) => <option key={s.value} value={s.value}>{t(`sup.st.${s.value}`, s.label)}</option>)}
                       </select>
                     </div>
                     <div className="md:col-span-2">
-                      <label className={lbl}>Why this supplier</label>
-                      <input className={inp} value={l.preferred_reason} placeholder="e.g. best price / quality / fastest lead time"
+                      <label className={lbl}>{t("sup.whyThisSupplier", "Why this supplier")}</label>
+                      <input className={inp} value={l.preferred_reason} placeholder={t("sup.whyPh", "e.g. best price / quality / fastest lead time")}
                         onChange={(e) => update(l._tempId, { preferred_reason: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>Min order value</label>
+                      <label className={lbl}>{t("sup.minOrderValue", "Min order value")}</label>
                       <div className="flex gap-1.5">
-                        <input className={`${inp} flex-1 min-w-0`} value={l.min_order_value} inputMode="decimal" placeholder="e.g. 5000"
+                        <input className={`${inp} flex-1 min-w-0`} value={l.min_order_value} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 5000`}
                           onChange={(e) => update(l._tempId, { min_order_value: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.">
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title={t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}>
                           CNY
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>Tooling / mold owner</label>
+                      <label className={lbl}>{t("sup.toolingOwner", "Tooling / mold owner")}</label>
                       <select className={inp} value={l.tooling_owner} onChange={(e) => update(l._tempId, { tooling_owner: e.target.value })}>
                         <option value="">—</option>
-                        {TOOLING_OWNERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        {TOOLING_OWNERS.map((o) => <option key={o.value} value={o.value}>{t(`sup.to.${o.value}`, o.label)}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>Tooling / mold cost</label>
-                      <input className={inp} value={l.tooling_cost} inputMode="decimal" placeholder="e.g. 12000"
+                      <label className={lbl}>{t("sup.toolingCost", "Tooling / mold cost")}</label>
+                      <input className={inp} value={l.tooling_cost} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 12000`}
                         onChange={(e) => update(l._tempId, { tooling_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className={lbl}>Notes</label>
-                  <input className={inp} value={l.notes} placeholder="Sourcing notes specific to this product…"
+                  <label className={lbl}>{t("sup.notes", "Notes")}</label>
+                  <input className={inp} value={l.notes} placeholder={t("sup.notesPh", "Sourcing notes specific to this product…")}
                     onChange={(e) => update(l._tempId, { notes: e.target.value })} />
                 </div>
               </div>
@@ -513,10 +516,10 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
             className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <PlusIcon className="h-3.5 w-3.5" />
-            {loadingSuppliers ? "Loading suppliers…" : supLoadFailed ? "Retry loading suppliers" : "Load suppliers"}
+            {loadingSuppliers ? t("sup.loadingSuppliers", "Loading suppliers…") : supLoadFailed ? t("sup.retryLoad", "Retry loading suppliers") : t("sup.load", "Load suppliers")}
           </button>
           <span className="text-[10px] text-[var(--text-ghost)]">
-            {supLoadFailed ? "couldn't reach the Suppliers app — try again" : "from the Suppliers app"}
+            {supLoadFailed ? t("sup.loadFailed", "couldn\u2019t reach the Suppliers app — try again") : t("sup.fromApp", "from the Suppliers app")}
           </span>
         </div>
       ) : (
@@ -527,9 +530,9 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
             disabled={available.length === 0}
             className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <PlusIcon className="h-3.5 w-3.5" /> {available.length ? "Link a supplier" : "All suppliers linked"}
+            <PlusIcon className="h-3.5 w-3.5" /> {available.length ? t("sup.linkSupplier", "Link a supplier") : t("sup.allLinked", "All suppliers linked")}
           </button>
-          <span className="text-[10px] text-[var(--text-ghost)]">from the Suppliers app</span>
+          <span className="text-[10px] text-[var(--text-ghost)]">{t("sup.fromApp", "from the Suppliers app")}</span>
         </div>
       )}
 
@@ -554,6 +557,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
    profile in a new tab.
    --------------------------------------------------------------------------- */
 function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOption; router: ReturnType<typeof useRouter>; onClose: () => void }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -561,17 +565,17 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
   }, [onClose]);
 
   const facts: { label: string; value: string | null | undefined }[] = [
-    { label: "Supply type", value: supplier.supply_type },
+    { label: t("sup.supplyType", "Supply type"), value: supplier.supply_type },
     { label: "MOQ", value: supplier.moq },
-    { label: "Lead time", value: supplier.lead_time },
-    { label: "Payment terms", value: supplier.payment_terms },
-    { label: "Currency", value: supplier.currency },
+    { label: t("sup.leadTime", "Lead time"), value: supplier.lead_time },
+    { label: t("sup.paymentTerms", "Payment terms"), value: supplier.payment_terms },
+    { label: t("sup.currency", "Currency"), value: supplier.currency },
   ];
   /* Profile facts only show when populated (most suppliers leave them blank). */
-  if (supplier.rating) facts.push({ label: "Rating", value: `★ ${supplier.rating}/5` });
-  if (supplier.sample_status) facts.push({ label: "Samples", value: supplier.sample_status });
-  if (supplier.employees) facts.push({ label: "Employees", value: supplier.employees });
-  if (supplier.year_established) facts.push({ label: "Established", value: supplier.year_established });
+  if (supplier.rating) facts.push({ label: t("sup.rating", "Rating"), value: `★ ${supplier.rating}/5` });
+  if (supplier.sample_status) facts.push({ label: t("sup.samples", "Samples"), value: supplier.sample_status });
+  if (supplier.employees) facts.push({ label: t("sup.employees", "Employees"), value: supplier.employees });
+  if (supplier.year_established) facts.push({ label: t("sup.established", "Established"), value: supplier.year_established });
   const cats = supplier.categories || [];
   const certs = supplier.certifications || [];
 
@@ -593,7 +597,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
             <div className="min-w-0">
               <div className="text-[16px] font-semibold text-[var(--text-primary)] leading-tight">{supplier.name}</div>
               {supplier.name_cn && <div className="text-[13px] text-[var(--text-muted)] truncate">{supplier.name_cn}</div>}
-              <div className="text-[10px] text-[var(--text-ghost)] mt-0.5">Managed in the Suppliers app</div>
+              <div className="text-[10px] text-[var(--text-ghost)] mt-0.5">{t("sup.managedIn", "Managed in the Suppliers app")}</div>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
@@ -618,7 +622,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
             <div className="mt-3 space-y-2">
               {cats.length > 0 && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">Product categories</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">{t("sup.productCategories", "Product categories")}</div>
                   <div className="flex flex-wrap gap-1.5">
                     {cats.map((c) => (
                       <span key={c} className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)]">{c}</span>
@@ -628,7 +632,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
               )}
               {certs.length > 0 && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">Certifications</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">{t("sup.certifications", "Certifications")}</div>
                   <div className="flex flex-wrap gap-1.5">
                     {certs.map((c) => (
                       <span key={c} className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)]">{c}</span>
@@ -643,7 +647,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
         {/* Contact */}
         {(supplier.email || supplier.phone || supplier.website || supplier.wechat || supplier.location || supplier.primary_contact) && (
           <div className="px-4 pb-4">
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-2">Contact</div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-2">{t("sup.contact", "Contact")}</div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] divide-y divide-[var(--border-subtle)]">
               {supplier.primary_contact?.name && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
@@ -658,13 +662,13 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
               )}
               {supplier.email && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-[11px] text-[var(--text-ghost)]">Email</span>
+                  <span className="text-[11px] text-[var(--text-ghost)]">{t("sup.email", "Email")}</span>
                   <a href={`mailto:${supplier.email}`} className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">{supplier.email}</a>
                 </div>
               )}
               {supplier.phone && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-[11px] text-[var(--text-ghost)]">Phone</span>
+                  <span className="text-[11px] text-[var(--text-ghost)]">{t("sup.phone", "Phone")}</span>
                   <a href={`tel:${supplier.phone}`} className="text-[12px] text-[var(--text-primary)] truncate hover:underline">{supplier.phone}</a>
                 </div>
               )}
@@ -676,13 +680,13 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
               )}
               {supplier.website && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-[11px] text-[var(--text-ghost)]">Website</span>
+                  <span className="text-[11px] text-[var(--text-ghost)]">{t("sup.website", "Website")}</span>
                   <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">{supplier.website.replace(/^https?:\/\//, "")}</a>
                 </div>
               )}
               {supplier.location && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-[11px] text-[var(--text-ghost)]">Location</span>
+                  <span className="text-[11px] text-[var(--text-ghost)]">{t("sup.location", "Location")}</span>
                   <span className="text-[12px] text-[var(--text-primary)] truncate text-right">{supplier.location}</span>
                 </div>
               )}
@@ -695,7 +699,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
           <button type="button"
             onClick={() => { onClose(); router.push(`/suppliers/${supplier.id}`); }}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity">
-            <ExternalLinkIcon className="h-3.5 w-3.5" /> Open full profile
+            <ExternalLinkIcon className="h-3.5 w-3.5" /> {t("sup.openProfile", "Open full profile")}
           </button>
         </div>
       </div>
@@ -717,6 +721,7 @@ function SupplierPhoto({
   onClear: () => void;
   sizeClass?: string;
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [drag, setDrag] = useState(false);
   const take = (files: FileList | null) => {
     const f = files?.[0];
@@ -742,20 +747,20 @@ function SupplierPhoto({
             <img src={url} alt="" className="h-full w-full object-contain p-1.5" />
             <div className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white">
-                <UploadIcon className="h-3.5 w-3.5" /> Change
+                <UploadIcon className="h-3.5 w-3.5" /> {t("sup.change", "Change")}
               </span>
             </div>
           </>
         ) : (
           <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-[var(--text-ghost)] group-hover:text-[var(--text-muted)] transition-colors">
             <PictureIcon className="h-7 w-7" />
-            <span className="text-[10px] font-medium">Add photo</span>
-            <span className="text-[9px] text-[var(--text-faint)]">drop or click</span>
+            <span className="text-[10px] font-medium">{t("sup.addPhoto", "Add photo")}</span>
+            <span className="text-[9px] text-[var(--text-faint)]">{t("sup.dropOrClick", "drop or click")}</span>
           </div>
         )}
         {uploading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]/85 text-[10px] font-medium text-[var(--text-muted)]">
-            Uploading…
+            {t("sup.uploading", "Uploading…")}
           </div>
         )}
         <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => take(e.target.files)} />
@@ -764,7 +769,7 @@ function SupplierPhoto({
         <button
           type="button"
           onClick={onClear}
-          aria-label="Remove photo"
+          aria-label={t("sup.removePhoto", "Remove photo")}
           className="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-2 border-[var(--bg-card)] hover:opacity-90 transition-opacity"
         >
           <CrossIcon className="h-2.5 w-2.5" />
@@ -787,6 +792,7 @@ function SupplierPickerModal({
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
@@ -834,21 +840,21 @@ function SupplierPickerModal({
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"
-      aria-label="Link a supplier"
+      aria-label={t("sup.linkSupplier", "Link a supplier")}
     >
       <div className="w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header + search */}
         <div className="shrink-0 p-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-2.5 px-1">
-            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Link a supplier</h3>
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("sup.linkSupplier", "Link a supplier")}</h3>
             <div className="flex items-center gap-2">
               {/* List / grid view toggle */}
               <div className="flex items-center rounded-lg border border-[var(--border-subtle)] overflow-hidden">
-                <button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} aria-label="List view"
+                <button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} aria-label={t("sup.listView", "List view")}
                   className={`h-7 w-7 flex items-center justify-center transition-colors ${view === "list" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
                   <LayoutListIcon className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label="Grid view"
+                <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label={t("sup.gridView", "Grid view")}
                   className={`h-7 w-7 flex items-center justify-center transition-colors ${view === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
                   <LayoutGridIcon className="h-3.5 w-3.5" />
                 </button>
@@ -864,7 +870,7 @@ function SupplierPickerModal({
               ref={inputRef}
               value={query}
               onChange={(e) => { setQuery(e.target.value); setActive(0); }}
-              placeholder="Search suppliers by name…"
+              placeholder={t("sup.searchPh", "Search suppliers by name…")}
               className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
             />
           </div>
@@ -873,7 +879,7 @@ function SupplierPickerModal({
         {/* Results */}
         <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
-            <p className="text-[12px] text-[var(--text-ghost)] text-center py-8">No suppliers match “{query}”.</p>
+            <p className="text-[12px] text-[var(--text-ghost)] text-center py-8">{t("sup.noMatch", "No suppliers match")} “{query}”.</p>
           ) : view === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-0.5">
               {filtered.map((s, i) => (
@@ -933,8 +939,8 @@ function SupplierPickerModal({
 
         {/* Footer hint */}
         <div className="shrink-0 px-3.5 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
-          <span>{filtered.length} of {suppliers.length} suppliers</span>
-          <span>↑↓ to navigate · ↵ to link · esc to close</span>
+          <span>{filtered.length} {t("sup.of", "of")} {suppliers.length} {t("sup.suppliersWord", "suppliers")}</span>
+          <span>{t("sup.keysHint", "↑↓ to navigate · ↵ to link · esc to close")}</span>
         </div>
       </div>
     </div>

@@ -2355,9 +2355,9 @@ export default function ProductForm({ productId }: Props) {
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   /* ── Classification summary for breadcrumb ── */
-  const divisionName = divisions.find(d => d.slug === product.division_slug)?.name;
-  const categoryName = categories.find(c => c.slug === product.category_slug)?.name;
-  const subcategoryName = subcategories.find(s => s.slug === product.subcategory_slug)?.name;
+  const divisionName = localizedName(divisions.find(d => d.slug === product.division_slug), lang) || undefined;
+  const categoryName = localizedName(categories.find(c => c.slug === product.category_slug), lang) || undefined;
+  const subcategoryName = localizedName(subcategories.find(s => s.slug === product.subcategory_slug), lang) || undefined;
 
   if (loading) {
     return (
