@@ -127,6 +127,8 @@ Sections: A · **B below** · C · D · E · F · G
 | automation_level | 自动化程度 | existing §1 | — | [ADDED — required facet] |
 | *(parked)* | 故障换阻抗ZP | — | — | [HELD → §3.1] |
 
+> **2026-07-31 · A10 catalog audit (Stao):** live template option lists extended — `optional_devices` +{auto_material_loader 自动上布装置 · fabric_pressing 压布装置 · moving_platform 移动平台}, `standard_equipment` +{wind_screen 风屏装置}. Values evidenced by the Stao A10 spreader options; no new fields, no facet-token changes.
+
 ### 5.2 ✅ XPRR — Fabric Relaxing Machine 面料松弛机
 | Field | 中文 | Type | Unit | Mark |
 |---|---|---|---|---|

@@ -617,6 +617,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
             { value: "edge_control", label: "Automatic Edge Control" },
             { value: "fabric_flatting_bar", label: "Fabric Flattening Bar" },
             { value: "run_out_sensor", label: "Fabric Run-Out Sensor" },
+            { value: "wind_screen", label: "Wind Screen / Air-Blocking Device" },
           ],
           ...pub,
           visualRenderType: "icon_chip",
@@ -644,6 +645,10 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
             { value: "width_measurement", label: "Fabric Width Measurement" },
             { value: "reverse_rolling", label: "Reverse Rolling Roller" },
             { value: "anti_collision", label: "Photoelectric Anti-Collision" },
+            /* Added 2026-07-31 from the Stao A10 catalog options list. */
+            { value: "auto_material_loader", label: "Automatic Material Loader" },
+            { value: "fabric_pressing", label: "Fabric Pressing Device" },
+            { value: "moving_platform", label: "Moving Platform" },
           ],
           ...pub,
           visualRenderType: "icon_chip",
