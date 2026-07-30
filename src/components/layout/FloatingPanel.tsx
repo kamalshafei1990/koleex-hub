@@ -1081,8 +1081,8 @@ export default function FloatingPanel() {
                       : tab === "ai" ? "4px" : "calc(50% + 1px)",
                     background: tab === "ai"
                       ? dk
-                        ? "linear-gradient(135deg, rgba(0,212,255,0.10) 0%, rgba(123,97,255,0.10) 50%, rgba(255,110,199,0.06) 100%)"
-                        : "linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(123,97,255,0.08) 100%)"
+                        ? "linear-gradient(135deg, rgba(86,127,178,0.14) 0%, rgba(127,169,214,0.12) 50%, rgba(188,216,240,0.08) 100%)"
+                        : "linear-gradient(135deg, rgba(86,127,178,0.12) 0%, rgba(188,216,240,0.10) 100%)"
                       : dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
                     transition: "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   }}

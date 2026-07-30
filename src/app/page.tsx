@@ -263,7 +263,7 @@ const AppCard = memo(function AppCard({
       }`}
         style={isAi ? {
           filter:
-            "drop-shadow(0 0 10px rgba(0,212,255,0.4)) drop-shadow(0 0 20px rgba(123,97,255,0.25))",
+            "drop-shadow(0 0 10px rgba(127,169,214,0.45)) drop-shadow(0 0 20px rgba(86,127,178,0.28))",
         } : undefined}
       >
         <span className="relative inline-flex">
@@ -1027,21 +1027,21 @@ export default function HomePage() {
             linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
             conic-gradient(
               from var(--ai-card-angle),
-              rgba(0,212,255,0.6),
-              rgba(123,97,255,0.6),
-              rgba(255,110,199,0.5),
-              rgba(0,212,255,0.15),
-              rgba(123,97,255,0.6),
-              rgba(0,212,255,0.6)
+              rgba(86,127,178,0.75),
+              rgba(127,169,214,0.65),
+              rgba(188,216,240,0.55),
+              rgba(86,127,178,0.15),
+              rgba(127,169,214,0.65),
+              rgba(86,127,178,0.75)
             );
           box-shadow:
-            0 0 12px rgba(123,97,255,0.15),
-            0 0 24px rgba(0,212,255,0.08);
+            0 0 12px rgba(86,127,178,0.18),
+            0 0 24px rgba(188,216,240,0.08);
         }
         .ai-card-neon:hover {
           box-shadow:
-            0 0 16px rgba(123,97,255,0.25),
-            0 0 32px rgba(0,212,255,0.15);
+            0 0 16px rgba(86,127,178,0.28),
+            0 0 32px rgba(188,216,240,0.15);
           transform: scale(1.02);
         }
       `}</style>

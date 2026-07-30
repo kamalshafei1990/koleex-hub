@@ -3,7 +3,7 @@
 /* ---------------------------------------------------------------------------
    KoleexOrb — the Koleex AI character (custom, fully code-controlled).
 
-   Hand-built SVG/CSS orb with the Koleex AI identity (rainbow conic-gradient
+   Hand-built SVG/CSS orb with the Koleex AI identity (hub-blue conic-gradient
    ring + two eyes on a dark face) and rich, smooth, perfectly-centred
    reactions we control completely. All eye motion is transition-based with
    springy easing (no snapping); the orb also feels ALIVE when idle (random
@@ -259,10 +259,10 @@ export default function KoleexOrb({
         : null;
   const glow = glowColor
     ? `0 0 0 2px rgba(${glowColor},.55), 0 0 22px 6px rgba(${glowColor},.45)`
-    : "0 0 16px 2px rgba(120,130,255,.10)";
+    : "0 0 16px 2px rgba(86,127,178,.14)";
 
   const RING_GRADIENT =
-    "conic-gradient(from 0deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b, #22d3ee, #3b82f6)";
+    "conic-gradient(from 0deg, #3e6796, #567fb2, #7fa9d6, #bcd8f0, #7fa9d6, #567fb2, #3e6796)";
   const RING_MASK = "radial-gradient(farthest-side, transparent 76%, #000 78%)";
 
   const eyeBase: CSSProperties = {
