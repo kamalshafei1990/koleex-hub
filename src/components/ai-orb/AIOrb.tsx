@@ -295,10 +295,11 @@ export default function AIOrb({
              property rides the spring so emotions morph, never snap. ── */
         .kx-aiorb .eyes {
           position: absolute;
-          left: 50%;
+          left: 57%;
           top: 44%;
           transform: translate(-50%, -50%);
           display: flex;
+          align-items: center;
           gap: 24px;
           z-index: 60;
           transition: transform 0.4s cubic-bezier(0.3, 1.6, 0.4, 1);
@@ -318,7 +319,6 @@ export default function AIOrb({
             box-shadow 0.4s ease;
           animation: kxA-blink 4.6s infinite;
         }
-        .kx-aiorb .eye.r { animation-delay: 0.05s; }
 
         /* idle: the LIFE loop — gaze wanders with anticipation while the
            body leans into each glance (see kxA-bodylife on the sphere). */
