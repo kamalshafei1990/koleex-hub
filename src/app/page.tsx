@@ -12,7 +12,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import KoleexOrb, { type OrbState } from "@/components/ai/KoleexOrb";
+import { type OrbState } from "@/components/ai/KoleexOrb";
+import KoleexGlowOrb from "@/components/ai/KoleexGlowOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import {
@@ -482,7 +483,9 @@ const AIGreeter = memo(function AIGreeter({
 
   return (
     <>
-      <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
+      {/* Trial: CSS glow-orb face in Hub Blue (owner request) — the Rive
+          KoleexOrb stays in the AI app headers for now. */}
+      <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
       <div
         className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
         style={{
