@@ -483,8 +483,7 @@ const AIGreeter = memo(function AIGreeter({
 
   return (
     <>
-      {/* Trial: CSS glow-orb face in Hub Blue (owner request) — the Rive
-          KoleexOrb stays in the AI app headers for now. */}
+      {/* The CSS glow-orb is the system-wide AI face (owner-approved). */}
       <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
       <div
         className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"

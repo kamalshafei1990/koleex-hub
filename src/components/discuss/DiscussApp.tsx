@@ -59,7 +59,7 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
-import KoleexOrb from "@/components/ai/KoleexOrb";
+import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";

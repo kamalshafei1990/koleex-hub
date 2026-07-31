@@ -9,7 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef } from "react";
-import KoleexOrb from "@/components/ai/KoleexOrb";
+import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import MicButton from "@/components/ai/MicButton";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";

@@ -25,7 +25,7 @@ import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import KoleexOrb from "@/components/ai/KoleexOrb";
+import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
   fetchMyChannels,

@@ -5,7 +5,7 @@
    signature ({ size?, className? }) so it can be used in navigation.ts,
    the launcher, the sidebar, etc. Extra props (e.g. `animated`) are ignored. */
 
-import KoleexOrb from "./KoleexOrb";
+import KoleexOrb from "./KoleexGlowOrb";
 
 export default function KoleexOrbIcon({
   size = 24,

@@ -13,7 +13,7 @@
 
 interface Props {
   /* Mirrors KoleexOrb's state prop so call sites can swap 1:1. "typing"
-     makes the aura breathe faster/brighter; other states idle. */
+     and "loading" make the aura breathe faster/brighter; other states idle. */
   state?: string;
   greetKey?: number | string;
   size?: number;
@@ -24,7 +24,7 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
   const s = size / 200;
   return (
     <div
-      className={`kx-glow-orb ${state === "typing" ? "is-typing" : ""} ${className}`}
+      className={`kx-glow-orb ${state === "typing" || state === "loading" ? "is-typing" : ""} ${className}`}
       style={{ width: size, height: size }}
       aria-hidden
     >
