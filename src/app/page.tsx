@@ -234,8 +234,8 @@ const AppCard = memo(function AppCard({
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "bg-[#0c0c0c] border-white/[0.06] hover:border-[#567fb2]/60 hover:bg-[#161616] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
-                    : "bg-[#f8f8f8] border-black/[0.06] hover:border-[#567fb2]/50 hover:bg-[#fafafa] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+                    ? "bg-[#0c0c0c] border-white/[0.06] hover:border-[#567fb2]/60 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
+                    : "bg-[#f8f8f8] border-black/[0.06] hover:border-[#567fb2]/50 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
