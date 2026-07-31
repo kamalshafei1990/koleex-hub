@@ -47,10 +47,19 @@ export default function UpdateWatcher() {
     void check();
     const onVis = () => { if (document.visibilityState === "visible") void check(); };
     document.addEventListener("visibilitychange", onVis);
-    const iv = window.setInterval(() => { void check(); }, 5 * 60 * 1000);
+    /* Also on window focus — visibilitychange misses focus switches between
+       two visible windows (common on desktop). */
+    window.addEventListener("focus", onVis);
+    /* 60s, not 5min: stale tabs were surviving whole review sessions and the
+       owner kept judging OLD bundles ("nothing changed"). A no-store fetch of
+       ~50 bytes per minute per visible tab is nothing. */
+    const iv = window.setInterval(() => {
+      if (document.visibilityState === "visible") void check();
+    }, 60 * 1000);
     return () => {
       alive = false;
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
       window.clearInterval(iv);
     };
   }, []);
