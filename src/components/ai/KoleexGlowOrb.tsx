@@ -60,8 +60,8 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           z-index: 5;
           filter: blur(24px);
           animation:
-            kx-orb-aura-spin 10s linear infinite,
-            kx-orb-breathe 3s ease-in-out infinite alternate;
+            kx-orb-aura-spin 7s linear infinite,
+            kx-orb-breathe 2.2s ease-in-out infinite alternate;
           background:
             radial-gradient(circle at 28% 70%, #567fb2 0%, rgba(86, 127, 178, 0.6) 30%, transparent 64%),
             radial-gradient(circle at 74% 28%, #7fa9d6 0%, rgba(127, 169, 214, 0.55) 26%, transparent 60%),
@@ -81,7 +81,7 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           box-shadow:
             inset 0 3px 12px rgba(255, 255, 255, 0.16),
             inset 0 -12px 30px rgba(0, 0, 0, 0.55);
-          animation: kx-orb-float 6s ease-in-out infinite;
+          animation: kx-orb-float 5s ease-in-out infinite;
         }
         /* Eyes: one bar + its box-shadow twin; blink + glance around. */
         .kx-glow-orb .sphere::before {
@@ -97,8 +97,8 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           box-shadow: 40px 0 0 #fff;
           z-index: 60;
           animation:
-            kx-orb-blink 4s infinite,
-            kx-orb-look 10s infinite ease-in-out;
+            kx-orb-blink 6.4s infinite,
+            kx-orb-look 7s infinite ease-in-out;
         }
         /* Faint floor light inside the glass so the ball reads 3D. */
         .kx-glow-orb .sphere::after {
@@ -113,26 +113,34 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           filter: blur(10px);
         }
         @keyframes kx-orb-float {
-          0%, 100% { transform: translate(-50%, -50%); }
-          50% { transform: translate(-50%, calc(-50% - 8px)); }
+          0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+          25% { transform: translate(calc(-50% + 5px), calc(-50% - 10px)) rotate(2.5deg); }
+          50% { transform: translate(-50%, calc(-50% - 15px)) rotate(0deg); }
+          75% { transform: translate(calc(-50% - 5px), calc(-50% - 10px)) rotate(-2.5deg); }
         }
         @keyframes kx-orb-aura-spin {
           to { transform: translate(-50%, -50%) rotate(360deg); }
         }
         @keyframes kx-orb-breathe {
-          from { opacity: 0.7; }
+          from { opacity: 0.55; }
           to { opacity: 1; }
         }
+        /* Two singles + one quick double blink per cycle. */
         @keyframes kx-orb-blink {
-          0%, 96% { height: 48px; }
-          98% { height: 5px; }
-          100% { height: 48px; }
+          0%, 42% { height: 48px; }
+          44% { height: 5px; }
+          46%, 88% { height: 48px; }
+          90% { height: 5px; }
+          92% { height: 48px; }
+          94% { height: 5px; }
+          96%, 100% { height: 48px; }
         }
         @keyframes kx-orb-look {
-          0%, 40% { left: 47%; }
-          45%, 55% { left: 40%; }
-          60%, 70% { left: 54%; }
-          75% { left: 47%; }
+          0%, 24% { left: 47%; top: 44%; }
+          30%, 40% { left: 39%; top: 44%; }
+          46%, 56% { left: 55%; top: 44%; }
+          62%, 70% { left: 50%; top: 39%; }
+          76%, 100% { left: 47%; top: 44%; }
         }
       `}</style>
     </div>
