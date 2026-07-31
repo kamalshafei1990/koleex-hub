@@ -500,6 +500,15 @@ function playTone(tone: SoundTone, volume: number) {
  *  preferences (master switch, do-not-disturb, per-category enable, chosen
  *  tone, volume). This is THE way any part of the Hub makes a sound. */
 export function playAppSound(category: SoundCategory, activity?: SoundActivity | null) {
+  /* Pre-gesture guard: before the user's first pointer/key gesture the
+     browser blocks playback anyway — attempting it only constructs a
+     suspended AudioContext (console warning, early audio-HW spin-up) and
+     could burp a STALE chime on the first click. Drop the sound; real
+     events after interaction chime normally. */
+  if (typeof window !== "undefined" && !unlocked && !audioCtx) {
+    attachUnlockListeners();
+    return;
+  }
   const prefs = getSoundPrefs();
   if (!prefs.master || prefs.dnd) return;
   const cat = prefs[category];

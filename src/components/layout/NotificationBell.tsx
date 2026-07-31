@@ -244,6 +244,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
      count RISES after the first resolved value, so the initial load and
      mark-as-read never beep. */
   const prevInboxRef = useRef<number | null>(null);
+  const discussBaselineRef = useRef(false);
   useEffect(() => {
     const prev = prevInboxRef.current;
     prevInboxRef.current = inboxUnread;
@@ -420,7 +421,13 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             (s, c) => s + (c.unread_count ?? 0),
             0,
           );
-          if (newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")
+          /* Baseline guard: the FIRST fetch compares against the empty
+             initial list, so pre-existing unread used to chime (and spin
+             up the AudioContext) on every page load. Only rises AFTER a
+             baseline exists are new messages. */
+          const hadBaseline = discussBaselineRef.current;
+          discussBaselineRef.current = true;
+          if (hadBaseline && newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")
               && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
             playAppSound("message");
           }
