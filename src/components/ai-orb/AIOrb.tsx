@@ -65,27 +65,6 @@ export default function AIOrb({
   useOrbParallax(rootRef, interactive && !compact, compact ? 1.5 : 3);
   useAudioSmoothing(rootRef, clamp01(audioLevel), audioActive);
 
-  /* Irregular, synchronized blink: JS-scheduled every 6–14s so no loop is
-     perceivable. Single indicator node → both bars compress together. */
-  const [blink, setBlink] = useState(false);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let alive = true;
-    let t1: ReturnType<typeof setTimeout>;
-    let t2: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      if (!alive) return;
-      t1 = setTimeout(() => {
-        if (!alive) return;
-        if (document.visibilityState === "hidden") { schedule(); return; }
-        setBlink(true);
-        t2 = setTimeout(() => { setBlink(false); schedule(); }, 130);
-      }, 6000 + Math.random() * 8000);
-    };
-    schedule();
-    return () => { alive = false; clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-
   /* aria label follows the app language. */
   const [lang, setLang] = useState("en");
   useEffect(() => {
@@ -138,7 +117,6 @@ export default function AIOrb({
         compact ? "is-compact" : "",
         interactive ? "is-interactive" : "tier-lite",
         paused ? "is-paused" : "",
-        blink ? "is-blink" : "",
         className,
       ].filter(Boolean).join(" ")}
       style={{ width: size, height: size }}
@@ -159,8 +137,9 @@ export default function AIOrb({
             <div className="ripple" />
             <div className="spec" />
             <div className="tint" />
-            {/* THE indicators: one node + box-shadow twin — geometry locked. */}
-            <div className="ind" />
+            {/* THE indicators: one node + box-shadow twin — geometry locked.
+                The gaze wrapper reproduces the ORIGINAL look-around motion. */}
+            <div className="gaze"><div className="ind" /></div>
           </div>
           <div className="ring" />
           {prog !== null && (
@@ -223,17 +202,17 @@ export default function AIOrb({
           z-index: 5;
           filter: blur(24px);
           animation:
-            kxA-spin 14s linear infinite,
-            kxA-breathe 4.5s ease-in-out infinite alternate;
+            kxA-spin 7s linear infinite,
+            kxA-breathe 2.2s ease-in-out infinite alternate;
           background:
             radial-gradient(circle at 28% 70%, #567fb2 0%, rgba(86, 127, 178, 0.6) 30%, transparent 64%),
             radial-gradient(circle at 74% 28%, #7fa9d6 0%, rgba(127, 169, 214, 0.55) 26%, transparent 60%),
             radial-gradient(circle at 62% 84%, #bcd8f0 0%, transparent 52%);
           transition: opacity 0.6s ease, filter 0.6s ease;
         }
-        .kx-aiorb.is-thinking .aura { animation-duration: 9s, 2.6s; }
+        .kx-aiorb.is-thinking .aura { animation-duration: 5s, 1.2s; }
         .kx-aiorb.is-processing .aura,
-        .kx-aiorb.is-transcribing .aura { animation-duration: 10s, 3s; }
+        .kx-aiorb.is-transcribing .aura { animation-duration: 6s, 1.5s; }
         .kx-aiorb.is-listening .aura,
         .kx-aiorb.is-speaking .aura {
           animation-duration: 11s, 3.5s;
@@ -243,7 +222,7 @@ export default function AIOrb({
         .kx-aiorb.is-error .aura { filter: blur(26px) brightness(0.65); }
         .kx-aiorb.is-warning .aura { animation-duration: 16s, 5s; }
         .kx-aiorb.is-sleeping .aura { animation-duration: 40s, 12s; opacity: 0.12; }
-        .kx-aiorb.is-awakening .aura { animation: kxA-aura-on 0.8s ease-out both, kxA-spin 14s linear infinite; }
+        .kx-aiorb.is-awakening .aura { animation: kxA-aura-on 0.8s ease-out both, kxA-spin 7s linear infinite; }
         .kx-aiorb.fam-counter-rotate .aura { animation-direction: reverse, normal; }
 
         /* ── Halo: thin activity arc on the rim (processing). ── */
@@ -305,12 +284,12 @@ export default function AIOrb({
           box-shadow:
             inset 0 3px 12px rgba(255, 255, 255, 0.16),
             inset 0 -12px 30px rgba(0, 0, 0, 0.55);
-          animation: kxA-drift 10s ease-in-out infinite;
+          animation: kxA-float 5s ease-in-out infinite;
           transition: filter 0.5s ease;
         }
         .kx-aiorb.is-processing .sphere { filter: brightness(1.05); }
-        .kx-aiorb.is-success .sphere { filter: brightness(1.1); animation: kxA-drift 10s ease-in-out infinite, kxA-settle 0.6s ease-out 1; }
-        .kx-aiorb.is-error .sphere { filter: brightness(0.92); animation: kxA-drift 10s ease-in-out infinite, kxA-nudge 0.35s ease-in-out 1; }
+        .kx-aiorb.is-success .sphere { filter: brightness(1.1); animation: kxA-float 5s ease-in-out infinite, kxA-settle 0.6s ease-out 1; }
+        .kx-aiorb.is-error .sphere { filter: brightness(0.92); animation: kxA-float 5s ease-in-out infinite, kxA-nudge 0.35s ease-in-out 1; }
         .kx-aiorb.is-sleeping .sphere { filter: brightness(0.75); animation-duration: 18s; }
 
         /* ── INDICATORS — geometry locked (see header). One node + twin. ── */
@@ -329,8 +308,18 @@ export default function AIOrb({
             transform 0.14s ease,
             opacity 0.5s ease,
             filter 0.4s ease;
+          animation: kxA-blink 6.4s infinite;
         }
-        .kx-aiorb.is-blink .ind { transform: translate(-50%, -50%) scaleY(0.1); }
+        .kx-aiorb.is-listening .ind,
+        .kx-aiorb.is-speaking .ind,
+        .kx-aiorb.is-sleeping .ind { animation: none; }
+        /* Gaze wrapper: the ORIGINAL look-around (left/right/up) — moves the
+           pair as one unit; bar geometry untouched. Runs while idle/working,
+           rests during results, audio states and sleep. */
+        .kx-aiorb .gaze { position: absolute; inset: 0; z-index: 60; }
+        .kx-aiorb.is-idle .gaze,
+        .kx-aiorb.is-thinking .gaze,
+        .kx-aiorb.is-processing .gaze { animation: kxA-look 7s ease-in-out infinite; }
         .kx-aiorb.is-listening .ind,
         .kx-aiorb.is-speaking .ind {
           filter: brightness(calc(1 + var(--kx-orb-audio, 0) * 0.6));
@@ -482,9 +471,11 @@ export default function AIOrb({
         .kx-aiorb .prog { width: 200px; height: 200px; z-index: 42; }
 
         /* ── Keyframes — all restrained. ── */
-        @keyframes kxA-drift {
-          0%, 100% { transform: translate(-50%, -50%); }
-          50% { transform: translate(-50%, calc(-50% - 2px)); }
+        @keyframes kxA-float {
+          0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+          25% { transform: translate(calc(-50% + 5px), calc(-50% - 10px)) rotate(2.5deg); }
+          50% { transform: translate(-50%, calc(-50% - 15px)) rotate(0deg); }
+          75% { transform: translate(calc(-50% - 5px), calc(-50% - 10px)) rotate(-2.5deg); }
         }
         @keyframes kxA-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
         @keyframes kxA-rot { to { transform: rotate(360deg); } }
@@ -498,6 +489,22 @@ export default function AIOrb({
           0%, 100% { transform: translate(-50%, -50%); }
           30% { transform: translate(calc(-50% - 2px), -50%); }
           65% { transform: translate(calc(-50% + 2px), -50%); }
+        }
+        @keyframes kxA-look {
+          0%, 24% { transform: translate(0, 0); }
+          30%, 40% { transform: translate(-14px, 0); }
+          46%, 56% { transform: translate(14px, 0); }
+          62%, 70% { transform: translate(6px, -10px); }
+          76%, 100% { transform: translate(0, 0); }
+        }
+        @keyframes kxA-blink {
+          0%, 42% { transform: translate(-50%, -50%) scaleY(1); }
+          44% { transform: translate(-50%, -50%) scaleY(0.1); }
+          46%, 88% { transform: translate(-50%, -50%) scaleY(1); }
+          90% { transform: translate(-50%, -50%) scaleY(0.1); }
+          92% { transform: translate(-50%, -50%) scaleY(1); }
+          94% { transform: translate(-50%, -50%) scaleY(0.1); }
+          96%, 100% { transform: translate(-50%, -50%) scaleY(1); }
         }
         @keyframes kxA-aura-on {
           from { opacity: 0; }
