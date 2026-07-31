@@ -481,7 +481,7 @@ const AIGreeter = memo(function AIGreeter({
   return (
     <>
       {/* The CSS glow-orb is the system-wide AI face (owner-approved). */}
-      <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
+      <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0" />
       <div
         className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
         style={{
