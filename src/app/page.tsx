@@ -290,7 +290,7 @@ const AppCard = memo(function AppCard({
           })()}
         </span>
       </span>
-      <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
+      <span className={`kx-app-label text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
         app.active
           ? isCurrentApp
             ? dk ? "text-white font-semibold" : "text-black font-semibold"
@@ -878,6 +878,18 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
+      {/* Shared paint server: tile icons switch their fill to this Hub Blue
+          gradient on hover (CSS can't gradient-fill an inline SVG any other
+          way). Zero-size, purely defs. */}
+      <svg width="0" height="0" className="absolute" aria-hidden focusable="false">
+        <defs>
+          <linearGradient id="kx-hub-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#567fb2" />
+            <stop offset="0.5" stopColor="#7fa9d6" />
+            <stop offset="1" stopColor="#bcd8f0" />
+          </linearGradient>
+        </defs>
+      </svg>
       {/* Subtle staggered tile entrance — pure CSS, disabled for reduced-motion. */}
       <style>{`
         @keyframes kx-tile-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
@@ -1057,6 +1069,19 @@ export default function HomePage() {
               rgba(86,127,178,0.9)
             );
           box-shadow: 0 0 16px rgba(86,127,178,${dk ? "0.35" : "0.28"});
+        }
+        /* Hover: icon + app name take the Hub Blue gradient too. The icon's
+           fill points at the #kx-hub-grad paint server (defs at page root);
+           the label uses background-clip text. */
+        .tile-hover-neon:hover svg,
+        .tile-hover-neon:hover svg path {
+          fill: url(#kx-hub-grad);
+        }
+        .tile-hover-neon:hover .kx-app-label {
+          background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
         }
         /* Regular tiles: on hover the border becomes a static Hub Blue
            gradient (same two-layer clip trick as ai-card-neon, without the
