@@ -136,11 +136,15 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     };
   }, []);
 
+  const grad = dk
+    ? "from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0]"
+    : "from-[#3e6796] via-[#567fb2] to-[#7fa9d6]";
+
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       {/* date sits above the time */}
       {dateLabel && (
-        <span className="mb-1.5 text-[12px] font-semibold bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
+        <span className={`mb-1.5 text-[12px] font-semibold bg-gradient-to-br ${grad} bg-clip-text text-transparent`}>
           {dateLabel}
         </span>
       )}
@@ -148,7 +152,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
       <div className="flex items-baseline gap-2">
         <span
-          className="text-[40px] md:text-[50px] font-semibold leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
+          className={`text-[40px] md:text-[50px] font-semibold leading-none tracking-tight tabular-nums bg-gradient-to-br ${grad} bg-clip-text text-transparent`}
         >
           {t.h12}
           <span
@@ -161,14 +165,14 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.mm}
         </span>
         <span
-          className="mb-1 text-[13px] font-semibold tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
+          className={`mb-1 text-[13px] font-semibold tracking-wide bg-gradient-to-br ${grad} bg-clip-text text-transparent`}
         >
           {t.pm ? "PM" : "AM"}
         </span>
       </div>
 
       {tzLabel && (
-        <span className="mt-1.5 text-[11px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
+        <span className={`mt-1.5 text-[11px] font-medium tracking-wide bg-gradient-to-br ${grad} bg-clip-text text-transparent`}>
           {tzLabel}
         </span>
       )}
@@ -243,8 +247,12 @@ const AppCard = memo(function AppCard({
         <span
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
             badge === "new"
-              ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
-              : "bg-[#567fb2]/20 text-[#7fa9d6] ring-1 ring-[#7fa9d6]/40"
+              ? dk
+                ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
+                : "bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-500/40"
+              : dk
+                ? "bg-[#567fb2]/20 text-[#7fa9d6] ring-1 ring-[#7fa9d6]/40"
+                : "bg-[#567fb2]/15 text-[#3e6796] ring-1 ring-[#567fb2]/40"
           }`}
           aria-label={badge === "new" ? "New app" : "Updated app"}
           title={badge === "new" ? "New app" : "Recently updated"}
@@ -884,6 +892,12 @@ export default function HomePage() {
             <stop offset="0.5" stopColor="#7fa9d6" />
             <stop offset="1" stopColor="#bcd8f0" />
           </linearGradient>
+          {/* Deeper run for light theme — the ice stop disappears on white. */}
+          <linearGradient id="kx-hub-grad-deep" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="24">
+            <stop offset="0" stopColor="#3e6796" />
+            <stop offset="0.5" stopColor="#567fb2" />
+            <stop offset="1" stopColor="#7fa9d6" />
+          </linearGradient>
         </defs>
       </svg>
       {/* Subtle staggered tile entrance — pure CSS, disabled for reduced-motion. */}
@@ -1074,21 +1088,21 @@ export default function HomePage() {
         /* Fill-based icons (most of the pack). */
         .tile-hover-neon:hover svg:not([fill="none"]),
         .tile-hover-neon:hover svg:not([fill="none"]) path {
-          fill: url(#kx-hub-grad);
+          fill: url(${dk ? "#kx-hub-grad" : "#kx-hub-grad-deep"});
         }
         /* Stroke-based icons (e.g. Notes): tint the stroke, never fill the
            body — the old blanket fill rule turned them into solid blobs. */
         .tile-hover-neon:hover svg[fill="none"],
         .tile-hover-neon:hover svg[fill="none"] * {
-          stroke: url(#kx-hub-grad);
+          stroke: url(${dk ? "#kx-hub-grad" : "#kx-hub-grad-deep"});
         }
         /* Mask-image icons from the Visual Library pack (bg-current spans,
            e.g. Translator): paint the gradient as their background. */
         .tile-hover-neon:hover span.bg-current {
-          background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
+          background-image: linear-gradient(135deg, ${dk ? "#567fb2, #7fa9d6, #bcd8f0" : "#3e6796, #567fb2, #7fa9d6"});
         }
         .tile-hover-neon .kx-app-label {
-          background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
+          background-image: linear-gradient(135deg, ${dk ? "#567fb2, #7fa9d6, #bcd8f0" : "#3e6796, #567fb2, #7fa9d6"});
           -webkit-background-clip: text;
           background-clip: text;
           transition: color 0.25s ease;
