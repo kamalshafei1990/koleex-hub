@@ -1,167 +1,117 @@
-# Koleex Hub Launch Trailer — Production Bible
-**"THE FUTURE WORKS HERE."** · 50s cinematic teaser · Higgsfield pipeline
-Status: PLAN — awaiting owner approval before shot generation (credits).
+# Koleex Hub Launch Trailer — Production Bible v2 (OWNER SCRIPT)
+**"THE FUTURE WORKS HERE."** · 45-60s · 2D ONLY
+
+> ⚠️ HARD RULE FROM OWNER: **Koleex Hub is always 2D. Never 3D.**
+> Flat motion graphics on pure black. No 3D renders, no holographic
+> 3D objects, no realistic materials (the earlier holo/glass/metal
+> logo treatments are DISCARDED). Depth is faked only with scale,
+> blur and parallax (2.5D), never with perspective geometry.
 
 ---
 
-## 0. Creative Lock
+## 0. Style Lock
 
-| Decision | Value |
+| Element | Value |
 |---|---|
-| Slogan | THE FUTURE WORKS HERE. |
-| Duration | ~50s (9 shots) |
-| Palette | **Hub Blue family** — deep `#3E6796` · steel `#567FB2` · sky `#7FA9D6` · ice `#BCD8F0` on cinematic black `#050608`. White typography. NO generic cyan, no rainbow. |
-| Type | Helvetica Neue (UltraLight for display lines, Medium for labels) |
-| Identity anchors | KOLEEX wordmark untouchable · hub gradient script · the AI orb face (dark glass sphere, two white bars, blue aura) as the "digital brain" |
-| Feel | Apple/NVIDIA launch film. Luxury technology. No people, no offices, no SaaS clichés. |
+| Background | pure black `#050608` |
+| Colors | **neon blue + white** — neon = our ice `#BCD8F0` at full glow over steel `#567FB2`; text pure white. Nothing else. |
+| Look | flat 2D vector motion graphics, cinematic lighting via GLOW only (blur/bloom on flat shapes) |
+| Pace | fast, explosive transitions (shatters, whips, hard cuts on beat) |
+| Sound | massive: heartbeat → explosion → aggressive build → freeze → final bass hit |
+| Voice | deep, calm, cinematic — announcing a revolution, not an ad |
+| Type | Helvetica Neue — UltraLight for sentences, Bold for slogan |
+| Logo | real 2D lockup PNG/SVG only — the model never redraws letterforms |
+| Note | script's "products rotate in 3D" is executed as a FLAT card-flip (2.5D), respecting the 2D rule |
 
-**Pipeline per shot:** keyframe still (nano_banana_pro, brand-locked) → image-to-video (kling/veo via Higgsfield `generate_video`) → assemble. Never one-prompt-whole-video.
-
----
-
-## 1. Asset Preparation Checklist
-
-### 1.1 Brand assets — ✅ HAVE
-- `public/brand/hub-logo/` — horizontal + stacked lockups (dark/light, transparent PNG), `hub-script.png`
-- KOLEEX wordmark SVG (`KoleexLogo.tsx` path data) — vector-clean
-- App icons v2 (512/192/180/maskable)
-- AI orb face renders (`idle-face.png` 800×800; can render any emotion/size from code)
-- Hub Blue palette + Helvetica Neue
-
-### 1.2 Brand assets — 🔧 GENERATE (Higgsfield stills, logo-as-reference)
-- [ ] **Holographic logo** — lockup as translucent blue hologram, scanlines, volumetric glow
-- [ ] **Glass logo** — lockup in clear glass, ice-blue refractions on black
-- [ ] **Metallic logo** — brushed dark-chrome lockup, steel-blue rim light
-> Rule: generate ATMOSPHERE around the real lockup (image reference), never let the model redraw letterforms. Composite real PNG on top where fidelity slips.
-
-### 1.3 UI showcase screens — 🔧 CAPTURE + DRESS
-Real app, dark mode, seeded demo data, 2560×1440, no empty states:
-Dashboard/Home · Koleex AI (orb + streaming reply) · CRM board · Products catalog · Discuss · Projects · To-do · Calendar · Employees · HR · Inventory · Analytics/Finance · Quotation editor.
-Dress pass: perspective-tilt onto glass panels (keyframe prompts handle this — screens supplied as references).
-
-### 1.4 Icon fleet — ✅ HAVE (SVGs in `src/components/icons/ui/` + app icons) → export 15 white icons on transparency for "holographic planets": AI (orb face), CRM, Products, Discuss, Projects, Tasks, Calendar, Planning, Employees, HR, Inventory, Finance, Reports, Analytics, Documents.
-
-### 1.5 Motion textures — 🔧 GENERATE (loopable stills → video)
-- [ ] particle field (data dust, steel-blue on black)
-- [ ] energy wave (ice-blue ribbon)
-- [ ] data streams (light trails)
-- [ ] neural mesh (nodes + edges, depth fog)
-- [ ] glass panel blank (for UI compositing)
+**Pipeline per scene:** 2D keyframe still (nano_banana, "flat vector motion-graphics frame") → image-to-video with 2D-locked prompt → cut on beats. Text lines (scene 1, ending) are pure post — never generated.
 
 ---
 
-## 2. Storyboard — 9 shots / ~50s
+## 1. Assets
 
-> Every Higgsfield video prompt below is final copy-paste form. Camera and light language kept consistent: black void `#050608`, single-source volumetric Hub Blue, shallow depth, slow confident moves. Aspect 16:9, generate 1080p+.
-
-### SHOT 1 — "The Digital Universe" · 5s
-- **Camera:** slow dolly forward, 24mm feel, tiny drift.
-- **Visual:** infinite black; millions of micro particles (steel-blue, sizes 1-3px) fade in like a star field; faint depth fog.
-- **VO:** *"Every company has information."*
-- **Sound:** sub-bass heartbeat, airy digital atmosphere.
-- **Transition out:** particles accelerate subtly → match-cut.
-- **Higgsfield prompt:** `Cinematic 5 second shot, camera dollies slowly forward through infinite black space filled with millions of tiny glowing steel-blue data particles (#567FB2), like a galaxy of information, volumetric haze, shallow depth of field, premium technology film, dark luxury, no text, no people, 16:9`
-
-### SHOT 2 — "Information Chaos" · 6s
-- **Camera:** handheld-nervous orbit, speed ramps.
-- **Visual:** the particles condense into thousands of chaotic floating objects — glass documents, spreadsheets, mail envelopes, chat bubbles, charts — colliding, overlapping, notification pings flashing; frame gets crowded and uncomfortable.
-- **VO:** *"But information…"* (beat) *"…isn't intelligence."*
-- **Sound:** rising cluster of UI pings detuning into noise; tension riser.
-- **Higgsfield prompt:** `Cinematic 6 second shot, chaotic swarm of hundreds of translucent glass UI objects — documents, spreadsheets, email envelopes, chat bubbles, charts — tumbling and colliding in dark space, cold steel-blue monochrome lighting, nervous orbiting camera with speed ramps, overwhelming digital chaos, premium dark tech film, no text, 16:9`
-
-### SHOT 3 — "Silence" · 3s
-- **Camera:** static.
-- **Visual:** hard freeze → all objects dissolve to black in 12 frames; one small ice-blue light breathes at center (the orb's aura being born).
-- **VO:** none. **Sound:** total cut to silence; one deep sub pulse.
-- **Higgsfield prompt:** `Cinematic 3 second shot, all floating debris freezes and dissolves into pure black, empty darkness, then one single soft ice-blue point of light (#BCD8F0) fades in at center and gently breathes, absolute minimalism, volumetric glow, premium, no text, 16:9`
-
-### SHOT 4 — "The Beginning" · 5s
-- **Camera:** slow push-in on the light.
-- **Visual:** the light blooms into the **real Koleex Hub lockup** (holographic treatment); a single radial pulse of Hub Blue energy travels outward; distant debris begins drifting TOWARD camera/logo.
-- **Keyframe:** holographic-logo still (asset 1.2) → image-to-video.
-- **Sound:** first melodic note; pulse whoosh.
-- **Higgsfield prompt (i2v on holo-logo still):** `Slow cinematic push-in, the holographic KOLEEX hub logo glows and emits one expanding circular pulse of steel-blue energy, distant glass debris in the darkness begins drifting toward it, gravitational, volumetric light rays, premium product launch film, 5 seconds, 16:9`
-
-### SHOT 5 — "The Ecosystem" · 6s
-- **Camera:** slow heroic orbit (30°).
-- **Visual:** 8 module icons as glass "planets" (real SVG icons on glass discs) fall into clean orbits around the glowing lockup; orbit trails = thin ice lines.
-- **VO:** *"Imagine everything connected."*
-- **Sound:** melody opens; soft harmonic per planet lock-in.
-- **Higgsfield prompt (i2v on composed still of icons orbiting logo):** `Cinematic 6 second orbit shot, eight glowing glass discs with white minimal app icons orbit a radiant central logo like planets, thin ice-blue orbital light trails, deep black space, steel-blue volumetric lighting, elegant, precise, premium technology, 16:9`
-
-### SHOT 6 — "The Assembly" · 6s
-- **Camera:** fast push through assembling layers, ends locked.
-- **Visual:** planets shatter into glass panels that fly and SNAP into one floating dashboard (real Home screen as reference dressed on glass) — Iron-Man-armor assembly energy.
-- **VO:** *"One platform. One workflow. One intelligence."* (three beats)
-- **Sound:** three mechanical-glass impacts on the three lines.
-- **Higgsfield prompt (i2v, dashboard keyframe):** `Cinematic 6 second shot, dozens of translucent glass UI panels fly in from all directions and assemble with precise mechanical snaps into one floating premium dark dashboard interface, ice-blue edge lighting, sparks of light at each connection, futuristic assembly like high-tech armor, black void, 16:9`
-
-### SHOT 7 — "Inside Koleex Hub" · 8s
-- **Camera:** one continuous fly-through (speed-ramped), through 5 "rooms".
-- **Visual:** camera dives INTO the dashboard glass → flies past living UI walls: Koleex AI orb answering (typing glow) → project cards flipping to done → calendar events snapping into place → product cards streaming by → analytics lines climbing. Each wall = dressed real screen.
-- **Sound:** pulse locked to cuts; rising.
-- **Higgsfield prompt:** `Cinematic 8 second continuous fly-through inside a digital glass universe of dark premium UI walls, passing a glowing dark glass AI sphere with two white eyes answering in light, project cards flipping, a calendar grid assembling, product cards streaming past, analytics curves rising, steel-blue and ice lighting, motion blur, speed ramps, luxury technology, no text, 16:9`
-
-### SHOT 8 — "The Neural Company" · 6s
-- **Camera:** pull-back reveal, rising crane.
-- **Visual:** exit the glass → the whole system seen from above: a neural brain of thousands of Hub Blue connections, modules as bright nodes, **the AI orb face glowing at the center**.
-- **VO:** *"Your company…"* (beat) *"…finally thinks…"* (beat) *"…as one."*
-- **Sound:** orchestra swells; connections light in waves with each phrase.
-- **Higgsfield prompt (i2v on neural-brain still w/ orb center):** `Cinematic 6 second pull-back reveal, a vast glowing neural network shaped like a digital brain floating in black space, thousands of steel-blue connections firing in waves, a small dark glass sphere with two white vertical eyes glowing at the very center, god-ray volumetric light, epic scale, premium, 16:9`
-
-### SHOT 9 — "Final Reveal" · 5s
-- **Camera:** static, breathing scale only.
-- **Visual:** cut to black (0.5s hold) → real lockup fades in (glass treatment, subtle aura) → type on, line by line, UltraLight tracking-wide: `KOLEEX HUB` → `THE FUTURE` / `WORKS HERE.` Final frame holds 1.5s.
-- **Sound:** massive single impact → clean silence with soft aura shimmer.
-- **Build:** this shot is pure post (real assets + type) — NO generation, guaranteeing perfect letterforms.
+✅ HAVE: 2D lockup (dark/light + hub script), KOLEEX wordmark SVG, 15 white app icons (flat SVG), Hub Blue palette, orb face (flat 2D render available from code), UI screens capturable from the live app (dark mode).
+🔧 GENERATE (all FLAT): window-swarm frame, gravity-orbit frame, assembly grid frame, interface fly-through frames (from dressed real screens), neural-network flat frame.
+🎙 VO + SFX: Higgsfield `generate_audio`; music brief in §4.
 
 ---
 
-## 3. Voice-Over Script (final)
+## 2. Scene Board (owner's script, verbatim beats)
 
-> Male, deep, calm, unhurried. Documentary gravity, not ad energy. ~55 words.
+### SCENE 1 · 0-5s — Darkness
+- Pure black. Heartbeat only: **Boom… Boom… Boom…**
+- White UltraLight sentence types on: **"Every company has information."** — then everything disappears.
+- Build: pure post (type + sound). No generation.
 
+### SCENE 2 · 5-10s — Chaos
+- Thousands of flat windows flying randomly: Excel, messages, emails, PDFs, folders, documents, tasks, invoices, machines, customers, employees, data. Disorganized. Disconnected.
+- VO: *"But information… isn't intelligence."*
+- **Huge explosion — everything shatters** (hard cut on impact).
+- Higgsfield prompt (keyframe → i2v):
+  `Flat 2D motion graphics, thousands of white and neon-blue outlined UI windows (spreadsheets, emails, chat bubbles, PDF documents, folders, invoices, ID cards) flying chaotically across a pure black screen, overlapping, glitching, random rotation, flat vector style with neon glow, NO 3D, NO realism, fast nervous motion, then everything shatters outward in a burst of flat glowing fragments, 5 seconds, 16:9`
+
+### SCENE 3 · 10-18s — Gravity
+- Silence. One glowing point → **the real Koleex Hub logo** fades in. One pulse.
+- Everything gets ATTRACTED like gravity: CRM, Projects, Calendar, Products, HR, Employees, Finance, AI, Documents, Tasks, Inventory, Discuss, Planning, Analytics — flat icon chips spiraling into orbit around the logo.
+- VO: *"Imagine… everything… connected."*
+- Higgsfield prompt (keyframe = real lockup + our flat icons composed → i2v):
+  `Flat 2D motion graphics on pure black: a glowing neon-blue pulse expands from a central logo, then dozens of small flat white app icons in rounded squares are pulled inward from all edges like gravity, spiraling into clean circular orbits around the center, thin neon-blue orbit lines, flat vector style with soft glow, NO 3D, elegant magnetic motion, 8 seconds, 16:9`
+
+### SCENE 4 · 18-30s — Assembly
+- Music turns aggressive. Modules rapidly SNAP into place like Iron-Man pieces — but FLAT: icon chips + window panels flying into a growing 2D grid: Discuss, Projects, Calendar, Notes, Planning, Products, CRM, Quotations, Inventory, Warehouse, Finance, Employees, HR, Settings, AI.
+- VO on three impacts: *"One platform."* **Boom.** *"One workflow."* **Boom.** *"One intelligence."*
+- Higgsfield prompt:
+  `Flat 2D motion graphics on pure black: dozens of flat glass-styled UI panels and white app icon chips fly in fast from off-screen and snap one by one into a precise glowing grid layout, each landing with a neon-blue flash pulse, aggressive rhythmic assembly, flat vector style, NO 3D, speed lines and glow bursts on impacts, 12 seconds, 16:9`
+
+### SCENE 5 · 30-40s — Inside
+- Massive 2D zoom THROUGH the interface (scale-up transitions, window-in-window). Windows morph, charts animate, notifications pop, AI answers, projects update, tasks complete, calendar syncs, product cards flip. Everything simultaneously.
+- VO: *"Every message. Every project. Every customer. Every product. Every decision. Connected."*
+- Built from 4-5 dressed REAL screens (flat, dark) + i2v per segment, cut every ~2s:
+  `Flat 2D motion graphics: rapid zoom into a premium dark dashboard UI, windows scale up and morph into the next screen, line charts draw themselves upward, notification badges pop, task rows tick to done with neon-blue check flashes, a calendar grid fills in, flat product cards flip over, everything animating at once, white + neon-blue on black, flat vector UI style, NO 3D, energetic, 2 seconds per segment, 16:9`
+
+### SCENE 6 · 40-50s — The Network
+- Everything FREEZES. 2D pull-back: the whole company is one glowing flat network — thousands of thin neon lines between nodes, alive, breathing. (Flat constellation, not a 3D brain.)
+- VO: *"Your company…"* (pause) *"finally thinks…"* (pause) *"as one."*
+- Higgsfield prompt:
+  `Flat 2D motion graphics on pure black: camera pulls back from a frozen UI grid which dissolves into a vast flat constellation network of glowing nodes connected by thousands of thin neon-blue lines, waves of light pulse across the connections in sync, alive and breathing, flat vector style, NO 3D, epic scale, 10 seconds, 16:9`
+
+### ENDING · 50-60s — Reveal
+- Black. A single blue light. The **"K"** appears alone → expands to **KOLEEX HUB** (real lockup). Glow.
+- Tagline types on: **THE FUTURE** / **WORKS HERE.**
+- Music ends with one massive bass hit on the final frame.
+- Build: pure post (real assets + type + glow). No generation.
+
+---
+
+## 3. Voice-Over Script (final, verbatim)
 ```
 Every company has information.
 But information… isn't intelligence.
 
-(silence)
+Imagine… everything… connected.
 
-Imagine everything connected.
 One platform. One workflow. One intelligence.
 
+Every message. Every project. Every customer.
+Every product. Every decision. Connected.
+
 Your company… finally thinks… as one.
-
-Koleex Hub. The future works here.
 ```
-(Generate via Higgsfield `generate_audio` / voice library; EN master, AR + ZH variants later.)
+(Deep male, cinematic documentary. EN master; AR/ZH versions after picture lock.)
 
-## 4. Sound Design Map
-| Zone | Shots | Direction |
-|---|---|---|
-| Chaos | 1-2 | heartbeat sub, digital air, detuned ping cluster, riser |
-| Void | 3 | hard silence + one sub pulse |
-| Birth | 4-5 | first melody, pulse whoosh, harmonic lock-ins |
-| Power | 6-7 | glass impacts ×3, driving pulse, speed-ramp whooshes |
-| Apotheosis | 8-9 | orchestral swell → single massive impact → shimmer out |
+## 4. Sound Map
+| t | Event |
+|---|---|
+| 0-5 | heartbeat ×3, black-room tone |
+| 5-10 | chaotic UI pings detune → riser → **explosion/shatter** |
+| 10-18 | silence → single pulse → magnetic whooshes, melody enters |
+| 18-30 | aggressive percussive build; **3 boom impacts** on the 3 lines |
+| 30-40 | relentless pulse, whoosh per cut |
+| 40-50 | freeze = cut to airy pad; swelling strings under VO triplet |
+| 50-60 | riser → **massive final bass hit** on lockup, shimmer out |
 
-## 5. Editing Timeline
-| t | Shot | Audio event |
-|---|---|---|
-| 0:00-0:05 | 1 | VO line 1 |
-| 0:05-0:11 | 2 | VO line 2 (split) |
-| 0:11-0:14 | 3 | silence |
-| 0:14-0:19 | 4 | melody starts |
-| 0:19-0:25 | 5 | VO line 3 |
-| 0:25-0:31 | 6 | VO 3 beats + impacts |
-| 0:31-0:39 | 7 | pulse build |
-| 0:39-0:45 | 8 | VO final triplet |
-| 0:45-0:50 | 9 | impact → logo hold |
-
-## 6. Execution Order
-1. ✅ This plan approved
-2. Generate 3 logo treatments (holo/glass/metal) → owner picks the hero treatment
-3. Capture + dress 13 UI screens (needs a signed-in session for screenshots)
-4. Generate keyframe stills for shots 1-8 → owner review contact sheet
-5. Animate approved keyframes (image-to-video) shot by shot
-6. VO + assemble + sound
+## 5. Execution Order (gates)
+1. ✅ Scene board approved (this doc)
+2. 2D keyframe stills for scenes 2-6 (5-7 images) → owner contact-sheet review
+3. Approved keyframes → image-to-video per scene
+4. Capture + dress the real UI screens for scene 5 (needs signed-in session)
+5. VO generation → edit on beats → sound design → master
