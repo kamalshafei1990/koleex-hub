@@ -606,7 +606,6 @@ export default function FloatingPanel() {
               <div
                 className="flex items-center rounded-xl p-[3px] flex-1"
                 style={{
-                  background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
                   border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)",
                 }}
               >
@@ -614,8 +613,8 @@ export default function FloatingPanel() {
                   onClick={() => setTab("ai")}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
                     tab === "ai"
-                      ? dk ? "bg-white/[0.10] text-white shadow-sm" : "bg-black/[0.08] text-black shadow-sm"
-                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
+                      ? dk ? "border border-[#567fb2]/70 text-white" : "border border-[#567fb2]/60 text-black"
+                      : dk ? "border border-transparent text-white/35 hover:text-white/55" : "border border-transparent text-black/35 hover:text-black/55"
                   }`}
                 >
                   <KoleexOrb state="idle" size={22} className={tab === "ai" ? "" : "opacity-40"} />
@@ -625,8 +624,8 @@ export default function FloatingPanel() {
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
                     tab === "discuss"
-                      ? dk ? "bg-white/[0.10] text-white shadow-sm" : "bg-black/[0.08] text-black shadow-sm"
-                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
+                      ? dk ? "border border-[#567fb2]/70 text-white" : "border border-[#567fb2]/60 text-black"
+                      : dk ? "border border-transparent text-white/35 hover:text-white/55" : "border border-transparent text-black/35 hover:text-black/55"
                   }`}
                 >
                   <DiscussIcon size={13} />

@@ -137,18 +137,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   }, []);
 
   return (
-    <div
-      className="shrink-0 hidden sm:flex flex-col items-center justify-center rounded-2xl px-6 py-2"
-      style={{
-        background: dk
-          ? "linear-gradient(180deg,#121212,#0c0c0c)"
-          : "linear-gradient(180deg,#ffffff,#f7f7f7)",
-        border: dk ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)",
-      }}
-    >
+    <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       {/* date sits above the time */}
       {dateLabel && (
-        <span className="mb-1 text-[11px] font-medium bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
+        <span className="mb-1.5 text-[12px] font-semibold bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
           {dateLabel}
         </span>
       )}
@@ -156,7 +148,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
       <div className="flex items-baseline gap-2">
         <span
-          className="text-[30px] md:text-[38px] font-light leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
+          className="text-[40px] md:text-[50px] font-semibold leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
         >
           {t.h12}
           <span
@@ -169,14 +161,14 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.mm}
         </span>
         <span
-          className="mb-1 text-[12px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
+          className="mb-1 text-[13px] font-semibold tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
         >
           {t.pm ? "PM" : "AM"}
         </span>
       </div>
 
       {tzLabel && (
-        <span className="mt-1 text-[10px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
+        <span className="mt-1.5 text-[11px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
           {tzLabel}
         </span>
       )}
