@@ -156,7 +156,7 @@ export default function MainHeader() {
               from public/brand/hub-logo. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.png" : "/brand/hub-logo/koleex-hub-logo-for-light.png"}
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-mono-dark.png" : "/brand/hub-logo/koleex-hub-logo-mono-light.png"}
             alt="Koleex Hub"
             className="w-auto h-5 md:h-8"
           />
