@@ -487,13 +487,13 @@ const AIGreeter = memo(function AIGreeter({
         className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
         style={{
           background: dk
-            ? "linear-gradient(180deg,#15151c,#0c0c11)"
-            : "linear-gradient(180deg,#ffffff,#f4f5f7)",
+            ? "linear-gradient(180deg,#121212,#0c0c0c)"
+            : "linear-gradient(180deg,#ffffff,#f7f7f7)",
           border: dk
             ? "1px solid rgba(255,255,255,0.08)"
             : "1px solid rgba(0,0,0,0.08)",
           boxShadow: dk
-            ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(86,127,178,.35)"
+            ? "0 1px 0 rgba(255,255,255,0.04) inset"
             : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
         }}
       >
