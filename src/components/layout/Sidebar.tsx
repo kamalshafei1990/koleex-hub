@@ -21,6 +21,8 @@ import { usePathname } from "next/navigation";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import SunIcon from "@/components/icons/ui/SunIcon";
+import MoonIcon from "@/components/icons/ui/MoonIcon";
 import {
   SIDEBAR_GROUPS,
   getGroupApps,
@@ -332,6 +334,62 @@ function EdgeToggle({
 }
 
 /* ── Sidebar content (shared by desktop rail + mobile drawer) ── */
+/* ── Mobile quick settings ──
+   Language + theme moved OUT of the crowded mobile header into the drawer
+   footer (owner-approved 2026-07-31): one tap away via the hamburger, and
+   the header keeps only menu · logo · bell · avatar. Mirrors MainHeader's
+   storage keys + events so both stay in sync. */
+function MobileQuickSettings({ dk }: { dk: boolean }) {
+  const [lang, setLangState] = useState<string>("en");
+  useEffect(() => {
+    const saved = window.localStorage.getItem("koleex-lang");
+    if (saved === "en" || saved === "zh" || saved === "ar") setLangState(saved);
+    const onLang = (e: Event) => {
+      const v = (e as CustomEvent<string>).detail;
+      if (v === "en" || v === "zh" || v === "ar") setLangState(v);
+    };
+    window.addEventListener("langchange", onLang);
+    return () => window.removeEventListener("langchange", onLang);
+  }, []);
+  const setLang = (code: "en" | "zh" | "ar") => {
+    document.documentElement.setAttribute("lang", code);
+    document.documentElement.setAttribute("dir", code === "ar" ? "rtl" : "ltr");
+    localStorage.setItem("koleex-lang", code);
+    window.dispatchEvent(new CustomEvent("langchange", { detail: code }));
+    setLangState(code);
+  };
+  const toggleTheme = () => {
+    const next = dk ? "light" : "dark";
+    try { localStorage.setItem("koleex-theme-mode", next); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent("thememodechange", { detail: next }));
+    window.dispatchEvent(new CustomEvent("themechange", { detail: next }));
+  };
+  const chip = (active: boolean) =>
+    `h-8 flex-1 rounded-lg text-[11px] font-semibold transition-colors ${
+      active
+        ? dk ? "bg-white/[0.14] text-white" : "bg-black/[0.10] text-black"
+        : dk ? "text-white/45" : "text-black/45"
+    }`;
+  return (
+    <div className={`px-3 pb-2 pt-2 border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"} flex items-center gap-2`}>
+      <div className={`flex flex-1 items-center rounded-lg border p-0.5 ${dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.08] bg-black/[0.03]"}`}>
+        <button onClick={() => setLang("en")} className={chip(lang === "en")}>EN</button>
+        <button onClick={() => setLang("zh")} className={chip(lang === "zh")}>中文</button>
+        <button onClick={() => setLang("ar")} className={chip(lang === "ar")}>عربي</button>
+      </div>
+      <button
+        onClick={toggleTheme}
+        aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
+        className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-colors ${
+          dk ? "border-white/[0.08] bg-white/[0.03] text-white/60" : "border-black/[0.08] bg-black/[0.03] text-black/60"
+        }`}
+      >
+        {dk ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+      </button>
+    </div>
+  );
+}
+
 function SidebarContent({
   mobile,
   expanded,
@@ -390,6 +448,7 @@ function SidebarContent({
           ),
         )}
       </nav>
+      {mobile && <MobileQuickSettings dk={dk} />}
       {/* Footer — quiet brand mark in the expanded state. */}
       <div className="p-3 flex items-center justify-center">
         {showExpanded && (

@@ -87,23 +87,23 @@ export default function MainHeader() {
     return () => window.removeEventListener("themechange", onThemeChange);
   }, []);
 
+  /* Drawer quick-settings dispatch langchange — mirror it so the desktop
+     pill highlight (and this component's dir effect) stay in sync. */
+  useEffect(() => {
+    const onLang = (e: Event) => {
+      const v = (e as CustomEvent<Lang>).detail;
+      if (v === "en" || v === "zh" || v === "ar") setLang(v);
+    };
+    window.addEventListener("langchange", onLang);
+    return () => window.removeEventListener("langchange", onLang);
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
     localStorage.setItem("koleex-lang", lang);
     window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));
   }, [lang]);
-
-  const [langOpen, setLangOpen] = useState(false);
-  const langRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   const dk = theme === "dark";
   const isHome = pathname === "/";
@@ -128,14 +128,14 @@ export default function MainHeader() {
   return (
     <header
       dir="ltr"
-      className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-1 px-2 min-[400px]:px-3 md:px-6 border-b transition-colors duration-300 ${
+      className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-2 px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
           ? "border-white/[0.08] bg-[#0A0A0A]"
           : "border-black/[0.08] bg-white"
       }`}
     >
       {/* Left: Hamburger (mobile) + Logo + Breadcrumb */}
-      <div className="flex items-center gap-1.5 min-[400px]:gap-2 md:gap-2.5 min-w-0 shrink">
+      <div className="flex items-center gap-2 md:gap-2.5 min-w-0 shrink">
         {/* Mobile hamburger — opens sidebar drawer */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -181,7 +181,7 @@ export default function MainHeader() {
       </div>
 
       {/* Right: Language + Theme + Notifications + Account */}
-      <div className="flex items-center gap-1.5 min-[400px]:gap-2 md:gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         {/* Language — desktop pill bar */}
         <div
           className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${
@@ -209,47 +209,9 @@ export default function MainHeader() {
           ))}
         </div>
 
-        {/* Language — mobile dropdown */}
-        <div ref={langRef} className="relative md:hidden">
-          <button
-            onClick={() => setLangOpen(!langOpen)}
-            className={`flex items-center gap-1 h-8 px-2.5 rounded-lg border text-[11px] font-semibold transition-colors ${
-              dk
-                ? "border-white/[0.08] bg-white/[0.04] text-white/70"
-                : "border-black/[0.08] bg-black/[0.04] text-black/70"
-            }`}
-          >
-            {languages.find((l) => l.code === lang)?.short}
-            <AngleDownIcon size={12} className={`transition-transform ${langOpen ? "rotate-180" : ""}`} />
-          </button>
-          {langOpen && (
-            <div
-              className={`absolute top-full right-0 mt-1.5 w-28 rounded-lg border shadow-lg overflow-hidden z-50 ${
-                dk
-                  ? "border-white/[0.1] bg-[#1a1a1a]"
-                  : "border-black/[0.1] bg-white"
-              }`}
-            >
-              {languages.map((l) => (
-                <button
-                  key={l.code}
-                  onClick={() => { setLang(l.code); setLangOpen(false); }}
-                  className={`w-full px-3 py-2 text-left text-[12px] font-medium transition-colors ${
-                    lang === l.code
-                      ? dk
-                        ? "bg-white/[0.08] text-white"
-                        : "bg-black/[0.06] text-black"
-                      : dk
-                        ? "text-white/60 hover:bg-white/[0.04] hover:text-white"
-                        : "text-black/60 hover:bg-black/[0.04] hover:text-black"
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Mobile: language + theme moved into the sidebar drawer footer
+            (owner-approved) — the phone header keeps only menu · logo ·
+            bell · avatar. */}
 
         {/* Divider between locale and tools (desktop only) */}
         <div
@@ -271,7 +233,7 @@ export default function MainHeader() {
             setTheme(next);
           }}
           aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
-          className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg border transition-all ${
+          className={`hidden md:flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg border transition-all ${
             dk
               ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
               : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
@@ -285,13 +247,13 @@ export default function MainHeader() {
             users. Stores the active tenant_id in localStorage; each page
             load, loadScopeContext() reads the override and scopes every
             query accordingly. */}
-        <TenantPicker dk={dk} />
+        <div className="hidden md:block"><TenantPicker dk={dk} /></div>
 
         {/* View-as picker — Super Admin only. Lets the SA view the
             system as any other user in their tenant (read-only). The
             picker disappears once view-as is active; the persistent
             banner is the only way to exit. */}
-        <ViewAsPicker dk={dk} />
+        <div className="hidden md:block"><ViewAsPicker dk={dk} /></div>
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}
