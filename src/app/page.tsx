@@ -906,7 +906,7 @@ export default function HomePage() {
         <div className="mb-7">
           <div className={`relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 focus-within:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] ${
             dk
-              ? "bg-white/[0.04] border-white/[0.07] focus-within:border-white/[0.22] focus-within:bg-white/[0.06]"
+              ? "bg-[#0c0c0c] border-white/[0.07] focus-within:border-white/[0.22]"
               : "bg-black/[0.02] border-black/[0.07] focus-within:border-black/[0.22] focus-within:bg-black/[0.04]"
           }`}>
             <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
@@ -982,7 +982,7 @@ export default function HomePage() {
             {groupedApps.map((group) => (
               <div key={group.id}>
                 <div className="flex items-center gap-2.5 mb-3">
-                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-[#567fb2]" : "text-[#567fb2]"}`}>
+                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
                     {t(group.tKey, group.label)}
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
