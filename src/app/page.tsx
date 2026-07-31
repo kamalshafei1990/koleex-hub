@@ -140,7 +140,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       {/* date sits above the time */}
       {dateLabel && (
-        <span className={`mb-1.5 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
+        <span className="mb-1.5 text-[12px] font-medium text-[#567fb2]">
           {dateLabel}
         </span>
       )}
