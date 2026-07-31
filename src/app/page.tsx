@@ -883,7 +883,7 @@ export default function HomePage() {
           way). Zero-size, purely defs. */}
       <svg width="0" height="0" className="absolute" aria-hidden focusable="false">
         <defs>
-          <linearGradient id="kx-hub-grad" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="kx-hub-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="24">
             <stop offset="0" stopColor="#567fb2" />
             <stop offset="0.5" stopColor="#7fa9d6" />
             <stop offset="1" stopColor="#bcd8f0" />
