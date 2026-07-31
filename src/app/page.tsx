@@ -246,7 +246,7 @@ const AppCard = memo(function AppCard({
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
             badge === "new"
               ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
-              : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
+              : "bg-[#567fb2]/20 text-[#7fa9d6] ring-1 ring-[#7fa9d6]/40"
           }`}
           aria-label={badge === "new" ? "New app" : "Updated app"}
           title={badge === "new" ? "New app" : "Recently updated"}
@@ -493,7 +493,7 @@ const AIGreeter = memo(function AIGreeter({
             ? "1px solid rgba(255,255,255,0.08)"
             : "1px solid rgba(0,0,0,0.08)",
           boxShadow: dk
-            ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(139,92,246,.30)"
+            ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(86,127,178,.35)"
             : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
         }}
       >
@@ -904,7 +904,7 @@ export default function HomePage() {
 
         {/* ── Zone A: Search (primary action — elevated) ── */}
         <div className="mb-7">
-          <div className={`relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 focus-within:shadow-[0_0_0_4px_rgba(139,92,246,0.12)] ${
+          <div className={`relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 focus-within:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] ${
             dk
               ? "bg-white/[0.04] border-white/[0.07] focus-within:border-white/[0.22] focus-within:bg-white/[0.06]"
               : "bg-black/[0.02] border-black/[0.07] focus-within:border-black/[0.22] focus-within:bg-black/[0.04]"
