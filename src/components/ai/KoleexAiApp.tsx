@@ -1472,7 +1472,8 @@ export default function KoleexAiApp() {
                 onPick={(p) => send(p)}
                 firstName={(account?.person?.full_name || account?.username || "")
                   .trim()
-                  .split(/\s+/)[0] || ""}
+                  .split(/\s+/)
+                  .filter((w) => !/^(mr|mrs|ms|miss|dr|eng|prof|sir)\.?$/i.test(w))[0] || ""}
               />
             ) : (
               messages.map((m, i) => (
@@ -2356,11 +2357,11 @@ function WelcomeCard({
   }, []);
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-1" />
-      <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
+      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-6" />
+      <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
         {greeting}
       </h2>
-      <p className="text-[12.5px] text-[var(--text-dim)] mb-8 max-w-md">
+      <p className="text-[12.5px] text-[var(--text-dim)] mb-9 max-w-md">
         {copy.welcomeSub}
       </p>
 
