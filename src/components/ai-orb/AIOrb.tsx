@@ -285,9 +285,9 @@ export default function AIOrb({
         .kx-aiorb.is-listening .sphere { transform: translateY(3px) scale(1.03); }
         .kx-aiorb.is-transcribing .sphere { transform: rotate(2deg); }
         .kx-aiorb.is-speaking .sphere { transform: translateY(calc(var(--kx-orb-audio, 0) * -4px)); }
-        .kx-aiorb.is-success .sphere { filter: brightness(1.14); animation: kxA-bounce 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 1; }
+        .kx-aiorb.is-success .sphere { filter: brightness(1.14); animation: kxA-bounce 1.1s cubic-bezier(0.34, 1.4, 0.5, 1) 1; }
         .kx-aiorb.is-warning .sphere { transform: rotate(-3deg); }
-        .kx-aiorb.is-error .sphere { animation: kxA-shake 0.5s ease-in-out 1; transform: translateY(6px) scale(0.985); filter: brightness(0.92); }
+        .kx-aiorb.is-error .sphere { animation: kxA-shake 0.55s ease-in-out 1; transform: translateY(10px) rotate(-3deg) scale(0.97); filter: brightness(0.88); }
         .kx-aiorb.is-sleeping .sphere { transform: translateY(8px) scale(0.97); filter: brightness(0.75); }
         .kx-aiorb.is-awakening .sphere { animation: kxA-wake 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1; }
 
@@ -296,38 +296,41 @@ export default function AIOrb({
         .kx-aiorb .eyes {
           position: absolute;
           left: 50%;
-          top: 44%;
+          top: 45%;
           transform: translate(-50%, -50%);
           display: flex;
-          gap: 24px;
+          gap: 22px;
           z-index: 60;
-          transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.4, 1);
+          transition: transform 0.4s cubic-bezier(0.3, 1.6, 0.4, 1);
         }
         .kx-aiorb .eye {
-          width: 16px;
-          height: 48px;
-          border-radius: 8px;
+          width: 30px;
+          height: 58px;
+          border-radius: 15px;
           background: #fff;
-          transform-origin: center;
+          transform-origin: center bottom;
           transition:
-            height 0.4s cubic-bezier(0.34, 1.45, 0.4, 1),
-            width 0.4s cubic-bezier(0.34, 1.45, 0.4, 1),
-            border-radius 0.4s ease,
-            transform 0.45s cubic-bezier(0.34, 1.45, 0.4, 1),
+            height 0.35s cubic-bezier(0.3, 1.6, 0.4, 1),
+            width 0.35s cubic-bezier(0.3, 1.6, 0.4, 1),
+            border-radius 0.35s ease,
+            transform 0.4s cubic-bezier(0.3, 1.6, 0.4, 1),
             opacity 0.4s ease,
             box-shadow 0.4s ease;
-          animation: kxA-blink 6.4s infinite;
+          animation: kxA-blink 4.6s infinite;
         }
-        .kx-aiorb .eye.r { animation-delay: 0.04s; }
+        .kx-aiorb .eye.r { animation-delay: 0.05s; }
 
-        /* idle: natural glancing (whole gaze wanders). */
-        .kx-aiorb.is-idle .eyes { animation: kxA-gaze 9s ease-in-out infinite; }
+        /* idle: the LIFE loop — gaze wanders with anticipation while the
+           body leans into each glance (see kxA-bodylife on the sphere). */
+        .kx-aiorb.is-idle .eyes { animation: kxA-life 12s ease-in-out infinite; }
+        .kx-aiorb.is-idle .sphere { animation: kxA-bodylife 12s ease-in-out infinite; }
 
         /* awakening: eyes stretch open wide, then settle. */
         .kx-aiorb.is-awakening .eye { animation: kxA-eyes-wake 0.9s ease-out both; }
 
         /* thinking: focused slits looking UP — actually pondering. */
-        .kx-aiorb.is-thinking .eye { height: 30px; animation: none; }
+        .kx-aiorb.is-thinking .eye { height: 34px; animation: none; }
+        .kx-aiorb.is-thinking .eye.r { height: 46px; }
         .kx-aiorb.is-thinking .eyes { animation: kxA-ponder 5.5s ease-in-out infinite; }
 
         /* processing: narrowed, steady, looking slightly down at the work. */
@@ -339,21 +342,21 @@ export default function AIOrb({
 
         /* reading: gaze tracks lines — small saccades stepping down. */
         .kx-aiorb.fam-line-scan .eyes { animation: kxA-trackline 2.2s ease-in-out infinite; }
-        .kx-aiorb.fam-line-scan .eye { height: 26px; }
+        .kx-aiorb.fam-line-scan .eye { height: 30px; }
 
         /* translating/connecting: gaze crosses side to side with the energy. */
         .kx-aiorb.fam-sweep-lr .eyes { animation: kxA-crossgaze 1.8s ease-in-out infinite alternate; }
 
         /* listening: soft, attentive; height breathes with the voice. */
+        .kx-aiorb.is-listening .eyes { transform: translate(-50%, -50%) rotate(4deg); }
         .kx-aiorb.is-listening .eye {
           animation: none;
-          height: calc(36px + var(--kx-orb-audio, 0) * 20px);
-          border-radius: 10px;
+          height: calc(42px + var(--kx-orb-audio, 0) * 22px);
         }
         /* speaking: syllables move the eyes. */
         .kx-aiorb.is-speaking .eye {
           animation: none;
-          height: calc(28px + var(--kx-orb-audio, 0) * 28px);
+          height: calc(30px + var(--kx-orb-audio, 0) * 30px);
         }
 
         /* transcribing: measured writing rhythm. */
@@ -362,22 +365,24 @@ export default function AIOrb({
         /* SUCCESS: happy closed arcs (^ ^) + brighten. */
         .kx-aiorb.is-success .eye {
           animation: none;
-          height: 16px;
-          width: 26px;
-          border-radius: 13px 13px 6px 6px;
-          transform: translateY(-10px);
-          box-shadow: 0 0 16px rgba(255, 255, 255, 0.9);
+          height: 20px;
+          width: 38px;
+          border-radius: 19px 19px 7px 7px;
+          transform: translateY(-14px);
+          box-shadow: 0 0 18px rgba(255, 255, 255, 0.95);
         }
+        .kx-aiorb.is-success .eyes { transform: translate(-50%, -50%) scale(1.06); }
         /* ERROR: sad inward slant + droop. */
-        .kx-aiorb.is-error .eye { animation: none; height: 30px; }
-        .kx-aiorb.is-error .eye.l { transform: rotate(16deg) translateY(6px); }
-        .kx-aiorb.is-error .eye.r { transform: rotate(-16deg) translateY(6px); }
+        .kx-aiorb.is-error .eye { animation: none; height: 34px; border-radius: 15px 15px 22px 22px; }
+        .kx-aiorb.is-error .eye.l { transform: rotate(18deg) translateY(8px); }
+        .kx-aiorb.is-error .eye.r { transform: rotate(-18deg) translateY(8px); }
+        .kx-aiorb.is-error .eyes { transform: translate(-50%, -44%); }
         /* WARNING: skeptical — one brow raised. */
         .kx-aiorb.is-warning .eye { animation: none; }
-        .kx-aiorb.is-warning .eye.l { height: 52px; transform: translateY(-5px); }
-        .kx-aiorb.is-warning .eye.r { height: 26px; transform: translateY(5px); }
+        .kx-aiorb.is-warning .eye.l { height: 64px; transform: translateY(-6px); }
+        .kx-aiorb.is-warning .eye.r { height: 30px; transform: translateY(6px); }
         /* SLEEPING: closed lines. */
-        .kx-aiorb.is-sleeping .eye { animation: none; height: 5px; opacity: 0.45; }
+        .kx-aiorb.is-sleeping .eye { animation: none; height: 6px; width: 34px; opacity: 0.45; }
 
         /* Floor light + specular keep the ball 3D. */
         .kx-aiorb .sphere::after {
@@ -523,11 +528,14 @@ export default function AIOrb({
           50% { transform: rotate(3.5deg); }
         }
         @keyframes kxA-bounce {
-          0% { transform: translateY(0) scale(1); }
-          30% { transform: translateY(-16px) scale(1.05, 0.96); }
-          55% { transform: translateY(0) scale(0.97, 1.04); }
-          75% { transform: translateY(-6px) scale(1.01, 0.99); }
-          100% { transform: translateY(0) scale(1); }
+          0% { transform: translateY(0) scale(1, 1); }
+          12% { transform: translateY(4px) scale(1.06, 0.9); }
+          32% { transform: translateY(-24px) scale(0.94, 1.1); }
+          48% { transform: translateY(0) scale(1.1, 0.88); }
+          62% { transform: translateY(-12px) scale(0.97, 1.05); }
+          76% { transform: translateY(0) scale(1.05, 0.95); }
+          88% { transform: translateY(-3px) scale(1, 1.01); }
+          100% { transform: translateY(0) scale(1, 1); }
         }
         @keyframes kxA-shake {
           0%, 100% { transform: translate(0, 6px); }
@@ -543,28 +551,47 @@ export default function AIOrb({
         }
         /* eyes */
         @keyframes kxA-blink {
-          0%, 41% { transform: scaleY(1); }
-          43% { transform: scaleY(0.08); }
-          45%, 87% { transform: scaleY(1); }
-          89% { transform: scaleY(0.08); }
-          91% { transform: scaleY(1); }
-          93% { transform: scaleY(0.08); }
-          95%, 100% { transform: scaleY(1); }
+          0%, 38% { transform: scaleY(1) scaleX(1); }
+          41% { transform: scaleY(0.06) scaleX(1.25); }
+          44%, 68% { transform: scaleY(1) scaleX(1); }
+          /* curious half-squint — pure personality */
+          72%, 78% { transform: scaleY(0.62) scaleX(1.08); }
+          82%, 90% { transform: scaleY(1) scaleX(1); }
+          92% { transform: scaleY(0.06) scaleX(1.25); }
+          94% { transform: scaleY(1) scaleX(1); }
+          96% { transform: scaleY(0.06) scaleX(1.25); }
+          98%, 100% { transform: scaleY(1) scaleX(1); }
         }
-        @keyframes kxA-gaze {
-          0%, 22% { transform: translate(-50%, -50%); }
-          28%, 36% { transform: translate(calc(-50% - 12px), -50%); }
-          42%, 52% { transform: translate(calc(-50% + 12px), -50%); }
-          58%, 66% { transform: translate(-50%, calc(-50% - 8px)); }
-          72%, 100% { transform: translate(-50%, -50%); }
+        @keyframes kxA-life {
+          0%, 14% { transform: translate(-50%, -50%); }
+          /* dart LEFT with a tiny anticipation kick */
+          17% { transform: translate(calc(-50% + 6px), -50%); }
+          20%, 30% { transform: translate(calc(-50% - 24px), calc(-50% - 4px)); }
+          34%, 40% { transform: translate(-50%, -50%); }
+          /* dart RIGHT */
+          43% { transform: translate(calc(-50% - 6px), -50%); }
+          46%, 56% { transform: translate(calc(-50% + 24px), calc(-50% - 4px)); }
+          60%, 68% { transform: translate(-50%, -50%); }
+          /* look UP dreamily */
+          72%, 80% { transform: translate(calc(-50% + 8px), calc(-50% - 14px)); }
+          85%, 100% { transform: translate(-50%, -50%); }
+        }
+        @keyframes kxA-bodylife {
+          0%, 14% { transform: rotate(0deg) translateY(0); }
+          20%, 30% { transform: rotate(-5deg) translateY(1px); }
+          34%, 40% { transform: rotate(0deg) translateY(0); }
+          46%, 56% { transform: rotate(5deg) translateY(1px); }
+          60%, 68% { transform: rotate(0deg) translateY(0); }
+          72%, 80% { transform: rotate(2deg) translateY(-4px); }
+          85%, 100% { transform: rotate(0deg) translateY(0); }
         }
         @keyframes kxA-ponder {
           0%, 100% { transform: translate(calc(-50% - 10px), calc(-50% - 12px)); }
           50% { transform: translate(calc(-50% + 10px), calc(-50% - 12px)); }
         }
         @keyframes kxA-hunt {
-          from { transform: translate(calc(-50% - 16px), -50%); }
-          to { transform: translate(calc(-50% + 16px), -50%); }
+          from { transform: translate(calc(-50% - 22px), -50%); }
+          to { transform: translate(calc(-50% + 22px), -50%); }
         }
         @keyframes kxA-trackline {
           0% { transform: translate(calc(-50% - 12px), calc(-50% - 6px)); }
@@ -582,9 +609,10 @@ export default function AIOrb({
           50% { height: 40px; }
         }
         @keyframes kxA-eyes-wake {
-          0% { height: 4px; opacity: 0.4; }
-          55% { height: 56px; opacity: 1; }
-          100% { height: 48px; opacity: 1; }
+          0% { height: 5px; width: 34px; opacity: 0.4; }
+          45% { height: 5px; width: 34px; opacity: 0.9; }
+          70% { height: 70px; width: 34px; opacity: 1; }
+          100% { height: 58px; width: 30px; opacity: 1; }
         }
         /* layers */
         @keyframes kxA-orbit {
