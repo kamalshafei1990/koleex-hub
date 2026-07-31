@@ -1075,9 +1075,21 @@ export default function HomePage() {
            only its (opaque) text color fades out, so entry/exit crossfade
            instead of snapping. The icon's fill flips to the #kx-hub-grad
            paint server while a drop-shadow glow fades in to soften it. */
-        .tile-hover-neon:hover svg,
-        .tile-hover-neon:hover svg path {
+        /* Fill-based icons (most of the pack). */
+        .tile-hover-neon:hover svg:not([fill="none"]),
+        .tile-hover-neon:hover svg:not([fill="none"]) path {
           fill: url(#kx-hub-grad);
+        }
+        /* Stroke-based icons (e.g. Notes): tint the stroke, never fill the
+           body — the old blanket fill rule turned them into solid blobs. */
+        .tile-hover-neon:hover svg[fill="none"],
+        .tile-hover-neon:hover svg[fill="none"] * {
+          stroke: url(#kx-hub-grad);
+        }
+        /* Mask-image icons from the Visual Library pack (bg-current spans,
+           e.g. Translator): paint the gradient as their background. */
+        .tile-hover-neon:hover span.bg-current {
+          background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
         }
         .tile-hover-neon .kx-app-label {
           background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
