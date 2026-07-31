@@ -55,19 +55,21 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
         }
         /* All the color lives back here — never over the face. */
         .kx-glow-orb .aura {
-          width: 200px;
-          height: 200px;
+          width: 214px;
+          height: 214px;
           z-index: 5;
-          filter: blur(22px);
-          animation: kx-orb-breathe 3s ease-in-out infinite alternate;
+          filter: blur(24px);
+          animation:
+            kx-orb-aura-spin 10s linear infinite,
+            kx-orb-breathe 3s ease-in-out infinite alternate;
           background:
-            radial-gradient(circle at 30% 70%, #567fb2 0%, transparent 55%),
-            radial-gradient(circle at 72% 30%, #7fa9d6 0%, transparent 55%),
-            radial-gradient(circle at 60% 80%, #bcd8f0 0%, transparent 45%);
+            radial-gradient(circle at 28% 70%, #567fb2 0%, rgba(86, 127, 178, 0.6) 30%, transparent 64%),
+            radial-gradient(circle at 74% 28%, #7fa9d6 0%, rgba(127, 169, 214, 0.55) 26%, transparent 60%),
+            radial-gradient(circle at 62% 84%, #bcd8f0 0%, transparent 52%);
         }
         .kx-glow-orb.is-typing .aura {
-          animation-duration: 1.2s;
-          filter: blur(18px);
+          animation-duration: 3s, 1.2s;
+          filter: blur(20px);
         }
         .kx-glow-orb .sphere {
           width: 200px;
@@ -114,8 +116,11 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           0%, 100% { transform: translate(-50%, -50%); }
           50% { transform: translate(-50%, calc(-50% - 8px)); }
         }
+        @keyframes kx-orb-aura-spin {
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
         @keyframes kx-orb-breathe {
-          from { opacity: 0.75; }
+          from { opacity: 0.7; }
           to { opacity: 1; }
         }
         @keyframes kx-orb-blink {
