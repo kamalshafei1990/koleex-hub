@@ -1,30 +1,27 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   AIOrb — the Koleex AI face as a state-driven visual status system.
+   AIOrb — the Koleex AI face as an EMOTIVE, state-driven status system.
 
-   Identity (unchanged, owner-approved): dark-glass sphere #0b0d11 with an
-   ice rim, two vertical white indicators (blink + glance), and ALL Hub
-   Blue color living BEHIND the ball as a breathing aura. This component
-   extends that identity with semantic motion layers:
+   Identity (unchanged): dark-glass sphere #0b0d11, ice rim, two white
+   eyes, Hub Blue aura living BEHIND the ball.
 
-     aura        — Hub Blue glow behind the ball (state-paced)
-     halo        — thin rotating tool ring (processing)
-     particles   — 8 orbital points (thinking/processing families)
-     sphere      — the glass ball: float, eyes, floor light
-     spec        — moving specular highlight (parallax-driven)
-     inner       — internal gradient circulation (thinking/analyzing)
-     scan        — activity scans (arc / line / sweep families)
-     streak      — occasional light streak while thinking
-     ripple      — center-out construction ripple (generating/creating)
-     ring        — one-shot success ripple
-     tint        — amber/red wash for warning/error
-     progress    — REAL-progress arc (never fake)
+   The emotion engine has two actors:
 
-   All motion is CSS (transform/opacity/filter only); the two rAF loops
-   (parallax, audio smoothing) write CSS variables on the root node and
-   never touch React state. prefers-reduced-motion collapses everything
-   to opacity. Authored at 200px, scaled via `size`.
+   · THE EYES — two real DOM capsules that MORPH between emotional
+     shapes (open / happy arcs / sad slant / skeptical / focused slits /
+     closed) through spring-eased transitions, plus continuous acting:
+     blinking, glancing, scanning while searching, line-tracking while
+     reading, looking up while thinking, swelling with audio.
+
+   · THE BODY — the ball itself changes posture: bounces on success,
+     shakes-and-droops on error, sways while thinking, leans in while
+     listening, perks up when awakening, sags asleep. Posture changes
+     ride one spring transition so every emotion flows into the next.
+
+   Activity layers (halo, particles, scans, ripples, progress arc) sit
+   around that living core. All continuous motion is CSS; the two rAF
+   loops (parallax, audio) write CSS vars only. Authored at 200px.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
@@ -63,7 +60,6 @@ export default function AIOrb({
   useOrbParallax(rootRef, interactive && !compact, compact ? 3 : 6);
   useAudioSmoothing(rootRef, clamp01(audioLevel), audioActive);
 
-  /* aria label follows the app language (koleex-lang + langchange). */
   const [lang, setLang] = useState("en");
   useEffect(() => {
     try {
@@ -76,7 +72,6 @@ export default function AIOrb({
   }, []);
   const statusLabel = label ?? orbStatusLabel(visual, activity, lang);
 
-  /* Pause the (many) CSS animations while the tab is hidden. */
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const onVis = () => setHidden(document.visibilityState === "hidden");
@@ -113,13 +108,20 @@ export default function AIOrb({
               <span key={i} style={{ ["--i" as string]: i }} />
             ))}
           </div>
-          <div className="sphere">
-            <div className="inner" />
-            <div className="scan" />
-            <div className="streak" />
-            <div className="ripple" />
-            <div className="spec" />
-            <div className="tint" />
+          {/* body = continuous float · sphere = emotional posture */}
+          <div className="body">
+            <div className="sphere">
+              <div className="inner" />
+              <div className="scan" />
+              <div className="streak" />
+              <div className="ripple" />
+              <div className="spec" />
+              <div className="tint" />
+              <div className="eyes">
+                <span className="eye l" />
+                <span className="eye r" />
+              </div>
+            </div>
           </div>
           <div className="ring" />
           {prog !== null && (
@@ -165,7 +167,7 @@ export default function AIOrb({
         }
         .kx-aiorb .aura,
         .kx-aiorb .halo,
-        .kx-aiorb .sphere,
+        .kx-aiorb .body,
         .kx-aiorb .ring,
         .kx-aiorb .prog {
           position: absolute;
@@ -175,32 +177,35 @@ export default function AIOrb({
           border-radius: 100%;
         }
 
-        /* ── Aura: ALL the Hub Blue lives back here — never over the face. ── */
+        /* ── Aura: ALL the Hub Blue lives behind — never over the face. ── */
         .kx-aiorb .aura {
           width: 214px;
           height: 214px;
           z-index: 5;
           filter: blur(24px);
           animation:
-            kxA-spin 10s linear infinite,
-            kxA-breathe 3.4s ease-in-out infinite alternate;
+            kxA-spin 9s linear infinite,
+            kxA-breathe 2.8s ease-in-out infinite alternate;
           background:
             radial-gradient(circle at 28% 70%, #567fb2 0%, rgba(86, 127, 178, 0.6) 30%, transparent 64%),
             radial-gradient(circle at 74% 28%, #7fa9d6 0%, rgba(127, 169, 214, 0.55) 26%, transparent 60%),
             radial-gradient(circle at 62% 84%, #bcd8f0 0%, transparent 52%);
+          transition: opacity 0.5s ease, filter 0.5s ease;
         }
         .kx-aiorb.is-thinking .aura,
         .kx-aiorb.is-processing .aura,
-        .kx-aiorb.is-transcribing .aura { animation-duration: 6s, 1.4s; filter: blur(20px); }
+        .kx-aiorb.is-transcribing .aura { animation-duration: 5s, 1.1s; filter: blur(19px); }
         .kx-aiorb.is-listening .aura,
         .kx-aiorb.is-speaking .aura {
-          animation-duration: 8s, 2.6s;
+          animation-duration: 7s, 2.2s;
           opacity: calc(0.72 + var(--kx-orb-audio, 0) * 0.28);
         }
+        .kx-aiorb.is-success .aura { filter: blur(19px) brightness(1.35); }
+        .kx-aiorb.is-error .aura { filter: blur(26px) brightness(0.6); }
         .kx-aiorb.is-sleeping .aura { animation-duration: 30s, 9s; opacity: 0.14; }
         .kx-aiorb.fam-counter-rotate .aura { animation-direction: reverse, normal; }
 
-        /* ── Halo: thin rotating tool ring (processing only). ── */
+        /* ── Halo: rotating tool ring (processing). ── */
         .kx-aiorb .halo {
           width: 206px;
           height: 206px;
@@ -214,12 +219,12 @@ export default function AIOrb({
           );
           -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px));
           mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px));
-          animation: kxA-rot 3.6s linear infinite;
+          animation: kxA-rot 3.2s linear infinite;
         }
         .kx-aiorb.is-processing .halo { opacity: 1; }
-        .kx-aiorb.fam-arc-scan .halo { animation-duration: 1.9s; }
+        .kx-aiorb.fam-arc-scan .halo { animation-duration: 1.7s; }
 
-        /* ── Particles: 8 soft points orbiting (thinking/processing). ── */
+        /* ── Particles. ── */
         .kx-aiorb .particles { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
         .kx-aiorb .particles span {
           position: absolute;
@@ -232,25 +237,38 @@ export default function AIOrb({
           background: rgba(188, 216, 240, 0.85);
           opacity: 0;
           transform: rotate(calc(var(--i) * 45deg)) translateX(112px);
+          transition: opacity 0.5s ease;
         }
         .kx-aiorb.is-thinking .particles span,
         .kx-aiorb.is-processing .particles span {
           opacity: 0.22;
-          animation: kxA-orbit 9s linear infinite;
-          animation-delay: calc(var(--i) * -1.125s);
+          animation: kxA-orbit 8s linear infinite;
+          animation-delay: calc(var(--i) * -1s);
         }
         .kx-aiorb.fam-ordered-orbit .particles span {
           opacity: 0.3;
-          animation-duration: 3.2s;
-          animation-delay: calc(var(--i) * -0.4s);
+          animation-duration: 3s;
+          animation-delay: calc(var(--i) * -0.375s);
         }
         .kx-aiorb.is-compact .particles span:nth-child(n + 5) { display: none; }
 
-        /* ── Sphere: the identity. Dark glass, ice rim, floor light. ── */
-        .kx-aiorb .sphere {
+        /* ── Body: continuous float — always alive. ── */
+        .kx-aiorb .body {
           width: 200px;
           height: 200px;
           z-index: 50;
+          animation: kxA-float 5s ease-in-out infinite;
+        }
+        .kx-aiorb.is-sleeping .body { animation-duration: 12s; }
+        .kx-aiorb.is-listening .body,
+        .kx-aiorb.is-speaking .body { animation-duration: 3.6s; }
+
+        /* ── Sphere: the glass + EMOTIONAL POSTURE. One spring transition
+             carries every state-to-state posture change. ── */
+        .kx-aiorb .sphere {
+          position: absolute;
+          inset: 0;
+          border-radius: 100%;
           overflow: hidden;
           background: #0b0d11;
           border: 2px solid rgba(188, 216, 240, 0.25);
@@ -258,46 +276,110 @@ export default function AIOrb({
             inset 0 3px 12px rgba(255, 255, 255, 0.16),
             inset 0 -12px 30px rgba(0, 0, 0, 0.55),
             inset 0 0 0 1px rgba(188, 216, 240, 0.06);
-          animation: kxA-float 5s ease-in-out infinite;
-          transition: filter 0.4s ease;
+          transition:
+            transform 0.5s cubic-bezier(0.34, 1.45, 0.4, 1),
+            filter 0.4s ease;
         }
-        .kx-aiorb.is-processing .sphere { filter: brightness(1.06); }
-        .kx-aiorb.is-sleeping .sphere { animation-duration: 14s; }
-        .kx-aiorb.is-success .sphere { filter: brightness(1.14); }
-        .kx-aiorb.is-error .sphere { animation: kxA-float 5s ease-in-out infinite, kxA-shake 0.42s ease-in-out 1; }
+        .kx-aiorb.is-thinking .sphere { animation: kxA-sway 5.5s ease-in-out infinite; }
+        .kx-aiorb.is-processing .sphere { filter: brightness(1.06); transform: rotate(-2deg); }
+        .kx-aiorb.is-listening .sphere { transform: translateY(3px) scale(1.03); }
+        .kx-aiorb.is-transcribing .sphere { transform: rotate(2deg); }
+        .kx-aiorb.is-speaking .sphere { transform: translateY(calc(var(--kx-orb-audio, 0) * -4px)); }
+        .kx-aiorb.is-success .sphere { filter: brightness(1.14); animation: kxA-bounce 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 1; }
+        .kx-aiorb.is-warning .sphere { transform: rotate(-3deg); }
+        .kx-aiorb.is-error .sphere { animation: kxA-shake 0.5s ease-in-out 1; transform: translateY(6px) scale(0.985); filter: brightness(0.92); }
+        .kx-aiorb.is-sleeping .sphere { transform: translateY(8px) scale(0.97); filter: brightness(0.75); }
+        .kx-aiorb.is-awakening .sphere { animation: kxA-wake 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1; }
 
-        /* Eyes: one bar + its box-shadow twin; blink + glance around. */
-        .kx-aiorb .sphere::before {
-          content: "";
+        /* ── EYES: two independent capsules that ACT. Every geometric
+             property rides the spring so emotions morph, never snap. ── */
+        .kx-aiorb .eyes {
           position: absolute;
+          left: 50%;
           top: 44%;
-          left: 47%;
           transform: translate(-50%, -50%);
+          display: flex;
+          gap: 24px;
+          z-index: 60;
+          transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.4, 1);
+        }
+        .kx-aiorb .eye {
           width: 16px;
           height: 48px;
-          background: #fff;
           border-radius: 8px;
-          box-shadow: 40px 0 0 #fff;
-          z-index: 60;
-          animation:
-            kxA-blink 6.4s infinite,
-            kxA-look 7s infinite ease-in-out;
-          transition: height 0.25s ease, opacity 0.4s ease;
+          background: #fff;
+          transform-origin: center;
+          transition:
+            height 0.4s cubic-bezier(0.34, 1.45, 0.4, 1),
+            width 0.4s cubic-bezier(0.34, 1.45, 0.4, 1),
+            border-radius 0.4s ease,
+            transform 0.45s cubic-bezier(0.34, 1.45, 0.4, 1),
+            opacity 0.4s ease,
+            box-shadow 0.4s ease;
+          animation: kxA-blink 6.4s infinite;
         }
-        .kx-aiorb.is-listening .sphere::before,
-        .kx-aiorb.is-speaking .sphere::before {
-          animation: none;
-          height: calc(34px + var(--kx-orb-audio, 0) * 22px);
-        }
-        .kx-aiorb.is-transcribing .sphere::before {
-          animation: kxA-scribe 1.1s ease-in-out infinite;
-        }
-        .kx-aiorb.is-sleeping .sphere::before { animation: none; height: 8px; opacity: 0.35; }
-        .kx-aiorb.is-success .sphere::before { animation: none; height: 48px; box-shadow: 40px 0 0 #fff, 0 0 14px rgba(255,255,255,0.8), 40px 0 14px rgba(255,255,255,0.8); }
-        .kx-aiorb.is-error .sphere::before { animation: none; height: 20px; }
-        .kx-aiorb.is-awakening .sphere::before { animation: kxA-eyes-on 0.8s ease-out both; }
+        .kx-aiorb .eye.r { animation-delay: 0.04s; }
 
-        /* Floor light inside the glass — keeps the ball 3D. */
+        /* idle: natural glancing (whole gaze wanders). */
+        .kx-aiorb.is-idle .eyes { animation: kxA-gaze 9s ease-in-out infinite; }
+
+        /* awakening: eyes stretch open wide, then settle. */
+        .kx-aiorb.is-awakening .eye { animation: kxA-eyes-wake 0.9s ease-out both; }
+
+        /* thinking: focused slits looking UP — actually pondering. */
+        .kx-aiorb.is-thinking .eye { height: 30px; animation: none; }
+        .kx-aiorb.is-thinking .eyes { animation: kxA-ponder 5.5s ease-in-out infinite; }
+
+        /* processing: narrowed, steady, looking slightly down at the work. */
+        .kx-aiorb.is-processing .eye { height: 34px; animation: none; }
+        .kx-aiorb.is-processing .eyes { transform: translate(-50%, -44%); }
+
+        /* searching: eyes dart left-right hunting. */
+        .kx-aiorb.fam-arc-scan .eyes { animation: kxA-hunt 1.5s ease-in-out infinite alternate; }
+
+        /* reading: gaze tracks lines — small saccades stepping down. */
+        .kx-aiorb.fam-line-scan .eyes { animation: kxA-trackline 2.2s ease-in-out infinite; }
+        .kx-aiorb.fam-line-scan .eye { height: 26px; }
+
+        /* translating/connecting: gaze crosses side to side with the energy. */
+        .kx-aiorb.fam-sweep-lr .eyes { animation: kxA-crossgaze 1.8s ease-in-out infinite alternate; }
+
+        /* listening: soft, attentive; height breathes with the voice. */
+        .kx-aiorb.is-listening .eye {
+          animation: none;
+          height: calc(36px + var(--kx-orb-audio, 0) * 20px);
+          border-radius: 10px;
+        }
+        /* speaking: syllables move the eyes. */
+        .kx-aiorb.is-speaking .eye {
+          animation: none;
+          height: calc(28px + var(--kx-orb-audio, 0) * 28px);
+        }
+
+        /* transcribing: measured writing rhythm. */
+        .kx-aiorb.is-transcribing .eye { animation: kxA-scribe 1s ease-in-out infinite; }
+
+        /* SUCCESS: happy closed arcs (^ ^) + brighten. */
+        .kx-aiorb.is-success .eye {
+          animation: none;
+          height: 16px;
+          width: 26px;
+          border-radius: 13px 13px 6px 6px;
+          transform: translateY(-10px);
+          box-shadow: 0 0 16px rgba(255, 255, 255, 0.9);
+        }
+        /* ERROR: sad inward slant + droop. */
+        .kx-aiorb.is-error .eye { animation: none; height: 30px; }
+        .kx-aiorb.is-error .eye.l { transform: rotate(16deg) translateY(6px); }
+        .kx-aiorb.is-error .eye.r { transform: rotate(-16deg) translateY(6px); }
+        /* WARNING: skeptical — one brow raised. */
+        .kx-aiorb.is-warning .eye { animation: none; }
+        .kx-aiorb.is-warning .eye.l { height: 52px; transform: translateY(-5px); }
+        .kx-aiorb.is-warning .eye.r { height: 26px; transform: translateY(5px); }
+        /* SLEEPING: closed lines. */
+        .kx-aiorb.is-sleeping .eye { animation: none; height: 5px; opacity: 0.45; }
+
+        /* Floor light + specular keep the ball 3D. */
         .kx-aiorb .sphere::after {
           content: "";
           position: absolute;
@@ -309,8 +391,6 @@ export default function AIOrb({
           background: radial-gradient(closest-side, rgba(127, 169, 214, 0.55), transparent);
           filter: blur(10px);
         }
-
-        /* Specular highlight — drifts with the cursor (fresnel-ish). */
         .kx-aiorb .spec {
           position: absolute;
           left: calc(22% + var(--kx-orb-hx, 0%));
@@ -324,7 +404,7 @@ export default function AIOrb({
           pointer-events: none;
         }
 
-        /* Internal gradient circulation — thinking looks computational. */
+        /* Internal circulation (thinking looks computational). */
         .kx-aiorb .inner {
           position: absolute;
           inset: 8%;
@@ -334,13 +414,13 @@ export default function AIOrb({
           background:
             radial-gradient(circle at 30% 60%, rgba(86, 127, 178, 0.22), transparent 55%),
             radial-gradient(circle at 72% 34%, rgba(127, 169, 214, 0.16), transparent 50%);
-          animation: kxA-rot 12s linear infinite;
+          animation: kxA-rot 11s linear infinite;
           z-index: 52;
         }
         .kx-aiorb.is-thinking .inner { opacity: 1; }
-        .kx-aiorb.fam-counter-rotate .inner { opacity: 1; animation-duration: 6s; }
+        .kx-aiorb.fam-counter-rotate .inner { opacity: 1; animation-duration: 5.5s; }
 
-        /* Scan element — one node, styled per activity family. */
+        /* Activity scans. */
         .kx-aiorb .scan {
           position: absolute;
           inset: 0;
@@ -367,10 +447,9 @@ export default function AIOrb({
         .kx-aiorb.fam-arc-scan .scan {
           opacity: 1;
           background: conic-gradient(from 0deg, rgba(188, 216, 240, 0.16) 0deg 26deg, transparent 34deg 360deg);
-          animation: kxA-rot 1.9s linear infinite;
+          animation: kxA-rot 1.7s linear infinite;
         }
 
-        /* Occasional light streak while thinking. */
         .kx-aiorb .streak {
           position: absolute;
           inset: -10%;
@@ -379,9 +458,8 @@ export default function AIOrb({
           z-index: 57;
           pointer-events: none;
         }
-        .kx-aiorb.is-thinking .streak { animation: kxA-streak 7s ease-in-out infinite; }
+        .kx-aiorb.is-thinking .streak { animation: kxA-streak 6s ease-in-out infinite; }
 
-        /* Center-out construction ripple (generating / creating-record). */
         .kx-aiorb .ripple {
           position: absolute;
           left: 50%;
@@ -395,9 +473,8 @@ export default function AIOrb({
           z-index: 53;
           pointer-events: none;
         }
-        .kx-aiorb.fam-ripple-out .ripple { animation: kxA-ripple 1.8s ease-out infinite; }
+        .kx-aiorb.fam-ripple-out .ripple { animation: kxA-ripple 1.6s ease-out infinite; }
 
-        /* One-shot success ring. */
         .kx-aiorb .ring {
           width: 200px;
           height: 200px;
@@ -408,7 +485,6 @@ export default function AIOrb({
         }
         .kx-aiorb.is-success .ring { animation: kxA-ring 0.7s ease-out 1; }
 
-        /* Amber / red wash for warning / error — soft, never flashing. */
         .kx-aiorb .tint {
           position: absolute;
           inset: 0;
@@ -430,44 +506,87 @@ export default function AIOrb({
         }
 
         .kx-aiorb .prog { width: 200px; height: 200px; z-index: 42; }
-
-        /* Awakening: glow turns on from the center, then settles. */
         .kx-aiorb.is-awakening .stage { animation: kxA-awaken 0.75s ease-out both; }
 
         /* ── Keyframes ── */
         @keyframes kxA-float {
           0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
-          25% { transform: translate(calc(-50% + 5px), calc(-50% - 10px)) rotate(2.5deg); }
-          50% { transform: translate(-50%, calc(-50% - 15px)) rotate(0deg); }
-          75% { transform: translate(calc(-50% - 5px), calc(-50% - 10px)) rotate(-2.5deg); }
+          25% { transform: translate(calc(-50% + 6px), calc(-50% - 11px)) rotate(2.5deg); }
+          50% { transform: translate(-50%, calc(-50% - 17px)) rotate(0deg); }
+          75% { transform: translate(calc(-50% - 6px), calc(-50% - 11px)) rotate(-2.5deg); }
         }
         @keyframes kxA-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
         @keyframes kxA-rot { to { transform: rotate(360deg); } }
-        @keyframes kxA-breathe { from { opacity: 0.62; } to { opacity: 1; } }
-        @keyframes kxA-blink {
-          0%, 42% { height: 48px; }
-          44% { height: 5px; }
-          46%, 88% { height: 48px; }
-          90% { height: 5px; }
-          92% { height: 48px; }
-          94% { height: 5px; }
-          96%, 100% { height: 48px; }
+        @keyframes kxA-breathe { from { opacity: 0.6; } to { opacity: 1; } }
+        @keyframes kxA-sway {
+          0%, 100% { transform: rotate(-3.5deg); }
+          50% { transform: rotate(3.5deg); }
         }
-        @keyframes kxA-look {
-          0%, 24% { left: 47%; top: 44%; }
-          30%, 40% { left: 39%; top: 44%; }
-          46%, 56% { left: 55%; top: 44%; }
-          62%, 70% { left: 50%; top: 39%; }
-          76%, 100% { left: 47%; top: 44%; }
+        @keyframes kxA-bounce {
+          0% { transform: translateY(0) scale(1); }
+          30% { transform: translateY(-16px) scale(1.05, 0.96); }
+          55% { transform: translateY(0) scale(0.97, 1.04); }
+          75% { transform: translateY(-6px) scale(1.01, 0.99); }
+          100% { transform: translateY(0) scale(1); }
+        }
+        @keyframes kxA-shake {
+          0%, 100% { transform: translate(0, 6px); }
+          20% { transform: translate(-4px, 6px) rotate(-2deg); }
+          40% { transform: translate(4px, 6px) rotate(2deg); }
+          60% { transform: translate(-3px, 6px) rotate(-1.5deg); }
+          80% { transform: translate(2px, 6px) rotate(1deg); }
+        }
+        @keyframes kxA-wake {
+          0% { transform: scale(0.85) translateY(10px); }
+          60% { transform: scale(1.06) translateY(-4px); }
+          100% { transform: scale(1) translateY(0); }
+        }
+        /* eyes */
+        @keyframes kxA-blink {
+          0%, 41% { transform: scaleY(1); }
+          43% { transform: scaleY(0.08); }
+          45%, 87% { transform: scaleY(1); }
+          89% { transform: scaleY(0.08); }
+          91% { transform: scaleY(1); }
+          93% { transform: scaleY(0.08); }
+          95%, 100% { transform: scaleY(1); }
+        }
+        @keyframes kxA-gaze {
+          0%, 22% { transform: translate(-50%, -50%); }
+          28%, 36% { transform: translate(calc(-50% - 12px), -50%); }
+          42%, 52% { transform: translate(calc(-50% + 12px), -50%); }
+          58%, 66% { transform: translate(-50%, calc(-50% - 8px)); }
+          72%, 100% { transform: translate(-50%, -50%); }
+        }
+        @keyframes kxA-ponder {
+          0%, 100% { transform: translate(calc(-50% - 10px), calc(-50% - 12px)); }
+          50% { transform: translate(calc(-50% + 10px), calc(-50% - 12px)); }
+        }
+        @keyframes kxA-hunt {
+          from { transform: translate(calc(-50% - 16px), -50%); }
+          to { transform: translate(calc(-50% + 16px), -50%); }
+        }
+        @keyframes kxA-trackline {
+          0% { transform: translate(calc(-50% - 12px), calc(-50% - 6px)); }
+          40% { transform: translate(calc(-50% + 12px), calc(-50% - 6px)); }
+          50% { transform: translate(calc(-50% - 12px), calc(-50% + 4px)); }
+          90% { transform: translate(calc(-50% + 12px), calc(-50% + 4px)); }
+          100% { transform: translate(calc(-50% - 12px), calc(-50% - 6px)); }
+        }
+        @keyframes kxA-crossgaze {
+          from { transform: translate(calc(-50% - 14px), -50%); }
+          to { transform: translate(calc(-50% + 14px), -50%); }
         }
         @keyframes kxA-scribe {
-          0%, 100% { height: 26px; width: 12px; }
-          50% { height: 40px; width: 12px; }
+          0%, 100% { height: 24px; }
+          50% { height: 40px; }
         }
-        @keyframes kxA-eyes-on {
-          from { opacity: 0; height: 4px; }
-          to { opacity: 1; height: 48px; }
+        @keyframes kxA-eyes-wake {
+          0% { height: 4px; opacity: 0.4; }
+          55% { height: 56px; opacity: 1; }
+          100% { height: 48px; opacity: 1; }
         }
+        /* layers */
         @keyframes kxA-orbit {
           from { transform: rotate(calc(var(--i) * 45deg)) translateX(112px); }
           to { transform: rotate(calc(var(--i) * 45deg + 360deg)) translateX(112px); }
@@ -482,8 +601,8 @@ export default function AIOrb({
           100% { background-position: 0 125%; }
         }
         @keyframes kxA-streak {
-          0%, 78% { opacity: 0; transform: translateX(-30%); }
-          86% { opacity: 1; }
+          0%, 76% { opacity: 0; transform: translateX(-30%); }
+          85% { opacity: 1; }
           94%, 100% { opacity: 0; transform: translateX(30%); }
         }
         @keyframes kxA-ripple {
@@ -498,18 +617,11 @@ export default function AIOrb({
           0%, 100% { opacity: 0.4; }
           50% { opacity: 1; }
         }
-        @keyframes kxA-shake {
-          0%, 100% { margin-left: 0; }
-          25% { margin-left: -2.5px; }
-          50% { margin-left: 2.5px; }
-          75% { margin-left: -1.5px; }
-        }
         @keyframes kxA-awaken {
           from { opacity: 0; filter: brightness(0.4); }
           to { opacity: 1; filter: brightness(1); }
         }
 
-        /* ── Accessibility: reduced motion keeps only opacity truth. ── */
         @media (prefers-reduced-motion: reduce) {
           .kx-aiorb *, .kx-aiorb *::before, .kx-aiorb *::after {
             animation: none !important;
