@@ -308,7 +308,7 @@ export default function AIOrb({
             transform 0.14s ease,
             opacity 0.5s ease,
             filter 0.4s ease;
-          animation: kxA-blink 6.4s infinite;
+          animation: kxA-blink 6.4s infinite, kxA-ind-shimmer 9s ease-in-out infinite;
         }
         .kx-aiorb.is-listening .ind,
         .kx-aiorb.is-speaking .ind,
@@ -319,7 +319,7 @@ export default function AIOrb({
         .kx-aiorb .gaze { position: absolute; inset: 0; z-index: 60; }
         .kx-aiorb.is-idle .gaze,
         .kx-aiorb.is-thinking .gaze,
-        .kx-aiorb.is-processing .gaze { animation: kxA-look 7s ease-in-out infinite; }
+        .kx-aiorb.is-processing .gaze { animation: kxA-look 11s ease-in-out infinite; }
         .kx-aiorb.is-listening .ind,
         .kx-aiorb.is-speaking .ind {
           filter: brightness(calc(1 + var(--kx-orb-audio, 0) * 0.6));
@@ -343,6 +343,7 @@ export default function AIOrb({
           border-radius: 100%;
           background: radial-gradient(closest-side, rgba(127, 169, 214, 0.55), transparent);
           filter: blur(10px);
+          animation: kxA-floor 3.6s ease-in-out infinite alternate;
         }
         .kx-aiorb .spec {
           position: absolute;
@@ -355,7 +356,7 @@ export default function AIOrb({
           filter: blur(6px);
           z-index: 55;
           pointer-events: none;
-          animation: kxA-specdrift 12s ease-in-out infinite alternate;
+          animation: kxA-specdrift 7s ease-in-out infinite alternate;
         }
 
         /* Internal energy circulation — computational, slow, layered. */
@@ -479,7 +480,7 @@ export default function AIOrb({
         }
         @keyframes kxA-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
         @keyframes kxA-rot { to { transform: rotate(360deg); } }
-        @keyframes kxA-breathe { from { opacity: 0.68; } to { opacity: 1; } }
+        @keyframes kxA-breathe { from { opacity: 0.58; } to { opacity: 1; } }
         @keyframes kxA-settle {
           0% { transform: translate(-50%, -50%) scale(1); }
           40% { transform: translate(-50%, -50%) scale(1.02); }
@@ -491,11 +492,22 @@ export default function AIOrb({
           65% { transform: translate(calc(-50% + 2px), -50%); }
         }
         @keyframes kxA-look {
-          0%, 24% { transform: translate(0, 0); }
-          30%, 40% { transform: translate(-14px, 0); }
-          46%, 56% { transform: translate(14px, 0); }
-          62%, 70% { transform: translate(6px, -10px); }
-          76%, 100% { transform: translate(0, 0); }
+          0%, 10% { transform: translate(0, 0); }
+          /* micro-glance left */
+          13%, 17% { transform: translate(-5px, 0); }
+          20%, 26% { transform: translate(0, 0); }
+          /* full glance left */
+          30%, 38% { transform: translate(-14px, -2px); }
+          42%, 47% { transform: translate(0, 0); }
+          /* full glance right */
+          51%, 59% { transform: translate(14px, -2px); }
+          63%, 67% { transform: translate(0, 0); }
+          /* dreamy up-glance */
+          71%, 78% { transform: translate(6px, -10px); }
+          82%, 88% { transform: translate(0, 0); }
+          /* micro-glance down-right */
+          91%, 94% { transform: translate(4px, 3px); }
+          97%, 100% { transform: translate(0, 0); }
         }
         @keyframes kxA-blink {
           0%, 42% { transform: translate(-50%, -50%) scaleY(1); }
@@ -505,6 +517,15 @@ export default function AIOrb({
           92% { transform: translate(-50%, -50%) scaleY(1); }
           94% { transform: translate(-50%, -50%) scaleY(0.1); }
           96%, 100% { transform: translate(-50%, -50%) scaleY(1); }
+        }
+        @keyframes kxA-floor {
+          from { opacity: 0.7; }
+          to { opacity: 1; }
+        }
+        @keyframes kxA-ind-shimmer {
+          0%, 76%, 100% { filter: brightness(1); }
+          82% { filter: brightness(1.22); }
+          88% { filter: brightness(1); }
         }
         @keyframes kxA-aura-on {
           from { opacity: 0; }
@@ -516,8 +537,8 @@ export default function AIOrb({
           100% { opacity: 1; }
         }
         @keyframes kxA-specdrift {
-          from { transform: translate(0, 0); }
-          to { transform: translate(6px, 4px); }
+          from { transform: translate(-4px, -2px); opacity: 0.8; }
+          to { transform: translate(10px, 6px); opacity: 1; }
         }
         @keyframes kxA-orbit {
           from { transform: rotate(calc(var(--i) * 45deg)) translateX(110px); }
