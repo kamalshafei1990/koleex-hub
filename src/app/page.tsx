@@ -267,7 +267,7 @@ const AppCard = memo(function AppCard({
             "drop-shadow(0 0 10px rgba(127,169,214,0.45)) drop-shadow(0 0 20px rgba(86,127,178,0.28))",
         } : undefined}
       >
-        <span className="relative inline-flex">
+        <span className="kx-app-icon relative inline-flex">
           {tileBadge > 0 && (
             <span
               className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
@@ -1075,17 +1075,38 @@ export default function HomePage() {
            only its (opaque) text color fades out, so entry/exit crossfade
            instead of snapping. The icon's fill flips to the #kx-hub-grad
            paint server while a drop-shadow glow fades in to soften it. */
-        .tile-hover-neon svg {
-          transition: filter 0.25s ease;
-        }
         .tile-hover-neon:hover svg,
         .tile-hover-neon:hover svg path {
           fill: url(#kx-hub-grad);
         }
-        .tile-hover-neon:hover svg {
-          filter:
-            drop-shadow(0 0 6px rgba(255, 255, 255, 0.75))
-            drop-shadow(0 0 14px rgba(255, 255, 255, 0.35));
+        /* White halo BEHIND the icon (not a drop-shadow of the glyph, which
+           bloomed over it): a big radial disc that fades in under the svg. */
+        .kx-app-icon svg {
+          position: relative;
+          z-index: 1;
+        }
+        .kx-app-icon::before {
+          content: "";
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 80px;
+          height: 80px;
+          transform: translate(-50%, -50%);
+          border-radius: 100%;
+          background: radial-gradient(
+            closest-side,
+            rgba(255, 255, 255, 0.5),
+            rgba(255, 255, 255, 0.16) 55%,
+            transparent 78%
+          );
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+        .tile-hover-neon:hover .kx-app-icon::before {
+          opacity: 1;
         }
         .tile-hover-neon .kx-app-label {
           background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
