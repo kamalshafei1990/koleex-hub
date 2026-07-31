@@ -218,7 +218,7 @@ const AppCard = memo(function AppCard({
       app={app}
       onPreload={onPrefetch}
       aria-label={label}
-      className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none outline-none focus-visible:ring-2 ${
+      className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
         dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
       } ${
         isAi

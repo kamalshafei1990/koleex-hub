@@ -447,8 +447,23 @@ function selectedSrcs(): string[] {
  *  times. */
 export function primeNotificationSound() {
   attachUnlockListeners();
-  ensureCtx();
-  for (const src of selectedSrcs()) void decode(src);
+  if (typeof window === "undefined") return;
+  /* Chrome warns (and spins up audio hardware) when an AudioContext is
+     created before ANY user gesture. Defer ctx creation + tone decode to
+     the first gesture — still long before the first realtime chime can
+     possibly fire, and the unlock listeners resume it as before. */
+  const warm = () => {
+    ensureCtx();
+    for (const src of selectedSrcs()) void decode(src);
+  };
+  if (unlocked || audioCtx) { warm(); return; }
+  const once = () => {
+    window.removeEventListener("pointerdown", once);
+    window.removeEventListener("keydown", once);
+    warm();
+  };
+  window.addEventListener("pointerdown", once, { passive: true });
+  window.addEventListener("keydown", once);
 }
 
 /** Play a tone through the shared context, resuming it first if the
