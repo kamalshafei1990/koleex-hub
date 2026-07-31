@@ -38,25 +38,25 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
         <div className="sphere" />
       </div>
 
-      <style jsx>{`
+      <style>{`
         .kx-glow-orb {
           position: relative;
           flex: none;
         }
-        .stage {
+        .kx-glow-orb .stage {
           position: absolute;
           left: 50%;
           top: 50%;
           width: 200px;
           height: 200px;
         }
-        .base {
+        .kx-glow-orb .base {
           position: absolute;
           inset: 5px;
           border-radius: 100%;
           background: #0a0a0a;
         }
-        .sphere {
+        .kx-glow-orb .sphere {
           position: absolute;
           left: 50%;
           top: 50%;
@@ -74,7 +74,7 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           animation: kx-orb-float 6s ease-in-out infinite;
         }
         /* Eyes: one bar + its box-shadow twin; blink + glance around. */
-        .sphere::before {
+        .kx-glow-orb .sphere::before {
           content: "";
           position: absolute;
           top: 45%;
@@ -90,14 +90,14 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
             kx-orb-blink 4s infinite,
             kx-orb-look 10s infinite ease-in-out;
         }
-        .sphere::after {
+        .kx-glow-orb .sphere::after {
           content: "";
           position: absolute;
           inset: 0;
           border-radius: 50%;
           animation: kx-orb-glow 2s ease-in-out infinite;
         }
-        .lava {
+        .kx-glow-orb .lava {
           position: absolute;
           left: 50%;
           top: 50%;
@@ -114,7 +114,7 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           animation-duration: 6s;
           filter: blur(20px);
         }
-        .lava::before {
+        .kx-glow-orb .lava::before {
           content: "";
           position: absolute;
           left: -10%;
@@ -129,7 +129,7 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           filter: blur(8px);
           mix-blend-mode: screen;
         }
-        .lava::after {
+        .kx-glow-orb .lava::after {
           content: "";
           position: absolute;
           left: -10%;
