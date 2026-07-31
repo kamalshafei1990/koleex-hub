@@ -229,13 +229,13 @@ const AppCard = memo(function AppCard({
             ? isCurrentApp
               ? `cursor-pointer group border ${
                   dk
-                    ? "bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:border-[#567fb2]/60 hover:scale-[1.02] ring-1 ring-white/[0.08]"
-                    : "bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:border-[#567fb2]/50 hover:scale-[1.02] ring-1 ring-black/[0.05]"
+                    ? "bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:border-[#567fb2]/60 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
+                    : "bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:border-[#567fb2]/50 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "bg-[#0c0c0c] border-white/[0.06] hover:border-[#567fb2]/60 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
-                    : "bg-[#f8f8f8] border-black/[0.06] hover:border-[#567fb2]/50 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+                    ? "bg-[#0c0c0c] border-white/[0.06] hover:border-[#567fb2]/60 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
+                    : "bg-[#f8f8f8] border-black/[0.06] hover:border-[#567fb2]/50 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
