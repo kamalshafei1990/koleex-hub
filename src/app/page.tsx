@@ -451,32 +451,9 @@ const AIGreeter = memo(function AIGreeter({
     };
   }, [greetingText]);
 
-  const [spark, setSpark] = useState<OrbState | null>(null);
-  useEffect(() => {
-    if (!introDone) return;
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const pool: OrbState[] = ["wink", "surprised", "celebrate", "success", "wink"];
-    const schedule = () => {
-      timer = setTimeout(
-        () => {
-          if (!alive) return;
-          setSpark(pool[Math.floor(Math.random() * pool.length)]);
-          timer = setTimeout(() => {
-            if (!alive) return;
-            setSpark(null);
-            schedule();
-          }, 1100);
-        },
-        6000 + Math.random() * 7000,
-      );
-    };
-    schedule();
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [introDone]);
+  /* The old random "spark" scheduler (wink/surprise pulses every 6-13s)
+     is GONE — owner wants strictly the original idle motion, no extra
+     pulses. Event-driven celebrate stays. */
 
   const orbState: OrbState = !introDone
     ? typed.length === 0
@@ -484,7 +461,7 @@ const AIGreeter = memo(function AIGreeter({
       : "typing"
     : celebrating
       ? "celebrate"
-      : spark ?? "idle";
+      : "idle";
 
   return (
     <>

@@ -36,7 +36,9 @@ function mapLegacy(state: string | undefined, activity: AIOrbActivity): {
          plain model latency → thinking. */
       return { state: activity !== "none" ? "processing" : "thinking", result: "none" };
     case "typing":
-      return { state: "processing", result: "none" };
+      /* Streaming tokens: the original face just quickened its aura —
+         map to thinking (energy pace), no halo/ripple layers. */
+      return { state: "thinking", result: "none" };
     case "success":
     case "celebrate":
       return { state: "idle", result: "success" };
@@ -60,9 +62,7 @@ export default function KoleexGlowOrb({
   interactive,
 }: Props) {
   const mapped = mapLegacy(state, activity);
-  /* "typing" = tokens streaming = output being constructed. */
-  const act: AIOrbActivity =
-    state === "typing" && activity === "none" ? "generating" : activity;
+  const act: AIOrbActivity = activity;
   return (
     <AIOrb
       state={mapped.state}
