@@ -35,6 +35,8 @@ import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
+import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
+import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import EmojiButton from "@/components/ai/EmojiButton";
@@ -1182,6 +1184,15 @@ export default function KoleexAiApp() {
     sending && lastMsg?.role === "assistant" && (lastMsg.content?.length ?? 0) === 0;
   const orbStreaming =
     sending && lastMsg?.role === "assistant" && (lastMsg.content?.length ?? 0) > 0;
+  /* Tool-aware: while the turn is in flight, the newest tool-call step
+     names what the agent is actually doing (searchProducts, createTodo…).
+     Central mapping turns it into an orb activity; unknown tools fall
+     back to "executing-action". */
+  const orbActivity: AIOrbActivity = sending
+    ? toolActivity(
+        (lastMsg?.steps ?? []).slice().reverse().find((st) => st.kind === "tool-call")?.tool,
+      )
+    : "none";
 
   const [orbPulse, setOrbPulse] = useState<null | "success" | "error">(null);
   const prevSendingRef = useRef(false);
@@ -1392,7 +1403,7 @@ export default function KoleexAiApp() {
           </button>
           {/* Koleex AI character — the live Rive orb, reacting to the
               conversation lifecycle (thinking / typing / done). */}
-          <KoleexOrb state={orbState} size={38} className="shrink-0" />
+          <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1432,7 +1443,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <KoleexOrb state={orbState} size={38} className="shrink-0" />
+          <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
@@ -1500,6 +1511,11 @@ export default function KoleexAiApp() {
                     i === messages.length - 1 && m.role === "assistant"
                       ? orbState
                       : "idle"
+                  }
+                  orbActivity={
+                    i === messages.length - 1 && m.role === "assistant"
+                      ? orbActivity
+                      : "none"
                   }
                 />
               ))
@@ -1892,6 +1908,7 @@ function Bubble({
   onFeedback,
   lang,
   orbState = "idle",
+  orbActivity = "none",
 }: {
   msg: ChatMsg;
   userAvatar?: string | null;
@@ -1901,6 +1918,7 @@ function Bubble({
       gets a non-idle value (thinking/typing/success/error); the rest stay
       calm so the transcript doesn't twitch. */
   orbState?: OrbState;
+  orbActivity?: AIOrbActivity;
   canRegenerate?: boolean;
   canEdit?: boolean;
   onCopy?: (text: string) => Promise<boolean> | boolean;
@@ -1985,7 +2003,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <KoleexOrb state={orbState} size={38} className="shrink-0" />
+        <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Tool-call / tool-result chips render ABOVE the final assistant
