@@ -296,19 +296,19 @@ export default function AIOrb({
         .kx-aiorb .eyes {
           position: absolute;
           left: 50%;
-          top: 45%;
+          top: 44%;
           transform: translate(-50%, -50%);
           display: flex;
-          gap: 22px;
+          gap: 24px;
           z-index: 60;
           transition: transform 0.4s cubic-bezier(0.3, 1.6, 0.4, 1);
         }
         .kx-aiorb .eye {
-          width: 30px;
-          height: 58px;
-          border-radius: 15px;
+          width: 16px;
+          height: 48px;
+          border-radius: 8px;
           background: #fff;
-          transform-origin: center bottom;
+          transform-origin: center;
           transition:
             height 0.35s cubic-bezier(0.3, 1.6, 0.4, 1),
             width 0.35s cubic-bezier(0.3, 1.6, 0.4, 1),
@@ -329,8 +329,8 @@ export default function AIOrb({
         .kx-aiorb.is-awakening .eye { animation: kxA-eyes-wake 0.9s ease-out both; }
 
         /* thinking: focused slits looking UP — actually pondering. */
-        .kx-aiorb.is-thinking .eye { height: 34px; animation: none; }
-        .kx-aiorb.is-thinking .eye.r { height: 46px; }
+        .kx-aiorb.is-thinking .eye { height: 28px; animation: none; }
+        .kx-aiorb.is-thinking .eye.r { height: 38px; }
         .kx-aiorb.is-thinking .eyes { animation: kxA-ponder 5.5s ease-in-out infinite; }
 
         /* processing: narrowed, steady, looking slightly down at the work. */
@@ -342,7 +342,7 @@ export default function AIOrb({
 
         /* reading: gaze tracks lines — small saccades stepping down. */
         .kx-aiorb.fam-line-scan .eyes { animation: kxA-trackline 2.2s ease-in-out infinite; }
-        .kx-aiorb.fam-line-scan .eye { height: 30px; }
+        .kx-aiorb.fam-line-scan .eye { height: 26px; }
 
         /* translating/connecting: gaze crosses side to side with the energy. */
         .kx-aiorb.fam-sweep-lr .eyes { animation: kxA-crossgaze 1.8s ease-in-out infinite alternate; }
@@ -351,12 +351,12 @@ export default function AIOrb({
         .kx-aiorb.is-listening .eyes { transform: translate(-50%, -50%) rotate(4deg); }
         .kx-aiorb.is-listening .eye {
           animation: none;
-          height: calc(42px + var(--kx-orb-audio, 0) * 22px);
+          height: calc(36px + var(--kx-orb-audio, 0) * 20px);
         }
         /* speaking: syllables move the eyes. */
         .kx-aiorb.is-speaking .eye {
           animation: none;
-          height: calc(30px + var(--kx-orb-audio, 0) * 30px);
+          height: calc(28px + var(--kx-orb-audio, 0) * 26px);
         }
 
         /* transcribing: measured writing rhythm. */
@@ -365,24 +365,22 @@ export default function AIOrb({
         /* SUCCESS: happy closed arcs (^ ^) + brighten. */
         .kx-aiorb.is-success .eye {
           animation: none;
-          height: 20px;
-          width: 38px;
-          border-radius: 19px 19px 7px 7px;
-          transform: translateY(-14px);
+          height: 48px;
+          transform: translateY(-6px);
           box-shadow: 0 0 18px rgba(255, 255, 255, 0.95);
         }
-        .kx-aiorb.is-success .eyes { transform: translate(-50%, -50%) scale(1.06); }
+        .kx-aiorb.is-success .eyes { transform: translate(-50%, -52%); }
         /* ERROR: sad inward slant + droop. */
-        .kx-aiorb.is-error .eye { animation: none; height: 34px; border-radius: 15px 15px 22px 22px; }
-        .kx-aiorb.is-error .eye.l { transform: rotate(18deg) translateY(8px); }
-        .kx-aiorb.is-error .eye.r { transform: rotate(-18deg) translateY(8px); }
+        .kx-aiorb.is-error .eye { animation: none; height: 32px; }
+        .kx-aiorb.is-error .eye.l { transform: rotate(16deg) translateY(8px); }
+        .kx-aiorb.is-error .eye.r { transform: rotate(-16deg) translateY(8px); }
         .kx-aiorb.is-error .eyes { transform: translate(-50%, -44%); }
         /* WARNING: skeptical — one brow raised. */
         .kx-aiorb.is-warning .eye { animation: none; }
-        .kx-aiorb.is-warning .eye.l { height: 64px; transform: translateY(-6px); }
-        .kx-aiorb.is-warning .eye.r { height: 30px; transform: translateY(6px); }
+        .kx-aiorb.is-warning .eye.l { height: 54px; transform: translateY(-5px); }
+        .kx-aiorb.is-warning .eye.r { height: 28px; transform: translateY(5px); }
         /* SLEEPING: closed lines. */
-        .kx-aiorb.is-sleeping .eye { animation: none; height: 6px; width: 34px; opacity: 0.45; }
+        .kx-aiorb.is-sleeping .eye { animation: none; height: 5px; opacity: 0.45; }
 
         /* Floor light + specular keep the ball 3D. */
         .kx-aiorb .sphere::after {
@@ -551,16 +549,16 @@ export default function AIOrb({
         }
         /* eyes */
         @keyframes kxA-blink {
-          0%, 38% { transform: scaleY(1) scaleX(1); }
-          41% { transform: scaleY(0.06) scaleX(1.25); }
-          44%, 68% { transform: scaleY(1) scaleX(1); }
+          0%, 38% { transform: scaleY(1); }
+          41% { transform: scaleY(0.08); }
+          44%, 68% { transform: scaleY(1); }
           /* curious half-squint — pure personality */
-          72%, 78% { transform: scaleY(0.62) scaleX(1.08); }
-          82%, 90% { transform: scaleY(1) scaleX(1); }
-          92% { transform: scaleY(0.06) scaleX(1.25); }
-          94% { transform: scaleY(1) scaleX(1); }
-          96% { transform: scaleY(0.06) scaleX(1.25); }
-          98%, 100% { transform: scaleY(1) scaleX(1); }
+          72%, 78% { transform: scaleY(0.62); }
+          82%, 90% { transform: scaleY(1); }
+          92% { transform: scaleY(0.08); }
+          94% { transform: scaleY(1); }
+          96% { transform: scaleY(0.08); }
+          98%, 100% { transform: scaleY(1); }
         }
         @keyframes kxA-life {
           0%, 14% { transform: translate(-50%, -50%); }
@@ -609,10 +607,10 @@ export default function AIOrb({
           50% { height: 40px; }
         }
         @keyframes kxA-eyes-wake {
-          0% { height: 5px; width: 34px; opacity: 0.4; }
-          45% { height: 5px; width: 34px; opacity: 0.9; }
-          70% { height: 70px; width: 34px; opacity: 1; }
-          100% { height: 58px; width: 30px; opacity: 1; }
+          0% { height: 5px; opacity: 0.4; }
+          45% { height: 5px; opacity: 0.9; }
+          70% { height: 58px; opacity: 1; }
+          100% { height: 48px; opacity: 1; }
         }
         /* layers */
         @keyframes kxA-orbit {
