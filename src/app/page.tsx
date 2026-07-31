@@ -138,7 +138,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 
   return (
     <div
-      className="shrink-0 hidden sm:flex flex-col items-center justify-center rounded-2xl px-6 py-3"
+      className="shrink-0 hidden sm:flex flex-col items-center justify-center rounded-2xl px-6 py-2"
       style={{
         background: dk
           ? "linear-gradient(180deg,#121212,#0c0c0c)"
@@ -156,7 +156,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
       <div className="flex items-baseline gap-2">
         <span
-          className="text-[38px] md:text-[48px] font-light leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
+          className="text-[30px] md:text-[38px] font-light leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
         >
           {t.h12}
           <span
