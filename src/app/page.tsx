@@ -140,7 +140,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       {/* date sits above the time */}
       {dateLabel && (
-        <span className="mb-1.5 text-[12px] font-medium text-[#567fb2]">
+        <span className="mb-1.5 text-[12px] font-medium bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
           {dateLabel}
         </span>
       )}
@@ -160,16 +160,14 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.mm}
         </span>
         <span
-          className={`mb-1.5 text-[14px] font-medium tracking-wide ${
-            dk ? "text-white/40" : "text-black/40"
-          }`}
+          className="mb-1.5 text-[14px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
         >
           {t.pm ? "PM" : "AM"}
         </span>
       </div>
 
       {tzLabel && (
-        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
+        <span className="mt-2 text-[11px] font-medium tracking-wide bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent">
           {tzLabel}
         </span>
       )}
