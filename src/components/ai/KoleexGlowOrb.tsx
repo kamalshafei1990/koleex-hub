@@ -66,9 +66,9 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           border-radius: 100%;
           background: rgba(0, 0, 0, 0.15);
           box-shadow:
-            0 0 40px 4px rgba(86, 127, 178, 0.28),
-            inset 0 0 40px rgba(188, 216, 240, 0.4),
-            inset 0 -20px 50px rgba(0, 0, 0, 0.25);
+            0 0 50px 5px rgba(0, 0, 0, 0.5),
+            inset 0 0 40px rgba(255, 255, 255, 0.5),
+            inset 0 -20px 50px rgba(0, 0, 0, 0.2);
           z-index: 50;
           overflow: hidden;
           animation: kx-orb-float 6s ease-in-out infinite;
@@ -122,10 +122,10 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           width: 120%;
           height: 120%;
           background:
-            radial-gradient(circle at 30% 30%, #567fb2 0%, transparent 45%),
-            radial-gradient(circle at 70% 30%, #7fa9d6 0%, transparent 45%),
-            radial-gradient(circle at 50% 60%, #bcd8f0 0%, transparent 45%),
-            radial-gradient(circle at 80% 40%, #3e6796 0%, transparent 45%);
+            radial-gradient(circle at 30% 30%, #2f5580 0%, transparent 45%),
+            radial-gradient(circle at 70% 30%, #6f9fd8 0%, transparent 45%),
+            radial-gradient(circle at 50% 60%, #e6f2fc 0%, transparent 45%),
+            radial-gradient(circle at 80% 40%, #567fb2 0%, transparent 45%);
           filter: blur(8px);
           mix-blend-mode: screen;
         }
@@ -137,10 +137,10 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           width: 120%;
           height: 120%;
           background:
-            radial-gradient(circle at 40% 40%, #567fb2 0%, transparent 35%),
-            radial-gradient(circle at 60% 40%, #bcd8f0 0%, transparent 35%),
-            radial-gradient(circle at 50% 70%, #7fa9d6 0%, transparent 35%),
-            radial-gradient(circle at 70% 50%, #3e6796 0%, transparent 35%);
+            radial-gradient(circle at 40% 40%, #6f9fd8 0%, transparent 35%),
+            radial-gradient(circle at 60% 40%, #e6f2fc 0%, transparent 35%),
+            radial-gradient(circle at 50% 70%, #9cc1e6 0%, transparent 35%),
+            radial-gradient(circle at 70% 50%, #2f5580 0%, transparent 35%);
           filter: blur(12px);
           mix-blend-mode: screen;
           animation: kx-orb-pulse 4s ease-in-out infinite alternate;
@@ -164,11 +164,11 @@ export default function KoleexGlowOrb({ state, size = 72, className = "" }: Prop
           75% { left: 47%; }
         }
         @keyframes kx-orb-glow {
-          0%, 100% { box-shadow: 0 0 60px rgba(127, 169, 214, 0.12); }
-          45% { box-shadow: 0 0 80px rgba(127, 169, 214, 0.22); }
-          50% { box-shadow: 0 0 70px rgba(127, 169, 214, 0.16); }
-          55% { box-shadow: 0 0 85px rgba(127, 169, 214, 0.22); }
-          60% { box-shadow: 0 0 60px rgba(127, 169, 214, 0.12); }
+          0%, 100% { box-shadow: 0 0 60px rgba(255, 255, 255, 0.1); }
+          45% { box-shadow: 0 0 80px rgba(255, 255, 255, 0.2); }
+          50% { box-shadow: 0 0 70px rgba(255, 255, 255, 0.15); }
+          55% { box-shadow: 0 0 85px rgba(255, 255, 255, 0.2); }
+          60% { box-shadow: 0 0 60px rgba(255, 255, 255, 0.1); }
         }
         @keyframes kx-orb-pulse {
           from { transform: scale(1); opacity: 0.9; }
