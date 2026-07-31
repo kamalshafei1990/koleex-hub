@@ -229,13 +229,13 @@ const AppCard = memo(function AppCard({
             ? isCurrentApp
               ? `cursor-pointer group border ${
                   dk
-                    ? "bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:border-[#567fb2]/60 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
-                    : "bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:border-[#567fb2]/50 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
+                    ? "tile-hover-neon bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
+                    : "tile-hover-neon bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "bg-[#0c0c0c] border-white/[0.06] hover:border-[#567fb2]/60 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
-                    : "bg-[#f8f8f8] border-black/[0.06] hover:border-[#567fb2]/50 hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
+                    ? "tile-hover-neon bg-[#0c0c0c] border-white/[0.06] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
+                    : "tile-hover-neon bg-[#f8f8f8] border-black/[0.06] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
@@ -982,7 +982,7 @@ export default function HomePage() {
             {groupedApps.map((group) => (
               <div key={group.id}>
                 <div className="flex items-center gap-2.5 mb-3">
-                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-[#567fb2]" : "text-[#567fb2]"}`}>
                     {t(group.tKey, group.label)}
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
@@ -1038,11 +1038,28 @@ export default function HomePage() {
             0 0 12px rgba(86,127,178,0.18),
             0 0 24px rgba(188,216,240,0.08);
         }
+        /* Regular tiles: on hover the border becomes a static Hub Blue
+           gradient (same two-layer clip trick as ai-card-neon, without the
+           spin animation so 30+ tiles stay cheap). */
+        .tile-hover-neon:hover {
+          border-color: transparent;
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+          background-image:
+            linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
+            linear-gradient(
+              135deg,
+              rgba(86,127,178,0.9),
+              rgba(127,169,214,0.7),
+              rgba(188,216,240,0.6),
+              rgba(86,127,178,0.9)
+            );
+        }
         .ai-card-neon:hover {
           box-shadow:
             0 0 16px rgba(86,127,178,0.28),
             0 0 32px rgba(188,216,240,0.15);
-          transform: scale(1.02);
+          transform: scale(1.05);
         }
       `}</style>
     </div>
