@@ -1070,35 +1070,58 @@ export default function HomePage() {
             );
           box-shadow: 0 0 16px rgba(86,127,178,${dk ? "0.35" : "0.28"});
         }
-        /* Hover: icon + app name take the Hub Blue gradient too. The icon's
-           fill points at the #kx-hub-grad paint server (defs at page root);
-           the label uses background-clip text. */
+        /* Hover: icon + app name take the Hub Blue gradient, smoothly.
+           The label keeps the gradient painted underneath at all times and
+           only its (opaque) text color fades out, so entry/exit crossfade
+           instead of snapping. The icon's fill flips to the #kx-hub-grad
+           paint server while a drop-shadow glow fades in to soften it. */
+        .tile-hover-neon svg {
+          transition: filter 0.25s ease;
+        }
         .tile-hover-neon:hover svg,
         .tile-hover-neon:hover svg path {
           fill: url(#kx-hub-grad);
         }
-        .tile-hover-neon:hover .kx-app-label {
+        .tile-hover-neon:hover svg {
+          filter:
+            drop-shadow(0 0 6px rgba(255, 255, 255, 0.75))
+            drop-shadow(0 0 14px rgba(255, 255, 255, 0.35));
+        }
+        .tile-hover-neon .kx-app-label {
           background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
           -webkit-background-clip: text;
           background-clip: text;
+          transition: color 0.25s ease;
+        }
+        .tile-hover-neon:hover .kx-app-label {
           color: transparent;
         }
-        /* Regular tiles: on hover the border becomes a static Hub Blue
-           gradient (same two-layer clip trick as ai-card-neon, without the
-           spin animation so 30+ tiles stay cheap). */
-        .tile-hover-neon:hover {
-          border-color: transparent;
-          background-origin: border-box;
-          background-clip: padding-box, border-box;
-          background-image:
-            linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
-            linear-gradient(
-              135deg,
-              rgba(86,127,178,0.9),
-              rgba(127,169,214,0.7),
-              rgba(188,216,240,0.6),
-              rgba(86,127,178,0.9)
-            );
+        /* Regular tiles: the gradient border is an overlay ring (gradient
+           masked to the border band) that FADES via opacity — background-
+           image itself can't transition, which caused a flash on mouse-out. */
+        .tile-hover-neon::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 1rem;
+          padding: 1.5px;
+          background: linear-gradient(
+            135deg,
+            rgba(86,127,178,0.9),
+            rgba(127,169,214,0.7),
+            rgba(188,216,240,0.6),
+            rgba(86,127,178,0.9)
+          );
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask-composite: exclude;
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          pointer-events: none;
+        }
+        .tile-hover-neon:hover::after {
+          opacity: 1;
         }
         .ai-card-neon:hover {
           box-shadow:
