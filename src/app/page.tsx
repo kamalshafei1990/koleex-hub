@@ -230,13 +230,13 @@ const AppCard = memo(function AppCard({
             ? isCurrentApp
               ? `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
-                    : "tile-hover-neon bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
+                    ? "tile-hover-neon bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.32),0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
+                    : "tile-hover-neon bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.22),0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon bg-[#0c0c0c] border-white/[0.06] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
-                    : "tile-hover-neon bg-[#f8f8f8] border-black/[0.06] hover:scale-[1.05] hover:shadow-[0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
+                    ? "tile-hover-neon bg-[#0c0c0c] border-white/[0.06] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.32),0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
+                    : "tile-hover-neon bg-[#f8f8f8] border-black/[0.06] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.2),0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
@@ -267,7 +267,7 @@ const AppCard = memo(function AppCard({
             "drop-shadow(0 0 10px rgba(127,169,214,0.45)) drop-shadow(0 0 20px rgba(86,127,178,0.28))",
         } : undefined}
       >
-        <span className="kx-app-icon relative inline-flex">
+        <span className="relative inline-flex">
           {tileBadge > 0 && (
             <span
               className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
@@ -1078,35 +1078,6 @@ export default function HomePage() {
         .tile-hover-neon:hover svg,
         .tile-hover-neon:hover svg path {
           fill: url(#kx-hub-grad);
-        }
-        /* White halo BEHIND the icon (not a drop-shadow of the glyph, which
-           bloomed over it): a big radial disc that fades in under the svg. */
-        .kx-app-icon svg {
-          position: relative;
-          z-index: 1;
-        }
-        .kx-app-icon::before {
-          content: "";
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          width: 80px;
-          height: 80px;
-          transform: translate(-50%, -50%);
-          border-radius: 100%;
-          background: radial-gradient(
-            closest-side,
-            rgba(255, 255, 255, 0.5),
-            rgba(255, 255, 255, 0.16) 55%,
-            transparent 78%
-          );
-          opacity: 0;
-          transition: opacity 0.25s ease;
-          pointer-events: none;
-          z-index: 0;
-        }
-        .tile-hover-neon:hover .kx-app-icon::before {
-          opacity: 1;
         }
         .tile-hover-neon .kx-app-label {
           background-image: linear-gradient(135deg, #567fb2, #7fa9d6, #bcd8f0);
