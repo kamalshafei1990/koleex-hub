@@ -319,7 +319,7 @@ export default function AIOrb({
         .kx-aiorb .gaze { position: absolute; inset: 0; z-index: 60; }
         .kx-aiorb.is-idle .gaze,
         .kx-aiorb.is-thinking .gaze,
-        .kx-aiorb.is-processing .gaze { animation: kxA-look 11s ease-in-out infinite; }
+        .kx-aiorb.is-processing .gaze { animation: kxA-look 9s ease-in-out infinite; }
         .kx-aiorb.is-listening .ind,
         .kx-aiorb.is-speaking .ind {
           filter: brightness(calc(1 + var(--kx-orb-audio, 0) * 0.6));
@@ -352,7 +352,7 @@ export default function AIOrb({
           width: 44%;
           height: 30%;
           border-radius: 100%;
-          background: radial-gradient(closest-side, rgba(255, 255, 255, 0.13), transparent 75%);
+          background: radial-gradient(closest-side, rgba(255, 255, 255, 0.17), transparent 75%);
           filter: blur(6px);
           z-index: 55;
           pointer-events: none;
@@ -492,22 +492,22 @@ export default function AIOrb({
           65% { transform: translate(calc(-50% + 2px), -50%); }
         }
         @keyframes kxA-look {
-          0%, 10% { transform: translate(0, 0); }
-          /* micro-glance left */
-          13%, 17% { transform: translate(-5px, 0); }
-          20%, 26% { transform: translate(0, 0); }
+          0%, 8% { transform: translate(0, 0); }
+          /* quick glance left */
+          11%, 15% { transform: translate(-8px, 0); }
+          18%, 23% { transform: translate(0, 0); }
           /* full glance left */
-          30%, 38% { transform: translate(-14px, -2px); }
-          42%, 47% { transform: translate(0, 0); }
+          27%, 35% { transform: translate(-16px, -3px); }
+          39%, 44% { transform: translate(0, 0); }
           /* full glance right */
-          51%, 59% { transform: translate(14px, -2px); }
-          63%, 67% { transform: translate(0, 0); }
-          /* dreamy up-glance */
-          71%, 78% { transform: translate(6px, -10px); }
-          82%, 88% { transform: translate(0, 0); }
-          /* micro-glance down-right */
-          91%, 94% { transform: translate(4px, 3px); }
-          97%, 100% { transform: translate(0, 0); }
+          48%, 56% { transform: translate(16px, -3px); }
+          60%, 64% { transform: translate(0, 0); }
+          /* up-glance */
+          68%, 75% { transform: translate(7px, -12px); }
+          79%, 85% { transform: translate(0, 0); }
+          /* small down-right */
+          88%, 92% { transform: translate(6px, 4px); }
+          95%, 100% { transform: translate(0, 0); }
         }
         @keyframes kxA-blink {
           0%, 42% { transform: translate(-50%, -50%) scaleY(1); }
@@ -519,13 +519,13 @@ export default function AIOrb({
           96%, 100% { transform: translate(-50%, -50%) scaleY(1); }
         }
         @keyframes kxA-floor {
-          from { opacity: 0.7; }
+          from { opacity: 0.55; }
           to { opacity: 1; }
         }
         @keyframes kxA-ind-shimmer {
-          0%, 76%, 100% { filter: brightness(1); }
-          82% { filter: brightness(1.22); }
-          88% { filter: brightness(1); }
+          0%, 74%, 100% { filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+          80% { filter: brightness(1.45) drop-shadow(0 0 8px rgba(255,255,255,0.55)); }
+          86% { filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
         }
         @keyframes kxA-aura-on {
           from { opacity: 0; }
