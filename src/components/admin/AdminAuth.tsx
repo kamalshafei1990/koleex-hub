@@ -40,7 +40,6 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
 import { setCurrentAccountId } from "@/lib/identity";
-import KoleexLogo from "@/components/layout/KoleexLogo";
 import { COUNTRIES } from "@/types/product-form";
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
@@ -312,7 +311,14 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         >
           {/* Brand header — tight, centered, a single statement. */}
           <div className="flex flex-col items-center mb-6">
-            <KoleexLogo className="h-[28px] w-auto text-white drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]" />
+            {/* Hub logo v2 — login screen is always dark, so the for-dark
+                composite (untouched KOLEEX wordmark + gradient hub script). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/hub-logo/koleex-hub-logo-for-dark.png"
+              alt="Koleex Hub"
+              className="h-8 w-auto drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
+            />
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />
               <span className="text-[10px] uppercase tracking-[0.24em] text-white/45 font-semibold">
