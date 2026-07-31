@@ -904,10 +904,10 @@ export default function HomePage() {
 
         {/* ── Zone A: Search (primary action — elevated) ── */}
         <div className="mb-7">
-          <div className={`relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 focus-within:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] ${
+          <div className={`search-neon relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 ${
             dk
-              ? "bg-[#0c0c0c] border-white/[0.07] focus-within:border-white/[0.22]"
-              : "bg-black/[0.02] border-black/[0.07] focus-within:border-black/[0.22] focus-within:bg-black/[0.04]"
+              ? "bg-[#0c0c0c] border-white/[0.07]"
+              : "bg-black/[0.02] border-black/[0.07]"
           }`}>
             <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
             <input
@@ -1037,6 +1037,23 @@ export default function HomePage() {
           box-shadow:
             0 0 12px rgba(86,127,178,0.18),
             0 0 24px rgba(188,216,240,0.08);
+        }
+        /* Search bar: focusing it lights the same Hub Blue gradient border
+           + glow the tiles use on hover — one interaction language. */
+        .search-neon:focus-within {
+          border-color: transparent;
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+          background-image:
+            linear-gradient(${dk ? "#0c0c0c" : "#fafafa"}, ${dk ? "#0c0c0c" : "#fafafa"}),
+            linear-gradient(
+              135deg,
+              rgba(86,127,178,0.9),
+              rgba(127,169,214,0.7),
+              rgba(188,216,240,0.6),
+              rgba(86,127,178,0.9)
+            );
+          box-shadow: 0 0 16px rgba(86,127,178,${dk ? "0.35" : "0.28"});
         }
         /* Regular tiles: on hover the border becomes a static Hub Blue
            gradient (same two-layer clip trick as ai-card-neon, without the
