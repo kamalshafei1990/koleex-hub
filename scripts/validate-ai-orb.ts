@@ -85,6 +85,38 @@ check("label: unknown lang falls back to en",
   orbStatusLabel("listening", "none", "fr") === "Listening…");
 check("label: idle stays brand", orbStatusLabel("idle", "none", "en") === "Koleex AI");
 
+/* ── INDICATOR GEOMETRY LOCK: static source assertions ── */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const orbSrc = readFileSync(join(__dirname, "../src/components/ai-orb/AIOrb.tsx"), "utf8");
+
+check("lock: base geometry 16x48 r8 present",
+  orbSrc.includes("width: 16px") && orbSrc.includes("height: 48px") &&
+  orbSrc.includes("border-radius: 8px") && orbSrc.includes("box-shadow: 40px 0 0 #fff"));
+check("lock: base position 47%/44% present",
+  orbSrc.includes("left: 47%") && orbSrc.includes("top: 44%"));
+check("lock: single indicator node (twin via box-shadow)",
+  orbSrc.includes('className="ind"') && !orbSrc.includes('className="eye'));
+
+/* every state-scoped .ind rule may only touch opacity/filter/transform(scaleY)/animation */
+const indRules = [...orbSrc.matchAll(/\.kx-aiorb\.[\w-]+ \.ind \{([^}]*)\}/g)];
+check("lock: state .ind rules exist", indRules.length >= 5);
+const FORBIDDEN = ["width", "height", "border-radius", "left:", "top:", "margin", "box-shadow", "gap"];
+for (const m of indRules) {
+  const body = m[1];
+  const bad = FORBIDDEN.filter((f) => body.includes(f));
+  check(`lock: state rule clean (${m[0].slice(0, 40)}…)`, bad.length === 0, `forbidden: ${bad.join(",")}`);
+  const transforms = body.match(/transform:[^;]+/g) ?? [];
+  for (const t of transforms) {
+    check("lock: transform is translate+scaleY only",
+      /translate\(-50%, -50%\)( scaleY\([^)]*\))?/.test(t) && !/rotate|translateX|translateY\(|scaleX/.test(t));
+  }
+}
+/* no cartoon acting keyframes remain */
+for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "kxA-ponder", "kxA-trackline", "kxA-shake", "kxA-eyes"]) {
+  check(`no cartoon keyframe: ${k}`, !orbSrc.includes(`@keyframes ${k}`));
+}
+
 if (fail > 0) {
   console.error(`\nvalidate:ai-orb FAILED — ${fail} failing, ${pass} passing`);
   process.exit(1);
