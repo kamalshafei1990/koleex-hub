@@ -148,7 +148,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
       <div className="flex items-baseline gap-2">
         <span
-          className="text-[58px] md:text-[68px] font-light leading-none tracking-tight tabular-nums text-[#567fb2]"
+          className="text-[58px] md:text-[68px] font-light leading-none tracking-tight tabular-nums bg-gradient-to-br from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0] bg-clip-text text-transparent"
         >
           {t.h12}
           <span
