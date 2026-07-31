@@ -136,15 +136,11 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     };
   }, []);
 
-  const grad = dk
-    ? "from-[#567fb2] via-[#7fa9d6] to-[#bcd8f0]"
-    : "from-[#3e6796] via-[#567fb2] to-[#7fa9d6]";
-
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       {/* date sits above the time */}
       {dateLabel && (
-        <span className={`mb-1.5 text-[12px] font-semibold bg-gradient-to-br ${grad} bg-clip-text text-transparent`}>
+        <span className="mb-1.5 text-[12px] font-medium text-[#7fa9d6]">
           {dateLabel}
         </span>
       )}
@@ -152,7 +148,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
       <div className="flex items-baseline gap-2">
         <span
-          className={`text-[40px] md:text-[50px] font-semibold leading-none tracking-tight tabular-nums bg-gradient-to-br ${grad} bg-clip-text text-transparent`}
+          className={`text-[44px] md:text-[54px] font-light leading-none tracking-tight tabular-nums ${dk ? "text-white/90" : "text-black/90"}`}
         >
           {t.h12}
           <span
@@ -165,14 +161,14 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.mm}
         </span>
         <span
-          className={`mb-1 text-[13px] font-semibold tracking-wide bg-gradient-to-br ${grad} bg-clip-text text-transparent`}
+          className={`mb-1 text-[13px] font-medium tracking-wide ${dk ? "text-white/40" : "text-black/40"}`}
         >
           {t.pm ? "PM" : "AM"}
         </span>
       </div>
 
       {tzLabel && (
-        <span className={`mt-1.5 text-[11px] font-medium tracking-wide bg-gradient-to-br ${grad} bg-clip-text text-transparent`}>
+        <span className={`mt-1.5 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
           {tzLabel}
         </span>
       )}
