@@ -155,3 +155,32 @@ Each wave ends with: census re-run (numbers must drop), screenshot matrix
   diverger first, highest business value).
 - **D3: ⏳ wave order after the pilot will be OWNER-DEFINED** — awaiting his
   list; nothing beyond the pilot proceeds until received.
+
+
+---
+
+## 7. Pilot (Products) — CLOSING REPORT · 2026-08-02
+
+**Shipped batches:** fa474f55 (law + kit v0 + --accent→HubBlue 193 sites +
+central state tokens) · 535c0c2c (catalog search = canonical focus ring,
+chip fallbacks→law) · 365a70d1 (dual chip shapes→StatusPill, /kds-lab,
+census v2) · c7d1b50e (canonical .kx-hover-card physics + product cards
+adopt it + type-ladder normalize) · +batch5 (Home tiles migrated onto the
+canonical physics — single implementation lives in globals.css).
+
+**Census v2 (data-color classified):** products UI-hex 47→16; of the 16,
+the majority are DECLARED EXEMPT by design:
+- *photo wells* — product image containers stay light (white→#f4f5f7) in
+  both themes so transparent product photos read correctly;
+- *spec illustrations* — the always-light gauge cards in products/settings
+  (line-art on #fafafa) are intentional illustration, not UI chrome.
+Exemption rule: such surfaces must carry a `/* kds-exempt: photo-well |
+illustration */` comment when touched next.
+
+**Methodology lessons institutionalized in scripts/kds-census.ts:**
+1) classify data-color lines (name:/hex:/swatch) separately; 2) app→UI
+often lives in components/* not app/* — map both.
+
+**Pipeline proven:** law → kit → convert → evidence screenshots → ship →
+re-census. Ready to scale to waves the moment the owner supplies the D3
+order.

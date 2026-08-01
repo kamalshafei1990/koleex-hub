@@ -935,3 +935,9 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: 0 0 16px rgba(86,127,178,.28), 0 10px 30px -12px rgba(0,0,0,.35);
 }
 .kx-hover-card:hover::after { opacity: 1; }
+
+/* Tile variant: launcher-style tiles scale up and glow inward too. */
+.kx-hover-card.kx-hover-tile:hover {
+  transform: scale(1.05);
+  box-shadow: inset 0 0 26px rgba(86,127,178,.32), 0 0 16px rgba(86,127,178,.35);
+}

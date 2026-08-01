@@ -227,13 +227,13 @@ const AppCard = memo(function AppCard({
             ? isCurrentApp
               ? `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.32),0_0_16px_rgba(86,127,178,0.35)] ring-1 ring-white/[0.08]"
-                    : "tile-hover-neon bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.22),0_0_16px_rgba(86,127,178,0.28)] ring-1 ring-black/[0.05]"
+                    ? "tile-hover-neon kx-hover-card kx-hover-tile bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] ring-1 ring-white/[0.08]"
+                    : "tile-hover-neon kx-hover-card kx-hover-tile bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] ring-1 ring-black/[0.05]"
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon bg-[#0c0c0c] border-white/[0.06] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.32),0_0_16px_rgba(86,127,178,0.35),0_8px_30px_rgba(0,0,0,0.6)]"
-                    : "tile-hover-neon bg-[#f8f8f8] border-black/[0.06] hover:scale-[1.05] hover:shadow-[inset_0_0_26px_rgba(86,127,178,0.2),0_0_16px_rgba(86,127,178,0.28),0_8px_30px_rgba(0,0,0,0.08)]"
+                    ? "tile-hover-neon kx-hover-card kx-hover-tile bg-[#0c0c0c] border-white/[0.06]"
+                    : "tile-hover-neon kx-hover-card kx-hover-tile bg-[#f8f8f8] border-black/[0.06]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
@@ -1083,33 +1083,8 @@ export default function HomePage() {
         .tile-hover-neon:hover .kx-app-label {
           color: transparent;
         }
-        /* Regular tiles: the gradient border is an overlay ring (gradient
-           masked to the border band) that FADES via opacity — background-
-           image itself can't transition, which caused a flash on mouse-out. */
-        .tile-hover-neon::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          border-radius: 1rem;
-          padding: 1.5px;
-          background: linear-gradient(
-            135deg,
-            rgba(86,127,178,0.9),
-            rgba(127,169,214,0.7),
-            rgba(188,216,240,0.6),
-            rgba(86,127,178,0.9)
-          );
-          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
-          opacity: 0;
-          transition: opacity 0.25s ease;
-          pointer-events: none;
-        }
-        .tile-hover-neon:hover::after {
-          opacity: 1;
-        }
+        /* Ring/motion physics now come from the canonical .kx-hover-card
+           (globals.css) — this block only keeps Home's icon/label gradient. */
         .ai-card-neon:hover {
           box-shadow:
             0 0 16px rgba(86,127,178,0.28),
