@@ -90,8 +90,12 @@ Each wave ends with: census re-run (numbers must drop), screenshot matrix
 - This plan + census live in docs/design-system/; census script committed as
   `scripts/kds-census.ts` and re-run at every wave end.
 
-## 6. Decision gates for the owner (before execution)
+## 6. Decision gates — RESOLVED (owner, 2026-08-01)
 
-- **D1:** legacy 5-accent nav colors — keep or retire to Hub Blue? (recommend: retire)
-- **D2:** pilot = notes? (recommend: yes — fastest proof)
-- **D3:** approve wave order above, or reorder by your business priority.
+- **D1: ✅ RETIRE the 5-accent system.** Hub Blue is the only brand accent;
+  functional status colors remain. (accentColors.ts + UNI-39 retirement is
+  scheduled INSIDE the waves, not a big-bang.)
+- **D2: ✅ Pilot = PRODUCTS** (owner overrode the notes suggestion — biggest
+  diverger first, highest business value).
+- **D3: ⏳ wave order after the pilot will be OWNER-DEFINED** — awaiting his
+  list; nothing beyond the pilot proceeds until received.
