@@ -451,9 +451,12 @@ const AIGreeter = memo(function AIGreeter({
      is GONE — owner wants strictly the original idle motion, no extra
      pulses. Event-driven celebrate stays. */
 
+  /* Page load enters plain idle — the old "surprised"→awakening mapping
+     fired the expanding ring + aura flash on EVERY Home visit (owner: no
+     flash). Typing still quickens the aura via "typing"→thinking. */
   const orbState: OrbState = !introDone
     ? typed.length === 0
-      ? "surprised"
+      ? "idle"
       : "typing"
     : celebrating
       ? "celebrate"
