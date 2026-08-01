@@ -941,3 +941,12 @@ input[type="number"]:not(.kx-spinner) {
   transform: scale(1.05);
   box-shadow: inset 0 0 26px rgba(86,127,178,.32), 0 0 16px rgba(86,127,178,.35);
 }
+
+/* White-ring variant (owner call: Products / Product Data cards) —
+   same canonical physics, ring + glow in white instead of Hub Blue. */
+.kx-hover-card.kx-ring-white::after {
+  background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.55), rgba(255,255,255,.9));
+}
+.kx-hover-card.kx-ring-white:hover {
+  box-shadow: 0 0 16px rgba(255,255,255,.16), 0 10px 30px -12px rgba(0,0,0,.35);
+}
