@@ -540,7 +540,7 @@ export default function ProductList() {
         const next = m + 2;
         if (next < totalSectionsRef.current) {
           const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-          if (idle) idle(pump, { timeout: 200 }); else setTimeout(pump, 80);
+          if (idle) idle(pump, { timeout: 150 }); else setTimeout(pump, 120);
         }
         return next;
       });
@@ -1242,15 +1242,29 @@ export default function ProductList() {
           {(totalSectionsRef.current = categoryTree.length) && null}
           {categoryTree.map((cat, catIdx) => (
             catIdx >= mountedSections ? (
-              /* Deferred section: keeps its anchor id + reserved height so
-                 jump-nav targets exist while its cards mount in idle time. */
-              <section key={cat.slug} id={`cat-${cat.slug}`} className="scroll-mt-32" style={{ minHeight: 600 }} aria-busy="true" />
+              /* Deferred section: anchor id + ESTIMATED height (matches the
+                 real section within ~10%) so nothing jumps when it mounts,
+                 plus a light skeleton so the gap reads as loading. */
+              <section
+                key={cat.slug}
+                id={`cat-${cat.slug}`}
+                className="scroll-mt-32"
+                style={{ height: 210 + Math.ceil(cat.total / 4) * 396 }}
+                aria-busy="true"
+              >
+                <div className="h-9 w-56 rounded-xl bg-[var(--bg-inverted)]/[0.04] mb-7 animate-pulse" />
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+                  {[0,1,2,3].map((i) => (
+                    <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.03] aspect-[4/3] animate-pulse" />
+                  ))}
+                </div>
+              </section>
             ) : (
             <section
               key={cat.slug}
               id={`cat-${cat.slug}`}
               style={{ contentVisibility: "auto", containIntrinsicSize: "1px 800px" }}
-              className="scroll-mt-32"
+              className={`scroll-mt-32 ${catIdx >= 2 ? "kx-section-in" : ""}`}
             >
               {/* ── CATEGORY headline — minimal & monochrome: icon in a clean
                   bordered tile, title, count on the right, then a hairline that

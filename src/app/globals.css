@@ -950,3 +950,7 @@ input[type="number"]:not(.kx-spinner) {
 .kx-hover-card.kx-ring-white:hover {
   box-shadow: 0 0 16px rgba(255,255,255,.16), 0 10px 30px -12px rgba(0,0,0,.35);
 }
+
+/* Progressive-mount polish: sections fade in instead of popping. */
+@keyframes kx-section-in { from { opacity: 0; } to { opacity: 1; } }
+.kx-section-in { animation: kx-section-in 0.3s ease both; }
