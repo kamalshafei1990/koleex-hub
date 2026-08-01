@@ -717,7 +717,7 @@ export default function ProductList() {
             )}
           </div>
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
+        <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11">
           {products.length} {t("list.countInCatalog")}
         </p>
 
@@ -725,7 +725,7 @@ export default function ProductList() {
             the user can refine the query without scrolling back up.
             z-30 sits above the category jump-nav (z-20) so the
             search row always wins when both stack. */}
-        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-3 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
         <div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)] p-3.5 shadow-sm">
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
