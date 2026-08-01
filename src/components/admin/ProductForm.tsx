@@ -625,11 +625,20 @@ export default function ProductForm({ productId }: Props) {
      so we don't double-fire the gating effect itself. */
   const [dirty, setDirty] = useState(false);
   const hydratedRef = useRef(false);
+  /* Programmatic-change budget: setup effects (e.g. the auto-seeded first
+     model on a NEW product) increment this BEFORE mutating watched state;
+     the watcher consumes one credit instead of marking dirty. Without it,
+     opening /products/new armed the leave-warning with zero user input. */
+  const programmaticChangesRef = useRef(0);
   useEffect(() => {
     if (loading) return;        // still hydrating from server
     if (!hydratedRef.current) {
       hydratedRef.current = true;
       return;                   // first run AFTER hydration — baseline
+    }
+    if (programmaticChangesRef.current > 0) {
+      programmaticChangesRef.current -= 1;
+      return;                   // setup mutation, not a user edit
     }
     setDirty(true);
   }, [loading, product, models, media, translations, prices, related, productSuppliers, certifications, productDocuments, sewingSpecs]);
@@ -1223,6 +1232,7 @@ export default function ProductForm({ productId }: Props) {
   /* ── Auto-create first model ── */
   const ensureFirstModel = useCallback(() => {
     if (models.length === 0) {
+      programmaticChangesRef.current += 1;
       setModels([{ ...createEmptyModel(), order: 0 }]);
     }
   }, [models.length]);
