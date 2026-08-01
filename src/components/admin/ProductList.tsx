@@ -1056,7 +1056,7 @@ export default function ProductList() {
                 role="tab"
                 aria-selected={filterDiv === ""}
                 onClick={() => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); }}
-                className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
                   filterDiv === ""
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
@@ -1080,7 +1080,7 @@ export default function ProductList() {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => { setFilterDiv(d.slug); setFilterCat(""); setFilterSub(""); }}
-                    className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                    className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
                       isActive
                         ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
@@ -1115,7 +1115,7 @@ export default function ProductList() {
         {loadError ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-red-500/30 p-16 text-center">
             <ProductsIcon size={48} className="text-red-400/70 mx-auto mb-4" />
-            <p className="text-[var(--text-primary)] text-[15px] font-semibold">{t("state.loadFailedTitle")}</p>
+            <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.loadFailedTitle")}</p>
             <p className="text-[var(--text-muted)] text-[13px] mt-1">{loadError}</p>
             <button
               type="button"
@@ -1155,7 +1155,7 @@ export default function ProductList() {
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
-            <p className="text-[var(--text-dim)] text-[15px] font-medium">
+            <p className="text-[var(--text-dim)] text-[14px] font-medium">
               {products.length === 0 ? t("state.noProducts") : t("state.noResults")}
             </p>
             <p className="text-[var(--text-ghost)] text-[13px] mt-1">
@@ -1247,7 +1247,7 @@ export default function ProductList() {
                 <div key={section.slug}>
                   <header className="flex items-center gap-2.5 mb-4">
                     <ClassMonoIcon src={classIcons.subcategory?.[section.slug]} className="h-[18px] w-[18px] text-[var(--text-muted)]" />
-                    <h3 className="text-[15px] md:text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
+                    <h3 className="text-[14px] md:text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
                       {section.name}
                     </h3>
                     <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">
@@ -1266,7 +1266,7 @@ export default function ProductList() {
                 <div
                   key={p.id}
                   {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-                  className="group relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 hover:border-[var(--border-focus)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]"
+                  className="group relative kx-hover-card bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
                 >
                   {/* Stretched navigation link — covers the whole card and
                       is the ONLY card-level anchor, so the edit/delete actions
@@ -1577,7 +1577,7 @@ export default function ProductList() {
                         <BoxesIcon className="h-2.5 w-2.5" /> {models}
                       </span>
                       {p.level && (
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider border ${lvl}`}>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${lvl}`}>
                           {p.level}
                         </span>
                       )}

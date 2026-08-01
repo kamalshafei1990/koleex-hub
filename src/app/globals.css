@@ -905,3 +905,33 @@ input[type="number"]:not(.kx-spinner) {
   from { transform: translateY(-14px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
 }
+
+/* ── KDS-1 §2 — canonical interactive-card hover physics ──
+   ONE implementation for the whole Hub: Hub Blue gradient ring
+   (masked overlay, opacity-faded), steel glow, gentle lift. Apply
+   class `kx-hover-card` to any interactive card/tile. */
+.kx-hover-card {
+  position: relative;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.kx-hover-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(86,127,178,.9), rgba(127,169,214,.7), rgba(188,216,240,.6), rgba(86,127,178,.9));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.kx-hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 16px rgba(86,127,178,.28), 0 10px 30px -12px rgba(0,0,0,.35);
+}
+.kx-hover-card:hover::after { opacity: 1; }
