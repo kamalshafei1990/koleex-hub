@@ -49,6 +49,36 @@ One doc = single source of truth (`docs/design-system/kds-1.md`, written in Phas
   (canonical exists), one table/list pattern, one empty-state, one drawer/modal.
 - RTL + 3-language parity, mobile stacking per fit-the-screen rule, 2D-only.
 
+### 1b. Layout DNA & Archetypes — "different organs, same face" (owner, 2026-08-01)
+
+Owner's principle: apps legitimately differ by FUNCTION (a calendar isn't a
+table isn't a chat) — but every app must feel like the SAME system, never a
+foreign product. So layout freedom lives INSIDE the body; the shell and
+rhythm are law.
+
+**The non-negotiable shared shell (every app, no exceptions):**
+- One PageHeader anatomy: title block · primary actions right (start in RTL)
+  · search placement · same height, type, spacing.
+- One page rhythm: same outer padding scale, same section-header style
+  (11px tracking-wide uppercase + hairline), same card surface + radius.
+- One state language: same skeletons, same empty-states, same error panels,
+  same toasts/modals (KDS), same scroll + sticky behaviors.
+- Same interaction physics everywhere (hover ring, focus, press).
+
+**Layout archetypes (every app declares exactly one; bodies differ, DNA doesn't):**
+| Archetype | Body pattern | Apps |
+|---|---|---|
+| A1 Directory | filters row + DataTable/cards + pagination | customers · suppliers · contacts · employees · invoices · inventory ops |
+| A2 Pipeline/Board | column board + drawer detail | crm · projects |
+| A3 Document editor | toolbar + paper canvas + side panels | quotations · documents · notes · price-calculator |
+| A4 Dashboard | KPI row + chart/section grid | finance · management · home · sales |
+| A5 Master-detail | left index / right detail (iPadOS) | settings · hr · knowledge · database |
+| A6 Special canvas | bespoke body, 100% shared chrome | calendar · discuss · ai · planning |
+
+A new page starts by picking its archetype; the validator's wave checklist
+includes "declares archetype + uses shared shell". This is what guarantees
+"same spirit" without flattening every app into one shape.
+
 ## 2. The Kit — canonical components (`src/components/kds/`)
 
 Build once, from the BEST existing implementations (steal from finance/
