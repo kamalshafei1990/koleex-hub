@@ -64,7 +64,14 @@
 
   /* Brand accent — the single non-neutral KOLEEX color. Use sparingly for
      functional highlights (selected state, primary CTA), never decoratively. */
-  --accent: #0066FF;
+  /* KDS-1 §1 (D1 executed): the system accent IS Hub Blue steel.
+     193 var(--accent) call sites inherit this in one move. */
+  --accent: #567FB2;
+  /* Central status tokens (law values) — 42 call sites previously relied
+     on per-file fallbacks; now one source of truth. */
+  --state-success: #10B981;
+  --state-warning: #F59E0B;
+  --state-error: #FF3333;
   --accent-hover: #0052CC;
 }
 

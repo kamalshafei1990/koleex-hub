@@ -1190,8 +1190,8 @@ export default function LegacyProductView() {
                     </div>
                     {(c.file_url || c.verification_url) && (
                       <div className="mt-2 flex flex-wrap gap-3 text-[11px]">
-                        {c.file_url && <a href={c.file_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#0066FF)] hover:underline">Certificate file</a>}
-                        {c.verification_url && <a href={c.verification_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#0066FF)] hover:underline">Verify online</a>}
+                        {c.file_url && <a href={c.file_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#567FB2)] hover:underline">Certificate file</a>}
+                        {c.verification_url && <a href={c.verification_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#567FB2)] hover:underline">Verify online</a>}
                       </div>
                     )}
                   </div>
@@ -1223,7 +1223,7 @@ export default function LegacyProductView() {
                     <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)]">{d.title || DOC_LABELS[d.doc_type] || d.file_name || "Document"}</p>
                     <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{DOC_LABELS[d.doc_type] || d.doc_type}{d.language ? ` · ${d.language.toUpperCase()}` : ""}{d.version ? ` · v${d.version}` : ""}</p>
                   </div>
-                  <span className="text-[11px] text-[var(--accent,#0066FF)] shrink-0">Open ↗</span>
+                  <span className="text-[11px] text-[var(--accent,#567FB2)] shrink-0">Open ↗</span>
                 </a>
               ))}
             </div>

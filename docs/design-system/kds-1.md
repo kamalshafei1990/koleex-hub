@@ -1,0 +1,57 @@
+# KDS-1 — The Law
+Frozen 2026-08-01 (owner-directed). Every visual decision in Koleex Hub obeys
+this document. Change requires owner sign-off + version bump.
+
+## 1. Color tokens (CSS variables — already live; this freezes ROLES)
+| Role | Token | Dark | Light |
+|---|---|---|---|
+| Page | `--bg-primary` | #0A0A0A | #FFFFFF |
+| Surface | `--bg-surface` / `-subtle` | #111 family | #F5F5F7 family |
+| Card | `--bg-card` | #121212 | #FFFFFF |
+| Text | `--text-primary / -muted / -dim / -ghost` | white @ 100/70/45/30 | black mirror |
+| Border | `--border-subtle / -focus` | white 8% / 22% | black 8% / 22% |
+| **Brand accent** | Hub Blue ONLY | deep `#3E6796` · steel `#567FB2` · sky `#7FA9D6` · ice `#BCD8F0` |
+| Status | success `#10B981` · warning `#F59E0B` · error `#FF3333` — functional use only |
+
+Law: **no raw hex in app code.** Only tokens + the 4 Hub Blue constants
+(via `kds/colors`). The legacy 5-accent nav system is RETIRED (D1) — its
+removal rides the waves.
+
+## 2. Interaction physics (identical everywhere)
+- Hover on interactive cards/tiles: Hub Blue gradient border-ring (masked
+  overlay, opacity-fade 250ms) + inset steel glow + `scale(1.05)`; icon/label
+  may take the Hub gradient.
+- Focus: Hub Blue ring (`0 0 0 4px rgba(86,127,178,.16)` or gradient ring).
+- Press: `scale(.97)`, 75ms.
+- Toggles: emerald track ON, white knob, always. Sliders/progress: Hub Blue
+  fill, white knob. Modals/drawers: dim + `backdrop-blur-sm`, always.
+- Motion: 2D only, 150-300ms, spring-out for entrances; no bounce theatrics.
+
+## 3. Type scale (Helvetica Neue; 4pt grid; NOTHING else)
+`10 · 11 · 12 · 13 · 14(body) · 16 · 18 · 22 · 26 · 32 · 44+(display, Light)`
+Weights: Light(display) / Regular(body) / Medium(labels) / Semibold(titles) /
+Bold(page titles). Arbitrary `text-[NNpx]` outside this ladder is a CI error
+(per-file legacy allowlist shrinks each wave).
+
+## 4. Shape tokens
+Radii: `lg(8) · xl(12) · 2xl(16)` — cards 2xl, inputs/buttons xl, chips lg,
+pills full. Spacing: 8px grid (4 allowed for icon gaps). Shadows: one ladder
+(`sm` hairline lift · `md` panel · `xl` modal). Borders: 1px hairline
+(1.5px only for brand rings).
+
+## 5. Layout DNA (see unification plan §1b)
+Shared shell: PageHeader anatomy · page rhythm · section-header style ·
+state language (skeleton/empty/error) · sticky/scroll behavior. Every app
+declares ONE archetype (Directory / Board / Document / Dashboard /
+Master-detail / Special-canvas). Freedom inside the body only.
+
+## 6. Elements — one shape per element
+Canonical set lives in `src/components/kds/`. Local re-implementations of
+Modal, StatusPill, ProgressBar, SearchInput, Toggle, Slider, Checkbox,
+Tabs, Pagination, Tooltip, Dropdown are forbidden (validator-enforced,
+legacy allowlist shrinks per wave).
+
+## 7. Non-negotiables carried over
+Custom SVG icons only (no lucide) · icons from General Icons Library ·
+KOLEEX wordmark untouchable · 2D only · fit-the-screen (wide desktop,
+stacked mobile, test 360px) · full en/zh/ar + RTL parity.
