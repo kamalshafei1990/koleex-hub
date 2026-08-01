@@ -130,6 +130,10 @@ export default function ProductList() {
     () => queryClient.getQueryData<ProductRow[]>(productsQK) ?? [],
   );
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
+  /* True once taxonomy is known (warm cache or network) — until then the
+     divisions bar renders as a same-height skeleton so its arrival never
+     pushes the grid down. */
+  const [metaReady, setMetaReady] = useState(false);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
   // Classification-icon hub overrides (level → slug → url). Lets the icons set
@@ -173,7 +177,20 @@ export default function ProductList() {
   };
   const initialFilters = readFilterSnapshot();
 
-  const [filterDiv, setFilterDiv] = useState(initialFilters.div ?? "");
+  const [filterDiv, setFilterDiv] = useState(() => {
+    if (initialFilters.div) return initialFilters.div;
+    /* Public catalog defaults to the flagship division. Resolve it
+       SYNCHRONOUSLY from the warm taxonomy cache when possible — applying
+       it post-paint re-filtered an already-visible grid (visible shuffle). */
+    if (!isInternal && typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(`kx_products_meta_v1:${currentScopeKey()}`);
+        const m = raw ? (JSON.parse(raw) as { divisions?: { slug: string }[] }) : null;
+        if (m?.divisions?.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) return FLAGSHIP_DIVISION_SLUG;
+      } catch { /* fall through */ }
+    }
+    return initialFilters.div ?? "";
+  });
   const [filterCat, setFilterCat] = useState(initialFilters.cat ?? "");
   const [filterSub, setFilterSub] = useState(initialFilters.sub ?? "");
   const [filterBrand, setFilterBrand] = useState(initialFilters.brand ?? "");
@@ -229,6 +246,26 @@ export default function ProductList() {
       if (rawImgs) {
         const cachedImgs = JSON.parse(rawImgs) as Record<string, string>;
         if (cachedImgs && typeof cachedImgs === "object") setMainImages(cachedImgs);
+      }
+      /* Warm-start the taxonomy too. Without it the warm paint had NO
+         division filter (slug→id map missing) and NO category order, so
+         the grid painted unfiltered + unsorted, then visibly re-shuffled
+         and grew a divisions bar when the meta fetch landed ~700ms later.
+         With it, the first paint IS the final layout. */
+      const rawMeta = typeof window !== "undefined"
+        ? window.localStorage.getItem(`kx_products_meta_v1:${currentScopeKey()}`)
+        : null;
+      if (rawMeta) {
+        const m = JSON.parse(rawMeta) as { divisions?: DivisionRow[]; categories?: CategoryRow[]; subcategories?: SubcategoryRow[] };
+        if (m && Array.isArray(m.divisions) && Array.isArray(m.categories) && Array.isArray(m.subcategories)) {
+          setDivisions(m.divisions);
+          setCategories(m.categories);
+          setSubcategories(m.subcategories);
+          setMetaReady(true);
+          if (!isInternal && !initialFilters.div && m.divisions.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
+            setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+          }
+        }
       }
     } catch { /* corrupt/absent cache → normal load path */ }
     setLoading(!paintedFromCache);
@@ -286,6 +323,12 @@ export default function ProductList() {
           if (cancelled) return;
           setDivisions(d); setCategories(c);
           setSubcategories(s);
+          setMetaReady(true);
+          /* Persist the taxonomy for the next open's first paint. */
+          try {
+            const metaJson = JSON.stringify({ divisions: d, categories: c, subcategories: s });
+            if (metaJson.length < 400_000) window.localStorage.setItem(`kx_products_meta_v1:${currentScopeKey()}`, metaJson);
+          } catch { /* quota guard */ }
           setModelCounts(ms.counts);
           setProductSuppliers(ms.suppliers);
           setAllSuppliers(ms.allSuppliers);
@@ -1067,6 +1110,18 @@ export default function ProductList() {
             not selected so it reads as the primary line); the rest
             are outlined secondary pills. Horizontally scrollable on
             mobile so long division names don't wrap awkwardly. */}
+        {orderedDivisions.length === 0 && !metaReady && (
+          /* Height-reserving skeleton for the divisions bar (matches the
+             real strip: rounded-xl shell, pill row). Prevents the whole
+             page from being pushed down when the taxonomy fetch lands. */
+          <div className="mb-6">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5">
+              {[88, 132, 108, 96, 84].map((w, i) => (
+                <div key={i} className="h-[30px] rounded-lg bg-[var(--bg-inverted)]/[0.05] animate-pulse" style={{ width: w }} />
+              ))}
+            </div>
+          </div>
+        )}
         {orderedDivisions.length > 0 && (
           <div className="mb-6">
             {/* Sliding-pill nav shell — matches the Database/app tab nav:
@@ -1114,9 +1169,14 @@ export default function ProductList() {
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    {savedIcon
-                      ? <ClassMonoIcon src={savedIcon} className="h-4 w-4 shrink-0" />
-                      : <DivIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />}
+                    {/* Fixed 16px icon slot: the saved hub icon replaces the
+                        fallback async — identical boxes mean the pill width
+                        never changes when it lands (no bar jitter). */}
+                    <span className="h-4 w-4 flex items-center justify-center shrink-0">
+                      {savedIcon
+                        ? <ClassMonoIcon src={savedIcon} className="h-4 w-4" />
+                        : <DivIcon className="h-3.5 w-3.5 opacity-80" />}
+                    </span>
                     {localizedName(d, lang)}
                   </button>
                 );
