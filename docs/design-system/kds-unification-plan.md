@@ -57,6 +57,32 @@ inventory/contacts, don't reinvent): `PageHeader · Section · KpiCard · DataTa
 Badge/Status · EmptyState · Toolbar`. Each = tokens only, both themes, RTL,
 mobile variant. Storybook-lite page at `/kds-lab` (hidden) for review.
 
+### 2b. Element Shape Law — ONE shape per element (owner-raised, 2026-08-01)
+
+The owner's exact pain, quantified by a second census — the SAME element
+re-implemented locally with different shapes across apps:
+
+| Element | Local implementations found | Worst offenders |
+|---|---|---|
+| **Modal / overlay** | **94 files** build their own `fixed inset-0` | inventory 10 · admin 9 · database 8 |
+| **Progress bar** | **77** hand-rolled bars | knowledge 14 · admin 8 · finance 6 |
+| **Status pill** | **66** variants | finance 12 · database 10 · knowledge 9 |
+| Custom checkbox | 29 | admin/inventory/database |
+| Search input | 26 | commercial-policy 6 · admin 4 |
+| Slider | 10 | scattered |
+| Toggle/Switch | 9 | admin 5 |
+| Pagination | 8 | scattered |
+| Tab bar | 7 | scattered |
+
+**The law:** for every element there is exactly ONE canonical KDS component —
+one shape, one behavior, both themes, RTL, mobile. Local look-alikes are
+DEBT and die wave-by-wave (each wave's checklist includes "zero local
+modals/pills/bars remain in this app"). The Kit list in §2 accordingly
+expands to: `Slider · Toggle · Checkbox · SearchInput · Pagination ·
+ProgressBar · StatusPill · Tooltip · Dropdown/Menu` on top of the original
+twelve. The validator (§3) gains per-element rules (e.g. new `fixed inset-0`
+outside kds/Modal = CI failure).
+
 ## 3. The Police — regression prevention (before migrating anything)
 
 - Extend `scripts/validate-design-system.ts`: **no new raw hex** outside
