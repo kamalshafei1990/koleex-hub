@@ -61,7 +61,7 @@ export async function GET(req: Request) {
   const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: (data ?? []).length });
   return NextResponse.json(
     { products: data ?? [] },
-    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header } },
+    { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=900", "Server-Timing": header } },
   );
 }
 

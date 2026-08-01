@@ -522,6 +522,34 @@ export default function ProductList() {
   /* Reset the keyboard cursor whenever the suggestion list changes. */
   useEffect(() => { setActiveSuggestionIdx(-1); }, [suggestions]);
 
+  /* PERF smooth-open: mounting 700+ product cards in one commit froze the
+     main thread right as the page appeared (the "opens not smooth" jank).
+     Reveal category sections progressively — first 2 immediately (above
+     the fold), then pump the rest in small idle slices. Unmounted sections
+     keep their <section id> and reserved height so the category jump-nav
+     and scroll position stay correct. */
+  const [mountedSections, setMountedSections] = useState(2);
+  const totalSectionsRef = useRef(0);
+  useEffect(() => {
+    if (loading) return;
+    let alive = true;
+    const pump = () => {
+      if (!alive) return;
+      setMountedSections((m) => {
+        if (m >= totalSectionsRef.current) return m;
+        const next = m + 2;
+        if (next < totalSectionsRef.current) {
+          const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+          if (idle) idle(pump, { timeout: 200 }); else setTimeout(pump, 80);
+        }
+        return next;
+      });
+    };
+    const t = setTimeout(pump, 50);
+    return () => { alive = false; clearTimeout(t); };
+  }, [loading]);
+
+
   /* Highlight matched substring inside a suggestion label. */
   const highlight = (label: string, q: string) => {
     if (!q) return label;
@@ -1211,7 +1239,13 @@ export default function ProductList() {
             )}
 
           <div className="space-y-14">
-          {categoryTree.map((cat) => (
+          {(totalSectionsRef.current = categoryTree.length) && null}
+          {categoryTree.map((cat, catIdx) => (
+            catIdx >= mountedSections ? (
+              /* Deferred section: keeps its anchor id + reserved height so
+                 jump-nav targets exist while its cards mount in idle time. */
+              <section key={cat.slug} id={`cat-${cat.slug}`} className="scroll-mt-32" style={{ minHeight: 600 }} aria-busy="true" />
+            ) : (
             <section
               key={cat.slug}
               id={`cat-${cat.slug}`}
@@ -1442,6 +1476,7 @@ export default function ProductList() {
               ))}
               </div>
             </section>
+            )
           ))}
           </div>
           </>
