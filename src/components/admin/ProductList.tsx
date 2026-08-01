@@ -83,8 +83,8 @@ const levelColors: Record<string, string> = {
 };
 /* Status IS functional → keep semantic status colors (success/warning/error). */
 const stColors: Record<string, string> = {
-  draft: "text-[var(--state-warning,#FFCC00)] bg-[var(--state-warning,#FFCC00)]/10 border-[var(--state-warning,#FFCC00)]/20",
-  active: "text-[var(--state-success,#00CC66)] bg-[var(--state-success,#00CC66)]/10 border-[var(--state-success,#00CC66)]/20",
+  draft: "text-[var(--state-warning,#F59E0B)] bg-[var(--state-warning,#F59E0B)]/10 border-[var(--state-warning,#F59E0B)]/20",
+  active: "text-[var(--state-success,#10B981)] bg-[var(--state-success,#10B981)]/10 border-[var(--state-success,#10B981)]/20",
   archived: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/10 border-[var(--state-error,#FF3333)]/20",
 };
 
@@ -755,7 +755,7 @@ export default function ProductList() {
                 aria-label={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
-                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors [&::-webkit-search-cancel-button]:hidden"
+                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-[border-color,box-shadow] focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] [&::-webkit-search-cancel-button]:hidden"
               />
               {/* Clear button — only when there's text. Native input
                   type=search clear button is inconsistent across
