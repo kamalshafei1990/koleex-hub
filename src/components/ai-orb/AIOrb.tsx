@@ -472,9 +472,9 @@ export default function AIOrb({
         /* ── Keyframes — all restrained. ── */
         @keyframes kxA-float {
           0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
-          25% { transform: translate(calc(-50% + 5px), calc(-50% - 10px)) rotate(2.5deg); }
-          50% { transform: translate(-50%, calc(-50% - 15px)) rotate(0deg); }
-          75% { transform: translate(calc(-50% - 5px), calc(-50% - 10px)) rotate(-2.5deg); }
+          25% { transform: translate(calc(-50% + 7px), calc(-50% - 14px)) rotate(3deg); }
+          50% { transform: translate(-50%, calc(-50% - 21px)) rotate(0deg); }
+          75% { transform: translate(calc(-50% - 7px), calc(-50% - 14px)) rotate(-3deg); }
         }
         @keyframes kxA-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
         @keyframes kxA-rot { to { transform: rotate(360deg); } }
