@@ -8,6 +8,7 @@ import { currentScopeKey } from "@/lib/me-bootstrap";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
+import { StatusPill } from "@/components/kds";
 import { localizedName } from "@/lib/i18n-name";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { IMG } from "@/lib/cdn";
@@ -81,12 +82,10 @@ const LEVEL_CHIP = "text-[var(--text-muted)] bg-[var(--bg-surface)] border-[var(
 const levelColors: Record<string, string> = {
   entry: LEVEL_CHIP, mid: LEVEL_CHIP, premium: LEVEL_CHIP, enterprise: LEVEL_CHIP,
 };
-/* Status IS functional → keep semantic status colors (success/warning/error). */
-const stColors: Record<string, string> = {
-  draft: "text-[var(--state-warning,#F59E0B)] bg-[var(--state-warning,#F59E0B)]/10 border-[var(--state-warning,#F59E0B)]/20",
-  active: "text-[var(--state-success,#10B981)] bg-[var(--state-success,#10B981)]/10 border-[var(--state-success,#10B981)]/20",
-  archived: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/10 border-[var(--state-error,#FF3333)]/20",
-};
+/* Status IS functional → semantic tones via the ONE canonical KDS pill
+   (this file previously had TWO different chip shapes for the same
+   status — rounded-md in grid, rounded-full in list; element law now). */
+const ST_TONE = { draft: "warning", active: "success", archived: "error" } as const;
 
 /* Renders a classification-hub icon (a flat Visual-Library SVG) in the current
    theme colour via a CSS mask, so it reads correctly on dark/light. Returns
@@ -1413,9 +1412,9 @@ export default function ProductList() {
                       {(() => {
                         const st = (p.status || "draft");
                         return (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${stColors[st] || stColors.draft}`}>
+                          <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
                             {t(`status.${st}`, st)}
-                          </span>
+                          </StatusPill>
                         );
                       })()}
                       {p.brand && (
@@ -1589,9 +1588,9 @@ export default function ProductList() {
                       {(() => {
                         const st = (p.status || "draft");
                         return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${stColors[st] || stColors.draft}`}>
+                          <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
                             {t(`status.${st}`, st)}
-                          </span>
+                          </StatusPill>
                         );
                       })()}
                     </div>
