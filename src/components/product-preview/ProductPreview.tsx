@@ -761,20 +761,35 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <SnapCarousel>
               {points.map((point, i) => {
                 const img = imgs.length > 0 ? imgs[i % imgs.length] : null;
+                // Apple shop-card anatomy: bold claim on the card surface,
+                // supporting clause below it, photo grounded at the bottom.
+                // Theme-aware surface so it reads right in light AND dark.
+                const parts = point.split(/\s+—\s+/);
+                const head = parts[0];
+                const body = parts.slice(1).join(" — ");
                 return (
                   <div
                     key={i}
-                    className="relative h-[440px] md:h-[560px] w-[85%] shrink-0 snap-start overflow-hidden rounded-[28px] bg-[var(--bg-secondary)] sm:w-[560px]"
+                    className="flex h-[500px] md:h-[560px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
                   >
+                    <div className="p-7 md:p-8">
+                      <h3 className="text-xl md:text-[24px] font-semibold leading-snug tracking-[-0.01em] text-[var(--text-primary)]">
+                        {head}
+                        {/[.!?]$/.test(head) ? "" : "."}
+                      </h3>
+                      {body ? (
+                        <p className="mt-3 text-[14px] md:text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                          {body.charAt(0).toUpperCase() + body.slice(1)}
+                          {/[.!?]$/.test(body) ? "" : "."}
+                        </p>
+                      ) : null}
+                    </div>
                     {img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="mt-auto h-[240px] md:h-[280px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </div>
                     ) : null}
-                    {/* top scrim keeps the claim readable over any shot */}
-                    <div className="absolute inset-x-0 top-0 h-2/5 bg-gradient-to-b from-black/70 to-transparent" />
-                    <p className="relative p-7 md:p-8 text-lg md:text-[22px] font-semibold leading-snug text-white">
-                      {point}
-                    </p>
                   </div>
                 );
               })}
