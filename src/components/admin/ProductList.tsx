@@ -1311,14 +1311,14 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group flex flex-col items-center justify-center gap-1.5 shrink-0 h-[64px] px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all"
+                      className="group relative flex flex-col items-center justify-center gap-2 shrink-0 w-[108px] h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       {classIcons.category?.[cat.slug] ? (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-[18px] w-[18px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 group-hover:opacity-100 transition-opacity" />
                       ) : (
-                        <LayoutGridIcon className="h-[18px] w-[18px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+                        <LayoutGridIcon className="h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 group-hover:opacity-100 transition-opacity" />
                       )}
-                      <span className="text-[10.5px] font-medium whitespace-nowrap text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors">{cat.name}</span>
+                      <span className="text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors line-clamp-2">{cat.name}</span>
                     </a>
                   ))}
                 </div>
