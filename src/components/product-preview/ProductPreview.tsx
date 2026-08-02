@@ -85,6 +85,10 @@ const labelForOption = (field: SpecField, optionValue: string): string => {
   return found?.label ?? optionValue;
 };
 
+/* Rotating glyph set for the Apple-style advantage grid — varied large
+   icons instead of one repeated spark. Tokens resolve via VisualGlyph. */
+const ADVANTAGE_GLYPHS = ["spark", "automation", "check", "question", "spark", "automation"];
+
 const selectedValuesOf = (raw: unknown): string[] =>
   Array.isArray(raw)
     ? (raw as unknown[]).map((v) => String(v))
@@ -407,26 +411,42 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
           </section>
-          <div className="space-y-3 md:space-y-4 max-w-3xl">
+          {/* Apple-style identity: centered stack — kicker, huge name,
+              light tagline, one CTA. */}
+          <div className="mx-auto max-w-3xl space-y-4 pt-4 text-center">
             {(brand || machineKindLabel) ? (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+              <div className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
                 {brand ? <span>{brand}</span> : null}
                 {brand && machineKindLabel ? <span className="text-[var(--text-ghost)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
             ) : null}
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.02]">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-semibold tracking-[-0.025em] text-[var(--text-primary)] leading-[1.02]">
               {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
             {displayTagline ? (
-              <p className="text-base md:text-xl font-light text-[var(--text-muted)] leading-snug max-w-xl">{displayTagline}</p>
+              <p className="mx-auto max-w-2xl text-lg md:text-2xl font-light text-[var(--text-muted)] leading-snug">{displayTagline}</p>
             ) : null}
-            <div className="pt-1">
+            <div className="pt-2">
               <a href="#overview" className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
                 {t("preview.learnMore", "Learn more")}
               </a>
             </div>
           </div>
+
+          {/* THE main product photo — the floating studio shot on a light
+              well (this is where the primary image lives; the poster above
+              is the campaign banner, this is the product itself). */}
+          {mainImageUrl ? (
+            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#f1f2f4]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={mainImageUrl}
+                alt={displayName}
+                className="mx-auto max-h-[560px] w-auto object-contain px-8 py-12 md:py-16"
+              />
+            </section>
+          ) : null}
         </div>
       ) : null}
 
@@ -597,8 +617,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
       {/* ═══ 3. OVERVIEW ═══ */}
       {firstKb("overview") ? (
-        <section className="max-w-3xl">
-          <p className="text-xl md:text-[1.75rem] md:leading-[1.4] font-light leading-relaxed text-[var(--text-secondary)]">
+        <section className="mx-auto max-w-4xl text-center">
+          <p className="text-xl md:text-[2rem] md:leading-[1.45] font-light leading-relaxed text-[var(--text-secondary)]">
             {asKnowledgeList(firstKb("overview")!.content).join(" ")}
           </p>
         </section>
@@ -687,12 +707,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           <div className="relative overflow-x-auto pb-1">
             <div className="relative min-w-[460px]">
               {/* connector line running through the node centers (h-14 → 28px) */}
-              <div className="absolute left-7 right-7 top-7 h-px bg-[var(--border-subtle)]" />
+              <div className="absolute left-10 right-10 top-10 h-px bg-[var(--border-subtle)]" />
               <div className="relative flex justify-between gap-3">
                 {automationFeatures.map((f, i) => (
                   <div key={f.key} className="flex flex-1 flex-col items-center text-center gap-2.5">
-                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)]">
-                      <VisualGlyph token="automation" className="h-5 w-5" />
+                    <span className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)]">
+                      <VisualGlyph token="automation" className="h-8 w-8" />
                       <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--text-primary)] text-[9px] font-bold text-[var(--bg-primary)]">
                         {i + 1}
                       </span>
@@ -712,17 +732,18 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
         <section className="space-y-4">
           <SectionHead eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Apple-style benefit grid: oversized glyph leading each card. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               ...asKnowledgeList(firstKb("selling_points")?.content),
               ...asKnowledgeList(firstKb("technical_advantages")?.content),
             ].map((point, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-6"
+                className="flex flex-col gap-5 rounded-3xl bg-[var(--bg-surface-subtle)] p-8"
               >
-                <VisualGlyph token="spark" className="mt-0.5 h-5 w-5 shrink-0 text-[var(--text-primary)]" />
-                <p className="text-base leading-relaxed text-[var(--text-primary)]">{point}</p>
+                <VisualGlyph token={ADVANTAGE_GLYPHS[i % ADVANTAGE_GLYPHS.length]} className="h-11 w-11 text-[var(--text-primary)]" />
+                <p className="text-[15px] md:text-base leading-relaxed text-[var(--text-primary)]">{point}</p>
               </div>
             ))}
           </div>
