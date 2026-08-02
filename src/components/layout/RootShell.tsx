@@ -26,6 +26,7 @@ import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
+import DevReload from "@/components/pwa/DevReload";
 import UpdateWatcher from "@/components/pwa/UpdateWatcher";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
@@ -238,6 +239,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}
       <ServiceWorkerRegistrar />
+      <DevReload />
       {/* Offers a one-tap refresh when a NEW build has shipped. Without this
           an already-open tab keeps running the bundle it booted with — the
           App Router only soft-navigates, so it never re-downloads JS and a

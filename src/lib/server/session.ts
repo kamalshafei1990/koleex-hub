@@ -306,7 +306,17 @@ export async function clearSessionCookie(): Promise<void> {
 export async function getSessionAccountId(): Promise<string | null> {
   const store = await cookies();
   const raw = store.get(COOKIE_NAME)?.value;
-  if (!raw) return null;
+  /* ── LOCAL PREVIEW AUTO-LOGIN ──
+     KX_DEV_AUTOLOGIN_ACCOUNT_ID lives ONLY in .env.local (gitignored,
+     never set on Vercel). When present and no valid cookie exists, the
+     request is treated as that account — so the owner's localhost
+     preview never asks to sign in and never expires. Setting this var
+     in any deployed environment would disable auth: DO NOT. */
+  const devAutoLogin = process.env.KX_DEV_AUTOLOGIN_ACCOUNT_ID;
+  if (!raw) {
+    if (devAutoLogin && UUID_RE.test(devAutoLogin)) return devAutoLogin;
+    return null;
+  }
 
   const dot = raw.indexOf(".");
   if (dot < 0) return null;
