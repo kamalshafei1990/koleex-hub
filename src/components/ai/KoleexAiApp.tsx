@@ -1530,29 +1530,34 @@ export default function KoleexAiApp() {
                 {error}
               </div>
             )}
+            {/* Floating "jump to latest" — STICKY, not absolute: an
+                absolute child of a scroll container anchors to the
+                container's own box (not the visible viewport), so the
+                old version drifted into the middle of long answers.
+                A zero-height sticky wrapper pins the chip to the
+                bottom of the VISIBLE area while the user is scrolled
+                up, and it never takes layout space. */}
+            {showJumpToBottom && (
+              <div className="pointer-events-none sticky bottom-4 z-[2] flex h-0 justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = scrollRef.current;
+                    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+                    /* Phase 13.1: clicking "↓ Latest" re-engages the
+                       stream-tracker so subsequent deltas follow again. */
+                    userFollowingRef.current = true;
+                    setShowJumpToBottom(false);
+                  }}
+                  aria-label="Jump to latest"
+                  className="pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
+                >
+                  ↓ Latest
+                </button>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
-
-          {/* Floating "jump to latest" button — only shown when user has
-              scrolled up more than ~120px from the bottom of a populated
-              conversation. Clicking smooths back down. */}
-          {showJumpToBottom && (
-            <button
-              type="button"
-              onClick={() => {
-                const el = scrollRef.current;
-                if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-                /* Phase 13.1: clicking "↓ Latest" re-engages the
-                   stream-tracker so subsequent deltas follow again. */
-                userFollowingRef.current = true;
-                setShowJumpToBottom(false);
-              }}
-              aria-label="Jump to latest"
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-8 px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
-            >
-              ↓ Latest
-            </button>
-          )}
         </div>
 
         {/* Composer — single unified pill (Gemini-style).
