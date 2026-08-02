@@ -855,7 +855,7 @@ function CalendarDemo({ sel, selCls, cellCls, shell }: { sel: number; selCls: st
 function DatePickerStyles() {
   const shell = "rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]";
   return (
-    <Family id="dps" title="Date Picker — internal style — OPEN BALLOT" note="you elected the custom calendar; now pick its LOOK (DPS-…) — day 2 = selected, day 14 = today">
+    <Family id="dps" title="Date Picker — internal style" note="winner: DPS-4" elected>
       <Variant vid="DPS-1" apps="current ui/DatePicker" count="Hub Blue square selection">
         <CalendarDemo sel={2} selCls="bg-[#567FB2] text-white rounded-lg" cellCls="rounded-lg" shell={shell} />
       </Variant>
@@ -865,8 +865,36 @@ function DatePickerStyles() {
       <Variant vid="DPS-3" apps="proposal" count="Hub Blue circle selection">
         <CalendarDemo sel={2} selCls="bg-[#567FB2] text-white rounded-full" cellCls="rounded-full" shell={shell} />
       </Variant>
-      <Variant vid="DPS-4" apps="proposal" count="Hub Blue gradient square + soft ring">
+      <Variant vid="DPS-4" apps="proposal" count="Hub Blue gradient square + soft ring" elected>
         <CalendarDemo sel={2} selCls="bg-gradient-to-br from-[#567FB2] to-[#7FA9D6] text-white rounded-lg shadow-[0_0_0_3px_rgba(86,127,178,0.2)]" cellCls="rounded-lg" shell={shell} />
+      </Variant>
+    </Family>
+  );
+}
+
+function PaginationBallot() {
+  return (
+    <Family id="pagination" title="Pagination — OPEN BALLOT" note="pick ONE (PG-…); your TBL-6 table ships with PG-1 today">
+      <Variant vid="PG-1" apps="Customers · Suppliers server lists" count="Prev / Page N of M / Next" wide>
+        <div className="w-full flex items-center justify-between gap-3 text-[13px] text-[var(--text-secondary)]">
+          <span>121 customers</span>
+          <span className="flex items-center gap-2">
+            <button className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px]">Prev</button>
+            <span>Page 2 / 7</span>
+            <button className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px]">Next</button>
+          </span>
+        </div>
+      </Variant>
+      <Variant vid="PG-2" apps="Catalogs PDF viewer" count="icon nav + page number input">
+        <div className="flex items-center gap-0.5 rounded-xl bg-[var(--bg-inverted)]/[0.06] border border-[var(--border-subtle)] px-1 py-1">
+          <button className="h-8 min-w-8 px-2 rounded-lg flex items-center justify-center text-[var(--text-primary)]"><AngleLeftIcon className="h-4 w-4" /></button>
+          <input className="h-7 w-10 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-center text-[12px] tabular-nums outline-none" defaultValue="3" />
+          <span className="text-[12px] text-[var(--text-dim)] tabular-nums px-1">/ 12</span>
+          <button className="h-8 min-w-8 px-2 rounded-lg flex items-center justify-center text-[var(--text-primary)]"><AngleRightIcon className="h-4 w-4" /></button>
+        </div>
+      </Variant>
+      <Variant vid="PG-4" apps="Database Visual Library · Catalogs" count="Load more / infinite scroll">
+        <button className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]">Load 60 more</button>
       </Variant>
     </Family>
   );
@@ -880,7 +908,7 @@ export default function ElementElection() {
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
         Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
-        Round 2 elected: MD-4 · CF-1 · DR-1 · TBL-6 · ROW-4 · TS-2 · MN-4 · AV-3 · DP-1. Still open: DPS (calendar style) · TP · SK/SP · FC.
+        Rounds 1+2 elected (see green). Still open: TP · SK/SP · FC · PG (pagination).
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·
@@ -898,6 +926,7 @@ export default function ElementElection() {
       <DatePickers />
       <DatePickerStyles />
       <FilterChips />
+      <PaginationBallot />
       <Toasts />
       <Menus />
       <Tooltips />

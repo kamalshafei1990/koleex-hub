@@ -233,7 +233,9 @@ export default function DatePicker({
                     disabled
                       ? "text-[var(--text-ghost)] cursor-not-allowed"
                       : isSelected
-                        ? "bg-[var(--accent)] text-white"
+                        /* ELECTED DPS-4 (owner, 2026-08-02): Hub Blue
+                           gradient square + soft ring. */
+                        ? "bg-gradient-to-br from-[#567FB2] to-[#7FA9D6] text-white shadow-[0_0_0_3px_rgba(86,127,178,0.2)]"
                         : isToday
                           ? "text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/40 hover:bg-[var(--bg-inverted)]/[0.06]"
                           : "text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06]"
