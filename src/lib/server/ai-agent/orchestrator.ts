@@ -1365,7 +1365,14 @@ function cleanAssistantText(raw: string): string {
     .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "")
     .replace(/<tool_call[^>]*\/?>/gi, "")
     .replace(/\[tool\s*:[^\]]*\]/gi, "")
-    .replace(/\s{2,}/g, " ")
+    /* MARKDOWN-SAFE collapse (2026-08-03 fix): the old /\s{2,}/ → " "
+       ate every blank line, so "…answer.\n\n## Heading\n\nBody…"
+       became "…answer. ## Heading Body…" and the whole reply rendered
+       as one crowded run-on paragraph. Collapse only runs of spaces/
+       tabs; cap newline runs at one blank line; keep structure. */
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
   return stripped;
 }
