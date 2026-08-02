@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -79,6 +79,13 @@ function divisionIcon(name: string): React.ElementType {
 /* Level is a tier label, NOT a functional status → neutral chips per the
    brand rule (monochrome-first; color reserved for true status). */
 const LEVEL_CHIP = "text-[var(--text-muted)] bg-[var(--bg-surface)] border-[var(--border-subtle)]";
+/* Frozen empty array — a fresh [] per render would defeat ProductCard's memo. */
+const EMPTY_SUPPLIERS: string[] = [];
+
+/* Hoisted: a fresh style object per section per render defeated nothing but
+   allocated needlessly. */
+const SECTION_CV = { contentVisibility: "auto", containIntrinsicSize: "1px 800px" } as const;
+
 const levelColors: Record<string, string> = {
   entry: LEVEL_CHIP, mid: LEVEL_CHIP, premium: LEVEL_CHIP, enterprise: LEVEL_CHIP,
 };
@@ -108,6 +115,208 @@ function ClassMonoIcon({ src, className }: { src?: string; className?: string })
     />
   );
 }
+
+/* ── ProductCard ──
+   Extracted from the grid map and MEMOISED. The catalogue mounts ~700
+   cards; before this, any parent re-render (typing in search, a filter
+   change, a meta fetch landing) reconciled every card subtree — ~17k
+   nodes — which is what made search feel laggy. All inputs are either
+   primitives or stable useMemo/useCallback values, so untouched cards
+   now bail out of re-rendering entirely. Markup is verbatim: this is a
+   pure extraction, no visual change. */
+const ProductCard = memo(function ProductCard({
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, t, onAskDelete,
+}: {
+  p: ProductRow;
+  imgUrl?: string;
+  models: number;
+  suppliers: string[];
+  lvl: string;
+  baseRoute: string;
+  isInternal: boolean;
+  catMap: Record<string, string>;
+  subMap: Record<string, string>;
+  divMap: Record<string, string>;
+  primaryModelNames: Record<string, string>;
+  t: (key: string, fallback?: string) => string;
+  onAskDelete: (e: React.MouseEvent, id: string, name: string) => void;
+}) {
+  return (
+    <div
+      key={p.id}
+      {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
+      className="group relative kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+    >
+      {/* Stretched navigation link — covers the whole card and
+          is the ONLY card-level anchor, so the edit/delete actions
+          below are siblings (not nested <a>) → no hydration error. */}
+      <Link
+        href={`${baseRoute}/${p.slug || p.id}`}
+        aria-label={p.product_name}
+        className="absolute inset-0 z-0"
+      />
+      {/* Image — calm, clean. Background matches the
+          card surface so transparent product photos
+          blend in (no white box around the photo).
+          No scale on hover — the card lifts, image
+          stays put. */}
+      <div className="relative aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
+        {imgUrl ? (
+          /* IMG.card = CDN-downscaled 480px render. The raw
+             URL here was the original multi-MB upload — the
+             whole grid was pulling full-size photos for
+             thumbnail-sized cells, which is why images took
+             forever to appear. */
+          <img
+            src={IMG.card(imgUrl)}
+            alt={p.product_name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain p-4"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageRawIcon className="h-10 w-10 text-gray-300" />
+          </div>
+        )}
+
+        {/* Badges overlay */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+          {p.featured && (
+            <span /* no backdrop-blur: the inverted bg is fully opaque, so it blurred nothing while costing a render surface on every card */
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider">
+              <StarIcon className="h-2.5 w-2.5" /> {t("list.featured", "Featured")}
+            </span>
+          )}
+          {p.level && (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider border ${lvl}`}>
+              {p.level}
+            </span>
+          )}
+        </div>
+
+        {/* Actions (show on hover) — internal only.
+            Edit is a real <Link> (with prefetch), wrapped
+            in stopPropagation so the click doesn't also
+            trigger the parent card's product-detail Link.
+            Delete stays a <button> since it opens a modal. */}
+        {isInternal && (
+        /* GEN-7 — edit/delete were hover-only, so on touch devices
+           (no :hover) the card had no visible edit option. Show the
+           actions by default on small screens and keep the clean
+           hover-reveal on desktop (md+). */
+        <div className="absolute bottom-2.5 right-2.5 z-10 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+          <Link
+            href={`${baseRoute}/${p.id}/edit`}
+            onClick={(e) => e.stopPropagation()}
+            className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            title={t("card.editProduct")}
+          >
+            <PencilIcon className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            onClick={(e) => onAskDelete(e, p.id, p.product_name)}
+            className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
+            title={t("card.deleteProduct")}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-3.5 md:p-4">
+        {(() => {
+          const mn = primaryModelNames[p.id];
+          const hasDistinctName = mn && mn !== p.product_name;
+          if (hasDistinctName) {
+            // Catalog layout — code first as the heading,
+            // descriptive name as the subtitle below.
+            return (
+              <>
+                <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                  {mn}
+                </h3>
+                <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug">
+                  {p.product_name}
+                </p>
+              </>
+            );
+          }
+          // No descriptive name yet — show the model code
+          // as the title and a small "Needs name" pill to
+          // flag it for the admin.
+          return (
+            <>
+              <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                {p.product_name}
+              </h3>
+              {isInternal && (
+                <p className="mt-0.5 text-[10px] font-medium text-amber-400/80">
+                  {t("list.needsName", "Needs name")}
+                </p>
+              )}
+            </>
+          );
+        })()}
+
+        {/* Category + Subcategory line.
+            Subcategory shown as a chip after the category
+            so admins can spot at a glance whether a
+            product is in lockstitch / overlock / etc.
+            without opening it. */}
+        <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1.5">
+          <LayersIcon className="h-3 w-3 shrink-0" />
+          <span className="truncate">{catMap[p.category_slug] || p.category_slug}</span>
+          {p.subcategory_slug && subMap[p.subcategory_slug] && (
+            <>
+              <span className="text-[var(--text-ghost)]">·</span>
+              <span className="truncate text-[var(--text-muted)]">{subMap[p.subcategory_slug]}</span>
+            </>
+          )}
+        </p>
+
+        {/* Division label — only for non-flagship products.
+            Garment Machinery is the default/home line and
+            gets a clean card; anything else gets tagged so
+            it's clear at a glance which line it belongs to. */}
+        {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
+          <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 uppercase tracking-wider truncate">
+            {divMap[p.division_slug]}
+          </p>
+        )}
+
+        {/* Meta row — publish status, brand, models. */}
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          {(() => {
+            const st = (p.status || "draft");
+            return (
+              <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
+                {t(`status.${st}`, st)}
+              </StatusPill>
+            );
+          })()}
+          {p.brand && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
+              <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
+            <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}
+          </span>
+        </div>
+
+        {/* Supplier — internal only */}
+        {isInternal && suppliers.length > 0 && (
+          <p className="text-[10px] text-[var(--text-ghost)] mt-2 truncate">
+            {suppliers.join(", ")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+});
 
 export default function ProductList() {
   const router = useRouter();
@@ -139,7 +348,11 @@ export default function ProductList() {
   // Classification-icon hub overrides (level → slug → url). Lets the icons set
   // in the Database app surface as section markers in the catalogue.
   const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
-  useEffect(() => { fetchClassificationIcons().then(setClassIcons).catch(() => {}); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetchClassificationIcons().then((v) => { if (alive) setClassIcons(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
@@ -175,7 +388,13 @@ export default function ProductList() {
       return raw ? (JSON.parse(raw) as Partial<FilterSnapshot>) : {};
     } catch { return {}; }
   };
-  const initialFilters = readFilterSnapshot();
+  /* Read the persisted snapshot EXACTLY once. As a plain call this ran on
+     every render (sync storage read while typing) and, since the snapshot is
+     rewritten on each filter change, its values went stale — which made the
+     flagship-division default silently override an explicit "All divisions". */
+  const initialFiltersRef = useRef<ReturnType<typeof readFilterSnapshot> | null>(null);
+  if (initialFiltersRef.current === null) initialFiltersRef.current = readFilterSnapshot();
+  const initialFilters = initialFiltersRef.current;
 
   const [filterDiv, setFilterDiv] = useState(() => {
     if (initialFilters.div) return initialFilters.div;
@@ -381,14 +600,14 @@ export default function ProductList() {
         div: filterDiv, cat: filterCat, sub: filterSub,
         brand: filterBrand, level: filterLevel, supplier: filterSupplier,
         visible: filterVisible, featured: filterFeatured, status: filterStatus,
-        search, showFilters, viewMode,
+        search: deferredSearch, showFilters, viewMode,
       };
       window.sessionStorage.setItem(filterStorageKey, JSON.stringify(snapshot));
     } catch { /* quota exceeded — fine */ }
   }, [
     filterDiv, filterCat, filterSub, filterBrand, filterLevel,
     filterSupplier, filterVisible, filterFeatured, filterStatus,
-    search, showFilters, viewMode, filterStorageKey,
+    deferredSearch, showFilters, viewMode, filterStorageKey,
   ]);
 
   const allBrands = useMemo(() => {
@@ -501,10 +720,10 @@ export default function ProductList() {
     | { kind: "brand"; label: string; count: number }
     | { kind: "product"; id: string; slug: string; label: string; modelCode?: string; thumb?: string };
 
-  const suggestions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q || q.length < 1) return [] as Suggestion[];
-
+  /* Tallies for the suggestion dropdown. They depend only on `products`, so
+     keeping them inside the search-keyed memo meant a full 705-product pass
+     on every keystroke for output that never changed. */
+  const suggestionCounts = useMemo(() => {
     const categoryProductCounts: Record<string, number> = {};
     const subcategoryProductCounts: Record<string, number> = {};
     const brandProductCounts: Record<string, number> = {};
@@ -513,6 +732,14 @@ export default function ProductList() {
       subcategoryProductCounts[p.subcategory_slug] = (subcategoryProductCounts[p.subcategory_slug] || 0) + 1;
       if (p.brand) brandProductCounts[p.brand] = (brandProductCounts[p.brand] || 0) + 1;
     }
+    return { categoryProductCounts, subcategoryProductCounts, brandProductCounts };
+  }, [products]);
+
+  const suggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q || q.length < 1) return [] as Suggestion[];
+
+    const { categoryProductCounts, subcategoryProductCounts, brandProductCounts } = suggestionCounts;
 
     /* Prefer prefix matches first (typing "i" → Industrial Sewing
        Machines comes before Cutting Equipment), fall back to
@@ -568,7 +795,9 @@ export default function ProductList() {
   }, [search, categories, subcategories, allBrands, products, primaryModelNames, mainImages]);
 
   /* Reset the keyboard cursor whenever the suggestion list changes. */
-  useEffect(() => { setActiveSuggestionIdx(-1); }, [suggestions]);
+  /* Functional bail-out: returning the identical value lets React skip the
+     re-render, so typing no longer costs a second full pass over the tree. */
+  useEffect(() => { setActiveSuggestionIdx((i) => (i === -1 ? i : -1)); }, [suggestions]);
 
   /* PERF smooth-open: mounting 700+ product cards in one commit froze the
      main thread right as the page appeared (the "opens not smooth" jank).
@@ -576,26 +805,6 @@ export default function ProductList() {
      the fold), then pump the rest in small idle slices. Unmounted sections
      keep their <section id> and reserved height so the category jump-nav
      and scroll position stay correct. */
-  const [mountedSections, setMountedSections] = useState(2);
-  const totalSectionsRef = useRef(0);
-  useEffect(() => {
-    if (loading) return;
-    let alive = true;
-    const pump = () => {
-      if (!alive) return;
-      setMountedSections((m) => {
-        if (m >= totalSectionsRef.current) return m;
-        const next = m + 2;
-        if (next < totalSectionsRef.current) {
-          const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-          if (idle) idle(pump, { timeout: 150 }); else setTimeout(pump, 120);
-        }
-        return next;
-      });
-    };
-    const t = setTimeout(pump, 50);
-    return () => { alive = false; clearTimeout(t); };
-  }, [loading]);
 
 
   /* Highlight matched substring inside a suggestion label. */
@@ -686,7 +895,9 @@ export default function ProductList() {
   };
 
   const categoryTree = useMemo<CategoryGroup[]>(() => {
-    if (filtered.length === 0) return [];
+    /* Grid-only: the list branch renders `filtered` directly, so building the
+       tree there was pure waste on every keystroke. */
+    if (viewMode !== "grid" || filtered.length === 0) return [];
     // Build product index: cat -> sub -> ProductRow[]
     const catBuckets: Record<string, Record<string, ProductRow[]>> = {};
     for (const p of filtered) {
@@ -696,24 +907,15 @@ export default function ProductList() {
       if (!catBuckets[c][s]) catBuckets[c][s] = [];
       catBuckets[c][s].push(p);
     }
-    const catOrder = categories.map(c => c.slug);
-    const subOrder = subcategories.map(s => s.slug);
-    const catSlugs = Object.keys(catBuckets).sort((a, b) => {
-      const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
-      if (ai === -1 && bi === -1) return 0;
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
+    /* Rank maps: the comparators used to call indexOf() on every comparison,
+       re-scanning the taxonomy arrays O(n log n) times per filter change. */
+    const catRank = new Map(categories.map((c, i) => [c.slug, i]));
+    const subRank = new Map(subcategories.map((x, i) => [x.slug, i]));
+    const rank = (m: Map<string, number>, k: string) => m.get(k) ?? Number.MAX_SAFE_INTEGER;
+    const catSlugs = Object.keys(catBuckets).sort((a, b) => rank(catRank, a) - rank(catRank, b));
     return catSlugs.map(catSlug => {
       const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? t("list.uncategorized", "Uncategorized") : catSlug);
-      const subSlugs = Object.keys(catBuckets[catSlug]).sort((a, b) => {
-        const ai = subOrder.indexOf(a); const bi = subOrder.indexOf(b);
-        if (ai === -1 && bi === -1) return 0;
-        if (ai === -1) return 1;
-        if (bi === -1) return -1;
-        return ai - bi;
-      });
+      const subSlugs = Object.keys(catBuckets[catSlug]).sort((a, b) => rank(subRank, a) - rank(subRank, b));
       const subSections = subSlugs.map(subSlug => ({
         slug: subSlug,
         name: subMap[subSlug] || (subSlug === "_uncategorized" ? t("list.other", "Other") : subSlug),
@@ -724,7 +926,7 @@ export default function ProductList() {
       const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
       return { slug: catSlug, name: displayName, total, subSections };
     });
-  }, [filtered, categories, subcategories, subMap, catNameBySlug]);
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode]);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
@@ -743,18 +945,30 @@ export default function ProductList() {
      with a system dialog that clashes with the hub's dark theme. */
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const askDelete = (e: React.MouseEvent, id: string, name: string) => {
+  const askDelete = useCallback((e: React.MouseEvent, id: string, name: string) => {
     e.preventDefault();
     e.stopPropagation();
     setDeleteTarget({ id, name });
-  };
+  }, []);
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const { id } = deleteTarget;
     setDeleteTarget(null);
     const ok = await deleteProduct(id);
-    if (ok) setProducts(prev => prev.filter(p => p.id !== id));
+    if (!ok) return;
+    setProducts((prev) => {
+      const next = prev.filter((x) => x.id !== id);
+      /* Keep the warm caches in step — otherwise the next visit paints the
+         deleted product from localStorage and it vanishes when the network
+         lands. */
+      queryClient.setQueryData(productsQK, next);
+      try {
+        const json = JSON.stringify(next);
+        if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+      } catch { /* quota guard */ }
+      return next;
+    });
   };
 
   const selectClass = "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]";
@@ -1326,32 +1540,16 @@ export default function ProductList() {
             )}
 
           <div className="space-y-14">
-          {(totalSectionsRef.current = categoryTree.length) && null}
-          {categoryTree.map((cat, catIdx) => (
-            catIdx >= mountedSections ? (
-              /* Deferred section: anchor id + ESTIMATED height (matches the
-                 real section within ~10%) so nothing jumps when it mounts,
-                 plus a light skeleton so the gap reads as loading. */
-              <section
-                key={cat.slug}
-                id={`cat-${cat.slug}`}
-                className="scroll-mt-32"
-                style={{ height: 210 + Math.ceil(cat.total / 4) * 396 }}
-                aria-busy="true"
-              >
-                <div className="h-9 w-56 rounded-xl bg-[var(--bg-inverted)]/[0.04] mb-7 animate-pulse" />
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-                  {[0,1,2,3].map((i) => (
-                    <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.03] aspect-[4/3] animate-pulse" />
-                  ))}
-                </div>
-              </section>
-            ) : (
+          {categoryTree.map((cat) => (
+            /* Every section renders; content-visibility:auto skips the paint +
+               layout of the offscreen ones. This replaced a progressive-mount
+               scheme whose reserved-height placeholders collapsed to real size
+               on mount and drove cold CLS to ~1.0 (measured). */
             <section
               key={cat.slug}
               id={`cat-${cat.slug}`}
-              style={{ contentVisibility: "auto", containIntrinsicSize: "1px 800px" }}
-              className={`scroll-mt-32 ${catIdx >= 2 ? "kx-section-in" : ""}`}
+              style={SECTION_CV}
+              className="scroll-mt-32"
             >
               {/* ── CATEGORY headline — minimal & monochrome: icon in a clean
                   bordered tile, title, count on the right, then a hairline that
@@ -1393,193 +1591,29 @@ export default function ProductList() {
                     <span className="flex-1 h-px bg-[var(--border-subtle)] ml-1" />
                   </header>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-            {section.products.map((p) => {
-              const imgUrl = mainImages[p.id];
-              const models = modelCounts[p.id] || 0;
-              const suppliers = productSuppliers[p.id] || [];
-              const lvl = levelColors[p.level || ""] || "";
-
-              return (
-                <div
-                  key={p.id}
-                  {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-                  className="group relative kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
-                >
-                  {/* Stretched navigation link — covers the whole card and
-                      is the ONLY card-level anchor, so the edit/delete actions
-                      below are siblings (not nested <a>) → no hydration error. */}
-                  <Link
-                    href={`${baseRoute}/${p.slug || p.id}`}
-                    aria-label={p.product_name}
-                    className="absolute inset-0 z-0"
-                  />
-                  {/* Image — calm, clean. Background matches the
-                      card surface so transparent product photos
-                      blend in (no white box around the photo).
-                      No scale on hover — the card lifts, image
-                      stays put. */}
-                  <div className="relative aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
-                    {imgUrl ? (
-                      /* IMG.card = CDN-downscaled 480px render. The raw
-                         URL here was the original multi-MB upload — the
-                         whole grid was pulling full-size photos for
-                         thumbnail-sized cells, which is why images took
-                         forever to appear. */
-                      <img
-                        src={IMG.card(imgUrl)}
-                        alt={p.product_name}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-contain p-4"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageRawIcon className="h-10 w-10 text-gray-300" />
-                      </div>
-                    )}
-
-                    {/* Badges overlay */}
-                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
-                      {p.featured && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-                          <StarIcon className="h-2.5 w-2.5" /> {t("list.featured", "Featured")}
-                        </span>
-                      )}
-                      {p.level && (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider border backdrop-blur-sm ${lvl}`}>
-                          {p.level}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Actions (show on hover) — internal only.
-                        Edit is a real <Link> (with prefetch), wrapped
-                        in stopPropagation so the click doesn't also
-                        trigger the parent card's product-detail Link.
-                        Delete stays a <button> since it opens a modal. */}
-                    {isInternal && (
-                    /* GEN-7 — edit/delete were hover-only, so on touch devices
-                       (no :hover) the card had no visible edit option. Show the
-                       actions by default on small screens and keep the clean
-                       hover-reveal on desktop (md+). */
-                    <div className="absolute bottom-2.5 right-2.5 z-10 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
-                      <Link
-                        href={`${baseRoute}/${p.id}/edit`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                        title={t("card.editProduct")}
-                      >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </Link>
-                      <button
-                        onClick={(e) => askDelete(e, p.id, p.product_name)}
-                        className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
-                        title={t("card.deleteProduct")}
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-3.5 md:p-4">
-                    {(() => {
-                      const mn = primaryModelNames[p.id];
-                      const hasDistinctName = mn && mn !== p.product_name;
-                      if (hasDistinctName) {
-                        // Catalog layout — code first as the heading,
-                        // descriptive name as the subtitle below.
-                        return (
-                          <>
-                            <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
-                              {mn}
-                            </h3>
-                            <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug">
-                              {p.product_name}
-                            </p>
-                          </>
-                        );
-                      }
-                      // No descriptive name yet — show the model code
-                      // as the title and a small "Needs name" pill to
-                      // flag it for the admin.
-                      return (
-                        <>
-                          <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
-                            {p.product_name}
-                          </h3>
-                          {isInternal && (
-                            <p className="mt-0.5 text-[10px] font-medium text-amber-400/80">
-                              {t("list.needsName", "Needs name")}
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-
-                    {/* Category + Subcategory line.
-                        Subcategory shown as a chip after the category
-                        so admins can spot at a glance whether a
-                        product is in lockstitch / overlock / etc.
-                        without opening it. */}
-                    <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1.5">
-                      <LayersIcon className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{catMap[p.category_slug] || p.category_slug}</span>
-                      {p.subcategory_slug && subMap[p.subcategory_slug] && (
-                        <>
-                          <span className="text-[var(--text-ghost)]">·</span>
-                          <span className="truncate text-[var(--text-muted)]">{subMap[p.subcategory_slug]}</span>
-                        </>
-                      )}
-                    </p>
-
-                    {/* Division label — only for non-flagship products.
-                        Garment Machinery is the default/home line and
-                        gets a clean card; anything else gets tagged so
-                        it's clear at a glance which line it belongs to. */}
-                    {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
-                      <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 uppercase tracking-wider truncate">
-                        {divMap[p.division_slug]}
-                      </p>
-                    )}
-
-                    {/* Meta row — publish status, brand, models. */}
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {(() => {
-                        const st = (p.status || "draft");
-                        return (
-                          <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
-                            {t(`status.${st}`, st)}
-                          </StatusPill>
-                        );
-                      })()}
-                      {p.brand && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-                          <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-                        <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}
-                      </span>
-                    </div>
-
-                    {/* Supplier — internal only */}
-                    {isInternal && suppliers.length > 0 && (
-                      <p className="text-[10px] text-[var(--text-ghost)] mt-2 truncate">
-                        {suppliers.join(", ")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {section.products.map((p) => (
+              <ProductCard
+                key={p.id}
+                p={p}
+                imgUrl={mainImages[p.id]}
+                models={modelCounts[p.id] || 0}
+                suppliers={productSuppliers[p.id] || EMPTY_SUPPLIERS}
+                lvl={levelColors[p.level || ""] || ""}
+                baseRoute={baseRoute}
+                isInternal={isInternal}
+                catMap={catMap}
+                subMap={subMap}
+                divMap={divMap}
+                primaryModelNames={primaryModelNames}
+                t={t}
+                onAskDelete={askDelete}
+              />
+            ))}
               </div>
                 </div>
               ))}
               </div>
             </section>
-            )
           ))}
           </div>
           </>

@@ -1,6 +1,7 @@
 "use client";
 
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import dynamic from "next/dynamic";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
@@ -21,7 +22,7 @@ import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
 import SelectWithCreate from "./SelectWithCreate";
-import BarcodeQRDisplay from "./BarcodeQRDisplay";
+const BarcodeQRDisplay = dynamic(() => import("./BarcodeQRDisplay"), { ssr: false, loading: () => null });
 import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {

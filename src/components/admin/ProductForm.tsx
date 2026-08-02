@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { localizedName } from "@/lib/i18n-name";
@@ -91,7 +92,10 @@ import CertificationsSection from "./form-sections/CertificationsSection";
 import ProductDocumentsSection from "./form-sections/ProductDocumentsSection";
 import CreateCategoryModal from "./form-sections/CreateCategoryModal";
 import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
-import CreateSupplierModal from "./form-sections/CreateSupplierModal";
+/* Lazy: this modal imports country-state-city, whose city.json is 7.7 MB.
+   Statically imported it rode in the editor chunk for every product open,
+   even though the modal is closed. Now it downloads on first use only. */
+const CreateSupplierModal = dynamic(() => import("./form-sections/CreateSupplierModal"), { ssr: false });
 import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import RichTextEditor from "./form-sections/RichTextEditor";
@@ -107,7 +111,8 @@ import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
-import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
+/* Lazy: pulls jsbarcode + qrcode, only needed once a model code exists. */
+const BarcodeQRDisplay = dynamic(() => import("./form-sections/BarcodeQRDisplay"), { ssr: false, loading: () => null });
 import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { slugify } from "@/types/product-form";
@@ -752,6 +757,9 @@ export default function ProductForm({ productId }: Props) {
       if (Array.isArray(d.translations)) setTranslations(d.translations);
       if (Array.isArray(d.prices)) setPrices(d.prices);
       if (Array.isArray(d.related)) setRelated(d.related);
+      if (Array.isArray(d.productSuppliers)) setProductSuppliers(d.productSuppliers);
+      if (Array.isArray(d.certifications)) setCertifications(d.certifications);
+      if (Array.isArray(d.productDocuments)) setProductDocuments(d.productDocuments);
       if (d.sewingSpecs) setSewingSpecs(d.sewingSpecs);
       setDirty(true);
       setDraftMeta(null);
@@ -878,7 +886,7 @@ export default function ProductForm({ productId }: Props) {
         if (!p) { setError("Product not found"); return; }
 
         const modelIds = dbModels.map(m => m.id);
-        const dbPrices = await fetchMarketPricesByModelIds(modelIds);
+        const dbPrices = await guard(fetchMarketPricesByModelIds(modelIds), [] as Awaited<ReturnType<typeof fetchMarketPricesByModelIds>>);
 
         setProduct({
           division_slug: p.division_slug,
@@ -1266,15 +1274,17 @@ export default function ProductForm({ productId }: Props) {
      freight/customs, not machine specs. Split the resolved schema so the Specs
      editor shows everything EXCEPT those groups, and the Logistics tab renders
      ONLY those groups. Both write to the same product.schema_specs. */
-  const specsTabSchema = activeSpecsSchema
+  /* Memoised: a fresh object each render gave SchemaSpecsSection a new
+     `schema` identity on every keystroke, re-running its own derivations
+     and re-rendering the whole section. */
+  const specsTabSchema = useMemo(() => (activeSpecsSchema
     ? { ...activeSpecsSchema, groups: activeSpecsSchema.groups.filter((g) => g.formTab !== "logistics") }
-    : null;
-  const logisticsSchemaGroups = activeSpecsSchema
-    ? activeSpecsSchema.groups.filter((g) => g.formTab === "logistics")
-    : [];
-  const logisticsTabSchema = activeSpecsSchema && logisticsSchemaGroups.length
-    ? { ...activeSpecsSchema, groups: logisticsSchemaGroups }
-    : null;
+    : null), [activeSpecsSchema]);
+  const logisticsTabSchema = useMemo(() => {
+    if (!activeSpecsSchema) return null;
+    const groups = activeSpecsSchema.groups.filter((g) => g.formTab === "logistics");
+    return groups.length ? { ...activeSpecsSchema, groups } : null;
+  }, [activeSpecsSchema]);
   const schemaCoveredCols = computeSchemaCoveredColumns(activeSpecsSchema);
   /* The legacy Technical block, Purchase Options + Fulfillment sub-sections are
      hidden when the active schema already covers their fields (no double entry).
@@ -1351,6 +1361,9 @@ export default function ProductForm({ productId }: Props) {
     const ti = i >= 0 ? i : 0;
     const link = productSuppliers[ti];
     if (link && (link.unit_cost_cny == null || link.unit_cost_cny === "")) {
+      /* Setup migration, not a user edit — credit the dirty watcher twice
+         (one per watched-state write) so the form doesn't open "Unsaved". */
+      programmaticChangesRef.current += 2;
       setProductSuppliers((prev) => prev.map((s, idx) => (idx === ti ? { ...s, unit_cost_cny: cp } : s)));
       updatePrimaryModel({ cost_price: "" });
     }
@@ -1708,6 +1721,8 @@ export default function ProductForm({ productId }: Props) {
     /* Mirror the suggestion into model_name + slug too so the hero
        "Primary Model" input — bound to primary_model with a model_name
        fallback — picks it up regardless of how the form loaded. */
+    /* Auto-derived code, not a user edit — see above. */
+    programmaticChangesRef.current += 1;
     updatePrimaryModel({
       primary_model: suggestedPrimaryModel,
       model_name: primaryModel.model_name || suggestedPrimaryModel,
@@ -5277,7 +5292,7 @@ export default function ProductForm({ productId }: Props) {
         existingCount={subcategories.length}
       />
 
-      <CreateSupplierModal
+      {showSupplierModal && <CreateSupplierModal
         open={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}
         onCreated={(supplier) => {
@@ -5286,7 +5301,7 @@ export default function ProductForm({ productId }: Props) {
             setModels(prev => prev.map(m => m._tempId === supplierTarget ? { ...m, supplier: supplier.name } : m));
           }
         }}
-      />
+      />}
 
       <CreateBrandModal
         open={showBrandModal}
