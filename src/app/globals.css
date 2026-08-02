@@ -954,3 +954,19 @@ input[type="number"]:not(.kx-spinner) {
 /* Progressive-mount polish: sections fade in instead of popping. */
 @keyframes kx-section-in { from { opacity: 0; } to { opacity: 1; } }
 .kx-section-in { animation: kx-section-in 0.3s ease both; }
+
+/* Inner steel glow variant — the Home-tile inset glow, as an overlay so
+   it reads over opaque children (product photo wells) too. Opt-in via
+   .kx-glow-in next to .kx-hover-card. */
+.kx-hover-card.kx-glow-in::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 26px rgba(86, 127, 178, 0.32);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 2;
+}
+.kx-hover-card.kx-glow-in:hover::before { opacity: 1; }

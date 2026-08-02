@@ -1396,7 +1396,7 @@ export default function ProductList() {
                 <div
                   key={p.id}
                   {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-                  className="group relative kx-hover-card bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+                  className="group relative kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
                 >
                   {/* Stretched navigation link — covers the whole card and
                       is the ONLY card-level anchor, so the edit/delete actions
