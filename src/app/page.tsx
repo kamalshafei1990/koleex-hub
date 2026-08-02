@@ -1146,11 +1146,13 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
         </p>
       )}
       {wasFailure && (
-        <div className="mt-3 flex items-center justify-center gap-2">
+        <div className="mt-4 flex items-center justify-center gap-2">
+          {/* Elected primary (R-2) — the old emerald chip predated the
+              element election and matched nothing in the system. */}
           {isAuth ? (
             <a
               href="/login"
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Sign in again
             </a>
@@ -1158,7 +1160,7 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Retry
             </button>
