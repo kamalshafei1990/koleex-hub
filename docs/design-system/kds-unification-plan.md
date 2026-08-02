@@ -237,9 +237,22 @@ variant `danger`.
 | Filter chip | **FC-1** — h-7 focus-border pill + round × | `kds/FilterChip` (new) |
 | Pagination | **PG-1** — Prev / Page N of M / Next | `kds/Pagination` (new) |
 
-FINAL open ballots: **UP** (dropzone) · **AC** (collapsible section) ·
-**RD** (descriptive choice rows). Number stepper: family does not exist
-in the repo — no ballot. Ballot page: `/kds-lab/elements`.
+### ELECTION ROUND 4 RESULTS — ELECTION COMPLETE 🏁 (owner, 2026-08-02)
+
+| Family | Winner | Canonical |
+|---|---|---|
+| Dropzone | **UP-1** — dashed token panel, icon tile, focus-border drag state | `kds/Dropzone` (new) |
+| Collapsible section | **AC-2** — tinted header strip + icon chip + collapsed preview | `kds/CollapsibleSection` (new) |
+| Choice rows | **RD-2** (delegated RD-2/RD-4) — iOS checkmark rows, reserved check slot | `kds/ChoiceRows` (new) |
+
+Number stepper: family does not exist in the repo — no ballot needed.
+
+**EVERY element family now has one owner-elected canon.** The kit in
+`src/components/kds/` is the single source; `/kds-lab/elements` is the
+permanent visual registry (all green). What remains is EXECUTION:
+element-first conformance sweeps replacing every local look-alike with
+the elected component — sweep order awaits owner sign-off (this
+supersedes the app-first wave order of §4).
 
 ---
 

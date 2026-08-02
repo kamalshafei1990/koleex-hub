@@ -902,8 +902,8 @@ function PaginationBallot() {
 
 function Dropzones() {
   return (
-    <Family id="uploads" title="File Upload / Dropzone — OPEN BALLOT" note="pick ONE dashed language (UP-…); tiles/rows/chips will follow it">
-      <Variant vid="UP-1" apps="ProductForm media · HR · Database (~12 sites)" count="dashed panel, token hover" wide>
+    <Family id="uploads" title="File Upload / Dropzone" note="winner: UP-1" elected>
+      <Variant vid="UP-1" apps="ProductForm media · HR · Database (~12 sites)" count="dashed panel, token hover" wide elected>
         <div className="w-full max-w-md border border-dashed rounded-xl py-8 text-center cursor-pointer transition-all border-[var(--border-subtle)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30">
           <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-2 flex items-center justify-center"><PlusIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>
           <p className="text-[11px] font-medium text-[var(--text-dim)]">Drop files here or click to upload</p>
@@ -931,7 +931,7 @@ function Accordions() {
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" className={`text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
   );
   return (
-    <Family id="accordions" title="Collapsible Section — OPEN BALLOT" note="pick ONE (AC-…)">
+    <Family id="accordions" title="Collapsible Section" note="winner: AC-2" elected>
       <Variant vid="AC-1" apps="ProductForm (19 sections) · To-do" count="card + icon tile + border-t body" wide>
         <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
           <button onClick={() => setA1(!a1)} className="w-full flex items-center gap-3 px-6 py-4 hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
@@ -943,7 +943,7 @@ function Accordions() {
           {a1 && <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)]">Section body…</div>}
         </div>
       </Variant>
-      <Variant vid="AC-2" apps="Suppliers · Employees · Contacts (~15 sections)" count="tinted header strip + preview" wide>
+      <Variant vid="AC-2" apps="Suppliers · Employees · Contacts (~15 sections)" count="tinted header strip + preview" wide elected>
         <div className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
           <button onClick={() => setA2(!a2)} className={`flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/30 px-5 py-3 text-start cursor-pointer hover:bg-[var(--bg-surface-subtle)]/60 transition-colors ${a2 ? "border-b border-[var(--border-subtle)]" : ""}`}>
             <span className="flex items-center gap-3 min-w-0">
@@ -977,8 +977,8 @@ function ChoiceRows() {
   const [r2, setR2] = useState(0);
   const [r3, setR3] = useState(0);
   return (
-    <Family id="choices" title="Choice Rows (single-select with descriptions) — OPEN BALLOT" note="segmented pills already elected (E-SEG); this is for descriptive options — pick ONE (RD-…)">
-      <Variant vid="RD-2" apps="Settings sounds" count="iOS checkmark row, no chrome">
+    <Family id="choices" title="Choice Rows (single-select with descriptions)" note="winner: RD-2 (delegated between RD-2/RD-4)" elected>
+      <Variant vid="RD-2" apps="Settings sounds" count="iOS checkmark row, no chrome" elected>
         <div className="w-full max-w-sm rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2">
           {["Chime", "Pulse"].map((l, i) => (
             <button key={l} onClick={() => setR1(i)} className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${i === 0 ? "border-b border-[var(--border-faint)]" : ""}`}>
@@ -1021,7 +1021,7 @@ export default function ElementElection() {
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
         Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
-        Rounds 1-3 elected (see green). FINAL open ballots: UP (dropzone) · AC (collapsible section) · RD (choice rows). Number stepper: none exists — no ballot.
+        🏁 ELECTION COMPLETE — every element family has one elected canon (green). Next: element-first conformance sweeps.
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·
