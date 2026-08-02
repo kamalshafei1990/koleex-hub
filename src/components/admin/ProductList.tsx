@@ -1311,13 +1311,14 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+                      className="group flex flex-col items-center justify-center gap-1.5 shrink-0 h-[64px] px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all"
                     >
-                      {classIcons.category?.[cat.slug] && (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-3.5 w-3.5 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors" />
+                      {classIcons.category?.[cat.slug] ? (
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-[18px] w-[18px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+                      ) : (
+                        <LayoutGridIcon className="h-[18px] w-[18px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
                       )}
-                      <span>{cat.name}</span>
-                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
+                      <span className="text-[10.5px] font-medium whitespace-nowrap text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors">{cat.name}</span>
                     </a>
                   ))}
                 </div>
