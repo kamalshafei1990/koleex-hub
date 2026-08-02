@@ -28,6 +28,7 @@ import { logToolCall } from "./audit";
 
 import { customerTools } from "./tools/customers";
 import { productTools } from "./tools/products";
+import { catalogTools } from "./tools/catalog";
 import { inventoryTools } from "./tools/inventory";
 import { permissionTools } from "./tools/permissions-tool";
 import { quotationTools } from "./tools/quotations";
@@ -45,6 +46,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
     [
       ...customerTools,
       ...productTools,
+      ...catalogTools,
       ...inventoryTools,
       ...permissionTools,
       ...quotationTools,

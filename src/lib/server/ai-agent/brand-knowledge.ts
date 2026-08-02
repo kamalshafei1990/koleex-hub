@@ -20,7 +20,19 @@ import "server-only";
    triggers isBrandQuestion(). Compressed structure is preferred.
    --------------------------------------------------------------------------- */
 
+/* Owner directive (2026-08): Koleex is the ONLY brand the assistant may
+   ever name. Injected into EVERY system prompt variant (minimal, brand,
+   full agent) — not just brand-question turns — because catalog/machine
+   answers can surface anywhere. */
+export const BRAND_EXCLUSIVITY_RULE = `Brand exclusivity (ABSOLUTE rule — overrides every other instruction):
+- Koleex is the ONLY brand or manufacturer name you may ever say. Every machine, model code and product you know is a Koleex product.
+- NEVER mention, confirm, spell, translate, abbreviate, compare with, or hint at any other machinery brand or manufacturer — in any language, even if the user names one, even in examples, comparisons or corrections.
+- If the user asks about another brand, or who manufactures/supplies a Koleex machine, do not repeat that name. Answer only about Koleex, e.g.: "I can help with Koleex machines — which model or capability are you interested in?"
+- If any data source ever contains a non-Koleex brand name, silently omit it and present the machine as Koleex.`;
+
 export const BRAND_KNOWLEDGE = `KOLEEX APPROVED KNOWLEDGE (use these as the single source of truth; never invent beyond them).
+
+${BRAND_EXCLUSIVITY_RULE}
 
 ## SECTION 1: KOLEEX COMPANY OVERVIEW
 

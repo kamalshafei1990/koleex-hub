@@ -531,18 +531,20 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   }
 
   return (
-    <div ref={flowRef} className="space-y-16 md:space-y-24 pb-20">
+    <div ref={flowRef} className="space-y-20 md:space-y-36 pb-24">
       {/* ═══ 0. POSTER HEADER (optional) ═══
           When an admin uploads a designed poster/banner, it leads the page
           full-bleed with an overlaid identity block + CTA — the "shop window".
           A subtle bottom scrim keeps the text legible over any image. When no
           poster is set, the auto-composed cinematic hero below takes over. */}
       {posterUrl ? (
-        <div data-reveal className="space-y-7">
+        <div data-reveal data-cascade className="space-y-10 md:space-y-14">
           {/* The poster is the photo, nothing else (owner rule): no scrim, no
               overlaid copy. Identity + CTA live in their own block below it,
               where they are readable regardless of what the image shows. */}
-          <section className="relative w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] aspect-[21/9] bg-[var(--bg-secondary)]">
+          {/* Full-bleed cinematic hero — escapes the page gutter like an
+              Apple product film; edge-to-edge, no frame. */}
+          <section className="relative -mx-4 md:-mx-6 lg:-mx-8 h-[52vh] md:h-[72vh] overflow-hidden bg-[var(--bg-secondary)]">
             {heroVideoUrl ? (
               /* The product film IS the hero: autoplaying, silent, looping —
                  still photo-only per the owner rule (no overlaid copy). */
@@ -579,7 +581,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
             ) : null}
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-semibold tracking-[-0.025em] text-[var(--text-primary)] leading-[1.02]">
+            <h1 className="text-4xl md:text-7xl lg:text-8xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] leading-[1.0]">
               {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
             {displayTagline ? (
@@ -865,11 +867,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           .map(({ field: f }) => `${displayScalar(values[f.key])}${f.unit ? " " + f.unit : ""}`);
         if (metrics.length < 2) return null;
         return (
-          <section className="mx-auto max-w-4xl space-y-6 text-center">
+          <section data-cascade className="mx-auto max-w-5xl space-y-6 text-center">
             <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
               {t("preview.eyebrowPerformance", "Performance")}
             </div>
-            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-7xl font-semibold tracking-[-0.02em] leading-[1.08] text-transparent">
+            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-8xl font-semibold tracking-[-0.025em] leading-[1.05] text-transparent">
               {metrics.join(". ")}.
             </p>
             {asKnowledgeList(firstKb("technical_advantages")?.content)[0] ? (
@@ -885,9 +887,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           copy column + full-bleed shot). Headline = the tagline split at
           its dash; body = the overview knowledge block. ═══ */}
       {firstKb("overview") ? (
-        <section className="space-y-8">
+        <section data-cascade className="space-y-10">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-12">
-            <h2 className="md:col-span-5 text-4xl md:text-[3.2rem] font-semibold tracking-[-0.02em] leading-[1.08] text-[var(--text-primary)]">
+            <h2 className="md:col-span-5 text-4xl md:text-[3.6rem] font-semibold tracking-[-0.025em] leading-[1.06] text-[var(--text-primary)]">
               {(displayTagline || displayName)
                 .split("—")
                 .map((part) => part.trim())
@@ -1100,9 +1102,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         const shot = (galleryUrls ?? []).filter((u) => u.includes("/products/details/")).slice(-1)[0];
         if (!shot) return null;
         return (
-          <section className="overflow-hidden rounded-[28px]">
+          <section className="-mx-4 md:-mx-6 lg:-mx-8 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shot} alt={displayName} className="aspect-[16/9] md:aspect-[21/9] w-full object-cover" />
+            <img src={shot} alt={displayName} className="h-[46vh] md:h-[64vh] w-full object-cover" />
           </section>
         );
       })()}

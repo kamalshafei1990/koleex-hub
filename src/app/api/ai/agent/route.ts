@@ -414,9 +414,11 @@ export async function POST(req: Request) {
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
 
-          const canFastPath = fastPathKey && (
-            isBrand || isSmall || (!isBusinessData && !isWorkData)
-          );
+          /* Data queries ALWAYS win over the tool-less fast lanes: a
+             question can read as a brand question AND a catalog/data
+             question ("which overlock models does Koleex have?") — the
+             tool loop must answer those from real data, not prose. */
+          const canFastPath = fastPathKey && !isBusinessData && !isWorkData;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";

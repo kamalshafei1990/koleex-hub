@@ -25,7 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { brandKnowledgeFor } from "./brand-knowledge";
+import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
@@ -410,6 +410,21 @@ function isBusinessDataQuery(msg: string): boolean {
   if (/\bkoleex\s+(product|customer|invoice|quotation|order|inventory|sales|data)/.test(s))
     return true;
 
+  /* Machine-catalog questions → tool loop (searchCatalog /
+     listCatalogFamilies). A Koleex model code alone is a strong
+     signal ("tell me about XSL-8000A4"); so is any mention of the
+     catalog or a machine-family + machine/model pairing. */
+  if (/\bX(?:F|CC?|SL|SO|SI|SS|SE|SH|SU|A|PL?|PS|R)-[A-Z0-9]/i.test(msg)) return true;
+  if (/\b(catalog|catalogue)\b/.test(s)) return true;
+  if (
+    /\b(overlock|lockstitch|interlock|coverstitch|bartack\w*|buttonhol\w*|zigzag|spreading|fusing|blind\s*stitch|multi-?needle|heat\s*press|embroidery|cutting|hemming|inspection|relaxing|shrinking)\s+(machine|machines|model|models|series|unit|units)\b/.test(
+      s,
+    )
+  )
+    return true;
+  if (/الكتالوج|كتالوج|موديلات|ماكينات|ماكينة/.test(msg)) return true;
+  if (/目录|型号|机器|机型/.test(msg)) return true;
+
   /* Arabic business terms. */
   if (
     /عملاء|عميل|زبون|زبائن|منتج|منتجات|مخزون|فاتورة|فواتير|عرض\s*سعر|عروض\s*أسعار|طلب|طلبات|مورد|موردين/.test(
@@ -527,9 +542,15 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      - Small-talk → fast-path prompt with MINIMAL system text (no
        brand knowledge, no tool routing). Short + fast answers.
      - Everything else → full tool-calling loop. */
-  const brandSection = classifyBrandSection(userMessage);
+  /* Data queries always outrank the tool-less fast paths: a message
+     can read as a brand question AND a catalog/data question ("which
+     overlock models does Koleex have?") — those must run the tool
+     loop and answer from real data, not brand prose. */
+  const isDataQuery =
+    isBusinessDataQuery(userMessage) || isWorkDataQuery(userMessage);
+  const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";
-  const isSmall = isSmallTalk(userMessage);
+  const isSmall = !isDataQuery && isSmallTalk(userMessage);
   const useFastPath = isBrand || isSmall;
   /* Three-way choice:
       · small-talk → minimal prompt (no brand, no agent rules)
@@ -964,6 +985,8 @@ Style:
 - Give substantive answers. For questions, a couple of paragraphs or a short list is usually right — explain context, give examples, anticipate follow-up. For small talk, a few natural sentences that invite more conversation work well.
 - Don't pad for length, but don't clip to one sentence either. Treat each question as worth a real answer.
 
+${BRAND_EXCLUSIVITY_RULE}
+
 Current user: ${ctx.auth.username}.`;
 }
 
@@ -1153,6 +1176,8 @@ function buildSystemPrompt(
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
 
+${BRAND_EXCLUSIVITY_RULE}
+
 ${nowBlock}
 
 ${ENTITY_GUIDANCE_FULL}
@@ -1177,6 +1202,7 @@ Answer style & FORMATTING (the chat renders full Markdown — USE IT like ChatGP
 Tool routing:
 - "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
 - "what brands / categories / families exist" → getCatalogStats.
+- Official catalog / machine-family / model-code questions ("what machines does Koleex make", "tell me about XSL-8000A4", "which overlock models are in the catalog", "what page is X on") → searchCatalog(query=...) or listCatalogFamilies. These cover ALL 544 Koleex Catalog 2025 models — richer than the products DB for machine-family questions. Every entry is a Koleex machine.
 - "list products" / "show products" / "what products do we have" → searchProducts with NO query (empty args). Do NOT pass the literal word "products" as the query.
 - "find / search products about Y" → searchProducts(query=Y).
 - "find customer Z" → getCustomerByName / getCustomerByCode.
@@ -2375,7 +2401,8 @@ async function orchestrateNoGroq(
     `Reply concisely in the user's language (${userLang ?? "en"}). ` +
     "You currently do NOT have access to the company's live data (tool calls are disabled). " +
     "Be helpful for general questions and conversational turns. If asked to look up live data, " +
-    "explain that the tool-calling layer needs a Groq API key and offer to help with anything else.";
+    "explain that the tool-calling layer needs a Groq API key and offer to help with anything else. " +
+    BRAND_EXCLUSIVITY_RULE;
 
   /* Trim history to the last few turns so the wire payload stays
      small — matches the Groq path which also caps history. */
