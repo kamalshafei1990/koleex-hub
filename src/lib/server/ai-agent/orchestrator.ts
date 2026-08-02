@@ -417,7 +417,7 @@ function isBusinessDataQuery(msg: string): boolean {
   if (/\bX(?:F|CC?|SL|SO|SI|SS|SE|SH|SU|A|PL?|PS|R)-[A-Z0-9]/i.test(msg)) return true;
   if (/\b(catalog|catalogue)\b/.test(s)) return true;
   if (
-    /\b(overlock|lockstitch|interlock|coverstitch|bartack\w*|buttonhol\w*|zigzag|spreading|fusing|blind\s*stitch|multi-?needle|heat\s*press|embroidery|cutting|hemming|inspection|relaxing|shrinking)\s+(machine|machines|model|models|series|unit|units)\b/.test(
+    /\b(overlock|lockstitch|interlock|coverstitch|bartack\w*|buttonhol\w*|zigzag|spreading|fusing|blind\s*stitch|multi-?needle|heat\s*press|embroidery|cutting|hemming|inspection|relaxing|shrinking|sewing)\s+(machine|machines|model|models|series|unit|units)\b/.test(
       s,
     )
   )
@@ -1203,6 +1203,7 @@ Tool routing:
 - "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
 - "what brands / categories / families exist" → getCatalogStats.
 - Official catalog / machine-family / model-code questions ("what machines does Koleex make", "tell me about XSL-8000A4", "which overlock models are in the catalog", "what page is X on") → searchCatalog(query=...) or listCatalogFamilies. These cover ALL 544 Koleex Catalog 2025 models — richer than the products DB for machine-family questions. Every entry is a Koleex machine.
+- HOW-machines-WORK questions (functions, features, technologies, typical specs, "what does a spreading machine do", "difference between lockstitch and chainstitch", "what should I look for in a cutting machine") → searchMachineKnowledge(query=...). It returns generic machine-type engineering knowledge; combine with searchCatalog when the user also wants concrete Koleex models. Never attribute this knowledge to any manufacturer.
 - "list products" / "show products" / "what products do we have" → searchProducts with NO query (empty args). Do NOT pass the literal word "products" as the query.
 - "find / search products about Y" → searchProducts(query=Y).
 - "find customer Z" → getCustomerByName / getCustomerByCode.
