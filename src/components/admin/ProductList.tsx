@@ -1298,7 +1298,10 @@ export default function ProductList() {
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
-                <div className="flex items-center gap-0.5">
+                {/* Boxed chips (owner, 2026-08-02): bordered mini-tiles with
+                    the category's hub icon + name — secondary-button language
+                    instead of the old ghost text links. */}
+                <div className="flex items-center gap-2">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -1308,10 +1311,13 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                     >
+                      {classIcons.category?.[cat.slug] && (
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-3.5 w-3.5 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors" />
+                      )}
                       <span>{cat.name}</span>
-                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]">{cat.total}</span>
+                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
                     </a>
                   ))}
                 </div>
