@@ -1834,54 +1834,6 @@ function DraftCard({ payload }: { payload: QuotationDraftPayload }) {
   );
 }
 
-/* ── Agent step chip ──
-   Renders one tool-call or tool-result as a small pill above the
-   assistant bubble. Colour-coded by permission status so a denied or
-   limited call is visually obvious (users deserve to see WHY data is
-   missing). Clicking/hovering reveals sources + filtered fields. */
-function AgentStepChip({ step }: {
-  step: {
-    kind: string;
-    text?: string;
-    tool?: string;
-    permissionStatus?: "allowed" | "limited" | "denied" | "approval_required";
-    sources?: string[];
-    filteredFields?: string[];
-  };
-}) {
-  const status = step.permissionStatus;
-  const colour =
-    status === "denied"          ? "border-rose-500/40   text-rose-300 bg-rose-500/10" :
-    status === "limited"         ? "border-amber-500/40  text-amber-200 bg-amber-500/10" :
-    status === "approval_required" ? "border-sky-500/40  text-sky-200  bg-sky-500/10" :
-                                     "border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]/60";
-  const icon =
-    step.kind === "tool-call"   ? "🔍" :
-    step.kind === "tool-result" ? (status === "limited" ? "⚠️" : "📋") :
-    step.kind === "denied"      ? "🔒" :
-                                  "•";
-  const label = step.text ?? step.tool ?? step.kind;
-  const sourcesTitle = [
-    step.sources && step.sources.length
-      ? `Sources: ${step.sources.join(", ")}`
-      : null,
-    step.filteredFields && step.filteredFields.length
-      ? `Hidden fields: ${step.filteredFields.join(", ")}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <span
-      title={sourcesTitle || undefined}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border backdrop-blur-md ${colour}`}
-    >
-      <span className="text-[12px] leading-none">{icon}</span>
-      <span className="truncate max-w-[260px]">{label}</span>
-    </span>
-  );
-}
-
 /* ── Bubble ── */
 
 /** Arabic / Persian / Hebrew scripts → force RTL direction + slightly
@@ -1936,9 +1888,6 @@ function Bubble({
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
   const steps = msg.steps ?? [];
-  const hasToolSteps = !isUser && steps.some((s) =>
-    s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied",
-  );
   const [copied, setCopied] = useState(false);
   const handleCopyClick = useCallback(async () => {
     if (!onCopy || !msg.content) return;
@@ -2006,18 +1955,10 @@ function Bubble({
         <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
-        {/* Tool-call / tool-result chips render ABOVE the final assistant
-            text so the user can see WHAT Koleex AI looked up before
-            reading the answer. Permission status drives the colour. */}
-        {hasToolSteps && (
-          <div className="flex flex-wrap gap-1.5">
-            {steps
-              .filter((s) => s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied")
-              .map((s, i) => (
-                <AgentStepChip key={i} step={s} />
-              ))}
-          </div>
-        )}
+        {/* Tool-step chips are NOT rendered (owner directive 2026-08-03:
+            "just give the answer direct"). The steps still exist on the
+            message — the orb's activity label uses the latest tool-call,
+            and the quotation DraftCard below still surfaces its result. */}
         {draftStep && (
           <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
         )}
