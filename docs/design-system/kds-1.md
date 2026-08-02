@@ -51,6 +51,17 @@ Modal, StatusPill, ProgressBar, SearchInput, Toggle, Slider, Checkbox,
 Tabs, Pagination, Tooltip, Dropdown are forbidden (validator-enforced,
 legacy allowlist shrinks per wave).
 
+**Owner-elected canon (2026-08-02, see unification plan §6b):**
+search = Products toolbar card + Hub-Blue-ring input · tabs = pill-in-shell
+(TAB-1) · segmented = Calendar inset p-1 · buttons = kds/Button
+(primary R-2 h-10 rounded-xl shadow · secondary/ghost/icon tiers from
+E-BTN) · pill = kds/StatusPill (PILL-1) · bar = kds/ProgressBar (PB-2) ·
+checkbox = kds/Checkbox (CB-3) · empty = kds/EmptyState (ES-3 dashed) ·
+section header = kds/SectionHeader (SH-3) · form field = EmployeeForm
+h-10 rounded-xl bg-primary (E-FIELD) · KPI = Customers stat card (E-KPI) ·
+cards = Documents action / Database data (E-CARD) · list row = Discuss
+(E-ROW). Danger button ballot still open.
+
 ## 7. Non-negotiables carried over
 Custom SVG icons only (no lucide) · icons from General Icons Library ·
 KOLEEX wordmark untouchable · 2D only · fit-the-screen (wide desktop,

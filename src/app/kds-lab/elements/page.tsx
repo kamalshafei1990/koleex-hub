@@ -188,11 +188,11 @@ function Elected() {
 
 function BtnRunoff() {
   return (
-    <Family id="btn-runoff" title="Primary button — RUNOFF" note="you approved BOTH shapes; the sweep needs ONE — pick R-1 or R-2">
+    <Family id="btn-runoff" title="Primary button" note="winner: R-2" elected>
       <Variant vid="R-1" apps="ui/Button primitive — your 'New Quotation' pick" count="h-9 · rounded-md · 12.5px">
         <button className="inline-flex shrink-0 items-center justify-center whitespace-nowrap font-semibold transition-all duration-150 bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 h-9 px-3.5 text-[12.5px] gap-1.5 rounded-md"><PlusIcon className="h-3 w-3" />New Quotation</button>
       </Variant>
-      <Variant vid="R-2" apps="Products 'Add Product' hero style (~27 sites)" count="h-10 · rounded-xl · 13px — matches your rounded-xl secondaries">
+      <Variant vid="R-2" apps="Products 'Add Product' hero style (~27 sites)" count="h-10 · rounded-xl · 13px" elected>
         <button className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"><PlusIcon className="h-4 w-4" />Add Product</button>
       </Variant>
     </Family>
@@ -203,8 +203,8 @@ function BtnRunoff() {
 
 function Pills() {
   return (
-    <Family id="pills" title="Status Pill / Badge" note="66 local implementations — pick ONE shape">
-      <Variant vid="PILL-1" apps="KDS kit v0 (Products list)" count="fixed 22px height, rounded-full">
+    <Family id="pills" title="Status Pill / Badge" note="winner: PILL-1" elected>
+      <Variant vid="PILL-1" apps="KDS kit (Products list)" count="fixed 22px height, rounded-full" elected>
         <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35">ACTIVE</span>
         <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35">DRAFT</span>
         <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35">ARCHIVED</span>
@@ -239,13 +239,13 @@ function Bar({ track, fill, w }: { track: string; fill: string; w: number }) {
 
 function ProgressBars() {
   return (
-    <Family id="bars" title="Progress Bar" note="77 bars — fill is Hub Blue by law; pick the SHAPE">
+    <Family id="bars" title="Progress Bar" note="winner: PB-2" elected>
       <Variant vid="PB-1" apps="KDS kit v0" count="gradient fill, RTL-correct">
         <div className="relative h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-visible" style={{ width: 220 }}>
           <div className="absolute inset-y-0 start-0 rounded-full bg-gradient-to-r from-[#567FB2] to-[#7FA9D6]" style={{ width: "62%" }} />
         </div>
       </Variant>
-      <Variant vid="PB-2" apps="Projects · Reports · Planning (12 files)" count="surface track, solid fill — most used">
+      <Variant vid="PB-2" apps="Projects · Reports · Planning (12 files)" count="surface track, solid fill — most used" elected>
         <Bar track="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden" fill="h-full rounded-full bg-[#567FB2] transition-all" w={62} />
       </Variant>
       <Variant vid="PB-4" apps="Database quality scores" count="threshold-colored ramp">
@@ -265,14 +265,14 @@ function Checkboxes() {
   const [c3, setC3] = useState(true);
   const [c4, setC4] = useState(true);
   return (
-    <Family id="checkboxes" title="Checkbox" note="29 implementations — pick ONE">
+    <Family id="checkboxes" title="Checkbox" note="winner: CB-3" elected>
       <Variant vid="CB-1" apps="Contacts · Suppliers · Projects (~22 sites)" count="native, accent only">
         <label className="inline-flex items-center gap-2 text-[13px]"><input type="checkbox" defaultChecked className="accent-[var(--bg-inverted)]" />Include archived</label>
       </Variant>
       <Variant vid="CB-2" apps="Roles · Calendar · HR · CRM (~17 sites)" count="native 16px, bordered, semantic accent">
         <label className="inline-flex items-center gap-2 text-[13px]"><input type="checkbox" defaultChecked className="h-4 w-4 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-emerald-500 cursor-pointer" />Can view</label>
       </Variant>
-      <Variant vid="CB-3" apps="To-do · Calendar pickers" count="custom square, inverted mono fill">
+      <Variant vid="CB-3" apps="To-do · Calendar pickers" count="custom square, inverted mono fill" elected>
         <button onClick={() => setC1(!c1)} className="inline-flex items-center gap-2 text-[13px] text-[var(--text-primary)]">
           <span className={`h-4 w-4 rounded-[5px] border flex items-center justify-center shrink-0 ${c1 ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--bg-primary)]" : "border-[var(--border-strong)] text-transparent"}`}><CheckIcon className="h-3 w-3" /></span>
           Assign to me
@@ -300,7 +300,7 @@ function Checkboxes() {
 
 function EmptyStates() {
   return (
-    <Family id="empty" title="Empty State" note="pick ONE anatomy">
+    <Family id="empty" title="Empty State" note="winner: ES-3" elected>
       <Variant vid="ES-1" apps="Products · Employees · CRM · Roles" count="boxed p-16 card + CTA">
         <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-10 text-center">
           <UsersIcon size={40} className="text-[var(--text-barely)] mx-auto mb-4" />
@@ -316,7 +316,7 @@ function EmptyStates() {
           <p className="text-[12px] text-[var(--text-dim)]">Requests you submit will appear here</p>
         </div>
       </Variant>
-      <Variant vid="ES-3" apps="Database · Translator · Finance (14 modules)" count="dashed 'waiting slot'">
+      <Variant vid="ES-3" apps="Database · Translator · Finance (14 modules)" count="dashed 'waiting slot'" elected>
         <div className="w-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-10 text-center">
           <LayoutGridIcon className="h-7 w-7 text-[var(--text-dim)]" />
           <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">No collections yet</p>
@@ -336,7 +336,7 @@ function EmptyStates() {
 
 function SectionHeaders() {
   return (
-    <Family id="sections" title="Section Header" note="pick ONE per role (page section vs form section)">
+    <Family id="sections" title="Section Header" note="winner: SH-3" elected>
       <Variant vid="SH-1" apps="Home · Discuss · KDS kit" count="uppercase eyebrow + hairline" wide>
         <div className="w-full flex items-center gap-2.5">
           <span className="text-[11px] font-semibold tracking-[1px] uppercase text-[var(--text-ghost)]">Data systems</span>
@@ -350,7 +350,7 @@ function SectionHeaders() {
           <span className="flex-1 h-px bg-[var(--border-subtle)] ml-1" />
         </div>
       </Variant>
-      <Variant vid="SH-3" apps="Employees · ProductForm · Suppliers (form sections)" count="icon chip + title + desc + rule" wide>
+      <Variant vid="SH-3" apps="Employees · ProductForm · Suppliers (form sections)" count="icon chip + title + desc + rule" wide elected>
         <div className="w-full flex items-start gap-3 pb-4 border-b border-[var(--border-faint)]">
           <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><UsersIcon size={16} /></div>
           <div className="min-w-0">
@@ -369,6 +369,22 @@ function SectionHeaders() {
   );
 }
 
+function DangerBallot() {
+  return (
+    <Family id="danger" title="Danger / Delete button — OPEN BALLOT" note="pick ONE — D-1, D-2 or D-3">
+      <Variant vid="D-1" apps="Products · Catalogs · Database delete-confirms (~13 sites)" count="tinted red, matches R-2 box">
+        <button className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all">Delete product</button>
+      </Variant>
+      <Variant vid="D-2" apps="Employees · HR (~18 sites)" count="solid saturated red">
+        <button className="h-9 px-4 rounded-lg bg-red-500 text-white text-[12.5px] font-semibold flex items-center gap-2 hover:bg-red-600 transition-colors">Delete employee</button>
+      </Variant>
+      <Variant vid="D-3" apps="Projects · Notes · To-do row actions" count="ghost — transparent until hover">
+        <button className="h-9 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5 transition-colors">Remove</button>
+      </Variant>
+    </Family>
+  );
+}
+
 /* ═══════════════ page ═══════════════ */
 
 export default function ElementElection() {
@@ -376,14 +392,15 @@ export default function ElementElection() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] px-6 md:px-10 py-10 max-w-[1200px] mx-auto">
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
-        Green = designs you already approved (now canon). Below them: the families still waiting
-        for a pick — reply with the winning ids (e.g. &quot;R-2, PILL-2, PB-2, CB-3, ES-2, SH-3&quot;).
+        Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
+        Open ballot below: DANGER button — reply with one id (e.g. &quot;D-1&quot;).
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·
         modal backdrop dim+blur · hover ring physics · PageHeader anatomy.
       </p>
       <Elected />
+      <DangerBallot />
       <BtnRunoff />
       <Pills />
       <ProgressBars />

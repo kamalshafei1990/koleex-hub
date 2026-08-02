@@ -197,8 +197,21 @@ this is element design only, per the owner's framing.
 | E-ROW | List row `px-3 py-2.5 rounded-xl hover:bg-surface-hover` + 40px avatar + name/meta/preview grid | Discuss sidebar |
 | E-HEADER | PageHeader anatomy incl. back button `h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl` | Documents header |
 
-Ballot page: `/kds-lab/elements` (green = elected). Still OPEN: R (primary
-button runoff) · PILL · PB · CB · ES · SH.
+### ELECTION ROUND 1 RESULTS (owner, 2026-08-02)
+
+| Family | Winner | Canonical component |
+|---|---|---|
+| Primary button | **R-2** — h-10 px-5 rounded-xl bg-inverted 13px semibold shadow-lg | `kds/Button` variant `primary` |
+| Status pill | **PILL-1** — h-[22px] rounded-full border, hex tones 12%/35% | `kds/StatusPill` (unchanged) |
+| Progress bar | **PB-2** — surface track + solid Hub-Blue fill, both rounded-full | `kds/ProgressBar` (reshaped) |
+| Checkbox | **CB-3** — 16px rounded-[5px], inverted mono fill + CheckIcon | `kds/Checkbox` (new) |
+| Empty state | **ES-3** — dashed rounded-2xl surface-subtle slot | `kds/EmptyState` (new) |
+| Section header | **SH-3** — icon chip + bold title + desc + border-b | `kds/SectionHeader` (reshaped) |
+
+`kds/Button` also carries the elected secondary/ghost/icon tiers from the
+E-BTN picks. Ballot page: `/kds-lab/elements` (green = elected). Still
+OPEN: **D** (danger button). Next ballots to prepare: modal/dialog shell,
+table/list-row anatomy, toast.
 
 ---
 
