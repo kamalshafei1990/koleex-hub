@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
 /* POST /api/ai/product-copy — AI-drafted marketing copy for the product form.
@@ -105,6 +106,10 @@ function parseJson(reply: string): { value?: string; values?: string[] } | null 
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   let body: { field?: Field; context?: Ctx };
   try {

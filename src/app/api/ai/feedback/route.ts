@@ -19,6 +19,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 
 type Payload = { message_id?: unknown; value?: unknown };
 
@@ -29,6 +30,10 @@ function asString(v: unknown): string | null {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   let body: Payload;
   try { body = (await req.json()) as Payload; }

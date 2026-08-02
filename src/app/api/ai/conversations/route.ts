@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 
 /* GET  /api/ai/conversations — list caller's conversations (most-recent first)
    POST /api/ai/conversations — create a new empty conversation */
@@ -10,6 +11,10 @@ import { requireAuth } from "@/lib/server/auth";
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const { data, error } = await supabaseServer
     .from("ai_conversations")
@@ -24,6 +29,10 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const body = (await req.json().catch(() => ({}))) as { title?: string };
   const { data, error } = await supabaseServer

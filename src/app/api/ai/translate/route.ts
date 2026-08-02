@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiTranslate, aiProviderConfigured, isTranslatableLang } from "@/lib/server/ai-provider";
 
 /* POST /api/ai/translate
@@ -93,6 +94,10 @@ async function translateOne(
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const body = (await req.json()) as {
     text?: string;

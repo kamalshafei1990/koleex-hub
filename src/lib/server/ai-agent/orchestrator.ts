@@ -25,7 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_DIALECT_RULE } from "./brand-knowledge";
+import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_DIALECT_RULE, DATA_PROTECTION_RULE } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
@@ -996,6 +996,8 @@ Style:
 ${BRAND_EXCLUSIVITY_RULE}
 
 ${DIRECT_VOICE_RULE}
+
+${DATA_PROTECTION_RULE}
 ${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 Current user: ${ctx.auth.username}.`;
 }
@@ -1190,6 +1192,8 @@ function buildSystemPrompt(
 ${BRAND_EXCLUSIVITY_RULE}
 
 ${DIRECT_VOICE_RULE}
+
+${DATA_PROTECTION_RULE}
 ${opts.dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 ${nowBlock}
 
@@ -2445,7 +2449,7 @@ async function orchestrateNoGroq(
     "You currently do NOT have access to the company's live data (tool calls are disabled). " +
     "Be helpful for general questions and conversational turns. If asked to look up live data, " +
     "explain that the tool-calling layer needs a Groq API key and offer to help with anything else. " +
-    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE;
+    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE;
 
   /* Trim history to the last few turns so the wire payload stays
      small — matches the Groq path which also caps history. */

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 
 /* GET    /api/ai/conversations/:id — conversation + ordered messages
    PATCH  /api/ai/conversations/:id — rename
@@ -13,6 +14,10 @@ type RouteCtx = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   const { id } = await params;
 
   const [cvRes, msgRes] = await Promise.all([
@@ -40,6 +45,10 @@ export async function GET(_req: Request, { params }: RouteCtx) {
 export async function PATCH(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   const { id } = await params;
   const body = (await req.json()) as { title?: string };
   if (!body.title?.trim()) {
@@ -60,6 +69,10 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
 export async function DELETE(_req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   const { id } = await params;
   const { error } = await supabaseServer
     .from("ai_conversations")

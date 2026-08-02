@@ -29,6 +29,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import {
   orchestrate,
@@ -153,6 +154,10 @@ export async function POST(req: Request) {
   const auth = await requireAuth();
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const body = (await req.json().catch(() => ({}))) as {
     conversationId?: string;

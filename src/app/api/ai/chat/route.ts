@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
 import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
@@ -123,6 +124,10 @@ export async function POST(req: Request) {
   const auth = await requireAuth();
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const body = (await req.json()) as {
     messages?: ChatMessage[];
