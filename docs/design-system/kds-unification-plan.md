@@ -210,10 +210,25 @@ this is element design only, per the owner's framing.
 
 `kds/Button` also carries the elected secondary/ghost/icon tiers from the
 E-BTN picks. **D-1 elected** (danger = tinted red, primary's box) → `kds/Button`
-variant `danger`. Ballot page: `/kds-lab/elements` (green = elected).
-Round 2 ballots in preparation: modal/dialog shell · drawer · confirm ·
-data table · list row · toast · dropdown menu · tooltip · popover ·
-skeleton/spinner · avatar · date picker · filter chip.
+variant `danger`.
+
+### ELECTION ROUND 2 RESULTS (owner, 2026-08-02)
+
+| Family | Winner | Canonical component |
+|---|---|---|
+| Modal shell | **MD-4** — chromeless padded card (rounded-2xl bg-surface p-5, no header/footer rules) | `kds/Modal` (new) |
+| Delete confirm | **CF-1** — compact hairline card, rose-tint confirm | `kds/ConfirmDialog` (new) |
+| Drawer | **DR-1** — eyebrow header, sectioned footer | `kds/Drawer` (new) |
+| Data table | **TBL-6** — sticky sentence-case 13px header, hairline rows | `kds/Table` + `Th`/`Td`/`ROW` (new) |
+| List row | **ROW-4** — full-bleed row + 3px Hub-Blue selection bar (accent = Hub Blue, not legacy #0066FF) | pattern (docs) |
+| Toast | **TS-2** — semantic tinted glass, bottom-center | `kds/Toast` (new) |
+| Dropdown/combobox | **MN-4** — rounded-lg bg-secondary listbox, full-bleed rows | `kds/MenuList` + `MenuItem` (new) |
+| Avatar fallback | **AV-3** — inverted solid mono initials | `kds/Avatar` (new) |
+| Date picker | **DP-1** — custom themed calendar (ui/DatePicker); internal style = DPS ballot pending | `ui/DatePicker` → kds later |
+
+Ballot page: `/kds-lab/elements`. Still OPEN: **DPS** (calendar internal
+style) · **TP** (tooltip) · **SK/SP** (loading language) · **FC**
+(filter chip).
 
 ---
 

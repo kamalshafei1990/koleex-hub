@@ -387,11 +387,11 @@ function DangerBallot() {
 
 function Toasts() {
   return (
-    <Family id="toasts" title="Toast / Notification — OPEN BALLOT" note="no shared toast exists; every app hand-rolls — pick ONE (TS-…)">
+    <Family id="toasts" title="Toast / Notification" note="winner: TS-2" elected>
       <Variant vid="TS-1" apps="Roles · Management · Discuss · PWA (4 sites)" count="inverted solid pill — de-facto house style">
         <div className="px-4 py-2.5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium shadow-lg flex items-center gap-2"><CheckIcon className="h-3.5 w-3.5" /> Saved successfully</div>
       </Variant>
-      <Variant vid="TS-2" apps="Inbox · Commercial Policy" count="semantic tinted glass">
+      <Variant vid="TS-2" apps="Inbox · Commercial Policy" count="semantic tinted glass" elected>
         <div className="px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"><CheckIcon className="h-3.5 w-3.5" /> Request approved</div>
         <div className="px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 bg-red-500/15 border-red-500/30 text-red-300">Failed to save</div>
       </Variant>
@@ -412,7 +412,7 @@ function Toasts() {
 
 function Menus() {
   return (
-    <Family id="menus" title="Dropdown / Context Menu — OPEN BALLOT" note="~60 floating menus, 4 recipes — pick ONE (MN-…)">
+    <Family id="menus" title="Dropdown / Context Menu" note="winner: MN-4" elected>
       <Variant vid="MN-1" apps="Discuss right-click menus" count="padded shell, rounded item pills">
         <div className="min-w-[220px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5">
           <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]">Pin conversation</button>
@@ -429,7 +429,7 @@ function Menus() {
           <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left">Revoke access</button>
         </div>
       </Variant>
-      <Variant vid="MN-4" apps="Contacts · ProductForm · Notes… (~45 sites)" count="combobox listbox — highest volume">
+      <Variant vid="MN-4" apps="Contacts · ProductForm · Notes… (~45 sites)" count="combobox listbox — highest volume" elected>
         <div className="w-64 max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {["Juki Corporation", "Jack Sewing Machine", "Brother Industries"].map((x, i) => (
             <button key={x} className={`w-full text-left px-3 py-2 text-[13px] transition-colors ${i === 0 ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"}`}>{x}</button>
@@ -462,7 +462,7 @@ function Tooltips() {
 
 function Modals() {
   return (
-    <Family id="modals" title="Modal Shell — OPEN BALLOT" note="94 hand-rolled overlays — pick ONE shell (MD-…); backdrop dim+blur is already law">
+    <Family id="modals" title="Modal Shell" note="winner: MD-4" elected>
       <Variant vid="MD-1" apps="Products form modals · Purchase · global dialog host (9 files)" count="px-6 chrome, 16px bold, ruled header+footer">
         <div className="w-full max-w-sm bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col overflow-hidden">
           <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-subtle)]">
@@ -489,7 +489,7 @@ function Modals() {
           </div>
         </div>
       </Variant>
-      <Variant vid="MD-4" apps="Suppliers · HR · Employees · Quotations (~14 files)" count="chromeless padded card, no rules">
+      <Variant vid="MD-4" apps="Suppliers · HR · Employees · Quotations (~14 files)" count="chromeless padded card, no rules" elected>
         <div className="w-full max-w-sm space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
           <p className="text-[14px] font-semibold text-[var(--text-primary)]">Log negotiation round</p>
           <p className="text-[13px] text-[var(--text-muted)]">Body content…</p>
@@ -517,8 +517,8 @@ function Modals() {
 
 function Confirms() {
   return (
-    <Family id="confirms" title="Delete Confirm — OPEN BALLOT" note="pick ONE (CF-…); delete button itself = elected D-1 tint">
-      <Variant vid="CF-1" apps="Expenses · Finance orders" count="compact hairline, no header bar">
+    <Family id="confirms" title="Delete Confirm" note="winner: CF-1" elected>
+      <Variant vid="CF-1" apps="Expenses · Finance orders" count="compact hairline, no header bar" elected>
         <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden">
           <div className="px-4 py-3.5">
             <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">Delete this expense?</p>
@@ -558,8 +558,8 @@ function Confirms() {
 
 function Drawers() {
   return (
-    <Family id="drawers" title="Drawer / Side Panel — OPEN BALLOT" note="pick ONE (DR-…)">
-      <Variant vid="DR-1" apps="Approvals · Payments · Attachments" count="eyebrow header, sectioned footer">
+    <Family id="drawers" title="Drawer / Side Panel" note="winner: DR-1" elected>
+      <Variant vid="DR-1" apps="Approvals · Payments · Attachments" count="eyebrow header, sectioned footer" elected>
         <div className="w-full max-w-sm h-64 flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-primary)] rounded-xl overflow-hidden">
           <div className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
             <div className="flex-1"><p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">Payment review</p><p className="mt-0.5 truncate text-[14px] font-medium text-[var(--text-primary)]">PO-2231 · Juki</p></div>
@@ -605,7 +605,7 @@ const TROWS = [
 
 function Tables() {
   return (
-    <Family id="tables" title="Data Table — OPEN BALLOT" note="6 recipes, 4 row heights, 8 hover tokens — pick ONE (TBL-…)">
+    <Family id="tables" title="Data Table" note="winner: TBL-6" elected>
       <Variant vid="TBL-1" apps="Inventory · Finance · Purchase (16 tables)" count="ERP micro-table — house default" wide>
         <div className="w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
           <table className="min-w-full text-[12.5px]">
@@ -645,7 +645,7 @@ function Tables() {
           </table>
         </div>
       </Variant>
-      <Variant vid="TBL-6" apps="Customers · Suppliers server lists" count="sticky sentence-case header, no hover" wide>
+      <Variant vid="TBL-6" apps="Customers · Suppliers server lists" count="sticky sentence-case header" wide elected>
         <div className="w-full" style={{ overflowX: "auto", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>{["SKU", "Item", "Qty", "Status"].map((h) => (
@@ -664,7 +664,7 @@ function Tables() {
 
 function ListRows() {
   return (
-    <Family id="rows" title="List Row (non-table) — OPEN BALLOT" note="pick ONE (ROW-…); Discuss chat row is already elected separately">
+    <Family id="rows" title="List Row (non-table)" note="winner: ROW-4" elected>
       <Variant vid="ROW-1" apps="Purchase + Sales + Invoices (14 files)" count="grid row in divide-y card — dominant" wide>
         <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)] overflow-hidden">
           {TROWS.map((r) => (
@@ -693,7 +693,7 @@ function ListRows() {
           </div>
         </div>
       </Variant>
-      <Variant vid="ROW-4" apps="Notes · Inbox sidebars" count="full-bleed + 3px selection bar" wide>
+      <Variant vid="ROW-4" apps="Notes · Inbox sidebars" count="full-bleed + 3px selection bar" wide elected>
         <div className="w-full max-w-sm bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden">
           <div className="relative px-4 py-3 border-b border-[var(--border-faint)] bg-[#567FB2]/[0.10]">
             <span className="absolute inset-y-0 start-0 w-[3px] bg-[#567FB2]" />
@@ -751,7 +751,7 @@ function Avatars() {
     <div className={cls} style={{ width: 40, height: 40, fontSize: 14, ...style }}>{ch}</div>
   );
   return (
-    <Family id="avatars" title="Avatar Fallback — OPEN BALLOT" note="photo is always round; pick the INITIALS fallback (AV-…)">
+    <Family id="avatars" title="Avatar Fallback" note="winner: AV-3" elected>
       <Variant vid="AV-1" apps="Discuss (9 sites)" count="neutral gradient + white initials">
         <A cls="rounded-full bg-gradient-to-br from-neutral-400 to-neutral-500 flex items-center justify-center text-white font-semibold" ch="KE" />
         <A cls="rounded-full bg-gradient-to-br from-neutral-300 to-neutral-600 flex items-center justify-center text-white font-semibold" ch="XZ" />
@@ -760,7 +760,7 @@ function Avatars() {
         <A cls="rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] font-semibold" ch="KE" />
         <A cls="rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] font-semibold" ch="AL" />
       </Variant>
-      <Variant vid="AV-3" apps="Header user chip · CRM owner" count="inverted solid mono">
+      <Variant vid="AV-3" apps="Header user chip · CRM owner" count="inverted solid mono" elected>
         <A cls="rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center font-semibold" ch="KE" />
       </Variant>
       <Variant vid="AV-4" apps="Inbox · Discuss thread · Customer chat" count="saturated hue gradients (off-brand)">
@@ -775,8 +775,8 @@ function Avatars() {
 function DatePickers() {
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
   return (
-    <Family id="datepicker" title="Date Picker — OPEN BALLOT" note="85 native date inputs vs 6 custom — pick ONE (DP-…)">
-      <Variant vid="DP-1" apps="To-do · HR Leave (custom DatePicker)" count="themed calendar, Today/Clear footer" wide>
+    <Family id="datepicker" title="Date Picker" note="winner: DP-1 custom — internal style ballot below (DPS)" elected>
+      <Variant vid="DP-1" apps="To-do · HR Leave (custom DatePicker)" count="themed calendar, Today/Clear footer" wide elected>
         <div className="flex flex-wrap gap-6 items-start">
           <button className="w-[220px] h-10 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[13px] flex items-center justify-between gap-2 text-start">
             <span className="text-[var(--text-primary)]">Aug 2, 2026</span>
@@ -829,6 +829,49 @@ function FilterChips() {
   );
 }
 
+function CalendarDemo({ sel, selCls, cellCls, shell }: { sel: number; selCls: string; cellCls: string; shell: string }) {
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  return (
+    <div className={`w-[264px] p-3 ${shell}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)]"><AngleLeftIcon className="h-3.5 w-3.5" /></span>
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">August 2026</span>
+        <span className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)]"><AngleRightIcon className="h-3.5 w-3.5" /></span>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 mb-0.5">{["S","M","T","W","T","F","S"].map((d, i) => <span key={i} className="h-6 flex items-center justify-center text-[10px] font-semibold text-[var(--text-ghost)] uppercase">{d}</span>)}</div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {days.map((d) => (
+          <span key={d} className={`h-8 text-[12px] font-medium flex items-center justify-center ${cellCls} ${d === sel ? selCls : d === 14 ? "text-[#7FA9D6] ring-1 ring-inset ring-[#567FB2]/40 " + cellCls : "text-[var(--text-primary)]"}`}>{d}</span>
+        ))}
+      </div>
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
+        <span className="text-[11px] font-semibold text-[#7FA9D6]">Today</span>
+        <span className="text-[11px] font-medium text-[var(--text-dim)]">Clear</span>
+      </div>
+    </div>
+  );
+}
+
+function DatePickerStyles() {
+  const shell = "rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]";
+  return (
+    <Family id="dps" title="Date Picker — internal style — OPEN BALLOT" note="you elected the custom calendar; now pick its LOOK (DPS-…) — day 2 = selected, day 14 = today">
+      <Variant vid="DPS-1" apps="current ui/DatePicker" count="Hub Blue square selection">
+        <CalendarDemo sel={2} selCls="bg-[#567FB2] text-white rounded-lg" cellCls="rounded-lg" shell={shell} />
+      </Variant>
+      <Variant vid="DPS-2" apps="proposal — matches your mono picks (CB-3/AV-3)" count="inverted mono circle selection">
+        <CalendarDemo sel={2} selCls="bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-full" cellCls="rounded-full" shell={shell} />
+      </Variant>
+      <Variant vid="DPS-3" apps="proposal" count="Hub Blue circle selection">
+        <CalendarDemo sel={2} selCls="bg-[#567FB2] text-white rounded-full" cellCls="rounded-full" shell={shell} />
+      </Variant>
+      <Variant vid="DPS-4" apps="proposal" count="Hub Blue gradient square + soft ring">
+        <CalendarDemo sel={2} selCls="bg-gradient-to-br from-[#567FB2] to-[#7FA9D6] text-white rounded-lg shadow-[0_0_0_3px_rgba(86,127,178,0.2)]" cellCls="rounded-lg" shell={shell} />
+      </Variant>
+    </Family>
+  );
+}
+
 /* ═══════════════ page ═══════════════ */
 
 export default function ElementElection() {
@@ -837,7 +880,7 @@ export default function ElementElection() {
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
         Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
-        D-1 danger elected. Next ballots (modals, tables, toasts, menus, loading, avatars) load here as they are harvested.
+        Round 2 elected: MD-4 · CF-1 · DR-1 · TBL-6 · ROW-4 · TS-2 · MN-4 · AV-3 · DP-1. Still open: DPS (calendar style) · TP · SK/SP · FC.
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·
@@ -853,6 +896,7 @@ export default function ElementElection() {
       <Loading />
       <Avatars />
       <DatePickers />
+      <DatePickerStyles />
       <FilterChips />
       <Toasts />
       <Menus />
