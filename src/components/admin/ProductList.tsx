@@ -805,8 +805,8 @@ export default function ProductList() {
             the user can refine the query without scrolling back up.
             z-30 sits above the category jump-nav (z-20) so the
             search row always wins when both stack. */}
-        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
-        <div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)] p-3.5 shadow-sm">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1 pb-2 mb-3 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
+        <div>
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
@@ -1131,7 +1131,7 @@ export default function ProductList() {
           </div>
         )}
         {orderedDivisions.length > 0 && (
-          <div className="mb-5">
+          <div className="mb-4">
             {/* Sliding-pill nav shell — matches the Database/app tab nav:
                 one bordered rounded-xl container, compact pills inside, the
                 active one filled. Divisions are client filters (buttons), so
@@ -1294,14 +1294,14 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-6 bg-[var(--bg-primary)]/95 backdrop-blur-xl overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Categories">
+              <nav className="sticky top-[52px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-1.5 mb-5 bg-[var(--bg-primary)]/95 backdrop-blur-xl" aria-label="Categories">
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
                 {/* Boxed chips (owner, 2026-08-02): bordered mini-tiles with
                     the category's hub icon + name — secondary-button language
                     instead of the old ghost text links. */}
-                <div className="flex items-center gap-2">
+                <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(100px,1fr))]">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -1311,7 +1311,7 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-col items-center justify-center gap-2 shrink-0 w-[108px] h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90" />
