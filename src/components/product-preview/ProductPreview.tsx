@@ -204,7 +204,7 @@ const SectionHead = ({
         {eyebrow}
       </div>
     ) : null}
-    <h3 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.05]">
+    <h3 className="text-4xl md:text-6xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.05]">
       {title}
     </h3>
   </div>
@@ -496,7 +496,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   }
 
   return (
-    <div className="space-y-12 md:space-y-16 pb-16">
+    <div className="space-y-16 md:space-y-24 pb-20">
       {/* ═══ 0. POSTER HEADER (optional) ═══
           When an admin uploads a designed poster/banner, it leads the page
           full-bleed with an overlaid identity block + CTA — the "shop window".
@@ -746,7 +746,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           ...asKnowledgeList(firstKb("selling_points")?.content),
           ...asKnowledgeList(firstKb("technical_advantages")?.content),
         ].slice(0, 5);
-        const imgs = [mainImageUrl, ...(galleryUrls ?? [])].filter(Boolean) as string[];
+        // Close-up detail shots lead the deck (they make the strongest
+        // cards); wide studio shots and the main render fill the rest.
+        const g = galleryUrls ?? [];
+        const detailShots = g.filter((u) => u.includes("/products/details/"));
+        const otherShots = g.filter((u) => !u.includes("/products/details/"));
+        const imgs = [...detailShots, ...otherShots, ...(mainImageUrl ? [mainImageUrl] : [])];
         if (points.length < 2) return null;
         return (
           <section className="space-y-8">
@@ -754,22 +759,25 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               {t("preview.getHighlights", "Get the highlights.")}
             </h2>
             <SnapCarousel>
-              {points.map((point, i) => (
-                <div
-                  key={i}
-                  className="flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:w-[520px]"
-                >
-                  <p className="p-7 md:p-9 text-lg md:text-[22px] font-semibold leading-snug text-[var(--text-primary)]">
-                    {point}
-                  </p>
-                  {imgs.length > 0 ? (
-                    <div className="mt-auto h-[220px] md:h-[280px]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imgs[i % imgs.length]} alt="" className="h-full w-full object-cover" />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+              {points.map((point, i) => {
+                const img = imgs.length > 0 ? imgs[i % imgs.length] : null;
+                return (
+                  <div
+                    key={i}
+                    className="relative h-[440px] md:h-[560px] w-[85%] shrink-0 snap-start overflow-hidden rounded-[28px] bg-[var(--bg-secondary)] sm:w-[560px]"
+                  >
+                    {img ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    ) : null}
+                    {/* top scrim keeps the claim readable over any shot */}
+                    <div className="absolute inset-x-0 top-0 h-2/5 bg-gradient-to-b from-black/70 to-transparent" />
+                    <p className="relative p-7 md:p-8 text-lg md:text-[22px] font-semibold leading-snug text-white">
+                      {point}
+                    </p>
+                  </div>
+                );
+              })}
             </SnapCarousel>
           </section>
         );
@@ -788,7 +796,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
               {t("preview.eyebrowPerformance", "Performance")}
             </div>
-            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-6xl font-semibold tracking-[-0.02em] leading-[1.1] text-transparent">
+            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-7xl font-semibold tracking-[-0.02em] leading-[1.08] text-transparent">
               {metrics.join(". ")}.
             </p>
             {asKnowledgeList(firstKb("technical_advantages")?.content)[0] ? (
@@ -1012,6 +1020,19 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           </div>
         </section>
       ) : null}
+
+      {/* ═══ FULL-BLEED DETAIL INTERLUDE — Apple-style giant close-up
+          breathing room between the story and the data. ═══ */}
+      {(() => {
+        const shot = (galleryUrls ?? []).filter((u) => u.includes("/products/details/")).slice(-1)[0];
+        if (!shot) return null;
+        return (
+          <section className="overflow-hidden rounded-[28px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={shot} alt={displayName} className="aspect-[16/9] md:aspect-[21/9] w-full object-cover" />
+          </section>
+        );
+      })()}
 
       {/* ═══ LAYER 3 — ADVANCED TECHNICAL DATA (progressive disclosure) ═══
           Primary groups open by default; standard/quiet collapsed so the
