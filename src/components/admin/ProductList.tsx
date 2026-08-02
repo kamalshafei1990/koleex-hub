@@ -721,7 +721,11 @@ export default function ProductList() {
     });
   }, [filtered, categories, subcategories, subMap, catNameBySlug]);
 
-  const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
+  /* The division is deliberately NOT counted here: it has its own
+     dedicated pill strip below the toolbar, so echoing it again in the
+     Filters badge + ACTIVE chips row + "Showing X" line made the page
+     top read three ways for one fact (owner: "too messy"). */
+  const activeFilterCount = [filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
 
   const clearAllFilters = () => {
     setFilterDiv(""); setFilterCat(""); setFilterSub(""); setFilterBrand("");
@@ -1075,7 +1079,6 @@ export default function ProductList() {
               {(() => {
                 const chips: { label: string; onClear: () => void }[] = [];
                 if (search) chips.push({ label: `"${search}"`, onClear: () => setSearch("") });
-                if (filterDiv) chips.push({ label: `${t("filter.division")}: ${divNameBySlug[filterDiv] || filterDiv}`, onClear: () => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); } });
                 if (filterCat) chips.push({ label: `${t("filter.category")}: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
                 if (filterSub) chips.push({ label: `${t("filter.subcategory")}: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
                 if (filterBrand) chips.push({ label: `${t("filter.brand")}: ${filterBrand}`, onClear: () => setFilterBrand("") });
@@ -1123,7 +1126,7 @@ export default function ProductList() {
           </div>
         )}
         {orderedDivisions.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-5">
             {/* Sliding-pill nav shell — matches the Database/app tab nav:
                 one bordered rounded-xl container, compact pills inside, the
                 active one filled. Divisions are client filters (buttons), so
@@ -1274,7 +1277,7 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2.5 mb-8 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)]/60 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Categories">
+              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-6 bg-[var(--bg-primary)]/95 backdrop-blur-xl overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Categories">
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
