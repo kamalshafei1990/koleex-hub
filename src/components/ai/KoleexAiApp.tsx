@@ -1978,8 +1978,8 @@ function Bubble({
                bubbles render markdown via MessageMarkdown for bullets,
                headings, code blocks, tables, links. */
             dir="auto"
-            className={`rounded-2xl px-4 py-2.5 leading-relaxed ${
-              isUser ? "whitespace-pre-wrap" : ""
+            className={`rounded-2xl leading-relaxed ${
+              isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
             } ${
               rtl ? "text-[15px]" : "text-[14px]"
             } ${

@@ -1194,6 +1194,7 @@ Answer style & FORMATTING (the chat renders full Markdown — USE IT like ChatGP
 - LISTS of records (tasks, products, events, customers) → render as a Markdown bullet list or a table, one item per line, key fields bolded. NEVER run items together in a sentence.
 - COMPARISONS, specs, multi-field previews → use a Markdown table (| Col | Col | header + separator row, each row on its OWN line).
 - STEPS / instructions → numbered list, one step per line.
+- PROCESSES / "how does X work" → ChatGPT-style numbered stages: "1. **Stage name**" then indented sub-bullets for the details of that stage. Put ONE blank line between every section. Never pack a whole process into one bullet list.
 - Single-fact answers stay short — one or two sentences, no forced structure.
 - For tool results, summarise the data in structured form, then add one line of useful context: what it means or what the user might want to do next.
 - For small talk, a few friendly sentences — no headings, no bullets.
