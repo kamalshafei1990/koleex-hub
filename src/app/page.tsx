@@ -380,7 +380,6 @@ const AIGreeter = memo(function AIGreeter({
   const [greet, setGreet] = useState(0);
   const [typed, setTyped] = useState("");
   const [introDone, setIntroDone] = useState(false);
-  const [celebrating, setCelebrating] = useState(false);
   const [quote, setQuote] = useState("");
   const [quoteTyped, setQuoteTyped] = useState("");
 
@@ -436,8 +435,6 @@ const AIGreeter = memo(function AIGreeter({
       } else {
         setIntroDone(true);
         setGreet((g) => g + 1);
-        setCelebrating(true);
-        stepTimer = setTimeout(() => setCelebrating(false), 1100);
       }
     };
     const startTimer = setTimeout(step, 550);
@@ -452,15 +449,11 @@ const AIGreeter = memo(function AIGreeter({
      pulses. Event-driven celebrate stays. */
 
   /* Page load enters plain idle — the old "surprised"→awakening mapping
-     fired the expanding ring + aura flash on EVERY Home visit (owner: no
-     flash). Typing still quickens the aura via "typing"→thinking. */
-  const orbState: OrbState = !introDone
-    ? typed.length === 0
-      ? "idle"
-      : "typing"
-    : celebrating
-      ? "celebrate"
-      : "idle";
+     fired the expanding ring + aura flash on EVERY Home visit, and the
+     end-of-greeting "celebrate" fired the success ring/settle pulse
+     (owner: no pulse on open, ever). Typing still quickens the aura via
+     "typing"→thinking. */
+  const orbState: OrbState = !introDone && typed.length > 0 ? "typing" : "idle";
 
   return (
     <>
