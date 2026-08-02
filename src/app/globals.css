@@ -970,3 +970,28 @@ input[type="number"]:not(.kx-spinner) {
   z-index: 2;
 }
 .kx-hover-card.kx-glow-in:hover::before { opacity: 1; }
+
+/* Hub-gradient icon/label hover — the Home tile "neon" language for
+   tiles OUTSIDE the Home page (masked hub icons + text labels).
+   .kx-neon-icon = ClassMonoIcon masked span (bg-current) — the hover
+   gradient shows through the mask. .kx-neon-svg = plain svg fallback.
+   .kx-neon-label = gradient-clipped text. */
+.kx-tile-neon .kx-neon-icon,
+.kx-tile-neon .kx-neon-svg,
+.kx-tile-neon .kx-neon-label { transition: color 0.2s ease, opacity 0.2s ease, filter 0.25s ease; }
+.kx-tile-neon:hover .kx-neon-icon {
+  background: linear-gradient(135deg, #567FB2, #7FA9D6, #BCD8F0) !important;
+  filter: drop-shadow(0 0 7px rgba(188, 216, 240, 0.45));
+  opacity: 1 !important;
+}
+.kx-tile-neon:hover .kx-neon-svg {
+  color: #7FA9D6;
+  filter: drop-shadow(0 0 7px rgba(188, 216, 240, 0.45));
+  opacity: 1 !important;
+}
+.kx-tile-neon:hover .kx-neon-label {
+  background: linear-gradient(135deg, #7FA9D6, #BCD8F0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

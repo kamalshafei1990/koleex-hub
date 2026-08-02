@@ -1311,14 +1311,14 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-col items-center justify-center gap-2 shrink-0 w-[108px] h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className="group relative flex flex-col items-center justify-center gap-2 shrink-0 w-[108px] h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       {classIcons.category?.[cat.slug] ? (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 group-hover:opacity-100 transition-opacity" />
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90" />
                       ) : (
-                        <LayoutGridIcon className="h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 group-hover:opacity-100 transition-opacity" />
+                        <LayoutGridIcon className="kx-neon-svg h-[22px] w-[22px] text-[var(--text-primary)] opacity-90" />
                       )}
-                      <span className="text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors line-clamp-2">{cat.name}</span>
+                      <span className="kx-neon-label text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] line-clamp-2">{cat.name}</span>
                     </a>
                   ))}
                 </div>
