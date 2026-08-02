@@ -1822,9 +1822,9 @@ function UtilizationView({
               {pct}%
             </span>
           </div>
-          <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+          <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
             <div
-              className={`h-full rounded-full ${pct > 100 ? "bg-red-500/80" : "bg-[var(--bg-inverted)]"}`}
+              className={`h-full rounded-full transition-all ${pct > 100 ? "bg-red-500/80" : "bg-[var(--bg-inverted)]"}`}
               style={{ width: `${Math.min(100, pct)}%` }}
             />
           </div>

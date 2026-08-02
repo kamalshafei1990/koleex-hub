@@ -103,7 +103,7 @@ export default function OverviewTab({ account }: Props) {
         </div>
         <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center gap-2 flex-wrap">
           {account.force_password_change && (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-amber-500/15 text-amber-300 border-amber-500/25">
+            <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35">
               {t("acc.overview.forcePasswordChange")}
             </span>
           )}
@@ -112,10 +112,10 @@ export default function OverviewTab({ account }: Props) {
             const state =
               account.password_state ??
               (account.has_password ? "ACTIVE" : "NO_PASSWORD");
-            const NEUTRAL = "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]";
-            const AMBER = "bg-amber-500/15 text-amber-300 border-amber-500/25";
-            const RED = "bg-red-500/15 text-red-300 border-red-500/25";
-            const GREEN = "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
+            const NEUTRAL = "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
+            const AMBER = "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
+            const RED = "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35";
+            const GREEN = "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35";
             const map: Record<string, { key: string; cls: string }> = {
               ACTIVE: { key: "acc.security.pwActive", cls: GREEN },
               TEMPORARY: { key: "acc.overview.tempPasswordSet", cls: AMBER },
@@ -126,7 +126,7 @@ export default function OverviewTab({ account }: Props) {
             };
             const m = map[state] ?? map.NO_PASSWORD;
             return (
-              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${m.cls}`}>
+              <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${m.cls}`}>
                 {t(m.key)}
               </span>
             );

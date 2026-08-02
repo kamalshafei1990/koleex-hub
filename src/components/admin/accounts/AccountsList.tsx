@@ -57,11 +57,11 @@ const selectClass =
   "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors";
 
 const statusColors: Record<AccountStatus, string> = {
-  invited:   "bg-sky-500/15 text-sky-300 border-sky-500/25",
-  active:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
-  pending:   "bg-amber-500/15 text-amber-400 border-amber-500/25",
-  inactive:  "bg-zinc-500/15 text-zinc-300 border-zinc-500/25",
-  suspended: "bg-red-500/15 text-red-300 border-red-500/25",
+  invited:   "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  active:    "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  pending:   "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  inactive:  "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  suspended: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 
 const levelColors: Record<CustomerLevel, string> = {
@@ -665,7 +665,7 @@ export default function AccountsList() {
                         </td>
                         <td className="px-3 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
+                            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${statusColors[a.status]}`}
                           >
                             {t(`acc.status.${a.status}`)}
                           </span>
@@ -767,7 +767,7 @@ export default function AccountsList() {
                         </div>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
+                            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${statusColors[a.status]}`}
                           >
                             {t(`acc.status.${a.status}`)}
                           </span>

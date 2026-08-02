@@ -1264,8 +1264,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                                 <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
                               </div>
                               <div className="mt-1.5 flex items-center gap-2">
-                                <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-                                  <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                                  <div className={`h-full rounded-full ${barCls} transition-all`} style={{ width: `${Math.max(3, pct)}%` }} />
                                 </div>
                                 <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
                               </div>
@@ -1277,8 +1277,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                                 <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
                               </div>
                               <div className="mt-1.5 flex items-center gap-2">
-                                <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-                                  <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                                  <div className={`h-full rounded-full ${barCls} transition-all`} style={{ width: `${Math.max(3, pct)}%` }} />
                                 </div>
                                 <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
                               </div>
@@ -1388,8 +1388,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                       {Math.round(heroPct)}<span className="text-base font-medium text-[var(--text-faint)]">/100</span>
                     </div>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-                    <div className={`h-full rounded-full ${heroToneFill}`} style={{ width: `${Math.max(4, Math.min(100, heroPct))}%` }} />
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                    <div className={`h-full rounded-full ${heroToneFill} transition-all`} style={{ width: `${Math.max(4, Math.min(100, heroPct))}%` }} />
                   </div>
                 </div>
 
@@ -1472,8 +1472,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                       {Math.round(score) || 0}<span className="text-base font-medium text-[var(--text-faint)]">/100</span>
                     </div>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-                    <div className={`h-full rounded-full ${negToneFill}`} style={{ width: `${Math.max(4, Math.min(100, score || 0))}%` }} />
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                    <div className={`h-full rounded-full ${negToneFill} transition-all`} style={{ width: `${Math.max(4, Math.min(100, score || 0))}%` }} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
@@ -1766,8 +1766,8 @@ const BarRow = ({ label, pct, tone = "blue", valueText, big }: { label: string; 
         <span className={`text-[12px] ${big ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{label}</span>
         <span className={`text-[12px] tabular-nums ${big ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-faint)]"} capitalize`}>{valueText ?? `${clamped}%`}</span>
       </div>
-      <div className={`mt-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ${big ? "h-2.5" : "h-1.5"}`}>
-        <div className={`h-full rounded-full ${fill[tone]} transition-[width] duration-300`} style={{ width: `${Math.max(2, clamped)}%` }} />
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+        <div className={`h-full rounded-full ${fill[tone]} transition-all`} style={{ width: `${Math.max(2, clamped)}%` }} />
       </div>
     </div>
   );

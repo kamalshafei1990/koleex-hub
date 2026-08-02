@@ -159,8 +159,8 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
                     <span className="text-[12px] text-[var(--text-primary)] truncate">{c.name}</span>
                     <span className="text-[11px] tabular-nums text-[var(--text-dim)] shrink-0">{formatMoney(c.total)}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                    <div className="h-full rounded-full bg-[var(--text-primary)]/70" style={{ width: `${Math.max(3, pct)}%` }} />
+                  <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.max(3, pct)}%` }} />
                   </div>
                 </li>
               );
@@ -184,8 +184,8 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
                     <span className="text-[12px] text-[var(--text-primary)] truncate">{s.name}</span>
                     <span className="text-[11px] tabular-nums text-[var(--text-dim)] shrink-0">{formatMoney(s.total)}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-500/70" style={{ width: `${Math.max(3, pct)}%` }} />
+                  <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.max(3, pct)}%` }} />
                   </div>
                 </li>
               );

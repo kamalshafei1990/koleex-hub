@@ -442,7 +442,7 @@ function UsageSection({ onOpenUser }: { onOpenUser: (id: string) => void }) {
                   <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-dim)]">{r.estimated_s > 0 ? `~${fmtHours(r.estimated_s)}` : "—"}</td>
                   <td className="px-4 py-2.5">
                     <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, (r.last7_s / max7) * 100)}%` }} />
+                      <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.min(100, (r.last7_s / max7) * 100)}%` }} />
                     </div>
                   </td>
                 </tr>

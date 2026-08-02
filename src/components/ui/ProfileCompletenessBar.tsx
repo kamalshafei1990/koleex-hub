@@ -39,7 +39,7 @@ export default function ProfileCompletenessBar({
           <span className="text-[11px] tabular-nums text-[var(--text-dim)]">{showPct ? `${pctOf(tier)}%` : `${tier.filled}/${tier.total}`}</span>
         </div>
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-          <div aria-hidden className={`h-full ${tone} transition-[width] duration-300`} style={{ width: `${pctOf(tier)}%` }} />
+          <div aria-hidden className={`h-full rounded-full ${tone} transition-all`} style={{ width: `${pctOf(tier)}%` }} />
         </div>
       </div>
     );
@@ -61,7 +61,7 @@ export default function ProfileCompletenessBar({
           <Bar label={t("profile.tier.preferred")} tier={tiers.preferred} tone="bg-amber-400" />
           <Bar label={t("profile.tier.optional")} tier={tiers.optional} tone="bg-[var(--text-dim)]" />
           <div className="mt-1 border-t border-[var(--border-subtle)] pt-2.5">
-            <Bar label={t("profile.tier.overall")} tier={tiers.overall} tone="bg-[var(--accent,#0066FF)]" showPct />
+            <Bar label={t("profile.tier.overall")} tier={tiers.overall} tone="bg-[#567FB2]" showPct />
           </div>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function ProfileCompletenessBar({
         <div className="text-[12px] tabular-nums text-[var(--text-secondary)]">{detail}</div>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-        <div aria-hidden className={`h-full ${tone} transition-[width] duration-300`} style={{ width: `${pct}%` }} />
+        <div aria-hidden className={`h-full rounded-full ${tone} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

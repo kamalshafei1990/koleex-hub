@@ -22,10 +22,10 @@ type Receipt = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
-  partial:   "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  complete:  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  cancelled: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  draft:     "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  partial:   "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  complete:  "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  cancelled: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 
 export default function ReceiptsModule({ t }: PurchaseModuleProps) {
@@ -93,7 +93,7 @@ export default function ReceiptsModule({ t }: PurchaseModuleProps) {
                   </p>
                 </div>
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{formatDate(r.received_at || r.created_at)}</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
+                <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tone}`}>{status}</span>
               </div>
             );
           })}

@@ -549,8 +549,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                   </div>
                   <div className="space-y-2">
                     {meterPct !== null ? (
-                      <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-                        <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${meterPct}%` }} />
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                        <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${meterPct}%` }} />
                       </div>
                     ) : null}
                     {(f.label ?? f.key).trim().toLowerCase() !== value.trim().toLowerCase() ? (

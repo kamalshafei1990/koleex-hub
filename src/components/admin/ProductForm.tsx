@@ -4936,9 +4936,9 @@ export default function ProductForm({ productId }: Props) {
                         <div className="w-20 text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
                           {labelMap[dim.dimension] || dim.dimension}
                         </div>
-                        <div className="h-2 rounded-full bg-[var(--bg-surface-subtle)] flex-1 overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-[var(--bg-surface)] flex-1 overflow-hidden">
                           <div
-                            className="h-full bg-[var(--text-primary)] rounded-full transition-all"
+                            className="h-full rounded-full bg-[#567FB2] transition-all"
                             style={{ width: `${dim.score}%` }}
                           />
                         </div>
@@ -5031,7 +5031,7 @@ export default function ProductForm({ productId }: Props) {
                     {missing.length === 0 ? t("review.readyToPublish", "Ready to publish") : t("review.requiredCount", "{n} required fields").replace("{n}", String(missing.length))}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       completionPct >= 90 ? "bg-emerald-500"

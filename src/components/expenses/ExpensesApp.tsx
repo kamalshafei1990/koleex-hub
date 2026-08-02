@@ -297,8 +297,8 @@ export default function ExpensesApp() {
                         </div>
                       </div>
                       <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
-                      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
-                        <div className={`h-full ${accentSolidBg(style.accent)}`} style={{ width: "100%" }} />
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                        <div className={`h-full rounded-full ${accentSolidBg(style.accent)} transition-all`} style={{ width: "100%" }} />
                       </div>
                     </button>
                   );

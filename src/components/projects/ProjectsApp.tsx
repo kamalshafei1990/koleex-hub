@@ -1434,7 +1434,7 @@ function ReportingView() {
                   <span className="text-[var(--text-muted)] font-semibold">{count}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                  <div className="h-full rounded-full bg-blue-400" style={{ width: `${(count / assigneeMax) * 100}%` }} />
+                  <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${(count / assigneeMax) * 100}%` }} />
                 </div>
               </div>
             ))

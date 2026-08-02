@@ -266,8 +266,8 @@ export default function SalesOrders() {
                         <div className="inline-flex flex-col items-end gap-1">
                           <span className="tabular-nums font-mono">{fmtQty(s.qty_remaining)}</span>
                           {s.qty_ordered > 0 && (
-                            <span aria-hidden className="h-1 w-16 overflow-hidden rounded-full bg-white/[0.05]">
-                              <span className="block h-full bg-emerald-400/50" style={{ width: `${pct}%` }} />
+                            <span aria-hidden className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                              <span className="block h-full rounded-full bg-emerald-400/50 transition-all" style={{ width: `${pct}%` }} />
                             </span>
                           )}
                         </div>

@@ -675,8 +675,9 @@ export function LiquidityMeter({
         <div className="text-[10px] text-[var(--text-dim)]">{t("uix.liquidity.inflow", "Inflow {pct}%").replace("{pct}", inflowPct.toFixed(0))}</div>
       </div>
       {/* Inflow-vs-outflow ratio bar */}
-      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-rose-500/[0.18]">
-        <div className="h-full rounded-full bg-emerald-600/70 dark:bg-emerald-400/70" style={{ width: `${inflowPct}%` }} />
+      <div className="mt-2.5 flex h-1.5 w-full rounded-full bg-[var(--bg-surface)] overflow-hidden">
+        <div className="h-full bg-emerald-600/70 dark:bg-emerald-400/70" style={{ width: `${inflowPct}%` }} />
+        <div className="h-full flex-1 bg-rose-500/[0.18]" />
       </div>
       {/* 7/30/60 windows */}
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -886,8 +887,8 @@ export function ConcentrationBar({
         }>{share.toFixed(0)}%</div>
       </div>
       <div className="mt-2 truncate text-[13px] font-medium text-[var(--text-primary)]">{party}</div>
-      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-        <div className={`h-full ${fillCls}`} style={{ width: `${Math.max(2, Math.min(100, share))}%` }} />
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+        <div className={`h-full rounded-full ${fillCls} transition-all`} style={{ width: `${Math.max(2, Math.min(100, share))}%` }} />
       </div>
       {hint && <div className="mt-2 text-[10px] text-[var(--text-dim)]">{hint}</div>}
     </div>

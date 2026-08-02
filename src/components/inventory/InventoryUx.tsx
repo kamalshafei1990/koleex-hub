@@ -240,20 +240,19 @@ export function relativeTime(iso: string | null | undefined): string {
    INV-H5D — colored pill, lowercase-friendly. Reads humanStatus()
    so operators never see a raw enum in the list row. */
 export function HumanStatusPill({ status }: { status: string }) {
-  /* Each tint pairs a saturated text color (legible on light backgrounds)
-     with a dark-mode brightener so the same pill works in both themes. */
+  /* PILL-1 tone classes (KDS StatusPill palette). */
   const cls =
-    status === "posted" || status === "active" || status === "received" || status === "completed"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+    status === "posted" || status === "active" || status === "received" || status === "completed" || status === "approved"
+      ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
       : status === "voided" || status === "archived" || status === "cancelled"
-        ? "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]"
+        ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
         : status === "draft" || status === "inactive" || status === "pending"
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-200"
-          : status === "approved" || status === "shipped"
-            ? "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-200"
-            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]";
+          ? "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35"
+          : status === "shipped"
+            ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
+            : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] tracking-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${cls}`}>
       {humanStatus(status)}
     </span>
   );

@@ -90,7 +90,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
                 </div>
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{formatDate(p.order_date || p.created_at)}</span>
                 <div className="flex items-center gap-2 justify-end">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
+                  <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tone}`}>{status}</span>
                   <span className="text-[13px] tabular-nums font-semibold text-[var(--text-primary)] min-w-[80px] text-right">{formatMoney(Number(p.total) || 0, p.currency || "USD")}</span>
                   {/* O.3 — Receive button. Disabled for terminal statuses. */}
                   {!["received", "cancelled", "closed"].includes(status) && (

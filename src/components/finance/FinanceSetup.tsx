@@ -140,7 +140,7 @@ export default function FinanceSetup() {
             </div>
           </div>
           <div aria-hidden className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-            <div className="h-full bg-emerald-600/60 dark:bg-emerald-400/60 transition-all duration-300" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
 

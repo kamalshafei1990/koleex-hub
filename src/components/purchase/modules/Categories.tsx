@@ -99,7 +99,7 @@ export default function CategoriesModule({ t }: PurchaseModuleProps) {
                     <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{c.name}</p>
                     {c.description && <p className="text-[11px] text-[var(--text-dim)] truncate">{c.description}</p>}
                   </div>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${c.is_active !== false ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]"}`}>
+                  <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${c.is_active !== false ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35" : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"}`}>
                     {c.is_active !== false ? "Active" : "Off"}
                   </span>
                 </li>

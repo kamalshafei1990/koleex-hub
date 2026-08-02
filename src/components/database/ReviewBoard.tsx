@@ -278,7 +278,7 @@ function DistCard({ title, bands }: { title: string; bands: Bands }) {
         {rows.map((r) => (
           <div key={r.label}>
             <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{r.label}</span><span className="tabular-nums text-[var(--text-dim)]">{r.value}</span></div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${r.cls}`} style={{ width: `${(r.value / total) * 100}%` }} /></div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]"><div className={`h-full rounded-full ${r.cls}`} style={{ width: `${(r.value / total) * 100}%` }} /></div>
           </div>
         ))}
       </div>

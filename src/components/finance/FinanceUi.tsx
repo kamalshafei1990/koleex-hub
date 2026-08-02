@@ -198,38 +198,45 @@ function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
 }
 
 /* ── StatusBadge ─────────────────────────────────────────────────── */
-const STATUS_PALETTE: Record<string, { bg: string; text: string; label?: string }> = {
-  paid:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  partial:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
-  unpaid:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
-  overdue:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
-  open:           { bg: "bg-sky-500/15",     text: "text-sky-600 dark:text-sky-400" },
-  in_production:  { bg: "bg-violet-500/15",  text: "text-violet-600 dark:text-violet-400", label: "In production" },
-  shipped:        { bg: "bg-blue-500/15",    text: "text-blue-600 dark:text-blue-400" },
-  delivered:      { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  closed:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
-  cancelled:      { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
-  good:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  watch:          { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
-  hold:           { bg: "bg-orange-500/15",  text: "text-orange-600 dark:text-orange-400" },
-  blocked:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
-  scheduled:      { bg: "bg-sky-500/15",     text: "text-sky-600 dark:text-sky-400" },
-  sent:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  done:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  snoozed:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
-  completed:      { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
-  pending:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
-  bounced:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
-  collect:        { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", label: "Money to collect" },
-  pay:            { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400",    label: "Money to pay" },
+/* PILL-1 tone classes (KDS StatusPill palette). */
+const PILL_NEUTRAL = "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
+const PILL_BRAND   = "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40";
+const PILL_SUCCESS = "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35";
+const PILL_WARNING = "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
+const PILL_ERROR   = "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35";
+
+const STATUS_PALETTE: Record<string, { cls: string; label?: string }> = {
+  paid:           { cls: PILL_SUCCESS },
+  partial:        { cls: PILL_WARNING },
+  unpaid:         { cls: PILL_NEUTRAL },
+  overdue:        { cls: PILL_ERROR },
+  open:           { cls: PILL_BRAND },
+  in_production:  { cls: PILL_BRAND, label: "In production" },
+  shipped:        { cls: PILL_BRAND },
+  delivered:      { cls: PILL_SUCCESS },
+  closed:         { cls: PILL_NEUTRAL },
+  cancelled:      { cls: PILL_ERROR },
+  good:           { cls: PILL_SUCCESS },
+  watch:          { cls: PILL_WARNING },
+  hold:           { cls: PILL_WARNING },
+  blocked:        { cls: PILL_ERROR },
+  scheduled:      { cls: PILL_BRAND },
+  sent:           { cls: PILL_SUCCESS },
+  done:           { cls: PILL_SUCCESS },
+  snoozed:        { cls: PILL_WARNING },
+  completed:      { cls: PILL_SUCCESS },
+  pending:        { cls: PILL_WARNING },
+  bounced:        { cls: PILL_ERROR },
+  collect:        { cls: PILL_SUCCESS, label: "Money to collect" },
+  pay:            { cls: PILL_ERROR, label: "Money to pay" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const p = STATUS_PALETTE[status] ?? { bg: "bg-white/5", text: "text-[var(--text-secondary)]" };
+  const p = STATUS_PALETTE[status] ?? { cls: PILL_NEUTRAL };
   const label = p.label ?? status.replace(/_/g, " ");
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${p.bg} ${p.text}`}
+      className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${p.cls}`}
     >
       {label}
     </span>
@@ -422,8 +429,8 @@ export function ProgressBar({
     : color === "rose"  ? "bg-rose-500"
     : "bg-sky-500";
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-      <div className={`h-full ${bg} transition-all`} style={{ width: `${pct}%` }} />
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+      <div className={`h-full rounded-full ${bg} transition-all`} style={{ width: `${pct}%` }} />
     </div>
   );
 }

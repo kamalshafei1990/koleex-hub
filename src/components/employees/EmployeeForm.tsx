@@ -1523,9 +1523,9 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-[var(--text-dim)] tabular-nums"
               title="Profile completeness"
             >
-              <span className="h-1.5 w-16 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] overflow-hidden">
+              <span className="h-1.5 w-16 rounded-full bg-[var(--bg-surface)] overflow-hidden">
                 <span
-                  className="block h-full rounded-full bg-[var(--text-primary)] transition-[width] duration-300"
+                  className="block h-full rounded-full bg-[#567FB2] transition-all"
                   style={{ width: `${completenessPct}%` }}
                 />
               </span>

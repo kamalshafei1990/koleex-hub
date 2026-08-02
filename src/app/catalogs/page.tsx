@@ -1739,7 +1739,7 @@ function CatalogModal({
                 <span className="text-[11px] font-semibold text-[var(--text-primary)]">{uploadPct}%</span>
               </div>
               <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                <div className="h-full rounded-full bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${uploadPct}%` }} />
+                <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${uploadPct}%` }} />
               </div>
             </div>
           )}
@@ -3170,8 +3170,8 @@ function CatalogsApp() {
                     return (
                       <div key={d.name} className="flex items-center gap-2">
                         <span className="text-[11px] text-[var(--text-secondary)] truncate w-24 shrink-0">{d.name}</span>
-                        <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface-bright)] overflow-hidden">
-                          <div className="h-full bg-[var(--text-dim)] rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                          <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-[11px] tabular-nums text-[var(--text-dim)] w-6 text-right shrink-0">{d.count}</span>
                       </div>

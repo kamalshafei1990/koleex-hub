@@ -141,9 +141,9 @@ export default function ReportsModule({ employees, t, lang }: HRModuleProps) {
                         {count}
                       </span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-1.5 w-full rounded-full bg-[var(--bg-surface)] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-400 transition-all"
+                        className="h-full rounded-full bg-[#567FB2] transition-all"
                         style={{ width: `${(count / maxDeptCount) * 100}%` }}
                       />
                     </div>

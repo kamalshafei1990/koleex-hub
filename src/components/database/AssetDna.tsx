@@ -152,7 +152,7 @@ export default function AssetDna({
           {(d.pattern_matches ?? []).slice(0, 6).map((p) => (
             <div key={p.pattern_name}>
               <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{p.pattern_name}</span><span className="tabular-nums text-[var(--text-dim)]">{p.score}%</span></div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${p.score >= 70 ? "bg-emerald-400" : p.score >= 45 ? "bg-amber-400" : "bg-rose-400"}`} style={{ width: `${p.score}%` }} /></div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]"><div className={`h-full rounded-full ${p.score >= 70 ? "bg-emerald-400" : p.score >= 45 ? "bg-amber-400" : "bg-rose-400"}`} style={{ width: `${p.score}%` }} /></div>
             </div>
           ))}
         </div>
@@ -208,7 +208,7 @@ function Bar({ label, value }: { label: string; value: number }) {
   return (
     <div {...kxInspectAttrs({ component: "AssetDNATab", module: "Database", section: "DNA" })} className="mb-1.5">
       <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{label}</span><span className="tabular-nums text-[var(--text-dim)]">{value}</span></div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
     </div>
   );
 }

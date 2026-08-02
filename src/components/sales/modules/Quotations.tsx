@@ -16,12 +16,12 @@ type Quote = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  sent:      "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  pending:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  accepted:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  rejected:  "bg-red-500/15 text-red-400 border-red-500/20",
-  expired:   "bg-slate-500/15 text-slate-400 border-slate-500/20",
+  draft:     "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  sent:      "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  pending:   "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  accepted:  "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  rejected:  "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
+  expired:   "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
 };
 
 export default function QuotationsModule({ t }: SalesModuleProps) {
@@ -72,7 +72,7 @@ export default function QuotationsModule({ t }: SalesModuleProps) {
                 <span className="text-[13px] text-[var(--text-muted)] truncate">{q.customer_name || "—"}</span>
                 <span className="hidden md:inline text-[12px] tabular-nums text-[var(--text-dim)]">{formatDate(q.created_at)}</span>
                 <div className="flex items-center gap-2 justify-end">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
+                  <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tone}`}>{status}</span>
                   <span className="text-[13px] tabular-nums font-semibold text-[var(--text-primary)] min-w-[80px] text-right">{formatMoney(Number(q.total) || 0)}</span>
                 </div>
               </Link>

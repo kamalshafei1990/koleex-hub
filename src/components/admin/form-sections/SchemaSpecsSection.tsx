@@ -601,9 +601,9 @@ function GroupCard({
           </span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden sm:block w-20 h-1.5 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
+          <div className="hidden sm:block w-20 h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--text-primary)] transition-all"
+              className="h-full rounded-full bg-[#567FB2] transition-all"
               style={{ width: `${pct}%` }}
             />
           </div>

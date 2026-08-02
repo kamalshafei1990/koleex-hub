@@ -247,7 +247,7 @@ export default function SourcingCommandCenter() {
               {data.concentration.length === 0 ? <p className="text-[12px] text-[var(--text-faint)]">{t("scc.noCountryData", "No country data.")}</p> : data.concentration.slice(0, 6).map((c) => (
                 <div key={c.country} className="mb-1.5 last:mb-0">
                   <div className="flex items-center justify-between text-[12px]"><span className="text-[var(--text-primary)]">{c.country}</span><span className="text-[var(--text-secondary)]">{c.count} · {c.pct}%</span></div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]"><div className="h-full rounded-full bg-[var(--text-secondary)]" style={{ width: `${c.pct}%` }} /></div>
+                  <div className="mt-1 h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden"><div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${c.pct}%` }} /></div>
                 </div>
               ))}
             </div>

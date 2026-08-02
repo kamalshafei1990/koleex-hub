@@ -317,8 +317,8 @@ export default function FinanceExpenseAnalytics() {
                           </span>
                         )}
                       </div>
-                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                        <div className={`h-full ${accentSolidBg(style.accent)}`} style={{ width: `${Math.min(100, Math.max(2, c.share))}%` }} />
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                        <div className={`h-full rounded-full ${accentSolidBg(style.accent)} transition-all`} style={{ width: `${Math.min(100, Math.max(2, c.share))}%` }} />
                       </div>
                     </div>
                   );

@@ -19,11 +19,11 @@ type Return = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
-  sent:      "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  refunded:  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  closed:    "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
-  cancelled: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  draft:     "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  sent:      "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  refunded:  "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  closed:    "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  cancelled: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 
 export default function ReturnsModule({ t }: PurchaseModuleProps) {
@@ -75,7 +75,7 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
                 </div>
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{formatDate(r.return_date || r.created_at)}</span>
                 <div className="flex items-center gap-2 justify-end">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
+                  <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tone}`}>{status}</span>
                   <span className="text-[13px] tabular-nums font-semibold text-emerald-700 dark:text-emerald-300 min-w-[80px] text-right">{formatMoney(Number(r.refund_amount || r.total_value) || 0, r.currency || "USD")}</span>
                 </div>
               </div>

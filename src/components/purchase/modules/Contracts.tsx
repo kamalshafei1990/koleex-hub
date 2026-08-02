@@ -21,10 +21,10 @@ type Contract = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:      "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
-  active:     "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  expired:    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  terminated: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  draft:      "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  active:     "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  expired:    "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  terminated: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 
 export default function ContractsModule({ t }: PurchaseModuleProps) {
@@ -105,7 +105,7 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
                   {r.start_date ? formatDate(r.start_date) : "—"} – {r.end_date ? formatDate(r.end_date) : "—"}
                 </span>
                 <div className="flex items-center gap-2 justify-end">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
+                  <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tone}`}>{status}</span>
                   <span className="text-[13px] tabular-nums font-semibold text-[var(--text-primary)] min-w-[80px] text-right">{formatMoney(Number(r.total_value) || 0, r.currency || "USD")}</span>
                 </div>
               </div>

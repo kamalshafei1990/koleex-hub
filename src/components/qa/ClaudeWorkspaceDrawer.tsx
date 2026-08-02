@@ -229,7 +229,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
 function Gauge({ label, value, tone }: { label: string; value: number; tone: "risk" | "confidence" }) {
   const color = tone === "risk"
     ? (value >= 66 ? "bg-rose-500" : value >= 33 ? "bg-amber-500" : "bg-emerald-500")
-    : "bg-[var(--text-primary)]";
+    : "bg-[#567FB2]";
   return (
     <div className="flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
       <div className="flex items-baseline justify-between">
@@ -237,7 +237,7 @@ function Gauge({ label, value, tone }: { label: string; value: number; tone: "ri
         <span className="text-[18px] font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
       </div>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-        <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </div>
     </div>
   );

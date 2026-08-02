@@ -6823,7 +6823,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       >
                         {tier.label}
                       </span>
-                      <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
+                      <div className="flex-1 h-1.5 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${tier.barColor ?? ""}`}
                           style={{
@@ -6850,9 +6850,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <div key={cty.code || cty.name.toLowerCase()} className="flex items-center gap-3">
                         <span className="text-base w-6 text-center shrink-0" aria-hidden>{countryCodeToFlag(cty.code) || "🏳️"}</span>
                         <span className="text-xs font-medium w-32 shrink-0 truncate text-[var(--text-secondary)]" title={cty.name}>{cty.name}</span>
-                        <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
+                        <div className="flex-1 h-1.5 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            className="h-full rounded-full bg-[#567FB2] transition-all"
                             style={{ width: countryMax > 0 ? `${(cty.count / countryMax) * 100}%` : "0%" }}
                           />
                         </div>

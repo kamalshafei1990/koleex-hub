@@ -48,11 +48,11 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const inputCls = "w-full rounded-lg bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
 const levelToneCls: Record<string, string> = {
-  none: "bg-[var(--bg-surface)] text-[var(--text-faint)] ring-1 ring-[var(--border-subtle)]",
-  low: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
-  moderate: "bg-[var(--bg-surface)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]",
-  elevated: "bg-amber-500/15 text-amber-300",
-  high: "bg-rose-500/15 text-rose-300",
+  none: "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  low: "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  moderate: "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  elevated: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  high: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 /* ── Risk escalation visual system ──
    LOW      subtle neutral
@@ -66,28 +66,28 @@ const sevStyle = (sev: string): SevStyle => {
     case "critical":
       return {
         card: "border border-rose-500/50 bg-rose-500/[0.08] shadow-[0_0_22px_-6px_rgba(244,63,94,0.5)]",
-        badge: "bg-rose-500 text-white",
+        badge: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
         dot: "bg-rose-500",
         pulse: true,
       };
     case "high":
       return {
         card: "border border-rose-400/35 bg-rose-500/[0.055]",
-        badge: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+        badge: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
         dot: "bg-rose-400",
         pulse: false,
       };
     case "medium":
       return {
         card: "border border-amber-500/30 bg-amber-500/[0.045]",
-        badge: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+        badge: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
         dot: "bg-amber-400",
         pulse: false,
       };
     default: // low
       return {
         card: "border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]",
-        badge: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
+        badge: "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
         dot: "bg-[var(--text-faint)]",
         pulse: false,
       };
@@ -245,7 +245,7 @@ export default function RiskSection({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4">
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold ${levelToneCls[levelTone]}`}>{risk?.level ? t("opt." + risk.level, RISK_LEVEL_LABELS[risk.level]) : t("rs.unscored", "Unscored")}</span>
+          <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${levelToneCls[levelTone]}`}>{risk?.level ? t("opt." + risk.level, RISK_LEVEL_LABELS[risk.level]) : t("rs.unscored", "Unscored")}</span>
           <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("rs.overallRisk", "Overall risk")}</div>
         </div>
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4">
@@ -332,7 +332,7 @@ export default function RiskSection({
                             <span className={`relative inline-flex h-2 w-2 rounded-full ${st.dot}`} />
                           </span>
                         ) : null}
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${st.badge}`}>{t("opt." + sev, SEVERITY_LABELS[sev] ?? sev)}</span>
+                        <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${st.badge}`}>{t("opt." + sev, SEVERITY_LABELS[sev] ?? sev)}</span>
                         <span className="text-[13px] font-semibold text-[var(--text-primary)]">{str(it, "title")}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-faint)]">

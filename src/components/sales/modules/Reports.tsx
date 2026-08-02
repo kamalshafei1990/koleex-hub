@@ -137,8 +137,8 @@ export default function ReportsModule({ t }: SalesModuleProps) {
                       {f.count} · {formatMoney(f.value)}
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                    <div className="h-full rounded-full bg-[var(--text-primary)]/70 transition-all" style={{ width: `${Math.max(3, pct)}%` }} />
+                  <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.max(3, pct)}%` }} />
                   </div>
                 </li>
               );
@@ -165,8 +165,9 @@ export default function ReportsModule({ t }: SalesModuleProps) {
           </div>
         </div>
         {winLoss.total > 0 && (
-          <div className="mt-4 h-2 rounded-full bg-red-500/30 overflow-hidden flex">
+          <div className="mt-4 flex h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
             <div className="h-full bg-emerald-500" style={{ width: `${winLoss.winRate}%` }} />
+            <div className="h-full flex-1 bg-red-500/30" />
           </div>
         )}
       </div>

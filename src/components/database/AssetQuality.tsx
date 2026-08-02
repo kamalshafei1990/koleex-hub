@@ -276,7 +276,7 @@ function Bar({ label, value }: { label: string; value: number }) {
   return (
     <div {...kxInspectAttrs({ component: "AssetQualityTab", module: "Database", section: "Quality" })} className="mb-1.5">
       <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{label}</span><span className="tabular-nums text-[var(--text-dim)]">{value}</span></div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
     </div>
   );
 }

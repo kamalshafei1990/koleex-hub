@@ -137,22 +137,19 @@ export function relativeTime(d: string | Date | null | undefined): string {
 }
 
 /* Status tones reused across PO / Bill / Return / Requisition / RFQ /
-   Receipt / Contract list rows. Each entry pairs a tinted background
-   with a saturated text color that's legible on light AND dark
-   surfaces — the dark mode brightener via `dark:text-{tint}-300` keeps
-   contrast acceptable on a near-black background while the base
-   `text-{tint}-700` stays readable on a near-white surface.
+   Receipt / Contract list rows. PILL-1 tone classes (KDS StatusPill
+   palette): tinted background + matching text + border.
 
    Keys are lowercased to be tolerant of how each table stores its
    enum text. */
-const TONE_NEUTRAL = "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
-const TONE_INFO    = "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300";
-const TONE_WARN    = "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
-const TONE_OK      = "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
-const TONE_BAD     = "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+const TONE_NEUTRAL = "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
+const TONE_INFO    = "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40";
+const TONE_WARN    = "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
+const TONE_OK      = "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35";
+const TONE_BAD     = "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35";
 
 export const STATUS_TONE_PO: Record<string, string> = {
-  draft:     TONE_NEUTRAL,
+  draft:     TONE_WARN,
   confirmed: TONE_INFO,
   partial:   TONE_WARN,
   received:  TONE_OK,
@@ -161,19 +158,19 @@ export const STATUS_TONE_PO: Record<string, string> = {
 };
 
 export const STATUS_TONE_BILL: Record<string, string> = {
-  draft:     TONE_NEUTRAL,
+  draft:     TONE_WARN,
   posted:    TONE_INFO,
   partial:   TONE_WARN,
   paid:      TONE_OK,
   overdue:   TONE_BAD,
-  cancelled: TONE_NEUTRAL,
+  cancelled: TONE_BAD,
 };
 
 export const STATUS_TONE_REQ: Record<string, string> = {
-  draft:     TONE_NEUTRAL,
+  draft:     TONE_WARN,
   pending:   TONE_WARN,
   approved:  TONE_OK,
   rejected:  TONE_BAD,
   converted: TONE_INFO,
-  cancelled: TONE_NEUTRAL,
+  cancelled: TONE_BAD,
 };

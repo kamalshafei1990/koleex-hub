@@ -42,11 +42,11 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const inputCls = "w-full rounded-lg bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 const QUALITY = ["", "low", "medium", "high"];
 const roleCls: Record<string, string> = {
-  preferred: "bg-[var(--text-primary)] text-[var(--bg-primary)]",
-  approved: "bg-[var(--bg-surface)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]",
-  backup: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
-  experimental: "bg-amber-500/15 text-amber-300",
-  blocked: "bg-rose-500/15 text-rose-300",
+  preferred: "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  approved: "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  backup: "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]",
+  experimental: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  blocked: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 const bandCls: Record<string, string> = {
   strong: "bg-[var(--text-primary)] text-[var(--bg-primary)]",
@@ -210,7 +210,7 @@ export default function SourcingSection({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${roleCls[str(l, "sourcing_role")] ?? roleCls.approved}`}>{sourcingRoleLabel(str(l, "sourcing_role"))}</span>
+                        <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${roleCls[str(l, "sourcing_role")] ?? roleCls.approved}`}>{sourcingRoleLabel(str(l, "sourcing_role"))}</span>
                         <PackageIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
                         <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{str(prod, "product_name") || t("srcg.productFallback", "Product")}</span>
                       </div>

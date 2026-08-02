@@ -66,9 +66,9 @@ export default function PriceListsModule({ t }: PurchaseModuleProps) {
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{p.name}</h3>
                 {p.is_active !== false ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shrink-0">Active</span>
+                  <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35 shrink-0">Active</span>
                 ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] shrink-0">Inactive</span>
+                  <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)] shrink-0">Inactive</span>
                 )}
               </div>
               <p className="text-[11px] text-[var(--text-dim)] truncate mb-2">{supplierName.get(p.supplier_id || "") || "—"}</p>

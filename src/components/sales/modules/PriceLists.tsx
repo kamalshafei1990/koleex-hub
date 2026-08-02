@@ -64,9 +64,9 @@ export default function PriceListsModule({ t }: SalesModuleProps) {
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{p.name}</h3>
                 {p.is_active !== false ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">Active</span>
+                  <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35 shrink-0">Active</span>
                 ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-slate-500/15 text-slate-400 border border-slate-500/20 shrink-0">Inactive</span>
+                  <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)] shrink-0">Inactive</span>
                 )}
               </div>
               <div className="flex items-baseline gap-2 mb-2">

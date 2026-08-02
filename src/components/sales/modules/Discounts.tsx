@@ -80,7 +80,7 @@ export default function DiscountsModule({ t }: SalesModuleProps) {
                       </p>
                     </div>
                     <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider truncate">{d.approver_role || "—"}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${d.is_active !== false ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-slate-500/15 text-slate-400 border-slate-500/20"}`}>
+                    <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${d.is_active !== false ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35" : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"}`}>
                       {d.is_active !== false ? "Active" : "Off"}
                     </span>
                   </li>
@@ -109,7 +109,7 @@ export default function DiscountsModule({ t }: SalesModuleProps) {
                     <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
                       {(v.discount_min_percent ?? 0)}% – {(v.discount_max_percent ?? 0)}%
                     </span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${v.is_active !== false ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-slate-500/15 text-slate-400 border-slate-500/20"}`}>
+                    <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${v.is_active !== false ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35" : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"}`}>
                       {v.is_active !== false ? "Active" : "Off"}
                     </span>
                   </li>

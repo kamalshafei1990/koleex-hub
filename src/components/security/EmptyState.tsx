@@ -56,8 +56,8 @@ export default function EmptyState({ variant, title, message, icon, progress, cl
       <p className="mt-1 max-w-sm text-sm text-[var(--text-dim)]">{message ?? copy.message}</p>
       {pct !== null && (
         <div className="mt-4 w-full max-w-xs">
-          <div className="h-1 overflow-hidden rounded-full bg-[var(--bg-surface-hover)]">
-            <div className="h-full rounded-full bg-[var(--text-dim)]" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
+          <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+            <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
           </div>
           <p className="mt-1 text-[11px] text-[var(--text-dim)]">{(pct * 100).toFixed(0)}% toward a confident baseline</p>
         </div>

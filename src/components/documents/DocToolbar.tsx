@@ -20,11 +20,11 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-yellow-500/15 text-yellow-400",
-  final: "bg-green-500/15 text-green-300",
-  sent: "bg-blue-500/15 text-blue-300",
-  paid: "bg-green-500/20 text-green-300",
-  cancelled: "bg-red-500/15 text-red-300",
+  draft: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  final: "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  sent: "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  paid: "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  cancelled: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 
 function StatusPill({
@@ -47,14 +47,14 @@ function StatusPill({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  const cls = STATUS_STYLE[status] ?? "bg-white/10 text-gray-200";
+  const cls = STATUS_STYLE[status] ?? "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
   return (
     <div style={{ position: "relative" }} ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex items-center gap-1.5 ${cls}`}
-        style={{ letterSpacing: "0.03em", cursor: "pointer" }}
+        className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${cls}`}
+        style={{ cursor: "pointer" }}
         title="Click to change status"
       >
         {status}

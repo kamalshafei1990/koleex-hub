@@ -55,7 +55,7 @@ export default function TrendPanel({ trend, outcome, window }: TrendPanelProps) 
             {outcome.successes} ok · {outcome.failures} failed
           </span>
         </div>
-        <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-[var(--bg-surface-hover)]" aria-hidden="true">
+        <div className="mt-2 flex h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden" aria-hidden="true">
           <div className="h-full bg-[var(--text-dim)]" style={{ width: `${successPct}%` }} />
           <div className="h-full bg-amber-400/70" style={{ width: `${failurePct}%` }} />
         </div>

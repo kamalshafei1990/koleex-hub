@@ -36,7 +36,6 @@ import {
   recordPayment,
   saveInvoiceLines,
   sendInvoice,
-  STATUS_COLOR,
   updateInvoice,
   type InvoiceItem,
   type InvoicePayment,
@@ -242,15 +241,24 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
   );
 }
 
+const STATUS_PILL_TONE: Record<InvoiceStatus, string> = {
+  draft:     "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  sent:      "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  issued:    "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40",
+  partial:   "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35",
+  paid:      "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35",
+  overdue:   "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
+  cancelled: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
+  void:      "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
+};
+
 function StatusPill({ status }: { status: InvoiceStatus }) {
   const { t } = useTranslation(invoicesT);
-  const color = STATUS_COLOR[status];
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-      style={{ background: `${color}22`, color }}
+      className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${STATUS_PILL_TONE[status]}`}
     >
-      <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
       {t(`status.${status}`)}
     </span>
   );

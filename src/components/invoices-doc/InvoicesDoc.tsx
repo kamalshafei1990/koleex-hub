@@ -1866,16 +1866,16 @@ export default function Quotations() {
                             {q.invoiceNo}
                           </span>
                           <span
-                            className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full ${
+                            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
                               q.status === "paid"
-                                ? "bg-emerald-500/15 text-emerald-400"
+                                ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
                                 : q.status === "sent"
-                                  ? "bg-sky-500/15 text-sky-400"
+                                  ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
                                   : q.status === "cancelled"
-                                    ? "bg-red-500/15 text-red-400"
+                                    ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
                                     : q.status === "overdue"
-                                      ? "bg-zinc-500/15 text-zinc-400"
-                                      : "bg-yellow-500/15 text-yellow-400"
+                                      ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
+                                      : "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35"
                             }`}
                           >
                             {q.status}
@@ -1980,10 +1980,10 @@ export default function Quotations() {
             and the user couldn't tell if anything was happening. */}
         {saveState !== "idle" && (
           <span
-            className={`text-xs font-semibold px-3 py-1 rounded-full ${
-              saveState === "saving" ? "bg-blue-500/15 text-blue-300"
-              : saveState === "saved" ? "bg-green-500/20 text-green-300"
-              : "bg-red-500/20 text-red-300"
+            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
+              saveState === "saving" ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
+              : saveState === "saved" ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
+              : "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
             }`}
             title={saveError || undefined}
           >
@@ -2198,14 +2198,14 @@ function StatusMenu({
 
   const colourFor = (s: InvoiceStatus): string =>
     s === "paid"
-      ? "bg-emerald-500/15 text-emerald-400"
+      ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
       : s === "sent"
-        ? "bg-sky-500/15 text-sky-400"
+        ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
         : s === "cancelled"
-          ? "bg-red-500/15 text-red-400"
+          ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
           : s === "overdue"
-            ? "bg-zinc-500/15 text-zinc-400"
-            : "bg-yellow-500/15 text-yellow-400";
+            ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
+            : "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
 
   const labelFor = (s: InvoiceStatus): string =>
     s.charAt(0).toUpperCase() + s.slice(1);
@@ -2215,8 +2215,8 @@ function StatusMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex items-center gap-1.5 ${colourFor(status)}`}
-        style={{ letterSpacing: "0.03em", border: "none", cursor: "pointer" }}
+        className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${colourFor(status)}`}
+        style={{ cursor: "pointer" }}
         title="Click to change status"
       >
         {labelFor(status)}

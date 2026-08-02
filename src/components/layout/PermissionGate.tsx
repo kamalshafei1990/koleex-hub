@@ -60,8 +60,8 @@ export default function PermissionGate({
   if (loading || retrying) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="h-2 w-32 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
-          <div className="h-full w-1/2 bg-[var(--bg-inverted)] animate-pulse" />
+        <div className="h-1.5 w-32 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+          <div className="h-full w-1/2 rounded-full bg-[#567FB2] animate-pulse" />
         </div>
       </div>
     );
@@ -75,8 +75,8 @@ export default function PermissionGate({
       <div className="min-h-[60vh] flex items-center justify-center px-6">
         <div className="max-w-md w-full text-center">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center mb-4">
-            <div className="h-2 w-8 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
-              <div className="h-full w-1/2 bg-[var(--text-dim)] animate-pulse" />
+            <div className="h-1.5 w-8 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+              <div className="h-full w-1/2 rounded-full bg-[#567FB2] animate-pulse" />
             </div>
           </div>
           <h1 className="text-[18px] font-bold text-[var(--text-primary)] mb-2">
@@ -101,8 +101,8 @@ export default function PermissionGate({
   if (!ctx) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="h-2 w-32 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
-          <div className="h-full w-1/2 bg-[var(--bg-inverted)] animate-pulse" />
+        <div className="h-1.5 w-32 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+          <div className="h-full w-1/2 rounded-full bg-[#567FB2] animate-pulse" />
         </div>
       </div>
     );

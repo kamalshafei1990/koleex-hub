@@ -4273,9 +4273,9 @@ function ReportBlock({
                     </span>
                   </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[var(--accent-primary,#5b7cff)]"
+                    className="h-full rounded-full bg-[#567FB2] transition-all"
                     style={{ width: `${pct}%` }}
                   />
                 </div>

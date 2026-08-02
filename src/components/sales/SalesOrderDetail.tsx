@@ -289,8 +289,8 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
                   <span>Fulfilment</span>
                   <span className="tabular-nums">{progressPct}%</span>
                 </div>
-                <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
-                  <div className="h-full bg-emerald-400/55" style={{ width: `${progressPct}%` }} />
+                <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                  <div className="h-full rounded-full bg-emerald-400/55 transition-all" style={{ width: `${progressPct}%` }} />
                 </div>
               </div>
             )}

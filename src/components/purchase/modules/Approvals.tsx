@@ -70,7 +70,7 @@ export default function ApprovalsModule({ t }: PurchaseModuleProps) {
                   </p>
                 </div>
                 <span className="text-[12px] text-[var(--text-muted)] truncate">{r.approver_role || "—"}</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${r.is_active !== false ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]"}`}>
+                <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${r.is_active !== false ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35" : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"}`}>
                   {r.is_active !== false ? "Active" : "Off"}
                 </span>
               </li>

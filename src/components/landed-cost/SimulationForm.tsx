@@ -1325,8 +1325,8 @@ export default function SimulationForm({ id }: { id?: string }) {
                         {fmt(row.val)}<span className="text-[var(--text-ghost)] ml-1">({row.pct.toFixed(1)}%)</span>
                       </span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.06] overflow-hidden">
-                      <div className="h-full rounded-full bg-[var(--bg-inverted)]/60 transition-all duration-500" style={{ width: `${Math.min(row.pct, 100)}%` }} />
+                    <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.min(row.pct, 100)}%` }} />
                     </div>
                   </div>
                 ))}

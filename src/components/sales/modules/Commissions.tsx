@@ -110,7 +110,7 @@ export default function CommissionsModule({ t }: SalesModuleProps) {
                 <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{tier.name}</p>
                 <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider truncate">{tier.applies_to || "—"}</span>
                 <span className="text-[14px] font-bold tabular-nums text-[var(--text-primary)]">{(Number(tier.rate_percent) || 0).toFixed(1)}%</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tier.is_active !== false ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-slate-500/15 text-slate-400 border-slate-500/20"}`}>
+                <span className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${tier.is_active !== false ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35" : "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"}`}>
                   {tier.is_active !== false ? "Active" : "Off"}
                 </span>
               </li>

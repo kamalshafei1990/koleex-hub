@@ -72,7 +72,7 @@ export function ChecklistPanel({ taskId }: { taskId: string }) {
             <span>{done} / {items.length} done</span><span>{pct}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
@@ -279,7 +279,7 @@ export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId
             <span>{done} / {items.length} done</span><span>{pct}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
