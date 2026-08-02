@@ -385,6 +385,450 @@ function DangerBallot() {
   );
 }
 
+function Toasts() {
+  return (
+    <Family id="toasts" title="Toast / Notification — OPEN BALLOT" note="no shared toast exists; every app hand-rolls — pick ONE (TS-…)">
+      <Variant vid="TS-1" apps="Roles · Management · Discuss · PWA (4 sites)" count="inverted solid pill — de-facto house style">
+        <div className="px-4 py-2.5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium shadow-lg flex items-center gap-2"><CheckIcon className="h-3.5 w-3.5" /> Saved successfully</div>
+      </Variant>
+      <Variant vid="TS-2" apps="Inbox · Commercial Policy" count="semantic tinted glass">
+        <div className="px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"><CheckIcon className="h-3.5 w-3.5" /> Request approved</div>
+        <div className="px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 bg-red-500/15 border-red-500/30 text-red-300">Failed to save</div>
+      </Variant>
+      <Variant vid="TS-3" apps="Expenses (UndoToast component)" count="elevated card + Undo + countdown">
+        <div className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-white/[0.08] bg-[var(--bg-secondary)] px-3.5 py-2 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.7)]">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
+          <span className="text-[12px] text-[var(--text-secondary)]">Expense deleted</span>
+          <button className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">Undo</button>
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] bg-white/[0.04]"><span className="block h-full w-2/3 bg-white/40" /></span>
+        </div>
+      </Variant>
+      <Variant vid="TS-4" apps="QA lightbox HUD" count="black glass capsule">
+        <div className="rounded-full border border-white/15 bg-black/70 px-3 py-1 text-[12px] font-medium text-white shadow-lg backdrop-blur-md">3 / 8</div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Menus() {
+  return (
+    <Family id="menus" title="Dropdown / Context Menu — OPEN BALLOT" note="~60 floating menus, 4 recipes — pick ONE (MN-…)">
+      <Variant vid="MN-1" apps="Discuss right-click menus" count="padded shell, rounded item pills">
+        <div className="min-w-[220px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl p-1.5">
+          <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]">Pin conversation</button>
+          <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]">Mark unread</button>
+          <div className="my-1 border-t border-[var(--border-subtle)]" />
+          <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors text-red-400 hover:bg-red-500/10">Delete</button>
+        </div>
+      </Variant>
+      <Variant vid="MN-2" apps="Accounts · Expenses · CRM · Inventory (~8 sites)" count="edge-to-edge full-bleed rows">
+        <div className="w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
+          <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors text-left">Edit account</button>
+          <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors text-left">Duplicate</button>
+          <div className="h-px bg-[var(--border-subtle)]" />
+          <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left">Revoke access</button>
+        </div>
+      </Variant>
+      <Variant vid="MN-4" apps="Contacts · ProductForm · Notes… (~45 sites)" count="combobox listbox — highest volume">
+        <div className="w-64 max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          {["Juki Corporation", "Jack Sewing Machine", "Brother Industries"].map((x, i) => (
+            <button key={x} className={`w-full text-left px-3 py-2 text-[13px] transition-colors ${i === 0 ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"}`}>{x}</button>
+          ))}
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Tooltips() {
+  return (
+    <Family id="tooltips" title="Tooltip — OPEN BALLOT" note="pick ONE (TP-…)">
+      <Variant vid="TP-1" apps="GuidanceTip — 14 files (bilingual help system)" count="slate panel, 320px, EN/中文">
+        <div className="w-[300px] rounded-lg px-3 py-2.5 text-[11px] leading-relaxed text-white border border-white/[0.18] shadow-2xl" style={{ background: "#1f2937" }}>
+          <p className="font-bold text-[9px] tracking-[0.08em] mb-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>MARKET BAND</p>
+          Controls which price band this market belongs to.
+          <p className="mt-1.5" lang="zh">控制该市场所属的价格区间。</p>
+        </div>
+      </Variant>
+      <Variant vid="TP-2" apps="Notes editor" count="inverted chip, 500ms delay">
+        <div className="inline-block whitespace-nowrap rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[10.5px] font-medium text-[var(--text-inverted)] shadow-lg">Bold (⌘B)</div>
+      </Variant>
+      <Variant vid="TP-4" apps="Landed Cost · Contacts (ad-hoc)" count="wrapping inverted panel">
+        <div className="w-48 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] leading-snug px-2.5 py-2 shadow-xl">Duty is calculated on CIF value plus applicable surcharges.</div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Modals() {
+  return (
+    <Family id="modals" title="Modal Shell — OPEN BALLOT" note="94 hand-rolled overlays — pick ONE shell (MD-…); backdrop dim+blur is already law">
+      <Variant vid="MD-1" apps="Products form modals · Purchase · global dialog host (9 files)" count="px-6 chrome, 16px bold, ruled header+footer">
+        <div className="w-full max-w-sm bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col overflow-hidden">
+          <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-subtle)]">
+            <div><p className="text-[16px] font-bold text-[var(--text-primary)]">Create brand</p><p className="text-[12px] text-[var(--text-dim)] mt-0.5">Add a new brand to the catalog</p></div>
+            <span className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-ghost)]">✕</span>
+          </div>
+          <div className="px-6 py-5 text-[13px] text-[var(--text-muted)]">Body content…</div>
+          <div className="px-6 py-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-3">
+            <button className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)]">Cancel</button>
+            <button className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold shadow-lg">Save</button>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="MD-3" apps="Finance · Sales · Discuss (~8 files)" count="compact px-5, 14px title">
+        <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
+            <div><p className="text-[14px] font-semibold">Add bank account</p><p className="mt-0.5 text-[11px] text-[var(--text-dim)]">Connected to reconciliation</p></div>
+            <span className="rounded-lg p-1.5 text-[var(--text-secondary)] text-[11px]">✕</span>
+          </div>
+          <div className="px-5 py-4 text-[13px] text-[var(--text-muted)]">Body content…</div>
+          <div className="border-t border-[var(--border-subtle)] px-5 py-3 flex items-center justify-end gap-2">
+            <button className="h-9 px-4 rounded-lg text-[12px] font-medium text-[var(--text-dim)]">Cancel</button>
+            <button className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">Save</button>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="MD-4" apps="Suppliers · HR · Employees · Quotations (~14 files)" count="chromeless padded card, no rules">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+          <p className="text-[14px] font-semibold text-[var(--text-primary)]">Log negotiation round</p>
+          <p className="text-[13px] text-[var(--text-muted)]">Body content…</p>
+          <div className="flex items-center gap-3">
+            <button className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">Save</button>
+            <button className="text-[12px] text-[var(--text-dim)]">Cancel</button>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="MD-5" apps="Inventory drawer · CRM · PageNavPopup" count="mobile fullscreen → desktop island, icon-chip header">
+        <div className="w-full max-w-sm rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="h-9 w-9 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center"><LayoutGridIcon className="h-4 w-4 text-[var(--text-dim)]" /></span>
+              <div><p className="text-[15px] font-semibold leading-none tracking-tight">Internal item</p><p className="mt-1 text-[11.5px] text-[var(--text-dim)]">SKU KX-00812</p></div>
+            </div>
+            <span className="text-[var(--text-dim)]">✕</span>
+          </div>
+          <div className="px-5 py-4 text-[13px] text-[var(--text-muted)]">Body content…</div>
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Confirms() {
+  return (
+    <Family id="confirms" title="Delete Confirm — OPEN BALLOT" note="pick ONE (CF-…); delete button itself = elected D-1 tint">
+      <Variant vid="CF-1" apps="Expenses · Finance orders" count="compact hairline, no header bar">
+        <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden">
+          <div className="px-4 py-3.5">
+            <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">Delete this expense?</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-dim)]">This cannot be undone.</p>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t border-white/[0.05] px-4 py-3">
+            <button className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)]">Cancel</button>
+            <button className="rounded-lg border border-rose-500/[0.30] bg-rose-500/[0.10] px-3 py-1.5 text-[12px] font-medium text-rose-300">Delete</button>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="CF-3" apps="Employees · To-do · product view (~4 files)" count="icon-led alert card">
+        <div className="w-full max-w-sm bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl">
+          <div className="flex items-start gap-3 mb-4">
+            <span className="h-10 w-10 rounded-xl bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 shrink-0">!</span>
+            <div><p className="text-[15px] font-bold">Delete employee?</p><p className="text-[12.5px] text-[var(--text-dim)] mt-1 leading-relaxed">The record and its history will be removed.</p></div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button className="h-9 px-4 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)]">Cancel</button>
+            <button className="h-9 px-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-[12.5px] font-semibold">Delete</button>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="CF-2" apps="Products admin + all dialog.confirm() calls" count="MD-1 shell at max-w-md">
+        <div className="w-full max-w-sm bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden">
+          <div className="px-6 py-5 border-b border-[var(--border-subtle)]"><p className="text-[16px] font-bold">Delete product?</p></div>
+          <div className="px-6 py-5 text-[13px] text-[var(--text-muted)] leading-relaxed">This will remove the product from the catalog.</div>
+          <div className="px-6 py-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-3">
+            <button className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)]">Cancel</button>
+            <button className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold">Delete</button>
+          </div>
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Drawers() {
+  return (
+    <Family id="drawers" title="Drawer / Side Panel — OPEN BALLOT" note="pick ONE (DR-…)">
+      <Variant vid="DR-1" apps="Approvals · Payments · Attachments" count="eyebrow header, sectioned footer">
+        <div className="w-full max-w-sm h-64 flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-primary)] rounded-xl overflow-hidden">
+          <div className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
+            <div className="flex-1"><p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">Payment review</p><p className="mt-0.5 truncate text-[14px] font-medium text-[var(--text-primary)]">PO-2231 · Juki</p></div>
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-[var(--text-dim)] text-[11px]">✕</span>
+          </div>
+          <div className="flex-1 px-4 py-4 text-[12px] text-[var(--text-dim)]">Body…</div>
+          <div className="border-t border-white/[0.05] px-4 py-3"><button className="w-full h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">Approve</button></div>
+        </div>
+      </Variant>
+      <Variant vid="DR-2" apps="Finance setup · Home · Inventory (4 copies)" count="14px header + rule, plain body">
+        <div className="w-full max-w-sm h-64 flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-primary)] rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+            <div><p className="text-[14px] font-semibold">Edit account</p><p className="text-[11px] text-[var(--text-dim)]">Chart of accounts</p></div>
+            <span className="text-[var(--text-dim)] text-[20px] leading-none">×</span>
+          </div>
+          <div className="flex-1 p-4 text-[12px] text-[var(--text-dim)]">Body…</div>
+          <div className="border-t border-[var(--border-subtle)] px-4 py-3 flex justify-end"><button className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">Save</button></div>
+        </div>
+      </Variant>
+      <Variant vid="DR-4" apps="Database Visual Library" count="tabbed header, mono code line">
+        <div className="w-full max-w-sm h-64 flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-xl overflow-hidden">
+          <div className="border-b border-[var(--border-subtle)] px-5 pt-4">
+            <p className="truncate text-[15px] font-semibold">needle-icon.svg</p>
+            <p className="font-mono text-[10.5px] px-0 text-[var(--text-dim)]">VL-04471</p>
+            <div className="mt-3 flex gap-4 text-[12px]">
+              <span className="relative pb-2 text-[var(--text-primary)] font-medium">Details<span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[var(--text-primary)]" /></span>
+              <span className="pb-2 text-[var(--text-dim)]">Usage</span>
+              <span className="pb-2 text-[var(--text-dim)]">History</span>
+            </div>
+          </div>
+          <div className="flex-1 px-5 py-4 text-[12px] text-[var(--text-dim)]">Body…</div>
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+const TROWS = [
+  ["KX-00812", "Lockstitch machine", "48", "Active"],
+  ["KX-00344", "Overlock 4-thread", "12", "Draft"],
+  ["KX-01277", "Spreading machine", "6", "Active"],
+];
+
+function Tables() {
+  return (
+    <Family id="tables" title="Data Table — OPEN BALLOT" note="6 recipes, 4 row heights, 8 hover tokens — pick ONE (TBL-…)">
+      <Variant vid="TBL-1" apps="Inventory · Finance · Purchase (16 tables)" count="ERP micro-table — house default" wide>
+        <div className="w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+          <table className="min-w-full text-[12.5px]">
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+              <th className="px-3 py-2.5 text-left font-semibold">SKU</th><th className="px-3 py-2.5 text-left font-semibold">Item</th><th className="px-3 py-2.5 text-right font-semibold">Qty</th><th className="px-3 py-2.5 text-left font-semibold">Status</th>
+            </tr></thead>
+            <tbody>{TROWS.map((r) => (
+              <tr key={r[0]} className="cursor-pointer border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-elevated)]">
+                <td className="px-3 py-3 font-mono text-[var(--text-dim)]">{r[0]}</td><td className="px-3 py-3">{r[1]}</td><td className="px-3 py-3 text-right tabular-nums">{r[2]}</td><td className="px-3 py-3">{r[3]}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      </Variant>
+      <Variant vid="TBL-4" apps="Accounts · Price Calculator · CRM" count="filled thead + divide-y in rounded-2xl" wide>
+        <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+          <table className="w-full text-left text-[12px]">
+            <thead className="bg-[var(--bg-surface-subtle)]/50"><tr className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
+              <th className="px-4 py-3">SKU</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3">Status</th>
+            </tr></thead>
+            <tbody className="divide-y divide-[var(--border-subtle)]">{TROWS.map((r) => (
+              <tr key={r[0]} className="hover:bg-[var(--bg-surface-subtle)]/60 transition-colors">
+                <td className="px-4 py-3 font-mono text-[var(--text-dim)]">{r[0]}</td><td className="px-4 py-3">{r[1]}</td><td className="px-4 py-3 tabular-nums">{r[2]}</td><td className="px-4 py-3">{r[3]}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      </Variant>
+      <Variant vid="TBL-5" apps="Commercial Policy knowledge (82 tables)" count="sentence-case header, filled, no hover" wide>
+        <div className="w-full overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border-subtle)" }}>
+          <table className="w-full text-[13px]">
+            <thead><tr style={{ background: "var(--bg-surface)", borderBottom: "1px solid var(--border-subtle)" }}>
+              <th className="px-4 py-3 text-left font-semibold" style={{ color: "var(--text-secondary)" }}>Sku</th><th className="px-4 py-3 text-left font-semibold" style={{ color: "var(--text-secondary)" }}>Item</th><th className="px-4 py-3 text-left font-semibold" style={{ color: "var(--text-secondary)" }}>Qty</th><th className="px-4 py-3 text-left font-semibold" style={{ color: "var(--text-secondary)" }}>Status</th>
+            </tr></thead>
+            <tbody>{TROWS.map((r) => (
+              <tr key={r[0]} style={{ borderBottom: "1px solid var(--border-faint)" }}>
+                <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>{r[0]}</td><td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>{r[1]}</td><td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>{r[2]}</td><td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>{r[3]}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      </Variant>
+      <Variant vid="TBL-6" apps="Customers · Suppliers server lists" count="sticky sentence-case header, no hover" wide>
+        <div className="w-full" style={{ overflowX: "auto", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>{["SKU", "Item", "Qty", "Status"].map((h) => (
+              <th key={h} style={{ padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", fontSize: 13, textAlign: "start", fontWeight: 600, color: "var(--text-secondary)", background: "var(--bg-surface)" }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>{TROWS.map((r) => (
+              <tr key={r[0]} style={{ cursor: "pointer" }}>{r.map((c, j) => (
+                <td key={j} style={{ padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", fontSize: 13 }}>{c}</td>
+              ))}</tr>))}</tbody>
+          </table>
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function ListRows() {
+  return (
+    <Family id="rows" title="List Row (non-table) — OPEN BALLOT" note="pick ONE (ROW-…); Discuss chat row is already elected separately">
+      <Variant vid="ROW-1" apps="Purchase + Sales + Invoices (14 files)" count="grid row in divide-y card — dominant" wide>
+        <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)] overflow-hidden">
+          {TROWS.map((r) => (
+            <div key={r[0]} className="grid grid-cols-[120px_1fr_60px_auto] gap-4 items-center px-4 py-3 hover:bg-[var(--bg-surface)] transition-colors cursor-pointer">
+              <span className="font-mono text-[12px] text-[var(--text-dim)]">{r[0]}</span>
+              <span className="text-[13px]">{r[1]}</span>
+              <span className="text-[12px] tabular-nums text-right">{r[2]}</span>
+              <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35">{r[3]}</span>
+            </div>
+          ))}
+        </div>
+      </Variant>
+      <Variant vid="ROW-2" apps="Employees · Products list view" count="faux table: column header row + rows" wide>
+        <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+          <div className="flex items-center gap-4 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
+            <span className="w-[120px] shrink-0">SKU</span><span className="flex-1">Item</span><span className="w-[60px]">Qty</span>
+          </div>
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {TROWS.map((r) => (
+              <div key={r[0]} className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer">
+                <span className="w-[120px] shrink-0 font-mono text-[12px] text-[var(--text-dim)]">{r[0]}</span>
+                <span className="flex-1 text-[13px]">{r[1]}</span>
+                <span className="w-[60px] text-[12px] tabular-nums">{r[2]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="ROW-4" apps="Notes · Inbox sidebars" count="full-bleed + 3px selection bar" wide>
+        <div className="w-full max-w-sm bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+          <div className="relative px-4 py-3 border-b border-[var(--border-faint)] bg-[#567FB2]/[0.10]">
+            <span className="absolute inset-y-0 start-0 w-[3px] bg-[#567FB2]" />
+            <p className="text-[13px] font-medium">Q3 supplier review</p><p className="text-[11.5px] text-[var(--text-dim)] mt-0.5">Selected row</p>
+          </div>
+          <div className="px-4 py-3 border-b border-[var(--border-faint)] hover:bg-[var(--bg-surface)] transition-colors">
+            <p className="text-[13px] font-medium">Spreading machine specs</p><p className="text-[11.5px] text-[var(--text-dim)] mt-0.5">Hover row</p>
+          </div>
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Loading() {
+  return (
+    <Family id="loading" title="Loading Language — OPEN BALLOT" note="pick a skeleton (SK-…) AND a spinner (SP-…)">
+      <Variant vid="SK-1" apps="15 route loading.tsx (shell kit)" count="token kit: surface-active bars in bordered blocks">
+        <div className="w-full max-w-sm space-y-2 animate-pulse">
+          <div className="h-4 w-2/3 rounded bg-[var(--bg-surface-active)]" />
+          <div className="h-24 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]" />
+          <div className="h-4 w-1/3 rounded bg-[var(--bg-surface-active)]" />
+        </div>
+      </Variant>
+      <Variant vid="SK-3" apps="ProductList · Accounts · Suppliers (~10 files)" count="surface-subtle blocks per-row">
+        <div className="w-full max-w-sm flex items-center gap-4 animate-pulse">
+          <div className="h-14 w-14 rounded-xl bg-[var(--bg-surface-subtle)] shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-[var(--bg-surface-subtle)] rounded w-2/3" />
+            <div className="h-3 bg-[var(--bg-surface-subtle)] rounded w-1/3" />
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="SP-1" apps="SpinnerIcon — 319 sites" count="icon arc spinner">
+        <div className="flex items-center gap-3 text-[var(--text-dim)]">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className="animate-spin"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2z" /></svg>
+          <span className="text-[12px]">Loading…</span>
+        </div>
+      </Variant>
+      <Variant vid="SP-4" apps="ui/Button · AppLaunchLink (~10 sites)" count="CSS ring spinner">
+        <div className="flex items-center gap-3">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />
+          <span className="text-[12px] text-[var(--text-dim)]">Loading…</span>
+        </div>
+      </Variant>
+      <Variant vid="SP-BAR" apps="PermissionGate (seen on every app open)" count="indeterminate mini bar">
+        <div className="h-2 w-32 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden"><div className="h-full w-1/2 bg-[var(--bg-inverted)] animate-pulse" /></div>
+      </Variant>
+    </Family>
+  );
+}
+
+function Avatars() {
+  const A = ({ cls, style, ch }: { cls: string; style?: React.CSSProperties; ch: string }) => (
+    <div className={cls} style={{ width: 40, height: 40, fontSize: 14, ...style }}>{ch}</div>
+  );
+  return (
+    <Family id="avatars" title="Avatar Fallback — OPEN BALLOT" note="photo is always round; pick the INITIALS fallback (AV-…)">
+      <Variant vid="AV-1" apps="Discuss (9 sites)" count="neutral gradient + white initials">
+        <A cls="rounded-full bg-gradient-to-br from-neutral-400 to-neutral-500 flex items-center justify-center text-white font-semibold" ch="KE" />
+        <A cls="rounded-full bg-gradient-to-br from-neutral-300 to-neutral-600 flex items-center justify-center text-white font-semibold" ch="XZ" />
+      </Variant>
+      <Variant vid="AV-2" apps="Employees · HR · Management (~26 files)" count="token circle, bordered, dim initials">
+        <A cls="rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] font-semibold" ch="KE" />
+        <A cls="rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] font-semibold" ch="AL" />
+      </Variant>
+      <Variant vid="AV-3" apps="Header user chip · CRM owner" count="inverted solid mono">
+        <A cls="rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center font-semibold" ch="KE" />
+      </Variant>
+      <Variant vid="AV-4" apps="Inbox · Discuss thread · Customer chat" count="saturated hue gradients (off-brand)">
+        <A cls="rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold" ch="KE" />
+        <A cls="rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold" ch="AL" />
+        <A cls="rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold" ch="XZ" />
+      </Variant>
+    </Family>
+  );
+}
+
+function DatePickers() {
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  return (
+    <Family id="datepicker" title="Date Picker — OPEN BALLOT" note="85 native date inputs vs 6 custom — pick ONE (DP-…)">
+      <Variant vid="DP-1" apps="To-do · HR Leave (custom DatePicker)" count="themed calendar, Today/Clear footer" wide>
+        <div className="flex flex-wrap gap-6 items-start">
+          <button className="w-[220px] h-10 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[13px] flex items-center justify-between gap-2 text-start">
+            <span className="text-[var(--text-primary)]">Aug 2, 2026</span>
+            <span className="text-[var(--text-dim)]">📅</span>
+          </button>
+          <div className="w-[280px] p-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)]"><AngleLeftIcon className="h-3.5 w-3.5" /></span>
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">August 2026</span>
+              <span className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)]"><AngleRightIcon className="h-3.5 w-3.5" /></span>
+            </div>
+            <div className="grid grid-cols-7 gap-0.5 mb-0.5">{["S","M","T","W","T","F","S"].map((d, i) => <span key={i} className="h-7 flex items-center justify-center text-[10px] font-semibold text-[var(--text-ghost)] uppercase">{d}</span>)}</div>
+            <div className="grid grid-cols-7 gap-0.5">
+              {days.map((d) => (
+                <span key={d} className={`h-8 rounded-lg text-[12px] font-medium flex items-center justify-center ${d === 2 ? "bg-[#567FB2] text-white" : "text-[var(--text-primary)]"}`}>{d}</span>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
+              <span className="text-[11px] font-semibold text-[#7FA9D6]">Today</span>
+              <span className="text-[11px] font-medium text-[var(--text-dim)]">Clear</span>
+            </div>
+          </div>
+        </div>
+      </Variant>
+      <Variant vid="DP-2" apps="Calendar · Invoices · CRM (85 inputs)" count="native OS calendar on the field">
+        <input type="date" defaultValue="2026-08-02" className="w-[220px] h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors" />
+      </Variant>
+    </Family>
+  );
+}
+
+function FilterChips() {
+  return (
+    <Family id="filterchips" title="Filter / Tag Chip — OPEN BALLOT" note="pick ONE (FC-…)">
+      <Variant vid="FC-1" apps="Products ACTIVE filters row" count="h-7 pill, focus border, round × button">
+        <span className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[11px] font-medium text-[var(--text-primary)]">Division: garment machinery<span className="h-5 w-5 rounded-full flex items-center justify-center text-[var(--text-dim)] text-[14px] leading-none">×</span></span>
+      </Variant>
+      <Variant vid="FC-2" apps="Contacts tags (8 sites)" count="text-xs, border-color">
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">supplier<span className="text-[var(--text-dim)]">×</span></span>
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">garment<span className="text-[var(--text-dim)]">×</span></span>
+      </Variant>
+      <Variant vid="FC-3" apps="Products form sections" count="h-7 borderless surface">
+        <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">stainless<span className="text-[var(--text-dim)]">×</span></span>
+        <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">220V<span className="text-[var(--text-dim)]">×</span></span>
+      </Variant>
+      <Variant vid="FC-4" apps="Notes #tags" count="h-6 compact, red remove hover">
+        <span className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)]">#meeting<span className="text-[var(--text-dim)]">×</span></span>
+      </Variant>
+    </Family>
+  );
+}
+
 /* ═══════════════ page ═══════════════ */
 
 export default function ElementElection() {
@@ -401,6 +845,18 @@ export default function ElementElection() {
       </p>
       <Elected />
       <DangerBallot />
+      <Modals />
+      <Confirms />
+      <Drawers />
+      <Tables />
+      <ListRows />
+      <Loading />
+      <Avatars />
+      <DatePickers />
+      <FilterChips />
+      <Toasts />
+      <Menus />
+      <Tooltips />
       <BtnRunoff />
       <Pills />
       <ProgressBars />
