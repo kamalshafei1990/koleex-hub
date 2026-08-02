@@ -164,6 +164,8 @@ export async function POST(req: Request) {
     content?: string;
     user_lang?: "en" | "zh" | "ar";
     stream?: boolean;
+    /** Extracted by /api/ai/attachments — name + plain text only. */
+    attachments?: Array<{ name?: string; text?: string }>;
   };
 
   const content = body.content?.trim();
@@ -176,6 +178,31 @@ export async function POST(req: Request) {
   if (!conversationId) {
     return NextResponse.json({ error: "conversationId required" }, { status: 400 });
   }
+
+  /* ── Attachments (owner feature 2026-08-03) ──
+     Text was extracted by /api/ai/attachments. The FULL text rides only
+     into the MODEL turn (attachBlock); the persisted user message gets a
+     slim 📎 marker so history and later-turn payloads stay small. */
+  const rawAtt = Array.isArray(body.attachments) ? body.attachments : [];
+  let attBudget = 60000;
+  const attFinal = rawAtt
+    .filter((a) => a && typeof a.name === "string" && typeof a.text === "string" && a.text.trim())
+    .slice(0, 6)
+    .map((a) => {
+      const text = String(a.text).slice(0, Math.max(0, Math.min(30000, attBudget)));
+      attBudget -= text.length;
+      return { name: String(a.name).slice(0, 120), text };
+    })
+    .filter((a) => a.text.length > 0);
+  const attachMarker = attFinal.length
+    ? "\n\n" + attFinal.map((a) => `📎 ${a.name}`).join("\n")
+    : "";
+  const attachBlock = attFinal
+    .map(
+      (a) =>
+        `\n\n[ATTACHED FILE: ${a.name}] (uploaded by the user — its extracted text follows; answer using it and never claim you cannot open files)\n"""\n${a.text}\n"""`,
+    )
+    .join("");
 
   /* Confirm the conversation is mine. Must stay sequential — a 404
      should be side-effect-free; no inserts fire if the conv isn't ours. */
@@ -200,7 +227,7 @@ export async function POST(req: Request) {
      Skips buildUserContext + history SELECT + orchestrate. Writes
      (user turn, assistant turn, conversation update) are independent
      once we know the conversation is ours, so run them in parallel. */
-  const fast = tryFastReply(content);
+  const fast = attFinal.length > 0 ? null : tryFastReply(content);
   if (fast) {
     const finalTitle = computeTitle(conv, content);
     const [, assistantInsert] = await Promise.all([
@@ -208,7 +235,7 @@ export async function POST(req: Request) {
         tenant_id: auth.tenant_id,
         conversation_id: conversationId,
         role: "user",
-        content,
+        content: content + attachMarker,
       }),
       supabaseServer
         .from("ai_messages")
@@ -339,7 +366,7 @@ export async function POST(req: Request) {
               tenant_id: auth.tenant_id,
               conversation_id: conversationId,
               role: "user",
-              content,
+              content: content + attachMarker,
             }),
           ]);
 
@@ -452,7 +479,7 @@ export async function POST(req: Request) {
             const fastMessages = [
               { role: "system" as const, content: systemPrompt },
               ...history,
-              { role: "user" as const, content: normalizedContent },
+              { role: "user" as const, content: normalizedContent + attachBlock },
             ];
             /* Token budget per lane. General gets a bigger ceiling
                than small-talk so explanations can breathe but still
@@ -517,7 +544,7 @@ export async function POST(req: Request) {
               dialect: wantsRewrite ? ("egyptian" as const) : null,
               ctx,
               history,
-              userMessage: content,
+              userMessage: content + attachBlock,
               userLang,
               conversationId: conversationId!,
             });
@@ -685,7 +712,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       conversation_id: conversationId,
       role: "user",
-      content,
+      content: content + attachMarker,
     }),
   ]);
   const tDeps = Date.now();
@@ -704,7 +731,7 @@ export async function POST(req: Request) {
   const agent = await orchestrate({
     ctx,
     history,
-    userMessage: content,
+    userMessage: content + attachBlock,
     userLang,
     conversationId,
   });

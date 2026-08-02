@@ -223,8 +223,17 @@ export default function KoleexAiApp() {
   const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
     const list = ev.target.files;
     if (!list || list.length === 0) return;
-    const picked = Array.from(list).slice(0, 6 - attachments.length);
-    setAttachments((prev) => [...prev, ...picked]);
+    /* V1 readable set: text-bearing files only. DeepSeek has no vision,
+       so images are rejected up-front with an honest message instead of
+       silently attaching something the model can't see. */
+    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log)$/i;
+    const all = Array.from(list);
+    const ok = all.filter((f) => SUPPORTED.test(f.name));
+    if (ok.length < all.length) {
+      setError("Supported files: PDF, TXT, MD, CSV, JSON. Images can't be read yet.");
+    }
+    const picked = ok.slice(0, 6 - attachments.length);
+    if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
     /* Allow re-picking the same file twice in a row. */
     ev.target.value = "";
   }, [attachments.length]);
@@ -454,7 +463,8 @@ export default function KoleexAiApp() {
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
-      if (!text) return;
+      const filesToSend = attachments;
+      if (!text && filesToSend.length === 0) return;
       /* Synchronous guard: flip ref BEFORE any await so a rapid second
          Send click / Enter press can't slip past the state check. */
       if (sendingRef.current) return;
@@ -505,10 +515,64 @@ export default function KoleexAiApp() {
       }
 
       setError(null);
+
+      /* ── Attachments: extract text server-side BEFORE the turn so it
+         can ride along with the message. Failures surface inline and
+         the turn continues with whatever extracted cleanly. */
+      const typedText =
+        text || "Please read the attached file(s) and give me the key points.";
+      let attachPayload: Array<{ name: string; text: string }> = [];
+      let displayText = typedText;
+      if (filesToSend.length > 0) {
+        try {
+          const fd = new FormData();
+          filesToSend.forEach((f) => fd.append("files", f, f.name));
+          const up = await fetch("/api/ai/attachments", {
+            method: "POST",
+            credentials: "include",
+            body: fd,
+          });
+          const uj = (await up.json().catch(() => null)) as {
+            files?: Array<{ name: string; text?: string; error?: string }>;
+          } | null;
+          const results = uj?.files ?? [];
+          attachPayload = results.filter(
+            (f): f is { name: string; text: string } => typeof f.text === "string" && f.text.length > 0,
+          );
+          const failed = results.filter((f) => !f.text);
+          if (failed.length > 0) {
+            setError(
+              failed
+                .map((f) => {
+                  const why =
+                    f.error === "image_not_supported" ? "images can't be read yet"
+                    : f.error === "no_text" ? "no readable text (scanned file?)"
+                    : f.error === "too_large" ? "over 10 MB"
+                    : "file type not supported";
+                  return `${f.name}: ${why}`;
+                })
+                .join(" · "),
+            );
+          }
+          if (attachPayload.length > 0) {
+            displayText = typedText + "\n\n" + attachPayload.map((f) => `📎 ${f.name}`).join("\n");
+          }
+        } catch {
+          setError("Couldn't process the attachment(s).");
+        }
+        setAttachments([]);
+      }
+      if (!text && attachPayload.length === 0 && filesToSend.length > 0) {
+        /* Attachment-only send where nothing extracted — nothing to ask. */
+        sendingRef.current = false;
+        setSending(false);
+        return;
+      }
+
       const optimistic: ChatMsg = {
         id: `tmp-${Date.now()}`,
         role: "user",
-        content: text,
+        content: displayText,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
@@ -554,9 +618,10 @@ export default function KoleexAiApp() {
           },
           body: JSON.stringify({
             conversationId,
-            content: text,
+            content: typedText,
             user_lang: lang,
             stream: true,
+            attachments: attachPayload,
           }),
           signal: aborter.signal,
         });
@@ -837,7 +902,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts],
+    [input, activeId, lang, stopTts, attachments],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -1689,6 +1754,7 @@ export default function KoleexAiApp() {
                     <input
                       ref={fileInputRef}
                       type="file"
+                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,application/pdf,text/plain,text/markdown,text/csv,application/json"
                       multiple
                       onChange={onFilesPicked}
                       className="hidden"
