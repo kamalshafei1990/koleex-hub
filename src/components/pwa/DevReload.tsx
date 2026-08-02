@@ -29,7 +29,22 @@ export default function DevReload() {
     };
     tick();
     const iv = setInterval(tick, 3000);
-    return () => { alive = false; clearInterval(iv); };
+    /* The embedded preview pane FREEZES timers while backgrounded and
+       does not resume them — so also tick on every wake signal, making
+       the reload land the instant the owner looks back at the tab. */
+    const wake = () => tick();
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", wake);
+    document.addEventListener("pointermove", wake, { passive: true });
+    return () => {
+      alive = false;
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", wake);
+      document.removeEventListener("pointermove", wake);
+    };
   }, []);
   return null;
 }
