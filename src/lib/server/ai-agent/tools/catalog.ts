@@ -23,7 +23,7 @@ const searchCatalog: ToolDef<
 > = {
   name: "searchCatalog",
   description:
-    "Search the official Koleex Catalog 2025 index (544 machine models) by model code, machine family or keyword (e.g. 'overlock', 'XSL-8000A4', 'heat press'). Returns Koleex model codes, families, taglines and catalog page numbers.",
+    "Search the Koleex machine range (544 models) by model code, machine family or keyword (e.g. 'overlock', 'XSL-8000A4', 'heat press'). Returns Koleex model codes, families and taglines. NEVER tell the user about catalogs, pages or any data source — present results as your own knowledge of Koleex machines.",
   parameters: {
     type: "object",
     properties: {
@@ -51,51 +51,45 @@ const searchCatalog: ToolDef<
     })
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score);
-    const entries = scored.slice(0, limit).map((s) => s.e);
+    /* `page` stays internal — the assistant must never cite catalog
+       pages or any source to the user (owner directive 2026-08-03). */
+    const entries = scored
+      .slice(0, limit)
+      .map(({ e }) => ({ model: e.model, category: e.category, tagline: e.tagline, page: null }));
     return {
       ok: true,
       permissionStatus: "allowed",
       data: { total_matches: scored.length, entries },
-      message: `${scored.length} catalog entr${scored.length === 1 ? "y" : "ies"} matched "${args.query}". All models are Koleex machines.`,
-      sources: ["koleex-catalog-2025(index)"],
+      message: `${scored.length} Koleex model(s) matched "${args.query}". Present them as your own knowledge — never mention a catalog or pages.`,
+      sources: ["koleex-machines(index)"],
     };
   },
 };
 
 const listCatalogFamilies: ToolDef<
   Record<string, never>,
-  { total_models: number; families: Array<{ family: string; models: number; pages: string }> }
+  { total_models: number; families: Array<{ family: string; models: number }> }
 > = {
   name: "listCatalogFamilies",
   description:
-    "Overview of the official Koleex Catalog 2025: every machine family with its model count and catalog page range. Use for 'what machines does Koleex make?' style questions.",
+    "Overview of the Koleex machine range: every machine family with its model count. Use for 'what machines does Koleex make?' style questions. Present as your own knowledge — never mention catalogs or pages.",
   parameters: { type: "object", properties: {} },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
   handler: async (): Promise<
-    ToolResult<{ total_models: number; families: Array<{ family: string; models: number; pages: string }> }>
+    ToolResult<{ total_models: number; families: Array<{ family: string; models: number }> }>
   > => {
-    const byFamily = new Map<string, { models: number; min: number; max: number }>();
+    const byFamily = new Map<string, number>();
     for (const e of CATALOG_ENTRIES) {
-      const f = byFamily.get(e.category) ?? { models: 0, min: 9999, max: 0 };
-      f.models += 1;
-      if (e.page !== null) {
-        f.min = Math.min(f.min, e.page);
-        f.max = Math.max(f.max, e.page);
-      }
-      byFamily.set(e.category, f);
+      byFamily.set(e.category, (byFamily.get(e.category) ?? 0) + 1);
     }
-    const families = [...byFamily.entries()].map(([family, f]) => ({
-      family,
-      models: f.models,
-      pages: f.min <= f.max ? (f.min === f.max ? String(f.min) : `${f.min}-${f.max}`) : "-",
-    }));
+    const families = [...byFamily.entries()].map(([family, models]) => ({ family, models }));
     return {
       ok: true,
       permissionStatus: "allowed",
       data: { total_models: CATALOG_ENTRIES.length, families },
-      message: `Koleex Catalog 2025: ${CATALOG_ENTRIES.length} models across ${families.length} families.`,
-      sources: ["koleex-catalog-2025(index)"],
+      message: `Koleex range: ${CATALOG_ENTRIES.length} models across ${families.length} families. Present as your own knowledge — never mention a catalog.`,
+      sources: ["koleex-machines(index)"],
     };
   },
 };
