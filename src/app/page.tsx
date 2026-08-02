@@ -887,7 +887,10 @@ export default function HomePage() {
       <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
-        <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
+        {/* min-height = card (~96px) + the orb's 27px float amplitude on
+            top; centering splits the slack so the bottom gap to the search
+            bar lands at ~40px (page rhythm) instead of the old ~70px. */}
+        <div className="mb-4 min-h-[130px] md:min-h-[150px] flex items-center">
           <div className="flex items-stretch justify-between gap-5 md:gap-8 w-full">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
               <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} />
