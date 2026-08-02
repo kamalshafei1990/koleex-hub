@@ -124,10 +124,24 @@ const asKnowledgeList = (
 const SectionHead = ({
   eyebrow,
   title,
+  hero,
 }: {
   eyebrow?: string;
   title: string;
-}) => (
+  /** Apple-style major section head: centered, Hub-Blue kicker, huge title. */
+  hero?: boolean;
+}) => hero ? (
+  <div className="space-y-2 text-center">
+    {eyebrow ? (
+      <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
+        {eyebrow}
+      </div>
+    ) : null}
+    <h3 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.05]">
+      {title}
+    </h3>
+  </div>
+) : (
   <div className="space-y-1">
     {eyebrow ? (
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
@@ -280,6 +294,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
        summaries (schema-driven via field.insight). Any field carrying an
        insight surfaces here; ordered by anchor priority when it is also an
        anchor, else appended. Generic — zero product-specific logic. */
+  /* Feature-explorer active chip (Apple 'Take a closer look'). */
+  const [explorerIdx, setExplorerIdx] = useState(0);
+
   const intelligence = useMemo(() => {
     const seen = new Set<string>();
     const items: { key: string; label: string; headline: string; insight: string }[] = [];
@@ -523,6 +540,29 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       </section>
       ) : null}
 
+      {/* ── Sticky product pill (Apple pattern): the product's own bar —
+          name at the start, section anchors at the end. Lives BELOW the
+          hero (owner rule: nothing overlays the header photo) and pins
+          under the hub header once the reader scrolls past it. */}
+      <div className="sticky top-2 z-30 -mb-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 px-5 py-2.5 shadow-lg backdrop-blur-xl">
+          <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]">
+            {displayName || productName}
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            <a href="#overview" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
+              {t("preview.stickyOverview", "Overview")}
+            </a>
+            <a href="#specs" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
+              {t("preview.stickySpecs", "Specs")}
+            </a>
+            <a href="#gallery" className="inline-flex items-center rounded-full bg-[var(--bg-inverted)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90">
+              {t("preview.stickyGallery", "Gallery")}
+            </a>
+          </span>
+        </div>
+      </div>
+
       {/* Anchor target for the poster "Learn more" CTA. */}
       <div id="overview" className="scroll-mt-24" />
 
@@ -623,6 +663,31 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           </p>
         </section>
       ) : null}
+
+      {/* ═══ 3b. PERFORMANCE STATEMENT — Apple gradient headline built from
+          the schema's own top metrics (no hardcoded copy). ═══ */}
+      {(() => {
+        const metrics = coreAnchors
+          .filter(({ kind, field: f }) => kind === "metric" && !isEmptyValue(values[f.key]))
+          .slice(0, 3)
+          .map(({ field: f }) => `${displayScalar(values[f.key])}${f.unit ? " " + f.unit : ""}`);
+        if (metrics.length < 2) return null;
+        return (
+          <section className="mx-auto max-w-4xl space-y-6 text-center">
+            <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
+              {t("preview.eyebrowPerformance", "Performance")}
+            </div>
+            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-6xl font-semibold tracking-[-0.02em] leading-[1.1] text-transparent">
+              {metrics.join(". ")}.
+            </p>
+            {asKnowledgeList(firstKb("technical_advantages")?.content)[0] ? (
+              <p className="mx-auto max-w-2xl text-base md:text-xl font-light leading-relaxed text-[var(--text-muted)]">
+                {asKnowledgeList(firstKb("technical_advantages")!.content)[0]}
+              </p>
+            ) : null}
+          </section>
+        );
+      })()}
 
       {/* ═══ 4. MATERIALS ═══ */}
       {materialPicks.length > 0 ? (
@@ -730,8 +795,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
       {/* ═══ 7. SELLING POINTS / TECHNICAL ADVANTAGES (knowledge cards) ═══ */}
       {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
-        <section className="space-y-4">
-          <SectionHead eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
+        <section className="space-y-8">
+          <SectionHead hero eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
           {/* Apple-style benefit grid: oversized glyph leading each card. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
@@ -753,27 +818,51 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ LAYER 2 — SMART PRODUCT INTELLIGENCE ═══
           Interpreted, benefit-oriented summaries (schema-driven via insight). */}
       {intelligence.length > 0 ? (
-        <section className="space-y-4">
-          <SectionHead eyebrow={t("preview.eyebrowWhatItMeans", "What it means for you")} title={t("preview.productIntelligence", "Product Intelligence")} />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {intelligence.map((it) => (
-              <div
-                key={it.key}
-                className="rounded-2xl bg-[var(--bg-surface-subtle)] p-6"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                    {it.label}
-                  </span>
-                  <span className="text-base font-semibold text-[var(--text-primary)] shrink-0">
-                    {it.headline}
-                  </span>
-                </div>
-                <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
-                  {it.insight}
-                </p>
+        <section className="space-y-8">
+          <SectionHead hero eyebrow={t("preview.eyebrowWhatItMeans", "What it means for you")} title={t("preview.takeCloserLook", "Take a closer look.")} />
+          <div className="rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-6 md:p-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-8 lg:gap-12">
+              {/* chip rail — Apple's (+) explorer list */}
+              <div className="order-2 lg:order-1 lg:col-span-5 space-y-2.5">
+                {intelligence.map((it, i) => (
+                  <div key={it.key}>
+                    <button
+                      type="button"
+                      onClick={() => setExplorerIdx(explorerIdx === i ? -1 : i)}
+                      aria-expanded={explorerIdx === i}
+                      className={`inline-flex items-center gap-3 rounded-full border px-2 py-2 pe-5 text-start transition-all ${
+                        explorerIdx === i
+                          ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
+                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] hover:border-[var(--border-focus)]"
+                      }`}
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[18px] leading-none transition-colors ${
+                        explorerIdx === i ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                      }`}>{explorerIdx === i ? "–" : "+"}</span>
+                      <span className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)]">{it.label}</span>
+                      <span className="ms-auto text-[12px] font-medium text-[#7FA9D6]">{it.headline}</span>
+                    </button>
+                    {explorerIdx === i ? (
+                      <div className="mt-2.5 rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
+                        <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                          <span className="font-semibold text-[var(--text-primary)]">{it.label}. </span>
+                          {it.insight}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-            ))}
+              {/* the product itself */}
+              <div className="order-1 lg:order-2 lg:col-span-7">
+                {mainImageUrl ? (
+                  <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mainImageUrl} alt={displayName} className="mx-auto max-h-[420px] w-auto object-contain px-6 py-8" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
         </section>
       ) : null}
@@ -782,8 +871,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           Primary groups open by default; standard/quiet collapsed so the
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
-        <div>
-          <SectionHead eyebrow={t("preview.eyebrowLayer3", "Layer 3")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
+        <div id="specs" className="scroll-mt-24">
+          <SectionHead hero eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (
             <Disclosure
@@ -927,8 +1016,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
       {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
-        <section className="space-y-4">
-          <SectionHead title={t("view.gallery", "Gallery")} />
+        <section id="gallery" className="scroll-mt-24 space-y-8">
+          <SectionHead hero eyebrow={t("preview.eyebrowUpClose", "Up close")} title={t("view.gallery", "Gallery")} />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {galleryUrls!.map((url, i) => (
               <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
