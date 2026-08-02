@@ -159,6 +159,49 @@ Each wave ends with: census re-run (numbers must drop), screenshot matrix
 
 ---
 
+## 6b. Element Election — owner-curated canon (owner, 2026-08-02)
+
+Owner's directive: he will personally SELECT the winning design for each
+element family from the designs that already exist in the system ("there
+are elements I feel totally satisfied about"). Process:
+
+1. **Harvest** — catalog the distinct visual variants of each element
+   family actually shipped across the apps (exact classNames, source,
+   usage count).
+2. **Ballot** — render every variant LIVE, side by side, labeled with a
+   variant id + which apps use it, on the hidden page `/kds-lab/elements`.
+3. **Election** — owner replies with his picks (e.g. "SB-2, PILL-1…").
+   A pick immediately becomes the canonical KDS component (built or
+   updated in `src/components/kds/`), superseding kit v0 defaults.
+4. **Conformance sweeps** — element-first migration (all apps' search
+   bars → the elected search bar, etc.), replacing/augmenting the
+   app-first wave order of §4. D3 sign-off still applies to sweep order.
+
+Already-law elements are NOT on the ballot (standing owner rules):
+toggles = emerald track + white knob · sliders/progress = blue fill +
+white knob (fill shape IS on the ballot) · modal backdrop = dim + blur ·
+hover physics = .kx-hover-card. Layout archetypes (§1b) are untouched —
+this is element design only, per the owner's framing.
+
+### ELECTED 2026-08-02 (owner selected live from the running apps)
+
+| Canon id | Element | Source of truth |
+|---|---|---|
+| E-SEARCH | Toolbar search card: `bg-secondary/80 backdrop-blur rounded-xl p-3.5` shell; input `h-10 pl-10 rounded-xl bg-surface-subtle` + Hub-Blue focus ring; joined h-10 w-10 view-toggle pair; Filters btn `h-10 px-4 rounded-xl` + count badge `h-5 min-w-[20px] rounded-full bg-inverted` | ProductList.tsx sticky bar |
+| E-TABS | Pill-in-shell nav (TAB-1): shell `rounded-xl border bg-secondary px-1.5 py-1.5`, pill `rounded-lg px-3.5 py-1.5 text-[12.5px]`, active = inverted fill | PageHeader/TabStrip |
+| E-SEG | Inset segmented: shell `bg-surface-subtle border rounded-xl p-1`, item `h-8 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wider`, active inverted | Calendar month/week/day |
+| E-BTN | Secondary `h-10 px-4 rounded-xl bg-surface-subtle border-subtle font-semibold hover:border-focus` (Today); icon-nav `h-10 w-10 rounded-xl` same skin; icon-primary `h-8 w-8 rounded-lg bg-inverted`; icon-secondary `h-8 w-8 rounded-lg bg-surface border-subtle`. Primary label btn → RUNOFF R-1 (h-9 rounded-md primitive) vs R-2 (h-10 rounded-xl hero) pending | Calendar/Customers/Documents |
+| E-KPI | Stat card `bg-secondary border-color rounded-xl p-3 md:p-5 hover:border-focus`; icon tile `w-8 h-8 rounded-lg bg-surface border-subtle`; label `text-[10px] uppercase tracking-widest text-faint`; value `text-2xl md:text-3xl font-bold`; sub `text-xs text-dim mt-1` | Customers dashboard |
+| E-CARD | Action card `rounded-2xl border-color bg-secondary p-5 hover:border-focus` + `w-10 h-10 rounded-xl` icon tile; data card `rounded-2xl border-subtle bg-surface p-5 hover:border-color hover:bg-surface-hover` + `h-11 w-11` tile + count pill | Documents / Database home |
+| E-FIELD | Form input/select `h-10 px-3 rounded-xl bg-[var(--bg-primary)] border-subtle focus:border-focus text-[13px]`; select `appearance-none pr-9` + custom chevron; label `text-[11px] font-medium text-dim mb-1` | EmployeeForm |
+| E-ROW | List row `px-3 py-2.5 rounded-xl hover:bg-surface-hover` + 40px avatar + name/meta/preview grid | Discuss sidebar |
+| E-HEADER | PageHeader anatomy incl. back button `h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl` | Documents header |
+
+Ballot page: `/kds-lab/elements` (green = elected). Still OPEN: R (primary
+button runoff) · PILL · PB · CB · ES · SH.
+
+---
+
 ## 7. Pilot (Products) — CLOSING REPORT · 2026-08-02
 
 **Shipped batches:** fa474f55 (law + kit v0 + --accent→HubBlue 193 sites +
