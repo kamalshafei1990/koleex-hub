@@ -25,7 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE } from "./brand-knowledge";
+import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
@@ -876,17 +876,6 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       }),
     );
 
-    /* Hit the hard ceiling — force the next iteration to produce a
-       final answer instead of calling more tools. We signal the model
-       by appending a synthetic system message and disabling tools on
-       the next call (set tool_choice="none"). */
-    if (totalToolRuns >= MAX_TOOLS_PER_TURN) {
-      messages.push({
-        role: "system",
-        content: "Tool-call budget reached. Summarise what you have with no further tool calls.",
-      });
-    }
-
     // Feed tool outputs back as tool-role messages. We only send a
     // minimal, LLM-safe projection — never the full raw object if it
     // could contain anything sensitive we haven't already filtered.
@@ -896,6 +885,20 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         tool_call_id: tc.id,
         name: tc.function.name,
         content: JSON.stringify(toLlmSafe(result)),
+      });
+    }
+
+    /* Hit the hard ceiling — force the next iteration to produce a
+       final answer instead of calling more tools. MUST be pushed AFTER
+       the tool-role feed above: providers require the assistant
+       tool_calls message to be IMMEDIATELY followed by its tool
+       replies, and injecting this system message between them returned
+       400 "insufficient tool messages following tool_calls" — the turn
+       then fell back to raw tool text as the user-visible answer. */
+    if (totalToolRuns >= MAX_TOOLS_PER_TURN) {
+      messages.push({
+        role: "system",
+        content: "Tool-call budget reached. Summarise what you have with no further tool calls.",
       });
     }
 
@@ -986,6 +989,8 @@ Style:
 - Don't pad for length, but don't clip to one sentence either. Treat each question as worth a real answer.
 
 ${BRAND_EXCLUSIVITY_RULE}
+
+${DIRECT_VOICE_RULE}
 
 Current user: ${ctx.auth.username}.`;
 }
@@ -1177,6 +1182,8 @@ function buildSystemPrompt(
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
 
 ${BRAND_EXCLUSIVITY_RULE}
+
+${DIRECT_VOICE_RULE}
 
 ${nowBlock}
 
@@ -2411,7 +2418,7 @@ async function orchestrateNoGroq(
     "You currently do NOT have access to the company's live data (tool calls are disabled). " +
     "Be helpful for general questions and conversational turns. If asked to look up live data, " +
     "explain that the tool-calling layer needs a Groq API key and offer to help with anything else. " +
-    BRAND_EXCLUSIVITY_RULE;
+    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE;
 
   /* Trim history to the last few turns so the wire payload stays
      small — matches the Groq path which also caps history. */

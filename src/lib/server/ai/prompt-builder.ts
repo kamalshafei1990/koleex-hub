@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BRAND_EXCLUSIVITY_RULE } from "../ai-agent/brand-knowledge";
+import { BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "../ai-agent/brand-knowledge";
 
 /* ---------------------------------------------------------------------------
    ai/prompt-builder — builds the system + user messages for each task mode.
@@ -124,6 +124,7 @@ export function buildFastPrompt(
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
+        ` ${DIRECT_VOICE_RULE}` +
         ` ${ENTITY_GUIDANCE_SHORT}` +
         (ctx.entityScope ? ` ${buildEntityDirective(ctx.entityScope)}` : "") +
         persona +
@@ -161,6 +162,7 @@ export function buildSmartPrompt(
       content:
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
+        ` ${DIRECT_VOICE_RULE}` +
         `${ENTITY_GUIDANCE_FULL}\n\n` +
         (ctx.entityScope
           ? `${buildEntityDirective(ctx.entityScope)}\n\n`
@@ -220,6 +222,7 @@ export function buildChatPrompt(
       content:
         `You are Koleex AI, a friendly general-purpose assistant living inside Koleex Hub.${whoAmI}` +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
+        ` ${DIRECT_VOICE_RULE}` +
         ` Language: reply in the user's current message language by default (fall back to ${lang} for very short turns). If the user explicitly tells you which language to use for replies ("reply in Arabic", "answer in English", "رد بالعربية", "请用中文回答"), honor that for ALL subsequent replies until they ask you to switch again — even if they keep writing to you in a different language. Request-language and reply-language can legitimately be different.` +
         ` Multilingual capability: you communicate naturally in English, Arabic (including Egyptian dialect), Chinese, and other widely-used languages. Detect the user's language automatically, reply in it, and switch smoothly when they switch. Handle mixed-language input and informal phrasing gracefully.` +
         ` Dialect + tone mirroring: match the user's DIALECT and REGISTER, not just the language family. Egyptian Arabic in → reply in Egyptian Arabic. Formal MSA in → reply in formal MSA. Casual simple English in → reply in simple casual English. Professional business English in → reply in professional English. Do not upgrade a user's register (don't make casual users feel lectured) or downgrade it (don't get informal with a business user).` +
@@ -272,6 +275,7 @@ export function buildBusinessPrompt(
       content:
         `You are Koleex AI's business reasoning assistant for Koleex Hub.${whoAmI}` +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
+        ` ${DIRECT_VOICE_RULE}` +
         ` Reply in ${lang}. Structure answers as short bullet points or numbered steps.` +
         ` HARD RULES — never break these:` +
         ` (1) Do NOT generate any pricing, cost, margin, discount, commission, credit-limit,` +
