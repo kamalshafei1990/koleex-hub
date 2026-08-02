@@ -1373,8 +1373,10 @@ export default function ProductList() {
               <div className="space-y-10">
               {cat.subSections.map((section) => (
                 <div key={section.slug}>
+                  {/* Subcategory icons removed (owner, 2026-08-02) — the
+                      name + count pill carry the row; icons doubled the
+                      visual noise under every category. */}
                   <header className="flex items-center gap-2.5 mb-4">
-                    <ClassMonoIcon src={classIcons.subcategory?.[section.slug]} className="h-[18px] w-[18px] text-[var(--text-muted)]" />
                     <h3 className="text-[14px] md:text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
                       {section.name}
                     </h3>
