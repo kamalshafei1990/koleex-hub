@@ -1431,7 +1431,7 @@ export default function SimulationForm({ id }: { id?: string }) {
 
             {/* Print button */}
             {!isNew && (
-              <Link href={`/landed-cost/${id}/print`} target="_blank" className="w-full h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+              <Link href={`/landed-cost/${id}/print`} target="_blank" className="w-full h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                 <PrinterIcon className="h-3.5 w-3.5" /> {t("printReport")}
               </Link>
             )}

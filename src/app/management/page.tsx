@@ -196,9 +196,9 @@ const getAppIcon = (moduleName: string) => {
 const inputCls = "w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors";
 const textareaCls = "w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors resize-none";
 const selectCls = inputCls;
-const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-subtle)] hover:bg-[var(--bg-surface)] transition-colors";
-const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all";
-const dangerBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 transition-all";
+const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors";
+const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all shadow-lg";
+const dangerBtnCls = "h-10 px-6 rounded-xl text-[13px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 transition-all";
 
 function ModalShell({ open, onClose, title, width, children, footer }: {
   open: boolean; onClose: () => void; title: string; width?: string;
@@ -422,7 +422,7 @@ function DepartmentModal({
                   </div>
                 ) : (
                   <button onClick={() => fileRef.current?.click()}
-                    className="h-9 px-4 rounded-lg text-[12px] font-medium border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all flex items-center gap-1.5">
+                    className="h-10 px-4 rounded-xl text-[13px] font-semibold bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center gap-1.5">
                     <UploadIcon size={12} /> {iconUrl ? t("mgmt.changeFile") : t("mgmt.uploadFile")}
                   </button>
                 )}
@@ -2199,7 +2199,7 @@ export default function ManagementPage() {
                   </div>
                 </div>
                 <button onClick={() => { setEditRole(null); setShowRoleModal(true); }}
-                  className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all">
+                  className="h-10 px-5 rounded-xl text-[13px] font-semibold flex items-center gap-1.5 bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg">
                   <PlusIcon size={13} /> {t("mgmt.newRole")}
                 </button>
               </div>
@@ -2331,7 +2331,7 @@ export default function ManagementPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.orgChartTitle")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
-                      className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
+                      className="h-10 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-1.5 bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                       <PlusIcon size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
@@ -2345,7 +2345,7 @@ export default function ManagementPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.positions")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
-                      className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
+                      className="h-10 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-1.5 bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                       <PlusIcon size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
@@ -2393,11 +2393,11 @@ export default function ManagementPage() {
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => { setDetailPos(pos); setShowPosDetail(true); }}
-                                className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
+                                className="h-7 px-2 rounded-lg text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
                                 <DocumentIcon size={11} /> {t("mgmt.details")}
                               </button>
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
-                                className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
+                                className="h-7 px-2 rounded-lg text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
                                 <UserPlusIcon size={11} /> {t("mgmt.assign")}
                               </button>
                               <button onClick={() => handleDuplicatePosition(pos.id)}

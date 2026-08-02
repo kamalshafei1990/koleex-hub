@@ -178,7 +178,7 @@ export default function FinanceOrders() {
             <button
               type="button"
               onClick={startNew}
-              className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg active:scale-95"
             >
               + {t("orders.newOrder", "New Order")}
             </button>
@@ -347,8 +347,8 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
           </div>
           <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub={t("orders.collected.label", "collected")} />
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onEdit} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] transition hover:border-[var(--border-color)]">{t("common.edit", "Edit")}</button>
-            <button type="button" onClick={onDelete} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
+            <button type="button" onClick={onEdit} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("common.edit", "Edit")}</button>
+            <button type="button" onClick={onDelete} className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all">{t("common.delete", "Delete")}</button>
           </div>
         </div>
       </div>
@@ -681,7 +681,7 @@ function OrderEditor({
           subtitle={t("orders.editor.subtitle", "Capture the selling price, every supplier cost, and let Koleex compute the profit automatically.")}
           action={
             <div className="flex gap-2">
-              <button type="button" onClick={onCancel} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("orders.editor.cancel", "Cancel")}</button>
+              <button type="button" onClick={onCancel} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("orders.editor.cancel", "Cancel")}</button>
               <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("orders.editor.save", "Save Order")}</button>
             </div>
           }
@@ -787,7 +787,7 @@ function OrderEditor({
             title={t("orders.step2.title", "Step 2 · Suppliers & Costs")}
             subtitle={t("orders.editor.step2.subtitle", "Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live.")}
             action={
-              <button type="button" onClick={addSupplier} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
+              <button type="button" onClick={addSupplier} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
             }
           >
             {draft.suppliers.length === 0 ? (

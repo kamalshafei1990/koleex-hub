@@ -103,7 +103,7 @@ export default function AssetDna({
             </div>
           </div>
           <button type="button" onClick={() => load(true)} disabled={recomputing} title={t("vl.dna.recompute", "Recompute")}
-            className="self-start rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50">
+            className="self-start h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center disabled:opacity-50">
             <RefreshCwIcon size={13} className={recomputing ? "animate-spin" : ""} />
           </button>
         </div>

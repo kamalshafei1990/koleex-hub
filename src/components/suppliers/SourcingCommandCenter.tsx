@@ -165,7 +165,7 @@ export default function SourcingCommandCenter() {
       <div className="mx-auto max-w-md py-24 text-center">
         <TriangleWarningIcon className="mx-auto h-6 w-6 text-[var(--text-secondary)]" />
         <p className="mt-3 text-sm text-[var(--text-secondary)]">{err || t("scc.noData", "No data available.")}</p>
-        <button onClick={() => void load()} className="mt-4 rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]">{t("scc.retry", "Retry")}</button>
+        <button onClick={() => void load()} className="mt-4 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("scc.retry", "Retry")}</button>
       </div>
     );
   }
@@ -377,15 +377,15 @@ export default function SourcingCommandCenter() {
             icon={<BookmarkIcon className="h-4 w-4" />}
             title={t("scc.savedViewsTitle", "Saved views & watchlists")}
             sub={t("scc.savedViewsSub", "Pin suppliers and save filter states")}
-            right={<button onClick={() => setShowCreate((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)]"><PlusIcon className="h-3.5 w-3.5" />{t("scc.new", "New")}</button>}
+            right={<button onClick={() => setShowCreate((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><PlusIcon className="h-3.5 w-3.5" />{t("scc.new", "New")}</button>}
           />
           {showCreate ? (
             <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
               <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder={t("scc.watchlistNamePlaceholder", "Watchlist name")} className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)] focus:outline-none" />
               <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{selected.length > 0 ? `${selected.length} ${t("scc.suppliersWillBeFollowed", "supplier(s) will be followed (from compare selection).")}` : t("scc.currentFiltersSaved", "Current filters will be saved. Select suppliers in compare mode to follow them.")}</p>
               <div className="mt-2 flex justify-end gap-2">
-                <button onClick={() => { setShowCreate(false); setWlName(""); }} className="rounded-lg px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{t("scc.cancel", "Cancel")}</button>
-                <button onClick={() => void createWatchlist()} disabled={!wlName.trim() || wlBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--bg-primary)] disabled:opacity-40">{wlBusy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : null}{t("scc.save", "Save")}</button>
+                <button onClick={() => { setShowCreate(false); setWlName(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("scc.cancel", "Cancel")}</button>
+                <button onClick={() => void createWatchlist()} disabled={!wlName.trim() || wlBusy} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">{wlBusy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : null}{t("scc.save", "Save")}</button>
               </div>
             </div>
           ) : null}

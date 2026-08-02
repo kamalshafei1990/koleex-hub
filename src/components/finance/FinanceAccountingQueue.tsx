@@ -506,7 +506,7 @@ function ActionButtons({
   if (item.accounting_status === "pending") {
     return (
       <button type="button" onClick={(e) => { stop(e); onDraft(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] hover:border-[var(--border-strong)] disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
         {t("accounting.queue.btn.draft", "Create draft")}
       </button>
     );
@@ -650,7 +650,7 @@ function ReviewDrawer({
         {item.accounting_status === "pending" && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("draft", { kind: item.kind, source_id: item.source_id })) await onAction(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)] disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
             {t("accounting.queue.btn.draft", "Create draft")}
           </button>
         )}

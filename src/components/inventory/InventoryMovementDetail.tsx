@@ -153,7 +153,7 @@ export default function InventoryMovementDetail({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] hover:bg-[var(--bg-surface)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             Close
           </button>

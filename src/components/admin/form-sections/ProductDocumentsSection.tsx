@@ -126,7 +126,7 @@ export default function ProductDocumentsSection({ documents, onChange }: Props) 
         </div>
       )}
       <button type="button" onClick={add}
-        className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 transition-colors">
+        className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] inline-flex items-center gap-1.5 transition-all">
         <PlusIcon className="h-3.5 w-3.5" /> Add document
       </button>
     </div>

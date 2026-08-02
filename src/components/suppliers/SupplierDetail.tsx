@@ -446,7 +446,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         <p className="text-sm text-[var(--text-secondary)]">{error ?? t("sd.supplierNotFound", "Supplier not found.")}</p>
         <button
           onClick={() => router.push("/suppliers")}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
+          className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
         >
           <ArrowLeftIcon className="h-4 w-4" /> {t("sd.backToSuppliers", "Back to suppliers")}
         </button>
@@ -493,7 +493,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
             {!embedded && (
               <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
                 <button type="button" onClick={() => router.back()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" /> {t("sd.back", "Back")}
                 </button>
                 <span className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
@@ -509,7 +509,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <div className="flex items-center gap-2 min-w-0">
               {onBack ? (
                 <button type="button" onClick={() => onBack()} aria-label={t("sd.backToOverview", "Back to overview")} title={t("sd.backToOverview", "Back to overview")}
-                  className="flex items-center gap-1.5 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+                  className="flex items-center gap-1.5 shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
                   <span className="hidden sm:inline">{t("sd.overview", "Overview")}</span>
                 </button>
@@ -526,11 +526,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+                <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <Edit3Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("sd.edit", "Edit")}</span>
                 </button>
                 {onDelete ? (
-                  <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
+                  <button onClick={() => onDelete()} className="flex items-center gap-1.5 h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all" aria-label={t("sd.delete", "Delete")}>
                     <TrashIcon className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
                   </button>
@@ -712,8 +712,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                   </div>
                   <input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder={t("sd.reasonPlaceholder", "Reason / internal note (optional)")} className="w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
                   <div className="flex items-center gap-3">
-                    <button type="button" disabled={savingStatus} onClick={saveStatus} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{savingStatus ? t("sd.saving", "Saving…") : t("sd.saveStatus", "Save status")}</button>
-                    <button type="button" onClick={() => setStatusOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("sd.cancel", "Cancel")}</button>
+                    <button type="button" disabled={savingStatus} onClick={saveStatus} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{savingStatus ? t("sd.saving", "Saving…") : t("sd.saveStatus", "Save status")}</button>
+                    <button type="button" onClick={() => setStatusOpen(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("sd.cancel", "Cancel")}</button>
                   </div>
                 </div>
               ) : null}

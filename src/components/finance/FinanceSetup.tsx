@@ -287,8 +287,8 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("setup.drawer.cancel", "Cancel")}</button>
-          <button onClick={save} disabled={submitting || !code} className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.drawer.save", "Save")}</button>
+          <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("setup.drawer.cancel", "Cancel")}</button>
+          <button onClick={save} disabled={submitting || !code} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.drawer.save", "Save")}</button>
         </div>
       }
     >
@@ -384,7 +384,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
           </div>
           <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
+          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
         </div>
 
         <div>
@@ -476,7 +476,7 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
           <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
+          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
         </div>
 
         <div>
@@ -588,7 +588,7 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
           </div>
           <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
+          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
         </div>
 
         <div>
@@ -703,7 +703,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
           </div>
           <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
+          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
         </div>
 
         <div>

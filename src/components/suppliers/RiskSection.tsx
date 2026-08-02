@@ -222,8 +222,8 @@ export default function RiskSection({
           <Field label={t("rs.assessmentNotes", "Assessment notes")}><textarea className={`${inputCls} min-h-[60px]`} value={d.assessment_notes as string} onChange={(e) => set("assessment_notes", e.target.value)} /></Field>
           {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
           <div className="flex items-center gap-3">
-            <button type="button" disabled={saving} onClick={save} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{saving ? t("rs.saving", "Saving…") : t("rs.saveRiskProfile", "Save risk profile")}</button>
-            <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("rs.cancel", "Cancel")}</button>
+            <button type="button" disabled={saving} onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{saving ? t("rs.saving", "Saving…") : t("rs.saveRiskProfile", "Save risk profile")}</button>
+            <button type="button" onClick={() => setEditing(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("rs.cancel", "Cancel")}</button>
           </div>
         </div>
       </section>
@@ -236,8 +236,8 @@ export default function RiskSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><ShieldExclamationIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("rs.title", "Risk Intelligence")}</h3></div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => { setIDim("operational"); setISev("medium"); setITitle(""); setIDesc(""); setIVis("procurement"); setIErr(null); setAddOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><PlusIcon className="h-3.5 w-3.5" /> {t("rs.raiseRisk", "Raise risk")}</button>
-          <button type="button" onClick={openEdit} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /> {hasProfile ? t("rs.edit", "Edit") : t("rs.scoreRisk", "Score risk")}</button>
+          <button type="button" onClick={() => { setIDim("operational"); setISev("medium"); setITitle(""); setIDesc(""); setIVis("procurement"); setIErr(null); setAddOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><PlusIcon className="h-3.5 w-3.5" /> {t("rs.raiseRisk", "Raise risk")}</button>
+          <button type="button" onClick={openEdit} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><Edit3Icon className="h-3.5 w-3.5" /> {hasProfile ? t("rs.edit", "Edit") : t("rs.scoreRisk", "Score risk")}</button>
         </div>
       </div>
 
@@ -379,8 +379,8 @@ export default function RiskSection({
             <Field label={t("rs.visibility", "Visibility")}><select className={inputCls} value={iVis} onChange={(e) => setIVis(e.target.value)}>{VISIBILITY_TIERS.map((vt) => <option key={vt} value={vt}>{t("opt." + vt, VISIBILITY_LABELS[vt])}</option>)}</select></Field>
             {iErr ? <div className="text-[12px] text-rose-400">{iErr}</div> : null}
             <div className="flex items-center gap-3">
-              <button type="button" disabled={iBusy} onClick={addItem} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{iBusy ? t("rs.saving", "Saving…") : t("rs.raiseRisk", "Raise risk")}</button>
-              <button type="button" onClick={() => setAddOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("rs.cancel", "Cancel")}</button>
+              <button type="button" disabled={iBusy} onClick={addItem} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{iBusy ? t("rs.saving", "Saving…") : t("rs.raiseRisk", "Raise risk")}</button>
+              <button type="button" onClick={() => setAddOpen(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("rs.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

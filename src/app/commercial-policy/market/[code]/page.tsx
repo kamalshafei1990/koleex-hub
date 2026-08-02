@@ -217,19 +217,19 @@ function MarketProfileView() {
                 <button
                   type="button"
                   onClick={() => setEditingBand((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg hover:border-[var(--border-strong)] transition"
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
                   <PencilIcon className="h-3.5 w-3.5" /> Edit Market
                 </button>
                 <a
                   href="#customers"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg hover:border-[var(--border-strong)] transition"
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
                   <UsersIcon className="h-3.5 w-3.5" /> View Customers
                 </a>
                 <Link
                   href="/customers"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
+                  className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
                 >
                   <UserPlusIcon className="h-3.5 w-3.5" /> Add Customer
                 </Link>

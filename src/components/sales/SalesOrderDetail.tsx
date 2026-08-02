@@ -210,7 +210,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
             {canShip && (
               <button
                 onClick={() => setShipOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10]"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 <RrIcon name="truck-side" size={12} />
                 Ship

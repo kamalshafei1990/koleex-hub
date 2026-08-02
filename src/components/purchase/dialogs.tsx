@@ -32,7 +32,7 @@ import { dialog } from "@/lib/ui-dialog";
 const labelCls = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
 const inputCls = "w-full h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder-[var(--text-ghost)] focus:border-[var(--border-focus)] focus:outline-none transition-colors";
 const textareaCls = `${inputCls} h-20 py-2 leading-relaxed resize-none`;
-const submitBtnCls = "h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all disabled:opacity-50";
+const submitBtnCls = "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50";
 const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors";
 
 interface DialogProps {

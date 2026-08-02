@@ -55,7 +55,7 @@ export default function EditEmployeePage() {
           </div>
           <Link
             href="/employees"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold"
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Back to employees

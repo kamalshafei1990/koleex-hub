@@ -83,7 +83,7 @@ export default function CollectionsBrowser() {
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
         </div>
         <button type="button" onClick={() => setShowCreate(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+          className="inline-flex shrink-0 items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
           <PlusIcon size={14} /> {t("vl.col.newCollection", "New collection")}
         </button>
       </div>

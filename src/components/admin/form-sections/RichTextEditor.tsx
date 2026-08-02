@@ -506,7 +506,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
               type="button"
               onClick={confirmLink}
               disabled={!linkUrl.trim()}
-              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all disabled:opacity-40"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
             >
               Insert
             </button>
@@ -561,7 +561,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
               type="button"
               onClick={confirmTable}
               disabled={!tableRows || !tableCols}
-              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all disabled:opacity-40"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
             >
               Insert table
             </button>
@@ -629,7 +629,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
               type="button"
               onClick={confirmImage}
               disabled={imageUploading || (!imageFile && !imageUrl.trim())}
-              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
             >
               {imageUploading && <SpinnerIcon className="h-4 w-4 animate-spin" />}
               {imageUploading ? "Uploading…" : "Insert"}

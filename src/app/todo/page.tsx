@@ -201,11 +201,11 @@ function DeleteModal({ open, deleting, onConfirm, onClose }: {
         <p className="text-sm text-[var(--text-muted)]">{t("modal.deleteConfirm")}</p>
         <div className="flex items-center justify-end gap-2 pt-2">
           <button onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             {t("modal.cancel")}
           </button>
           <button onClick={onConfirm} disabled={deleting}
-            className="h-9 px-4 rounded-lg bg-red-500/90 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500 transition-colors disabled:opacity-50">
+            className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-50">
             {deleting && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             {t("modal.delete")}
           </button>
@@ -374,7 +374,7 @@ function LabelPicker({ labels, value, onChange, t, newLabelName, setNewLabelName
                   className="flex-1 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
                   onKeyDown={(ev) => { if (ev.key === "Enter") onCreate(); if (ev.key === "Escape") setShowNewLabel(false); }} />
                 <button type="button" onClick={onCreate}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold shrink-0">{t("common.add")}</button>
+                  className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg shrink-0">{t("common.add")}</button>
                 <button type="button" onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)] shrink-0 px-1"><CrossIcon size={12} /></button>
               </div>
             ) : (
@@ -845,11 +845,11 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-end gap-2 px-4 md:px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose}
-            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             {t("modal.cancel")}
           </button>
           <button onClick={handleSave} disabled={saving || !title.trim()}
-            className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? t("modal.saving") : editEntry ? t("modal.save") : t("modal.add")}
           </button>
@@ -1971,7 +1971,7 @@ export default function TodoPage() {
               <span className="hidden md:inline">{t("report.link")}</span>
             </Link>
             <button onClick={() => setModal({ open: true, entry: null })}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0">
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
               <PlusIcon size={16} />
               <span className="hidden md:inline">{t("add")}</span>
             </button>

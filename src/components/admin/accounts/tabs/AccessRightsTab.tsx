@@ -616,7 +616,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
               type="button"
               onClick={saveAsNewTemplate}
               disabled={applyingTemplate}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 flex items-center gap-1.5"
               title="Save the current access-rights grid as a new role template. Other admins can pick it from this dropdown. Renaming happens in Roles & Permissions."
             >
               + Save as new template
@@ -625,7 +625,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
               type="button"
               onClick={resetToRoleDefaults}
               disabled={applyingTemplate}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 flex items-center gap-1.5"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 flex items-center gap-1.5"
               title="Clear every per-module override and fall back to this account's role defaults."
             >
               {t("acc.access.resetToRoleDefaults", "Reset to role defaults")}

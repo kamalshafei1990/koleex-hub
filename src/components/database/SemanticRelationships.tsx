@@ -92,7 +92,7 @@ export default function SemanticRelationships({
           {t("vl.sem.heading", "Semantic relationships")}{rels.length > 0 ? ` · ${rels.length}` : ""}
         </span>
         <button type="button" onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
+          className="inline-flex items-center gap-1 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
           <PlusIcon size={12} /> {t("vl.sem.add", "Add")}
         </button>
       </div>

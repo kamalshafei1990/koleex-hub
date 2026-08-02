@@ -186,8 +186,8 @@ export function EditDrawer({
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-rose-600 dark:text-rose-300 truncate">{error ?? ""}</span>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("bank.action.cancel", "Cancel")}</button>
-              <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+              <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("bank.action.cancel", "Cancel")}</button>
+              <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
                 {isEdit ? t("bank.action.saveChanges", "Save changes") : t("bank.action.createAccount", "Create account")}
               </button>
@@ -344,8 +344,8 @@ export function ManualMovementDrawer({
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-rose-600 dark:text-rose-300 truncate">{error ?? ""}</span>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("bank.action.cancel", "Cancel")}</button>
-              <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+              <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("bank.action.cancel", "Cancel")}</button>
+              <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
                 {t("movement.action.record", "Record movement")}
               </button>

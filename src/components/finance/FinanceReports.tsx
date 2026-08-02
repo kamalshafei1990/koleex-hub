@@ -357,7 +357,7 @@ function FiltersPanel({
           type="button"
           onClick={onPrint}
           disabled={busy !== null}
-          className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-[12px] font-semibold transition hover:border-[var(--border-strong)] disabled:opacity-50"
+          className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
         >
           {busy === "print" ? t("reports.btn.printing", "Preparing…") : t("reports.btn.print", "Print")}
         </button>

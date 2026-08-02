@@ -181,7 +181,7 @@ export default function DisplayTab({ account, onChanged }: {
         <button
           type="button"
           onClick={() => patch(DEFAULT_DISPLAY)}
-          className="shrink-0 h-8 px-3 rounded-lg border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+          className="shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
         >
           {t("display.reset")}
         </button>

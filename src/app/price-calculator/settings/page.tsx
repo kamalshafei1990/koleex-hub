@@ -258,7 +258,7 @@ export default function PricingSettingsPage() {
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><GlobeIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Countries & Regional Bands</span>
-              <button onClick={addCountry} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
+              <button onClick={addCountry} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
                 <PlusIcon className="h-3.5 w-3.5" /> Add
               </button>
             </div>
@@ -314,7 +314,7 @@ export default function PricingSettingsPage() {
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><LayersIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Product Category Margin Levels</span>
-              <button onClick={addCategory} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
+              <button onClick={addCategory} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
                 <PlusIcon className="h-3.5 w-3.5" /> Add
               </button>
             </div>

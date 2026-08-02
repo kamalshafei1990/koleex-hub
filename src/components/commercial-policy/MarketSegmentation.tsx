@@ -148,7 +148,7 @@ export default function MarketSegmentation({
             <button
               type="button"
               onClick={begin}
-              className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               Manage
             </button>
@@ -159,7 +159,7 @@ export default function MarketSegmentation({
                 type="button"
                 onClick={cancel}
                 disabled={saving}
-                className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -167,7 +167,7 @@ export default function MarketSegmentation({
                 type="button"
                 onClick={save}
                 disabled={saving}
-                className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50"
+                className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
                 {saving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon size={14} />}
                 Save

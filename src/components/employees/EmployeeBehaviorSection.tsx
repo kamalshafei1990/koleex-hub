@@ -206,11 +206,11 @@ export default function EmployeeBehaviorSection({
           </div>
         )}
 
-        <Link href="/hr?tab=behavior" className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-opacity">
+        <Link href="/hr?tab=behavior" className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
           {t("hr.bhv.assessInHr")} <ArrowRightIcon size={13} className="rtl:rotate-180" />
         </Link>
         {canConfigurePosition && positionId && (
-          <button type="button" onClick={() => setConfigOpen(true)} className="ms-2 inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+          <button type="button" onClick={() => setConfigOpen(true)} className="ms-2 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
             <CogIcon size={13} /> {t("hr.bhv.configurePosition")}
           </button>
         )}

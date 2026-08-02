@@ -1477,19 +1477,19 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Link
             href={`/employees/${saved.id}`}
-            className="h-10 px-3 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-opacity"
+            className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-all shadow-lg"
           >
             {t("saved.view")}
           </Link>
           <button
             onClick={resetForm}
-            className="h-10 px-3 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             {t("saved.addAnother")}
           </button>
           <Link
             href="/employees"
-            className="h-10 px-3 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center justify-center transition-colors"
           >
             {t("saved.toList")}
           </Link>
@@ -1534,7 +1534,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               aria-label={t("save.employee")}
             >
               {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}

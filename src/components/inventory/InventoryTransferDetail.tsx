@@ -487,7 +487,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
                 <button
                   type="button"
                   onClick={() => setShowVoid(false)}
-                  className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)]"
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
                   Cancel
                 </button>
@@ -499,7 +499,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
                     setShowVoid(false);
                     setVoidReason("");
                   }}
-                  className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
                 >
                   <RrIcon name="check" size={12} /> {t("inv.transfers.act.void")}
                 </button>
@@ -551,7 +551,7 @@ function ActionBtn({
       type="button"
       onClick={onClick}
       disabled={busy || disabled}
-      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
     >
       {children}
     </button>

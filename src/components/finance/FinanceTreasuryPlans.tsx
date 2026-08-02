@@ -205,7 +205,7 @@ export default function FinanceTreasuryPlans() {
           action={
             <Link
               href="/finance/treasury-forecast"
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               <RrIcon name="plus" size={12} />
               {t("treasuryPlans.new", "New plan from forecast")}
@@ -232,7 +232,7 @@ export default function FinanceTreasuryPlans() {
               action={
                 <Link
                   href="/finance/treasury-forecast"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
+                  className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
                 >
                   <RrIcon name="arrow-up-right-from-square" size={12} />
                   {t("treasuryPlans.openForecast", "Open Treasury Forecast")}
@@ -446,7 +446,7 @@ function PlanDetail({
           )}
           <button
             onClick={onClose}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+            className="inline-flex items-center gap-1 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="cross" size={11} />
           </button>
@@ -481,7 +481,7 @@ function PlanDetail({
             <button
               onClick={onCompareCurrent}
               disabled={compareBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
             >
               {compareBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="recycle" size={11} />}
               {t("treasuryPlans.compare.recompare", "Re-compare")}

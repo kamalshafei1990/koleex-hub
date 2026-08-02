@@ -200,9 +200,9 @@ export default function VisualRelationshipModal({
         <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-5 py-4">
           <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{t("vl.rel.n-selected", "{n} selected").replace("{n}", String(picked.length))}</span>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("vl.rel.cancel", "Cancel")}</button>
+            <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.rel.cancel", "Cancel")}</button>
             <button type="button" onClick={save} disabled={saving || !picked.length}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
               {saving && <SpinnerIcon size={14} className="animate-spin" />}{saving ? t("vl.rel.linking", "Linking…") : t("vl.rel.link", "Link")}
             </button>
           </div>

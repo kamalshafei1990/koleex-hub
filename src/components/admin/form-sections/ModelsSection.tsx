@@ -316,7 +316,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   <button
                     type="button"
                     onClick={onEditInHero}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] transition-colors"
+                    className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] border border-[var(--border-subtle)] transition-all"
                   >
                     <ArrowUpRightIcon className="h-3.5 w-3.5" />
                     Edit in Hero
@@ -766,7 +766,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
         </div>
         <button
           onClick={addModel}
-          className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-sm"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
         >
           <PlusIcon className="h-3.5 w-3.5" /> Add Variant
         </button>

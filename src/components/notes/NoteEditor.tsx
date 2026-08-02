@@ -524,7 +524,7 @@ export default function NoteEditor({
         ) : (
           <>
             <button onClick={onRestore} className="h-8 px-3 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-500/25 transition-all">{t("restore")}</button>
-            <button onClick={onPurge} className="h-8 px-3 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-[11px] font-semibold hover:bg-red-500/25 transition-all">{t("deleteForever")}</button>
+            <button onClick={onPurge} className="h-8 px-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-[11px] font-semibold hover:bg-red-500/30 transition-all">{t("deleteForever")}</button>
           </>
         )}
       </div>

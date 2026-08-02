@@ -523,7 +523,7 @@ function InvoiceDetailView({
               {!["paid", "cancelled", "void"].includes(inv.status) && (
                 <button
                   onClick={() => setPayOpen(true)}
-                  className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90"
+                  className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
                 >
                   <RrIcon name="check" size={12} /> {t("btn.recordPayment")}
                 </button>
@@ -920,8 +920,8 @@ function InvoiceFormModal({
           </Field>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
-          <button onClick={onClose} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold">{t("btn.cancel")}</button>
-          <button onClick={save} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors">{t("btn.cancel")}</button>
+          <button onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
             {t("btn.create")}
           </button>
         </div>
@@ -1031,8 +1031,8 @@ function PaymentModal({
         </div>
         {err && <p className="px-5 -mt-1 pb-1 text-[12px] font-medium text-rose-400">{err}</p>}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
-          <button onClick={onClose} disabled={saving} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold disabled:opacity-50">{t("btn.cancel")}</button>
-          <button onClick={save} disabled={saving || !amountValid} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold disabled:opacity-50">
+          <button onClick={onClose} disabled={saving} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors disabled:opacity-50">{t("btn.cancel")}</button>
+          <button onClick={save} disabled={saving || !amountValid} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
             {saving ? "…" : t("btn.recordPayment")}
           </button>
         </div>

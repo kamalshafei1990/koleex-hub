@@ -122,7 +122,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
     <div className="space-y-5" {...kxInspectAttrs({ component: "AssetRegistryTab", module: "Database", section: "Registry", recordId: asset.id })}>
       {/* Links */}
       <Section title={`${t("vl.registry.businessMapping", "Business mapping")}${data.links.length ? ` · ${data.links.length}` : ""}`}
-        action={<button type="button" onClick={() => setAdding((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-primary)] hover:border-[var(--border-color)]"><PlusIcon size={12} /> {t("vl.registry.map", "Map")}</button>}>
+        action={<button type="button" onClick={() => setAdding((v) => !v)} className="inline-flex items-center gap-1 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><PlusIcon size={12} /> {t("vl.registry.map", "Map")}</button>}>
         {data.links.length === 0 ? (
           <p className="text-[11.5px] text-[var(--text-dim)]">{t("vl.registry.notMapped", "Not mapped to any division/category/system yet.")}</p>
         ) : (
@@ -159,7 +159,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
               </select>
             </label>
             <button type="button" disabled={!divId || busy} onClick={addLink}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
+              className="inline-flex w-full items-center justify-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
               {busy ? <SpinnerIcon size={12} className="animate-spin" /> : null} {t("vl.registry.addMapping", "Add mapping")}
             </button>
           </div>

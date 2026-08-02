@@ -604,7 +604,7 @@ export default function CRM() {
           <button
             type="button"
             onClick={() => setEditingId("new")}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             <PlusIcon className="h-3.5 w-3.5" />
             {t("new")}
@@ -1290,7 +1290,7 @@ function PipelineColumn({
                     setQuickCompany("");
                     setQuickRevenue("");
                   }}
-                  className="h-7 px-2 rounded-md text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  className="h-7 px-2 rounded-lg text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 >
                   {t("form.cancel")}
                 </button>
@@ -1298,7 +1298,7 @@ function PipelineColumn({
                   type="button"
                   onClick={handleQuickSubmit}
                   disabled={quickBusy || !quickName.trim()}
-                  className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+                  className="h-7 px-2.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                 >
                   {quickBusy && <SpinnerIcon className="h-3 w-3 animate-spin" />}
                   {t("quick.add.btn")}
@@ -2543,7 +2543,7 @@ function OpportunityModal({
                         setShowLost(false);
                         setLostReason("");
                       }}
-                      className="h-8 px-3 rounded-lg text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                      className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                     >
                       {t("form.cancel")}
                     </button>
@@ -2551,7 +2551,7 @@ function OpportunityModal({
                       type="button"
                       onClick={handleMarkLost}
                       disabled={saving || !lostReason.trim()}
-                      className="h-8 px-3 rounded-lg bg-red-500 text-white text-[12px] font-semibold disabled:opacity-50"
+                      className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50"
                     >
                       {t("form.markLost")}
                     </button>
@@ -2630,7 +2630,7 @@ function OpportunityModal({
               <button
                 type="button"
                 onClick={handleArchive}
-                className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                className="inline-flex items-center gap-1 h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
               >
                 <ArchiveIcon className="h-3.5 w-3.5" />
                 {t("form.archive")}
@@ -2638,7 +2638,7 @@ function OpportunityModal({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+                className="inline-flex items-center gap-1 h-10 px-5 rounded-xl text-[13px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <TrashIcon className="h-3.5 w-3.5" />
                 {t("form.delete")}
@@ -2651,7 +2651,7 @@ function OpportunityModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-lg text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             >
               {t("form.cancel")}
             </button>
@@ -2659,7 +2659,7 @@ function OpportunityModal({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
             >
               {saving && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
               {isNew ? t("form.create") : t("form.save")}
@@ -2799,7 +2799,7 @@ function ActivitiesPanel({
                 setNotes("");
                 setDueAt("");
               }}
-              className="h-7 px-2.5 rounded-md text-[11.5px] font-semibold text-[var(--text-dim)]"
+              className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[var(--text-dim)]"
             >
               {t("form.cancel")}
             </button>
@@ -2807,7 +2807,7 @@ function ActivitiesPanel({
               type="button"
               onClick={handleAdd}
               disabled={busy || !title.trim()}
-              className="h-7 px-3 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold disabled:opacity-50"
+              className="h-7 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold disabled:opacity-50"
             >
               {t("act.add")}
             </button>
@@ -3864,7 +3864,7 @@ function GenerateLeadsModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
             {t("form.cancel")}
           </button>
@@ -3872,7 +3872,7 @@ function GenerateLeadsModal({
             type="button"
             onClick={handleGenerate}
             disabled={busy || count < 1}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             {t("gen.create")}
@@ -4047,7 +4047,7 @@ function StageEditModal({
               type="button"
               onClick={handleDelete}
               disabled={busy}
-              className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1 h-10 px-5 rounded-xl text-[13px] font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
             >
               <TrashIcon className="h-3.5 w-3.5" />
               {t("stage.edit.delete")}
@@ -4059,7 +4059,7 @@ function StageEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-lg text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             >
               {t("form.cancel")}
             </button>
@@ -4067,7 +4067,7 @@ function StageEditModal({
               type="button"
               onClick={handleSave}
               disabled={busy || !name.trim()}
-              className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
             >
               {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
               {t("stage.edit.save")}
@@ -4343,7 +4343,7 @@ function ConfigurationPage({
           <button
             type="button"
             onClick={onAddStage}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-all shrink-0"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg shrink-0"
           >
             <PlusIcon className="h-3.5 w-3.5" />
             {t("cfg.addStage")}

@@ -316,8 +316,8 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
 
           <div className="flex items-center justify-end gap-3">
             {error && <span className="text-[12px] text-rose-400">{error}</span>}
-            <button type="button" onClick={() => save(false)} disabled={saving} className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50">{t("hr.bhv.saveDraft")}</button>
-            <button type="button" onClick={() => save(true)} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-50">{saving ? t("hr.bhv.saving") : t("hr.bhv.finalize")}</button>
+            <button type="button" onClick={() => save(false)} disabled={saving} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{t("hr.bhv.saveDraft")}</button>
+            <button type="button" onClick={() => save(true)} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{saving ? t("hr.bhv.saving") : t("hr.bhv.finalize")}</button>
           </div>
 
           {pickerOpen && (
@@ -347,7 +347,7 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
             <div className="flex flex-wrap items-center gap-2">
               {TYPES.map(([v, k]) => (
                 <button key={v} type="button" onClick={() => startNew(v)}
-                  className="h-9 px-3.5 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   + {t(k)}
                 </button>
               ))}

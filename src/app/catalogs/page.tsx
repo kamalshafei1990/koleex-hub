@@ -841,7 +841,7 @@ function QuickAddContactModal({
           {/* ── Contact persons ── */}
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2"><UsersIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /><p className={sectionTitle}>{t("quick.contactPerson")}</p></div>
-            <button type="button" onClick={addPerson} className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+            <button type="button" onClick={addPerson} className="flex h-10 items-center gap-1.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               <PlusIcon className="h-3 w-3" /> {t("quick.addPerson")}
             </button>
           </div>
@@ -905,9 +905,9 @@ function QuickAddContactModal({
 
         {/* Footer (fixed) */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
-          <button onClick={onClose} className="h-10 px-5 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">{t("common.cancel")}</button>
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("common.cancel")}</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
-            className="flex h-10 items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-6 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 transition-all disabled:opacity-40">
+            className="flex h-10 items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? t("quick.creating") : t("quick.create")}
           </button>
@@ -1745,11 +1745,11 @@ function CatalogModal({
           )}
           <div className="flex items-center justify-end gap-2">
             <button onClick={onClose}
-              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
               {t("common.cancel")}
             </button>
             <button onClick={handleSave} disabled={saving || (batchFiles.length > 0 ? false : (!file && !editEntry) || !title.trim())}
-              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
               {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
               {saving ? (progress || t("modal.uploading")) : editEntry ? t("modal.saveChanges") : batchFiles.length > 0 ? t("modal.uploadBatch").replace("{n}", String(batchFiles.length)) : t("modal.uploadBtn")}
             </button>
@@ -1795,7 +1795,7 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose}
-            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             {t("common.cancel")}
           </button>
           <button onClick={onConfirm} disabled={deleting}
@@ -3380,12 +3380,12 @@ function CatalogsApp() {
 
           <button onClick={() => setShowSupplierImport(true)}
             title={t("cat.importSupplier", "Read a PDF catalog → auto-create the supplier")}
-            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors shrink-0 ml-auto">
+            className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-all shrink-0 ml-auto">
             <ScanLineIcon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t("cat.importSupplierShort", "Import supplier")}</span>
           </button>
           <button onClick={() => setUploadModal({ open: true, editEntry: null })}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0">
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0">
             <PlusIcon className="h-3.5 w-3.5" /> {t("cat.upload")}
           </button>
         </div>
@@ -3396,17 +3396,17 @@ function CatalogsApp() {
             <span className="text-[12px] font-semibold text-blue-400">{selected.size} {t("cat.selected")}</span>
             <div className="flex-1" />
             <button onClick={() => setSelected(new Set(filtered.map(c => c.id)))}
-              className="h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">{t("cat.selectAll")}</button>
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("cat.selectAll")}</button>
             <button onClick={handleBulkDownload}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 transition-colors">
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] inline-flex items-center gap-1.5 transition-all">
               <DownloadIcon className="h-3.5 w-3.5" /> {t("cat.downloadSelected")}
             </button>
             <button onClick={handleBulkDelete} disabled={bulkDeleting}
-              className="h-8 px-3 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-[12px] font-semibold inline-flex items-center gap-1.5 hover:bg-red-500/25 transition-colors disabled:opacity-50">
+              className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold inline-flex items-center gap-1.5 hover:bg-red-500/30 transition-all disabled:opacity-50">
               {bulkDeleting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />} {t("cat.deleteSelected")}
             </button>
             <button onClick={clearSelection}
-              className="h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors inline-flex items-center gap-1.5">
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors inline-flex items-center gap-1.5">
               <CrossIcon className="h-3.5 w-3.5" /> {t("cat.clearSel")}
             </button>
           </div>
@@ -3425,7 +3425,7 @@ function CatalogsApp() {
             <h3 className="text-[15px] font-semibold text-[var(--text-secondary)] mb-1">{t("cat.emptyTitle")}</h3>
             <p className="text-[12px] text-[var(--text-dim)] mb-5">{t("cat.emptyDesc")}</p>
             <button onClick={() => setUploadModal({ open: true, editEntry: null })}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors">
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
               <UploadIcon className="h-4 w-4" /> {t("cat.upload")}
             </button>
           </div>

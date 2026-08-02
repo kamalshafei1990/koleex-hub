@@ -136,7 +136,7 @@ export default function FinanceGeneralLedger() {
             <button
               type="button"
               onClick={() => setFrom("")}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >{t("gl.allTime", "All-time")}</button>
             <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {loading ? t("common.loading", "Loading…") : ledger ? t("gl.entriesCount", "{n} entries").replace("{n}", String(ledger.rows.length)) : ""}

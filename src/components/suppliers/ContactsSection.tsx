@@ -325,14 +325,14 @@ export default function ContactsSection({
           <button
             type="button"
             onClick={() => openQr(null)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <ScanLineIcon className="h-3.5 w-3.5" /> {t("cs.addQr", "Add QR")}
           </button>
           <button
             type="button"
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             <PlusIcon className="h-3.5 w-3.5" /> {t("cs.addContact", "Add contact")}
           </button>
@@ -405,10 +405,10 @@ export default function ContactsSection({
           </div>
           <div className="flex items-center gap-3">
             <button type="button" disabled={saving} onClick={saveContact}
-              className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
               {saving ? t("cs.saving", "Saving…") : t("cs.saveContact", "Save contact")}
             </button>
-            <button type="button" onClick={() => setEditingId(null)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("cs.cancel", "Cancel")}</button>
+            <button type="button" onClick={() => setEditingId(null)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("cs.cancel", "Cancel")}</button>
           </div>
         </div>
       ) : null}
@@ -595,10 +595,10 @@ export default function ContactsSection({
             {qrErr ? <div className="text-[12px] text-rose-400">{qrErr}</div> : null}
             <div className="flex items-center gap-3">
               <button type="button" disabled={qrBusy} onClick={saveQr}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 <UploadIcon className="h-3.5 w-3.5" />{qrBusy ? t("cs.uploading", "Uploading…") : t("cs.uploadQr", "Upload QR")}
               </button>
-              <button type="button" onClick={() => setQrOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("cs.cancel", "Cancel")}</button>
+              <button type="button" onClick={() => setQrOpen(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("cs.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

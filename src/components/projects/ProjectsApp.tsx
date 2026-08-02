@@ -870,7 +870,7 @@ function ProjectDetailView({
               />
               <button
                 onClick={handleAddStage}
-                className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
               >
                 {t("btn.add")}
               </button>
@@ -954,7 +954,7 @@ function StageHeader({
             onKeyDown={(e) => { if (e.key === "Enter") save(); }}
             className="flex-1 h-6 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] outline-none"
           />
-          <button onClick={save} className="h-6 px-2 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold">OK</button>
+          <button onClick={save} className="h-6 px-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold">OK</button>
         </>
       ) : (
         <>
@@ -1486,7 +1486,7 @@ function ConfigurationView({ tags, reloadTags }: { tags: ProjectTag[]; reloadTag
           />
           <button
             onClick={add}
-            className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             {t("btn.add")}
           </button>
@@ -1535,7 +1535,7 @@ function TagRow({ tag, onReload }: { tag: ProjectTag; onReload: () => void }) {
         <>
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-8 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)]" />
           <input value={name} onChange={(e) => setName(e.target.value)} className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] outline-none" />
-          <button onClick={save} className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold">OK</button>
+          <button onClick={save} className="h-7 px-2.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold">OK</button>
           <button onClick={() => setEditing(false)} className="h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"><CrossIcon size={12} /></button>
         </>
       ) : (
@@ -1846,14 +1846,14 @@ function ProjectFormModal({
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <div>
             {editing && (
-              <button onClick={remove} className="h-9 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5">
+              <button onClick={remove} className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
                 <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold">{t("btn.cancel")}</button>
-            <button onClick={save} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">
+            <button onClick={onClose} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors">{t("btn.cancel")}</button>
+            <button onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
               {editing ? t("btn.save") : t("btn.create")}
             </button>
           </div>
@@ -2220,7 +2220,7 @@ function TaskFormModal({
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <div className="flex items-center gap-1.5">
             {editing && (
-              <button onClick={remove} className="h-9 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5">
+              <button onClick={remove} className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
                 <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
               </button>
             )}
@@ -2234,14 +2234,14 @@ function TaskFormModal({
               </button>
             )}
             {editing?.linked_planning_item_id && (
-              <Link href="/planning" className="h-9 px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[12px] font-semibold flex items-center gap-1.5">
+              <Link href="/planning" className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium flex items-center gap-1.5 transition-colors">
                 <LinkIcon size={13} /> {t("task.viewPlanning", "View in Planning")}
               </Link>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold">{t("btn.cancel")}</button>
-            <button onClick={save} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">
+            <button onClick={onClose} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors">{t("btn.cancel")}</button>
+            <button onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
               {editing ? t("btn.save") : t("btn.create")}
             </button>
           </div>

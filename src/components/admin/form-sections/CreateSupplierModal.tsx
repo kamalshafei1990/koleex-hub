@@ -538,7 +538,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
           <button onClick={handleClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving || !companyNameEn.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+          <button onClick={handleSave} disabled={saving || !companyNameEn.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Creating..." : "Create Supplier"}
           </button>
@@ -690,7 +690,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className={sectionTitle + " mb-0"}>Contact Persons</p>
-            <button type="button" onClick={addContactPerson} className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
+            <button type="button" onClick={addContactPerson} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all">
               <PlusIcon className="h-3 w-3" /> Add Person
             </button>
           </div>

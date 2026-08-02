@@ -114,7 +114,7 @@ export default function InventoryBatches() {
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+          className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <RrIcon name="plus" size={12} />
           {t("inv.batches.new")}
@@ -411,7 +411,7 @@ function CreateBatchDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               {t("inv.transfers.act.cancel")}
             </button>

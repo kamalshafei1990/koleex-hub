@@ -148,13 +148,13 @@ export default function CollectionDetail({ cid }: { cid: string }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setShowEdit(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PencilIcon size={12} /> {t("vl.colDetail.edit", "Edit")}</button>
+            <button type="button" onClick={() => setShowEdit(true)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><PencilIcon size={12} /> {t("vl.colDetail.edit", "Edit")}</button>
             {!isApproved
-              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "approve" })} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"><BadgeCheckIcon size={12} /> {t("vl.colDetail.approve", "Approve")}</button>
-              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("vl.colDetail.unapprove", "Unapprove")}</button>}
+              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "approve" })} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"><BadgeCheckIcon size={12} /> {t("vl.colDetail.approve", "Approve")}</button>
+              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.colDetail.unapprove", "Unapprove")}</button>}
             {!isArchived
-              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "archive" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><ArchiveIcon size={12} /> {t("vl.colDetail.archive", "Archive")}</button>
-              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("vl.colDetail.restore", "Restore")}</button>}
+              ? <button type="button" disabled={busy} onClick={() => colAction({ action: "archive" })} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><ArchiveIcon size={12} /> {t("vl.colDetail.archive", "Archive")}</button>
+              : <button type="button" disabled={busy} onClick={() => colAction({ action: "restore" })} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.colDetail.restore", "Restore")}</button>}
             <button type="button" onClick={del} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--text-dim)] hover:text-rose-400"><TrashIcon size={12} /></button>
           </div>
         </div>
@@ -302,7 +302,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
           {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
         </div>
         <button type="button" onClick={() => setUploadOpen(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+          className="inline-flex shrink-0 items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
           <PlusIcon size={12} /> {t("vl.colDetail.upload", "Upload")}
         </button>
       </div>

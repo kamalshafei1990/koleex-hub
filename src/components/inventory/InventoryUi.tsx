@@ -586,7 +586,7 @@ export function PrimaryButton({
   disabled?: boolean;
 }) {
   const cls =
-    "inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90 disabled:opacity-50";
+    "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50";
   const inner = (
     <>
       {icon && <RrIcon name={icon} size={12} />}
@@ -617,7 +617,7 @@ export function SecondaryButton({
   disabled?: boolean;
 }) {
   const cls =
-    "inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-50";
+    "inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50";
   const inner = (
     <>
       {icon && <RrIcon name={icon} size={12} />}

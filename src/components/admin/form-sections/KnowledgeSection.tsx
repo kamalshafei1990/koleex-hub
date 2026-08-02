@@ -422,7 +422,7 @@ function QAEditor({ items, onChange }: { items: QA[]; onChange: (items: QA[]) =>
       <button
         type="button"
         onClick={add}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-colors"
+        className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
       >
         <PlusIcon className="h-3 w-3 text-[var(--text-muted)]" /> Add question
       </button>

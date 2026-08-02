@@ -3171,8 +3171,8 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
     <div className={`text-[12px] rounded-lg px-3 py-2 ${err ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"}`}>{err || notice}</div>
   );
   const pwInput = "w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3";
-  const genBtn = "shrink-0 px-3 h-9 rounded-lg border border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors";
-  const primaryBtn = "px-3.5 h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-sm font-medium disabled:opacity-40 transition-opacity";
+  const genBtn = "shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all";
+  const primaryBtn = "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40";
 
   const roleCreator = (
     !showRoleForm ? (
@@ -3318,7 +3318,7 @@ const CustomerActivityHub = React.memo(function CustomerActivityHub({ contactId,
   const sortedTimeline = [...timeline].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   const fmtD = (v: string) => { if (!v) return ""; try { return new Date(v).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch { return v; } };
   const inputCls = "h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3";
-  const addBtn = "shrink-0 px-3 h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-sm font-medium disabled:opacity-40";
+  const addBtn = "shrink-0 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40";
 
   return (
     <div className="space-y-6">
@@ -3540,8 +3540,8 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
                 <input value={newSite} onChange={e => setNewSite(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitCustom(); } }} placeholder="Website for logo (e.g. carrier.com)" className="flex-1 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3" />
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={submitCustom} disabled={!newName.trim()} className="px-3 h-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-xs font-medium disabled:opacity-40">Add</button>
-                <button type="button" onClick={() => { setAddMode(false); setNewName(""); setNewSite(""); }} className="px-3 h-8 rounded-lg border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">Cancel</button>
+                <button type="button" onClick={submitCustom} disabled={!newName.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">Add</button>
+                <button type="button" onClick={() => { setAddMode(false); setNewName(""); setNewSite(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
               </div>
             </div>
           )}
@@ -3774,7 +3774,7 @@ const CustomerPipelineBlock = React.memo(function CustomerPipelineBlock({
           <div className="text-sm text-[var(--text-subtle)] mb-2">{t("pipeline.empty", "No deals yet")}</div>
           <Link
             href={`/crm?contact=${contactId}&new=1`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-xs font-medium hover:opacity-90"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             <PlusIcon size={12} /> {t("pipeline.newDeal", "New deal")}
           </Link>
@@ -4836,10 +4836,10 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
         </p>
         {err ? <div className="mb-4 text-[12px] text-rose-400">{err}</div> : null}
         <div className="flex gap-3 justify-end">
-          <button onClick={close} disabled={busy} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
+          <button onClick={close} disabled={busy} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
             {t("btn.cancel")}
           </button>
-          <button onClick={confirm} disabled={busy} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50">
+          <button onClick={confirm} disabled={busy} className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50">
             {busy ? t("ts.saving", "Saving…") : t("btn.delete")}
           </button>
         </div>
@@ -5945,10 +5945,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
 
           <div className="flex items-center justify-center gap-3 mt-6">
-            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+            <Link href="/" className="h-10 px-4 rounded-xl inline-flex items-center bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               {t("btn.backToHub")}
             </Link>
-            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] transition-colors">
+            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="h-10 px-5 rounded-xl text-[13px] bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-semibold hover:opacity-90 transition-all shadow-lg">
               {t("btn.retry")}
             </button>
           </div>
@@ -8655,13 +8655,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </h2>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-            <button onClick={handleCancel} className="px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+            <button onClick={handleCancel} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
               {t("btn.cancel")}
             </button>
             <button
               onClick={handleSave}
               disabled={saving || formHydrating || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
-              className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1 md:gap-1.5 h-10 px-5 rounded-xl text-[13px] bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <DiskIcon size={14} />}
               {saving ? t("btn.saving") : t("btn.save")}

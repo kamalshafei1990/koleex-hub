@@ -227,7 +227,7 @@ export default function FactorySection({
           <button
             type="button"
             onClick={openEdit}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <Edit3Icon className="h-3.5 w-3.5" /> {hasData ? t("fs.edit", "Edit") : t("fs.addFactoryData", "Add factory data")}
           </button>
@@ -361,10 +361,10 @@ export default function FactorySection({
         {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
         <div className="flex items-center gap-3">
           <button type="button" disabled={saving} onClick={save}
-            className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
             {saving ? t("fs.saving", "Saving…") : t("fs.saveFactoryData", "Save factory data")}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("fs.cancel", "Cancel")}</button>
+          <button type="button" onClick={() => setEditing(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("fs.cancel", "Cancel")}</button>
         </div>
       </div>
     </section>

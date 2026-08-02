@@ -151,7 +151,7 @@ function ActionButton({
       onClick={onClick}
       title={title}
       className={
-        "flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.05] bg-white/[0.02] transition-colors " +
+        "flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.05] bg-white/[0.02] transition-colors " +
         (danger
           ? "text-gray-400 hover:border-rose-500/[0.25] hover:bg-rose-500/[0.06] hover:text-rose-300"
           : "text-gray-400 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-gray-100")

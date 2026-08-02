@@ -124,12 +124,12 @@ export default function FeatureCardsSection({ cards, onChange }: Props) {
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
                   aria-label={t("fc.moveUp", "Move up")}
-                  className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-primary)] disabled:opacity-30 transition-colors">
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-30 transition-colors">
                   <AngleUpIcon className="h-3 w-3" />
                 </button>
                 <button type="button" onClick={() => move(i, 1)} disabled={i === cards.length - 1}
                   aria-label={t("fc.moveDown", "Move down")}
-                  className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-primary)] disabled:opacity-30 transition-colors">
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-30 transition-colors">
                   <AngleDownIcon className="h-3 w-3" />
                 </button>
               </div>

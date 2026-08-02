@@ -125,7 +125,7 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
           >
             {url ? t("assets.replace") : t("assets.upload")}
           </button>

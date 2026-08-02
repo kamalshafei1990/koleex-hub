@@ -195,9 +195,9 @@ export default function AnnotationEditor({ file, onSave, onCancel, labels }: Pro
           {toolBtn("text", labels.text)}
         </div>
         <div className="ms-auto flex items-center gap-1.5">
-          <button type="button" onClick={undo} disabled={shapes.length === 0} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">{labels.undo}</button>
-          <button type="button" onClick={onCancel} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{labels.cancel}</button>
-          <button type="button" onClick={save} className="rounded-md bg-[var(--bg-inverted)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] shadow-sm hover:opacity-90">{labels.save}</button>
+          <button type="button" onClick={undo} disabled={shapes.length === 0} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-40">{labels.undo}</button>
+          <button type="button" onClick={onCancel} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{labels.cancel}</button>
+          <button type="button" onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">{labels.save}</button>
         </div>
       </div>
       <div ref={wrapperRef} className="relative mx-auto flex flex-1 items-center justify-center overflow-auto rounded-lg bg-[var(--bg-secondary)]">

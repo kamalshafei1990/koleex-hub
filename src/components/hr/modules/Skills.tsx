@@ -324,7 +324,7 @@ export default function SkillsModule({ employees, t, lang }: HRModuleProps) {
                 type="button"
                 onClick={save}
                 disabled={saving || !draft.size}
-                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
                 {saving ? t("hr.skills.saving") : `${t("hr.skills.save")}${draft.size ? ` (${draft.size})` : ""}`}
               </button>

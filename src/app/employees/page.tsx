@@ -324,7 +324,7 @@ export default function EmployeesPage() {
               {employees.length === 0 ? t("list.empty.body") : ""}
             </p>
             {employees.length === 0 && (
-              <Link href="/employees/new" className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all">
+              <Link href="/employees/new" className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg">
                 <PlusIcon className="h-4 w-4" /> {t("app.add")}
               </Link>
             )}
@@ -458,7 +458,7 @@ export default function EmployeesPage() {
                 type="button"
                 onClick={() => setConfirmTarget(null)}
                 disabled={deleting}
-                className="h-9 px-4 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+                className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -466,7 +466,7 @@ export default function EmployeesPage() {
                 type="button"
                 onClick={onDelete}
                 disabled={deleting}
-                className="h-9 px-4 rounded-lg bg-red-500 text-white text-[12.5px] font-semibold flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-50"
               >
                 {deleting && <SpinnerIcon size={13} className="animate-spin" />}
                 Delete employee

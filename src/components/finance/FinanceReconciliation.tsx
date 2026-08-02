@@ -145,7 +145,7 @@ export default function FinanceReconciliation() {
               type="button"
               onClick={rescan}
               disabled={rescanBusy}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:opacity-60"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
             >
               {rescanBusy ? (
                 <>
@@ -213,7 +213,7 @@ export default function FinanceReconciliation() {
                 <button
                   onClick={rescan}
                   disabled={rescanBusy}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
                 >
                   <RrIcon name="search" size={12} />
                   {t("reconciliation.empty.cta", "Rescan now")}

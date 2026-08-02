@@ -220,7 +220,7 @@ export default function FinanceTreasuryForecast() {
                   setSaveDraft({ name: `${def} · ${new Date().toLocaleDateString()}`, description: "" });
                 }}
                 disabled={!base || loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-3 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
                 <RrIcon name="check" size={12} />
                 {t("forecast.saveAsPlan", "Save as plan")}
@@ -235,7 +235,7 @@ export default function FinanceTreasuryForecast() {
               <button
                 onClick={() => onPreset("base")}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-60"
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
               >
                 {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
                 {t("forecast.resetToBase", "Reset to base")}
@@ -287,7 +287,7 @@ export default function FinanceTreasuryForecast() {
               </div>
               <div className="border-t border-[var(--border-subtle)] px-5 py-3">
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("forecast.save.cancel", "Cancel")}</button>
+                  <button onClick={() => setSaveDraft(null)} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("forecast.save.cancel", "Cancel")}</button>
                   <button
                     disabled={saveBusy || !saveDraft.name.trim()}
                     onClick={async () => {
@@ -316,7 +316,7 @@ export default function FinanceTreasuryForecast() {
                         setSaveBusy(false);
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
                   >
                     {saveBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
                     {t("forecast.save.confirm", "Save plan")}

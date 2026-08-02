@@ -2525,7 +2525,7 @@ export default function ProductForm({ productId }: Props) {
             <button
               type="button"
               onClick={handleCancel}
-              className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
+              className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
               title={dirty ? t("wizard.unsavedChangesTitle", "You have unsaved changes") : t("wizard.backToProducts", "Back to products")}
             >
               <ArrowLeftIcon className="h-4 w-4" />
@@ -2554,14 +2554,14 @@ export default function ProductForm({ productId }: Props) {
             <button
               type="button"
               onClick={handleCancel}
-              className="hidden sm:inline-flex items-center justify-center h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
             >
               {t("action.cancel", "Cancel")}
             </button>
             <button
               onClick={save}
               disabled={saving}
-              className="h-9 px-4 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
             >
               {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
               <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
@@ -2605,14 +2605,14 @@ export default function ProductForm({ productId }: Props) {
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="h-9 rounded-xl border border-[var(--border-subtle)] px-3 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-subtle)]"
+                  className="h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
                 >
                   {t("draft.discard", "Discard")}
                 </button>
                 <button
                   type="button"
                   onClick={restoreDraft}
-                  className="h-9 rounded-xl bg-[var(--bg-inverted)] px-4 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+                  className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all hover:opacity-90 shadow-lg"
                 >
                   {t("draft.restore", "Restore draft")}
                 </button>
@@ -5205,7 +5205,7 @@ export default function ProductForm({ productId }: Props) {
           <button
             onClick={prevStep}
             disabled={currentStep === 0}
-            className="h-10 px-5 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <ArrowLeftIcon className="h-4 w-4" /> {t("wizard.previous", "Previous")}
           </button>
@@ -5452,14 +5452,14 @@ function SlugEditor({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             {t("hero.done", "Done")}
           </button>
           <button
             type="button"
             onClick={() => { onResetToAuto(); setEditing(false); }}
-            className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             title={t("hero.regenerateSlug", "Regenerate slug from product name")}
           >
             {t("hero.reset", "Reset")}
@@ -5579,7 +5579,7 @@ function HighlightsEditor({
             type="button"
             onClick={add}
             disabled={!input.trim()}
-            className="h-11 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+            className="h-11 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all shadow-lg"
           >
             <PlusIcon className="h-3.5 w-3.5" /> {t("hero.add", "Add")}
           </button>

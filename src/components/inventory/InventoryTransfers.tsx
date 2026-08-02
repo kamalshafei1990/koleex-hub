@@ -187,7 +187,7 @@ export default function InventoryTransfers() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="plus" size={12} />
             {t("inv.transfers.new")}
@@ -218,7 +218,7 @@ export default function InventoryTransfers() {
           <button
             type="button"
             onClick={() => setShowMoreFilters((v) => !v)}
-            className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             {showMoreFilters ? t("inv.transfers.filters.fewer") : t("inv.transfers.filters.more")}
           </button>
@@ -313,7 +313,7 @@ export default function InventoryTransfers() {
                         <button
                           type="button"
                           onClick={onPrimary}
-                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] sm:min-h-0 sm:py-1.5"
+                          className="inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                         >
                           {primaryActionLabel}
                         </button>

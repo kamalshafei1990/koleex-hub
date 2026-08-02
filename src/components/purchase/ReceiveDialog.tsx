@@ -471,13 +471,13 @@ export default function ReceiveDialog({
             {totalToReceive > 0 ? `${totalToReceive} units will move into stock` : "No quantities entered"}
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+            <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={submitting || !detail || totalToReceive <= 0}
-              className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
             >
               {submitting ? "Posting…" : "Confirm receipt"}
             </button>

@@ -56,7 +56,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-all"
+          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
         >
           <PlusIcon className="h-3.5 w-3.5" /> New PO
         </button>
@@ -97,7 +97,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
                     <button
                       type="button"
                       onClick={() => setReceivePoId(p.id)}
-                      className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] text-[var(--text-primary)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
+                      className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                     >
                       Receive
                     </button>

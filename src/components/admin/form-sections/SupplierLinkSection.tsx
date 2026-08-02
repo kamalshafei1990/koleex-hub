@@ -514,7 +514,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
             type="button"
             onClick={loadSuppliers}
             disabled={loadingSuppliers}
-            className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 px-5 inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <PlusIcon className="h-3.5 w-3.5" />
             {loadingSuppliers ? t("sup.loadingSuppliers", "Loading suppliers…") : supLoadFailed ? t("sup.retryLoad", "Retry loading suppliers") : t("sup.load", "Load suppliers")}
@@ -529,7 +529,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
             type="button"
             onClick={() => setPickerOpen(true)}
             disabled={available.length === 0}
-            className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 px-5 inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <PlusIcon className="h-3.5 w-3.5" /> {available.length ? t("sup.linkSupplier", "Link a supplier") : t("sup.allLinked", "All suppliers linked")}
           </button>
@@ -699,7 +699,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
         <div className="flex items-center justify-end gap-2 p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
           <button type="button"
             onClick={() => { onClose(); router.push(`/suppliers/${supplier.id}`); }}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity">
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
             <ExternalLinkIcon className="h-3.5 w-3.5" /> {t("sup.openProfile", "Open full profile")}
           </button>
         </div>

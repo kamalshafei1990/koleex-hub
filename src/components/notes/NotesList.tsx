@@ -88,7 +88,7 @@ export default function NotesList({
         {isTrashView && notes.length > 0 && (
           <button
             onClick={onEmptyTrash}
-            className="h-7 px-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-[11px] font-semibold hover:bg-red-500/25 transition-all shrink-0"
+            className="h-7 px-2.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-[11px] font-semibold hover:bg-red-500/30 transition-all shrink-0"
           >
             {t("emptyTrash")}
           </button>

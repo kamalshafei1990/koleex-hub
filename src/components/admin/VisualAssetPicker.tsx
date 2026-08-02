@@ -83,7 +83,7 @@ export default function VisualAssetPicker({
           <p className="text-[14px] font-bold text-[var(--text-primary)] flex-1">{title}</p>
           <button
             onClick={() => onPick(null)}
-            className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-1 rounded-md"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
             Clear
           </button>

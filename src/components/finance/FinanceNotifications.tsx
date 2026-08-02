@@ -262,7 +262,7 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
         >
           Custom…
         </button>
-        <button onClick={() => onAction(n.id, "cancel")} className="ml-auto rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-white/10">Cancel</button>
+        <button onClick={() => onAction(n.id, "cancel")} className="ml-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">Cancel</button>
       </div>
     </div>
   );

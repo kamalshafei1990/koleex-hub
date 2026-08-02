@@ -266,7 +266,7 @@ export default function InventoryItems() {
             <button
               type="button"
               onClick={() => setFiltersOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               aria-expanded={filtersOpen}
             >
               Filters {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
@@ -344,7 +344,7 @@ export default function InventoryItems() {
                     action={
                       <button
                         onClick={() => setInternalDrawerOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                        className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                       >
                         <RrIcon name="briefcase" size={11} />
                         {t("inv.add_internal_use")}
@@ -577,13 +577,13 @@ function QuickAddDrawer({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
           >
             {!submitting && <RrIcon name="check" size={12} />}
             {submitting ? "Saving…" : "Create Item"}
@@ -920,11 +920,11 @@ function ItemDetailDrawer({
                 Restore
               </button>
             ) : (
-              <button onClick={archive} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 hover:bg-rose-500/20 disabled:opacity-50">
+              <button onClick={archive} disabled={busy} className="inline-flex items-center gap-1.5 h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50">
                 <RrIcon name="trash" size={12} /> Archive
               </button>
             )}
-            <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+            <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               Close
             </button>
           </div>
@@ -1199,7 +1199,7 @@ function TypesPanel({
           {error && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>
           )}
-          <button onClick={submit} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50">
+          <button onClick={submit} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
             {submitting ? "Creating…" : "Create custom type"}
           </button>
         </div>
@@ -1327,7 +1327,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
         <button
           type="button"
           onClick={() => setAddOpen((s) => !s)}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <RrIcon name="plus" size={10} />
           Add variant

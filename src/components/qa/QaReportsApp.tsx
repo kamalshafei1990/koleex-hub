@@ -697,7 +697,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           type="button"
           onClick={exportCSV}
           title={t("qa.filter.exportTip", "Export the current view as CSV")}
-          className="h-9 rounded-lg border border-[var(--border-color)] px-3 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           {t("qa.filter.exportCSV", "Export CSV")}
         </button>
@@ -706,7 +706,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           onClick={() => setShowHelp(true)}
           title={t("qa.filter.helpTip", "Keyboard shortcuts (?)")}
           aria-label={t("qa.filter.help", "Keyboard shortcuts")}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[12px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           ?
         </button>
@@ -1105,10 +1105,10 @@ function ReportDetail({
               {t("qa.detail.openRoute", "Open Route ↗")}
             </a>
           ) : null}
-          <button type="button" onClick={() => setWorkspaceOpen(true)} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
+          <button type="button" onClick={() => setWorkspaceOpen(true)} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
             {t("qa.detail.debugWorkspace", "Debug Workspace")}
           </button>
-          <button type="button" onClick={copyDebugPrompt} disabled={copying} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-60">
+          <button type="button" onClick={copyDebugPrompt} disabled={copying} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60">
             {copying ? t("qa.detail.preparing", "Preparing…") : copied ? t("qa.common.copied", "Copied ✓") : t("qa.detail.copyPrompt", "Copy AI Prompt")}
           </button>
         </div>
@@ -1292,7 +1292,7 @@ function ReportDetail({
         </div>
         <div className="flex items-center justify-end gap-2">
           {saved && <span className="text-[12px] text-emerald-500">{t("qa.triage.saved", "Saved ✓")}</span>}
-          <button type="button" onClick={saveTriage} disabled={saving} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+          <button type="button" onClick={saveTriage} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
             {saving ? t("qa.triage.saving", "Saving…") : t("qa.triage.save", "Save changes")}
           </button>
         </div>
@@ -1482,7 +1482,7 @@ function DuplicateControl({
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("qa.action.duplicateOfPrompt", "Duplicate of…")}</span>
-            <button type="button" onClick={() => { setPicking(false); setSearch(""); }} className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
+            <button type="button" onClick={() => { setPicking(false); setSearch(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("qa.common.cancel", "Cancel")}</button>
           </div>
           <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("qa.action.searchIssues", "Search issues…")} className="mb-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
           <ul className="max-h-40 overflow-y-auto">
@@ -1509,7 +1509,7 @@ function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (
   return (
     <div>
       {!open ? (
-        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)]">
+        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
           ↻ {t("qa.action.reopenIssue", "Reopen issue")}
         </button>
       ) : (
@@ -1517,8 +1517,8 @@ function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("qa.action.whyReopen", "Why reopen?")}</div>
           <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("qa.action.reopenReasonPlaceholder", "Reason (preserved on the timeline)…")} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
           <div className="mt-1.5 flex justify-end gap-2">
-            <button type="button" onClick={() => { setOpen(false); setReason(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
-            <button type="button" disabled={disabled} onClick={async () => { const ok = await onReopen(reason.trim()); if (ok) { setOpen(false); setReason(""); } }} className="rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+            <button type="button" onClick={() => { setOpen(false); setReason(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("qa.common.cancel", "Cancel")}</button>
+            <button type="button" disabled={disabled} onClick={async () => { const ok = await onReopen(reason.trim()); if (ok) { setOpen(false); setReason(""); } }} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
               {t("qa.action.reopen", "Reopen")}
             </button>
           </div>
@@ -1620,7 +1620,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
             <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent)]" />
             {t("qa.discussion.internal", "Internal note")}
           </label>
-          <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
+          <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {posting ? t("qa.discussion.posting", "Posting…") : t("qa.discussion.comment", "Comment")}
           </button>
         </div>
@@ -1793,7 +1793,7 @@ function BulkBar({
         <option value="__null">{t("qa.bulk.unassign", "Unassign")}</option>
         {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
       </select>
-      <button type="button" onClick={onClear} disabled={busy} className="ms-auto rounded-md px-2 py-1 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.bulk.clear", "Clear selection")}</button>
+      <button type="button" onClick={onClear} disabled={busy} className="ms-auto h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("qa.bulk.clear", "Clear selection")}</button>
     </div>
   );
 }

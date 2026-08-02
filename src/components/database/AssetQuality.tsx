@@ -119,7 +119,7 @@ export default function AssetQuality({
             </div>
           </div>
           <button type="button" onClick={() => load(true)} disabled={recomputing} title={t("vl.quality.recompute", "Recompute")}
-            className="self-start rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50">
+            className="self-start h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center disabled:opacity-50">
             <RefreshCwIcon size={13} className={recomputing ? "animate-spin" : ""} />
           </button>
         </div>
@@ -235,7 +235,7 @@ export default function AssetQuality({
             </button>
           ))}
           <button type="button" disabled={savingReview} onClick={() => review()}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+            className="ml-auto inline-flex items-center gap-1 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
             {savingReview ? <SpinnerIcon size={12} className="animate-spin" /> : null} {t("vl.quality.saveNotes", "Save notes")}
           </button>
         </div>

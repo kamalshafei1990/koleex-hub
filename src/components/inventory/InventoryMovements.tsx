@@ -506,7 +506,7 @@ export default function InventoryMovements() {
           <button
             type="button"
             onClick={() => setShowMoreFilters((v) => !v)}
-            className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             {showMoreFilters ? t("mv.filters.fewer") : t("mv.filters.more")}
           </button>
@@ -517,7 +517,7 @@ export default function InventoryMovements() {
             <button
               type="button"
               onClick={() => setShowForm((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)]"
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               <RrIcon name="plus" size={12} />
               {t("mv.new")}
@@ -797,14 +797,14 @@ export default function InventoryMovements() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)]"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
               >
                 {!submitting && <RrIcon name="check" size={12} />}
                 {submitting ? t("mv.submitting") : t("mv.submit")}
@@ -912,7 +912,7 @@ export default function InventoryMovements() {
                         <button
                           type="button"
                           onClick={() => setDetailId(m.id)}
-                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] sm:min-h-0 sm:py-1.5"
+                          className="inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                         >
                           {primaryActionLabel}
                         </button>

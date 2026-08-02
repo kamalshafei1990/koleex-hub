@@ -188,7 +188,7 @@ export default function FinanceExpenseAnalytics() {
           action={
             <Link
               href="/expenses"
-              className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg active:scale-95"
             >
               <span className="inline-flex items-center gap-1.5">{t("expAnalytics.openApp", "Open Expenses App")} <RrIcon name="arrow-up-right-from-square" size={12} /></span>
             </Link>

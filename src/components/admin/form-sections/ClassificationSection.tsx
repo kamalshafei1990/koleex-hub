@@ -339,7 +339,7 @@ export default function ClassificationSection({
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => onChange({ division_slug: "", category_slug: "", subcategory_slug: "" })}
-              className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
             >
               <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
@@ -389,7 +389,7 @@ export default function ClassificationSection({
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => onChange({ category_slug: "", subcategory_slug: "" })}
-              className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
             >
               <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
@@ -454,7 +454,7 @@ export default function ClassificationSection({
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => onChange({ subcategory_slug: "" })}
-              className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
             >
               <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>

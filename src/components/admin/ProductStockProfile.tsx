@@ -317,7 +317,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
           type="button"
           onClick={save}
           disabled={saving}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-strong,var(--bg-surface))] px-3 py-1.5 text-[12px] text-[var(--text-primary)] disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
         >
           {saving ? t("stock.saving") : t("stock.save")}
         </button>

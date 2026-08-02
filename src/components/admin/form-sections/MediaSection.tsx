@@ -336,7 +336,7 @@ function MediaSlot({
         {(multiple || items.length === 0) && (
           <button
             onClick={() => ref.current?.click()}
-            className="h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-colors shrink-0"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
           >
             <UploadIcon className="h-3 w-3" /> {t("media.uploadAction", "Upload")}
           </button>
@@ -741,7 +741,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
             <button
               type="button"
               onClick={saveEdit}
-              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               {t("action.save", "Save")}
             </button>

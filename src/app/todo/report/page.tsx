@@ -187,7 +187,7 @@ export default function TodoReportPage() {
               </div>
             )}
             <button onClick={exportCsv} disabled={rows.length === 0}
-              className="ms-auto h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition disabled:opacity-40">
+              className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
               {t("report.export")}
             </button>
           </div>

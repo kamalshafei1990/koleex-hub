@@ -131,7 +131,7 @@ export default function InventorySearch() {
             <button
               type="button"
               onClick={() => setQ("")}
-              className="rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               <RrIcon name="cross" size={11} />
             </button>

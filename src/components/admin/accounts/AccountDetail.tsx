@@ -430,7 +430,7 @@ export default function AccountDetail({ accountId }: Props) {
                 <button
                   onClick={handleResetPassword}
                   disabled={working}
-                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
                   title="Generate a random password for the admin to share"
                 >
                   <RefreshCcwIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
@@ -440,7 +440,7 @@ export default function AccountDetail({ accountId }: Props) {
             <button
               onClick={handleToggleForce}
               disabled={working}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
               title={
                 data.force_password_change
                   ? t("acc.detail.clearForceHint")
@@ -455,7 +455,7 @@ export default function AccountDetail({ accountId }: Props) {
             <button
               onClick={handleToggleStatus}
               disabled={working}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
             >
               {isActive ? (
                 <>
@@ -520,14 +520,14 @@ export default function AccountDetail({ accountId }: Props) {
                 type="button"
                 onClick={handleSetCustomPassword}
                 disabled={working || customPw.trim().length < 8}
-                className="h-10 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {working ? "Applying…" : "Apply"}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowSetPw(false); setCustomPw(""); }}
-                className="h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 Cancel
               </button>
@@ -554,7 +554,7 @@ export default function AccountDetail({ accountId }: Props) {
             </div>
             <button
               onClick={copyNewPw}
-              className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5"
             >
               <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
             </button>
@@ -614,7 +614,7 @@ export default function AccountDetail({ accountId }: Props) {
                   type="button"
                   onClick={handleAvatarRemove}
                   disabled={uploadingAvatar}
-                  className="text-[11px] text-[var(--text-dim)] hover:text-red-300 flex items-center gap-1 disabled:opacity-60"
+                  className="text-[11px] text-[var(--text-dim)] hover:text-red-400 flex items-center gap-1 disabled:opacity-60"
                 >
                   <TrashIcon className="h-3 w-3" /> {t("acc.btn.remove")}
                 </button>

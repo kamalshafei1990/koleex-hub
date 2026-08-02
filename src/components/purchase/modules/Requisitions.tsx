@@ -54,7 +54,7 @@ export default function RequisitionsModule({ t }: PurchaseModuleProps) {
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-all"
+          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
         >
           <PlusIcon className="h-3.5 w-3.5" /> New requisition
         </button>

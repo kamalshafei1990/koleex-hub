@@ -90,11 +90,11 @@ function PushEnableCard() {
           </p>
         </div>
         {subscribed ? (
-          <button type="button" onClick={disable} disabled={busy} className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-50 shrink-0">
+          <button type="button" onClick={disable} disabled={busy} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 shrink-0">
             {busy ? "…" : t("notif.push.turnOff")}
           </button>
         ) : (
-          <button type="button" onClick={enable} disabled={busy || !supported} className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 disabled:opacity-50 shrink-0">
+          <button type="button" onClick={enable} disabled={busy || !supported} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 shrink-0">
             {busy ? t("notif.push.enabling") : t("notif.push.enable")}
           </button>
         )}

@@ -239,13 +239,13 @@ export default function VisualLibraryBrowser() {
                 placeholder={t("vl.browse.category-name", "Category name…")}
                 className="min-w-0 flex-1 rounded-md border border-[var(--border-focus)] bg-[var(--bg-card)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none" />
               <button type="button" disabled={catBusy || !newCat.trim()} onClick={addCategory}
-                className="shrink-0 rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[11px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">
+                className="shrink-0 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 {catBusy ? "…" : t("vl.browse.add", "Add")}
               </button>
             </div>
           ) : (
             <button type="button" onClick={() => setAddingCat(true)}
-              className="mt-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]">
+              className="mt-1 flex w-full items-center gap-1.5 h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
               <PlusIcon size={12} /> {t("vl.browse.add-category", "Add category")}
             </button>
           )}
@@ -272,7 +272,7 @@ export default function VisualLibraryBrowser() {
               </button>
             </div>
             <button type="button" onClick={() => setShowUpload(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+              className="inline-flex shrink-0 items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
               <PlusIcon size={14} /> {t("vl.browse.new-entity", "New entity")}
             </button>
           </div>
@@ -348,7 +348,7 @@ export default function VisualLibraryBrowser() {
         {!loading && filtered.length > visible.length && (
           <div className="flex justify-center pt-1">
             <button type="button" onClick={() => setLimit((l) => l + 300)}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]">
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               {t("vl.browse.show-more", "Show more — {a} of {b} remaining").replace("{a}", String(filtered.length - visible.length)).replace("{b}", String(filtered.length))}
             </button>
           </div>
@@ -360,15 +360,15 @@ export default function VisualLibraryBrowser() {
           <span className="text-[12.5px] font-medium text-[var(--text-primary)] tabular-nums">{t("vl.browse.n-selected", "{n} selected").replace("{n}", String(selected.size))}</span>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("approve")}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
               {bulkBusy ? <SpinnerIcon size={12} className="animate-spin" /> : <BadgeCheckIcon size={12} />} {t("vl.browse.approve", "Approve")}
             </button>
             <button type="button" disabled={bulkBusy} onClick={() => setShowBulkCol(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
               <LayersIcon size={12} /> {t("vl.browse.collection", "Collection")}
             </button>
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("archive")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
               <ArchiveIcon size={12} /> {t("vl.browse.archive", "Archive")}
             </button>
             <button type="button" onClick={clearSelection} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.browse.clear", "Clear")}</button>

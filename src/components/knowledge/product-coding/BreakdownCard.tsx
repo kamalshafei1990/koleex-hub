@@ -291,7 +291,7 @@ export default function BreakdownCard({
                 type="button"
                 onClick={reset}
                 disabled={!isDirty}
-                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                 aria-label={t("bd.reset")}
               >
                 <span aria-hidden>↺</span>
@@ -300,7 +300,7 @@ export default function BreakdownCard({
               <button
                 type="button"
                 onClick={copy}
-                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center gap-1.5"
                 aria-label={t("bd.copy")}
               >
                 <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
@@ -310,7 +310,7 @@ export default function BreakdownCard({
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center gap-1.5"
                   aria-label={t("bd.copy_link")}
                 >
                   <span aria-hidden>🔗</span>

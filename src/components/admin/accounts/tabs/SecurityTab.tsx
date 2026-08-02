@@ -275,7 +275,7 @@ export default function SecurityTab({ account }: Props) {
             <button
               type="button"
               onClick={() => { setPwFormOpen(true); setError(null); }}
-              className={primaryBtnClass + " text-[12px]"}
+              className={primaryBtnClass}
             >
               <KeyIcon className="h-3.5 w-3.5" />
               {t("acc.security.changePassword") || "Change password"}
@@ -310,7 +310,7 @@ export default function SecurityTab({ account }: Props) {
                   type="button"
                   onClick={() => handleChangePassword("generate")}
                   disabled={pwSaving}
-                  className={ghostBtnClass + " text-[12px] whitespace-nowrap disabled:opacity-50"}
+                  className={ghostBtnClass + " whitespace-nowrap disabled:opacity-50"}
                 >
                   {pwSaving ? "…" : (t("acc.security.generate") || "Auto-generate")}
                 </button>
@@ -331,7 +331,7 @@ export default function SecurityTab({ account }: Props) {
                   type="button"
                   onClick={() => handleChangePassword("manual")}
                   disabled={pwSaving || pwInput.trim().length < 8}
-                  className={primaryBtnClass + " text-[12px] disabled:opacity-50"}
+                  className={primaryBtnClass + " disabled:opacity-50"}
                 >
                   {pwSaving ? "Saving…" : (t("acc.security.savePassword") || "Save password")}
                 </button>
@@ -358,7 +358,7 @@ export default function SecurityTab({ account }: Props) {
                     navigator.clipboard?.writeText(pwGenerated);
                     setToast(t("common.copied") || "Copied");
                   }}
-                  className={ghostBtnClass + " text-[12px]"}
+                  className={ghostBtnClass}
                 >
                   {t("common.copy") || "Copy"}
                 </button>
@@ -367,7 +367,7 @@ export default function SecurityTab({ account }: Props) {
                 <button
                   type="button"
                   onClick={() => { setPwGenerated(null); setPwFormOpen(false); setPwInput(""); }}
-                  className={primaryBtnClass + " text-[12px]"}
+                  className={primaryBtnClass}
                 >
                   {t("common.done") || "Done"}
                 </button>
@@ -487,7 +487,7 @@ export default function SecurityTab({ account }: Props) {
                       type="button"
                       onClick={() => handleDeleteKey(k.id)}
                       disabled={busy}
-                      className="h-10 px-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[12px] font-medium flex items-center gap-1.5 hover:bg-red-500/15 transition-all disabled:opacity-60"
+                      className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-red-500/30 transition-all disabled:opacity-60"
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
                       {t("acc.security.delete")}
@@ -545,7 +545,7 @@ export default function SecurityTab({ account }: Props) {
                   type="button"
                   onClick={() => handleRevokeSession(s.id)}
                   disabled={busy}
-                  className="h-10 px-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[12px] font-medium flex items-center gap-1.5 hover:bg-red-500/15 transition-all disabled:opacity-60"
+                  className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-red-500/30 transition-all disabled:opacity-60"
                 >
                   <XCircleIcon className="h-3.5 w-3.5" />
                   {t("acc.security.signOut")}

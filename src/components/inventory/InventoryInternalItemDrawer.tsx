@@ -662,7 +662,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
             <div className="flex items-center justify-between gap-2">
               <button
                 onClick={onClose}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-2 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 {t("inv.int.cancel")}
               </button>
@@ -670,7 +670,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
                 onClick={submit}
                 disabled={submitting || !name.trim()}
                 data-testid="inv-internal-save"
-                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-5 py-2 text-[13px] font-semibold text-[var(--bg-primary)] hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
                 {!submitting && <RrIcon name="check" size={12} />}
                 {submitting ? t("inv.int.saving") : t("inv.int.save")}
@@ -1241,7 +1241,7 @@ function BreadcrumbHeader({
       <button
         onClick={onBack}
         aria-label={t("inv.int.back")}
-        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
       >
         <RrIcon name="arrow-left" size={13} />
       </button>

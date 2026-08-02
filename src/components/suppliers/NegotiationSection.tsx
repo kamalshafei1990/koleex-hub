@@ -125,8 +125,8 @@ export default function NegotiationSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("neg.title", "Negotiation Intelligence")}</h3></div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => { setNiD(niInitial()); setNiErr(null); setNiEdit(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /> {hasIntel ? t("neg.editScorecard", "Edit scorecard") : t("neg.score", "Score")}</button>
-          <button type="button" onClick={() => { setD(emptyDraft()); setErr(null); setOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"><PlusIcon className="h-3.5 w-3.5" /> {t("neg.logRound", "Log round")}</button>
+          <button type="button" onClick={() => { setNiD(niInitial()); setNiErr(null); setNiEdit(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><Edit3Icon className="h-3.5 w-3.5" /> {hasIntel ? t("neg.editScorecard", "Edit scorecard") : t("neg.score", "Score")}</button>
+          <button type="button" onClick={() => { setD(emptyDraft()); setErr(null); setOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"><PlusIcon className="h-3.5 w-3.5" /> {t("neg.logRound", "Log round")}</button>
         </div>
       </div>
 
@@ -173,8 +173,8 @@ export default function NegotiationSection({
             <Field label={t("neg.fieldInternalNotes", "Internal notes")}><textarea className={`${inputCls} min-h-[56px]`} value={niD.internal_notes} onChange={(e) => setNi("internal_notes", e.target.value)} /></Field>
             {niErr ? <div className="text-[12px] text-rose-400">{niErr}</div> : null}
             <div className="flex items-center gap-3">
-              <button type="button" disabled={niBusy} onClick={saveIntel} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{niBusy ? t("neg.saving", "Saving…") : t("neg.saveScorecard", "Save scorecard")}</button>
-              <button type="button" onClick={() => setNiEdit(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("neg.cancel", "Cancel")}</button>
+              <button type="button" disabled={niBusy} onClick={saveIntel} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{niBusy ? t("neg.saving", "Saving…") : t("neg.saveScorecard", "Save scorecard")}</button>
+              <button type="button" onClick={() => setNiEdit(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("neg.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>
@@ -250,8 +250,8 @@ export default function NegotiationSection({
             <Field label={t("neg.fieldBehaviorNotes", "Behavior patterns")}><textarea className={`${inputCls} min-h-[48px]`} value={d.behavior_notes} onChange={(e) => set("behavior_notes", e.target.value)} placeholder={t("neg.phBehaviorNotes", "Holds firm early, concedes near quarter-end…")} /></Field>
             {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
             <div className="flex items-center gap-3">
-              <button type="button" disabled={busy} onClick={save} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{busy ? t("neg.saving", "Saving…") : t("neg.logRound", "Log round")}</button>
-              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("neg.cancel", "Cancel")}</button>
+              <button type="button" disabled={busy} onClick={save} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{busy ? t("neg.saving", "Saving…") : t("neg.logRound", "Log round")}</button>
+              <button type="button" onClick={() => setOpen(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("neg.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

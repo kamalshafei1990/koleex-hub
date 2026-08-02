@@ -144,9 +144,9 @@ export default function NotificationsSettingsPage() {
 
   const card = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5";
   const btnPrimary =
-    "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-2";
+    "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-2";
   const btnGhost =
-    "h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-50 inline-flex items-center gap-2";
+    "h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 inline-flex items-center gap-2";
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">

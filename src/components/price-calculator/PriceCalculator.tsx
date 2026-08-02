@@ -367,10 +367,10 @@ export default function PriceCalculator() {
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
-            <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+            <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               <SettingsIcon2 className="h-3.5 w-3.5" /> <span className="hidden md:inline">Settings</span>
             </Link>
-            <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+            <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               <RefreshCwIcon className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
             </button>
             <button onClick={generate} className="hidden md:flex h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold items-center gap-2 hover:opacity-90 transition-all shadow-lg">
@@ -391,7 +391,7 @@ export default function PriceCalculator() {
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PackageIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Products</span>
-                <button onClick={addProduct} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
+                <button onClick={addProduct} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
                   <PlusIcon className="h-3.5 w-3.5" /> Add
                 </button>
               </div>
@@ -683,7 +683,7 @@ export default function PriceCalculator() {
                     { icon: PrinterIcon, label: "Print", fn: () => window.print() },
                     { icon: Share2Icon, label: "Share", fn: () => {} },
                   ].map(b => (
-                    <button key={b.label} onClick={b.fn} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+                    <button key={b.label} onClick={b.fn} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                       <b.icon className="h-3.5 w-3.5" /> {b.label}
                     </button>
                   ))}

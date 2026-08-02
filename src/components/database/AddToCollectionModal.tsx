@@ -117,7 +117,7 @@ export default function AddToCollectionModal({
         <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-5 py-4">
           <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{t("vl.addCol.selectedCount", "{n} selected").replace("{n}", String(sel.size))}</span>
           <button type="button" onClick={save} disabled={saving || sel.size === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
             {saving && <SpinnerIcon size={14} className="animate-spin" />}{t("vl.addCol.add", "Add")}
           </button>
         </div>

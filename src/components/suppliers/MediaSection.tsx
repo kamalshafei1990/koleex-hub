@@ -275,7 +275,7 @@ export default function MediaSection({
           <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("ms.title", "Evidence & Documents")}</h3>
         </div>
         <button type="button" onClick={openUpload}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
           <PlusIcon className="h-3.5 w-3.5" /> {t("ms.addAsset", "Add asset")}
         </button>
       </div>
@@ -497,10 +497,10 @@ export default function MediaSection({
             {upErr ? <div className="text-[12px] text-rose-400">{upErr}</div> : null}
             <div className="flex items-center gap-3">
               <button type="button" disabled={busy} onClick={save}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 <UploadIcon className="h-3.5 w-3.5" />{busy ? t("ms.uploading", "Uploading…") : t("ms.uploadAsset", "Upload asset")}
               </button>
-              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("ms.cancel", "Cancel")}</button>
+              <button type="button" onClick={() => setOpen(false)} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("ms.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

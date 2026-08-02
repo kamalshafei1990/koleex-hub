@@ -725,10 +725,10 @@ function PositionSkillsConfig({
         <div className="flex items-center justify-between gap-3 p-4 border-t border-[var(--border-subtle)]">
           <span className="text-[11px] text-rose-400">{error}</span>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">{t("hr.sk.cancel")}</button>
+            <button type="button" onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("hr.sk.cancel")}</button>
             <button
               type="button" onClick={save} disabled={saving || loading}
-              className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
             >
               {saving ? t("hr.sk.saving") : t("hr.sk.saveRequirements")}
             </button>

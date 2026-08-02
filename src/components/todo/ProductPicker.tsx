@@ -316,7 +316,7 @@ export default function ProductPicker({
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between px-4 md:px-5 py-3 border-t border-[var(--border-subtle)]">
           <span className="text-[11px] text-[var(--text-ghost)]">{loading ? "" : `${filtered.length} ${t("picker.productsWord")}`}</span>
-          <button onClick={onClose} className="h-9 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
             {t("common.done")}
           </button>
         </div>

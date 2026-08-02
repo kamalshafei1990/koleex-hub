@@ -284,7 +284,7 @@ export default function ShareDialog({
         <div className="flex items-center justify-end px-5 py-3.5 border-t border-[var(--border-subtle)] shrink-0">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-all"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >
             {t("share.done")}
           </button>

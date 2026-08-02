@@ -407,12 +407,12 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
           />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+          <button onClick={load} className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
             <RefreshIcon className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={handleCreate}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
           >
             <PlusIcon className="h-3.5 w-3.5" /> {t("vl.brands.newBrand", "New Brand")}
           </button>

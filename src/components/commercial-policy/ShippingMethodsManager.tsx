@@ -177,7 +177,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
         {isSuperAdmin && (
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
@@ -387,10 +387,10 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
 
         {canEdit && (
           <div className="flex flex-col gap-1 shrink-0">
-            <button type="button" onClick={onEdit} title="Edit" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition">
+            <button type="button" onClick={onEdit} title="Edit" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={onDelete} title="Delete" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition">
+            <button type="button" onClick={onDelete} title="Delete" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition-colors">
               <TrashIcon className="h-3.5 w-3.5" />
             </button>
           </div>

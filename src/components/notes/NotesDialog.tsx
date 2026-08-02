@@ -113,14 +113,14 @@ export function PromptDialog({
           <button
             onClick={onClose}
             disabled={busy}
-            className="h-9 px-4 rounded-lg text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
           >
             {cancelLabel ?? "Cancel"}
           </button>
           <button
             onClick={() => void submit()}
             disabled={busy}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
           >
             {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             {confirmLabel ?? "OK"}
@@ -168,8 +168,8 @@ export function ConfirmDialog({
 
   const confirmBtn =
     variant === "danger"
-      ? "bg-red-500 text-white hover:bg-red-500/90"
-      : "bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90";
+      ? "bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30"
+      : "bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 shadow-lg";
 
   const iconColor =
     variant === "danger" ? "text-red-400" : "text-[var(--text-dim)]";
@@ -203,14 +203,14 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={busy}
-            className="h-9 px-4 rounded-lg text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
           >
             {cancelLabel ?? "Cancel"}
           </button>
           <button
             onClick={() => void submit()}
             disabled={busy}
-            className={`h-9 px-4 rounded-lg text-[12.5px] font-semibold flex items-center gap-2 transition-all disabled:opacity-40 ${confirmBtn}`}
+            className={`h-10 px-5 rounded-xl text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-40 ${confirmBtn}`}
           >
             {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             {confirmLabel ?? "Confirm"}

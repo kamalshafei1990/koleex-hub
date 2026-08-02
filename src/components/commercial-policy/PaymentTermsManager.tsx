@@ -215,7 +215,7 @@ export default function PaymentTermsManager({
         {isSuperAdmin && (
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
+            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
@@ -442,7 +442,7 @@ function TermCard({
                 type="button"
                 onClick={setDefault}
                 title="Set as the default for this category"
-                className="p-1.5 text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded transition"
+                className="p-1.5 text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition"
               >
                 <StarIcon size={12} />
               </button>
@@ -451,7 +451,7 @@ function TermCard({
               type="button"
               onClick={onEdit}
               title="Edit"
-              className="p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded transition"
+              className="p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-lg transition"
             >
               <PencilIcon className="h-3 w-3" />
             </button>
@@ -459,7 +459,7 @@ function TermCard({
               type="button"
               onClick={onDelete}
               title="Delete"
-              className="p-1.5 text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 rounded transition"
+              className="p-1.5 text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
             >
               <TrashIcon className="h-3 w-3" />
             </button>

@@ -238,8 +238,8 @@ function AttributeModal({
           )}
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? "Saving..." : editValue ? "Save" : "Create"}
           </button>
@@ -342,8 +342,8 @@ function ClassificationModal({
           <div><label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" rows={3} className={inp + " h-auto py-3 resize-none"} /></div>
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
           </button>
         </div>
@@ -369,7 +369,7 @@ function DeleteModal({ open, onClose, title, message, warning, onConfirm, deleti
           {warning && <div className="mt-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-400">{warning}</div>}
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
           <button onClick={onConfirm} disabled={deleting} className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-40">
             {deleting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </button>
@@ -699,7 +699,7 @@ export default function ProductSettingsPage() {
               };
             })}
           />
-          <button onClick={loadAll} disabled={loading} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ml-auto"><RefreshIcon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
+          <button onClick={loadAll} disabled={loading} className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center ml-auto"><RefreshIcon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
         </div>
 
         {/* Content */}
@@ -817,7 +817,7 @@ function BrandsTab({ brands, brandLogos, onAdd, onEdit, onDelete }: {
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands…" className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : "No brands yet."}</p></div>
@@ -857,7 +857,7 @@ function PlugTypesTab({ items, counts, onAdd, onEdit, onDelete }: {
         <div className="flex gap-3">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">plug types</span></div>
         </div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add plug type</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add plug type</button>
       </div>
       {items.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">No plug types yet.</p></div>
@@ -999,7 +999,7 @@ function VisualValueTab({ type, items, counts, onAdd, onEdit, onDelete }: {
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">{label}s</span></div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{totalUsages}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
         </div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {items.length > 4 && (
         <div className="relative max-w-sm mb-4"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
@@ -1050,7 +1050,7 @@ function SimpleTab({ type, items, counts, tagColors, onAdd, onEdit, onDelete }: 
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : `No ${label}s yet.`}</p></div>

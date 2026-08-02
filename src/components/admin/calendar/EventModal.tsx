@@ -669,7 +669,7 @@ export default function EventModal({
               type="button"
               onClick={onDelete}
               disabled={saving}
-              className="h-10 px-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[13px] font-medium flex items-center gap-2 hover:bg-red-500/15 transition-all disabled:opacity-60"
+              className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-60"
             >
               <TrashIcon className="h-4 w-4" /> {t("modal.delete")}
             </button>
@@ -681,7 +681,7 @@ export default function EventModal({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               {t("modal.cancel")}
             </button>

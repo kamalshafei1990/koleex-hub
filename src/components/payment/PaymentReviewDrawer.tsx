@@ -428,13 +428,13 @@ export default function PaymentReviewDrawer({
               />
               <div className="mt-2 flex items-center justify-end gap-1.5">
                 <button type="button" onClick={() => { setReasonMode(null); setReason(""); }}
-                  className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px] text-gray-300 hover:bg-white/[0.05]">Cancel</button>
+                  className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
                 <button type="button" disabled={!reason.trim() || acting != null}
                   onClick={() => void performApproval(reasonMode === "reject" ? "reject" : "request_changes", reason.trim())}
                   className={
-                    "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors " +
+                    "h-10 px-6 rounded-xl text-[13px] font-semibold transition-all " +
                     (reasonMode === "reject"
-                      ? "border border-rose-500/[0.30] bg-rose-500/[0.10] text-rose-200 hover:bg-rose-500/[0.16]"
+                      ? "bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30"
                       : "border border-amber-500/[0.30] bg-amber-500/[0.10] text-amber-200 hover:bg-amber-500/[0.16]") +
                     " disabled:opacity-50 disabled:cursor-not-allowed"
                   }
@@ -512,7 +512,7 @@ function ActionButton({
     <button
       type="button" onClick={onClick} disabled={busy}
       className={
-        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors " +
+        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors " +
         toneCls + " disabled:opacity-50 disabled:cursor-wait"
       }
     >

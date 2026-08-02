@@ -159,7 +159,7 @@ export default function FinanceBankAccounts() {
           action={
             <button
               onClick={startNew}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               <RrIcon name="plus" size={12} />
               {t("bankAccounts.btnNew", "New account")}
@@ -195,7 +195,7 @@ export default function FinanceBankAccounts() {
               action={
                 <button
                   onClick={startNew}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
+                  className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
                 >
                   <RrIcon name="plus" size={12} />
                   {t("bankAccounts.empty.cta", "Add first account")}
@@ -334,7 +334,7 @@ function AccountCard({
         </div>
         <button
           onClick={onOpen}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           {active ? t("bankAccounts.action.close", "Close") : t("bankAccounts.action.open", "Open")}
           <RrIcon name={active ? "cross" : "arrow-up-right"} size={9} />
@@ -381,21 +381,21 @@ function AccountCard({
       <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
         <Link
           href={`/finance/bank-imports?account=${account.id}`}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <RrIcon name="upload" size={9} />
           {t("bankAccounts.action.import", "Import statement")}
         </Link>
         <button
           onClick={onAddMovement}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <RrIcon name="plus" size={9} />
           {t("bankAccounts.action.manual", "Manual movement")}
         </button>
         <button
           onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <RrIcon name="pencil" size={9} />
           {t("bankAccounts.action.edit", "Edit")}
@@ -475,14 +475,14 @@ function AccountDetail({
           </Link>
           <button
             onClick={onAddMovement}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="plus" size={11} />
             {t("bankAccounts.action.manual", "Manual movement")}
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="pencil" size={11} />
             {t("bankAccounts.action.edit", "Edit")}

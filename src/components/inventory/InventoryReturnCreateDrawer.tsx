@@ -261,7 +261,7 @@ export default function InventoryReturnCreateDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] hover:bg-[var(--bg-surface)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             Close
           </button>
@@ -400,7 +400,7 @@ export default function InventoryReturnCreateDrawer({
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] hover:bg-[var(--bg-elevated)]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               <RrIcon name="plus" size={10} />
               {t("inv.returns.form.add_item")}
@@ -484,7 +484,7 @@ export default function InventoryReturnCreateDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)]"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             Cancel
           </button>
@@ -492,7 +492,7 @@ export default function InventoryReturnCreateDrawer({
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
           >
             <RrIcon name="check" size={12} />
             {submitting ? "…" : t("inv.returns.form.save_draft")}

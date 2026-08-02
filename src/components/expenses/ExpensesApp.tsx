@@ -320,7 +320,7 @@ export default function ExpensesApp() {
             <button
               type="button"
               onClick={() => setCategoryFilter("")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-600 dark:text-rose-400 hover:border-rose-500/40"
+              className="inline-flex items-center gap-1.5 h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all"
               title={t("filter.clearTitle", "Clear category filter")}
             >
               {t("filter.clear", "Clear filter")}
@@ -528,7 +528,7 @@ function ExpenseRow({
           <div className="flex items-center gap-1">
             <button
               onClick={onEdit}
-              className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-highlight)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               title={t("row.editTitle", "Edit expense")}
             >
               {t("common.edit", "Edit")}
@@ -566,7 +566,7 @@ function RowKebab({
         type="button"
         aria-label={t("row.moreActions", "More actions")}
         onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v); }}
-        className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
       >
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
       </button>
@@ -874,14 +874,14 @@ function ExpenseEditor({
             <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={onClose}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 {t("common.cancel", "Cancel")}
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
               >
                 {saving ? (
                   <>

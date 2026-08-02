@@ -370,7 +370,7 @@ export default function CustomerProfilePage({
           {/* The existing Contacts component handles edit — link back into it */}
           <Link
             href={`/customers?selected=${contact.id}`}
-            className="h-9 px-4 rounded-xl text-[12px] font-medium bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] inline-flex items-center gap-2 transition-colors"
+            className="h-10 px-4 rounded-xl text-[13px] font-semibold bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] inline-flex items-center gap-2 transition-all"
           >
             <PencilIcon size={12} /> {t("header.editInList")}
           </Link>

@@ -1700,7 +1700,7 @@ export default function TranslatorApp() {
                             }
                           }}
                           disabled={!imgText.trim()}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
+                          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
                         >
                           <VlIcon slug="translate" size={13} /> {t("tr.title", "Translator")}
                         </button>
@@ -1763,7 +1763,7 @@ export default function TranslatorApp() {
             <button
               type="submit"
               disabled={!url.trim() || pageBusy}
-              className="shrink-0 rounded-xl bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
+              className="shrink-0 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
             >
               {t("tr.urlGo", "Translate page")}
             </button>

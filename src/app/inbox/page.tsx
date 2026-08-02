@@ -552,7 +552,7 @@ export default function InboxPage() {
                the column is already in view. */
             setMobileView("detail");
           }}
-          className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
         >
           <PenSquareIcon className="h-3.5 w-3.5" />
           <span className="hidden md:inline">Compose</span>
@@ -1146,7 +1146,7 @@ function MessageDetail({
                 setConfirmMode("approve");
                 setConfirmNote("");
               }}
-              className="h-8 px-3 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors flex items-center gap-1.5"
+              className="h-8 px-3 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors flex items-center gap-1.5"
             >
               <CheckCircleIcon className="h-3 w-3" />
               Approve
@@ -1157,7 +1157,7 @@ function MessageDetail({
                 setConfirmMode("reject");
                 setConfirmNote("");
               }}
-              className="h-8 px-3 rounded-md bg-red-500/10 border border-red-500/30 text-[11px] font-semibold text-red-300 hover:bg-red-500/20 transition-colors flex items-center gap-1.5"
+              className="h-8 px-3 rounded-lg bg-red-500/20 border border-red-500/30 text-[11px] font-semibold text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
             >
               <XCircleIcon className="h-3 w-3" />
               Reject
@@ -2250,7 +2250,7 @@ function ProductPickerModal({
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 px-4 rounded-xl text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+            className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
             Cancel
           </button>
@@ -2258,7 +2258,7 @@ function ProductPickerModal({
             type="button"
             onClick={confirm}
             disabled={selected.size === 0}
-            className="h-9 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
           >
             <PlusIcon className="h-3.5 w-3.5" />
             Add {selected.size > 0 ? `(${selected.size})` : ""}

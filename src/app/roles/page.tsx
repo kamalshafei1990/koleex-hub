@@ -67,8 +67,8 @@ const getAppIcon = (moduleName: string) => {
 
 const inputCls = "w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors";
 const textareaCls = "w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors resize-none";
-const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-subtle)] hover:bg-[var(--bg-surface)] transition-colors";
-const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all";
+const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors";
+const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg disabled:opacity-30";
 
 /* ═══════════════════════════════════════════════════
    MODAL SHELL
@@ -223,7 +223,7 @@ function DeleteConfirm({ open, roleName, onClose, onConfirm, deleting }: {
     <ModalShell open={open} onClose={onClose} title={t("modal.deleteTitle")} width="max-w-[400px]" footer={
       <><button onClick={onClose} className={cancelBtnCls}>{t("btn.cancel")}</button>
       <button onClick={onConfirm} disabled={deleting}
-        className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 transition-all"
+        className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50"
       >{deleting ? t("btn.deleting") : t("btn.delete")}</button></>
     }>
       <p className="text-[13px] text-[var(--text-secondary)]">
@@ -832,7 +832,7 @@ export default function RolesPage() {
             {roles.length === 0 && (
               <button
                 onClick={() => { setEditRole(null); setShowRoleModal(true); }}
-                className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all"
+                className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg"
               >
                 <PlusIcon className="h-4 w-4" /> {t("btn.createRole")}
               </button>

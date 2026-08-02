@@ -378,13 +378,13 @@ export default function ShipDialog({
               : totalToShip > 0 ? `${totalToShip} units will leave inventory` : "No quantities entered"}
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
+            <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={submitting || !detail || totalToShip <= 0 || hasBlocker}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50 disabled:hover:bg-white/[0.06]"
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
             >
               {!submitting && <RrIcon name="truck-side" size={12} />}
               {submitting ? "Posting…" : "Confirm shipment"}

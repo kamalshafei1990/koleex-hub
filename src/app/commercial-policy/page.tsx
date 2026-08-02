@@ -387,7 +387,7 @@ function SectionShell({
             <button
               type="button"
               onClick={onEditStart}
-              className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               Edit
             </button>
@@ -398,7 +398,7 @@ function SectionShell({
                 type="button"
                 onClick={onCancel}
                 disabled={saving}
-                className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -599,7 +599,7 @@ function SettingsSection({
                 onClick={refreshFx}
                 disabled={fxRefreshing || ed.editing}
                 title={ed.editing ? "Finish editing first" : "Fetch the latest CNY/USD rate now"}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {fxRefreshing
                   ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -1811,7 +1811,7 @@ function DeleteRowBtn({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Delete row"
       title="Delete row"
-      className="h-7 w-7 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
+      className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 6h18" />

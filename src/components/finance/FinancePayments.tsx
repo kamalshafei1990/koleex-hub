@@ -127,7 +127,7 @@ export default function FinancePayments() {
               title={editing.direction === "in" ? t("payments.editor.titleIn", "Record customer payment") : t("payments.editor.titleOut", "Record supplier payment")}
               action={
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(null)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("payments.editor.cancel", "Cancel")}</button>
+                  <button onClick={() => setEditing(null)} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("payments.editor.cancel", "Cancel")}</button>
                   <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("payments.editor.save", "Save Payment")}</button>
                 </div>
               }

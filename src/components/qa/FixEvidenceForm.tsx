@@ -152,7 +152,7 @@ export default function FixEvidenceForm({ issueId, onSaved, defaultCommit = "" }
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+        className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
       >
         + Add fix evidence
       </button>
@@ -168,7 +168,7 @@ export default function FixEvidenceForm({ issueId, onSaved, defaultCommit = "" }
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
         >
           Cancel
         </button>
@@ -257,7 +257,7 @@ export default function FixEvidenceForm({ issueId, onSaved, defaultCommit = "" }
           type="button"
           onClick={submit}
           disabled={busy || uploading > 0}
-          className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save fix evidence"}
         </button>

@@ -1157,7 +1157,7 @@ function RoleConfig({
         />
         <button
           onClick={add}
-          className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
         >
           {t("btn.add")}
         </button>
@@ -1217,7 +1217,7 @@ function RoleRow({
           />
           <button
             onClick={save}
-            className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold"
+            className="h-7 px-2.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold"
           >
             {t("btn.save")}
           </button>
@@ -1308,7 +1308,7 @@ function ResourceConfig({
         />
         <button
           onClick={add}
-          className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
         >
           {t("btn.add")}
         </button>
@@ -1705,7 +1705,7 @@ function ItemModal({
                 onClick={() => {
                   if (confirm(t("modal.deleteConfirm"))) onDelete(editing.id);
                 }}
-                className="h-9 px-2.5 sm:px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5"
+                className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors"
               >
                 <TrashIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{t("btn.delete")}</span>
@@ -1723,13 +1723,13 @@ function ItemModal({
             )}
             <button
               onClick={onClose}
-              className="h-9 px-2.5 sm:px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold"
+              className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors"
             >
               {t("btn.cancel")}
             </button>
             <button
               onClick={save}
-              className="h-9 px-3 sm:px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               {editing ? t("btn.save") : t("btn.create")}
             </button>

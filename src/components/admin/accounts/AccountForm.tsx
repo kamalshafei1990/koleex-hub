@@ -640,14 +640,14 @@ export default function AccountForm({ mode, account }: Props) {
                   <button
                     type="button"
                     onClick={() => set("temporary_password", generateTemporaryPassword())}
-                    className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                    className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                   >
                     <RefreshCcwIcon className="h-3.5 w-3.5" /> New
                   </button>
                   <button
                     type="button"
                     onClick={copyPassword}
-                    className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                    className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                   >
                     <CopyIcon className="h-3.5 w-3.5" /> Copy
                   </button>
@@ -689,14 +689,14 @@ export default function AccountForm({ mode, account }: Props) {
                       <button
                         type="button"
                         onClick={() => set("temporary_password", generateTemporaryPassword())}
-                        className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                        className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                       >
                         <RefreshCcwIcon className="h-3.5 w-3.5" /> Generate
                       </button>
                       <button
                         type="button"
                         onClick={copyPassword}
-                        className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                        className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                       >
                         <CopyIcon className="h-3.5 w-3.5" /> Copy
                       </button>
@@ -736,7 +736,7 @@ export default function AccountForm({ mode, account }: Props) {
                           }
                         }}
                         disabled={pwResetBusy || form.temporary_password.trim().length < 8}
-                        className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                        className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
                       >
                         {pwResetBusy ? "Applying…" : "Apply password"}
                       </button>
@@ -947,7 +947,7 @@ export default function AccountForm({ mode, account }: Props) {
                     <button
                       type="button"
                       onClick={() => setShowCompanyPanel((s) => !s)}
-                      className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
+                      className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
                       title="Create new company"
                     >
                       <PlusIcon className="h-3.5 w-3.5" /> New
@@ -1214,7 +1214,7 @@ export default function AccountForm({ mode, account }: Props) {
               <button
                 type="button"
                 onClick={() => { const id = createdInfo.id; setCreatedInfo(null); router.push(`/accounts/${id}`); }}
-                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 {t("acc.created.done", "Done")}
               </button>
@@ -1355,7 +1355,7 @@ function InlineCompanyPanel({
         <button
           type="button"
           onClick={onCancel}
-          className="h-9 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           {t("acc.btn.cancel")}
         </button>
@@ -1363,7 +1363,7 @@ function InlineCompanyPanel({
           type="button"
           onClick={save}
           disabled={saving}
-          className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? t("acc.btn.saving") : t("acc.inline.addCompany")}
@@ -1490,7 +1490,7 @@ function InlinePersonPanel({
         <button
           type="button"
           onClick={onCancel}
-          className="h-9 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           {t("acc.btn.cancel")}
         </button>
@@ -1498,7 +1498,7 @@ function InlinePersonPanel({
           type="button"
           onClick={save}
           disabled={saving}
-          className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? t("acc.btn.saving") : t("acc.inline.addContact")}

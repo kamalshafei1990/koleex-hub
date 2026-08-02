@@ -371,7 +371,7 @@ export default function AccountsList() {
             <div className="flex gap-2">
               <button
                 onClick={copyTempPw}
-                className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5"
               >
                 <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
               </button>
@@ -400,7 +400,7 @@ export default function AccountsList() {
             </div>
             <button
               onClick={() => setShowFilters((s) => !s)}
-              className={`h-10 px-4 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
+              className={`h-10 px-4 rounded-xl border text-[13px] font-semibold flex items-center gap-2 transition-all ${
                 showFilters || activeFilters > 0
                   ? "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
                   : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]"
@@ -417,7 +417,7 @@ export default function AccountsList() {
             {activeFilters > 0 && (
               <button
                 onClick={clearFilters}
-                className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1.5 transition-colors"
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
               >
                 <CrossIcon className="h-3 w-3" /> {t("acc.clear")}
               </button>
@@ -696,7 +696,7 @@ export default function AccountsList() {
                             disabled={working}
                             aria-haspopup="menu"
                             aria-expanded={openMenu === a.id}
-                            className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center ml-auto disabled:opacity-60"
+                            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center ml-auto disabled:opacity-60"
                           >
                             <MoreHorizontalIcon className="h-4 w-4" />
                           </button>
@@ -792,7 +792,7 @@ export default function AccountsList() {
                       disabled={working}
                       aria-haspopup="menu"
                       aria-expanded={openMenu === a.id}
-                      className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center disabled:opacity-60"
+                      className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center disabled:opacity-60"
                     >
                       <MoreHorizontalIcon className="h-4 w-4" />
                     </button>

@@ -29,7 +29,7 @@ import {
 
 const card = "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]";
 const inputCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
-const btnCls = "h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 shrink-0 disabled:opacity-40";
+const btnCls = "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg shrink-0 disabled:opacity-40";
 
 function relTime(iso: string): string {
   const d = new Date(iso);

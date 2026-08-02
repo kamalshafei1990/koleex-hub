@@ -293,7 +293,7 @@ export default function KoleexMainSuppliers() {
                             <button
                               type="button"
                               onClick={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, categoryLabel: c.label, subcategories: c.subcategories.map((s) => ({ code: s.key, label: s.label })) })}
-                              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+                              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                               title={t("cov.addAcrossCategory", "Add a supplier across this category")}
                             >
                               <PlusIcon size={11} /> {t("cov.addSupplier", "Add supplier")}
@@ -409,7 +409,7 @@ function SubcategoryCard({ label, code, rows, t, onAdd, onOpen, onRemove, onChan
         </div>
         <button
           type="button" onClick={onAdd}
-          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
           <PlusIcon size={11} /> {t("cov.add", "Add")}
         </button>

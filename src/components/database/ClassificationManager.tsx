@@ -322,7 +322,7 @@ export default function ClassificationManager() {
           </div>
           {!isTypes && (
             <button type="button" onClick={() => setAdding((v) => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+              className="inline-flex shrink-0 items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
               <PlusIcon size={14} /> {t("vl.class.new", "New {x}").replace("{x}", oneLabel)}
             </button>
           )}
@@ -338,8 +338,8 @@ export default function ClassificationManager() {
               onKeyDown={(e) => { if (e.key === "Enter") create(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
               placeholder={t("vl.class.newNamePh", "New {x} name…").replace("{x}", oneLabel)}
               className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-            <button type="button" disabled={busyId === "new"} onClick={create} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} className="animate-spin" /> : t("vl.class.add", "Add")}</button>
-            <button type="button" onClick={() => { setAdding(false); setNewName(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.class.cancel", "Cancel")}</button>
+            <button type="button" disabled={busyId === "new"} onClick={create} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} className="animate-spin" /> : t("vl.class.add", "Add")}</button>
+            <button type="button" onClick={() => { setAdding(false); setNewName(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("vl.class.cancel", "Cancel")}</button>
           </div>
         )}
 
@@ -590,7 +590,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
         </div>
         <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5">
           <span className="text-[10.5px] text-[var(--text-dim)]">{total > 0 ? t("vl.class.showing", "Showing {n} of {m}").replace("{n}", String(items.length)).replace("{m}", String(total)) : t("vl.class.iconsLive", "Icons live in the Visual Library.")}</span>
-          <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-rose-400">{t("vl.class.clearIcon", "Clear icon")}</button>
+          <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-red-400">{t("vl.class.clearIcon", "Clear icon")}</button>
         </div>
       </div>
     </div>

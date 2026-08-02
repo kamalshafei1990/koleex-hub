@@ -83,7 +83,7 @@ export default function InventoryWarehouses() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="plus" size={12} />
             New Location
@@ -144,7 +144,7 @@ export default function InventoryWarehouses() {
                     action={
                       <button
                         onClick={() => setDrawerOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1 text-[11.5px] hover:bg-[var(--bg-surface)]"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-1 text-[11.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                       >
                         <RrIcon name="plus" size={11} />
                         New Location
@@ -350,13 +350,13 @@ function NewLocationDrawer({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
           >
             {!submitting && <RrIcon name="check" size={12} />}
             {submitting ? "Saving…" : "Create Location"}

@@ -72,7 +72,7 @@ export default function FinanceStatements() {
           action={
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] print:hidden"
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all print:hidden"
             >
               {t("statements.printPdf", "Print / PDF")}
             </button>

@@ -105,7 +105,7 @@ export default function FinanceSuppliers() {
                       type="button"
                       onClick={() => void generateStatement(r.supplier_id)}
                       disabled={generating === r.supplier_id}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-[var(--border-strong)] disabled:opacity-50"
+                      className="inline-flex w-full items-center justify-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
                     >
                       <RrIcon name="file-invoice" size={12} />
                       {generating === r.supplier_id ? t("suppliers.preparing", "Preparing…") : t("suppliers.generate", "Generate Supplier Statement")}

@@ -196,7 +196,7 @@ export default function AssetReview({
             </div>
           </div>
           <button type="button" onClick={load} title={t("vl.review.recompute", "Recompute")}
-            className="self-start rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+            className="self-start h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center">
             <RefreshCwIcon size={13} />
           </button>
         </div>

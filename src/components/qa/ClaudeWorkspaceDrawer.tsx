@@ -91,7 +91,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
   }
 
   const s = ws?.issue_snapshot ?? {};
-  const btn = "rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-50";
+  const btn = "h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50";
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
 
@@ -395,7 +395,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
 
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
-  const btn = "rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-50";
+  const btn = "h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50";
 
   const loadSessions = useCallback(async () => {
     setLoading(true); setError(null);
@@ -556,7 +556,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       {/* Action bar */}
       <div className="flex items-center gap-2">
         <button type="button" onClick={runAnalysis} disabled={running}
-          className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
           {running ? t("qa.ai.analysing", "Analysing…") : sessions.length ? t("qa.ai.rerun", "Re-run AI Analysis") : t("qa.ai.ask", "Ask AI to Analyse")}
         </button>
         {active?.response_markdown && (

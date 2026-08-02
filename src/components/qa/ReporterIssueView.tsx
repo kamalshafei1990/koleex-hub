@@ -424,7 +424,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           <button
             type="button"
             onClick={startEdit}
-            className="mt-0.5 shrink-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+            className="mt-0.5 shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             {t("qa.reporter.edit", "Edit report")}
           </button>
@@ -497,14 +497,14 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           </div>
           {eErr && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">{eErr}</div>}
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={cancelEdit} className="rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+            <button type="button" onClick={cancelEdit} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
               {t("qa.reporter.editCancel", "Cancel")}
             </button>
             <button
               type="button"
               onClick={saveEdit}
               disabled={eSaving || eUploading > 0}
-              className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
             >
               {eSaving ? t("qa.reporter.editSaving", "Saving…") : t("qa.reporter.editSave", "Save changes")}
             </button>
@@ -585,7 +585,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           />
           <AttachmentStrip att={att} disabled={posting} />
           <div className="flex justify-end">
-            <button type="button" onClick={postReply} disabled={posting || (!text.trim() && att.count === 0)} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
+            <button type="button" onClick={postReply} disabled={posting || (!text.trim() && att.count === 0)} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
               {posting ? t("qa.reporter.posting", "Posting…") : t("qa.reporter.reply", "Reply")}
             </button>
           </div>
@@ -666,7 +666,7 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
             type="button"
             onClick={() => setShowReopen(true)}
             disabled={busy !== null}
-            className="rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
           >
             {t("qa.reporter.reopen", "It's not fixed — reopen")}
           </button>
@@ -684,12 +684,12 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
               where the error is when reopening). */}
           <AttachmentStrip att={att} disabled={busy !== null} />
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={() => { setShowReopen(false); setReason(""); }} disabled={busy !== null} className="rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
+            <button type="button" onClick={() => { setShowReopen(false); setReason(""); }} disabled={busy !== null} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("qa.common.cancel", "Cancel")}</button>
             <button
               type="button"
               onClick={() => send("reopen", reason.trim())}
               disabled={busy !== null || reason.trim().length === 0}
-              className="rounded-lg bg-[var(--bg-inverted)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--text-inverted)] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
             >
               {busy === "reopen" ? t("qa.reporter.reopening", "Reopening…") : t("qa.reporter.confirmReopen", "Confirm reopen")}
             </button>
