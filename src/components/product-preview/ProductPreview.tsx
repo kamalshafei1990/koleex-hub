@@ -14,7 +14,7 @@
    visual language without re-declaring it.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
   ProductSchemaDefinition,
   ProductKnowledgeBlock,
@@ -61,6 +61,13 @@ interface ProductPreviewProps {
   ar3dUrl?: string | null;
   countryOfOrigin?: string | null;
   warranty?: string | null;
+  /** Same-subcategory public products for the Apple-style compare band. */
+  siblings?: {
+    name: string;
+    slug: string;
+    imageUrl?: string | null;
+    values: Record<string, unknown>;
+  }[];
 }
 
 /* ── value helpers ─────────────────────────────────────────────── */
@@ -118,6 +125,66 @@ const asKnowledgeList = (
 };
 
 /* ── small presentational atoms ────────────────────────────────── */
+
+/* Apple-style horizontal snap scroller with dot pagination. Children are
+   the slides (each should be shrink-0 snap-start). Dot tracking uses
+   bounding rects so it stays correct in RTL. */
+const SnapCarousel = ({ children }: { children: React.ReactNode[] }) => {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [idx, setIdx] = useState(0);
+  const syncDots = () => {
+    const el = railRef.current;
+    if (!el) return;
+    const left = el.getBoundingClientRect().left;
+    let best = 0;
+    let bestD = Infinity;
+    Array.from(el.children).forEach((kid, i) => {
+      const d = Math.abs((kid as HTMLElement).getBoundingClientRect().left - left);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    setIdx(best);
+  };
+  const goTo = (i: number) => {
+    const el = railRef.current;
+    const kid = el?.children[i] as HTMLElement | undefined;
+    if (!el || !kid) return;
+    el.scrollBy({
+      left: kid.getBoundingClientRect().left - el.getBoundingClientRect().left,
+      behavior: "smooth",
+    });
+  };
+  return (
+    <div className="space-y-5">
+      <div
+        ref={railRef}
+        onScroll={syncDots}
+        className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      {children.length > 1 ? (
+        <div className="flex items-center justify-center gap-2">
+          {children.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Slide ${i + 1}`}
+              onClick={() => goTo(i)}
+              className={`h-2 rounded-full transition-all ${
+                idx === i
+                  ? "w-6 bg-[var(--text-primary)]"
+                  : "w-2 bg-[var(--border-strong)] hover:bg-[var(--text-faint)]"
+              }`}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 /* Eyebrow + title section header — the single rhythm device for every
    major band so vertical pacing stays consistent. */
@@ -222,6 +289,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     ar3dUrl,
     countryOfOrigin,
     warranty,
+    siblings,
   } = props;
 
   /* Localized overlay: when the active language has a filled-in
@@ -296,6 +364,21 @@ export const ProductPreview = (props: ProductPreviewProps) => {
        anchor, else appended. Generic — zero product-specific logic. */
   /* Feature-explorer active chip (Apple 'Take a closer look'). */
   const [explorerIdx, setExplorerIdx] = useState(0);
+  /* Compare band — which sibling is selected (Apple 'Worth the upgrade?'). */
+  const [compareIdx, setCompareIdx] = useState(0);
+
+  /* Human display for any field value — option labels, joined multis,
+     localized booleans, units. Shared by the compare band. */
+  const displayFieldValue = (f: SpecField, raw: unknown): string => {
+    if (isEmptyValue(raw)) return "—";
+    if (Array.isArray(raw))
+      return raw
+        .map((v) => f.options?.find((o) => o.value === String(v))?.label ?? String(v))
+        .join(", ");
+    if (typeof raw === "string") return f.options?.find((o) => o.value === raw)?.label ?? raw;
+    if (typeof raw === "boolean") return raw ? t("preview.yes", "Yes") : t("preview.no", "No");
+    return `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
+  };
 
   const intelligence = useMemo(() => {
     const seen = new Set<string>();
@@ -655,14 +738,42 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 3. OVERVIEW ═══ */}
-      {firstKb("overview") ? (
-        <section className="mx-auto max-w-4xl text-center">
-          <p className="text-xl md:text-[2rem] md:leading-[1.45] font-light leading-relaxed text-[var(--text-secondary)]">
-            {asKnowledgeList(firstKb("overview")!.content).join(" ")}
-          </p>
-        </section>
-      ) : null}
+      {/* ═══ 3. HIGHLIGHTS — Apple "Get the highlights." snap carousel:
+          the strongest claims as swipeable cards, each closing on a shot
+          of the machine. Dots paginate; the rail scrolls free. ═══ */}
+      {(() => {
+        const points = [
+          ...asKnowledgeList(firstKb("selling_points")?.content),
+          ...asKnowledgeList(firstKb("technical_advantages")?.content),
+        ].slice(0, 5);
+        const imgs = [mainImageUrl, ...(galleryUrls ?? [])].filter(Boolean) as string[];
+        if (points.length < 2) return null;
+        return (
+          <section className="space-y-8">
+            <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+              {t("preview.getHighlights", "Get the highlights.")}
+            </h2>
+            <SnapCarousel>
+              {points.map((point, i) => (
+                <div
+                  key={i}
+                  className="flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:w-[520px]"
+                >
+                  <p className="p-7 md:p-9 text-lg md:text-[22px] font-semibold leading-snug text-[var(--text-primary)]">
+                    {point}
+                  </p>
+                  {imgs.length > 0 ? (
+                    <div className="mt-auto h-[220px] md:h-[280px]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imgs[i % imgs.length]} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </SnapCarousel>
+          </section>
+        );
+      })()}
 
       {/* ═══ 3b. PERFORMANCE STATEMENT — Apple gradient headline built from
           the schema's own top metrics (no hardcoded copy). ═══ */}
@@ -688,6 +799,41 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           </section>
         );
       })()}
+
+      {/* ═══ 3c. EDITORIAL — Apple left-aligned story (headline stack +
+          copy column + full-bleed shot). Headline = the tagline split at
+          its dash; body = the overview knowledge block. ═══ */}
+      {firstKb("overview") ? (
+        <section className="space-y-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-12">
+            <h2 className="md:col-span-5 text-4xl md:text-[3.2rem] font-semibold tracking-[-0.02em] leading-[1.08] text-[var(--text-primary)]">
+              {(displayTagline || displayName)
+                .split("—")
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .map((part, i) => (
+                  <span key={i} className="block">
+                    {part}
+                    {/[.!?]$/.test(part) ? "" : "."}
+                  </span>
+                ))}
+            </h2>
+            <p className="md:col-span-7 md:pt-2 text-base md:text-xl font-light leading-relaxed text-[var(--text-secondary)]">
+              {asKnowledgeList(firstKb("overview")!.content).join(" ")}
+            </p>
+          </div>
+          {(galleryUrls ?? [])[0] ? (
+            <div className="overflow-hidden rounded-3xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={galleryUrls![0]}
+                alt={displayName}
+                className="aspect-[16/9] md:aspect-[21/10] w-full object-cover"
+              />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* ═══ 4. MATERIALS ═══ */}
       {materialPicks.length > 0 ? (
@@ -970,6 +1116,82 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })() : null}
 
+      {/* ═══ 10c. COMPARE — Apple "Worth the upgrade?" against machines of
+          the same family. Dropdown picks the rival; both columns read the
+          SAME core-anchor fields so the comparison is apples-to-apples. ═══ */}
+      {siblings && siblings.length > 0 && coreAnchors.length > 0 ? (
+        <section className="space-y-8">
+          <SectionHead
+            hero
+            eyebrow={t("preview.eyebrowCompare", "Compare")}
+            title={t("preview.compareTitle", "How it stacks up.")}
+          />
+          <div className="mx-auto flex max-w-md items-center justify-center gap-3">
+            <label htmlFor="kx-compare-pick" className="shrink-0 text-[13px] text-[var(--text-muted)]">
+              {t("preview.compareWith", "Compare with")}
+            </label>
+            <select
+              id="kx-compare-pick"
+              value={Math.min(compareIdx, siblings.length - 1)}
+              onChange={(e) => setCompareIdx(Number(e.target.value))}
+              className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none transition-all focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)]"
+            >
+              {siblings.map((s, i) => (
+                <option key={s.slug} value={i}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {(() => {
+            const rival = siblings[Math.min(compareIdx, siblings.length - 1)];
+            const cols = [
+              { key: "self", name: displayName, imageUrl: mainImageUrl, vals: values, self: true },
+              { key: "rival", name: rival.name, imageUrl: rival.imageUrl ?? null, vals: rival.values, self: false },
+            ];
+            return (
+              <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:gap-10">
+                {cols.map((c) => (
+                  <div key={c.key} className="space-y-6 text-center">
+                    <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4] md:h-56">
+                      {c.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.imageUrl} alt={c.name} className="h-full w-full object-contain p-4" />
+                      ) : (
+                        <span className="text-sm text-[#8a8f98]">{t("preview.noImage", "No image")}</span>
+                      )}
+                    </div>
+                    <div className="text-[15px] font-semibold text-[var(--text-primary)]">
+                      {c.self ? displayName : c.name}
+                    </div>
+                    <div className="space-y-5">
+                      {coreAnchors.slice(0, 5).map(({ field: f }) => (
+                        <div key={f.key}>
+                          <div className="text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+                            {displayFieldValue(f, c.vals[f.key])}
+                          </div>
+                          <div className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
+                            {f.label ?? f.key}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {!c.self ? (
+                      <a
+                        href={`/products/${rival.slug}`}
+                        className="inline-flex items-center rounded-full bg-[var(--bg-inverted)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+                      >
+                        {t("preview.viewProduct", "View")}
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </section>
+      ) : null}
+
       {/* ═══ 10b. WARNINGS & SAFETY (knowledge) ═══ */}
       {firstKb("warnings") ? (
         <section className="space-y-4">
@@ -1018,14 +1240,18 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {hasGallery ? (
         <section id="gallery" className="scroll-mt-24 space-y-8">
           <SectionHead hero eyebrow={t("preview.eyebrowUpClose", "Up close")} title={t("view.gallery", "Gallery")} />
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {/* Apple "Up close" rail — large snap cards instead of a grid. */}
+          <SnapCarousel>
             {galleryUrls!.map((url, i) => (
-              <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
+              <div
+                key={`${url}-${i}`}
+                className="aspect-[4/3] w-[85%] shrink-0 snap-start overflow-hidden rounded-3xl bg-[var(--bg-surface-subtle)] sm:w-[480px] md:w-[640px]"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`${productName} ${i + 1}`} className="h-full w-full object-cover" />
               </div>
             ))}
-          </div>
+          </SnapCarousel>
         </section>
       ) : null}
 

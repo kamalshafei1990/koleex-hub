@@ -93,6 +93,13 @@ export interface SchemaProductPreviewProps {
   countryOfOrigin: string | null;
   warranty: string | null;
   surface: "website";
+  /** Same-subcategory public products powering the compare band. */
+  siblings: {
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+    values: Record<string, unknown>;
+  }[];
 }
 
 export interface LoadedSchemaProduct {
@@ -144,7 +151,7 @@ export async function loadPublicSchemaProduct(
 
   const supabase = getSupabaseServer();
 
-  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }] =
+  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }] =
     await Promise.all([
       supabase.from("subcategories").select("code").eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
@@ -161,6 +168,26 @@ export async function loadPublicSchemaProduct(
         .from("product_translations")
         .select("locale, product_name, tagline, excerpt, description")
         .eq("product_id", product.id),
+      // Compare band: machines of the same family that carry schema specs.
+      // Public surface compares against published rows only; the internal
+      // preview (allowUnpublished) may also compare against drafts, matching
+      // the viewer's own privilege.
+      product.subcategory_slug
+        ? (() => {
+            let q = supabase
+              .from("products")
+              .select("id, product_name, slug, schema_specs")
+              .eq("subcategory_slug", product.subcategory_slug)
+              .neq("id", product.id)
+              .not("schema_specs", "is", null)
+              // '{}' rows are "connected but never filled" — useless in a
+              // side-by-side and they crowd out the filled ones (limit 6).
+              .neq("schema_specs", "{}")
+              .limit(6);
+            if (!opts?.allowUnpublished) q = q.eq("visible", true).eq("status", "active");
+            return q;
+          })()
+        : Promise.resolve({ data: null }),
     ]);
 
   const subcategoryCode = (subcat?.code as string | null) ?? "";
@@ -202,6 +229,33 @@ export async function loadPublicSchemaProduct(
   const galleryUrls = gallery.map((m) => m.url).filter(Boolean);
   const mainImageUrl = byType("main_image")[0]?.url ?? galleryUrls[0] ?? null;
 
+  // ── Siblings for the compare band (same website-surface key filter) ──
+  type SiblingRow = { id: string; product_name: string; slug: string; schema_specs: Record<string, unknown> | null };
+  const siblingRows = ((siblingData as SiblingRow[] | null) ?? []).filter(
+    (s) => s.schema_specs && Object.keys(s.schema_specs).length > 0,
+  );
+  const siblingImages = new Map<string, string>();
+  if (siblingRows.length > 0) {
+    const { data: sibMedia } = await supabase
+      .from("product_media")
+      .select('product_id, url, type, "order"')
+      .in("product_id", siblingRows.map((s) => s.id))
+      .in("type", ["main_image", "gallery"])
+      .order("order", { ascending: true });
+    for (const m of (sibMedia as { product_id: string; url: string; type: string }[] | null) ?? []) {
+      if (!m.url) continue;
+      // main_image wins; first gallery shot is the fallback.
+      if (m.type === "main_image" || !siblingImages.has(m.product_id)) siblingImages.set(m.product_id, m.url);
+    }
+  }
+  const siblings = siblingRows.map((s) => {
+    const vals: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(s.schema_specs ?? {})) {
+      if (websiteFieldKeys.has(k)) vals[k] = v;
+    }
+    return { name: s.product_name, slug: s.slug, imageUrl: siblingImages.get(s.id) ?? null, values: vals };
+  });
+
   return {
     productName: product.product_name,
     tagline: model?.tagline ?? null,
@@ -224,6 +278,7 @@ export async function loadPublicSchemaProduct(
       countryOfOrigin: product.country_of_origin,
       warranty: product.warranty,
       surface: "website",
+      siblings,
     },
   };
 }
