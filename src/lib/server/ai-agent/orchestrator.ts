@@ -25,7 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "./brand-knowledge";
+import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_DIALECT_RULE } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
@@ -73,6 +73,9 @@ export interface OrchestrateInput {
   /** Latest user message (already persisted by the caller). */
   userMessage: string;
   userLang: "en" | "zh" | "ar";
+  /** Set when the language detector flags Egyptian dialect / Franco —
+   *  the model then generates natural Egyptian Arabic natively. */
+  dialect?: "egyptian" | null;
   conversationId: string;
 }
 
@@ -484,7 +487,7 @@ function isWorkDataQuery(msg: string): boolean {
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
-  const { ctx, history, userMessage, userLang, conversationId } = input;
+  const { ctx, history, userMessage, userLang, dialect, conversationId } = input;
   const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
@@ -565,10 +568,11 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
           ctx,
           userLang,
           brandSection as "company" | "ai" | "both",
+          dialect,
         )
       : useFastPath && isSmall
-        ? buildMinimalSystemPrompt(ctx, userLang)
-        : buildSystemPrompt(ctx, userLang);
+        ? buildMinimalSystemPrompt(ctx, userLang, dialect)
+        : buildSystemPrompt(ctx, userLang, { dialect });
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without
@@ -974,6 +978,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 export function buildMinimalSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
+  dialect?: "egyptian" | null,
 ): string {
   const uiLangHint =
     userLang === "zh" ? "Chinese (Simplified)" :
@@ -991,7 +996,7 @@ Style:
 ${BRAND_EXCLUSIVITY_RULE}
 
 ${DIRECT_VOICE_RULE}
-
+${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 Current user: ${ctx.auth.username}.`;
 }
 
@@ -1008,6 +1013,7 @@ export function buildBrandSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
   section: "company" | "ai" | "both",
+  dialect?: "egyptian" | null,
 ): string {
   const langName =
     userLang === "zh" ? "Chinese (Simplified)" :
@@ -1110,7 +1116,7 @@ Reply: "I was built by Koleex International Group, with the vision driven by Mr.
 
 ---
 
-${brandKnowledgeFor(section)}`;
+${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }
 
 /* Build the "current date/time" directive in the user's timezone. Server
@@ -1152,7 +1158,7 @@ Date rules (critical — the model does NOT know the date on its own):
 function buildSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
-  opts: { brandSection?: "company" | "ai" | "both" | null } = {},
+  opts: { brandSection?: "company" | "ai" | "both" | null; dialect?: "egyptian" | null } = {},
 ): string {
   /* Hint from the client about the UI language. Not a hard rule — the
      model is instructed to MIRROR the user's message language per turn,
@@ -1184,7 +1190,7 @@ function buildSystemPrompt(
 ${BRAND_EXCLUSIVITY_RULE}
 
 ${DIRECT_VOICE_RULE}
-
+${opts.dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 ${nowBlock}
 
 ${ENTITY_GUIDANCE_FULL}
@@ -1595,7 +1601,28 @@ export const PRICING_GUARD_MESSAGE =
  *  place so the UI matches. No-op when either (a) the reply has no
  *  pricing-like content or (b) a pricing tool ran successfully this
  *  turn. */
-export function sealPricingSafety(finalReply: string, steps: AgentStep[]): string {
+/* Deterministic backstop for DIRECT_VOICE_RULE: the model occasionally
+   still opens with retrieval narration ("حصلت على المعلومات",
+   "لقيتلك التفاصيل", "I found what you need"). If the FIRST line is a
+   short standalone opener containing such a marker, drop that line —
+   the real answer always follows on the next line. Never touches
+   content beyond the first line. */
+const NARRATION_MARKERS =
+  /(حصلت على|لقيتلك|لقيت لك|جبتلك|جبت لك|دلوقتي عندي|عندي كل اللي|وجدت المعلومات|إليك ما وجدت|بعد البحث|هعرضلك اللي لقيته|I (?:found|got|gathered|now have)\b|here'?s what I found|based on (?:my|the) (?:search|results))/i;
+export function stripProcessNarration(reply: string): string {
+  if (!reply) return reply;
+  const nl = reply.indexOf("\n");
+  if (nl === -1 || nl > 120) return reply;
+  const first = reply.slice(0, nl).trim();
+  if (!NARRATION_MARKERS.test(first)) return reply;
+  return reply.slice(nl + 1).replace(/^\n+/, "");
+}
+
+export function sealPricingSafety(rawFinalReply: string, steps: AgentStep[]): string {
+  /* Central choke point every return path flows through — apply the
+     direct-voice narration strip here so BOTH the streaming and the
+     plain-JSON agent paths get it. */
+  const finalReply = stripProcessNarration(rawFinalReply);
   if (!containsPricingOutput(finalReply)) return finalReply;
   if (hasValidPricingEvidence(steps)) return finalReply;
 

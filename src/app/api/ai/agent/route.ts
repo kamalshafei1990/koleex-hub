@@ -39,6 +39,7 @@ import {
   buildBrandSystemPrompt,
   buildMinimalSystemPrompt,
   sealPricingSafety,
+  stripProcessNarration,
 } from "@/lib/server/ai-agent/orchestrator";
 import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
@@ -429,9 +430,10 @@ export async function POST(req: Request) {
                     ctx,
                     userLang,
                     brandSection as "company" | "ai" | "both",
+                    wantsRewrite ? "egyptian" : null,
                   )
                 : fastLane === "small"
-                  ? buildMinimalSystemPrompt(ctx, userLang)
+                  ? buildMinimalSystemPrompt(ctx, userLang, wantsRewrite ? "egyptian" : null)
                   : /* general */
                     buildSmartPrompt(normalizedContent, {
                       userLang,
@@ -507,6 +509,7 @@ export async function POST(req: Request) {
                with end.agent.finalReply — same contract as chat. */
           } else {
             agent = await orchestrate({
+              dialect: wantsRewrite ? ("egyptian" as const) : null,
               ctx,
               history,
               userMessage: content,
@@ -551,6 +554,16 @@ export async function POST(req: Request) {
              safety net — repetition loops are a model failure mode
              that's language-agnostic. */
           let rewroteReply = false;
+          /* Direct-voice backstop: drop a narration-only opening line
+             ("لقيتلك التفاصيل", "I found what you need") before any
+             dialect polish. */
+          if (agent.finalReply) {
+            const stripped = stripProcessNarration(agent.finalReply);
+            if (stripped !== agent.finalReply) {
+              agent = { ...agent, finalReply: stripped };
+              rewroteReply = true;
+            }
+          }
           if (wantsRewrite && agent.finalReply) {
             const intentForBuilder =
               isBrand || isSmall
