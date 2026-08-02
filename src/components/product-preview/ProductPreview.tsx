@@ -14,7 +14,7 @@
    visual language without re-declaring it.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ProductSchemaDefinition,
   ProductKnowledgeBlock,
@@ -301,6 +301,41 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   const effectiveSurface: ProductSchemaSurface = surface ?? "website";
 
+  /* ── Apple-style scroll choreography ──
+     One IntersectionObserver arms every top-level band: sections drift up
+     and fade in as the reader reaches them (.kx-rev/.kx-rev-in in
+     globals.css). Transform+opacity only (no layout, no CLS), skipped
+     entirely for prefers-reduced-motion. The sticky product pill is a
+     plain div sibling so it is never transformed (sticky would break). */
+  const flowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = flowRef.current;
+    if (!root) return;
+    const kids = Array.from(root.children).filter(
+      (el) => el.tagName === "SECTION" || el.hasAttribute("data-reveal"),
+    );
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    kids.forEach((el) => el.classList.add("kx-rev"));
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("kx-rev-in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -8% 0px" },
+    );
+    kids.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  /* First uploaded video doubles as the living hero (Apple product film).
+     Falls back to the still poster when the product has no video. */
+  const heroVideoUrl =
+    (videoUrls ?? []).find((u) => /\.(mp4|webm|mov)(\?|$)/i.test(u)) ?? null;
+
   const visibleFields = useMemo<SpecField[]>(() => {
     if (!schema) return [];
     return filterFieldsForSurface(schema.groups.flatMap((g) => g.fields), effectiveSurface);
@@ -496,20 +531,43 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   }
 
   return (
-    <div className="space-y-16 md:space-y-24 pb-20">
+    <div ref={flowRef} className="space-y-16 md:space-y-24 pb-20">
       {/* ═══ 0. POSTER HEADER (optional) ═══
           When an admin uploads a designed poster/banner, it leads the page
           full-bleed with an overlaid identity block + CTA — the "shop window".
           A subtle bottom scrim keeps the text legible over any image. When no
           poster is set, the auto-composed cinematic hero below takes over. */}
       {posterUrl ? (
-        <div className="space-y-7">
+        <div data-reveal className="space-y-7">
           {/* The poster is the photo, nothing else (owner rule): no scrim, no
               overlaid copy. Identity + CTA live in their own block below it,
               where they are readable regardless of what the image shows. */}
           <section className="relative w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] aspect-[21/9] bg-[var(--bg-secondary)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
+            {heroVideoUrl ? (
+              /* The product film IS the hero: autoplaying, silent, looping —
+                 still photo-only per the owner rule (no overlaid copy). */
+              <video
+                src={heroVideoUrl}
+                poster={posterUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                /* React never serialises the muted ATTRIBUTE (facebook/react
+                   #10389), so autoplay policies see an unmuted video and
+                   block it — force the property and kick playback here. */
+                ref={(el) => {
+                  if (el) {
+                    el.muted = true;
+                    el.play().catch(() => {});
+                  }
+                }}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
+            )}
           </section>
           {/* Apple-style identity: centered stack — kicker, huge name,
               light tagline, one CTA. */}
@@ -1053,7 +1111,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           Primary groups open by default; standard/quiet collapsed so the
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
-        <div id="specs" className="scroll-mt-24">
+        <div id="specs" data-reveal className="scroll-mt-24">
           <SectionHead hero eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (

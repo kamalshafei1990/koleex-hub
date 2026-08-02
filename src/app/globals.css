@@ -995,3 +995,19 @@ input[type="number"]:not(.kx-spinner) {
   background-clip: text;
   color: transparent;
 }
+
+/* Apple-style scroll choreography (ProductPreview): bands drift up and
+   fade in as they enter the viewport. Armed by JS (.kx-rev added only
+   when motion is allowed), so no-JS and reduced-motion readers see
+   everything instantly. Transform+opacity only — zero layout shift. */
+.kx-rev {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.kx-rev-in {
+  opacity: 1;
+  transform: none;
+}
