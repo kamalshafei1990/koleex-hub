@@ -22,6 +22,9 @@ const VARIANTS = {
     "h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]",
   iconNav:
     "h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]",
+  /* ELECTED D-1 (owner, 2026-08-02): tinted red, same box as primary. */
+  danger:
+    "h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30",
 } as const;
 
 export type KdsButtonVariant = keyof typeof VARIANTS;

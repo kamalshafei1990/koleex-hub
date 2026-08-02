@@ -371,8 +371,8 @@ function SectionHeaders() {
 
 function DangerBallot() {
   return (
-    <Family id="danger" title="Danger / Delete button — OPEN BALLOT" note="pick ONE — D-1, D-2 or D-3">
-      <Variant vid="D-1" apps="Products · Catalogs · Database delete-confirms (~13 sites)" count="tinted red, matches R-2 box">
+    <Family id="danger" title="Danger / Delete button" note="winner: D-1" elected>
+      <Variant vid="D-1" apps="Products · Catalogs · Database delete-confirms (~13 sites)" count="tinted red, matches R-2 box" elected>
         <button className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all">Delete product</button>
       </Variant>
       <Variant vid="D-2" apps="Employees · HR (~18 sites)" count="solid saturated red">
@@ -393,7 +393,7 @@ export default function ElementElection() {
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
         Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
-        Open ballot below: DANGER button — reply with one id (e.g. &quot;D-1&quot;).
+        D-1 danger elected. Next ballots (modals, tables, toasts, menus, loading, avatars) load here as they are harvested.
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·

@@ -209,9 +209,11 @@ this is element design only, per the owner's framing.
 | Section header | **SH-3** — icon chip + bold title + desc + border-b | `kds/SectionHeader` (reshaped) |
 
 `kds/Button` also carries the elected secondary/ghost/icon tiers from the
-E-BTN picks. Ballot page: `/kds-lab/elements` (green = elected). Still
-OPEN: **D** (danger button). Next ballots to prepare: modal/dialog shell,
-table/list-row anatomy, toast.
+E-BTN picks. **D-1 elected** (danger = tinted red, primary's box) → `kds/Button`
+variant `danger`. Ballot page: `/kds-lab/elements` (green = elected).
+Round 2 ballots in preparation: modal/dialog shell · drawer · confirm ·
+data table · list row · toast · dropdown menu · tooltip · popover ·
+skeleton/spinner · avatar · date picker · filter chip.
 
 ---
 
