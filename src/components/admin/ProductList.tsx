@@ -352,10 +352,15 @@ export default function ProductList() {
       } catch (e) {
         if (!cancelled) {
           const aborted = e instanceof DOMException && e.name === "AbortError";
+          /* 401 = expired session, not a server fault — surface a
+             sign-in path instead of a Retry that can never succeed. */
+          const authFailed = e instanceof Error && e.message.includes("HTTP 401");
           setLoadError(
-            aborted
-              ? "The server took too long to respond. Please retry."
-              : humanizeError(e),
+            authFailed
+              ? "__auth__"
+              : aborted
+                ? "The server took too long to respond. Please retry."
+                : humanizeError(e),
           );
           setLoading(false);
         }
@@ -1203,7 +1208,19 @@ export default function ProductList() {
         )}
 
         {/* Product Grid / List */}
-        {loadError ? (
+        {loadError === "__auth__" ? (
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
+            <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
+            <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.sessionExpiredTitle", "Session expired")}</p>
+            <p className="text-[var(--text-muted)] text-[13px] mt-1">{t("state.sessionExpiredHint", "Please sign in again to load the catalog.")}</p>
+            <a
+              href="/login"
+              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
+            >
+              {t("action.signInAgain", "Sign in again")}
+            </a>
+          </div>
+        ) : loadError ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-red-500/30 p-16 text-center">
             <ProductsIcon size={48} className="text-red-400/70 mx-auto mb-4" />
             <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.loadFailedTitle")}</p>
