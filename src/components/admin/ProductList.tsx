@@ -1294,7 +1294,7 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[52px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-1.5 mb-5 bg-[var(--bg-primary)]" aria-label="Categories">
+              <nav className="sticky top-[49px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-1.5 mb-5 bg-[var(--bg-primary)]" aria-label="Categories">
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
