@@ -392,38 +392,42 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   }
 
   return (
-    <div className="space-y-20 md:space-y-28 pb-28">
+    <div className="space-y-12 md:space-y-16 pb-16">
       {/* ═══ 0. POSTER HEADER (optional) ═══
           When an admin uploads a designed poster/banner, it leads the page
           full-bleed with an overlaid identity block + CTA — the "shop window".
           A subtle bottom scrim keeps the text legible over any image. When no
           poster is set, the auto-composed cinematic hero below takes over. */}
       {posterUrl ? (
-        <section className="relative w-full overflow-hidden rounded-3xl border border-[var(--border-subtle)] aspect-[21/9]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 lg:p-14 space-y-3 md:space-y-4 max-w-3xl">
+        <div className="space-y-7">
+          {/* The poster is the photo, nothing else (owner rule): no scrim, no
+              overlaid copy. Identity + CTA live in their own block below it,
+              where they are readable regardless of what the image shows. */}
+          <section className="relative w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] aspect-[21/9] bg-[var(--bg-secondary)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
+          </section>
+          <div className="space-y-3 md:space-y-4 max-w-3xl">
             {(brand || machineKindLabel) ? (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
                 {brand ? <span>{brand}</span> : null}
-                {brand && machineKindLabel ? <span className="text-white/40">/</span> : null}
+                {brand && machineKindLabel ? <span className="text-[var(--text-ghost)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
             ) : null}
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-[-0.02em] text-white leading-[1.02]">
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.02]">
               {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
             {displayTagline ? (
-              <p className="text-base md:text-xl font-light text-white/85 leading-snug max-w-xl">{displayTagline}</p>
+              <p className="text-base md:text-xl font-light text-[var(--text-muted)] leading-snug max-w-xl">{displayTagline}</p>
             ) : null}
             <div className="pt-1">
-              <a href="#overview" className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-white text-black text-sm font-semibold hover:opacity-90 transition-opacity">
+              <a href="#overview" className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
                 {t("preview.learnMore", "Learn more")}
               </a>
             </div>
           </div>
-        </section>
+        </div>
       ) : null}
 
       {/* ═══ 1. CINEMATIC HERO (auto-composed; hidden when a custom poster is set) ═══
