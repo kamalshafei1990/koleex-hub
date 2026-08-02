@@ -226,9 +226,20 @@ variant `danger`.
 | Avatar fallback | **AV-3** — inverted solid mono initials | `kds/Avatar` (new) |
 | Date picker | **DP-1** — custom themed calendar (ui/DatePicker); internal style = DPS ballot pending | `ui/DatePicker` → kds later |
 
-Ballot page: `/kds-lab/elements`. Still OPEN: **DPS** (calendar internal
-style) · **TP** (tooltip) · **SK/SP** (loading language) · **FC**
-(filter chip).
+### ELECTION ROUND 3 RESULTS (owner, 2026-08-02)
+
+| Family | Winner | Canonical |
+|---|---|---|
+| Calendar style | **DPS-4** — Hub-Blue gradient square + soft ring | applied in `ui/DatePicker` |
+| Tooltip | **TP-1** — bilingual slate GuidanceTip | `ui/GuidanceTip` declared canonical |
+| Skeleton | **SK-1** (delegated) — AppShellSkeletons token kit | `ui/skeletons/AppShellSkeletons` |
+| Spinner | **SP-1** (delegated) — SpinnerIcon arc | `kds/Spinner` (new wrapper) |
+| Filter chip | **FC-1** — h-7 focus-border pill + round × | `kds/FilterChip` (new) |
+| Pagination | **PG-1** — Prev / Page N of M / Next | `kds/Pagination` (new) |
+
+FINAL open ballots: **UP** (dropzone) · **AC** (collapsible section) ·
+**RD** (descriptive choice rows). Number stepper: family does not exist
+in the repo — no ballot. Ballot page: `/kds-lab/elements`.
 
 ---
 

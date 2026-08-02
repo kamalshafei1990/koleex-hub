@@ -442,8 +442,8 @@ function Menus() {
 
 function Tooltips() {
   return (
-    <Family id="tooltips" title="Tooltip — OPEN BALLOT" note="pick ONE (TP-…)">
-      <Variant vid="TP-1" apps="GuidanceTip — 14 files (bilingual help system)" count="slate panel, 320px, EN/中文">
+    <Family id="tooltips" title="Tooltip" note="winner: TP-1" elected>
+      <Variant vid="TP-1" apps="GuidanceTip — 14 files (bilingual help system)" count="slate panel, 320px, EN/中文" elected>
         <div className="w-[300px] rounded-lg px-3 py-2.5 text-[11px] leading-relaxed text-white border border-white/[0.18] shadow-2xl" style={{ background: "#1f2937" }}>
           <p className="font-bold text-[9px] tracking-[0.08em] mb-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>MARKET BAND</p>
           Controls which price band this market belongs to.
@@ -710,8 +710,8 @@ function ListRows() {
 
 function Loading() {
   return (
-    <Family id="loading" title="Loading Language — OPEN BALLOT" note="pick a skeleton (SK-…) AND a spinner (SP-…)">
-      <Variant vid="SK-1" apps="15 route loading.tsx (shell kit)" count="token kit: surface-active bars in bordered blocks">
+    <Family id="loading" title="Loading Language" note="winners: SK-1 + SP-1 (delegated)" elected>
+      <Variant vid="SK-1" apps="15 route loading.tsx (shell kit)" count="token kit: surface-active bars in bordered blocks" elected>
         <div className="w-full max-w-sm space-y-2 animate-pulse">
           <div className="h-4 w-2/3 rounded bg-[var(--bg-surface-active)]" />
           <div className="h-24 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]" />
@@ -727,7 +727,7 @@ function Loading() {
           </div>
         </div>
       </Variant>
-      <Variant vid="SP-1" apps="SpinnerIcon — 319 sites" count="icon arc spinner">
+      <Variant vid="SP-1" apps="SpinnerIcon — 319 sites" count="icon arc spinner" elected>
         <div className="flex items-center gap-3 text-[var(--text-dim)]">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className="animate-spin"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2z" /></svg>
           <span className="text-[12px]">Loading…</span>
@@ -810,8 +810,8 @@ function DatePickers() {
 
 function FilterChips() {
   return (
-    <Family id="filterchips" title="Filter / Tag Chip — OPEN BALLOT" note="pick ONE (FC-…)">
-      <Variant vid="FC-1" apps="Products ACTIVE filters row" count="h-7 pill, focus border, round × button">
+    <Family id="filterchips" title="Filter / Tag Chip" note="winner: FC-1" elected>
+      <Variant vid="FC-1" apps="Products ACTIVE filters row" count="h-7 pill, focus border, round × button" elected>
         <span className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[11px] font-medium text-[var(--text-primary)]">Division: garment machinery<span className="h-5 w-5 rounded-full flex items-center justify-center text-[var(--text-dim)] text-[14px] leading-none">×</span></span>
       </Variant>
       <Variant vid="FC-2" apps="Contacts tags (8 sites)" count="text-xs, border-color">
@@ -874,8 +874,8 @@ function DatePickerStyles() {
 
 function PaginationBallot() {
   return (
-    <Family id="pagination" title="Pagination — OPEN BALLOT" note="pick ONE (PG-…); your TBL-6 table ships with PG-1 today">
-      <Variant vid="PG-1" apps="Customers · Suppliers server lists" count="Prev / Page N of M / Next" wide>
+    <Family id="pagination" title="Pagination" note="winner: PG-1" elected>
+      <Variant vid="PG-1" apps="Customers · Suppliers server lists" count="Prev / Page N of M / Next" wide elected>
         <div className="w-full flex items-center justify-between gap-3 text-[13px] text-[var(--text-secondary)]">
           <span>121 customers</span>
           <span className="flex items-center gap-2">
@@ -900,6 +900,119 @@ function PaginationBallot() {
   );
 }
 
+function Dropzones() {
+  return (
+    <Family id="uploads" title="File Upload / Dropzone — OPEN BALLOT" note="pick ONE dashed language (UP-…); tiles/rows/chips will follow it">
+      <Variant vid="UP-1" apps="ProductForm media · HR · Database (~12 sites)" count="dashed panel, token hover" wide>
+        <div className="w-full max-w-md border border-dashed rounded-xl py-8 text-center cursor-pointer transition-all border-[var(--border-subtle)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30">
+          <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-2 flex items-center justify-center"><PlusIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>
+          <p className="text-[11px] font-medium text-[var(--text-dim)]">Drop files here or click to upload</p>
+          <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">PNG, JPG, PDF up to 10MB</p>
+        </div>
+      </Variant>
+      <Variant vid="UP-1b" apps="Catalogs (blue accent dialect)" count="border-2 dashed, blue drag state">
+        <div className="w-full max-w-md py-8 rounded-xl border-2 border-dashed bg-[var(--bg-surface)] flex flex-col items-center gap-2 transition-all cursor-pointer border-[#567FB2] bg-[#567FB2]/5">
+          <PlusIcon className="h-5 w-5 text-[#7FA9D6]" />
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Drop to upload (drag state shown)</p>
+        </div>
+      </Variant>
+      <Variant vid="UP-4" apps="Product docs · QA · Catalogs (~6 sites)" count="solid chip button (no dashes)">
+        <span className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"><PlusIcon className="h-3.5 w-3.5" /> Attach file</span>
+      </Variant>
+    </Family>
+  );
+}
+
+function Accordions() {
+  const [a1, setA1] = useState(true);
+  const [a2, setA2] = useState(true);
+  const [a3, setA3] = useState(true);
+  const Chev = ({ open }: { open: boolean }) => (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" className={`text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+  );
+  return (
+    <Family id="accordions" title="Collapsible Section — OPEN BALLOT" note="pick ONE (AC-…)">
+      <Variant vid="AC-1" apps="ProductForm (19 sections) · To-do" count="card + icon tile + border-t body" wide>
+        <div className="w-full bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+          <button onClick={() => setA1(!a1)} className="w-full flex items-center gap-3 px-6 py-4 hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
+            <span className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]"><LayoutGridIcon className="h-4 w-4" /></span>
+            <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left">Technical Specifications</span>
+            <span className="text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full">12 fields</span>
+            <Chev open={a1} />
+          </button>
+          {a1 && <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)]">Section body…</div>}
+        </div>
+      </Variant>
+      <Variant vid="AC-2" apps="Suppliers · Employees · Contacts (~15 sections)" count="tinted header strip + preview" wide>
+        <div className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+          <button onClick={() => setA2(!a2)} className={`flex w-full items-center justify-between gap-3 bg-[var(--bg-surface-subtle)]/30 px-5 py-3 text-start cursor-pointer hover:bg-[var(--bg-surface-subtle)]/60 transition-colors ${a2 ? "border-b border-[var(--border-subtle)]" : ""}`}>
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"><UsersIcon size={15} /></span>
+              <span className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">Contact Persons</span>
+              {!a2 && <span className="ms-1 truncate text-[11px] text-[var(--text-faint)]">3 contacts</span>}
+            </span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" className={`text-[var(--text-faint)] transition-transform ${a2 ? "" : "-rotate-90 rtl:rotate-90"}`}><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+          {a2 && <div className="px-5 py-4 text-[12px] text-[var(--text-dim)]">Section body…</div>}
+        </div>
+      </Variant>
+      <Variant vid="AC-4" apps="Product customer preview" count="bare divider rows, eyebrow + title" wide>
+        <div className="w-full border-b border-[var(--border-subtle)]">
+          <button onClick={() => setA3(!a3)} className="group w-full flex items-center justify-between gap-3 py-5 text-left">
+            <span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">Specifications</span>
+              <span className="block text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Machine details</span>
+            </span>
+            <Chev open={a3} />
+          </button>
+          {a3 && <div className="pb-7 -mt-1 text-[12px] text-[var(--text-dim)]">Section body…</div>}
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
+function ChoiceRows() {
+  const [r1, setR1] = useState(0);
+  const [r2, setR2] = useState(0);
+  const [r3, setR3] = useState(0);
+  return (
+    <Family id="choices" title="Choice Rows (single-select with descriptions) — OPEN BALLOT" note="segmented pills already elected (E-SEG); this is for descriptive options — pick ONE (RD-…)">
+      <Variant vid="RD-2" apps="Settings sounds" count="iOS checkmark row, no chrome">
+        <div className="w-full max-w-sm rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2">
+          {["Chime", "Pulse"].map((l, i) => (
+            <button key={l} onClick={() => setR1(i)} className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${i === 0 ? "border-b border-[var(--border-faint)]" : ""}`}>
+              <span><span className={`block truncate text-[13px] ${r1 === i ? "font-semibold" : ""} text-[var(--text-primary)]`}>{l}</span><span className="mt-0.5 block text-[11px] text-[var(--text-dim)]">Notification tone</span></span>
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">{r1 === i && <CheckIcon className="h-3.5 w-3.5 text-[var(--text-primary)]" />}</span>
+            </button>
+          ))}
+        </div>
+      </Variant>
+      <Variant vid="RD-3" apps="Inventory usage scope" count="bordered card + native radio">
+        <div className="w-full max-w-sm grid grid-cols-1 gap-1.5">
+          {["Internal use", "Product-related"].map((l, i) => (
+            <label key={l} onClick={() => setR2(i)} className={`flex cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 ${r2 === i ? "border-[var(--text-primary)] bg-[var(--bg-surface)]" : "border-[var(--border-color)]"}`}>
+              <input type="radio" checked={r2 === i} readOnly className="mt-0.5" />
+              <span><span className="block text-[12px] font-medium text-[var(--text-primary)]">{l}</span><span className="block text-[10.5px] leading-relaxed text-[var(--text-dim)]">Controls where this item appears</span></span>
+            </label>
+          ))}
+        </div>
+      </Variant>
+      <Variant vid="RD-4" apps="Expenses category picker" count="tile grid + trailing check">
+        <div className="w-full max-w-sm grid grid-cols-2 gap-2">
+          {["Logistics", "Marketing"].map((l, i) => (
+            <button key={l} onClick={() => setR3(i)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-[12px] font-medium transition-all ${r3 === i ? "border-[#567FB2]/50 bg-[#567FB2]/10 text-[var(--text-primary)]" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"}`}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--bg-surface)]"><LayoutGridIcon className="h-3.5 w-3.5" /></span>
+              <span className="flex-1 truncate">{l}</span>
+              {r3 === i && <CheckIcon className="h-3 w-3 shrink-0 opacity-80" />}
+            </button>
+          ))}
+        </div>
+      </Variant>
+    </Family>
+  );
+}
+
 /* ═══════════════ page ═══════════════ */
 
 export default function ElementElection() {
@@ -908,7 +1021,7 @@ export default function ElementElection() {
       <h1 className="text-[26px] font-bold tracking-tight mb-1">KDS — Element Election</h1>
       <p className="text-[12px] text-[var(--text-dim)] mb-2 max-w-2xl">
         Green = elected canon (owner, 2026-08-02): E-set + R-2 · PILL-1 · PB-2 · CB-3 · ES-3 · SH-3.
-        Rounds 1+2 elected (see green). Still open: TP · SK/SP · FC · PG (pagination).
+        Rounds 1-3 elected (see green). FINAL open ballots: UP (dropzone) · AC (collapsible section) · RD (choice rows). Number stepper: none exists — no ballot.
       </p>
       <p className="text-[11px] text-[var(--text-ghost)] mb-10">
         Already law (never on the ballot): toggles emerald+white · slider/bar fill Hub Blue ·
@@ -927,6 +1040,9 @@ export default function ElementElection() {
       <DatePickerStyles />
       <FilterChips />
       <PaginationBallot />
+      <Dropzones />
+      <Accordions />
+      <ChoiceRows />
       <Toasts />
       <Menus />
       <Tooltips />
