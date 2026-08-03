@@ -282,6 +282,19 @@ function computeSchemaCoveredColumns(
    couple of shape conversions the columns need (dimension object → text,
    temperature range object → text). Only emits keys that are actually present
    in schema_specs so a partially-filled schema never nulls a legacy column. */
+/* products columns that are Postgres ARRAY type — verified against the
+   live schema. Anything mirrored into these MUST be an array. */
+const ARRAY_COLUMNS = new Set([
+  "voltage",
+  "frequency_hz",
+  "plug_types",
+  "colors",
+  "tags",
+  "highlights",
+  "alternate_names",
+  "support_channels",
+]);
+
 function schemaColumnMirror(
   schema: { groups?: { fields?: { key: string }[] }[] } | null | undefined,
   specs: Record<string, unknown> | null | undefined,
@@ -298,6 +311,20 @@ function schemaColumnMirror(
     } else if (col === "operating_temp" && typeof v === "object" && !Array.isArray(v)) {
       const r = v as { min?: number; max?: number };
       out[col] = `${r.min ?? ""}–${r.max ?? ""} °C`;
+    } else if (ARRAY_COLUMNS.has(col)) {
+      /* THE product-save killer (fixed 2026-08-03): these legacy columns
+         are Postgres ARRAYs, but their schema fields are scalars —
+         voltage_options is a `select`, frequency_hz a `unit_number`.
+         Writing the raw scalar produced `malformed array literal: "220V"`
+         → 500 → the operator only ever saw "Failed to create product".
+         Coerce to a text array; drop empties so we never write [""]. */
+      const arr = (Array.isArray(v) ? v : [v])
+        .filter((x) => x !== null && x !== undefined && x !== "")
+        .map((x) => String(x));
+      if (arr.length > 0) out[col] = arr;
+    } else if (Array.isArray(v) && !ARRAY_COLUMNS.has(col)) {
+      /* Mirror image: a multi-value spec pointed at a scalar column. */
+      out[col] = v.map((x) => String(x)).join(", ");
     } else {
       out[col] = v;
     }

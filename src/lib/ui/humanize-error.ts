@@ -50,10 +50,24 @@ export function humanizeError(input: unknown): string {
   if (input == null) raw = FALLBACK;
   else if (typeof input === "string") raw = input;
   else if (input instanceof Error) raw = input.message;
-  else if (typeof input === "object" && "error" in input) {
-    const e = (input as { error: unknown }).error;
-    raw = typeof e === "string" ? e : String(e);
+  else if (typeof input === "object") {
+    /* Supabase/PostgrestError is a plain object carrying `message`
+       (+ details/hint/code) and NO `error` key — the old branch only
+       looked for `error`, so every DB failure fell through to
+       String(obj) and users were shown the literal "[object Object]".
+       That is why product-save failures were undiagnosable. */
+    const o = input as { message?: unknown; error?: unknown; details?: unknown; hint?: unknown };
+    const pick =
+      typeof o.message === "string" && o.message.trim() ? o.message
+      : typeof o.error === "string" && o.error.trim() ? o.error
+      : typeof o.details === "string" && o.details.trim() ? o.details
+      : typeof o.hint === "string" && o.hint.trim() ? o.hint
+      : null;
+    raw = pick ?? FALLBACK;
   } else raw = String(input);
+
+  /* Never let an unresolved object reach the user. */
+  if (raw === "[object Object]") raw = FALLBACK;
 
   if (!raw || raw.trim().length === 0) return FALLBACK;
   for (const [pattern, mapped] of KNOWN_PATTERNS) {

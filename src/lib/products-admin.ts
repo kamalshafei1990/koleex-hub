@@ -10,6 +10,7 @@
    without edits.
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   uploadToStorage,
   removeFromStorage,
@@ -219,13 +220,20 @@ export async function fetchProductById(id: string): Promise<ProductRow | null> {
 export async function fetchProductByIdOrSlug(handle: string): Promise<ProductRow | null> {
   return fetchProductById(handle);
 }
+/* Save helpers THROW with the server's real reason (2026-08-03).
+   They used to return null/false, so the form could only say "Failed to
+   create product" — the actual cause (a permission gate, a bad column,
+   a constraint) never reached the operator or the logs, which is why
+   the same failure kept coming back unexplained. */
 export async function createProduct(product: Record<string, unknown>): Promise<ProductRow | null> {
   const { ok, json } = await jsend("/api/products", "POST", product);
-  return ok ? ((json.product as ProductRow) ?? null) : null;
+  if (!ok) throw new Error(humanizeError(json ?? "Couldn't save the product."));
+  return (json.product as ProductRow) ?? null;
 }
 export async function updateProduct(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  const { ok } = await jsend(`/api/products/${encodeURIComponent(id)}`, "PATCH", updates);
-  return ok;
+  const { ok, json } = await jsend(`/api/products/${encodeURIComponent(id)}`, "PATCH", updates);
+  if (!ok) throw new Error(humanizeError(json ?? "Couldn't save the product."));
+  return true;
 }
 export async function deleteProduct(id: string): Promise<boolean> {
   const { ok } = await jsend(`/api/products/${encodeURIComponent(id)}`, "DELETE");

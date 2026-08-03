@@ -86,7 +86,12 @@ export async function POST(req: Request) {
     .select()
     .single();
   if (error) {
-    console.error("[api/products POST]", error.message);
+    console.error("[api/products POST]", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ product: data });
