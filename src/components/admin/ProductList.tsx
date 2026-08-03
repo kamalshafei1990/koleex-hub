@@ -426,15 +426,22 @@ const ProductCard = memo(function ProductCard({
               </div>
             )}
 
-            {/* Cost · freshness */}
-            <div className="flex items-center gap-2 text-[10px] text-[var(--text-ghost)] min-w-0">
-              {signal.cost != null && (
-                <span className="font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">
-                  ¥ {signal.cost.toLocaleString()}
+            {/* Cost · freshness — cost is a headline number an operator
+                reads across the whole grid, so it carries real weight:
+                dim currency mark, large tabular figure. */}
+            <div className="flex items-baseline gap-2 min-w-0">
+              {signal.cost != null ? (
+                <span className="flex items-baseline gap-1 shrink-0">
+                  <span className="text-[11px] font-medium text-[var(--text-ghost)]">¥</span>
+                  <span className="text-[17px] md:text-[18px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] leading-none">
+                    {signal.cost.toLocaleString()}
+                  </span>
                 </span>
+              ) : (
+                <span className="text-[10px] text-[var(--text-ghost)]">{t("card.noCostYet", "Cost not set")}</span>
               )}
               {signal.updatedAt && (
-                <span className="ms-auto shrink-0" title={new Date(signal.updatedAt).toLocaleString()}>
+                <span className="ms-auto shrink-0 text-[10px] text-[var(--text-ghost)]" title={new Date(signal.updatedAt).toLocaleString()}>
                   {agoShort(signal.updatedAt)}
                 </span>
               )}
@@ -1939,7 +1946,10 @@ export default function ProductList() {
                       {isInternal && (() => {
                         const c = signals[p.id]?.cost;
                         return c != null ? (
-                          <span className="text-[11.5px] font-semibold tabular-nums text-[var(--text-subtle)]">¥ {c.toLocaleString()}</span>
+                          <span className="flex items-baseline gap-0.5">
+                            <span className="text-[10px] text-[var(--text-ghost)]">¥</span>
+                            <span className="text-[14px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]">{c.toLocaleString()}</span>
+                          </span>
                         ) : (
                           <span className="text-[11px] text-[var(--text-ghost)]">—</span>
                         );
