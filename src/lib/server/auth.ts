@@ -381,11 +381,16 @@ export async function requireModuleAccess(
     );
   }
 
-  const roleAllows = rolePermRes.data?.can_view === true;
-  const overrideHides =
-    overrideRes.data !== null && overrideRes.data?.can_view === false;
+  /* Override rows replace the role's verdict in BOTH directions
+     (2026-08-03 fix): a hide-override (can_view=false) still denies,
+     and a GRANT-override (can_view=true) now allows an account whose
+     role lacks the module — previously positive grants only worked in
+     the client nav and every server route 403'd. */
+  const overrideView = overrideRes.data?.can_view;
+  const effectiveView =
+    typeof overrideView === "boolean" ? overrideView : rolePermRes.data?.can_view === true;
 
-  if (!roleAllows || overrideHides) {
+  if (!effectiveView) {
     return NextResponse.json(
       { error: `No access to ${moduleName}` },
       { status: 403 },
@@ -451,7 +456,7 @@ export async function requireModuleAction(
       .maybeSingle(),
     supabaseServer
       .from("account_permission_overrides")
-      .select("can_view, module_key")
+      .select("can_view, can_create, can_edit, can_delete, module_key")
       .eq("account_id", auth.account_id)
       .ilike("module_key", moduleName)
       .maybeSingle(),
@@ -470,9 +475,31 @@ export async function requireModuleAction(
     return NextResponse.json({ error: `No access to ${moduleName}` }, { status: 403 });
   }
 
-  const row = rolePermRes.data as
+  /* Per-account override rows REPLACE the role's flags for the module
+     (2026-08-03 fix). The old code read overrides only as a hide switch,
+     so an admin GRANTING an account extra rights ("salt may create
+     products") worked in the client nav but 403'd at every API — the
+     'Failed to create product' report. Boolean columns win outright;
+     null/absent columns fall back to the role row. */
+  const roleRow = rolePermRes.data as
     | { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean }
     | null;
+  const overrideRow = overrideRes.data as
+    | { can_view?: boolean | null; can_create?: boolean | null; can_edit?: boolean | null; can_delete?: boolean | null }
+    | null;
+  const merged = (k: "can_view" | "can_create" | "can_edit" | "can_delete"): boolean | undefined => {
+    const o = overrideRow?.[k];
+    if (typeof o === "boolean") return o;
+    return roleRow?.[k];
+  };
+  const row = overrideRow || roleRow
+    ? {
+        can_view: merged("can_view"),
+        can_create: merged("can_create"),
+        can_edit: merged("can_edit"),
+        can_delete: merged("can_delete"),
+      }
+    : null;
 
   /* No row for this module. Deny-by-default protects anything holding company
      records, but an openAccess tool (AppDef.openAccess) stays usable until an

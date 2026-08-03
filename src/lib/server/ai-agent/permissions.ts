@@ -129,19 +129,21 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
         can_delete: row.can_delete ?? false,
       };
     }
-    // Account-level overrides win (same rule as Hub APIs): a hide
-    // override beats a role grant, but a grant override does not beat a
-    // role denial — only admins toggle overrides.
+    // Account-level overrides REPLACE the role's flags in BOTH
+    // directions (2026-08-03 fix, same rule as requireModuleAction):
+    // a hide override beats a role grant AND a grant override beats a
+    // role denial — only admins can write overrides, and the Roles app
+    // stores complete rows when it grants an account extra rights.
     for (const ov of overridesRes.data ?? []) {
       const key = ov.module_key.toLowerCase();
       const existing = modulePermissions[key] ?? {
         can_view: false, can_create: false, can_edit: false, can_delete: false,
       };
       modulePermissions[key] = {
-        can_view: ov.can_view === false ? false : existing.can_view,
-        can_create: ov.can_create === false ? false : existing.can_create,
-        can_edit: ov.can_edit === false ? false : existing.can_edit,
-        can_delete: ov.can_delete === false ? false : existing.can_delete,
+        can_view: typeof ov.can_view === "boolean" ? ov.can_view : existing.can_view,
+        can_create: typeof ov.can_create === "boolean" ? ov.can_create : existing.can_create,
+        can_edit: typeof ov.can_edit === "boolean" ? ov.can_edit : existing.can_edit,
+        can_delete: typeof ov.can_delete === "boolean" ? ov.can_delete : existing.can_delete,
       };
     }
   }
