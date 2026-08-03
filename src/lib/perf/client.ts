@@ -24,7 +24,14 @@ export type PerfTags = Record<string, string | number | boolean>;
 export type PerfEntry = { n: string; v: number; t: number; tags?: PerfTags };
 
 const MAX_BATCH = 50;
-const FLUSH_MS = 20_000;
+/* 60s, not 20s. Measured on an idle Hub tab, /api/perf/ingest was the single
+   most frequent request the app makes — ~3 POSTs a minute per user, more than
+   every functional poll combined. It costs a function invocation and an auth
+   resolution each time, so at 100 concurrent users it was ~3 req/s of pure
+   instrumentation. Batching three windows into one loses no events (the same
+   entries ship, just in bigger batches) and the buffer still flushes
+   immediately on hide/pagehide, so nothing is lost when a tab goes away. */
+const FLUSH_MS = 60_000;
 const RING_MAX = 200;
 
 let buf: PerfEntry[] = [];
@@ -174,7 +181,12 @@ export function initPerf(): void {
   try {
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
     window.addEventListener("pagehide", flush);
-    flushTimer = window.setInterval(flush, FLUSH_MS);
+    /* A hidden tab already shipped its buffer on the hide event above, and
+       collects almost nothing while backgrounded — polling it awake to send
+       an empty batch is waste multiplied by every open tab in the company. */
+    flushTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") flush();
+    }, FLUSH_MS);
     void flushTimer;
   } catch { /* ignore */ }
 }
