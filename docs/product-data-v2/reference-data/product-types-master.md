@@ -88,7 +88,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XFFP | Fusing Machine | fusing_type, belt_width, temperature_range | fusing_type, belt_width, temperature_range | double_belt, cooling_section |
 | ▲ XFFF | Form Finisher (Steam-Air Dolly) | garment_type, tensioning_method, steam_source | garment_type, tensioning_method, twin_station | side_clamps, sleeve_tensioners |
 | ▲ XFSH | Shirt Finisher | type(cabinet/tunnel), throughput, tensioning | type, throughput, tensioning | collar_cuff_clamps, conveyor |
-| ▲ XFTT | Trouser Topper / Legger | type(topper/legger), throughput | topper_vs_legger, twin, throughput | leg_clamps, waistband_tension |
+| ✅ XFTT | Trouser Topper / Legger | type(topper/legger), throughput, station_count | topper_vs_legger, twin, throughput, station_count | leg_clamps, waistband_tension, robot_handling |
 | ▲ XFST | Steam Tunnel | throughput, zones, conveyor_type | throughput, zones, conveyor | variable_speed, multi_zone |
 | ✅ XFTS | Thread Sucking / Trimming Machine | format, suction_power | format, suction_power, with_blow_gun | spot_blow_gun, ionizer |
 | ▲ XFSP | Spotting / Stain Removal Machine | gun_types, with_vacuum_table | gun_types, with_vacuum_table, heated | heated_table, drying_blower |

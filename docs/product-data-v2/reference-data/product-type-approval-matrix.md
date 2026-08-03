@@ -88,7 +88,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Fusing Machine | XFFP | **Confirmed** | fusing_type, belt_width | cooling | collars, cuffs | live |
 | Form Finisher (Dolly) | XFFF | **Confirmed** | garment_type, tensioning | side_clamps | jackets | live |
 | Shirt Finisher | XFSH | Proposed | type, throughput | clamps | shirts | new |
-| Trouser Topper/Legger | XFTT | Proposed | type, throughput | leg_clamps | trousers | new |
+| Trouser Topper/Legger | XFTT | **Confirmed** | type, throughput, station_count | leg_clamps, robot_handling | trousers | live (app name: Trouser Pressing Machines) |
 | Steam Tunnel | XFST | Proposed | throughput, zones | multi_zone | knitwear | new |
 | Thread Sucking/Trimming | XFTS | **Confirmed** | format, suction | blow_gun | all | live |
 | Spotting/Stain Removal | XFSP | Proposed | gun_types, vacuum_table | heated_table | all | new |
@@ -160,7 +160,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 ---
 
 ## 1. Confirmed Product Types (38)
-XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
+XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
 
 ## 2. Proposed Product Types (50)
 XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP, **XFSS** · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV, **XPCI** · **XMKP, XMKD, XMKS** (CAD & Marker) · **XWIC, XWIR, XWIB, XWIA** (Workshop Infra) · **XMDS, XMDD, XMDC, XMDH, XMDN** (Motors & Drives).
