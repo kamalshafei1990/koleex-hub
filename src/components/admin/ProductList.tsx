@@ -134,6 +134,7 @@ export interface ProductSignal {
   cost: number | null;
   visible: boolean;
   updatedAt: string | null;
+  supplier: { name: string; logo: string | null } | null;
 }
 
 /** "3d" / "5h" / "now" — compact staleness for the internal card. */
@@ -397,15 +398,40 @@ const ProductCard = memo(function ProductCard({
               </div>
             )}
 
-            {/* Cost · supplier · freshness */}
+            {/* Supplier — logo + name. Sourcing is the internal card's
+                second question after readiness ("who makes this?"), so it
+                gets a real row with the factory's mark, not a grey
+                comma-separated tail. */}
+            {(signal.supplier || suppliers.length > 0) && (
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="h-6 w-6 shrink-0 rounded-md bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                  {signal.supplier?.logo ? (
+                    <img
+                      src={IMG.thumb(signal.supplier.logo)}
+                      alt=""
+                      className="h-full w-full object-contain p-0.5"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <FactoryIcon className="h-3 w-3 text-gray-400" />
+                  )}
+                </span>
+                <span className="truncate text-[11px] font-medium text-[var(--text-subtle)]">
+                  {signal.supplier?.name || suppliers[0]}
+                </span>
+                {suppliers.length > 1 && (
+                  <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">+{suppliers.length - 1}</span>
+                )}
+              </div>
+            )}
+
+            {/* Cost · freshness */}
             <div className="flex items-center gap-2 text-[10px] text-[var(--text-ghost)] min-w-0">
               {signal.cost != null && (
                 <span className="font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">
                   ¥ {signal.cost.toLocaleString()}
                 </span>
-              )}
-              {suppliers.length > 0 && (
-                <span className="truncate">{suppliers.join(", ")}</span>
               )}
               {signal.updatedAt && (
                 <span className="ms-auto shrink-0" title={new Date(signal.updatedAt).toLocaleString()}>
@@ -1839,12 +1865,22 @@ export default function ProductList() {
                         <span className="text-[var(--text-ghost)]">·</span>
                         <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
                       </div>
-                      {/* Desktop: supplier line — internal only */}
-                      {isInternal && suppliers.length > 0 && (
-                        <p className="hidden md:block text-[11px] text-[var(--text-ghost)] mt-0.5 truncate">
-                          {suppliers.join(", ")}
-                        </p>
-                      )}
+                      {/* Desktop: supplier line — internal only, with logo */}
+                      {isInternal && (signals[p.id]?.supplier || suppliers.length > 0) && (() => {
+                        const sup = signals[p.id]?.supplier;
+                        return (
+                          <div className="hidden md:flex items-center gap-1.5 mt-0.5 min-w-0">
+                            {sup?.logo && (
+                              <span className="h-4 w-4 shrink-0 rounded bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                                <img src={IMG.thumb(sup.logo)} alt="" className="h-full w-full object-contain" loading="lazy" decoding="async" />
+                              </span>
+                            )}
+                            <span className="text-[11px] text-[var(--text-ghost)] truncate">
+                              {sup?.name || suppliers.join(", ")}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Category (desktop only) — show the division

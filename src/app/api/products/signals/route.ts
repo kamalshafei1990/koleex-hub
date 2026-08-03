@@ -15,6 +15,8 @@ import type { ProductKnowledgeBlock } from "@/types/product-schema";
      cost       — primary model cost in CNY (cost-permission gated)
      visible    — customers can see it (distinct from status)
      updatedAt  — staleness
+     supplier   — primary supplier {name, logo} (link first, else the
+                  model's supplier text matched by name)
 
    Deliberately a SEPARATE endpoint, not extra weight on
    /api/products?view=list: the public /products catalogue must keep its
@@ -48,7 +50,7 @@ export async function GET() {
   if (denied) return denied;
   const canSeeCosts = await hasProductCostAccess(auth);
 
-  const [prodRes, subRes, mediaRes, modelRes] = await Promise.all([
+  const [prodRes, subRes, mediaRes, modelRes, supRes, linkRes] = await Promise.all([
     supabaseServer
       .from("products")
       .select(
@@ -58,8 +60,16 @@ export async function GET() {
     supabaseServer.from("product_media").select("product_id, type"),
     supabaseServer
       .from("product_models")
-      .select('product_id, primary_model, model_name, cost_price, global_price, "order"')
+      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, "order"')
       .order("order", { ascending: true }),
+    /* Supplier directory — 145 rows, logo columns are URLs (verified: 0
+       base64), so shipping them in a bulk payload is safe. */
+    supabaseServer
+      .from("contacts")
+      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+      .eq("contact_type", "supplier")
+      .eq("tenant_id", auth.tenant_id),
+    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary"),
   ]);
 
   if (prodRes.error) {
@@ -84,10 +94,39 @@ export async function GET() {
     media.set(m.product_id, b);
   }
 
+  /* Supplier lookup — by id AND by every name variant, because most
+     products carry the supplier as free TEXT on the model rather than a
+     product_suppliers link (only a handful are linked today). */
+  interface SupLite { name: string; logo: string | null }
+  const supById = new Map<string, SupLite>();
+  const supByName = new Map<string, SupLite>();
+  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+  for (const c of (supRes.data ?? []) as Array<{
+    id: string;
+    company_name_en: string | null;
+    company_name_cn: string | null;
+    display_name: string | null;
+    photo_url: string | null;
+    logo_url: string | null;
+  }>) {
+    const name = c.company_name_en || c.display_name || c.company_name_cn || "";
+    if (!name) continue;
+    const lite: SupLite = { name, logo: c.photo_url || c.logo_url || null };
+    supById.set(c.id, lite);
+    for (const variant of [c.company_name_en, c.company_name_cn, c.display_name]) {
+      if (variant && variant.trim()) supByName.set(norm(variant), lite);
+    }
+  }
+  const linkedSupplier = new Map<string, string>();
+  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null }>) {
+    if (!l.supplier_id) continue;
+    if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
+  }
+
   /* first model per product (rows pre-sorted by order) */
   const primary = new Map<
     string,
-    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null }
+    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null; supplier: string | null }
   >();
   for (const m of (modelRes.data ?? []) as Array<{
     product_id: string;
@@ -95,6 +134,7 @@ export async function GET() {
     model_name: string | null;
     cost_price: number | null;
     global_price: number | null;
+    supplier: string | null;
   }>) {
     if (!primary.has(m.product_id)) primary.set(m.product_id, m);
   }
@@ -107,6 +147,7 @@ export async function GET() {
       cost: number | null;
       visible: boolean;
       updatedAt: string | null;
+      supplier: { name: string; logo: string | null } | null;
     }
   > = {};
 
@@ -160,6 +201,14 @@ export async function GET() {
       cost: canSeeCosts ? (model?.cost_price ?? null) : null,
       visible: p.visible === true,
       updatedAt: p.updated_at,
+      supplier: (() => {
+        const linkId = linkedSupplier.get(p.id);
+        if (linkId && supById.has(linkId)) return supById.get(linkId)!;
+        const txt = (model?.supplier || "").trim();
+        if (!txt) return null;
+        /* Known supplier → real logo; unknown free text → name only. */
+        return supByName.get(norm(txt)) ?? { name: txt, logo: null };
+      })(),
     };
   }
 
