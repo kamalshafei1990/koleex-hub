@@ -192,7 +192,7 @@ const ProductCard = memo(function ProductCard({
           blend in (no white box around the photo).
           No scale on hover — the card lifts, image
           stays put. */}
-      <div className="relative aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
+      <div className="relative aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
         {imgUrl ? (
           /* IMG.card = CDN-downscaled 480px render. The raw
              URL here was the original multi-MB upload — the
@@ -262,7 +262,7 @@ const ProductCard = memo(function ProductCard({
           the readiness slot always exists, and the cost row is pinned to
           the bottom with mt-auto. Without this, a one-line name shifted
           everything below it up and the grid read as ragged. */}
-      <div className={`p-3.5 md:p-4 ${isInternal ? "flex flex-col min-h-[208px]" : ""}`}>
+      <div className={`p-3.5 md:p-4 max-sm:p-3 ${isInternal ? "flex flex-col min-h-[208px] max-sm:min-h-[164px]" : ""}`}>
         {(() => {
           const mn = primaryModelNames[p.id];
           const hasDistinctName = mn && mn !== p.product_name;
@@ -274,7 +274,7 @@ const ProductCard = memo(function ProductCard({
                 <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
                   {mn}
                 </h3>
-                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug ${isInternal ? "min-h-[34px]" : ""}`}>
+                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug ${isInternal ? "min-h-[34px] max-sm:min-h-0" : ""}`}>
                   {p.product_name}
                 </p>
               </>
@@ -289,7 +289,7 @@ const ProductCard = memo(function ProductCard({
                 {p.product_name}
               </h3>
               {isInternal && (
-                <p className="mt-0.5 text-[10px] font-medium text-amber-400/80 min-h-[34px]">
+                <p className="mt-0.5 text-[10px] font-medium text-amber-400/80 min-h-[34px] max-sm:min-h-0">
                   {t("list.needsName", "Needs name")}
                 </p>
               )}
@@ -327,7 +327,7 @@ const ProductCard = memo(function ProductCard({
         )}
 
         {/* Meta row — publish status, brand, models. */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <div className="flex items-center gap-2 mt-3 max-sm:mt-2 max-sm:gap-1.5 flex-wrap">
           {(() => {
             const st = (p.status || "draft");
             return (
@@ -359,7 +359,7 @@ const ProductCard = memo(function ProductCard({
             Readiness bar + gap chips + cost/supplier/freshness. This is
             what turns the grid from a gallery into a worklist. */}
         {isInternal && signal && (
-          <div className="mt-3 space-y-2 flex flex-col flex-1">
+          <div className="mt-3 space-y-2 max-sm:mt-2 max-sm:space-y-1.5 flex flex-col flex-1">
             {/* Readiness — the same computeReadiness engine the editor
                 uses, so card and detail page never disagree. */}
             {/* Readiness slot is ALWAYS rendered so the rows below never
@@ -386,7 +386,7 @@ const ProductCard = memo(function ProductCard({
             {/* Gap chips — shown ONLY when something is missing, so a
                 complete product reads as a clean card. */}
             {signal.missing.length > 0 && (
-              <div className="flex flex-wrap gap-1 min-h-[18px]">
+              <div className="flex flex-wrap gap-1 min-h-[18px] max-sm:min-h-0">
                 {signal.missing.map((k) => (
                   <span
                     key={k}
@@ -433,7 +433,7 @@ const ProductCard = memo(function ProductCard({
               </div>
             ) : (
               /* Keep the slot so cost stays on the same line across cards. */
-              <div className="flex items-center gap-2 min-w-0 h-6">
+              <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden">
                 <span className="text-[10px] text-[var(--text-ghost)]">{t("card.noSupplier", "No supplier linked")}</span>
               </div>
             )}
@@ -450,7 +450,7 @@ const ProductCard = memo(function ProductCard({
                   </span>
                 </span>
               ) : (
-                <span className="text-[10px] text-[var(--text-ghost)]">{t("card.noCostYet", "Cost not set")}</span>
+                <span className="text-[10px] text-[var(--text-ghost)] max-sm:hidden">{t("card.noCostYet", "Cost not set")}</span>
               )}
               {signal.updatedAt && (
                 <span className="ms-auto shrink-0 text-[10px] text-[var(--text-ghost)]" title={new Date(signal.updatedAt).toLocaleString()}>
