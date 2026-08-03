@@ -257,8 +257,12 @@ const ProductCard = memo(function ProductCard({
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-3.5 md:p-4">
+      {/* Content — internal cards are a fixed-height flex column so every
+          card in a row lines up: the name slot always reserves two lines,
+          the readiness slot always exists, and the cost row is pinned to
+          the bottom with mt-auto. Without this, a one-line name shifted
+          everything below it up and the grid read as ragged. */}
+      <div className={`p-3.5 md:p-4 ${isInternal ? "flex flex-col min-h-[208px]" : ""}`}>
         {(() => {
           const mn = primaryModelNames[p.id];
           const hasDistinctName = mn && mn !== p.product_name;
@@ -270,7 +274,7 @@ const ProductCard = memo(function ProductCard({
                 <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
                   {mn}
                 </h3>
-                <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug">
+                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug ${isInternal ? "min-h-[34px]" : ""}`}>
                   {p.product_name}
                 </p>
               </>
@@ -285,7 +289,7 @@ const ProductCard = memo(function ProductCard({
                 {p.product_name}
               </h3>
               {isInternal && (
-                <p className="mt-0.5 text-[10px] font-medium text-amber-400/80">
+                <p className="mt-0.5 text-[10px] font-medium text-amber-400/80 min-h-[34px]">
                   {t("list.needsName", "Needs name")}
                 </p>
               )}
@@ -355,12 +359,15 @@ const ProductCard = memo(function ProductCard({
             Readiness bar + gap chips + cost/supplier/freshness. This is
             what turns the grid from a gallery into a worklist. */}
         {isInternal && signal && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2 flex flex-col flex-1">
             {/* Readiness — the same computeReadiness engine the editor
                 uses, so card and detail page never disagree. */}
-            {signal.readiness != null && (
-              <div className="flex items-center gap-2">
-                <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+            {/* Readiness slot is ALWAYS rendered so the rows below never
+                shift between cards; unknown readiness shows an empty
+                track and a dash instead of collapsing. */}
+            <div className="flex items-center gap-2">
+              <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                {signal.readiness != null && (
                   <div
                     className={`h-full rounded-full transition-all ${
                       signal.readiness >= 80 ? "bg-emerald-500"
@@ -369,17 +376,17 @@ const ProductCard = memo(function ProductCard({
                     }`}
                     style={{ width: `${Math.max(2, Math.min(100, signal.readiness))}%` }}
                   />
-                </div>
-                <span className="text-[10px] font-semibold tabular-nums text-[var(--text-dim)] shrink-0">
-                  {signal.readiness}%
-                </span>
+                )}
               </div>
-            )}
+              <span className="text-[10px] font-semibold tabular-nums text-[var(--text-dim)] shrink-0">
+                {signal.readiness != null ? `${signal.readiness}%` : "—"}
+              </span>
+            </div>
 
             {/* Gap chips — shown ONLY when something is missing, so a
                 complete product reads as a clean card. */}
             {signal.missing.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 min-h-[18px]">
                 {signal.missing.map((k) => (
                   <span
                     key={k}
@@ -402,7 +409,7 @@ const ProductCard = memo(function ProductCard({
                 second question after readiness ("who makes this?"), so it
                 gets a real row with the factory's mark, not a grey
                 comma-separated tail. */}
-            {(signal.supplier || suppliers.length > 0) && (
+            {(signal.supplier || suppliers.length > 0) ? (
               <div className="flex items-center gap-2 min-w-0">
                 <span className="h-6 w-6 shrink-0 rounded-md bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
                   {signal.supplier?.logo ? (
@@ -424,12 +431,17 @@ const ProductCard = memo(function ProductCard({
                   <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">+{suppliers.length - 1}</span>
                 )}
               </div>
+            ) : (
+              /* Keep the slot so cost stays on the same line across cards. */
+              <div className="flex items-center gap-2 min-w-0 h-6">
+                <span className="text-[10px] text-[var(--text-ghost)]">{t("card.noSupplier", "No supplier linked")}</span>
+              </div>
             )}
 
             {/* Cost · freshness — cost is a headline number an operator
                 reads across the whole grid, so it carries real weight:
                 dim currency mark, large tabular figure. */}
-            <div className="flex items-baseline gap-2 min-w-0">
+            <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
                 <span className="flex items-baseline gap-1 shrink-0">
                   <span className="text-[11px] font-medium text-[var(--text-ghost)]">¥</span>
