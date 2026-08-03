@@ -124,8 +124,36 @@ function ClassMonoIcon({ src, className }: { src?: string; className?: string })
    primitives or stable useMemo/useCallback values, so untouched cards
    now bail out of re-rendering entirely. Markup is verbatim: this is a
    pure extraction, no visual change. */
+/* ── Internal work signals (Product Data card) ──
+   Shape mirrors /api/products/signals. Kept local: the public catalogue
+   never receives these fields. */
+export interface ProductSignal {
+  /** null = no spec template resolved, so a % would be meaningless. */
+  readiness: number | null;
+  missing: string[];
+  cost: number | null;
+  visible: boolean;
+  updatedAt: string | null;
+}
+
+/** "3d" / "5h" / "now" — compact staleness for the internal card. */
+function agoShort(iso: string | null): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d`;
+  const mo = Math.floor(d / 30);
+  return mo < 12 ? `${mo}mo` : `${Math.floor(mo / 12)}y`;
+}
+
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, t, onAskDelete,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, signal, t, onAskDelete,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -138,6 +166,9 @@ const ProductCard = memo(function ProductCard({
   subMap: Record<string, string>;
   divMap: Record<string, string>;
   primaryModelNames: Record<string, string>;
+  /* Internal work signals (Product Data only) — readiness, gaps, cost,
+     visibility, staleness. Undefined on the public /products card. */
+  signal?: ProductSignal;
   t: (key: string, fallback?: string) => string;
   onAskDelete: (e: React.MouseEvent, id: string, name: string) => void;
 }) {
@@ -262,10 +293,12 @@ const ProductCard = memo(function ProductCard({
         })()}
 
         {/* Category + Subcategory line.
-            Subcategory shown as a chip after the category
-            so admins can spot at a glance whether a
-            product is in lockstitch / overlock / etc.
-            without opening it. */}
+            PUBLIC card only: the internal grid is already grouped by
+            category → subcategory headings, so repeating them on every
+            card is pure noise (owner directive 2026-08-03 — the internal
+            card must answer "what's missing / what does it cost", not
+            restate the section it sits in). */}
+        {!isInternal && (
         <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1.5">
           <LayersIcon className="h-3 w-3 shrink-0" />
           <span className="truncate">{catMap[p.category_slug] || p.category_slug}</span>
@@ -276,12 +309,13 @@ const ProductCard = memo(function ProductCard({
             </>
           )}
         </p>
+        )}
 
         {/* Division label — only for non-flagship products.
             Garment Machinery is the default/home line and
             gets a clean card; anything else gets tagged so
             it's clear at a glance which line it belongs to. */}
-        {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
+        {!isInternal && p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
           <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 uppercase tracking-wider truncate">
             {divMap[p.division_slug]}
           </p>
@@ -297,9 +331,18 @@ const ProductCard = memo(function ProductCard({
               </StatusPill>
             );
           })()}
-          {p.brand && (
+          {/* Brand chip: PUBLIC only. Internally every product is Koleex,
+              so the chip carried zero information and cost a whole row. */}
+          {!isInternal && p.brand && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
               <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
+            </span>
+          )}
+          {/* Visibility — distinct from status: "active" says the record is
+              live, this says customers can actually see it. */}
+          {isInternal && signal && !signal.visible && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]" title={t("card.hidden", "Hidden from customers")}>
+              {t("card.hiddenShort", "Hidden")}
             </span>
           )}
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
@@ -307,8 +350,73 @@ const ProductCard = memo(function ProductCard({
           </span>
         </div>
 
-        {/* Supplier — internal only */}
-        {isInternal && suppliers.length > 0 && (
+        {/* ── Internal work signals ──
+            Readiness bar + gap chips + cost/supplier/freshness. This is
+            what turns the grid from a gallery into a worklist. */}
+        {isInternal && signal && (
+          <div className="mt-3 space-y-2">
+            {/* Readiness — the same computeReadiness engine the editor
+                uses, so card and detail page never disagree. */}
+            {signal.readiness != null && (
+              <div className="flex items-center gap-2">
+                <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      signal.readiness >= 80 ? "bg-emerald-500"
+                      : signal.readiness >= 50 ? "bg-amber-500"
+                      : "bg-rose-500/80"
+                    }`}
+                    style={{ width: `${Math.max(2, Math.min(100, signal.readiness))}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-semibold tabular-nums text-[var(--text-dim)] shrink-0">
+                  {signal.readiness}%
+                </span>
+              </div>
+            )}
+
+            {/* Gap chips — shown ONLY when something is missing, so a
+                complete product reads as a clean card. */}
+            {signal.missing.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {signal.missing.map((k) => (
+                  <span
+                    key={k}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-400/90 border border-amber-500/20"
+                  >
+                    {t(`card.missing.${k}`, {
+                      photo: "No photo",
+                      specs: "No specs",
+                      cost: "No cost",
+                      code: "No code",
+                      description: "No description",
+                      template: "No spec template",
+                    }[k] ?? k)}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Cost · supplier · freshness */}
+            <div className="flex items-center gap-2 text-[10px] text-[var(--text-ghost)] min-w-0">
+              {signal.cost != null && (
+                <span className="font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">
+                  ¥ {signal.cost.toLocaleString()}
+                </span>
+              )}
+              {suppliers.length > 0 && (
+                <span className="truncate">{suppliers.join(", ")}</span>
+              )}
+              {signal.updatedAt && (
+                <span className="ms-auto shrink-0" title={new Date(signal.updatedAt).toLocaleString()}>
+                  {agoShort(signal.updatedAt)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Public card keeps the plain supplier line it always had. */}
+        {isInternal && !signal && suppliers.length > 0 && (
           <p className="text-[10px] text-[var(--text-ghost)] mt-2 truncate">
             {suppliers.join(", ")}
           </p>
@@ -357,6 +465,9 @@ export default function ProductList() {
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
+  /* Internal work signals — fetched only under /product-data, in parallel
+     with the meta round-trip, so the public catalogue payload is untouched. */
+  const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   // Skip the skeleton on revisit when the list is already cached for this scope.
   const [loading, setLoading] = useState(
@@ -509,6 +620,17 @@ export default function ProductList() {
            awaiting meta — observe its rejection so it can't surface as an
            unhandled-promise error. */
         metaPromise.catch(() => {});
+        /* Work signals: Product Data only, fire-and-forget so a slow or
+           failed signals call can never delay (or break) the grid — the
+           cards simply render without the readiness strip. */
+        if (isInternal) {
+          fetch("/api/products/signals", { credentials: "include", signal: ctrl.signal })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((j: { signals?: Record<string, ProductSignal> } | null) => {
+              if (!cancelled && j?.signals) setSignals(j.signals);
+            })
+            .catch(() => { /* grid works fine without signals */ });
+        }
         let p: ProductRow[];
         try {
           /* ?view=list keeps the response to the ~15 columns this grid
@@ -1605,6 +1727,7 @@ export default function ProductList() {
                 subMap={subMap}
                 divMap={divMap}
                 primaryModelNames={primaryModelNames}
+                signal={signals[p.id]}
                 t={t}
                 onAskDelete={askDelete}
               />
@@ -1621,12 +1744,19 @@ export default function ProductList() {
           /* ── List View ── */
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             {/* List header */}
+            {/* Internal table trades the Brand column (always "Koleex")
+                for the two numbers an operator actually scans: readiness
+                and cost. Public table keeps Brand. */}
             <div className="hidden md:grid grid-cols-[56px_1fr_140px_120px_100px_80px_80px] gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
               <span />
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colCategory")}</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colBrand")}</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colModels")}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                {isInternal ? t("list.colReady", "Ready") : t("list.colBrand")}
+              </span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                {isInternal ? t("list.colCost", "Cost") : t("list.colModels")}
+              </span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
               <span />
             </div>
@@ -1732,9 +1862,34 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Brand (desktop only) */}
+                    {/* Readiness (internal) / Brand (public) — desktop only */}
                     <div className="hidden md:flex items-center gap-1.5 min-w-0">
-                      {p.brand ? (
+                      {isInternal ? (() => {
+                        const sig = signals[p.id];
+                        if (!sig) return <span className="text-[11px] text-[var(--text-ghost)]">—</span>;
+                        if (sig.readiness == null) {
+                          return (
+                            <span className="text-[10px] text-amber-400/80" title={t("card.missing.template", "No spec template")}>
+                              {t("list.noTemplate", "No template")}
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-2 w-full min-w-0">
+                            <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  sig.readiness >= 80 ? "bg-emerald-500"
+                                  : sig.readiness >= 50 ? "bg-amber-500"
+                                  : "bg-rose-500/80"
+                                }`}
+                                style={{ width: `${Math.max(2, Math.min(100, sig.readiness))}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">{sig.readiness}%</span>
+                          </div>
+                        );
+                      })() : p.brand ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)] truncate">
                           <TagsIcon className="h-2.5 w-2.5 shrink-0" /> {p.brand}
                         </span>
@@ -1743,8 +1898,16 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Models count (desktop only) */}
+                    {/* Cost + models (internal) / models (public) — desktop only */}
                     <div className="hidden md:flex items-center gap-1.5">
+                      {isInternal && (() => {
+                        const c = signals[p.id]?.cost;
+                        return c != null ? (
+                          <span className="text-[11.5px] font-semibold tabular-nums text-[var(--text-subtle)]">¥ {c.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-[11px] text-[var(--text-ghost)]">—</span>
+                        );
+                      })()}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)]">
                         <BoxesIcon className="h-2.5 w-2.5" /> {models}
                       </span>
