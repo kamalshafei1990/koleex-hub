@@ -548,6 +548,26 @@ export default function ProductList() {
      every render (sync storage read while typing) and, since the snapshot is
      rewritten on each filter change, its values went stale — which made the
      flagship-division default silently override an explicit "All divisions". */
+  /* The category nav pins directly beneath the sticky toolbar. Its offset
+     used to be the literal `top-[49px]`, which is a guess at the toolbar's
+     height — and the theme's density layer resizes the search field, so the
+     guess is wrong at any density but one. Too small and the nav slides
+     under the toolbar; too big and a transparent slit opens between them
+     that scrolling cards flicker through. Measure it instead and publish it
+     as --kx-pd-tools-h on the shared parent. */
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = toolbarRef.current;
+    const host = el?.parentElement;
+    if (!el || !host) return;
+    const apply = () => host.style.setProperty("--kx-pd-tools-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    apply();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const initialFiltersRef = useRef<ReturnType<typeof readFilterSnapshot> | null>(null);
   if (initialFiltersRef.current === null) initialFiltersRef.current = readFilterSnapshot();
   const initialFilters = initialFiltersRef.current;
@@ -1230,7 +1250,11 @@ export default function ProductList() {
             the user can refine the query without scrolling back up.
             z-30 sits above the category jump-nav (z-20) so the
             search row always wins when both stack. */}
-        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1 pb-2 mb-3 bg-[var(--bg-primary)]">
+        {/* Sticky toolbar. `pt-2` (not pt-1) so the search field doesn't sit
+            4px under the app header when pinned — on a phone that read as the
+            two bars touching. Its measured height feeds --kx-pd-tools-h, which
+            is what the category nav below pins to. */}
+        <div ref={toolbarRef} className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
         <div>
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
@@ -1719,7 +1743,11 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[49px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]" aria-label="Categories">
+              <nav
+                style={{ top: "var(--kx-pd-tools-h, 52px)" }}
+                className="sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]"
+                aria-label="Categories"
+              >
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
