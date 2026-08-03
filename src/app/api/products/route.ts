@@ -1,5 +1,6 @@
 import "server-only";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { coerceProductArrayColumns } from "@/lib/product-array-columns";
 
 /* ---------------------------------------------------------------------------
    /api/products
@@ -80,6 +81,9 @@ export async function POST(req: Request) {
      explicitly. Default to the caller's tenant so API consumers don't
      have to know about tenancy. */
   if (!body.tenant_id) body.tenant_id = auth.tenant_id;
+  /* Last line of defence for the text[] columns — the form coerces too, but
+     any other caller sending a scalar would otherwise get a 500. */
+  coerceProductArrayColumns(body);
   const { data, error } = await supabaseServer
     .from("products")
     .insert(body)

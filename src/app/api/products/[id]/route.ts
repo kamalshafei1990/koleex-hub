@@ -1,5 +1,6 @@
 import "server-only";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { coerceProductArrayColumns } from "@/lib/product-array-columns";
 
 /* ---------------------------------------------------------------------------
    /api/products/[id]
@@ -89,13 +90,21 @@ export async function PATCH(
     targetId = (row as { id: string }).id;
   }
 
+  /* text[] columns fed by scalar spec fields — coerce before the update so
+     a stray "220V" can't turn an edit into a 500 (see the POST twin). */
+  coerceProductArrayColumns(body);
   const { error } = await supabaseServer
     .from("products")
     .update(body)
     .eq("tenant_id", auth.tenant_id)
     .eq("id", targetId);
   if (error) {
-    console.error("[api/products/[id] PATCH]", error.message);
+    console.error("[api/products/[id] PATCH]", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
 
