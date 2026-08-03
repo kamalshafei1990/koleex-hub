@@ -365,6 +365,7 @@ export interface ProductSupplierLinkRow {
   notes?: string | null;
   /* product-as-supplied facts (pd_supplier_product_facts) */
   supplier_product_name?: string | null;
+  supplier_product_name_i18n?: Record<string, string> | null;
   supplier_product_photo?: string | null;
   supply_type?: string | null;
   sample_available?: boolean | null;

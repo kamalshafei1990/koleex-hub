@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { LOCALES } from "@/types/product-form";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -78,6 +79,14 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  /* Localised supplier product name (owner request 2026-08-03).
+     Per-card: which locale is being edited, whether the row is
+     expanded, and the in-flight / result state of auto-translate.
+     Mirrors the Hero tab's name-translation contract exactly. */
+  const [nameLocale, setNameLocale] = useState<Record<string, string>>({});
+  const [nameTrOpen, setNameTrOpen] = useState<Record<string, boolean>>({});
+  const [translatingName, setTranslatingName] = useState<string | null>(null);
+  const [nameTrMsg, setNameTrMsg] = useState<Record<string, { kind: "ok" | "error"; text: string }>>({});
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
 
@@ -140,6 +149,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         payment_terms: "",
         notes: "",
         supplier_product_name: "",
+        supplier_product_name_i18n: {},
         supplier_product_photo: "",
         supply_type: "",
         sample_available: false,
@@ -165,6 +175,66 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
     onChange(links.map((l) => (l._tempId === tempId ? { ...l, ...patch } : l)));
 
   const remove = (tempId: string) => onChange(links.filter((l) => l._tempId !== tempId));
+
+  /* Auto-translate the supplier's product name into the chosen locale.
+     source_lang stays "auto" because factories name their machines in
+     their own language (usually Chinese) — unlike the Hero name, which
+     is always English-sourced. Same honest fallback handling: the API
+     answers 200 with fallback:true when no provider is configured. */
+  const autoTranslateName = useCallback(
+    async (tempId: string, source: string, target: string) => {
+      const text = source.trim();
+      if (!text) return;
+      setTranslatingName(tempId);
+      setNameTrMsg((m) => ({ ...m, [tempId]: undefined as never }));
+      try {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ text, target_lang: target, source_lang: "auto" }),
+        });
+        const data = (await res.json()) as {
+          translated?: string;
+          fallback?: boolean;
+          reason?: string;
+        };
+        if (!res.ok || data?.fallback || !data?.translated) {
+          setNameTrMsg((m) => ({
+            ...m,
+            [tempId]: {
+              kind: "error",
+              text:
+                data?.reason === "no_provider"
+                  ? t("sup.trNoProvider", "Auto-translate is off — no translation service is configured. Type it manually for now.")
+                  : t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually."),
+            },
+          }));
+          return;
+        }
+        const row = links.find((l) => l._tempId === tempId);
+        update(tempId, {
+          supplier_product_name_i18n: {
+            ...(row?.supplier_product_name_i18n ?? {}),
+            [target]: data.translated,
+          },
+        });
+        setNameTrMsg((m) => ({
+          ...m,
+          [tempId]: { kind: "ok", text: t("sup.trDone", "Translated — review before saving.") },
+        }));
+      } catch {
+        setNameTrMsg((m) => ({
+          ...m,
+          [tempId]: { kind: "error", text: t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually.") },
+        }));
+      } finally {
+        setTranslatingName(null);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [links, t],
+  );
 
   /* Marking a link primary unmarks the others — at most one primary. */
   const setPrimary = (tempId: string) =>
@@ -258,6 +328,74 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                         placeholder={t("sup.productNamePh", "What the supplier calls this product")}
                         onChange={(e) => update(l._tempId, { supplier_product_name: e.target.value })}
                       />
+                      {/* ── Other languages (same contract as the Hero tab) ──
+                          The factory names the machine in its own language;
+                          this keeps the other locales next to it. Collapsed
+                          until asked for, or auto-open when data exists. */}
+                      {(() => {
+                        const i18n = l.supplier_product_name_i18n ?? {};
+                        const hasAny = Object.values(i18n).some((v) => (v || "").trim().length > 0);
+                        const open = nameTrOpen[l._tempId] ?? hasAny;
+                        if (!open) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setNameTrOpen((o) => ({ ...o, [l._tempId]: true }))}
+                              className="mt-1.5 text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                            >
+                              + {t("sup.addLanguage", "Add another language")}
+                            </button>
+                          );
+                        }
+                        const loc = nameLocale[l._tempId] ?? "zh";
+                        const isRtl = loc === "ar" || loc === "ur";
+                        const localeName = LOCALES.find((x) => x.code === loc)?.name ?? loc;
+                        const msg = nameTrMsg[l._tempId];
+                        return (
+                          <div className="mt-2 space-y-1.5">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <select
+                                value={loc}
+                                onChange={(e) => {
+                                  setNameLocale((m) => ({ ...m, [l._tempId]: e.target.value }));
+                                  setNameTrMsg((m) => ({ ...m, [l._tempId]: undefined as never }));
+                                }}
+                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                              >
+                                {LOCALES.map((x) => (
+                                  <option key={x.code} value={x.code}>{x.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => autoTranslateName(l._tempId, l.supplier_product_name, loc)}
+                                disabled={!l.supplier_product_name.trim() || translatingName === l._tempId}
+                                className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                              >
+                                {translatingName === l._tempId
+                                  ? t("sup.translating", "Translating…")
+                                  : t("sup.autoTranslate", "Auto-translate")}
+                              </button>
+                            </div>
+                            <input
+                              dir={isRtl ? "rtl" : "ltr"}
+                              value={i18n[loc] ?? ""}
+                              onChange={(e) =>
+                                update(l._tempId, {
+                                  supplier_product_name_i18n: { ...i18n, [loc]: e.target.value },
+                                })
+                              }
+                              placeholder={t("sup.nameInLang", "Product name in {lang}").replace("{lang}", localeName)}
+                              className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] placeholder:font-normal outline-none focus:border-[var(--border-focus)] ${isRtl ? "text-right" : ""}`}
+                            />
+                            {msg && (
+                              <p className={`text-[11px] leading-relaxed ${msg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>
+                                {msg.text}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label className={lbl}>{t("sup.modelNumber", "Model number")}<FieldHelp {...H.modelNumber} /></label>

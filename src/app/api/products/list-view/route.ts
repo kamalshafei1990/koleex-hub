@@ -27,8 +27,8 @@ export async function GET() {
   const canSeeCosts = canSeeSecrets && (await hasProductCostAccess(auth));
 
   const modelCols = canSeeCosts
-    ? `product_id, supplier, model_name, "order"`
-    : `product_id, model_name, "order"`;
+    ? `product_id, supplier, model_name, primary_model, "order"`
+    : `product_id, model_name, primary_model, "order"`;
 
   const [prodRes, modelRes, imgRes] = await Promise.all([
     supabaseServer
@@ -55,11 +55,18 @@ export async function GET() {
   for (const row of (modelRes.data ?? []) as unknown as Array<{
     product_id: string;
     model_name: string | null;
+    primary_model?: string | null;
     supplier?: string | null;
   }>) {
     counts[row.product_id] = (counts[row.product_id] || 0) + 1;
-    if (row.model_name && !primaryModelNames[row.product_id]) {
-      primaryModelNames[row.product_id] = row.model_name;
+    /* The card shows the CANONICAL KOLEEX code (primary_model) —
+       model_name is a legacy/auto-derived label and drifts from what
+       the operator approved (bug 2026-08-03: card read "XPRI-Y" while
+       the saved code was "XPRI-01"). Fall back to model_name only when
+       no KOLEEX code exists yet. */
+    const label = row.primary_model?.trim() || row.model_name;
+    if (label && !primaryModelNames[row.product_id]) {
+      primaryModelNames[row.product_id] = label;
     }
     if (canSeeCosts && row.supplier) {
       if (!suppliers[row.product_id]) suppliers[row.product_id] = [];

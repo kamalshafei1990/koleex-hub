@@ -1081,6 +1081,11 @@ export default function ProductForm({ productId }: Props) {
           payment_terms: str(s.payment_terms),
           notes: str(s.notes),
           supplier_product_name: str(s.supplier_product_name),
+          supplier_product_name_i18n: Object.fromEntries(
+            Object.entries(
+              ((s as { supplier_product_name_i18n?: Record<string, unknown> | null }).supplier_product_name_i18n) ?? {},
+            ).map(([k, v]) => [k, String(v ?? "")]),
+          ),
           supplier_product_photo: str(s.supplier_product_photo),
           supply_type: s.supply_type || "",
           sample_available: !!s.sample_available,
@@ -2444,6 +2449,14 @@ export default function ProductForm({ productId }: Props) {
         payment_terms: null,
         notes: s.notes || null,
         supplier_product_name: s.supplier_product_name || null,
+        supplier_product_name_i18n: (() => {
+          const clean = Object.fromEntries(
+            Object.entries(s.supplier_product_name_i18n ?? {})
+              .map(([k, v]) => [k, String(v ?? "").trim()])
+              .filter(([, v]) => v.length > 0),
+          );
+          return Object.keys(clean).length > 0 ? clean : null;
+        })(),
         supplier_product_photo: s.supplier_product_photo || null,
         supply_type: s.supply_type || null,
         sample_available: s.sample_available,

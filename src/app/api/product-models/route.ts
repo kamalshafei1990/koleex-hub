@@ -42,8 +42,8 @@ export async function GET(req: Request) {
        second round-trip. Fetch only the minimal columns we need —
        don't return a row shape that could later leak cost. */
     const selectCols = canSeeSecrets
-      ? `product_id, supplier, model_name, "order"`
-      : `product_id, model_name, "order"`;
+      ? `product_id, supplier, model_name, primary_model, "order"`
+      : `product_id, model_name, primary_model, "order"`;
     const { data, error } = await supabaseServer
       .from("product_models")
       .select(selectCols)
@@ -60,13 +60,16 @@ export async function GET(req: Request) {
       product_id: string;
       supplier?: string | null;
       model_name?: string | null;
+      primary_model?: string | null;
       order?: number | null;
     }>;
     for (const row of rows) {
       counts[row.product_id] = (counts[row.product_id] || 0) + 1;
-      // First-seen model_name wins (rows are pre-sorted by order asc)
-      if (row.model_name && !primaryModelNames[row.product_id]) {
-        primaryModelNames[row.product_id] = row.model_name;
+      // First-seen wins (rows are pre-sorted by order asc). Prefer the
+      // canonical KOLEEX code over the legacy model_name label.
+      const label = row.primary_model?.trim() || row.model_name;
+      if (label && !primaryModelNames[row.product_id]) {
+        primaryModelNames[row.product_id] = label;
       }
       if (canSeeSecrets && row.supplier) {
         if (!suppliers[row.product_id]) suppliers[row.product_id] = [];

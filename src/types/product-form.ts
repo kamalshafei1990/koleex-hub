@@ -250,6 +250,10 @@ export interface ProductSupplierFormState {
   notes: string;
   /* product-as-supplied facts (migration pd_supplier_product_facts). */
   supplier_product_name: string;
+  /* Locale-keyed translations of the supplier's product name (owner
+     request 2026-08-03). Base field above stays the source text — the
+     factory usually names it in its own language. */
+  supplier_product_name_i18n: Record<string, string>;
   supplier_product_photo: string;   // image URL (uploaded to storage)
   supply_type: string;              // OEM / ODM / Own brand
   sample_available: boolean;
