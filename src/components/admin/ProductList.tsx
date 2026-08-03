@@ -39,7 +39,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
-  fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
+  fetchProducts, fetchTaxonomyAll,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
   fetchClassificationIcons,
 } from "@/lib/products-admin";
@@ -673,7 +673,7 @@ export default function ProductList() {
            request costs ~1-2s of pure latency. The public catalogue, which
            has no signals call, still fetches them directly. */
         const metaPromise = Promise.all([
-          fetchDivisions(), fetchCategories(), fetchSubcategories(),
+          fetchTaxonomyAll(),
           isInternal ? Promise.resolve(null) : fetchModelSummaries(),
           isInternal ? Promise.resolve(null) : fetchProductMainImages(),
         ]);
@@ -750,8 +750,9 @@ export default function ProductList() {
         /* Meta hydration — tolerant: a failed secondary fetch degrades a
            filter/photo, it must not blank an already-painted catalogue. */
         try {
-          const [d, c, s, ms, imgs] = await metaPromise;
+          const [taxonomy, ms, imgs] = await metaPromise;
           if (cancelled) return;
+          const { divisions: d, categories: c, subcategories: s } = taxonomy;
           setDivisions(d); setCategories(c);
           setSubcategories(s);
           setMetaReady(true);

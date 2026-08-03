@@ -122,6 +122,44 @@ async function fetchTaxonomy<T>(kind: string): Promise<T[]> {
   return json.rows ?? [];
 }
 
+/** All three taxonomy lists in ONE round trip.
+
+    Screens that render the catalogue need divisions, categories and
+    subcategories together, and on the operators' connection a request
+    costs ~1-2s of latency no matter how small it is — three requests for
+    three tiny tables is the expensive part, not the data. This fills the
+    same session caches the individual fetchers read, so any later call
+    for one of them costs nothing.
+
+    A failed request returns empty lists and writes NOTHING to the cache:
+    caching an empty taxonomy would leave the grid unfiltered for the rest
+    of the session. */
+export async function fetchTaxonomyAll(): Promise<{
+  divisions: DivisionRow[];
+  categories: CategoryRow[];
+  subcategories: SubcategoryRow[];
+}> {
+  const d0 = readSessionCache<DivisionRow[]>("kx:taxo:divisions");
+  const c0 = readSessionCache<CategoryRow[]>("kx:taxo:categories");
+  const s0 = readSessionCache<SubcategoryRow[]>("kx:taxo:subcategories");
+  if (d0 && c0 && s0) return { divisions: d0, categories: c0, subcategories: s0 };
+
+  const json = await jget<{
+    divisions?: DivisionRow[];
+    categories?: CategoryRow[];
+    subcategories?: SubcategoryRow[];
+  }>("/api/taxonomy/all", {});
+  const divisions = json.divisions ?? [];
+  const categories = json.categories ?? [];
+  const subcategories = json.subcategories ?? [];
+  if (divisions.length && categories.length) {
+    writeSessionCache("kx:taxo:divisions", divisions);
+    writeSessionCache("kx:taxo:categories", categories);
+    writeSessionCache("kx:taxo:subcategories", subcategories);
+  }
+  return { divisions, categories, subcategories };
+}
+
 export async function fetchDivisions(): Promise<DivisionRow[]> {
   return memoFetch("divisions", () => fetchTaxonomy<DivisionRow>("divisions"));
 }

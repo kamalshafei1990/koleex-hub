@@ -37,7 +37,30 @@ export async function GET(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const kind = asKind((await params).kind);
+  const rawKind = (await params).kind;
+
+  /* kind=all → all three lists in ONE round trip. Every screen that shows
+     the catalogue needs all three, and on the operators' connection a
+     round trip costs ~1-2s of pure latency regardless of how little work
+     it does, so three requests for three tiny tables is the expensive
+     part. Same rows, same order, same permission (taxonomy is public
+     catalogue structure to any authenticated user). */
+  if (rawKind === "all") {
+    const [d, c, s] = await Promise.all(
+      TAXONOMY_KINDS.map((k) => supabaseServer.from(k).select("*").order("order")),
+    );
+    const failed = [d, c, s].find((r) => r.error);
+    if (failed?.error) {
+      console.error("[api/taxonomy all GET]", failed.error.message);
+      return NextResponse.json({ error: failed.error.message }, { status: 500 });
+    }
+    return NextResponse.json(
+      { divisions: d.data ?? [], categories: c.data ?? [], subcategories: s.data ?? [] },
+      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+    );
+  }
+
+  const kind = asKind(rawKind);
   if (!kind) return NextResponse.json({ error: "Unknown taxonomy kind" }, { status: 404 });
 
   const { data, error } = await supabaseServer.from(kind).select("*").order("order");
