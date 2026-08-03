@@ -18,18 +18,37 @@ import "server-only";
    be used by the public to spam logs. The account id is NOT logged — batches
    carry an anonymous per-session id (`sid`) instead.
 
+   ONE EXCEPTION (see BASELINE_METRICS below): six load-timing metrics are
+   also written to `perf_samples` WITH the account id, so the China-CDN
+   before/after can be measured per employee instead of guessed. Temporary
+   and reversible — drop the table when the comparison is done.
+
    NOTE: emitted via console.warn because next.config removeConsole strips
    console.log/info from production builds (only error/warn survive).
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { supabaseServer } from "@/lib/server/supabase-server";
 
 const NAME_RE = /^[a-z0-9._-]{1,48}$/;
 const TAG_KEY_RE = /^[a-z0-9_]{1,24}$/;
 const TAG_VAL_RE = /^[A-Za-z0-9 ._:/\-]{0,64}$/;
 const MAX_BODY = 32_768;
 const MAX_ITEMS = 50;
+
+/* The load-timing metrics kept durably for the China-acceleration
+   before/after comparison. Deliberately tiny: cold TTFB / DOM / load are the
+   page arriving, home.interactive_ms is the number the owner is judged on,
+   and the two nav timings show whether in-app moves improved too. */
+const BASELINE_METRICS = new Set([
+  "nav.cold.ttfb_ms",
+  "nav.cold.dom_ms",
+  "nav.cold.load_ms",
+  "home.interactive_ms",
+  "nav.warm_ms",
+  "app_launch.nav_ms",
+]);
 
 type In = { sid?: unknown; m?: unknown };
 
@@ -74,5 +93,37 @@ export async function POST(req: Request) {
       `[kx-metric] ${JSON.stringify({ sid, env: process.env.VERCEL_ENV ?? "dev", ts: Date.now(), m: clean })}`,
     );
   }
+
+  /* ── China-acceleration baseline ──────────────────────────────────────
+     Vercel keeps runtime logs for ONE DAY on Pro, so the log line above
+     cannot answer "was the CDN worth it?" six weeks from now. A narrow
+     whitelist of LOAD TIMINGS is persisted to `perf_samples` so the
+     before/after comparison rests on real staff devices instead of an
+     estimate. Everything else still goes to logs only.
+
+     PRIVACY — a deliberate, reversible exception: this route's rule is
+     that the account id is never recorded, only the anonymous `sid`. For
+     these six metrics we DO store account_id, because the point is to
+     find whether one employee's connection is the outlier. Remove the
+     column (or drop the table) once the comparison is done. */
+  const persist = clean.filter((m) => BASELINE_METRICS.has(m.n)).slice(0, 12);
+  if (persist.length) {
+    /* Fire-and-forget: a metrics write must never delay or fail the
+       response it rides on. */
+    void supabaseServer.from("perf_samples").insert(
+      persist.map((m) => ({
+        account_id: auth.account_id,
+        sid,
+        metric: m.n,
+        value: m.v,
+        route: typeof m.tags?.route === "string" ? m.tags.route
+             : typeof m.tags?.app === "string" ? m.tags.app : null,
+        env: process.env.VERCEL_ENV ?? "dev",
+      })),
+    ).then(({ error }) => {
+      if (error) console.warn("[perf/ingest persist]", error.message);
+    });
+  }
+
   return new NextResponse(null, { status: 204 });
 }
