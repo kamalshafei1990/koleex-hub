@@ -128,6 +128,33 @@ export async function GET(req: Request) {
         });
       }
 
+      /* Both badge counts in ONE round trip.
+
+         `unread` and `unreadTasks` are polled once a minute each, by every
+         signed-in user, on every screen — together they were the two most
+         called functional routes in production. They read the same table
+         with the same scope, so asking twice bought nothing but a second
+         border crossing for users in China. The two counts still exist
+         separately above for callers that need only one. */
+      case "badges": {
+        const base = () => supabaseServer
+          .from(INBOX)
+          .select("*", { count: "exact", head: true })
+          .eq("recipient_account_id", me)
+          .is("read_at", null)
+          .is("archived_at", null);
+        const [unreadRes, tasksRes] = await Promise.all([
+          base(),
+          base().eq("category", "task").eq("metadata->>type", "todo_assignment"),
+        ]);
+        if (unreadRes.error) throw new Error(unreadRes.error.message);
+        if (tasksRes.error) throw new Error(tasksRes.error.message);
+        return NextResponse.json(
+          { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0 } },
+          { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } },
+        );
+      }
+
       default:
         return NextResponse.json({ error: "Unknown resource" }, { status: 400 });
     }

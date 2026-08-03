@@ -281,6 +281,13 @@ export function subscribeToInboxMessages(
   return () => { closed = true; unsub(); };
 }
 
+/* Both badge counts ride ONE request. cachedGet coalesces by URL, so the
+   unread poll and the to-do poll — which fire a minute apart on every screen
+   for every signed-in user — now share a single round trip instead of paying
+   two border crossings for two numbers from the same table. Invalidation is
+   by prefix ("/api/inbox/feed"), so mark-read still clears this key. */
+type BadgeCounts = { ok?: boolean; data?: { unread?: number; unreadTasks?: number } };
+
 export async function fetchUnreadCount(accountId: string): Promise<number> {
   void accountId; // recipient scope comes from the session server-side
   /* Coalesced: four consumers ask for this count on one Home load (bell
@@ -289,10 +296,8 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
      coalesce adds no staleness — and every inbox mutate invalidates it so
      mark-read updates the badge immediately. */
   try {
-    const json = await cachedGet<{ ok?: boolean; data?: number }>(
-      "/api/inbox/feed?resource=unread", 5_000,
-    );
-    return json?.data ?? 0;
+    const json = await cachedGet<BadgeCounts>("/api/inbox/feed?resource=badges", 5_000);
+    return json?.data?.unread ?? 0;
   } catch {
     return 0;
   }
@@ -308,10 +313,8 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
 export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
   void accountId; // recipient scope comes from the session server-side
   try {
-    const json = await cachedGet<{ ok?: boolean; data?: number }>(
-      "/api/inbox/feed?resource=unreadTasks", 5_000,
-    );
-    return json?.data ?? 0;
+    const json = await cachedGet<BadgeCounts>("/api/inbox/feed?resource=badges", 5_000);
+    return json?.data?.unreadTasks ?? 0;
   } catch {
     return 0;
   }
