@@ -356,6 +356,35 @@ export default function FloatingPanel() {
           return;
         }
 
+        /* JSON-response resilience (the KoleexAiApp "Phase 9" guard,
+           previously missing here): canned fast-path replies come back
+           as plain JSON even when we asked for SSE. Without this branch
+           the SSE parser found no frames and the empty placeholder
+           bubble pulsed forever — the "AI in floating button not work"
+           report. */
+        const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+        if (!ct.includes("text/event-stream")) {
+          const json = (await res.json().catch(() => null)) as
+            | { reply?: string; error?: string }
+            | null;
+          const replyText =
+            json?.reply?.trim() ||
+            json?.error ||
+            "AI is unavailable right now. Please try again.";
+          setAiMessages(prev => [...prev, { role: "ai", text: replyText }]);
+          if (viaVoice && json?.reply) {
+            setAiSpeaking(true);
+            ttsHandleRef.current = speakText(json.reply, {
+              lang: uiLang,
+              onEnd: () => {
+                ttsHandleRef.current = null;
+                setAiSpeaking(false);
+              },
+            });
+          }
+          return;
+        }
+
         /* Insert placeholder assistant bubble so deltas visibly
            stream. Track its index for in-place mutation. */
         let bubbleIndex = -1;
@@ -416,6 +445,23 @@ export default function FloatingPanel() {
               }
             }
           }
+        }
+
+        /* Stream closed without a single delta or end event (provider
+           died mid-handshake, proxy cut the stream, …): never leave an
+           empty bubble pulsing forever — swap it for a clear retry line. */
+        if (!finalReply && !accumulated) {
+          setAiMessages(prev => {
+            if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
+            const next = prev.slice();
+            if (!next[bubbleIndex].text) {
+              next[bubbleIndex] = {
+                role: "ai",
+                text: "I couldn't get a reply this time — please try again.",
+              };
+            }
+            return next;
+          });
         }
 
         const spokenText = finalReply || accumulated;
