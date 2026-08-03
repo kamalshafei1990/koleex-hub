@@ -43,9 +43,14 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1440, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 160, 256, 384, 480],
     qualities: [75, 78],
-    /* Most uploads use unique timestamped paths (effectively immutable); a
-       replaced-in-place image converges within 4h. */
-    minimumCacheTTL: 14400,
+    /* 30 days, not 4 hours. Uploads land on timestamped paths
+       (`1777239418837_yl-2100f-js-ed.png`), so a replaced photo is a NEW url
+       and can never be masked by a long TTL — the old 4h window only forced
+       every product thumbnail to be re-fetched and re-optimised four times a
+       day for no benefit. For staff in China this is the difference between a
+       grid of photos served from the local edge cache and one that crosses
+       the border again every afternoon. */
+    minimumCacheTTL: 2_592_000,
     /* DEV ONLY: VPN clients in fake-IP mode (Clash/Surge — standard in China)
        resolve supabase.co to 198.18.x.x locally, tripping the optimizer's
        private-IP SSRF guard and 400ing EVERY avatar in dev. Production builds
