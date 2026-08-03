@@ -289,6 +289,20 @@ export default function FloatingPanel() {
      language so replies land in the right locale. */
   const aiSendingRef = useRef(false);
   const [aiSending, setAiSending] = useState(false);
+  /* Auto-follow (owner report 2026-08-03: panel didn't scroll while the
+     AI streamed its answer). New message → always jump to bottom; mid-
+     stream growth → follow only while the user is near the bottom, so
+     scrolling up to re-read is never yanked away. */
+  const aiScrollRef = useRef<HTMLDivElement | null>(null);
+  const aiMsgCountRef = useRef(0);
+  useEffect(() => {
+    const el = aiScrollRef.current;
+    if (!el) return;
+    const grew = aiMessages.length > aiMsgCountRef.current;
+    aiMsgCountRef.current = aiMessages.length;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (grew || nearBottom) el.scrollTop = el.scrollHeight;
+  }, [aiMessages]);
   /* Voice-chat state. Phase 1: we only track whether TTS is currently
      speaking so the mic button can swap to a "stop" state. Transcript
      flows through the normal input → handleAiSend path. */
@@ -799,7 +813,7 @@ export default function FloatingPanel() {
             ) : (
               /* ── AI Tab ── */
               <div className="flex flex-col h-full">
-                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                <div ref={aiScrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
                       <KoleexOrb state={aiSending ? "loading" : "idle"} size={72} />
