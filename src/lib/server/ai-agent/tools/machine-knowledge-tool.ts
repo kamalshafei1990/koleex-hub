@@ -27,7 +27,7 @@ const searchMachineKnowledge: ToolDef<
     type: "object",
     properties: {
       query: { type: "string", description: "Machine type, function, feature or question keywords." },
-      limit: { type: "integer", description: "Max sections. Default 3, cap 6." },
+      limit: { type: "integer", description: "Max sections. Default 2, cap 4." },
     },
     required: ["query"],
   },
@@ -38,7 +38,7 @@ const searchMachineKnowledge: ToolDef<
     args,
   ): Promise<ToolResult<{ total_matches: number; sections: MachineKnowledgeSection[] }>> => {
     const q = String(args.query ?? "").toLowerCase().trim();
-    const limit = Math.min(Math.max(Number(args.limit ?? 3) || 3, 1), 6);
+    const limit = Math.min(Math.max(Number(args.limit ?? 2) || 2, 1), 4);
     if (!q) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Provide a search query." };
     }
@@ -56,7 +56,12 @@ const searchMachineKnowledge: ToolDef<
     })
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score);
-    const sections = scored.slice(0, limit).map((x) => x.s);
+    /* Trim per-section content — full 2.6k sections ballooned the
+       answer-phase prompt and slowed generation ~2x. 1.2k keeps the
+       substance. */
+    const sections = scored
+      .slice(0, limit)
+      .map((x) => ({ title: x.s.title, content: x.s.content.slice(0, 1200) }));
     return {
       ok: true,
       permissionStatus: "allowed",

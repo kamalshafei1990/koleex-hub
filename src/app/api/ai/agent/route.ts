@@ -540,8 +540,13 @@ export async function POST(req: Request) {
                the sealed reply and the client replaces its buffer
                with end.agent.finalReply — same contract as chat. */
           } else {
+            let liveDeltaCount = 0;
             agent = await orchestrate({
               dialect: wantsRewrite ? ("egyptian" as const) : null,
+              onDelta: (text) => {
+                liveDeltaCount++;
+                controller.enqueue(send({ type: "delta", text }));
+              },
               ctx,
               history,
               userMessage: content + attachBlock,
@@ -565,7 +570,7 @@ export async function POST(req: Request) {
                  · ~28 chars/chunk
                  · 12 ms between chunks → ~2 200 chars/sec visible rate
                A 200-word (~1 200 char) answer streams in ~520 ms. */
-            const full = agent.finalReply ?? "";
+            const full = liveDeltaCount > 0 ? "" : (agent.finalReply ?? "");
             const CHUNK = 28;
             for (let i = 0; i < full.length; i += CHUNK) {
               const text = full.slice(i, i + CHUNK);

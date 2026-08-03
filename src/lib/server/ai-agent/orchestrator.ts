@@ -77,6 +77,9 @@ export interface OrchestrateInput {
    *  the model then generates natural Egyptian Arabic natively. */
   dialect?: "egyptian" | null;
   conversationId: string;
+  /** Streaming hook: when set, the ANSWER-phase model call streams and
+   *  each content token is forwarded here in real time. */
+  onDelta?: (text: string) => void;
 }
 
 /** Small-talk / meta detector. Short greetings, identity questions,
@@ -487,7 +490,7 @@ function isWorkDataQuery(msg: string): boolean {
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
-  const { ctx, history, userMessage, userLang, dialect, conversationId } = input;
+  const { ctx, history, userMessage, userLang, dialect, conversationId, onDelta } = input;
   const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
@@ -653,11 +656,51 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     /* After the per-turn tool budget is spent, disable tools so the
        model can only produce a final answer. */
     const toolChoice: "auto" | "none" = totalToolRuns >= MAX_TOOLS_PER_TURN ? "none" : "auto";
-    const res = await callGroqWithRetry(key, messages, { toolChoice });
+    /* REAL answer streaming (perf fix 2026-08-03): once tools have run,
+       the next call is (almost always) the final answer — stream it so
+       the user reads while it generates instead of waiting ~8-12s for
+       the whole completion. The first (tool-deciding) call stays
+       non-streamed: it emits only compact tool_calls JSON. */
+    let choice:
+      | { role?: string; content: string | null; tool_calls?: WireMsg["tool_calls"] }
+      | undefined;
+    let callFailedStatus = 0;
+    let callFailedBody = "";
+    const liveEmit = totalToolRuns > 0 ? onDelta : undefined;
+    if (liveEmit) {
+      const sres = await callGroqStreamingOnce(key, messages, { toolChoice, onDelta: liveEmit });
+      if (!sres.ok) {
+        callFailedStatus = sres.status || 500;
+        callFailedBody = sres.bodyText;
+      } else {
+        choice = {
+          role: "assistant",
+          content: sres.content,
+          tool_calls: sres.toolCalls.length > 0 ? (sres.toolCalls as WireMsg["tool_calls"]) : undefined,
+        };
+      }
+    } else {
+      const res = await callGroqWithRetry(key, messages, { toolChoice });
+      if (!res.ok) {
+        callFailedStatus = res.status;
+        callFailedBody = await res.text().catch(() => "");
+      } else {
+        const json = (await res.json()) as {
+          choices?: Array<{
+            message?: {
+              role: string;
+              content: string | null;
+              tool_calls?: WireMsg["tool_calls"];
+            };
+            finish_reason?: string;
+          }>;
+        };
+        choice = json.choices?.[0]?.message;
+      }
+    }
 
-    if (!res.ok) {
-      const bodyText = await res.text().catch(() => "");
-      console.error("[ai.agent.groq]", res.status, bodyText.slice(0, 500));
+    if (callFailedStatus) {
+      console.error("[ai.agent.groq]", callFailedStatus, callFailedBody.slice(0, 500));
 
       /* Rescue-first: if tools already produced valid data this turn,
          don't discard that work because a secondary Groq call failed.
@@ -682,7 +725,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          Rate limits (429) and overloaded (503) get the friendly
          "handling a lot of requests" line; everything else gets the
          clean generic retry prompt. Raw status stays in the log. */
-      const isRateLimited = res.status === 429 || res.status === 503;
+      const isRateLimited = callFailedStatus === 429 || callFailedStatus === 503;
       const msg = isRateLimited
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
@@ -698,18 +741,6 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       };
     }
 
-    const json = (await res.json()) as {
-      choices?: Array<{
-        message?: {
-          role: string;
-          content: string | null;
-          tool_calls?: WireMsg["tool_calls"];
-        };
-        finish_reason?: string;
-      }>;
-    };
-
-    const choice = json.choices?.[0]?.message;
     if (!choice) {
       /* Rescue-first on malformed/empty response too. If tools ran
          earlier this turn, prefer their output over a generic error. */
@@ -2565,6 +2596,105 @@ async function callGroqPlain(
     return callGroqPlain(key, messages, opts, attempt + 1);
   }
   return res;
+}
+
+/** One STREAMING chat-completions call. Content tokens are forwarded to
+ *  onDelta live (until a tool_call appears — tool rounds stay silent);
+ *  streamed tool_call fragments are re-assembled by index so the normal
+ *  dispatch loop can run unchanged. */
+async function callGroqStreamingOnce(
+  key: string,
+  messages: WireMsg[],
+  opts: { toolChoice: "auto" | "none"; onDelta: (t: string) => void },
+): Promise<{
+  ok: boolean;
+  status: number;
+  bodyText: string;
+  content: string;
+  toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+}> {
+  const body: Record<string, unknown> = {
+    model: AGENT_MODEL,
+    messages,
+    temperature: 0.3,
+    max_tokens: 2048,
+    stream: true,
+  };
+  if (opts.toolChoice !== "none") {
+    body.tools = openAiToolSchemas();
+    body.tool_choice = "auto";
+  }
+  const res = await fetch(AGENT_LLM_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    return {
+      ok: false,
+      status: res.status,
+      bodyText: await res.text().catch(() => ""),
+      content: "",
+      toolCalls: [],
+    };
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let content = "";
+  let sawTool = false;
+  const calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const j = JSON.parse(payload) as {
+          choices?: Array<{
+            delta?: {
+              content?: string;
+              tool_calls?: Array<{
+                index?: number;
+                id?: string;
+                function?: { name?: string; arguments?: string };
+              }>;
+            };
+          }>;
+        };
+        const d = j.choices?.[0]?.delta;
+        if (!d) continue;
+        if (d.tool_calls) {
+          sawTool = true;
+          for (const tc of d.tool_calls) {
+            const i = tc.index ?? 0;
+            while (calls.length <= i) {
+              calls.push({ id: "", type: "function", function: { name: "", arguments: "" } });
+            }
+            if (tc.id) calls[i].id = tc.id;
+            if (tc.function?.name) calls[i].function.name += tc.function.name;
+            if (tc.function?.arguments) calls[i].function.arguments += tc.function.arguments;
+          }
+        }
+        if (typeof d.content === "string" && d.content) {
+          content += d.content;
+          if (!sawTool) opts.onDelta(d.content);
+        }
+      } catch {
+        /* partial frame across chunks — next iteration completes it */
+      }
+    }
+  }
+  return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name) };
 }
 
 async function callGroqWithRetry(
