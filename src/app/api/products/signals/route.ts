@@ -57,7 +57,10 @@ export async function GET() {
         "id, division_slug, category_slug, subcategory_slug, product_name, schema_specs, schema_knowledge, excerpt, description, warranty, moq, lead_time, visible, updated_at",
       ),
     supabaseServer.from("subcategories").select("slug, code"),
-    supabaseServer.from("product_media").select("product_id, type"),
+    supabaseServer
+      .from("product_media")
+      .select('product_id, type, url, "order"')
+      .order("order", { ascending: true }),
     supabaseServer
       .from("product_models")
       .select('product_id, primary_model, model_name, cost_price, global_price, supplier, "order"')
@@ -82,11 +85,17 @@ export async function GET() {
     if (s.slug && s.code) subCode.set(s.slug, s.code);
   }
 
-  /* media counts by product + type */
+  /* media counts by product + type, plus the first main image per product.
+     The thumbnail map rides along because this endpoint already reads the
+     whole media table — see the round-trip note at the bottom. */
   const media = new Map<string, { main: number; gallery: number; packing: number; manual: number; video: number }>();
-  for (const m of (mediaRes.data ?? []) as Array<{ product_id: string; type: string }>) {
+  const mainImages: Record<string, string> = {};
+  for (const m of (mediaRes.data ?? []) as Array<{ product_id: string; type: string; url: string | null }>) {
     const b = media.get(m.product_id) ?? { main: 0, gallery: 0, packing: 0, manual: 0, video: 0 };
-    if (m.type === "main_image") b.main += 1;
+    if (m.type === "main_image") {
+      b.main += 1;
+      if (m.url && !mainImages[m.product_id]) mainImages[m.product_id] = m.url;
+    }
     else if (m.type === "gallery") b.gallery += 1;
     else if (m.type === "packing") b.packing += 1;
     else if (m.type === "manual") b.manual += 1;
@@ -123,6 +132,14 @@ export async function GET() {
     if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
   }
 
+  /* Model summary — the exact shape /api/product-models?summary=1 returns,
+     including its permission rule: supplier names are COST-side data and
+     only ship when the caller passes hasProductCostAccess. */
+  const counts: Record<string, number> = {};
+  const suppliersByProduct: Record<string, string[]> = {};
+  const supplierSet = new Set<string>();
+  const primaryModelNames: Record<string, string> = {};
+
   /* first model per product (rows pre-sorted by order) */
   const primary = new Map<
     string,
@@ -137,6 +154,16 @@ export async function GET() {
     supplier: string | null;
   }>) {
     if (!primary.has(m.product_id)) primary.set(m.product_id, m);
+    counts[m.product_id] = (counts[m.product_id] || 0) + 1;
+    const label = m.primary_model?.trim() || m.model_name;
+    if (label && !primaryModelNames[m.product_id]) primaryModelNames[m.product_id] = label;
+    if (canSeeCosts && m.supplier) {
+      if (!suppliersByProduct[m.product_id]) suppliersByProduct[m.product_id] = [];
+      if (!suppliersByProduct[m.product_id].includes(m.supplier)) {
+        suppliersByProduct[m.product_id].push(m.supplier);
+      }
+      supplierSet.add(m.supplier);
+    }
   }
 
   const signals: Record<
@@ -212,11 +239,29 @@ export async function GET() {
     };
   }
 
-  /* Private SWR cache: signals move at data-entry speed, not per click.
+  /* ROUND-TRIP BUDGET: on the operators' network a single request costs
+     ~1-2s before any work happens (a static edge asset measures the same),
+     and parallel requests contend with each other. This endpoint already
+     reads product_models and product_media in full, so it also returns the
+     model summary and the thumbnail map — three requests collapse into one
+     for the Product Data grid. The public catalogue still calls the
+     separate endpoints, which are unchanged.
+
+     Private SWR cache: signals move at data-entry speed, not per click.
      30s fresh / 5min stale keeps repeat opens instant without ever
      serving another account's view (private). */
   return NextResponse.json(
-    { signals, costVisible: canSeeCosts },
+    {
+      signals,
+      costVisible: canSeeCosts,
+      models: {
+        counts,
+        suppliers: suppliersByProduct,
+        allSuppliers: Array.from(supplierSet).sort(),
+        primaryModelNames,
+      },
+      mainImages,
+    },
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
   );
 }

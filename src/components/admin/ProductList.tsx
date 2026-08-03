@@ -645,6 +645,16 @@ export default function ProductList() {
     } catch { /* corrupt/absent cache → normal load path */ }
     setLoading(!paintedFromCache);
     setLoadError(null);
+    /* Thumbnails arrive from either the signals bundle or the standalone
+       media endpoint — one place applies them and persists the warm-start
+       copy, so the next open paints photos with the first frame. */
+    const applyMainImages = (imgs: Record<string, string>) => {
+      setMainImages(imgs);
+      try {
+        const json = JSON.stringify(imgs);
+        if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
+      } catch { /* quota guard */ }
+    };
     (async () => {
       try {
         /* Products are the CRITICAL fetch — if this fails we must surface a
@@ -657,9 +667,15 @@ export default function ProductList() {
         /* The meta fetches don't depend on the products response — start
            them immediately so they load alongside it instead of queueing
            behind the largest request on the page. */
+        /* Internally the signals call already carries the model summary and
+           the thumbnail map (it reads both tables anyway), so we don't pay
+           two more round trips for them — on the operators' network every
+           request costs ~1-2s of pure latency. The public catalogue, which
+           has no signals call, still fetches them directly. */
         const metaPromise = Promise.all([
-          fetchDivisions(), fetchCategories(),
-          fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
+          fetchDivisions(), fetchCategories(), fetchSubcategories(),
+          isInternal ? Promise.resolve(null) : fetchModelSummaries(),
+          isInternal ? Promise.resolve(null) : fetchProductMainImages(),
         ]);
         /* If the products fetch throws we bail to the error state without
            awaiting meta — observe its rejection so it can't surface as an
@@ -670,11 +686,40 @@ export default function ProductList() {
            cards simply render without the readiness strip. */
         if (isInternal) {
           fetch("/api/products/signals", { credentials: "include", signal: ctrl.signal })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((j: { signals?: Record<string, ProductSignal> } | null) => {
-              if (!cancelled && j?.signals) setSignals(j.signals);
+            .then((r) => {
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
+              return r.json();
             })
-            .catch(() => { /* grid works fine without signals */ });
+            .then((j: {
+              signals?: Record<string, ProductSignal>;
+              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; primaryModelNames: Record<string, string> };
+              mainImages?: Record<string, string>;
+            }) => {
+              if (cancelled) return;
+              if (j?.signals) setSignals(j.signals);
+              if (j?.models) {
+                setModelCounts(j.models.counts);
+                setProductSuppliers(j.models.suppliers);
+                setAllSuppliers(j.models.allSuppliers);
+                setPrimaryModelNames(j.models.primaryModelNames || {});
+              }
+              if (j?.mainImages) applyMainImages(j.mainImages);
+            })
+            .catch(async () => {
+              /* Signals are optional, but model codes and thumbnails are
+                 not — fall back to the standalone endpoints so a signals
+                 failure never strips the grid of its identity. */
+              if (cancelled) return;
+              try {
+                const [ms, imgs] = await Promise.all([fetchModelSummaries(), fetchProductMainImages()]);
+                if (cancelled) return;
+                setModelCounts(ms.counts);
+                setProductSuppliers(ms.suppliers);
+                setAllSuppliers(ms.allSuppliers);
+                setPrimaryModelNames(ms.primaryModelNames || {});
+                applyMainImages(imgs);
+              } catch { /* grid still renders without either */ }
+            });
         }
         let p: ProductRow[];
         try {
@@ -715,16 +760,14 @@ export default function ProductList() {
             const metaJson = JSON.stringify({ divisions: d, categories: c, subcategories: s });
             if (metaJson.length < 400_000) window.localStorage.setItem(`kx_products_meta_v1:${currentScopeKey()}`, metaJson);
           } catch { /* quota guard */ }
-          setModelCounts(ms.counts);
-          setProductSuppliers(ms.suppliers);
-          setAllSuppliers(ms.allSuppliers);
-          setPrimaryModelNames(ms.primaryModelNames || {});
-          setMainImages(imgs);
-          /* Persist the photo map for instant thumbnails on the next visit. */
-          try {
-            const json = JSON.stringify(imgs);
-            if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
-          } catch { /* quota guard */ }
+          /* null = the signals bundle is carrying these instead. */
+          if (ms) {
+            setModelCounts(ms.counts);
+            setProductSuppliers(ms.suppliers);
+            setAllSuppliers(ms.allSuppliers);
+            setPrimaryModelNames(ms.primaryModelNames || {});
+          }
+          if (imgs) applyMainImages(imgs);
           /* Public catalog lands on Garment Machinery by default — it's
              the flagship. Only when the user has NO stored filter. */
           if (
