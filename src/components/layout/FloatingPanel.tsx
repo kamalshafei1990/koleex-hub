@@ -26,6 +26,8 @@ import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton"
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
+import MessageMarkdown from "@/components/ai/MessageMarkdown";
+import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
   fetchMyChannels,
@@ -156,6 +158,14 @@ export default function FloatingPanel() {
   const [msgInput, setMsgInput] = useState("");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "ai"; text: string }>>([]);
+  /* ── Same-brain mode (owner directive 2026-08-03): the FAB's AI tab is
+     a SHORTCUT WINDOW onto the real Koleex AI app — same /api/ai/agent
+     orchestrator (tools + permissions + audit), same persisted
+     conversation (it appears in the /ai sidebar), same markdown
+     rendering. One rolling conversation is kept per device. */
+  const FAB_CONV_KEY = "koleex-fab-ai-conv";
+  const fabConvIdRef = useRef<string | null>(null);
+  const fabHistoryLoadedRef = useRef(false);
   const [sending, setSending] = useState(false);
 
   /* ── Contextual Copilot hints (Phase 1.7) ──
@@ -178,6 +188,36 @@ export default function FloatingPanel() {
     window.addEventListener("koleex:copilot-context", handler as EventListener);
     return () => window.removeEventListener("koleex:copilot-context", handler as EventListener);
   }, []);
+
+  /* Restore the rolling FAB conversation (id + its history) the first
+     time the AI tab is shown after mount. 404 → start fresh. */
+  useEffect(() => {
+    if (!open || tab !== "ai" || fabHistoryLoadedRef.current) return;
+    fabHistoryLoadedRef.current = true;
+    try { fabConvIdRef.current = window.localStorage.getItem(FAB_CONV_KEY); } catch { /* ignore */ }
+    const id = fabConvIdRef.current;
+    if (!id) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/ai/conversations/${id}`, { credentials: "include" });
+        if (!res.ok) {
+          fabConvIdRef.current = null;
+          try { window.localStorage.removeItem(FAB_CONV_KEY); } catch { /* ignore */ }
+          return;
+        }
+        const json = (await res.json()) as {
+          messages?: Array<{ role: string; content: string }>;
+        };
+        const restored = (json.messages ?? [])
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role === "assistant" ? ("ai" as const) : ("user" as const),
+            text: m.content,
+          }));
+        if (restored.length > 0) setAiMessages(restored);
+      } catch { /* offline — start empty */ }
+    })();
+  }, [open, tab]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -335,14 +375,30 @@ export default function FloatingPanel() {
         ? (document.documentElement.lang as "en" | "zh" | "ar")
         : "en") || "en";
 
-      const wireMessages = [
-        ...[...aiMessages, { role: "user", text } as const].map(m => ({
-          role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
-          content: m.text,
-        })),
-      ];
-
       try {
+        /* Same-brain: ensure the rolling agent conversation exists.
+           History lives server-side, so no wire replay is needed. */
+        let convId = fabConvIdRef.current;
+        if (!convId) {
+          const cRes = await fetch("/api/ai/conversations", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          if (!cRes.ok) {
+            setAiMessages(prev => [...prev, { role: "ai", text: "AI is unavailable right now." }]);
+            return;
+          }
+          const cJson = (await cRes.json()) as { conversation?: { id: string } };
+          convId = cJson.conversation?.id ?? null;
+          if (!convId) {
+            setAiMessages(prev => [...prev, { role: "ai", text: "AI is unavailable right now." }]);
+            return;
+          }
+          fabConvIdRef.current = convId;
+          try { window.localStorage.setItem(FAB_CONV_KEY, convId); } catch { /* ignore */ }
+        }
         /* Streaming fetch (Phase 2). The server emits SSE events:
              start | delta | end
            We append a placeholder AI bubble, mutate it as deltas
@@ -350,7 +406,7 @@ export default function FloatingPanel() {
            `end.reply` at stream close. Voice-originated turns speak
            only the final sealed reply (NOT mid-stream deltas) so
            TTS can't say pricing that the server later redacted. */
-        const res = await fetch("/api/ai/chat", {
+        const res = await fetch("/api/ai/agent", {
           method: "POST",
           credentials: "include",
           headers: {
@@ -358,7 +414,8 @@ export default function FloatingPanel() {
             Accept: "text/event-stream",
           },
           body: JSON.stringify({
-            messages: wireMessages,
+            conversationId: convId,
+            content: text,
             user_lang: uiLang,
             stream: true,
           }),
@@ -379,9 +436,16 @@ export default function FloatingPanel() {
         const ct = (res.headers.get("content-type") ?? "").toLowerCase();
         if (!ct.includes("text/event-stream")) {
           const json = (await res.json().catch(() => null)) as
-            | { reply?: string; error?: string }
+            | {
+                reply?: string;
+                error?: string;
+                agent?: { finalReply?: string };
+                message?: { content?: string };
+              }
             | null;
           const replyText =
+            json?.agent?.finalReply?.trim() ||
+            json?.message?.content?.trim() ||
             json?.reply?.trim() ||
             json?.error ||
             "AI is unavailable right now. Please try again.";
@@ -426,8 +490,9 @@ export default function FloatingPanel() {
               try {
                 const json = JSON.parse(payload) as
                   | { type: "start" }
+                  | { type: "steps" }
                   | { type: "delta"; text: string }
-                  | { type: "end"; reply: string }
+                  | { type: "end"; reply?: string; agent?: { finalReply?: string } }
                   | { type: "error"; message?: string };
                 if (json.type === "delta") {
                   accumulated += json.text;
@@ -438,7 +503,7 @@ export default function FloatingPanel() {
                     return next;
                   });
                 } else if (json.type === "end") {
-                  finalReply = json.reply;
+                  finalReply = json.agent?.finalReply ?? json.reply ?? accumulated;
                   setAiMessages(prev => {
                     if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
                     const next = prev.slice();
@@ -499,7 +564,7 @@ export default function FloatingPanel() {
         setAiSending(false);
       }
     },
-    [aiMessages, stopTts],
+    [stopTts],
   );
   const handleAiSend = useCallback(() => {
     sendAiText(aiInput, false);
@@ -701,6 +766,29 @@ export default function FloatingPanel() {
                 </button>
               </div>
             )}
+            {tab === "ai" && (
+              <button
+                onClick={() => {
+                  /* Shortcut → the full Koleex AI app, landing on THIS
+                     same conversation (the app restores its active chat
+                     from this per-account key). */
+                  try {
+                    if (fabConvIdRef.current && accountIdRef.current) {
+                      window.localStorage.setItem(
+                        `koleex-ai-active-chat:${accountIdRef.current}`,
+                        fabConvIdRef.current,
+                      );
+                    }
+                  } catch { /* ignore */ }
+                  window.location.href = "/ai";
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${hoverBg} ${textM}`}
+                title="Open in Koleex AI"
+                aria-label="Open in Koleex AI"
+              >
+                <ArrowUpRightIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={handleClose}
               className={`p-1.5 rounded-lg transition-colors ${hoverBg} ${textM}`}
@@ -878,13 +966,15 @@ export default function FloatingPanel() {
                           <KoleexOrb state="idle" size={28} />
                         )}
                       </div>
-                      {/* Message bubble */}
-                      <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed whitespace-pre-line ${
+                      {/* Message bubble — assistant renders the SAME
+                          markdown pipeline as the /ai app (headings,
+                          lists, tables); user text stays literal. */}
+                      <div dir="auto" style={{ unicodeBidi: "plaintext" }} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                         m.role === "user"
-                          ? dk ? "bg-white/[0.12] text-white" : "bg-black/[0.08] text-black"
-                          : dk ? "bg-white/[0.05] text-white/80" : "bg-black/[0.04] text-black/80"
+                          ? `whitespace-pre-line ${dk ? "bg-white/[0.12] text-white" : "bg-black/[0.08] text-black"}`
+                          : dk ? "bg-white/[0.05] text-white/85" : "bg-black/[0.04] text-black/85"
                       }`}>
-                        {m.text}
+                        {m.role === "ai" ? <MessageMarkdown content={m.text} /> : m.text}
                       </div>
                     </div>
                   ))}
