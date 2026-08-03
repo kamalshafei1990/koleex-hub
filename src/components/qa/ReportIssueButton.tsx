@@ -99,6 +99,20 @@ export default function ReportIssueButton() {
     try { localStorage.setItem("koleex.qa.report.open.v1", open ? "1" : "0"); } catch { /* ignore */ }
   }, [open]);
 
+  /* The AI and Discuss apps anchor a composer to the bottom of the viewport,
+     and on a phone that composer is ~137px tall — taller than this button's
+     5.75rem dock, so the button landed ON the text input (measured at 375px:
+     button 688-720, textarea 684-728). FloatingPanel already lifts its own FAB
+     to bottom-40 on exactly these two routes; this dock never learned the same
+     rule. Sit above the lifted FAB there, and keep the original offset
+     everywhere else. */
+  const isComposerApp =
+    pathname === "/ai" || pathname.startsWith("/ai/") ||
+    pathname === "/discuss" || pathname.startsWith("/discuss/");
+  const dockClass = isComposerApp
+    ? "bottom-[13.5rem] md:bottom-[10.5rem]"
+    : "bottom-[5.75rem]";
+
   if (!open) {
     return (
       <button
@@ -109,7 +123,7 @@ export default function ReportIssueButton() {
         data-qa-capture-skip=""
         /* Sits as a clean stacked dock above the AI/Discuss FAB — same end-6
            rail, matched size + shadow material so the two read as a family. */
-        className="fixed end-6 bottom-[5.75rem] z-[80] flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+        className={`fixed end-6 ${dockClass} z-[80] flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]`}
         style={{ boxShadow: "0 4px 14px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.04)" }}
       >
         <MessageSquarePlusIcon size={16} />
