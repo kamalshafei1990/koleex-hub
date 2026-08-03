@@ -1007,6 +1007,12 @@ export default function ProductForm({ productId }: Props) {
           primary_model: m.primary_model || "",
           code_prefix: m.code_prefix || "",
           coding_status: m.coding_status || "",
+          /* Typed DB JSON → UI strings (arrays comma-joined). */
+          specs_overrides: Object.fromEntries(
+            Object.entries((m as { specs_overrides?: Record<string, unknown> | null }).specs_overrides ?? {}).map(
+              ([k, v]) => [k, Array.isArray(v) ? v.map(String).join(", ") : String(v)],
+            ),
+          ),
         }));
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
@@ -2302,6 +2308,32 @@ export default function ProductForm({ productId }: Props) {
           primary_model: m.primary_model ? m.primary_model.trim().toUpperCase().replace(/\s+/g, "") : null,
           code_prefix: m.code_prefix ? m.code_prefix.trim().toUpperCase() : null,
           coding_status: m.coding_status || null,
+          /* UI strings → typed JSON per the resolved schema field. */
+          specs_overrides: (() => {
+            const src = m.specs_overrides ?? {};
+            const out: Record<string, unknown> = {};
+            const fields = new Map(
+              (activeSpecsSchema?.groups ?? []).flatMap((g) => g.fields.map((f) => [f.key, f] as const)),
+            );
+            for (const [k, raw] of Object.entries(src)) {
+              const val = String(raw).trim();
+              if (!val) continue;
+              const f = fields.get(k);
+              const ft = f?.fieldType;
+              if (ft === "number" || ft === "unit_number") {
+                const n = parseFloat(val);
+                if (Number.isFinite(n)) out[k] = n;
+              } else if (ft === "boolean") {
+                out[k] = val === "true" || val === "yes";
+              } else if (ft === "multi_select" || ft === "chips" || ft === "icon_chips" || ft === "image_chips") {
+                const arr = val.split(",").map((x) => x.trim()).filter(Boolean);
+                if (arr.length > 0) out[k] = arr;
+              } else {
+                out[k] = val;
+              }
+            }
+            return Object.keys(out).length > 0 ? out : null;
+          })(),
         };
 
         if (m.id) {
@@ -4261,6 +4293,17 @@ export default function ProductForm({ productId }: Props) {
               badge={t("models.countBadge", `${models.length} models`).replace("{n}", String(models.length))}
             >
               <ModelsSection
+                specFields={(activeSpecsSchema?.groups ?? []).flatMap((g) =>
+                  g.fields
+                    .filter((f) => !["file", "image", "long_text"].includes(f.fieldType))
+                    .map((f) => ({
+                      key: f.key,
+                      label: f.label ?? f.key,
+                      unit: f.unit ?? null,
+                      fieldType: f.fieldType,
+                      options: (f.options ?? []).map((o) => ({ value: o.value, label: o.label })),
+                    })),
+                )}
                 productPacking={productPackingDefaults}
                 models={models}
                 onChange={setModels}

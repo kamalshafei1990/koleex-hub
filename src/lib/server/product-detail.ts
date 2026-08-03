@@ -59,9 +59,12 @@ interface MediaRow {
 }
 
 interface ModelRow {
+  model_name: string | null;
   primary_model: string | null;
   tagline: string | null;
   order: number | null;
+  visible: boolean | null;
+  specs_overrides: Record<string, unknown> | null;
 }
 
 /** Localized overlay for the public hero — English stays the base; a row
@@ -93,6 +96,13 @@ export interface SchemaProductPreviewProps {
   countryOfOrigin: string | null;
   warranty: string | null;
   surface: "website";
+  /** The product's model lineup with per-model TECHNICAL overrides
+   *  (website-surface keys only) — powers "Choose your model". */
+  variants: Array<{
+    code: string;
+    tagline: string | null;
+    overrides: Record<string, unknown>;
+  }>;
   /** Same-subcategory public products powering the compare band. */
   siblings: {
     name: string;
@@ -161,7 +171,7 @@ export async function loadPublicSchemaProduct(
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('primary_model, tagline, "order"')
+        .select('model_name, primary_model, tagline, "order", visible, specs_overrides')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -248,6 +258,21 @@ export async function loadPublicSchemaProduct(
       if (m.type === "main_image" || !siblingImages.has(m.product_id)) siblingImages.set(m.product_id, m.url);
     }
   }
+  // ── Model lineup for the "Choose your model" table ──
+  const variants = models
+    .filter((m) => m.visible !== false && (m.primary_model || m.model_name))
+    .map((m) => {
+      const overrides: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(m.specs_overrides ?? {})) {
+        if (websiteFieldKeys.has(k)) overrides[k] = v;
+      }
+      return {
+        code: (m.primary_model || m.model_name) as string,
+        tagline: m.tagline,
+        overrides,
+      };
+    });
+
   const siblings = siblingRows.map((s) => {
     const vals: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(s.schema_specs ?? {})) {
@@ -278,6 +303,7 @@ export async function loadPublicSchemaProduct(
       countryOfOrigin: product.country_of_origin,
       warranty: product.warranty,
       surface: "website",
+      variants,
       siblings,
     },
   };

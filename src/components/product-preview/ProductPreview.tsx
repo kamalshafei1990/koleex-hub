@@ -61,6 +61,12 @@ interface ProductPreviewProps {
   ar3dUrl?: string | null;
   countryOfOrigin?: string | null;
   warranty?: string | null;
+  /** Model lineup with per-model technical overrides — "Choose your model". */
+  variants?: Array<{
+    code: string;
+    tagline: string | null;
+    overrides: Record<string, unknown>;
+  }>;
   /** Same-subcategory public products for the Apple-style compare band. */
   siblings?: {
     name: string;
@@ -289,6 +295,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     ar3dUrl,
     countryOfOrigin,
     warranty,
+    variants,
     siblings,
   } = props;
 
@@ -1212,6 +1219,79 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })() : null}
 
+      {/* ═══ 10b2. MODEL LINEUP — "Choose your model." One product
+          platform, several models differing on a few technical axes
+          (the 988LC catalog pattern). Columns = union of the models'
+          override keys; values inherit from the product spec sheet
+          when a model doesn't override them. ═══ */}
+      {(() => {
+        const list = (variants ?? []).filter((v) => v.code);
+        if (list.length < 2) return null;
+        const keySet: string[] = [];
+        for (const v of list) {
+          for (const k of Object.keys(v.overrides)) {
+            if (!keySet.includes(k)) keySet.push(k);
+          }
+        }
+        if (keySet.length === 0) return null;
+        const fieldsByKey = new Map(visibleFields.map((f) => [f.key, f] as const));
+        const cols = keySet
+          .filter((k) => fieldsByKey.has(k))
+          .sort((a, b) => visibleFields.findIndex((f) => f.key === a) - visibleFields.findIndex((f) => f.key === b))
+          .slice(0, 6);
+        if (cols.length === 0) return null;
+        return (
+          <section className="space-y-8">
+            <SectionHead
+              hero
+              eyebrow={t("preview.eyebrowLineup", "Lineup")}
+              title={t("preview.chooseModel", "Choose your model.")}
+            />
+            <div className="overflow-x-auto rounded-[20px] border border-[var(--border-subtle)]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-[var(--bg-surface-subtle)]">
+                    <th className="px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      {t("preview.model", "Model")}
+                    </th>
+                    {cols.map((k) => {
+                      const f = fieldsByKey.get(k)!;
+                      return (
+                        <th key={k} className="whitespace-nowrap px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                          {f.label ?? k}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((v) => (
+                    <tr key={v.code} className="border-t border-[var(--border-subtle)]">
+                      <td className="px-5 py-4">
+                        <div className="text-[14px] font-semibold text-[var(--text-primary)]">{v.code}</div>
+                        {v.tagline ? (
+                          <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
+                        ) : null}
+                      </td>
+                      {cols.map((k) => {
+                        const f = fieldsByKey.get(k)!;
+                        const raw = k in v.overrides ? v.overrides[k] : values[k];
+                        const inherited = !(k in v.overrides);
+                        return (
+                          <td key={k} className={`px-5 py-4 text-[13.5px] ${inherited ? "text-[var(--text-muted)]" : "font-medium text-[var(--text-primary)]"}`}>
+                            {displayFieldValue(f, raw)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* ═══ 10c. COMPARE — Apple "Worth the upgrade?" against machines of
           the same family. Dropdown picks the rival; both columns read the
           SAME core-anchor fields so the comparison is apples-to-apples. ═══ */}
@@ -1359,8 +1439,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {hasVideos
               ? videoUrls!.map((url, i) => (
                   <div key={`${url}-${i}`} className="aspect-video overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={`Video ${i + 1}`} className="h-full w-full object-cover" />
+                    {/* Real playable video (was an <img> pointing at an
+                        .mp4 — rendered as a broken image). */}
+                    <video src={url} controls preload="metadata" playsInline className="h-full w-full object-cover" />
                   </div>
                 ))
               : null}

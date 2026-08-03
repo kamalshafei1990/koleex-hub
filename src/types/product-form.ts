@@ -123,6 +123,12 @@ export interface ProductFormState {
 
 export interface ModelFormState {
   _tempId: string;
+  /* Per-model TECHNICAL differences vs the product's schema_specs
+     (owner-approved models system, 2026-08-03). UI keeps every value
+     as a string (multi-selects comma-joined); typed conversion happens
+     once at save using the resolved schema. Empty object = model is
+     identical to the product spec sheet. */
+  specs_overrides: Record<string, string>;
   id?: string;
   model_name: string;
   slug: string;
@@ -388,6 +394,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
 
 export function createEmptyModel(): ModelFormState {
   return {
+    specs_overrides: {},
     _tempId: crypto.randomUUID(),
     model_name: "",
     slug: "",

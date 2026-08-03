@@ -25,9 +25,20 @@ import SelectWithCreate from "./SelectWithCreate";
 const BarcodeQRDisplay = dynamic(() => import("./BarcodeQRDisplay"), { ssr: false, loading: () => null });
 import ConfirmDialog from "./ConfirmDialog";
 
+export interface VariantSpecField {
+  key: string;
+  label: string;
+  unit: string | null;
+  fieldType: string;
+  options: Array<{ value: string; label: string }>;
+}
+
 interface Props {
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
+  /* Resolved-schema fields eligible for per-model TECHNICAL overrides
+     (models system 2026-08-03). Empty/omitted → panel hidden. */
+  specFields?: VariantSpecField[];
   suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: (modelTempId: string) => void;
   hidePrimary?: boolean;  // when true, skip the first model (it's shown in Hero)
@@ -94,7 +105,7 @@ export type ProductPackingDefaults = {
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
-  onEditInHero, primaryModel, productPacking,
+  onEditInHero, primaryModel, productPacking, specFields = [],
 }: {
   model: ModelFormState; idx: number; total: number;
   /* The product's primary variant (models[0]). Non-primary variants
@@ -115,6 +126,7 @@ function ModelCard({
   /* Callback for the primary model's "Edit in Hero" jump — see Props
      comment on ModelsSection. Ignored for non-primary variants. */
   onEditInHero?: () => void;
+  specFields?: VariantSpecField[];
   /* Product-level packing entered on the Logistics tab (schema products).
      One click copies it here — the SAME data must never be typed twice. */
   productPacking?: ProductPackingDefaults | null;
@@ -510,6 +522,90 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
             </>
           )}
 
+          {/* ── Technical differences (models system 2026-08-03) ──
+              The catalog pattern: one product platform, several models
+              that differ in a few TECHNICAL axes (needles, threads,
+              speed, feed configuration…). A model INHERITS the
+              product's Specifications and overrides only the keys
+              listed here. Feeds the public "Choose your model" table. */}
+          {specFields.length > 0 && (
+            <Panel icon={<ScaleIcon className="h-3.5 w-3.5" />} title="Technical differences (vs product specs)">
+              <div className="space-y-2">
+                {Object.entries(model.specs_overrides ?? {}).map(([k, v]) => {
+                  const f = specFields.find((sf) => sf.key === k);
+                  return (
+                    <div key={k} className="flex items-center gap-2">
+                      <span className="w-[38%] shrink-0 truncate text-[11.5px] text-[var(--text-muted)]" title={f?.label ?? k}>
+                        {f?.label ?? k}
+                        {f?.unit ? <span className="text-[var(--text-ghost)]"> ({f.unit})</span> : null}
+                      </span>
+                      {f && (f.fieldType === "select") && f.options.length > 0 ? (
+                        <select
+                          value={v}
+                          onChange={(e) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: e.target.value } })}
+                          className="h-8 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                        >
+                          <option value="">—</option>
+                          {f.options.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      ) : f && f.fieldType === "boolean" ? (
+                        <select
+                          value={v}
+                          onChange={(e) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: e.target.value } })}
+                          className="h-8 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                        >
+                          <option value="">—</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      ) : (
+                        <input
+                          value={v}
+                          onChange={(e) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: e.target.value } })}
+                          placeholder={f && (f.fieldType === "multi_select" || f.fieldType === "chips") ? "value1, value2…" : "value"}
+                          className="h-8 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = { ...model.specs_overrides };
+                          delete next[k];
+                          onUpdate({ specs_overrides: next });
+                        }}
+                        className="h-8 w-8 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-rose-300 hover:bg-rose-500/10 inline-flex items-center justify-center"
+                        aria-label={`Remove ${f?.label ?? k}`}
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const k = e.target.value;
+                    if (!k) return;
+                    onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: "" } });
+                  }}
+                  className="h-8 w-full rounded-lg border border-dashed border-[var(--border-subtle)] bg-transparent px-2 text-[12px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)]"
+                >
+                  <option value="">+ Add a spec that differs on this model…</option>
+                  {specFields
+                    .filter((sf) => !(sf.key in (model.specs_overrides ?? {})))
+                    .map((sf) => (
+                      <option key={sf.key} value={sf.key}>{sf.label}</option>
+                    ))}
+                </select>
+                <p className="text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
+                  Everything not listed here is inherited from the product's Specifications tab.
+                </p>
+              </div>
+            </Panel>
+          )}
+
           {/* Packaging & Logistics panel — these are PACKED/SHIPMENT
               dimensions, distinct from the bare-machine dimensions and
               weight that live on the Technical step. Net + Gross weight
@@ -693,7 +789,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
   );
 }
 
-export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking }: Props) {
+export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
@@ -789,6 +885,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
             const trueIdx = startIndex + i;
             return (
               <ModelCard
+                specFields={specFields}
                 productPacking={productPacking}
                 key={m._tempId}
                 model={m}
