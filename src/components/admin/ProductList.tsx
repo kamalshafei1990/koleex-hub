@@ -1726,7 +1726,15 @@ export default function ProductList() {
                 {/* Boxed chips (owner, 2026-08-02): bordered mini-tiles with
                     the category's hub icon + name — secondary-button language
                     instead of the old ghost text links. */}
-                <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(100px,1fr))]">
+                {/* On a phone the 88px tile grid wrapped to four rows and ate
+                    roughly half the viewport before a single product was
+                    visible. Below `sm` the same links render as ONE
+                    horizontally-scrolling row of compact pills — the exact
+                    language of the Divisions bar above — which costs ~40px
+                    instead of ~380px. From `sm` up the tile grid is unchanged.
+                    One DOM tree, responsive classes: no duplicated markup and
+                    no second copy for screen readers to read out. */}
+                <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(100px,1fr))] max-sm:flex max-sm:overflow-x-auto max-sm:pb-0.5 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -1736,14 +1744,14 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 max-sm:h-[36px] max-sm:w-auto max-sm:shrink-0 max-sm:flex-row max-sm:justify-start max-sm:gap-1.5 max-sm:px-3 max-sm:py-0 max-sm:rounded-full"
                     >
                       {classIcons.category?.[cat.slug] ? (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90" />
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 max-sm:h-4 max-sm:w-4 max-sm:shrink-0" />
                       ) : (
-                        <LayoutGridIcon className="kx-neon-svg h-[22px] w-[22px] text-[var(--text-primary)] opacity-90" />
+                        <LayoutGridIcon className="kx-neon-svg h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 max-sm:h-4 max-sm:w-4 max-sm:shrink-0" />
                       )}
-                      <span className="kx-neon-label text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] line-clamp-2">{cat.name}</span>
+                      <span className="kx-neon-label text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] line-clamp-2 max-sm:text-[11px] max-sm:leading-none max-sm:whitespace-nowrap">{cat.name}</span>
                     </a>
                   ))}
                 </div>
