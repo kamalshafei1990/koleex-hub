@@ -479,6 +479,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "hero.nameOtherLang": { en: "Other language", zh: "其他语言", ar: "لغة أخرى" },
   "hero.addLanguage": { en: "Add another language", zh: "添加其他语言", ar: "إضافة لغة أخرى" },
   "hero.marketTier": { en: "Market tier", zh: "市场层级", ar: "فئة السوق" },
+  "hero.tierAuto": { en: "Auto", zh: "自动", ar: "تلقائي" },
+  "hero.tierUseSuggested": { en: "Policy says {tier}", zh: "政策建议：{tier}", ar: "السياسة تقترح {tier}" },
   "hero.statusLabel": { en: "Status", zh: "状态", ar: "الحالة" },
   "hero.visibilityLabel": { en: "Visibility", zh: "可见性", ar: "الظهور" },
   "hero.nameInLangPlaceholder": { en: "Product name in {lang}", zh: "{lang} 的产品名称", ar: "اسم المنتج بـ {lang}" },

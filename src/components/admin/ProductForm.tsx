@@ -10,6 +10,7 @@ import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/Fie
 import FeatureCardsSection from "@/components/admin/form-sections/FeatureCardsSection";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { suggestMarketTier } from "@/lib/pricing-config";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
@@ -1384,6 +1385,29 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
+
+  /* ── Market tier, derived from cost via Commercial Setup ──────────────
+     Cost can sit on the supplier link or on the variant; read whichever
+     exists, the same resolution the pricing cards use. */
+  const tierSuggestion = useMemo(() => {
+    const link = productSuppliers.find((x) => x.is_primary) || productSuppliers[0] || null;
+    const raw = link?.unit_cost_cny ?? primaryModel?.cost_price ?? null;
+    const cost = raw == null || raw === "" ? null : Number(raw);
+    return suggestMarketTier(Number.isFinite(cost as number) ? (cost as number) : null);
+  }, [productSuppliers, primaryModel?.cost_price]);
+
+  /* Fill an EMPTY tier from the policy — once, and never over a choice the
+     operator already made. Auto-correcting a deliberate override would make
+     the control feel broken. */
+  const tierAutofilledRef = useRef(false);
+  useEffect(() => {
+    if (!tierSuggestion || tierAutofilledRef.current) return;
+    if (product.level) return;
+    tierAutofilledRef.current = true;
+    updateProduct_({ level: tierSuggestion.tier });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tierSuggestion, product.level]);
+
   const updatePrimaryModel = useCallback((updates: Partial<ModelFormState>) => {
     setModels(prev => {
       if (prev.length === 0) {
@@ -2988,9 +3012,34 @@ export default function ProductForm({ productId }: Props) {
                       </div>
                     </div>
 
-                    {/* Row 2 — market tier, same labelled-group treatment. */}
+                    {/* Row 2 — market tier, same labelled-group treatment.
+                        The tier is DERIVED from the factory cost through the
+                        Commercial Setup bands (suggestMarketTier), because the
+                        two were previously separate judgements about the same
+                        thing and could disagree. The suggestion fills an empty
+                        tier once; a tier you choose yourself is never
+                        overwritten, and if it differs from the policy the
+                        mismatch is shown rather than silently corrected. */}
                     <div>
-                      <span className={groupLabel}>{t("hero.marketTier", "Market tier")}</span>
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span className={`${groupLabel} mb-0`}>{t("hero.marketTier", "Market tier")}</span>
+                        {tierSuggestion && (
+                          product.level === tierSuggestion.tier ? (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-400/90">
+                              {t("hero.tierAuto", "Auto")}
+                            </span>
+                          ) : product.level ? (
+                            <button
+                              type="button"
+                              onClick={() => updateProduct_({ level: tierSuggestion.tier })}
+                              title={tierSuggestion.band.name}
+                              className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                            >
+                              {t("hero.tierUseSuggested", "Policy says {tier}").replace("{tier}", tierSuggestion.tier)}
+                            </button>
+                          ) : null
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {([
                           { v: "entry", label: t("hero.levelEntry", "Entry") },

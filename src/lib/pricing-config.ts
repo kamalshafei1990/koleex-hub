@@ -169,3 +169,38 @@ export async function savePricingConfig(config: PricingConfig): Promise<boolean>
   if (error) { console.error("[PricingConfig] Save:", error.message); return false; }
   return true;
 }
+
+/* ── Market tier from cost ────────────────────────────────────────────────
+   The hero's Market tier (products.level) and the pricing engine's cost
+   bands were two separate judgements about the same thing: how expensive a
+   machine is. The tier was typed by hand while DEFAULT_CATEGORIES already
+   said, in the commercial policy, which band a cost falls in — so the two
+   could disagree and the tier carried no guarantee.
+
+   This maps the policy's bands onto the four tier chips, so the suggestion
+   is DERIVED from Commercial Setup rather than invented next to it. Change a
+   band there and the suggestion follows; there is no second threshold table
+   to keep in sync. */
+export type MarketTier = "entry" | "mid" | "premium" | "enterprise";
+
+const LEVEL_TO_TIER: Record<string, MarketTier> = {
+  level1: "entry",
+  level2: "mid",
+  level3: "premium",
+  level4: "enterprise",
+};
+
+/** The tier the commercial policy implies for a factory cost in CNY.
+ *  Returns null when there is no cost yet — a missing cost must never be
+ *  read as "Entry". */
+export function suggestMarketTier(
+  costCny: number | null | undefined,
+  categories: PricingCategory[] = DEFAULT_CATEGORIES,
+): { tier: MarketTier; band: PricingCategory } | null {
+  if (costCny == null || !Number.isFinite(costCny) || costCny <= 0) return null;
+  const band =
+    categories.find((c) => costCny >= c.min && costCny < c.max) ??
+    categories[categories.length - 1];
+  const tier = LEVEL_TO_TIER[band.id];
+  return tier ? { tier, band } : null;
+}
