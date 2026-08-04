@@ -166,6 +166,9 @@ export async function POST(req: Request) {
     stream?: boolean;
     /** Extracted by /api/ai/attachments — name + plain text only. */
     attachments?: Array<{ name?: string; text?: string }>;
+    /** The composer's globe control. A nudge, not a command: it tells the
+     *  orchestrator the user explicitly wants the web checked this turn. */
+    web_search?: boolean;
   };
 
   const content = body.content?.trim();
@@ -552,6 +555,7 @@ export async function POST(req: Request) {
               userMessage: content + attachBlock,
               userLang,
               conversationId: conversationId!,
+              webSearchRequested: body.web_search === true,
             });
 
             /* Emit tool-chip steps up front so the UI can render them
@@ -739,6 +743,7 @@ export async function POST(req: Request) {
     userMessage: content + attachBlock,
     userLang,
     conversationId,
+    webSearchRequested: body.web_search === true,
   });
   const tOrch = Date.now();
 

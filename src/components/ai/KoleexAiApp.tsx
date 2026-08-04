@@ -133,6 +133,9 @@ const COPY: Record<Lang, {
   back: string;
   seeMore: string;
   seeLess: string;
+  sources: string;
+  webSearchOn: string;
+  webSearchOff: string;
   save: string;
   cancel: string;
   prompts: string[];
@@ -177,6 +180,9 @@ const COPY: Record<Lang, {
     back: "Back",
     seeMore: "See more",
     seeLess: "See less",
+    sources: "Sources",
+    webSearchOn: "Web search: on",
+    webSearchOff: "Web search: off",
     save: "Save",
     cancel: "Cancel",
     prompts: [
@@ -225,6 +231,9 @@ const COPY: Record<Lang, {
     back: "返回",
     seeMore: "查看更多",
     seeLess: "收起",
+    sources: "来源",
+    webSearchOn: "联网搜索：开",
+    webSearchOff: "联网搜索：关",
     save: "保存",
     cancel: "取消",
     prompts: [
@@ -274,6 +283,9 @@ const COPY: Record<Lang, {
     back: "رجوع",
     seeMore: "عرض المزيد",
     seeLess: "عرض أقل",
+    sources: "المصادر",
+    webSearchOn: "البحث في الويب: مفعّل",
+    webSearchOff: "البحث في الويب: متوقّف",
     save: "حفظ",
     cancel: "إلغاء",
     prompts: [
@@ -764,6 +776,11 @@ export default function KoleexAiApp() {
             user_lang: lang,
             stream: true,
             attachments: attachPayload,
+            /* The globe control. It does not force a search — it tells the
+               orchestrator the user explicitly asked for one, which becomes a
+               nudge in the system prompt. The user's own message is never
+               rewritten to carry the request. */
+            web_search: webSearch,
           }),
           signal: aborter.signal,
         });
@@ -1044,7 +1061,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments],
+    [input, activeId, lang, stopTts, attachments, webSearch],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -2252,7 +2269,7 @@ export default function KoleexAiApp() {
                       onClick={() => setWebSearch((v) => !v)}
                       aria-pressed={webSearch}
                       aria-label="Search the web"
-                      title={webSearch ? "Web search: on" : "Web search: off"}
+                      title={webSearch ? copy.webSearchOn : copy.webSearchOff}
                       className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
                           ? "bg-emerald-300/[0.12] text-emerald-200 ring-1 ring-emerald-300/40"
@@ -2587,7 +2604,9 @@ function Bubble({
 }) {
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
-  const steps = msg.steps ?? [];
+  /* Memoised so the `?? []` fallback doesn't mint a new array each render
+     and re-run everything downstream that depends on it. */
+  const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
   const [copied, setCopied] = useState(false);
   const handleCopyClick = useCallback(async () => {
     if (!onCopy || !msg.content) return;
@@ -2604,6 +2623,32 @@ function Bubble({
      content. Placeholder bubbles (empty content = typing dots)
      get no actions. */
   const showActions = !isUser && !!msg.content;
+
+  /* Web sources attached to this reply, de-duplicated by host so five
+     pages from one site read as one chip rather than a wall. Only
+     search_web contributes here — internal tools cite record ids, which
+     are not links and would be meaningless as chips. */
+  const webSources = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ url: string; host: string }> = [];
+    for (const st of steps) {
+      if (st.tool !== "search_web") continue;
+      for (const raw of st.sources ?? []) {
+        try {
+          const u = new URL(raw);
+          if (u.protocol !== "http:" && u.protocol !== "https:") continue;
+          const host = u.hostname.replace(/^www\./, "");
+          if (seen.has(host)) continue;
+          seen.add(host);
+          out.push({ url: u.toString(), host });
+        } catch {
+          /* Not a URL we can render as a link — skip it silently. */
+        }
+      }
+    }
+    return out.slice(0, 6);
+  }, [steps]);
+  const sourcesLabel = (COPY[lang] ?? COPY.en).sources;
 
   /* Phase 13: edit-and-retry state. Only user messages can be
      edited, and only when the parent allows it (not while another
@@ -2770,6 +2815,28 @@ function Bubble({
                 ✎ Edit
               </button>
             )}
+          </div>
+        )}
+        {/* Sources — the pages search_web actually read for this answer.
+            An answer built from the live web has to show its working, or
+            the user has no way to tell it apart from one the model made
+            up: same tone, same confidence. Only rendered when a tool
+            reported sources, so ordinary replies stay clean. */}
+        {!isUser && webSources.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+            <span className="shrink-0">{sourcesLabel}</span>
+            {webSources.map((s) => (
+              <a
+                key={s.url}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                title={s.url}
+                className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:border-[var(--text-dim)] max-w-[180px] truncate"
+              >
+                {s.host}
+              </a>
+            ))}
           </div>
         )}
         {/* Phase 12: assistant action row — Copy + (on last msg)

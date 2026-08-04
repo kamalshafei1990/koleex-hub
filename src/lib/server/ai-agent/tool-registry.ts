@@ -41,6 +41,9 @@ import { projectTools } from "./tools/projects";
 import { planningTools } from "./tools/planning";
 import { calendarTools } from "./tools/calendar";
 import { userMemoryTools } from "./tools/user-memory";
+/* The agent's only route to the public internet — see tools/web-search.ts
+   for the public-information-only and brand guards. */
+import { webSearchTools } from "./tools/web-search";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -58,6 +61,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...planningTools,
       ...calendarTools,
   ...userMemoryTools,
+      ...webSearchTools,
     ].map((t) => [t.name, t]),
   ),
 );

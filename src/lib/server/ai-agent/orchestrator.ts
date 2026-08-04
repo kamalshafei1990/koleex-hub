@@ -77,6 +77,9 @@ export interface OrchestrateInput {
    *  the model then generates natural Egyptian Arabic natively. */
   dialect?: "egyptian" | null;
   conversationId: string;
+  /** The composer's globe control was on for this turn. A nudge toward
+   *  search_web, never a command — the model still decides. */
+  webSearchRequested?: boolean;
   /** Streaming hook: when set, the ANSWER-phase model call streams and
    *  each content token is forwarded here in real time. */
   onDelta?: (text: string) => void;
@@ -488,9 +491,50 @@ function isWorkDataQuery(msg: string): boolean {
   return false;
 }
 
+/* ─── Live-information detector ───────────────────────────────────
+   Questions whose honest answer depends on the world TODAY, not on what
+   the model absorbed during training: weather, news, rates, prices of
+   public commodities, "latest"/"current"/"right now" framings.
+
+   These have to bypass the tool-less fast paths, or the model produces
+   the exact failure the owner screenshotted — a polite apology for
+   having no live access, while search_web sits one layer below it.
+
+   Deliberately keyword-driven and conservative in the same style as the
+   detectors above: a false positive only costs one extra tool-loop turn,
+   while a false negative is a wrong answer. Covers en / ar / zh because
+   all three are in daily use here. */
+function isLiveInfoQuery(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s) return false;
+
+  /* Subjects that are almost always time-sensitive. */
+  if (/\b(weather|forecast|temperature|humidity|rain|raining|snow|storm|wind)\b/.test(s)) return true;
+  if (/\b(news|headlines|happening|breaking)\b/.test(s)) return true;
+  if (/\b(exchange\s+rate|currency\s+rate|usd\s+to\s+|eur\s+to\s+|rmb|cny|forex|stock\s+price|share\s+price)\b/.test(s)) return true;
+  if (/\b(flight|flights)\s+(status|delay|delayed)\b/.test(s)) return true;
+  if (/\b(freight|shipping)\s+(rate|rates|cost)\b/.test(s)) return true;
+
+  /* Explicit requests to go and look. */
+  if (/\b(search|google|look\s+up|check\s+online|on\s+the\s+(web|internet))\b/.test(s)) return true;
+
+  /* "current / latest / today's X" framings. */
+  if (/\b(current|latest|today'?s|right\s+now|as\s+of\s+today|this\s+week'?s)\b/.test(s)) return true;
+
+  /* Arabic */
+  if (/الطقس|الجو|درجة\s*الحرارة|الأخبار|اخبار|سعر\s*الصرف|سعر\s*الدولار|آخر\s*الأخبار|ابحث\s*في\s*النت|ابحث\s*على\s*النت/.test(msg)) return true;
+  /* Chinese */
+  if (/天气|气温|新闻|汇率|股价|最新|搜索一下|查一下/.test(msg)) return true;
+
+  return false;
+}
+
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
-  const { ctx, history, userMessage, userLang, dialect, conversationId, onDelta } = input;
+  const {
+    ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
+    webSearchRequested = false,
+  } = input;
   const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
@@ -553,7 +597,14 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      overlock models does Koleex have?") — those must run the tool
      loop and answer from real data, not brand prose. */
   const isDataQuery =
-    isBusinessDataQuery(userMessage) || isWorkDataQuery(userMessage);
+    isBusinessDataQuery(userMessage) ||
+    isWorkDataQuery(userMessage) ||
+    /* Live-info questions must reach the tool loop for the same reason
+       work queries must: the fast paths carry NO tools, so "what's the
+       weather in Cairo" would be answered by a model apologising for
+       having no live access — with search_web sitting one layer away. */
+    webSearchRequested ||
+    isLiveInfoQuery(userMessage);
   const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";
   const isSmall = !isDataQuery && isSmallTalk(userMessage);
@@ -575,7 +626,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         )
       : useFastPath && isSmall
         ? buildMinimalSystemPrompt(ctx, userLang, dialect)
-        : buildSystemPrompt(ctx, userLang, { dialect });
+        : buildSystemPrompt(ctx, userLang, { dialect }) +
+          /* Appended rather than baked in: the flag is per-turn, and the
+             instruction only makes sense on the turn the user asked for it. */
+          (webSearchRequested
+            ? "\n\nThe user turned WEB SEARCH on for this message. Prefer calling search_web before answering, unless the question is purely about Koleex's own records or needs no lookup at all."
+            : "");
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without
@@ -1305,6 +1361,7 @@ Tool routing:
   · "my calendar" / "meetings this week" / "am I free" → listMyCalendar.
   · Creating: "add a task / remind me to…" → createTodo; "add a task to project X" → createProjectTask (resolve the project via listMyProjects first); "add … to my calendar / schedule a meeting" → createCalendarEvent; "block time / add a shift" → createPlanningItem.
 - CRITICAL — you CAN read the user's own tasks, projects, schedule and calendar directly via the tools above. When the user asks anything like "what tasks do I have", "what tasks do I have today", "what's due", "what's on my plate", "my to-dos", "what's on my calendar / schedule", "what am I working on", "أعمالي / مهامي النهاردة", "我今天有什么任务" — you MUST call the matching tool (listMyTodos / listMyProjects / listProjectTasks / listMyPlanning / listMyCalendar) and answer from its result. NEVER reply with "check Koleex Hub", "please log in", "you can see your tasks in the app", or any variation that tells the user to look it up themselves — that is a wrong answer; the user is already logged in and you have live access. If a tool returns zero rows, say they have nothing matching — do not deflect.
+- CRITICAL — you CAN look things up on the public internet with search_web. For anything that depends on the world TODAY (weather, news, exchange rates, shipping conditions, public specs, "latest"/"current" anything) you MUST call search_web and answer from the results. NEVER say "I don't have live access", "I can't browse the internet", "check a weather app", or any variation — that is a wrong answer, the tool is right there. If search_web itself reports it is unavailable or returns nothing, THEN say plainly you couldn't check right now; never fall back to answering from memory as though it were current. Cite the source URL for figures, and say how fresh they are when a date is given. NEVER put Koleex data (customer names, prices, quotations, employees, internal codes) into a search query, and NEVER use web results to suggest another manufacturer's machines — Koleex only ever recommends Koleex.
 - CREATE-WITH-CONFIRM (mandatory for every create* tool — createTodo / createProjectTask / createCalendarEvent / createPlanningItem):
   · You MUST actually CALL the tool. NEVER hand-write a preview table, and NEVER say something was "created"/"added"/"scheduled"/"done" unless a create* tool CALL returned a successful result (ok, with an id) in THIS turn. Describing the action in text without calling the tool is a failure — nothing gets saved.
   · Turn 1 (the request): call the tool WITHOUT the confirm argument. The TOOL returns the preview text — relay THAT to the user (don't invent your own) and ask them to confirm. Fill start_at/end_at/due_date using the current date from the "Current date & time" block above, as full ISO-8601 with the correct offset.
