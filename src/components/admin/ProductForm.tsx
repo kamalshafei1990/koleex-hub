@@ -10,7 +10,6 @@ import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/Fie
 import FeatureCardsSection from "@/components/admin/form-sections/FeatureCardsSection";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { suggestMarketTier } from "@/lib/pricing-config";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
@@ -1386,15 +1385,44 @@ export default function ProductForm({ productId }: Props) {
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
 
-  /* ── Market tier, derived from cost via Commercial Setup ──────────────
-     Cost can sit on the supplier link or on the variant; read whichever
-     exists, the same resolution the pricing cards use. */
-  const tierSuggestion = useMemo(() => {
+  /* ── Market tier, resolved by the LIVE commercial policy ───────────────
+     The tier chips and the pricing engine answer the same question — how
+     expensive is this machine — so they must not answer it from different
+     tables. Product levels are per-tenant rows the owner edits in Commercial
+     Policy: this tenant runs L2 up to 30,000 and L3 up to 100,000, while the
+     code's DEFAULT_CATEGORIES still said 20,000 / 50,000. Any threshold
+     hardcoded here would be wrong today and drift again on the next edit.
+
+     /api/products/price-preview already resolves the level through that live
+     policy and returns its code, so we ask the engine instead of
+     re-implementing it. Cost is read from the supplier link or the variant,
+     whichever tab it was entered on. */
+  const tierCost = useMemo(() => {
     const link = productSuppliers.find((x) => x.is_primary) || productSuppliers[0] || null;
     const raw = link?.unit_cost_cny ?? primaryModel?.cost_price ?? null;
-    const cost = raw == null || raw === "" ? null : Number(raw);
-    return suggestMarketTier(Number.isFinite(cost as number) ? (cost as number) : null);
+    const n = raw == null || raw === "" ? NaN : Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }, [productSuppliers, primaryModel?.cost_price]);
+
+  const [tierSuggestion, setTierSuggestion] = useState<{ tier: string; levelName: string } | null>(null);
+
+  useEffect(() => {
+    if (tierCost == null) { setTierSuggestion(null); return; }
+    let cancelled = false;
+    const LEVEL_TO_TIER: Record<string, string> = { L1: "entry", L2: "mid", L3: "premium", L4: "enterprise" };
+    const id = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/products/price-preview?cost_cny=${encodeURIComponent(String(tierCost))}&qty=1`, { credentials: "include" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { base?: { productLevelCode?: string; productLevelName?: string } };
+        const code = j?.base?.productLevelCode;
+        if (cancelled || !code) return;
+        const tier = LEVEL_TO_TIER[code];
+        if (tier) setTierSuggestion({ tier, levelName: j.base?.productLevelName || code });
+      } catch { /* the chips still work by hand */ }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [tierCost]);
 
   /* Fill an EMPTY tier from the policy — once, and never over a choice the
      operator already made. Auto-correcting a deliberate override would make
@@ -3014,7 +3042,7 @@ export default function ProductForm({ productId }: Props) {
 
                     {/* Row 2 — market tier, same labelled-group treatment.
                         The tier is DERIVED from the factory cost through the
-                        Commercial Setup bands (suggestMarketTier), because the
+                        live Commercial Policy engine, because the
                         two were previously separate judgements about the same
                         thing and could disagree. The suggestion fills an empty
                         tier once; a tier you choose yourself is never
@@ -3032,7 +3060,7 @@ export default function ProductForm({ productId }: Props) {
                             <button
                               type="button"
                               onClick={() => updateProduct_({ level: tierSuggestion.tier })}
-                              title={tierSuggestion.band.name}
+                              title={tierSuggestion.levelName}
                               className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
                             >
                               {t("hero.tierUseSuggested", "Policy says {tier}").replace("{tier}", tierSuggestion.tier)}
