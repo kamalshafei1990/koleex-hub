@@ -107,7 +107,10 @@ export default function AppLaunchLink({
     // Warm the REAL client app chunk on intent (route prefetch only warms the
     // RSC shell) so the first launch of a heavy app isn't a multi-second chunk
     // download. Deduped + network-gated inside preloadAppChunk.
-    try { preloadAppChunk(app.id); } catch { /* best-effort */ }
+    /* force: this fires on INTENT (hover / focus on the tile), so the user
+       has aimed at this app — paying for its chunk is what they asked for,
+       even on a slow link. The idle warm on Home stays gated. */
+    try { preloadAppChunk(app.id, { force: true }); } catch { /* best-effort */ }
     try { onPreload?.(app); } catch { /* warm is best-effort */ }
   }, [inactive, app, onPreload]);
 

@@ -32,6 +32,8 @@ const CHUNK_PRELOADERS: Record<string, () => Promise<unknown>> = {
   quotations: () => import("@/components/quotations/Quotations"),
 };
 
+import { isPreloadAllowed, readNetworkContext } from "./app-prefetch";
+
 const warmed = new Set<string>();
 
 /** True if this app has a real client chunk worth warming. */
@@ -47,9 +49,24 @@ export function wasChunkWarmed(appId: string): boolean {
 }
 
 /** Warm the real client chunk for `appId` (best-effort, deduped per session).
-    No-op for apps without a registered preloader, or once already warmed. */
-export function preloadAppChunk(appId: string): void {
+    No-op for apps without a registered preloader, or once already warmed.
+
+    GATED ON THE CONNECTION. This module used to warm unconditionally while
+    its sibling app-prefetch already refused to preload on Save-Data, a slow
+    effective connection, a hidden tab or offline — so the cheap DATA warm was
+    polite and the expensive CHUNK warm was not. Measured on a cold home load:
+    the Customers/Suppliers chunk pulls 2,270 KB of the page's 3,502 KB of
+    JavaScript (it carries the country-state-city dataset), it starts right
+    AFTER the load event, and it took 3.3 s — competing for bandwidth with the
+    page the user is actually waiting for. On a fast link that is free and the
+    next launch is instant; on a slow one it is the reason the first open
+    crawls. Same gate as the data warm, so both behave alike.
+
+    `force` is for intent-driven warms (hover / focus on an app tile): the user
+    has aimed at that app, so paying for its chunk is what they asked for. */
+export function preloadAppChunk(appId: string, opts?: { force?: boolean }): void {
   if (warmed.has(appId)) return;
+  if (!opts?.force && !isPreloadAllowed(readNetworkContext())) return;
   const fn = CHUNK_PRELOADERS[appId];
   if (!fn) return;
   warmed.add(appId);
