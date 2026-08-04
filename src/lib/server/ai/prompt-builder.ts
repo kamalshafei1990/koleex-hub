@@ -238,7 +238,7 @@ export function buildChatPrompt(
   ctx: AiContext = {},
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
-  const whoAmI = ctx.username ? ` The current user is ${ctx.username}.` : "";
+  const whoAmI = viewerLine(ctx);
   return [
     {
       role: "system",
@@ -279,7 +279,7 @@ export function buildBusinessPrompt(
   ctx: AiContext = {},
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
-  const whoAmI = ctx.username ? ` The current user is ${ctx.username}.` : "";
+  const whoAmI = viewerLine(ctx);
 
   /* Cost-visibility redirect — the exact string the spec requires when
      the user's role cannot see KOLEEX cost. The prompt tells the model
