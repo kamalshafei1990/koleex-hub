@@ -315,7 +315,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 composite (untouched KOLEEX wordmark + gradient hub script). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/hub-logo/koleex-hub-logo-for-dark.png"
+              src="/brand/hub-logo/koleex-hub-logo-for-dark.webp"
               alt="Koleex Hub"
               className="h-8 w-auto drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
             />

@@ -152,12 +152,24 @@ export default function MainHeader() {
         >
           {/* Hub logo v2 (owner-approved option B) — the script "hub" makes
               the lockup taller than the bare wordmark, so the img runs larger
-              to keep KOLEEX at its familiar optical size. Theme-matched PNGs
-              from public/brand/hub-logo. */}
+              to keep KOLEEX at its familiar optical size.
+
+              WEBP, NOT THE PNG. The source PNG is 3124px wide / 404 KB and
+              renders at 32px tall — a 15x oversized download on EVERY page,
+              which is why the header logo was slow (and on a weak connection,
+              why it sometimes never arrived). The 640px webp is 17 KB: still
+              3x the rendered width, so it stays sharp on retina.
+
+              width/height are declared so the header reserves the space and
+              the rest of the bar doesn't jump when the logo lands. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.png" : "/brand/hub-logo/koleex-hub-logo-for-light.png"}
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.webp" : "/brand/hub-logo/koleex-hub-logo-for-light.webp"}
             alt="Koleex Hub"
+            width={640}
+            height={99}
+            decoding="async"
+            fetchPriority="high"
             className="w-auto h-5 md:h-8"
           />
         </Link>
