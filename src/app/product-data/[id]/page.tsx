@@ -1,24 +1,23 @@
 "use client";
 
-/* Internal detail view. Re-exports the existing public-style product
-   detail page but flags it so the component can show cost / supplier
-   / internal-notes sections. Both paths render the exact same component
-   file; the internal flag comes from the route via a data attribute on
-   body (read by the component with usePathname). */
+/* Internal product record. NOT the customer-facing product page.
+
+   This route used to render LegacyProductView — the same component the
+   Products app shows to customers, with internal blocks bolted on. That is
+   the wrong shape for Product Data: a showroom hides what is empty, and an
+   operator opens a product precisely to find what is missing. The two apps
+   answer different questions, so they no longer share a page.
+
+   The customer-facing page still lives at /products/[slug], and the header
+   here links to it. */
 
 import PermissionGate from "@/components/layout/PermissionGate";
-import LegacyProductView from "@/app/products/[id]/LegacyProductView";
+import ProductProfile from "@/components/admin/ProductProfile";
 
-/* Internal detail view. Renders the legacy client renderer directly — it
-   reads `id` from useParams() and detects the /product-data path via
-   usePathname() to surface internal cost/supplier/notes sections.
-   (The public /products/[id] route is now a server component that picks
-   the schema-driven view when a schema resolves, so it can't be rendered
-   as a child here — we mount the underlying renderer instead.) */
 export default function ProductDataDetailPage() {
   return (
     <PermissionGate module="Product Data">
-      <LegacyProductView />
+      <ProductProfile />
     </PermissionGate>
   );
 }
