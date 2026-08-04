@@ -38,7 +38,8 @@ import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import TabStrip from "@/components/ui/TabStrip";
 
 /* ── shapes (loose on purpose: the products table is column-agnostic) ── */
 type Row = Record<string, unknown>;
@@ -100,93 +101,69 @@ function Field({ label, value, mono }: { label: string; value: unknown; mono?: b
   );
 }
 
+/* The editor's Section card, field-for-field: icon in a rounded square,
+   title, optional badge, collapse chevron. */
 function Group({
-  title, count, onEdit, children,
-}: { title: string; count?: string; onEdit?: () => void; children: React.ReactNode }) {
+  icon, title, count, onEdit, children,
+}: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-      <header className="flex items-center justify-between gap-3 px-4 md:px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-        <div className="flex items-center gap-2 min-w-0">
-          <h2 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{title}</h2>
-          {count && <span className="text-[11px] text-[var(--text-ghost)] shrink-0">{count}</span>}
+    <section className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+      <div className="w-full flex items-center gap-3 px-6 py-4">
+        <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+          {icon}
         </div>
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left truncate">{title}</h2>
+        {count && (
+          <span className="text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full shrink-0">{count}</span>
+        )}
         {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
+          <button type="button" onClick={onEdit} className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <PencilIcon className="h-3 w-3" /> Edit
           </button>
         )}
-      </header>
-      <div className="p-4 md:p-5">{children}</div>
+        <button type="button" onClick={() => setOpen(!open)} className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors" aria-label={open ? "Collapse" : "Expand"}>
+          <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>}
     </section>
   );
 }
 
 /* ── Steps ────────────────────────────────────────────────────────────────
-   Deliberately the SAME eleven steps, in the same order, with the same icons
-   and the same pill bar as the editor. The record and the editor are two
-   views of one thing; making the profile look like a different app forces
-   the operator to re-learn where everything lives. */
+   The SAME eleven sections the editor shows, in the same order, under the
+   same labels. The record and the editor are two views of one thing, so the
+   navigation must not differ between them. */
 const STEPS = [
-  { id: "classify",   label: "Classification",            short: "Classify",   icon: <FolderTreeIcon className="h-4 w-4" /> },
-  { id: "supplier",   label: "Supplier & Sourcing",       short: "Supplier",   icon: <FactoryIcon className="h-4 w-4" /> },
-  { id: "identity",   label: "Hero & Identity",           short: "Identity",   icon: <SparklesIcon className="h-4 w-4" /> },
-  { id: "specs",      label: "Specifications",            short: "Specs",      icon: <Settings2Icon className="h-4 w-4" /> },
-  { id: "commercial", label: "Variants",                  short: "Variants",   icon: <BoxesIcon className="h-4 w-4" /> },
-  { id: "pricing",    label: "Cost & Price",              short: "Price",      icon: <DollarSignIcon className="h-4 w-4" /> },
-  { id: "logistics",  label: "Logistics & Customs",       short: "Logistics",  icon: <GlobeIcon className="h-4 w-4" /> },
-  { id: "compliance", label: "Compliance & Warranty",     short: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
-  { id: "media",      label: "Media & Documents",         short: "Media",      icon: <ImageRawIcon className="h-4 w-4" /> },
-  { id: "knowledge",  label: "Knowledge & Relationships", short: "Knowledge",  icon: <BookOpenIcon className="h-4 w-4" /> },
-  { id: "finalize",   label: "Review",                    short: "Review",     icon: <CheckIcon className="h-4 w-4" /> },
+  { id: "classify",   short: "Classify" },
+  { id: "supplier",   short: "Supplier" },
+  { id: "identity",   short: "Hero" },
+  { id: "specs",      short: "Specs" },
+  { id: "commercial", short: "Variants" },
+  { id: "pricing",    short: "Price" },
+  { id: "logistics",  short: "Logistics" },
+  { id: "compliance", short: "Compliance" },
+  { id: "media",      short: "Media & Files" },
+  { id: "knowledge",  short: "Knowledge" },
+  { id: "finalize",   short: "Review" },
 ] as const;
 
-/* The editor's StepNav, minus the wizard states that only make sense while
-   editing (locked / required-field badges). A step with nothing recorded gets
-   a dim dot instead of a tick — the same "what still needs work?" read the
-   editor gives, without pretending anything is blocked. */
-function ProfileStepNav({ current, onPick, filled }: {
-  current: number; onPick: (i: number) => void; filled: Set<number>;
-}) {
+/* The editor's own sticky tab bar, via the same canonical TabStrip — not a
+   lookalike, the same component. */
+function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number) => void }) {
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6 sticky top-0 z-20">
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-        {STEPS.map((step, i) => {
-          const isActive = i === current;
-          const has = filled.has(i);
-          return (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => onPick(i)}
-              title={step.label}
-              className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
-                isActive
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg"
-                  : has
-                  ? "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
-                  : "text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)]"
-              }`}
-            >
-              <div className={`relative h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                isActive ? "bg-white/20"
-                : has ? "bg-emerald-500/20 text-emerald-400"
-                : "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
-              }`}>
-                {has && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1}
-              </div>
-              <span className="hidden md:inline">{step.short}</span>
-              {i < STEPS.length - 1 && (
-                <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <nav className="sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+      <TabStrip
+        ariaLabel="Product sections"
+        items={STEPS.map((st, i) => ({
+          key: st.id,
+          label: st.short,
+          active: i === current,
+          onClick: () => onPick(i),
+        }))}
+      />
+    </nav>
   );
 }
 
@@ -244,85 +221,74 @@ export default function ProductProfile() {
 
   const readiness = data.readiness?.overall ?? null;
 
-  /* Which steps actually hold something. Mirrors the editor's green ticks, so
-     the operator can see at a glance which parts of the record are still
-     untouched without opening each one. */
-  const filledSteps = new Set<number>();
-  {
-    const pr = p as Record<string, unknown>;
-    const any = (...keys: string[]) => keys.some((k) => {
-      const v = pr[k];
-      return !(v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0));
-    });
-    if (any("division_slug", "category_slug", "subcategory_slug")) filledSteps.add(0);
-    if (data.suppliers.length) filledSteps.add(1);
-    if (any("product_name", "brand", "excerpt", "description")) filledSteps.add(2);
-    if (Object.keys((pr.schema_specs as Record<string, unknown>) ?? {}).length) filledSteps.add(3);
-    if (data.models.length) filledSteps.add(4);
-    if (data.models.some((m) => m.cost_price != null || m.global_price != null || (m.pricing_mode && m.pricing_mode !== "fixed"))) filledSteps.add(5);
-    if (any("country_of_origin", "hs_code", "machine_weight_kg")) filledSteps.add(6);
-    if (any("warranty_months", "ce_certified", "rohs_compliant") || data.certifications.length) filledSteps.add(7);
-    if (data.media.length || data.documents.length) filledSteps.add(8);
-    if (((pr.schema_knowledge as unknown[]) ?? []).length || data.related.length) filledSteps.add(9);
-  }
   const s2 = (k: string) => p[k];
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-[1500px] mx-auto space-y-4">
-      {/* ── Identity header ── */}
-      <div className="flex items-start gap-4">
-        <Link href="/product-data" aria-label="Back" className="shrink-0 h-9 w-9 rounded-xl border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-          <ArrowLeftIcon className="h-4 w-4" />
-        </Link>
-        <div className="h-16 w-16 md:h-20 md:w-20 shrink-0 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-white flex items-center justify-center">
-          {hero
-            ? <img src={IMG.thumb(hero)} alt="" className="h-full w-full object-contain p-1" />
-            : <span className="text-[10px] text-gray-400">No photo</span>}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[18px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] break-words">
-            {(s2("product_name") as string) || "Untitled product"}
-          </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-[var(--text-dim)]">
-            <span className="font-mono">{(data.models[0]?.primary_model as string) || "no code"}</span>
-            <span className="text-[var(--text-ghost)]">·</span>
-            <span>{(s2("category_slug") as string) || "—"}</span>
-            {data.subcategory && <><span className="text-[var(--text-ghost)]">·</span><span>{data.subcategory.name}</span></>}
-          </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              {(s2("status") as string) || "draft"}
-            </span>
-            {s2("visible") !== true && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]">Hidden from customers</span>
-            )}
-            {readiness != null && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
-                <span className="inline-block h-1 w-16 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
-                  <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
-                </span>
-                {readiness}% complete
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-4">
+      {/* ── Header — the editor's own: back square, title + status, subtitle,
+             actions on the right. Same sizes, same spacing. ── */}
+      <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            href="/product-data"
+            aria-label="Back to Product Data"
+            className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+          </Link>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
+                {(s2("product_name") as string) || "Untitled product"}
+              </h1>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                {(s2("status") as string) || "draft"}
               </span>
-            )}
+              {s2("visible") !== true && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]">Hidden</span>
+              )}
+              {readiness != null && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+                  <span className="inline-block h-1 w-16 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
+                    <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
+                  </span>
+                  {readiness}%
+                </span>
+              )}
+            </div>
+            <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5 truncate">
+              {(data.models[0]?.primary_model as string) || "no code"}
+              {" · "}{(s2("category_slug") as string) || "—"}
+              {data.subcategory ? ` · ${data.subcategory.name}` : ""}
+            </p>
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {s2("slug") ? (
-            <Link href={`/products/${s2("slug") as string}`} className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" title="Open the customer-facing page">
-              <ExternalLinkIcon className="h-3.5 w-3.5" /> Public page
+            <Link
+              href={`/products/${s2("slug") as string}`}
+              title="Open the customer-facing page"
+              className="hidden sm:inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+            >
+              <ExternalLinkIcon className="h-4 w-4" /> Public page
             </Link>
           ) : null}
-          <Link href={editHref} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">
-            <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
+          <Link
+            href={editHref}
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0"
+          >
+            <PencilIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("action.edit", "Edit")}</span>
           </Link>
         </div>
       </div>
 
-      <ProfileStepNav current={step} onPick={setStep} filled={filledSteps} />
+      <ProfileTabs current={step} onPick={setStep} />
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group title="Classification" onEdit={() => goStep("classify")}>
+      <Group icon={<FolderTreeIcon className="h-4 w-4" />} title="Classification" onEdit={() => goStep("classify")}>
         <div className={grid}>
           <Field label="Division" value={s2("division_slug")} />
           <Field label="Category" value={s2("category_slug")} />
@@ -336,7 +302,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group title="Supplier & Sourcing" count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
+      <Group icon={<FactoryIcon className="h-4 w-4" />} title="Supplier & Sourcing" count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
         {data.suppliers.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">No supplier linked.</p>
         ) : (
@@ -369,7 +335,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "identity" && (
       <div className="space-y-4">
-        <Group title="Identity & lifecycle" onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Identity & lifecycle" onEdit={() => goStep("identity")}>
           <div className={grid}>
             <Field label="Product name" value={s2("product_name")} />
             <Field label="Public URL" value={s2("slug")} mono />
@@ -391,7 +357,7 @@ export default function ProductProfile() {
             <Field label="Visible to customers" value={s2("visible")} />
           </div>
         </Group>
-        <Group title="Description" onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Description" onEdit={() => goStep("identity")}>
           <div className="space-y-4">
             <Field label="Short description (excerpt)" value={s2("excerpt")} />
             <Field label="Full description" value={s2("description")} />
@@ -399,7 +365,7 @@ export default function ProductProfile() {
             <Field label="Tags" value={s2("tags")} />
           </div>
         </Group>
-        <Group title="Languages & markets" count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Languages & markets" count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
             ? <p className="text-[12px] text-[var(--text-ghost)] italic">English only — no localized names recorded.</p>
             : <div className={grid}>{data.translations.map((tr, i) => <Field key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
@@ -408,7 +374,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "specs" && (
-      <Group title="Specifications" count={data.schema ? undefined : "no template"} onEdit={() => goStep("specs")}>
+      <Group icon={<Settings2Icon className="h-4 w-4" />} title="Specifications" count={data.schema ? undefined : "no template"} onEdit={() => goStep("specs")}>
         {!data.schema ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">
             No spec template resolves for this classification, so there are no specification fields to fill.
@@ -435,7 +401,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group title="Variants" count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
+      <Group icon={<BoxesIcon className="h-4 w-4" />} title="Variants" count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">No variant recorded — a product needs at least one.</p>
         ) : (
@@ -465,7 +431,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "pricing" && (
-      <Group title="Cost & Price" count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
+      <Group icon={<DollarSignIcon className="h-4 w-4" />} title="Cost & Price" count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">No variant to price.</p>
         ) : (
@@ -493,7 +459,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "logistics" && (
-      <Group title="Logistics & Customs" onEdit={() => goStep("logistics")}>
+      <Group icon={<GlobeIcon className="h-4 w-4" />} title="Logistics & Customs" onEdit={() => goStep("logistics")}>
         <div className={grid}>
           <Field label="Country of origin" value={s2("country_of_origin")} />
           <Field label="HS code" value={s2("hs_code")} mono />
@@ -521,7 +487,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group title="Compliance & Warranty" count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
+      <Group icon={<ShieldCheckIcon className="h-4 w-4" />} title="Compliance & Warranty" count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
         <div className={grid}>
           <Field label="Warranty (months)" value={s2("warranty_months")} />
           <Field label="Warranty type" value={s2("warranty_type")} />
@@ -555,7 +521,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "media" && (
-      <Group title="Media & Documents" count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
+      <Group icon={<ImageRawIcon className="h-4 w-4" />} title="Media & Documents" count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
         <div className="flex flex-wrap gap-2 mb-4">
           {data.media.length === 0 && <span className="text-[12px] text-[var(--text-ghost)] italic">No media uploaded.</span>}
           {data.media.slice(0, 24).map((m, i) => (
@@ -580,7 +546,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "knowledge" && (
-      <Group title="Knowledge & Relationships" count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
+      <Group icon={<BookOpenIcon className="h-4 w-4" />} title="Knowledge & Relationships" count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
         <div className={grid}>
           <Field label="Knowledge blocks" value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>
@@ -601,7 +567,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "finalize" && (
       <div className="space-y-4">
-        <Group title="Readiness">
+        <Group icon={<CheckIcon className="h-4 w-4" />} title="Readiness">
           {readiness == null ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic">No spec template resolves, so completeness can&apos;t be scored.</p>
           ) : (
@@ -620,7 +586,7 @@ export default function ProductProfile() {
             </div>
           )}
         </Group>
-        <Group title="Record">
+        <Group icon={<CheckIcon className="h-4 w-4" />} title="Record">
           <div className={grid}>
             <Field label="Product id" value={s2("id")} mono />
             <Field label="Created" value={s2("created_at")} />
@@ -630,6 +596,7 @@ export default function ProductProfile() {
         </Group>
       </div>
       )}
+      </div>
     </div>
   );
 }
