@@ -469,10 +469,17 @@ export const PRODUCTS_UI_I18N: Translations = {
   "hero.hidden": { en: "Hidden", zh: "隐藏", ar: "مخفي" },
   "hero.visibleOnCatalog": { en: "Visible on public catalog", zh: "在公开目录中可见", ar: "ظاهر في الكتالوج العام" },
   "hero.hiddenFromCatalog": { en: "Hidden from public catalog", zh: "从公开目录中隐藏", ar: "مخفي من الكتالوج العام" },
+  /* Tier LABELS mirror the Commercial Policy level names (L1 Entry / Volume,
+     L2 Standard Commercial, L3 Advanced / Semi-Industrial, L4 High-End /
+     Strategic) so the form, the policy page and the margin maths all use one
+     vocabulary. "Enterprise" was dropped on purpose: in business usage it
+     describes the size of the BUYER, while L4 describes the machine — mixing
+     the two is how a product lands in the wrong band. Stored values stay
+     entry / mid / premium / enterprise, so this is display only. */
   "hero.levelEntry": { en: "Entry", zh: "入门", ar: "أساسي" },
-  "hero.levelMid": { en: "Mid", zh: "中端", ar: "متوسط" },
-  "hero.levelPremium": { en: "Premium", zh: "高端", ar: "متميّز" },
-  "hero.levelEnterprise": { en: "Enterprise", zh: "企业级", ar: "مؤسسي" },
+  "hero.levelMid": { en: "Standard", zh: "标准", ar: "قياسي" },
+  "hero.levelPremium": { en: "Advanced", zh: "进阶", ar: "متقدّم" },
+  "hero.levelEnterprise": { en: "High-End", zh: "高端", ar: "راقٍ" },
   "hero.productNameLabel": { en: "Product Name *", zh: "产品名称 *", ar: "اسم المنتج *" },
   "hero.charsCount": { en: "{n} chars", zh: "{n} 个字符", ar: "{n} حرفًا" },
   "hero.productNamePlaceholder": { en: "e.g. KX Lockstitch Industrial 9500", zh: "例如 KX Lockstitch Industrial 9500", ar: "مثال: KX Lockstitch Industrial 9500" },

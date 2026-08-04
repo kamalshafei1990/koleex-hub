@@ -466,7 +466,16 @@ export default function ProductProfile() {
           <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
           <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
           <Row label={t("pp.f.family", "Family")} value={s2("family")} />
-          <Row label={t("pp.f.level", "Level")} value={s2("level")} />
+          <Row
+                label={t("pp.f.level", "Level")}
+                /* Show the tier LABEL, not the stored key — the record must
+                   speak the same words as the editor and the policy page. */
+                value={(() => {
+                  const v = s2("level") as string | null;
+                  if (!v) return null;
+                  return t(`hero.level${v.charAt(0).toUpperCase()}${v.slice(1)}`, v);
+                })()}
+              />
           <Row label={t("pp.f.template", "Spec template")} value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
         </div>
       </Group>

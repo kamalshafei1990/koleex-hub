@@ -3063,7 +3063,10 @@ export default function ProductForm({ productId }: Props) {
                               title={tierSuggestion.levelName}
                               className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
                             >
-                              {t("hero.tierUseSuggested", "Policy says {tier}").replace("{tier}", tierSuggestion.tier)}
+                              {t("hero.tierUseSuggested", "Policy says {tier}").replace("{tier}", t(
+                                `hero.level${tierSuggestion.tier.charAt(0).toUpperCase()}${tierSuggestion.tier.slice(1)}`,
+                                tierSuggestion.tier,
+                              ))}
                             </button>
                           ) : null
                         )}
