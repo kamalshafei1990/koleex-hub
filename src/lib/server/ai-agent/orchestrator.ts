@@ -1218,7 +1218,37 @@ function buildSystemPrompt(
      each turn from ctx.timezone (the user's Calendar preference). */
   const nowBlock = buildNowBlock(ctx.timezone);
 
+  /* WHO YOU ARE TALKING TO.
+
+     This was missing entirely, so an agent running inside the user's own
+     authenticated session answered "I don't have access to your identity"
+     when asked its user's name — technically honest about the prompt, and
+     absurd to the person reading it. Naming the SIGNED-IN user is not a
+     disclosure: it is the one identity they already own. Everything about
+     OTHER people stays behind the permission layer exactly as before. */
+  const v = ctx.viewer;
+  const memoryLines = Object.entries(ctx.memory);
+  const viewerBlock = `
+Who you are talking to (from their signed-in session — you DO know this):
+- Name: ${v.name || v.username}
+- Username: ${v.username}
+- Role: ${v.role || "not set"}${v.isSuperAdmin ? " (super admin)" : ""}
+- Department: ${v.department || "not set"}
+Use their name naturally when it helps. Never claim you don't know who they are.
+${memoryLines.length
+    ? `
+Things they asked you to remember:
+${memoryLines.map(([k, val]) => `- ${k}: ${val}`).join("\n")}`
+    : ""}
+Anything personal NOT listed above (birthday, preferences, family, plans) you genuinely
+do not know. Don't guess and don't invent it — ASK them, in one short question. When they
+answer, call remember_about_user to save it so you still know it next time. Facts about
+OTHER people and company data stay governed by their permissions — this changes nothing there.
+`;
+
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
+
+${viewerBlock}
 
 ${BRAND_EXCLUSIVITY_RULE}
 

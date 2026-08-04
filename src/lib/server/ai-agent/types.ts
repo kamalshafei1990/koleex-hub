@@ -61,6 +61,23 @@ export interface UserContext {
    *  event times in the user's local time, not the model's stale idea of
    *  "now" or naive UTC. */
   timezone: string;
+  /* ── Who the agent is talking to ────────────────────────────────────
+     The session always knew this; the model never did, so "do you know
+     who I am?" got an honest but absurd "I have no access to your
+     identity" from an agent running inside the user's own authenticated
+     session. Telling the model the SIGNED-IN user's own identity is not
+     a disclosure — it is the one person whose data they already own. */
+  viewer: {
+    name: string | null;
+    username: string;
+    role: string | null;
+    department: string | null;
+    isSuperAdmin: boolean;
+  };
+  /* Facts the user asked the agent to remember, stored per account in
+     accounts.preferences.ai_memory (no new table). Key → value, e.g.
+     { birthday: "3 March", prefers: "short answers" }. */
+  memory: Record<string, string>;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

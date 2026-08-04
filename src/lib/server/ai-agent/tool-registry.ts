@@ -40,6 +40,7 @@ import { todoTools } from "./tools/todos";
 import { projectTools } from "./tools/projects";
 import { planningTools } from "./tools/planning";
 import { calendarTools } from "./tools/calendar";
+import { userMemoryTools } from "./tools/user-memory";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -56,6 +57,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...projectTools,
       ...planningTools,
       ...calendarTools,
+  ...userMemoryTools,
     ].map((t) => [t.name, t]),
   ),
 );

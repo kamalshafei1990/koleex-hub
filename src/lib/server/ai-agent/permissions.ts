@@ -104,15 +104,42 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     // latency; used to give the agent the user's real "now".
     supabaseServer
       .from("accounts")
-      .select("preferences")
+      .select("preferences, username, person:person_id(full_name, name_alt), role:role_id(name)")
       .eq("id", auth.account_id)
       .maybeSingle(),
   ]);
 
   const prefs = (prefsRes.data?.preferences ?? {}) as {
     calendar?: { timezone?: string };
+    ai_memory?: Record<string, string>;
   };
   const timezone = prefs.calendar?.timezone || "Asia/Dubai";
+
+  /* Identity of the person actually typing. Supabase returns an embedded
+     one-to-one as either an object or a single-element array depending on
+     the relationship shape, so normalise both. */
+  const row = prefsRes.data as unknown as {
+    username?: string;
+    person?: { full_name?: string | null } | Array<{ full_name?: string | null }> | null;
+    role?: { name?: string | null } | Array<{ name?: string | null }> | null;
+  } | null;
+  const one = <T,>(v: T | T[] | null | undefined): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+  const viewer = {
+    name: one(row?.person)?.full_name ?? null,
+    username: auth.username,
+    role: one(row?.role)?.name ?? null,
+    department: auth.department,
+    isSuperAdmin: superAdmin,
+  };
+
+  /* Only well-formed string facts — never let arbitrary JSON reach the prompt. */
+  const memory: Record<string, string> = {};
+  for (const [k, v] of Object.entries(prefs.ai_memory ?? {})) {
+    if (typeof k === "string" && typeof v === "string" && k.length <= 40 && v.length <= 200) {
+      memory[k] = v;
+    }
+  }
 
   const modulePermissions: UserContext["modulePermissions"] = {};
 
@@ -166,6 +193,8 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     isSuperAdmin: superAdmin,
     canViewPrivate,
     timezone,
+    viewer,
+    memory,
   };
 }
 
