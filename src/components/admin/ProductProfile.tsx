@@ -39,6 +39,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
 
 /* ── Translation ──────────────────────────────────────────────────────────
@@ -159,6 +160,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.updated":     { en: "Last updated",       zh: "最后更新",       ar: "آخر تحديث" },
   "pp.f.schemaVer":   { en: "Schema version",     zh: "模板版本",       ar: "إصدار القالب" },
   "pp.f.supPhoto":    { en: "Supplier product photo", zh: "供应商产品照片", ar: "صورة المنتج لدى المورّد" },
+  "pp.f.classification": { en: "Classification", zh: "分类", ar: "التصنيف" },
   "pp.f.heroPoster":  { en: "Hero poster",        zh: "首页海报",       ar: "بوستر الواجهة" },
   "pp.f.brandMark":   { en: "Brand mark",         zh: "品牌标识",       ar: "علامة العلامة التجارية" },
   /* empty-state lines */
@@ -175,7 +177,7 @@ type Row = Record<string, unknown>;
 interface Profile {
   product: Row;
   subcategory: { slug: string; code: string; name: string } | null;
-  schema: { name: string; version: string; groups: Array<{ key?: string; title?: string; fields?: Array<{ key: string; label?: string; unit?: string }> }> } | null;
+  schema: { name: string; version: string; groups: Array<{ key?: string; title?: string; fields?: Array<{ key: string; label?: string; unit?: string; description?: string; required?: boolean; publicVisible?: boolean; aiReadable?: boolean; internalOnly?: boolean }> }> } | null;
   models: Row[];
   media: Row[];
   translations: Row[];
@@ -223,15 +225,6 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
     return <span className="text-[11px] font-mono text-[var(--text-subtle)] break-all">{JSON.stringify(v)}</span>;
   }
   return <span className={`text-[13px] text-[var(--text-primary)] ${mono ? "font-mono text-[12px]" : ""} break-words`}>{String(v)}</span>;
-}
-
-function Field({ label, value, mono }: { label: string; value: unknown; mono?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{label}</div>
-      <Val v={value} mono={mono} />
-    </div>
-  );
 }
 
 /* The editor's Section card, field-for-field: icon in a rounded square,
@@ -317,6 +310,27 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
   { type: "ar_3d",         fallback: "3D / AR" },
   { type: "video",         fallback: "Video" },
 ];
+
+/* The editor's field row: label on top, value under it, help line beneath.
+   Used by every tab so a reader never meets two different field shapes. */
+function Row({ label, value, help, mono, badge }: {
+  label: string; value: unknown; help?: string; mono?: boolean; badge?: string;
+}) {
+  return (
+    <div className="py-3 first:pt-0 last:pb-0">
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <span className="text-[12.5px] font-medium text-[var(--text-primary)]">{label}</span>
+        {badge && (
+          <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">{badge}</span>
+        )}
+      </div>
+      <div className="mb-1"><Val v={value} mono={mono} /></div>
+      {help && <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">{help}</p>}
+    </div>
+  );
+}
+
+const rows = "divide-y divide-[var(--border-subtle)]";
 
 const grid = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4";
 
@@ -419,17 +433,33 @@ export default function ProductProfile() {
 
       <ProfileTabs current={step} onPick={setStep} />
 
+      {/* The editor keeps the classification visible above every tab but the
+         first, so you always know what template you are reading against. */}
+      {STEPS[step].id !== "classify" && (
+        <div className="flex items-center gap-2 flex-wrap text-[12px] mb-4 px-1">
+          <span className="uppercase tracking-wider text-[10px] text-[var(--text-ghost)]">{t("pp.f.classification", "Classification")}:</span>
+          <span className="text-[var(--text-dim)]">{(s2("division_slug") as string) || "—"}</span>
+          <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+          <span className="text-[var(--text-dim)]">{(s2("category_slug") as string) || "—"}</span>
+          <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+          <span className="text-[var(--text-primary)] font-medium">{data.subcategory?.name ?? "—"}</span>
+          {data.subcategory?.code && (
+            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{data.subcategory.code}</span>
+          )}
+        </div>
+      )}
+
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
       <Group icon={<FolderTreeIcon className="h-4 w-4" />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
-        <div className={grid}>
-          <Field label={t("pp.f.division", "Division")} value={s2("division_slug")} />
-          <Field label={t("pp.f.category", "Category")} value={s2("category_slug")} />
-          <Field label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
-          <Field label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
-          <Field label={t("pp.f.family", "Family")} value={s2("family")} />
-          <Field label={t("pp.f.level", "Level")} value={s2("level")} />
-          <Field label={t("pp.f.template", "Spec template")} value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
+        <div className={rows}>
+          <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} />
+          <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} />
+          <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
+          <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
+          <Row label={t("pp.f.family", "Family")} value={s2("family")} />
+          <Row label={t("pp.f.level", "Level")} value={s2("level")} />
+          <Row label={t("pp.f.template", "Spec template")} value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
         </div>
       </Group>
       )}
@@ -462,15 +492,15 @@ export default function ProductProfile() {
                         : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
                     </div>
                   </div>
-                  <div className={grid.replace("lg:grid-cols-4", "lg:grid-cols-2")}>
-                  <Field label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
-                  <Field label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
-                  {data.costVisible && <Field label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
-                  <Field label={t("pp.f.supplyType", "Supply type")} value={sup.supply_type} />
-                  <Field label={t("pp.f.incoterms", "Incoterms")} value={sup.incoterms} />
-                  <Field label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
-                  <Field label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
-                  <Field label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
+                  <div className={rows}>
+                  <Row label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
+                  <Row label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
+                  {data.costVisible && <Row label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
+                  <Row label={t("pp.f.supplyType", "Supply type")} value={sup.supply_type} />
+                  <Row label={t("pp.f.incoterms", "Incoterms")} value={sup.incoterms} />
+                  <Row label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
+                  <Row label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
+                  <Row label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
                   </div>
                 </div>
               </div>
@@ -496,74 +526,110 @@ export default function ProductProfile() {
                   : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
               </div>
             </div>
-            <div className={grid.replace("lg:grid-cols-4", "lg:grid-cols-2")}>
-              <Field label={t("pp.f.status", "Status")} value={s2("status")} />
-              <Field label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
-              <Field label={t("pp.f.featured", "Featured")} value={s2("featured")} />
-              <Field label={t("pp.f.level", "Level")} value={s2("level")} />
-              <Field label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
-              <Field label={t("pp.f.koleexCode", "KOLEEX code")} value={data.models[0]?.primary_model} mono />
+            <div className={rows}>
+              <Row label={t("pp.f.status", "Status")} value={s2("status")} />
+              <Row label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
+              <Row label={t("pp.f.featured", "Featured")} value={s2("featured")} />
+              <Row label={t("pp.f.level", "Level")} value={s2("level")} />
+              <Row label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
+              <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={data.models[0]?.primary_model} mono />
             </div>
           </div>
-          <div className={grid}>
-            <Field label={t("pp.f.publicUrl", "Public URL")} value={s2("slug")} mono />
-            <Field label={t("pp.f.brand", "Brand")} value={s2("brand")} />
-            <Field label={t("pp.f.manufacturer", "Manufacturer")} value={s2("manufacturer")} />
-            <Field label={t("pp.f.mpn", "MPN")} value={s2("mpn")} mono />
-            <Field label={t("pp.f.gtin", "GTIN")} value={s2("gtin")} mono />
-            <Field label={t("pp.f.sku", "Internal SKU")} value={s2("internal_sku")} mono />
-            <Field label={t("pp.f.legacy", "Legacy code")} value={s2("legacy_code")} mono />
-            <Field label={t("pp.f.generation", "Generation")} value={s2("generation")} />
-            <Field label={t("pp.f.modelYear", "Model year")} value={s2("model_year")} />
-            <Field label={t("pp.f.launch", "Launch date")} value={s2("launch_date")} />
-            <Field label={t("pp.f.eol", "End of life")} value={s2("eol_date")} />
-            <Field label={t("pp.f.availFrom", "Available from")} value={s2("available_from")} />
-            <Field label={t("pp.f.lastOrder", "Last order date")} value={s2("last_order_date")} />
-            <Field label={t("pp.f.aliases", "Alternate names")} value={s2("alternate_names")} />
-            <Field label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
+          <div className={rows}>
+            <Row label={t("pp.f.publicUrl", "Public URL")} value={s2("slug")} mono />
+            <Row label={t("pp.f.brand", "Brand")} value={s2("brand")} />
+            <Row label={t("pp.f.manufacturer", "Manufacturer")} value={s2("manufacturer")} />
+            <Row label={t("pp.f.mpn", "MPN")} value={s2("mpn")} mono />
+            <Row label={t("pp.f.gtin", "GTIN")} value={s2("gtin")} mono />
+            <Row label={t("pp.f.sku", "Internal SKU")} value={s2("internal_sku")} mono />
+            <Row label={t("pp.f.legacy", "Legacy code")} value={s2("legacy_code")} mono />
+            <Row label={t("pp.f.generation", "Generation")} value={s2("generation")} />
+            <Row label={t("pp.f.modelYear", "Model year")} value={s2("model_year")} />
+            <Row label={t("pp.f.launch", "Launch date")} value={s2("launch_date")} />
+            <Row label={t("pp.f.eol", "End of life")} value={s2("eol_date")} />
+            <Row label={t("pp.f.availFrom", "Available from")} value={s2("available_from")} />
+            <Row label={t("pp.f.lastOrder", "Last order date")} value={s2("last_order_date")} />
+            <Row label={t("pp.f.aliases", "Alternate names")} value={s2("alternate_names")} />
+            <Row label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
           </div>
         </Group>
         <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
-            <Field label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
-            <Field label={t("pp.f.description", "Full description")} value={s2("description")} />
-            <Field label={t("pp.f.highlights", "Highlights")} value={s2("highlights")} />
-            <Field label={t("pp.f.tags", "Tags")} value={s2("tags")} />
+            <Row label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
+            <Row label={t("pp.f.description", "Full description")} value={s2("description")} />
+            <Row label={t("pp.f.highlights", "Highlights")} value={s2("highlights")} />
+            <Row label={t("pp.f.tags", "Tags")} value={s2("tags")} />
           </div>
         </Group>
         <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
             ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
-            : <div className={grid}>{data.translations.map((tr, i) => <Field key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
+            : <div className={rows}>{data.translations.map((tr, i) => <Row key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
         </Group>
       </div>
       )}
 
       {STEPS[step].id === "specs" && (
-      <Group icon={<Settings2Icon className="h-4 w-4" />} title={t("pp.sec.specs", "Specifications")} count={data.schema ? undefined : "no template"} onEdit={() => goStep("specs")}>
-        {!data.schema ? (
+      !data.schema ? (
+        <Group icon={<Settings2Icon className="h-4 w-4" />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
           <p className="text-[12px] text-[var(--text-ghost)] italic">
             {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
           </p>
-        ) : (
-          <div className="space-y-5">
-            {(data.schema.groups ?? []).map((g, gi) => (
-              <div key={gi}>
-                <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">{g.title || g.key}</div>
-                <div className={grid}>
-                  {(g.fields ?? []).map((f) => (
-                    <Field
-                      key={f.key}
-                      label={`${f.label || f.key}${f.unit ? ` (${f.unit})` : ""}`}
-                      value={(s2("schema_specs") as Record<string, unknown> | null)?.[f.key]}
-                    />
+        </Group>
+      ) : (
+        <div className="space-y-4">
+          {(data.schema.groups ?? []).map((g, gi) => {
+            const fields = g.fields ?? [];
+            const specs = (s2("schema_specs") as Record<string, unknown> | null) ?? {};
+            const isFilled = (k: string) => {
+              const v = specs[k];
+              return !(v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0));
+            };
+            const done = fields.filter((f) => isFilled(f.key)).length;
+            return (
+              <Group
+                key={gi}
+                icon={<Settings2Icon className="h-4 w-4" />}
+                title={g.title || g.key || ""}
+                count={`${done}/${fields.length}`}
+                onEdit={() => goStep("specs")}
+              >
+                {/* One field per row with its own help line — the editor's
+                    shape. A four-column grid packed more in but stripped the
+                    descriptions, which are half of what makes a spec field
+                    fillable. */}
+                <div className="divide-y divide-[var(--border-subtle)]">
+                  {fields.map((f) => (
+                    <div key={f.key} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <span className="text-[12.5px] font-medium text-[var(--text-primary)]">
+                          {f.label || f.key}
+                          {f.required && <span className="text-rose-400 ms-1">*</span>}
+                        </span>
+                        <span className="flex items-center gap-1 shrink-0">
+                          {f.internalOnly
+                            ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]">INTERNAL</span>
+                            : f.publicVisible
+                            ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-400/90">PUBLIC</span>
+                            : null}
+                          {f.aiReadable && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">AI</span>}
+                        </span>
+                      </div>
+                      <div className="mb-1">
+                        <Val v={specs[f.key]} />
+                        {f.unit && isFilled(f.key) ? <span className="text-[11px] text-[var(--text-ghost)] ms-1">{f.unit}</span> : null}
+                      </div>
+                      {f.description && (
+                        <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">{f.description}</p>
+                      )}
+                    </div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+              </Group>
+            );
+          })}
+        </div>
+      )
       )}
 
       {STEPS[step].id === "commercial" && (
@@ -579,15 +645,15 @@ export default function ProductProfile() {
                   <span className="text-[11px] font-mono text-[var(--text-dim)]">{(m.primary_model as string) || "—"}</span>
                   {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
                 </div>
-                <div className={grid}>
-                  <Field label={t("pp.f.variantName", "Variant name")} value={m.model_name} />
-                  <Field label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
-                  <Field label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
-                  <Field label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
-                  <Field label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
-                  <Field label={t("pp.f.barcode", "Barcode")} value={m.barcode} mono />
-                  <Field label={t("pp.f.visible", "Visible")} value={m.visible} />
-                  <Field label={t("pp.f.status", "Status")} value={m.status} />
+                <div className={rows}>
+                  <Row label={t("pp.f.variantName", "Variant name")} value={m.model_name} />
+                  <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
+                  <Row label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
+                  <Row label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
+                  <Row label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
+                  <Row label={t("pp.f.barcode", "Barcode")} value={m.barcode} mono />
+                  <Row label={t("pp.f.visible", "Visible")} value={m.visible} />
+                  <Row label={t("pp.f.status", "Status")} value={m.status} />
                 </div>
               </div>
             ))}
@@ -607,15 +673,15 @@ export default function ProductProfile() {
                 <div className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">
                   {(m.model_name as string) || "Untitled variant"}
                 </div>
-                <div className={grid}>
-                  <Field label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
-                  <Field label={t("pp.f.priceNote", "Price note")} value={m.price_note} />
-                  {data.costVisible && <Field label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price} />}
-                  <Field label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
-                  {data.costVisible && <Field label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
-                  {data.costVisible && <Field label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}
-                  <Field label={t("pp.f.moq", "MOQ")} value={m.moq} />
-                  <Field label={t("pp.f.leadTime", "Lead time")} value={m.lead_time} />
+                <div className={rows}>
+                  <Row label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
+                  <Row label={t("pp.f.priceNote", "Price note")} value={m.price_note} />
+                  {data.costVisible && <Row label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price} />}
+                  <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
+                  {data.costVisible && <Row label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
+                  {data.costVisible && <Row label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}
+                  <Row label={t("pp.f.moq", "MOQ")} value={m.moq} />
+                  <Row label={t("pp.f.leadTime", "Lead time")} value={m.lead_time} />
                 </div>
               </div>
             ))}
@@ -626,26 +692,26 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "logistics" && (
       <Group icon={<GlobeIcon className="h-4 w-4" />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
-        <div className={grid}>
-          <Field label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
-          <Field label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
-          <Field label={t("pp.f.moq", "MOQ")} value={s2("moq")} />
-          <Field label={t("pp.f.leadTime", "Lead time")} value={s2("lead_time")} />
-          <Field label={t("pp.f.machineWeight", "Machine weight (kg)")} value={s2("machine_weight_kg")} />
-          <Field label={t("pp.f.machineDims", "Machine dimensions")} value={s2("machine_dimensions")} />
+        <div className={rows}>
+          <Row label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
+          <Row label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
+          <Row label={t("pp.f.moq", "MOQ")} value={s2("moq")} />
+          <Row label={t("pp.f.leadTime", "Lead time")} value={s2("lead_time")} />
+          <Row label={t("pp.f.machineWeight", "Machine weight (kg)")} value={s2("machine_weight_kg")} />
+          <Row label={t("pp.f.machineDims", "Machine dimensions")} value={s2("machine_dimensions")} />
         </div>
         {data.models[0] && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
             <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">{t("pp.f.packingTitle", "Primary variant packing")}</div>
-            <div className={grid}>
-              <Field label={t("pp.f.netWeight", "Net weight")} value={data.models[0].net_weight} />
-              <Field label={t("pp.f.grossWeight", "Gross weight")} value={data.models[0].weight} />
-              <Field label={t("pp.f.cbm", "CBM")} value={data.models[0].cbm} />
-              <Field label={t("pp.f.carton", "Carton dimensions")} value={data.models[0].carton_dimensions} />
-              <Field label={t("pp.f.packingType", "Packing type")} value={data.models[0].packing_type} />
-              <Field label={t("pp.f.q20", "20ft qty")} value={data.models[0].container_20ft_qty} />
-              <Field label={t("pp.f.q40", "40ft qty")} value={data.models[0].container_40ft_qty} />
-              <Field label={t("pp.f.q40hq", "40HQ qty")} value={data.models[0].container_40hq_qty} />
+            <div className={rows}>
+              <Row label={t("pp.f.netWeight", "Net weight")} value={data.models[0].net_weight} />
+              <Row label={t("pp.f.grossWeight", "Gross weight")} value={data.models[0].weight} />
+              <Row label={t("pp.f.cbm", "CBM")} value={data.models[0].cbm} />
+              <Row label={t("pp.f.carton", "Carton dimensions")} value={data.models[0].carton_dimensions} />
+              <Row label={t("pp.f.packingType", "Packing type")} value={data.models[0].packing_type} />
+              <Row label={t("pp.f.q20", "20ft qty")} value={data.models[0].container_20ft_qty} />
+              <Row label={t("pp.f.q40", "40ft qty")} value={data.models[0].container_40ft_qty} />
+              <Row label={t("pp.f.q40hq", "40HQ qty")} value={data.models[0].container_40hq_qty} />
             </div>
           </div>
         )}
@@ -654,22 +720,22 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "compliance" && (
       <Group icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
-        <div className={grid}>
-          <Field label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
-          <Field label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
-          <Field label={t("pp.f.warrStart", "Starts from")} value={s2("warranty_start_from")} />
-          <Field label={t("pp.f.warrCover", "Coverage")} value={s2("warranty_coverage")} />
-          <Field label={t("pp.f.warrExcl", "Exclusions")} value={s2("warranty_exclusions")} />
-          <Field label={t("pp.f.ce", "CE certified")} value={s2("ce_certified")} />
-          <Field label={t("pp.f.rohs", "RoHS compliant")} value={s2("rohs_compliant")} />
-          <Field label={t("pp.f.spares", "Spare parts availability")} value={s2("spare_parts_availability")} />
-          <Field label={t("pp.f.serviceLife", "Service life")} value={s2("service_life")} />
-          <Field label={t("pp.f.maintenance", "Maintenance interval")} value={s2("maintenance_interval")} />
-          <Field label={t("pp.f.support", "Technical support")} value={s2("technical_support")} />
-          <Field label={t("pp.f.channels", "Support channels")} value={s2("support_channels")} />
-          <Field label={t("pp.f.training", "Training available")} value={s2("training_available")} />
-          <Field label={t("pp.f.installation", "Installation service")} value={s2("installation_service")} />
-          <Field label={t("pp.f.returns", "Returns policy")} value={s2("returns_policy")} />
+        <div className={rows}>
+          <Row label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
+          <Row label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
+          <Row label={t("pp.f.warrStart", "Starts from")} value={s2("warranty_start_from")} />
+          <Row label={t("pp.f.warrCover", "Coverage")} value={s2("warranty_coverage")} />
+          <Row label={t("pp.f.warrExcl", "Exclusions")} value={s2("warranty_exclusions")} />
+          <Row label={t("pp.f.ce", "CE certified")} value={s2("ce_certified")} />
+          <Row label={t("pp.f.rohs", "RoHS compliant")} value={s2("rohs_compliant")} />
+          <Row label={t("pp.f.spares", "Spare parts availability")} value={s2("spare_parts_availability")} />
+          <Row label={t("pp.f.serviceLife", "Service life")} value={s2("service_life")} />
+          <Row label={t("pp.f.maintenance", "Maintenance interval")} value={s2("maintenance_interval")} />
+          <Row label={t("pp.f.support", "Technical support")} value={s2("technical_support")} />
+          <Row label={t("pp.f.channels", "Support channels")} value={s2("support_channels")} />
+          <Row label={t("pp.f.training", "Training available")} value={s2("training_available")} />
+          <Row label={t("pp.f.installation", "Installation service")} value={s2("installation_service")} />
+          <Row label={t("pp.f.returns", "Returns policy")} value={s2("returns_policy")} />
         </div>
         {data.certifications.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-2">
@@ -756,8 +822,8 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "knowledge" && (
       <Group icon={<BookOpenIcon className="h-4 w-4" />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
-        <div className={grid}>
-          <Field label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
+        <div className={rows}>
+          <Row label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>
         {data.related.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-1.5">
@@ -788,19 +854,19 @@ export default function ProductProfile() {
                 <span className="text-[13px] font-bold tabular-nums text-[var(--text-primary)]">{readiness}%</span>
               </div>
               {data.readiness?.dimensions && (
-                <div className={grid}>
-                  {data.readiness.dimensions.map((d) => <Field key={d.key} label={d.label} value={`${d.score}%`} />)}
+                <div className={rows}>
+                  {data.readiness.dimensions.map((d) => <Row key={d.key} label={d.label} value={`${d.score}%`} />)}
                 </div>
               )}
             </div>
           )}
         </Group>
         <Group icon={<CheckIcon className="h-4 w-4" />} title={t("pp.sec.record", "Record")}>
-          <div className={grid}>
-            <Field label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
-            <Field label={t("pp.f.created", "Created")} value={s2("created_at")} />
-            <Field label={t("pp.f.updated", "Last updated")} value={s2("updated_at")} />
-            <Field label={t("pp.f.schemaVer", "Schema version")} value={s2("schema_version")} />
+          <div className={rows}>
+            <Row label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
+            <Row label={t("pp.f.created", "Created")} value={s2("created_at")} />
+            <Row label={t("pp.f.updated", "Last updated")} value={s2("updated_at")} />
+            <Row label={t("pp.f.schemaVer", "Schema version")} value={s2("schema_version")} />
           </div>
         </Group>
       </div>
