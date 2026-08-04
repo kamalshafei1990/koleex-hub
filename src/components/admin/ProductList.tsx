@@ -515,10 +515,35 @@ export default function ProductList() {
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
   // Classification-icon hub overrides (level → slug → url). Lets the icons set
   // in the Database app surface as section markers in the catalogue.
-  const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
+  /* WARM START. The real icons live in the Classification Icon Hub and arrive
+     on their own request, so every open used to paint the built-in fallback
+     first and swap to the real icon a moment later — the "icons change after
+     loading" flicker. Everything else on this page already warm-starts from
+     localStorage (products, taxonomy, thumbnails); the icon map was the one
+     that didn't. Seeding from the last known map means the first frame is
+     already correct on every visit after the first, and the network response
+     just confirms or updates it.
+
+     Icons are URLs keyed by slug — small, and no cost/supplier data — so the
+     cache is safe to keep. Scoped like its siblings so nothing bleeds across
+     tenants or a view-as switch. */
+  const ICONS_KEY = "kx_class_icons_v1";
+  const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem(`${ICONS_KEY}:${currentScopeKey()}`);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch { return {}; }
+  });
   useEffect(() => {
     let alive = true;
-    fetchClassificationIcons().then((v) => { if (alive) setClassIcons(v); }).catch(() => {});
+    fetchClassificationIcons().then((v) => {
+      if (!alive || !v || Object.keys(v).length === 0) return;
+      setClassIcons(v);
+      try { window.localStorage.setItem(`${ICONS_KEY}:${currentScopeKey()}`, JSON.stringify(v)); }
+      catch { /* quota guard */ }
+    }).catch(() => {});
     return () => { alive = false; };
   }, []);
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
