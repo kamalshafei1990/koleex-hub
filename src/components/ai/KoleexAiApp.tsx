@@ -1430,8 +1430,18 @@ export default function KoleexAiApp() {
           ) : (
             groups.map((g) => (
               <div key={g.label}>
-                <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold text-[var(--text-dim)]">
-                  {g.label}
+                {/* A date is chrome, not a conversation. This used to be
+                    10px bold dim text sitting directly above 12px medium
+                    muted rows — two greys a fifth of an alpha apart, both
+                    left-aligned — so "Yesterday" scanned as just another
+                    chat title. It now carries a hairline rule across the
+                    rest of the row and sticks while the list scrolls,
+                    which reads unmistakably as a section divider. */}
+                <div className="sticky top-0 z-[1] bg-[var(--bg-secondary)] px-4 pt-3 pb-1.5 flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] shrink-0">
+                    {g.label}
+                  </span>
+                  <span className="h-px flex-1 bg-[var(--border-subtle)]" aria-hidden="true" />
                 </div>
                 {g.rows.map((c) => (
                   <SidebarRow
@@ -2334,10 +2344,10 @@ function SidebarRow({
       className={`group px-3 py-2 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
-          : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"
+          : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <div className="text-[12px] font-medium truncate flex-1 min-w-0">
+      <div className="text-[13px] font-medium truncate flex-1 min-w-0">
         {row.title}
       </div>
       <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
