@@ -3070,10 +3070,25 @@ export default function ProductForm({ productId }: Props) {
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {([
-                          { v: "entry", label: t("hero.levelEntry", "Entry") },
-                          { v: "mid", label: t("hero.levelMid", "Mid") },
-                          { v: "premium", label: t("hero.levelPremium", "Premium") },
-                          { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise") },
+                          /* An ordinal ramp, cool -> warm, so the four read as
+                             a ladder at a glance instead of four identical
+                             chips. Colour is functional here (it encodes rank),
+                             which is the one case the monochrome-first brand
+                             rule allows. Fixed width so the row is a ruler —
+                             the labels differ in length, and ragged chips made
+                             the ladder hard to scan. */
+                          { v: "entry", label: t("hero.levelEntry", "Entry"),
+                            on: "bg-slate-400/15 text-slate-300 border-slate-400/40",
+                            dot: "bg-slate-400" },
+                          { v: "mid", label: t("hero.levelMid", "Mid"),
+                            on: "bg-[#567FB2]/15 text-[#BCD8F0] border-[#567FB2]/50",
+                            dot: "bg-[#7FA9D6]" },
+                          { v: "premium", label: t("hero.levelPremium", "Premium"),
+                            on: "bg-violet-500/15 text-violet-300 border-violet-500/45",
+                            dot: "bg-violet-400" },
+                          { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise"),
+                            on: "bg-amber-500/15 text-amber-300 border-amber-500/50",
+                            dot: "bg-amber-400" },
                         ] as const).map(l => {
                           const active = product.level === l.v;
                           return (
@@ -3081,12 +3096,13 @@ export default function ProductForm({ productId }: Props) {
                               key={l.v}
                               type="button"
                               onClick={() => updateProduct_({ level: active ? "" : l.v })}
-                              className={`h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                              className={`h-7 w-[104px] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
                                 active
-                                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                                  ? l.on
                                   : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:border-[var(--border-focus)]"
                               }`}
                             >
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${active ? l.dot : "bg-[var(--border-subtle)]"}`} />
                               {l.label}
                             </button>
                           );
