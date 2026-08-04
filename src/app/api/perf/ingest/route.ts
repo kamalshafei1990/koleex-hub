@@ -106,7 +106,17 @@ export async function POST(req: Request) {
      these six metrics we DO store account_id, because the point is to
      find whether one employee's connection is the outlier. Remove the
      column (or drop the table) once the comparison is done. */
-  const persist = clean.filter((m) => BASELINE_METRICS.has(m.n)).slice(0, 12);
+  /* A load that "took" hours was not loading — it was a tab left open in the
+     background, where the interactive mark lands whenever the tab is finally
+     shown. One such row (30,278,677 ms = 8.4 h) dragged the average of 19
+     samples to 1,628 s while the median sat at a truthful 2.2 s. A baseline
+     that a single hidden tab can distort is worse than no baseline, because
+     the before/after comparison would be argued over instead of trusted. */
+  const SANE_MAX_MS = 120_000;
+  const persist = clean
+    .filter((m) => BASELINE_METRICS.has(m.n))
+    .filter((m) => m.v >= 0 && m.v <= SANE_MAX_MS)
+    .slice(0, 12);
   if (persist.length) {
     /* Fire-and-forget: a metrics write must never delay or fail the
        response it rides on. */
