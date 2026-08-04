@@ -491,9 +491,42 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     <label className={lbl}>{t("mv.costCny", "Cost Price (CNY)")}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">¥</span>
-                      <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                      <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`}
+                        disabled={model.pricing_mode === "on_request"} />
                     </div>
                   </div>
+                </div>
+
+                {/* ── How this model is priced ──
+                    Without this, a machine that is quoted per configuration
+                    could only be recorded by leaving the price blank — which
+                    the grid and the readiness score read as MISSING DATA, so a
+                    complete record sat at a permanent penalty and buried the
+                    products that really were unfinished. */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                  <div>
+                    <label className={lbl}>{t("mv.pricingMode", "Pricing")}</label>
+                    <select
+                      value={model.pricing_mode || "fixed"}
+                      onChange={(e) => onUpdate({ pricing_mode: e.target.value as "fixed" | "from" | "on_request" })}
+                      className={inp}
+                    >
+                      <option value="fixed">{t("mv.pricingFixed", "Fixed price")}</option>
+                      <option value="from">{t("mv.pricingFrom", "From — base + options")}</option>
+                      <option value="on_request">{t("mv.pricingOnRequest", "Priced per configuration")}</option>
+                    </select>
+                  </div>
+                  {model.pricing_mode && model.pricing_mode !== "fixed" && (
+                    <div className="md:col-span-2">
+                      <label className={lbl}>{t("mv.priceNote", "What drives the price")}</label>
+                      <input
+                        value={model.price_note || ""}
+                        onChange={(e) => onUpdate({ price_note: e.target.value })}
+                        placeholder={t("mv.phPriceNote", "e.g. depends on table width, motor and automation level")}
+                        className={inp}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                   <div>

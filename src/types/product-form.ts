@@ -136,6 +136,12 @@ export interface ModelFormState {
   supplier: string;
   reference_model: string;
   cost_price: string;
+  /* How this model is priced. 'fixed' keeps today's behaviour for every
+     existing row; 'from' means the figures above are a base that options add
+     to; 'on_request' means there is no list price and a blank cost is the
+     answer rather than a gap. */
+  pricing_mode: "fixed" | "from" | "on_request";
+  price_note: string;
   global_price: string;
   supports_head_only: boolean | null;
   supports_complete_set: boolean | null;
@@ -406,6 +412,8 @@ export function createEmptyModel(): ModelFormState {
     supplier: "",
     reference_model: "",
     cost_price: "",
+    pricing_mode: "fixed",
+    price_note: "",
     global_price: "",
     supports_head_only: null,
     supports_complete_set: null,

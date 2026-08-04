@@ -132,6 +132,10 @@ export interface ProductSignal {
   readiness: number | null;
   missing: string[];
   cost: number | null;
+  /* fixed = one list price. from = base + priced options. on_request =
+     quoted per configuration, so an empty cost is the ANSWER, not a gap. */
+  pricingMode: "fixed" | "from" | "on_request";
+  priceNote: string | null;
   visible: boolean;
   updatedAt: string | null;
   supplier: { name: string; logo: string | null } | null;
@@ -443,11 +447,22 @@ const ProductCard = memo(function ProductCard({
                 dim currency mark, large tabular figure. */}
             <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
-                <span className="flex items-baseline gap-1 shrink-0">
+                <span className="flex items-baseline gap-1 shrink-0" title={signal.priceNote || undefined}>
+                  {/* "From" tells the operator this figure is a floor, not the
+                      price — the options add to it. */}
+                  {signal.pricingMode === "from" && (
+                    <span className="text-[10px] font-medium text-[var(--text-ghost)] me-0.5">{t("card.priceFrom", "From")}</span>
+                  )}
                   <span className="text-[11px] font-medium text-[var(--text-ghost)]">¥</span>
                   <span className="text-[17px] md:text-[18px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] leading-none">
                     {signal.cost.toLocaleString()}
                   </span>
+                </span>
+              ) : signal.pricingMode === "on_request" ? (
+                /* Priced per configuration — a real answer, so it reads as
+                   information and not as the amber "you forgot something". */
+                <span className="text-[10px] font-medium text-[var(--text-subtle)]" title={signal.priceNote || undefined}>
+                  {t("card.priceOnRequest", "Priced per configuration")}
                 </span>
               ) : (
                 <span className="text-[10px] text-[var(--text-ghost)] max-sm:hidden">{t("card.noCostYet", "Cost not set")}</span>

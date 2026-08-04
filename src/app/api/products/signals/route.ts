@@ -63,7 +63,7 @@ export async function GET() {
       .order("order", { ascending: true }),
     supabaseServer
       .from("product_models")
-      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, "order"')
+      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, "order"')
       .order("order", { ascending: true }),
     /* Supplier directory — 145 rows, logo columns are URLs (verified: 0
        base64), so shipping them in a bulk payload is safe. */
@@ -143,7 +143,7 @@ export async function GET() {
   /* first model per product (rows pre-sorted by order) */
   const primary = new Map<
     string,
-    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null; supplier: string | null }
+    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null; supplier: string | null; pricing_mode: string | null; price_note: string | null }
   >();
   for (const m of (modelRes.data ?? []) as Array<{
     product_id: string;
@@ -152,6 +152,8 @@ export async function GET() {
     cost_price: number | null;
     global_price: number | null;
     supplier: string | null;
+    pricing_mode: string | null;
+    price_note: string | null;
   }>) {
     if (!primary.has(m.product_id)) primary.set(m.product_id, m);
     counts[m.product_id] = (counts[m.product_id] || 0) + 1;
@@ -172,6 +174,8 @@ export async function GET() {
       readiness: number | null;
       missing: string[];
       cost: number | null;
+      pricingMode: "fixed" | "from" | "on_request";
+      priceNote: string | null;
       visible: boolean;
       updatedAt: string | null;
       supplier: { name: string; logo: string | null } | null;
@@ -204,6 +208,7 @@ export async function GET() {
         supplier_model: model?.model_name ?? null,
         cost_price: model?.cost_price ?? null,
         global_price: model?.global_price ?? null,
+        pricing_mode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
         warranty: p.warranty,
         moq: p.moq == null ? null : String(p.moq),
         lead_time: p.lead_time,
@@ -219,13 +224,18 @@ export async function GET() {
     if (Object.values(values).filter((v) => v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)).length === 0)
       missing.push("specs");
     if (!model?.primary_model) missing.push("code");
-    if (model?.cost_price == null) missing.push("cost");
+    /* Only a FIXED-price model can be "missing" its cost. A machine quoted
+       per configuration has no cost to fill in, and flagging it forever was
+       what buried the products that genuinely are unfinished. */
+    if (model?.cost_price == null && (model?.pricing_mode ?? "fixed") === "fixed") missing.push("cost");
     if (!(p.excerpt || "").trim() && !(p.description || "").trim()) missing.push("description");
 
     signals[p.id] = {
       readiness: report ? report.overall : null,
       missing: missing.slice(0, 3),
       cost: canSeeCosts ? (model?.cost_price ?? null) : null,
+      pricingMode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
+      priceNote: model?.price_note ?? null,
       visible: p.visible === true,
       updatedAt: p.updated_at,
       supplier: (() => {

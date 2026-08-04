@@ -48,6 +48,11 @@ export interface ReadinessInput {
     supplier_model?: string | null;
     cost_price?: string | number | null;
     global_price?: string | number | null;
+    /* 'on_request' means the machine is quoted per configuration and has no
+       list price BY DESIGN. Scoring it as "missing cost / missing price"
+       leaves a complete record permanently stuck below 100% and buries the
+       products that really are unfinished. */
+    pricing_mode?: "fixed" | "from" | "on_request" | null;
     warranty?: string | null;
     moq?: string | null;
     lead_time?: string | null;
@@ -153,12 +158,17 @@ function scoreMedia(input: ReadinessInput): ReadinessScore {
 
 /** Commercial: 8 fixed fields from input.commercial. */
 function scoreCommercial(input: ReadinessInput): ReadinessScore {
+  /* 'from' still needs its base figures — that IS the "from" number. Only
+     'on_request' has nothing to fill in. */
+  const priceless = input.commercial.pricing_mode === "on_request";
   const fields: Array<{ key: keyof ReadinessInput["commercial"]; label: string }> = [
     { key: "product_name", label: "Product name" },
     { key: "primary_model", label: "Primary model" },
     { key: "supplier_model", label: "Supplier model" },
-    { key: "cost_price", label: "Cost price" },
-    { key: "global_price", label: "Global price" },
+    ...(priceless ? [] : [
+      { key: "cost_price" as const, label: "Cost price" },
+      { key: "global_price" as const, label: "Global price" },
+    ]),
     { key: "warranty", label: "Warranty" },
     { key: "moq", label: "MOQ" },
     { key: "lead_time", label: "Lead time" },

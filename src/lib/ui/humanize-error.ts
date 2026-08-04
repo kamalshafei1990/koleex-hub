@@ -23,31 +23,71 @@
        "Something went wrong. Please try again."
    ========================================================================== */
 
-const KNOWN_PATTERNS: Array<[RegExp | string, string]> = [
-  [/violates foreign key constraint/i,         "Linked record is missing or was removed — pick a different value."],
-  [/violates not-null constraint/i,            "A required field is empty."],
-  [/violates check constraint/i,               "One of the fields has an invalid value."],
-  [/duplicate key value/i,                     "This record already exists."],
-  [/permission denied/i,                       "You don't have permission for this action."],
-  [/jwt expired|invalid token|unauthorized/i,  "Your session expired — please sign in again."],
-  [/network|fetch failed|failed to fetch/i,    "Network problem — check your connection and retry."],
-  [/timeout/i,                                 "The server took too long to respond. Please retry."],
-  /* Domain-specific helpful rewrites. */
-  [/no fx rate.*configured|missing fx rate/i,  "FX rate is missing — open Finance → FX Rates to add one."],
-  [/from and to currencies must differ/i,      "From and To currencies must be different."],
-  [/rate must be > 0/i,                        "FX rate must be greater than zero."],
-  [/insufficient stock|not enough stock/i,     "Not enough stock at this location."],
-  [/already posted|already approved/i,         "This document is already finalised and cannot be changed."],
-  [/^HTTP\s?\d{3}/,                            "Something went wrong. Please try again."],
-  [/Failed\s?\(\d{3}\)/i,                      "Something went wrong. Please try again."],
-  [/^422\b|^400\b|^500\b/,                     "Something went wrong. Please try again."],
-];
+/* ── Localisation ──────────────────────────────────────────────────────────
+   These sentences are the ONLY thing most operators ever read when
+   something fails, and they were hardcoded English — so an Arabic session
+   ended with "Network problem — check your connection and retry." sitting
+   in the middle of an Arabic conversation, and the Chinese staff read every
+   failure in a language they did not pick.
 
-const FALLBACK = "Something went wrong. Please try again.";
+   The active language lives in localStorage["koleex-lang"], written by the
+   header switcher. Reading it here keeps humanizeError's signature
+   (unknown -> string) intact, so all ~40 call sites are fixed at once
+   without touching one of them. On the server (no window) it stays
+   English, which is correct for logs. */
+type Lang = "en" | "zh" | "ar";
+type Msg = Record<Lang, string>;
+
+function activeLang(): Lang {
+  if (typeof window === "undefined") return "en";
+  try {
+    const v = window.localStorage.getItem("koleex-lang");
+    return v === "ar" || v === "zh" ? v : "en";
+  } catch { return "en"; }
+}
+
+const M = {
+  fk:        { en: "Linked record is missing or was removed — pick a different value.", ar: "السجل المرتبط غير موجود أو تم حذفه — اختر قيمة أخرى.", zh: "关联记录不存在或已被删除 — 请选择其他值。" },
+  notNull:   { en: "A required field is empty.", ar: "هناك حقل مطلوب فارغ.", zh: "有必填字段未填写。" },
+  check:     { en: "One of the fields has an invalid value.", ar: "أحد الحقول يحتوي على قيمة غير صالحة.", zh: "某个字段的值无效。" },
+  duplicate: { en: "This record already exists.", ar: "هذا السجل موجود بالفعل.", zh: "该记录已存在。" },
+  denied:    { en: "You don't have permission for this action.", ar: "لا تملك صلاحية لتنفيذ هذا الإجراء.", zh: "您没有执行此操作的权限。" },
+  session:   { en: "Your session expired — please sign in again.", ar: "انتهت جلستك — يرجى تسجيل الدخول مرة أخرى.", zh: "登录已过期 — 请重新登录。" },
+  network:   { en: "Network problem — check your connection and retry.", ar: "مشكلة في الشبكة — تحقق من اتصالك ثم أعد المحاولة.", zh: "网络异常 — 请检查网络连接后重试。" },
+  timeout:   { en: "The server took too long to respond. Please retry.", ar: "استغرق الخادم وقتاً طويلاً للرد. يرجى إعادة المحاولة.", zh: "服务器响应超时，请重试。" },
+  fxMissing: { en: "FX rate is missing — open Finance → FX Rates to add one.", ar: "سعر الصرف غير موجود — افتح المالية ← أسعار الصرف لإضافته.", zh: "缺少汇率 — 请在「财务 → 汇率」中添加。" },
+  fxSame:    { en: "From and To currencies must be different.", ar: "يجب أن تختلف عملة المصدر عن عملة الوجهة.", zh: "源货币与目标货币必须不同。" },
+  fxZero:    { en: "FX rate must be greater than zero.", ar: "يجب أن يكون سعر الصرف أكبر من صفر.", zh: "汇率必须大于零。" },
+  stock:     { en: "Not enough stock at this location.", ar: "الكمية غير كافية في هذا الموقع.", zh: "该库位库存不足。" },
+  finalised: { en: "This document is already finalised and cannot be changed.", ar: "هذا المستند مُعتمد بالفعل ولا يمكن تعديله.", zh: "该单据已确认，无法修改。" },
+  generic:   { en: "Something went wrong. Please try again.", ar: "حدث خطأ ما. يرجى المحاولة مرة أخرى.", zh: "出了点问题，请重试。" },
+} satisfies Record<string, Msg>;
+
+const say = (m: Msg): string => m[activeLang()] ?? m.en;
+
+const KNOWN_PATTERNS: Array<[RegExp | string, Msg]> = [
+  [/violates foreign key constraint/i,         M.fk],
+  [/violates not-null constraint/i,            M.notNull],
+  [/violates check constraint/i,               M.check],
+  [/duplicate key value/i,                     M.duplicate],
+  [/permission denied/i,                       M.denied],
+  [/jwt expired|invalid token|unauthorized/i,  M.session],
+  [/network|fetch failed|failed to fetch/i,    M.network],
+  [/timeout/i,                                 M.timeout],
+  /* Domain-specific helpful rewrites. */
+  [/no fx rate.*configured|missing fx rate/i,  M.fxMissing],
+  [/from and to currencies must differ/i,      M.fxSame],
+  [/rate must be > 0/i,                        M.fxZero],
+  [/insufficient stock|not enough stock/i,     M.stock],
+  [/already posted|already approved/i,         M.finalised],
+  [/^HTTP\s?\d{3}/,                            M.generic],
+  [/Failed\s?\(\d{3}\)/i,                      M.generic],
+  [/^422\b|^400\b|^500\b/,                     M.generic],
+];
 
 export function humanizeError(input: unknown): string {
   let raw: string;
-  if (input == null) raw = FALLBACK;
+  if (input == null) raw = say(M.generic);
   else if (typeof input === "string") raw = input;
   else if (input instanceof Error) raw = input.message;
   else if (typeof input === "object") {
@@ -63,19 +103,19 @@ export function humanizeError(input: unknown): string {
       : typeof o.details === "string" && o.details.trim() ? o.details
       : typeof o.hint === "string" && o.hint.trim() ? o.hint
       : null;
-    raw = pick ?? FALLBACK;
+    raw = pick ?? say(M.generic);
   } else raw = String(input);
 
   /* Never let an unresolved object reach the user. */
-  if (raw === "[object Object]") raw = FALLBACK;
+  if (raw === "[object Object]") raw = say(M.generic);
 
-  if (!raw || raw.trim().length === 0) return FALLBACK;
+  if (!raw || raw.trim().length === 0) return say(M.generic);
   for (const [pattern, mapped] of KNOWN_PATTERNS) {
     const matches = typeof pattern === "string" ? raw.toLowerCase().includes(pattern.toLowerCase()) : pattern.test(raw);
-    if (matches) return mapped;
+    if (matches) return say(mapped);
   }
   /* Drop stack-trace lines and trim long technical strings. */
   const firstLine = raw.split(/\r?\n/)[0].trim();
-  if (firstLine.length > 180) return FALLBACK;
+  if (firstLine.length > 180) return say(M.generic);
   return firstLine;
 }
