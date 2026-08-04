@@ -96,13 +96,18 @@ export async function GET(
         .eq("party_id", id)
         .limit(200),
     ),
-    // Products supplied — products link to suppliers via supplier_product_links
-    // (there is no products.supplier_id). Join through and dedupe below.
+    /* Products supplied.
+
+       This read `supplier_product_links` while Product Data's Supplier tab
+       writes `product_suppliers` — two tables for one relationship, so a
+       supplier with 52 linked products showed "No products are linked to
+       this supplier yet". product_suppliers is the populated one (52 rows vs
+       0) and the one whose FK was repointed at contacts, so it is the source
+       of truth; the legacy table is still merged below for any older row. */
     safe(() =>
       supabaseServer
-        .from("supplier_product_links")
+        .from("product_suppliers")
         .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name, products(id, product_name, slug, category_slug, primary_model)")
-        .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .limit(200),
     ),
@@ -248,6 +253,24 @@ export async function GET(
   // once via distinct component rows). Shape matches the UI: product_name/slug/category.
   const seenProducts = new Set<string>();
   const products: Row[] = [];
+  /* Most links carry no supplier-specific photo, so without the product's own
+     main image the cards would be a wall of empty frames. One extra query,
+     scoped to the products actually linked. */
+  const linkedIds = productLinkRows
+    .map((r) => ((r.products as Row | null)?.id))
+    .filter((v): v is string => typeof v === "string");
+  const mainImages = new Map<string, string>();
+  if (linkedIds.length) {
+    const { data: mediaRows } = await supabaseServer
+      .from("product_media")
+      .select('product_id, url, "order"')
+      .in("product_id", linkedIds)
+      .eq("type", "main_image")
+      .order("order", { ascending: true });
+    for (const m of (mediaRows ?? []) as Array<{ product_id: string; url: string | null }>) {
+      if (m.url && !mainImages.has(m.product_id)) mainImages.set(m.product_id, m.url);
+    }
+  }
   for (const r of productLinkRows) {
     const p = (r.products as Row | null) ?? null;
     const pid = p && typeof p.id === "string" ? p.id : null;
@@ -259,7 +282,7 @@ export async function GET(
     // falling back to the product master.
     products.push({
       ...p,
-      photo: s(r.supplier_product_photo) ?? null,
+      photo: s(r.supplier_product_photo) ?? mainImages.get(pid) ?? null,
       model: s(r.supplier_product_code) ?? s(p.primary_model) ?? null,
       product_name: s(r.supplier_product_name) ?? s(p.product_name) ?? null,
       is_primary: r.is_primary === true,
