@@ -47,8 +47,6 @@ import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import PinOffIcon from "@/components/icons/ui/PinOffIcon";
-import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import ProjectGlyph, { useProjectColorHex } from "@/components/ai/ProjectGlyph";
 import {
   DEFAULT_PROJECT_COLOR,
@@ -131,6 +129,10 @@ const COPY: Record<Lang, {
   moveTo: string;
   noProject: string;
   more: string;
+  recents: string;
+  back: string;
+  seeMore: string;
+  seeLess: string;
   save: string;
   cancel: string;
   prompts: string[];
@@ -171,6 +173,10 @@ const COPY: Record<Lang, {
     moveTo: "Move to",
     noProject: "No project",
     more: "More",
+    recents: "Recents",
+    back: "Back",
+    seeMore: "See more",
+    seeLess: "See less",
     save: "Save",
     cancel: "Cancel",
     prompts: [
@@ -215,6 +221,10 @@ const COPY: Record<Lang, {
     moveTo: "移动到",
     noProject: "无项目",
     more: "更多",
+    recents: "最近",
+    back: "返回",
+    seeMore: "查看更多",
+    seeLess: "收起",
     save: "保存",
     cancel: "取消",
     prompts: [
@@ -260,6 +270,10 @@ const COPY: Record<Lang, {
     moveTo: "نقل إلى",
     noProject: "بدون مشروع",
     more: "المزيد",
+    recents: "الأحدث",
+    back: "رجوع",
+    seeMore: "عرض المزيد",
+    seeLess: "عرض أقل",
     save: "حفظ",
     cancel: "إلغاء",
     prompts: [
@@ -276,6 +290,9 @@ const COPY: Record<Lang, {
    the narrowest width at which a two-word title plus its hover actions still
    fits without truncating on the first word. */
 const SIDEBAR_W = 248;
+
+/* How many project rows show before "See more". */
+const PROJECTS_COLLAPSED = 4;
 
 export default function KoleexAiApp() {
   const { lang } = useTranslation({}) as unknown as { lang: Lang };
@@ -464,40 +481,14 @@ export default function KoleexAiApp() {
   }, []);
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
-  /* Which folders are expanded. Collapsed by default so a long project list
-     can't push the recent chats off the screen — but the choice survives a
-     refresh, because re-opening the same folder after every reload is the
-     kind of small tax that makes a sidebar feel unfinished. Per-account so a
-     shared browser doesn't leak one person's layout to the next. */
-  const openProjectsKey = account?.id ? `koleex-ai-open-projects:${account.id}` : null;
-  const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    if (!openProjectsKey) return;
-    try {
-      const raw = window.localStorage.getItem(openProjectsKey);
-      if (raw) setOpenProjects(new Set(JSON.parse(raw) as string[]));
-    } catch { /* corrupt or unavailable storage — start collapsed */ }
-  }, [openProjectsKey]);
-  const toggleProject = useCallback((id: string) => {
-    setOpenProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  /* Persisting from an effect, not from inside the updater above: a state
-     updater must stay pure, or React re-running it (StrictMode, the compiler)
-     would double-write. Syncing state OUT to an external store is precisely
-     what an effect is for. */
-  const openProjectsHydrated = useRef(false);
-  useEffect(() => {
-    if (!openProjectsKey) return;
-    if (!openProjectsHydrated.current) { openProjectsHydrated.current = true; return; }
-    try {
-      window.localStorage.setItem(openProjectsKey, JSON.stringify([...openProjects]));
-    } catch { /* best-effort */ }
-  }, [openProjects, openProjectsKey]);
+  /* Which project the sidebar is currently INSIDE. Null is the normal view
+     (projects + history); a value replaces the whole list with that folder's
+     chats and a way back. Deliberately not persisted — reopening the app
+     should land you where the work is, not where you were filing. */
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  /* Long project lists get truncated, same as the reference: the folders are
+     a shortcut bar, and past four rows they start crowding out the chats. */
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
   useEffect(() => {
     /* Read cache synchronously BEFORE the network fetch so the UI
@@ -582,11 +573,13 @@ export default function KoleexAiApp() {
   const startNewChat = useCallback(async () => {
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
+    /* Starting a chat while standing inside a folder files it there — the
+       server verifies the id belongs to the caller before it uses it. */
     const res = await fetch("/api/ai/conversations", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
     });
     if (!res.ok) return;
     const { conversation } = (await res.json()) as { conversation: ConversationRow };
@@ -598,7 +591,7 @@ export default function KoleexAiApp() {
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
-  }, []);
+  }, [activeProjectId]);
 
   /* ── Send a message ──
      Unified path: every turn runs through /api/ai/agent (the
@@ -1304,8 +1297,8 @@ export default function KoleexAiApp() {
   const moveConversation = useCallback(
     (row: ConversationRow, projectId: string | null) => {
       if ((row.project_id ?? null) === projectId) return;
-      /* Landing in a folder is only visible if the folder is open. */
-      if (projectId) setOpenProjects((prev) => new Set(prev).add(projectId));
+      /* The chat leaves this list either way — into a folder, or out of the
+         one we are standing in. Nothing to expand: folders are a view now. */
       return patchConversation(row, { project_id: projectId });
     },
     [patchConversation],
@@ -1349,7 +1342,12 @@ export default function KoleexAiApp() {
           ? prev.map((p) => (p.id === project.id ? project : p))
           : [...prev, project],
       );
-      if (!draft.id) setOpenProjects((prev) => new Set(prev).add(project.id));
+      /* A folder you just made is a folder you meant to use — step into it,
+         and make sure it is on screen if the list was truncated. */
+      if (!draft.id) {
+        setShowAllProjects(true);
+        setActiveProjectId(project.id);
+      }
       setProjectDraft(null);
     } finally {
       setProjectSaving(false);
@@ -1409,24 +1407,42 @@ export default function KoleexAiApp() {
      — someone who typed a query wants matches, not chronology. */
   const searching = sidebarQuery.trim().length > 0;
 
+  const openProject = useMemo(
+    () => projects.find((p) => p.id === activeProjectId) ?? null,
+    [projects, activeProjectId],
+  );
+  /* A folder that gets deleted (here or in another tab) must not strand the
+     sidebar inside a view that no longer exists. */
+  useEffect(() => {
+    if (activeProjectId && !openProject) setActiveProjectId(null);
+  }, [activeProjectId, openProject]);
+
+  /* Inside a folder: its chats, pinned ones first, dates ignored — a folder
+     is small enough to scan and its own chronology is rarely the question. */
+  const openProjectRows = useMemo(() => {
+    if (!openProject) return [];
+    return filteredConversations
+      .filter((c) => c.project_id === openProject.id)
+      .slice()
+      .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
+  }, [filteredConversations, openProject]);
+
   const pinnedRows = useMemo(
-    () => (searching ? [] : filteredConversations.filter((c) => c.pinned)),
+    () =>
+      searching ? [] : filteredConversations.filter((c) => c.pinned && !c.project_id),
     [filteredConversations, searching],
   );
-
-  const projectSections = useMemo(() => {
-    if (searching) return [];
-    return projects.map((p) => ({
-      project: p,
-      rows: filteredConversations.filter((c) => !c.pinned && c.project_id === p.id),
-    }));
-  }, [projects, filteredConversations, searching]);
 
   const groups = useMemo(() => {
     if (searching) return [{ label: "", rows: filteredConversations }];
     const loose = filteredConversations.filter((c) => !c.pinned && !c.project_id);
     return groupByDate(loose, copy);
   }, [filteredConversations, searching, copy]);
+
+  const visibleProjects = useMemo(
+    () => (showAllProjects ? projects : projects.slice(0, PROJECTS_COLLAPSED)),
+    [projects, showAllProjects],
+  );
 
   /* ── Smart autoscroll (Phase 13.1 rewrite) ──
      Two problems the previous version had:
@@ -1707,131 +1723,62 @@ export default function KoleexAiApp() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
-          {/* ── Projects ──
-              Folders live above the chat history, the way a filing cabinet
-              sits above the pile on the desk. Hidden entirely while
-              searching: a query is a request for chats, not for structure. */}
-          {!searching && (
-            <div>
-              <SectionHeader label={copy.projects}>
+        <div className="flex-1 overflow-y-auto pb-2">
+          {/* A project is a place you GO, not a drawer you unfold in a list.
+              Opening one takes the whole panel — its own header with a way
+              back, then only its chats — which is why there is no chevron,
+              no nested indent and no count badge on the rows above. */}
+          {openProject ? (
+            <>
+              <div className="px-2 pt-2 pb-1 flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() =>
-                    setProjectDraft({
-                      id: null,
-                      name: "",
-                      icon: DEFAULT_PROJECT_ICON,
-                      color: DEFAULT_PROJECT_COLOR,
-                    })
-                  }
-                  className="h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
-                  title={copy.newProject}
-                  aria-label={copy.newProject}
+                  onClick={() => setActiveProjectId(null)}
+                  className="h-7 w-7 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
+                  title={copy.back}
+                  aria-label={copy.back}
                 >
-                  <PlusIcon size={12} />
+                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
                 </button>
-              </SectionHeader>
+                <ProjectGlyph icon={openProject.icon} color={openProject.color} size={14} />
+                <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate flex-1 min-w-0">
+                  {openProject.name}
+                </span>
+                <div className="group flex shrink-0">
+                  <RowMenu
+                    label={copy.more}
+                    alwaysVisible
+                    items={[
+                      {
+                        key: "edit",
+                        label: copy.editProject,
+                        icon: <PencilIcon className="h-3 w-3" />,
+                        onSelect: () =>
+                          setProjectDraft({
+                            id: openProject.id,
+                            name: openProject.name,
+                            icon: openProject.icon,
+                            color: openProject.color,
+                          }),
+                      },
+                      {
+                        key: "delete",
+                        label: copy.deleteProject,
+                        icon: <TrashIcon className="h-3 w-3" />,
+                        danger: true,
+                        onSelect: () => setPendingDeleteProjectId(openProject.id),
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
 
-              {projectSections.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setProjectDraft({
-                      id: null,
-                      name: "",
-                      icon: DEFAULT_PROJECT_ICON,
-                      color: DEFAULT_PROJECT_COLOR,
-                    })
-                  }
-                  className="mx-2 my-0.5 w-[calc(100%-1rem)] px-3 py-2 rounded-lg text-start text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2"
-                >
-                  <PlusIcon size={12} />
-                  {copy.newProject}
-                </button>
+              {openProjectRows.length === 0 ? (
+                <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
+                  {copy.emptyProject}
+                </div>
               ) : (
-                projectSections.map(({ project, rows }) => (
-                  <div key={project.id}>
-                    <ProjectRow
-                      project={project}
-                      count={rows.length}
-                      open={openProjects.has(project.id)}
-                      onToggle={() => toggleProject(project.id)}
-                      onEdit={() =>
-                        setProjectDraft({
-                          id: project.id,
-                          name: project.name,
-                          icon: project.icon,
-                          color: project.color,
-                        })
-                      }
-                      onDelete={() => setPendingDeleteProjectId(project.id)}
-                      editLabel={copy.editProject}
-                      deleteLabel={copy.deleteProject}
-                      moreLabel={copy.more}
-                    />
-                    {openProjects.has(project.id) &&
-                      (rows.length === 0 ? (
-                        <div className="ps-8 pe-3 py-1.5 text-[11px] text-[var(--text-dim)]">
-                          {copy.emptyProject}
-                        </div>
-                      ) : (
-                        rows.map((c) => (
-                          <SidebarRow
-                            key={c.id}
-                            row={c}
-                            active={c.id === activeId}
-                            nested
-                            projects={projects}
-                            copy={copy}
-                            onOpen={() => openConversation(c.id)}
-                            onRename={() => renameConversation(c.id, c.title)}
-                            onDelete={() => requestDeleteConversation(c.id)}
-                            onTogglePin={() => togglePin(c)}
-                            onMove={(pid) => moveConversation(c, pid)}
-                          />
-                        ))
-                      ))}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {pinnedRows.length > 0 && (
-            <div>
-              <SectionHeader label={copy.pinned} />
-              {pinnedRows.map((c) => (
-                <SidebarRow
-                  key={c.id}
-                  row={c}
-                  active={c.id === activeId}
-                  projects={projects}
-                  copy={copy}
-                  onOpen={() => openConversation(c.id)}
-                  onRename={() => renameConversation(c.id, c.title)}
-                  onDelete={() => requestDeleteConversation(c.id)}
-                  onTogglePin={() => togglePin(c)}
-                  onMove={(pid) => moveConversation(c, pid)}
-                />
-              ))}
-            </div>
-          )}
-
-          {conversations.length === 0 ? (
-            <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
-              <KoleexOrb state="idle" size={40} />
-              <div className="text-[12px]">{copy.noChats}</div>
-            </div>
-          ) : filteredConversations.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
-              {copy.noSearchResults ?? "No chats match your search."}
-            </div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.label || "results"}>
-                {g.label && <SectionHeader label={g.label} />}
-                {g.rows.map((c) => (
+                openProjectRows.map((c) => (
                   <SidebarRow
                     key={c.id}
                     row={c}
@@ -1844,9 +1791,140 @@ export default function KoleexAiApp() {
                     onTogglePin={() => togglePin(c)}
                     onMove={(pid) => moveConversation(c, pid)}
                   />
-                ))}
-              </div>
-            ))
+                ))
+              )}
+            </>
+          ) : (
+            <>
+              {/* ── Projects ──
+                  Flat rows with their icon, the way a filing cabinet's
+                  drawers are labelled on the front. Hidden while searching:
+                  a query is a request for chats, not for structure. */}
+              {!searching && (
+                <>
+                  <SectionHeader label={copy.projects}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProjectDraft({
+                          id: null,
+                          name: "",
+                          icon: DEFAULT_PROJECT_ICON,
+                          color: DEFAULT_PROJECT_COLOR,
+                        })
+                      }
+                      className="h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
+                      title={copy.newProject}
+                      aria-label={copy.newProject}
+                    >
+                      <PlusIcon size={12} />
+                    </button>
+                  </SectionHeader>
+
+                  {projects.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProjectDraft({
+                          id: null,
+                          name: "",
+                          icon: DEFAULT_PROJECT_ICON,
+                          color: DEFAULT_PROJECT_COLOR,
+                        })
+                      }
+                      className="mx-2 w-[calc(100%-1rem)] px-2 py-1.5 rounded-lg text-start text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2"
+                    >
+                      <PlusIcon size={13} />
+                      {copy.newProject}
+                    </button>
+                  ) : (
+                    <>
+                      {visibleProjects.map((p) => (
+                        <ProjectRow
+                          key={p.id}
+                          project={p}
+                          onOpen={() => setActiveProjectId(p.id)}
+                          onEdit={() =>
+                            setProjectDraft({
+                              id: p.id,
+                              name: p.name,
+                              icon: p.icon,
+                              color: p.color,
+                            })
+                          }
+                          onDelete={() => setPendingDeleteProjectId(p.id)}
+                          editLabel={copy.editProject}
+                          deleteLabel={copy.deleteProject}
+                          moreLabel={copy.more}
+                        />
+                      ))}
+                      {projects.length > PROJECTS_COLLAPSED && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllProjects((v) => !v)}
+                          className="mx-2 w-[calc(100%-1rem)] px-2 py-1.5 rounded-lg text-start text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2"
+                        >
+                          <MoreHorizontalIcon size={13} />
+                          {showAllProjects ? copy.seeLess : copy.seeMore}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {conversations.length === 0 ? (
+                <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
+                  <KoleexOrb state="idle" size={40} />
+                  <div className="text-[12px]">{copy.noChats}</div>
+                </div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
+                  {copy.noSearchResults ?? "No chats match your search."}
+                </div>
+              ) : (
+                <>
+                  {/* Pinned chats sit at the top of the history with their pin
+                      showing — no heading of their own. A pin is a property of
+                      the chat, not a category to file it under, and giving it
+                      a section made the sidebar read as three lists. */}
+                  {!searching && <SectionHeader label={copy.recents} />}
+                  {pinnedRows.map((c) => (
+                    <SidebarRow
+                      key={c.id}
+                      row={c}
+                      active={c.id === activeId}
+                      projects={projects}
+                      copy={copy}
+                      onOpen={() => openConversation(c.id)}
+                      onRename={() => renameConversation(c.id, c.title)}
+                      onDelete={() => requestDeleteConversation(c.id)}
+                      onTogglePin={() => togglePin(c)}
+                      onMove={(pid) => moveConversation(c, pid)}
+                    />
+                  ))}
+                  {groups.map((g) => (
+                    <div key={g.label || "results"}>
+                      {g.label && <SectionHeader label={g.label} muted />}
+                      {g.rows.map((c) => (
+                        <SidebarRow
+                          key={c.id}
+                          row={c}
+                          active={c.id === activeId}
+                          projects={projects}
+                          copy={copy}
+                          onOpen={() => openConversation(c.id)}
+                          onRename={() => renameConversation(c.id, c.title)}
+                          onDelete={() => requestDeleteConversation(c.id)}
+                          onTogglePin={() => togglePin(c)}
+                          onMove={(pid) => moveConversation(c, pid)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       </aside>
@@ -2870,27 +2948,36 @@ function BubbleActions({
 function SectionHeader({
   label,
   children,
+  muted,
 }: {
   label: string;
   children?: React.ReactNode;
+  /** Date sub-headings inside the history — quieter than "Projects" /
+   *  "Recents", which name the two halves of the panel. */
+  muted?: boolean;
 }) {
   return (
-    <div className="sticky top-0 z-[2] bg-[var(--bg-secondary)] px-4 pt-3 pb-1.5 flex items-center gap-2">
-      <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] shrink-0">
+    <div className="px-4 pt-4 pb-1 flex items-center gap-2">
+      <span
+        className={`text-[12px] font-semibold shrink-0 ${
+          muted ? "text-[var(--text-dim)]" : "text-[var(--text-primary)]"
+        }`}
+      >
         {label}
       </span>
-      <span className="h-px flex-1 bg-[var(--border-subtle)]" aria-hidden="true" />
+      <span className="flex-1" />
       {children}
     </div>
   );
 }
 
-/* ── A project folder row ── */
+/* ── A project folder row ──
+   Same shape as a chat row — icon, name, hover menu — because in the panel
+   they are peers: two kinds of thing you click to go somewhere. No chevron
+   and no count; the folder opens the panel rather than unfolding in place. */
 function ProjectRow({
   project,
-  count,
-  open,
-  onToggle,
+  onOpen,
   onEdit,
   onDelete,
   editLabel,
@@ -2898,9 +2985,7 @@ function ProjectRow({
   moreLabel,
 }: {
   project: AiProject;
-  count: number;
-  open: boolean;
-  onToggle: () => void;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
   editLabel: string;
@@ -2909,28 +2994,16 @@ function ProjectRow({
 }) {
   return (
     <div
-      className="group px-2 py-1.5 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      onClick={onToggle}
+      className="group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      onClick={onOpen}
       role="button"
       tabIndex={0}
-      aria-expanded={open}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); }
       }}
     >
-      {/* The chevron follows the writing direction, so it never points into
-          the text in Arabic. rtl:rotate-180 handles the collapsed state; the
-          open state points down in both directions. */}
-      <span className="text-[var(--text-dim)] shrink-0 flex">
-        {open ? <AngleDownIcon size={12} /> : <AngleRightIcon size={12} className="rtl:rotate-180" />}
-      </span>
-      <ProjectGlyph icon={project.icon} color={project.color} size={14} className="shrink-0" />
-      <span className="text-[13px] font-medium truncate flex-1 min-w-0">{project.name}</span>
-      {count > 0 && (
-        <span className="text-[10px] text-[var(--text-dim)] tabular-nums shrink-0 group-hover:hidden">
-          {count}
-        </span>
-      )}
+      <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
+      <span className="text-[13px] truncate flex-1 min-w-0">{project.name}</span>
       <RowMenu
         label={moreLabel}
         items={[
@@ -2947,7 +3020,6 @@ function ProjectRow({
 function SidebarRow({
   row,
   active,
-  nested,
   projects,
   copy,
   onOpen,
@@ -2958,7 +3030,6 @@ function SidebarRow({
 }: {
   row: ConversationRow;
   active: boolean;
-  nested?: boolean;
   projects: AiProject[];
   copy: typeof COPY["en"];
   onOpen: () => void;
@@ -3016,21 +3087,21 @@ function SidebarRow({
   return (
     <div
       onClick={onOpen}
-      className={`group ${nested ? "ps-7 pe-2" : "px-3"} py-2 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${
+      className={`group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-1 ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
           : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <div className="text-[13px] font-medium truncate flex-1 min-w-0">
-        {row.title}
-      </div>
+      <div className="text-[13px] truncate flex-1 min-w-0">{row.title}</div>
+      {/* The pin marks the row while it is pinned and hides again on hover so
+          it can't be mistaken for a button you have to press to keep it. */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
         className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${
           pinned
-            ? "text-[var(--text-primary)]"
+            ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
             : "opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
         }`}
         title={pinned ? copy.unpin : copy.pin}
@@ -3059,7 +3130,16 @@ type MenuItem = {
   onSelect?: () => void;
 };
 
-function RowMenu({ label, items }: { label: string; items: MenuItem[] }) {
+function RowMenu({
+  label,
+  items,
+  alwaysVisible,
+}: {
+  label: string;
+  items: MenuItem[];
+  /** The project header's menu has no row to hover — it stays put. */
+  alwaysVisible?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
     top?: number;
@@ -3122,8 +3202,10 @@ function RowMenu({ label, items }: { label: string; items: MenuItem[] }) {
           setOpen((v) => !v);
         }}
         className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
-          open ? "opacity-100 text-[var(--text-primary)]" : "opacity-0 group-hover:opacity-100"
-        }`}
+          open || alwaysVisible
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100"
+        } ${open ? "text-[var(--text-primary)]" : ""}`}
         title={label}
         aria-label={label}
         aria-haspopup="menu"
