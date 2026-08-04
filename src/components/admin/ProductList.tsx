@@ -189,7 +189,7 @@ const ProductCard = memo(function ProductCard({
       <Link
         href={`${baseRoute}/${p.slug || p.id}`}
         aria-label={p.product_name}
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-[5]"
       />
       {/* Image — calm, clean. Background matches the
           card surface so transparent product photos

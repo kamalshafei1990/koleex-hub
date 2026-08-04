@@ -624,7 +624,12 @@ function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
                 {allSelected ? t("cov.clearAll", "Clear") : t("cov.allInCategory", "All in category")}
               </button>
             </div>
-            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+            {/* max-h-24 fitted three rows. Fabric Preparation has EIGHT
+                 subcategories, which wrap to four — so the last two
+                 (Fabric Shrinking Machines, Fusing Machines) sat below the
+                 fold with no scrollbar hint, and the picker looked like it
+                 was missing them while the counter correctly said 0/8. */}
+            <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
               {target.subcategories.map((s) => {
                 const on = selected.has(s.code);
                 return (
