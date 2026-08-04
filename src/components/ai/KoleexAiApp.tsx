@@ -43,6 +43,23 @@ import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import PinIcon from "@/components/icons/ui/PinIcon";
+import PinOffIcon from "@/components/icons/ui/PinOffIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import ProjectGlyph, { useProjectColorHex } from "@/components/ai/ProjectGlyph";
+import {
+  DEFAULT_PROJECT_COLOR,
+  DEFAULT_PROJECT_ICON,
+  PROJECT_COLOR_KEYS,
+  PROJECT_ICONS,
+  PROJECT_NAME_MAX,
+  type AiProject,
+  type ProjectColor,
+  type ProjectIcon,
+} from "@/lib/ai-projects";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
@@ -71,6 +88,10 @@ interface ConversationRow {
   message_count: number;
   created_at: string;
   updated_at: string;
+  /* Both default on the server and are absent from any sessionStorage cache
+     written before this feature shipped — always read them defensively. */
+  pinned?: boolean;
+  project_id?: string | null;
 }
 
 /* ── Localised copy ── */
@@ -94,6 +115,24 @@ const COPY: Record<Lang, {
   stopped: string;
   searchChats?: string;
   noSearchResults?: string;
+  /* Projects + pinning */
+  projects: string;
+  newProject: string;
+  editProject: string;
+  projectName: string;
+  projectIcon: string;
+  projectColor: string;
+  deleteProject: string;
+  confirmDeleteProject: string;
+  emptyProject: string;
+  pin: string;
+  unpin: string;
+  pinned: string;
+  moveTo: string;
+  noProject: string;
+  more: string;
+  save: string;
+  cancel: string;
   prompts: string[];
 }> = {
   en: {
@@ -116,6 +155,24 @@ const COPY: Record<Lang, {
     stopped: "Stopped",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
+    projects: "Projects",
+    newProject: "New project",
+    editProject: "Edit project",
+    projectName: "Project name",
+    projectIcon: "Icon",
+    projectColor: "Colour",
+    deleteProject: "Delete project",
+    confirmDeleteProject:
+      "Delete this project? Its chats stay — they move back to the main list.",
+    emptyProject: "No chats in here yet",
+    pin: "Pin",
+    unpin: "Unpin",
+    pinned: "Pinned",
+    moveTo: "Move to",
+    noProject: "No project",
+    more: "More",
+    save: "Save",
+    cancel: "Cancel",
     prompts: [
       "What's a good way to start my day at work?",
       "Help me write a polite reply to a customer email.",
@@ -143,6 +200,23 @@ const COPY: Record<Lang, {
     stopped: "已停止",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
+    projects: "项目",
+    newProject: "新建项目",
+    editProject: "编辑项目",
+    projectName: "项目名称",
+    projectIcon: "图标",
+    projectColor: "颜色",
+    deleteProject: "删除项目",
+    confirmDeleteProject: "删除这个项目？其中的对话会保留，并移回主列表。",
+    emptyProject: "这里还没有对话",
+    pin: "置顶",
+    unpin: "取消置顶",
+    pinned: "已置顶",
+    moveTo: "移动到",
+    noProject: "无项目",
+    more: "更多",
+    save: "保存",
+    cancel: "取消",
     prompts: [
       "早上开始工作的好方法是什么？",
       "帮我给客户写一封礼貌的回复邮件。",
@@ -170,6 +244,24 @@ const COPY: Record<Lang, {
     stopped: "تم الإيقاف",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
+    projects: "المشاريع",
+    newProject: "مشروع جديد",
+    editProject: "تعديل المشروع",
+    projectName: "اسم المشروع",
+    projectIcon: "الأيقونة",
+    projectColor: "اللون",
+    deleteProject: "حذف المشروع",
+    confirmDeleteProject:
+      "حذف هذا المشروع؟ محادثاته تبقى — وتعود إلى القائمة الرئيسية.",
+    emptyProject: "لا توجد محادثات هنا بعد",
+    pin: "تثبيت",
+    unpin: "إلغاء التثبيت",
+    pinned: "مثبّتة",
+    moveTo: "نقل إلى",
+    noProject: "بدون مشروع",
+    more: "المزيد",
+    save: "حفظ",
+    cancel: "إلغاء",
     prompts: [
       "ما طريقة جيدة لبدء يومي في العمل؟",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",
@@ -178,6 +270,12 @@ const COPY: Record<Lang, {
     ],
   },
 };
+
+/* The chat list is titles, not prose — 280px was giving the thread pane less
+   room than it needed without giving the titles more than they used. 248 is
+   the narrowest width at which a two-word title plus its hover actions still
+   fits without truncating on the first word. */
+const SIDEBAR_W = 248;
 
 export default function KoleexAiApp() {
   const { lang } = useTranslation({}) as unknown as { lang: Lang };
@@ -332,7 +430,10 @@ export default function KoleexAiApp() {
      fetch and overwrite with fresh data. Stale-while-revalidate.
      Cache is session-scoped (not persisted) so a logout / fresh tab
      still gets a clean load. */
-  const CONV_CACHE_KEY = "koleex-ai-conversations-cache-v1";
+  /* v2: the cached shape gained `pinned` / `project_id`. Bumping the key
+     retires v1 payloads instead of seeding the sidebar with rows that would
+     briefly render every pinned chat as unpinned. */
+  const CONV_CACHE_KEY = "koleex-ai-conversations-cache-v2";
   const loadConversations = useCallback(async () => {
     const res = await fetch("/api/ai/conversations", { credentials: "include" });
     if (!res.ok) return;
@@ -349,6 +450,54 @@ export default function KoleexAiApp() {
       }
     }
   }, []);
+
+  /* ── Project folders ──
+     Small list (a handful of rows), owned entirely by the sidebar. Loaded
+     once alongside the conversations; every mutation below updates local
+     state optimistically and reconciles with the row the server returns. */
+  const [projects, setProjects] = useState<AiProject[]>([]);
+  const loadProjects = useCallback(async () => {
+    const res = await fetch("/api/ai/projects", { credentials: "include" });
+    if (!res.ok) return;
+    const { projects: rows } = (await res.json()) as { projects: AiProject[] };
+    setProjects(rows ?? []);
+  }, []);
+  useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  /* Which folders are expanded. Collapsed by default so a long project list
+     can't push the recent chats off the screen — but the choice survives a
+     refresh, because re-opening the same folder after every reload is the
+     kind of small tax that makes a sidebar feel unfinished. Per-account so a
+     shared browser doesn't leak one person's layout to the next. */
+  const openProjectsKey = account?.id ? `koleex-ai-open-projects:${account.id}` : null;
+  const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!openProjectsKey) return;
+    try {
+      const raw = window.localStorage.getItem(openProjectsKey);
+      if (raw) setOpenProjects(new Set(JSON.parse(raw) as string[]));
+    } catch { /* corrupt or unavailable storage — start collapsed */ }
+  }, [openProjectsKey]);
+  const toggleProject = useCallback((id: string) => {
+    setOpenProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  /* Persisting from an effect, not from inside the updater above: a state
+     updater must stay pure, or React re-running it (StrictMode, the compiler)
+     would double-write. Syncing state OUT to an external store is precisely
+     what an effect is for. */
+  const openProjectsHydrated = useRef(false);
+  useEffect(() => {
+    if (!openProjectsKey) return;
+    if (!openProjectsHydrated.current) { openProjectsHydrated.current = true; return; }
+    try {
+      window.localStorage.setItem(openProjectsKey, JSON.stringify([...openProjects]));
+    } catch { /* best-effort */ }
+  }, [openProjects, openProjectsKey]);
 
   useEffect(() => {
     /* Read cache synchronously BEFORE the network fetch so the UI
@@ -1110,6 +1259,123 @@ export default function KoleexAiApp() {
     [copy.renamePrompt],
   );
 
+  /* ── Pin / move a conversation ──
+     Both patch the same endpoint and both apply optimistically: the sidebar
+     re-sorts the instant you click, and only rolls back if the server says
+     no. A pin that waits for a round trip on this network (~1s) feels
+     broken, and this is a reversible, single-field change — exactly the
+     case optimism is for. */
+  const patchConversation = useCallback(
+    async (
+      before: ConversationRow,
+      patch: { pinned?: boolean; project_id?: string | null },
+    ) => {
+      const id = before.id;
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      );
+      const res = await fetch(`/api/ai/conversations/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        /* Put back exactly the fields we touched — not the whole row, which
+           may have been updated by a reply landing in the meantime. */
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? { ...c, pinned: before.pinned ?? false, project_id: before.project_id ?? null }
+              : c,
+          ),
+        );
+        setError(humanizeError(`HTTP ${res.status}`));
+      }
+    },
+    [],
+  );
+
+  const togglePin = useCallback(
+    (row: ConversationRow) => patchConversation(row, { pinned: !row.pinned }),
+    [patchConversation],
+  );
+
+  const moveConversation = useCallback(
+    (row: ConversationRow, projectId: string | null) => {
+      if ((row.project_id ?? null) === projectId) return;
+      /* Landing in a folder is only visible if the folder is open. */
+      if (projectId) setOpenProjects((prev) => new Set(prev).add(projectId));
+      return patchConversation(row, { project_id: projectId });
+    },
+    [patchConversation],
+  );
+
+  /* ── Project create / edit / delete ──
+     One modal serves both create and edit (a null id means create), so the
+     two can never drift apart in layout or validation. */
+  const [projectDraft, setProjectDraft] = useState<{
+    id: string | null;
+    name: string;
+    icon: ProjectIcon;
+    color: ProjectColor;
+  } | null>(null);
+  const [projectSaving, setProjectSaving] = useState(false);
+  const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<string | null>(null);
+
+  const saveProjectDraft = useCallback(async () => {
+    const draft = projectDraft;
+    if (!draft || projectSaving) return;
+    const name = draft.name.trim().slice(0, PROJECT_NAME_MAX);
+    if (!name) return;
+    setProjectSaving(true);
+    try {
+      const res = await fetch(
+        draft.id ? `/api/ai/projects/${draft.id}` : "/api/ai/projects",
+        {
+          method: draft.id ? "PATCH" : "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, icon: draft.icon, color: draft.color }),
+        },
+      );
+      if (!res.ok) {
+        setError(humanizeError(`HTTP ${res.status}`));
+        return;
+      }
+      const { project } = (await res.json()) as { project: AiProject };
+      setProjects((prev) =>
+        draft.id
+          ? prev.map((p) => (p.id === project.id ? project : p))
+          : [...prev, project],
+      );
+      if (!draft.id) setOpenProjects((prev) => new Set(prev).add(project.id));
+      setProjectDraft(null);
+    } finally {
+      setProjectSaving(false);
+    }
+  }, [projectDraft, projectSaving]);
+
+  const confirmDeleteProject = useCallback(async () => {
+    const id = pendingDeleteProjectId;
+    if (!id) return;
+    const res = await fetch(`/api/ai/projects/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    setPendingDeleteProjectId(null);
+    if (!res.ok) {
+      setError(humanizeError(`HTTP ${res.status}`));
+      return;
+    }
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    /* The column is ON DELETE SET NULL, so the chats are already back in the
+       main list server-side; mirror that locally instead of refetching. */
+    setConversations((prev) =>
+      prev.map((c) => (c.project_id === id ? { ...c, project_id: null } : c)),
+    );
+  }, [pendingDeleteProjectId]);
+
   /* ── Phase 13: sidebar search ──
      Simple substring filter on title + last_preview. Case-insensitive.
      Empty query shows everything, matches the original grouped view.
@@ -1127,16 +1393,40 @@ export default function KoleexAiApp() {
     });
   }, [conversations, sidebarQuery]);
 
-  /* ── Group sidebar entries by relative date ──
-     Only applied when the search box is empty; filtered searches
-     render flat. */
-  const groups = useMemo(
-    () =>
-      sidebarQuery.trim()
-        ? [{ label: "", rows: filteredConversations }]
-        : groupByDate(filteredConversations, copy),
-    [filteredConversations, sidebarQuery, copy],
+  /* ── Sidebar sections ──
+     Every conversation appears in EXACTLY ONE place, which is the whole
+     reason the three lists below are derived from one another rather than
+     filtered independently:
+
+       pinned    → any pinned chat, folder or not
+       projects  → that folder's chats, minus the pinned ones
+       recents   → everything left, grouped by date as before
+
+     Duplicating a row across sections would make pin and move feel like
+     they copied the chat instead of moving it.
+
+     Searching bypasses the split entirely and returns one flat list of hits
+     — someone who typed a query wants matches, not chronology. */
+  const searching = sidebarQuery.trim().length > 0;
+
+  const pinnedRows = useMemo(
+    () => (searching ? [] : filteredConversations.filter((c) => c.pinned)),
+    [filteredConversations, searching],
   );
+
+  const projectSections = useMemo(() => {
+    if (searching) return [];
+    return projects.map((p) => ({
+      project: p,
+      rows: filteredConversations.filter((c) => !c.pinned && c.project_id === p.id),
+    }));
+  }, [projects, filteredConversations, searching]);
+
+  const groups = useMemo(() => {
+    if (searching) return [{ label: "", rows: filteredConversations }];
+    const loose = filteredConversations.filter((c) => !c.pinned && !c.project_id);
+    return groupByDate(loose, copy);
+  }, [filteredConversations, searching, copy]);
 
   /* ── Smart autoscroll (Phase 13.1 rewrite) ──
      Two problems the previous version had:
@@ -1355,9 +1645,9 @@ export default function KoleexAiApp() {
         } md:flex flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
         style={{
           /* On mobile we ignore sidebarCollapsed (desktop-only concept).
-             On desktop, width morphs 0 ↔ 280 based on collapsed state. */
-          width: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
-          minWidth: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
+             On desktop, width morphs 0 ↔ SIDEBAR_W based on collapsed state. */
+          width: sidebarOpen ? SIDEBAR_W : (sidebarCollapsed ? 0 : SIDEBAR_W),
+          minWidth: sidebarOpen ? SIDEBAR_W : (sidebarCollapsed ? 0 : SIDEBAR_W),
           /* Phase UI.3 — spring cubic-bezier replaced with a calm ease-out. */
           transition: "width 0.25s ease-out, min-width 0.25s ease-out",
         }}
@@ -1418,6 +1708,116 @@ export default function KoleexAiApp() {
         )}
 
         <div className="flex-1 overflow-y-auto">
+          {/* ── Projects ──
+              Folders live above the chat history, the way a filing cabinet
+              sits above the pile on the desk. Hidden entirely while
+              searching: a query is a request for chats, not for structure. */}
+          {!searching && (
+            <div>
+              <SectionHeader label={copy.projects}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProjectDraft({
+                      id: null,
+                      name: "",
+                      icon: DEFAULT_PROJECT_ICON,
+                      color: DEFAULT_PROJECT_COLOR,
+                    })
+                  }
+                  className="h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
+                  title={copy.newProject}
+                  aria-label={copy.newProject}
+                >
+                  <PlusIcon size={12} />
+                </button>
+              </SectionHeader>
+
+              {projectSections.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProjectDraft({
+                      id: null,
+                      name: "",
+                      icon: DEFAULT_PROJECT_ICON,
+                      color: DEFAULT_PROJECT_COLOR,
+                    })
+                  }
+                  className="mx-2 my-0.5 w-[calc(100%-1rem)] px-3 py-2 rounded-lg text-start text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2"
+                >
+                  <PlusIcon size={12} />
+                  {copy.newProject}
+                </button>
+              ) : (
+                projectSections.map(({ project, rows }) => (
+                  <div key={project.id}>
+                    <ProjectRow
+                      project={project}
+                      count={rows.length}
+                      open={openProjects.has(project.id)}
+                      onToggle={() => toggleProject(project.id)}
+                      onEdit={() =>
+                        setProjectDraft({
+                          id: project.id,
+                          name: project.name,
+                          icon: project.icon,
+                          color: project.color,
+                        })
+                      }
+                      onDelete={() => setPendingDeleteProjectId(project.id)}
+                      editLabel={copy.editProject}
+                      deleteLabel={copy.deleteProject}
+                      moreLabel={copy.more}
+                    />
+                    {openProjects.has(project.id) &&
+                      (rows.length === 0 ? (
+                        <div className="ps-8 pe-3 py-1.5 text-[11px] text-[var(--text-dim)]">
+                          {copy.emptyProject}
+                        </div>
+                      ) : (
+                        rows.map((c) => (
+                          <SidebarRow
+                            key={c.id}
+                            row={c}
+                            active={c.id === activeId}
+                            nested
+                            projects={projects}
+                            copy={copy}
+                            onOpen={() => openConversation(c.id)}
+                            onRename={() => renameConversation(c.id, c.title)}
+                            onDelete={() => requestDeleteConversation(c.id)}
+                            onTogglePin={() => togglePin(c)}
+                            onMove={(pid) => moveConversation(c, pid)}
+                          />
+                        ))
+                      ))}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {pinnedRows.length > 0 && (
+            <div>
+              <SectionHeader label={copy.pinned} />
+              {pinnedRows.map((c) => (
+                <SidebarRow
+                  key={c.id}
+                  row={c}
+                  active={c.id === activeId}
+                  projects={projects}
+                  copy={copy}
+                  onOpen={() => openConversation(c.id)}
+                  onRename={() => renameConversation(c.id, c.title)}
+                  onDelete={() => requestDeleteConversation(c.id)}
+                  onTogglePin={() => togglePin(c)}
+                  onMove={(pid) => moveConversation(c, pid)}
+                />
+              ))}
+            </div>
+          )}
+
           {conversations.length === 0 ? (
             <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
               <KoleexOrb state="idle" size={40} />
@@ -1429,30 +1829,20 @@ export default function KoleexAiApp() {
             </div>
           ) : (
             groups.map((g) => (
-              <div key={g.label}>
-                {/* A date is chrome, not a conversation. This used to be
-                    10px bold dim text sitting directly above 12px medium
-                    muted rows — two greys a fifth of an alpha apart, both
-                    left-aligned — so "Yesterday" scanned as just another
-                    chat title. It now carries a hairline rule across the
-                    rest of the row and sticks while the list scrolls,
-                    which reads unmistakably as a section divider. */}
-                <div className="sticky top-0 z-[1] bg-[var(--bg-secondary)] px-4 pt-3 pb-1.5 flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] shrink-0">
-                    {g.label}
-                  </span>
-                  <span className="h-px flex-1 bg-[var(--border-subtle)]" aria-hidden="true" />
-                </div>
+              <div key={g.label || "results"}>
+                {g.label && <SectionHeader label={g.label} />}
                 {g.rows.map((c) => (
                   <SidebarRow
                     key={c.id}
                     row={c}
                     active={c.id === activeId}
+                    projects={projects}
+                    copy={copy}
                     onOpen={() => openConversation(c.id)}
                     onRename={() => renameConversation(c.id, c.title)}
                     onDelete={() => requestDeleteConversation(c.id)}
-                    renameLabel={copy.rename}
-                    deleteLabel={copy.delete}
+                    onTogglePin={() => togglePin(c)}
+                    onMove={(pid) => moveConversation(c, pid)}
                   />
                 ))}
               </div>
@@ -1852,6 +2242,157 @@ export default function KoleexAiApp() {
         onConfirm={confirmDeleteConversation}
         onClose={() => setPendingDeleteId(null)}
       />
+
+      {/* Deleting a folder is safe by construction (the chats survive), and
+          the copy says so — otherwise nobody would ever risk the button. */}
+      <ConfirmDialog
+        open={pendingDeleteProjectId !== null}
+        title={copy.confirmDeleteProject}
+        variant="danger"
+        confirmLabel={copy.deleteProject}
+        cancelLabel={copy.cancel}
+        onConfirm={confirmDeleteProject}
+        onClose={() => setPendingDeleteProjectId(null)}
+      />
+
+      {projectDraft && (
+        <ProjectDialog
+          draft={projectDraft}
+          copy={copy}
+          saving={projectSaving}
+          onChange={setProjectDraft}
+          onSave={saveProjectDraft}
+          onClose={() => setProjectDraft(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Project create / edit dialog ──
+   One dialog for both jobs: a null id means create. Name, icon and colour
+   are all decided in the same place so a folder is never half-configured. */
+function ProjectDialog({
+  draft,
+  copy,
+  saving,
+  onChange,
+  onSave,
+  onClose,
+}: {
+  draft: { id: string | null; name: string; icon: ProjectIcon; color: ProjectColor };
+  copy: typeof COPY["en"];
+  saving: boolean;
+  onChange: (next: { id: string | null; name: string; icon: ProjectIcon; color: ProjectColor }) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const colorHex = useProjectColorHex();
+  const canSave = draft.name.trim().length > 0 && !saving;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      {/* House rule: a modal backdrop dims AND blurs — never dim alone. */}
+      <button
+        type="button"
+        aria-label={copy.cancel}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl p-4"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <ProjectGlyph icon={draft.icon} color={draft.color} size={16} />
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+            {draft.id ? copy.editProject : copy.newProject}
+          </h2>
+        </div>
+
+        <label className="block text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1">
+          {copy.projectName}
+        </label>
+        <input
+          autoFocus
+          value={draft.name}
+          maxLength={PROJECT_NAME_MAX}
+          onChange={(e) => onChange({ ...draft, name: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter" && canSave) onSave(); }}
+          className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          placeholder={copy.newProject}
+        />
+
+        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
+          {copy.projectIcon}
+        </div>
+        <div className="grid grid-cols-6 gap-1.5">
+          {PROJECT_ICONS.map((ic) => (
+            <button
+              key={ic}
+              type="button"
+              onClick={() => onChange({ ...draft, icon: ic })}
+              aria-pressed={draft.icon === ic}
+              aria-label={ic}
+              className={`h-9 rounded-lg border flex items-center justify-center ${
+                draft.icon === ic
+                  ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)]"
+                  : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--text-dim)]"
+              }`}
+            >
+              <ProjectGlyph icon={ic} color={draft.color} size={16} />
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
+          {copy.projectColor}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {PROJECT_COLOR_KEYS.map((ck) => (
+            <button
+              key={ck}
+              type="button"
+              onClick={() => onChange({ ...draft, color: ck })}
+              aria-pressed={draft.color === ck}
+              aria-label={ck}
+              className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${
+                draft.color === ck ? "border-[var(--text-primary)]" : "border-transparent"
+              }`}
+            >
+              <span
+                className="h-5 w-5 rounded-full block"
+                style={{ backgroundColor: colorHex(ck) }}
+              />
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 rounded-lg text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+          >
+            {copy.cancel}
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!canSave}
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] disabled:opacity-40 hover:opacity-90"
+          >
+            {copy.save}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2319,29 +2860,163 @@ function BubbleActions({
   );
 }
 
+/* ── Sidebar section heading ──
+   A date, "Projects" and "Pinned" are all chrome, not content. The label used
+   to be 10px bold text at rgba(255,255,255,0.44) sitting directly above chat
+   rows at 0.66 — two greys a fifth of an alpha apart, same left edge, no
+   separator — so "Yesterday" scanned as just another chat. The hairline rule
+   and the sticky behaviour are what make it read as a divider; every section
+   in the sidebar now shares this one component so they cannot drift apart. */
+function SectionHeader({
+  label,
+  children,
+}: {
+  label: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="sticky top-0 z-[2] bg-[var(--bg-secondary)] px-4 pt-3 pb-1.5 flex items-center gap-2">
+      <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] shrink-0">
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-[var(--border-subtle)]" aria-hidden="true" />
+      {children}
+    </div>
+  );
+}
+
+/* ── A project folder row ── */
+function ProjectRow({
+  project,
+  count,
+  open,
+  onToggle,
+  onEdit,
+  onDelete,
+  editLabel,
+  deleteLabel,
+  moreLabel,
+}: {
+  project: AiProject;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  editLabel: string;
+  deleteLabel: string;
+  moreLabel: string;
+}) {
+  return (
+    <div
+      className="group px-2 py-1.5 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); }
+      }}
+    >
+      {/* The chevron follows the writing direction, so it never points into
+          the text in Arabic. rtl:rotate-180 handles the collapsed state; the
+          open state points down in both directions. */}
+      <span className="text-[var(--text-dim)] shrink-0 flex">
+        {open ? <AngleDownIcon size={12} /> : <AngleRightIcon size={12} className="rtl:rotate-180" />}
+      </span>
+      <ProjectGlyph icon={project.icon} color={project.color} size={14} className="shrink-0" />
+      <span className="text-[13px] font-medium truncate flex-1 min-w-0">{project.name}</span>
+      {count > 0 && (
+        <span className="text-[10px] text-[var(--text-dim)] tabular-nums shrink-0 group-hover:hidden">
+          {count}
+        </span>
+      )}
+      <RowMenu
+        label={moreLabel}
+        items={[
+          { key: "edit", label: editLabel, icon: <PencilIcon className="h-3 w-3" />, onSelect: onEdit },
+          { key: "delete", label: deleteLabel, icon: <TrashIcon className="h-3 w-3" />, danger: true, onSelect: onDelete },
+        ]}
+      />
+    </div>
+  );
+}
+
 /* ── Sidebar row with hover actions ── */
 
 function SidebarRow({
   row,
   active,
+  nested,
+  projects,
+  copy,
   onOpen,
   onRename,
   onDelete,
-  renameLabel,
-  deleteLabel,
+  onTogglePin,
+  onMove,
 }: {
   row: ConversationRow;
   active: boolean;
+  nested?: boolean;
+  projects: AiProject[];
+  copy: typeof COPY["en"];
   onOpen: () => void;
   onRename: () => void;
   onDelete: () => void;
-  renameLabel: string;
-  deleteLabel: string;
+  onTogglePin: () => void;
+  onMove: (projectId: string | null) => void;
 }) {
+  const pinned = !!row.pinned;
+  const inProject = row.project_id ?? null;
+
+  /* Rename, pin, move and delete are four actions on a 248px row — as inline
+     buttons they would leave the title barely wider than a word. Pin stays
+     out (it is the one you reach for mid-thought, and it has to stay visible
+     when ON so you can see the chat is pinned); the rest live behind one
+     menu, which is also where "move to a folder" belongs since it needs the
+     project list. */
+  const items: MenuItem[] = [
+    {
+      key: "pin",
+      label: pinned ? copy.unpin : copy.pin,
+      icon: pinned ? <PinOffIcon className="h-3 w-3" /> : <PinIcon className="h-3 w-3" />,
+      onSelect: onTogglePin,
+    },
+    {
+      key: "rename",
+      label: copy.rename,
+      icon: <PencilIcon className="h-3 w-3" />,
+      onSelect: onRename,
+    },
+    { key: "sep-move", separator: true, label: copy.moveTo },
+    {
+      key: "none",
+      label: copy.noProject,
+      selected: inProject === null,
+      onSelect: () => onMove(null),
+    },
+    ...projects.map((p) => ({
+      key: `p-${p.id}`,
+      label: p.name,
+      icon: <ProjectGlyph icon={p.icon} color={p.color} size={12} />,
+      selected: inProject === p.id,
+      onSelect: () => onMove(p.id),
+    })),
+    { key: "sep-danger", separator: true },
+    {
+      key: "delete",
+      label: copy.delete,
+      icon: <TrashIcon className="h-3 w-3" />,
+      danger: true,
+      onSelect: onDelete,
+    },
+  ];
+
   return (
     <div
       onClick={onOpen}
-      className={`group px-3 py-2 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${
+      className={`group ${nested ? "ps-7 pe-2" : "px-3"} py-2 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
           : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -2350,23 +3025,173 @@ function SidebarRow({
       <div className="text-[13px] font-medium truncate flex-1 min-w-0">
         {row.title}
       </div>
-      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onRename(); }}
-          className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
-          title={renameLabel}
-        >
-          <PencilIcon className="h-3 w-3" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center"
-          title={deleteLabel}
-        >
-          <TrashIcon className="h-3 w-3" />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${
+          pinned
+            ? "text-[var(--text-primary)]"
+            : "opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+        }`}
+        title={pinned ? copy.unpin : copy.pin}
+        aria-label={pinned ? copy.unpin : copy.pin}
+        aria-pressed={pinned}
+      >
+        <PinIcon className="h-3 w-3" />
+      </button>
+      <RowMenu label={copy.more} items={items} />
     </div>
+  );
+}
+
+/* ── The one-button row menu ──
+   Rendered `position: fixed` against the trigger's own rectangle rather than
+   absolutely inside the row. The sidebar list is an overflow-y-auto column,
+   which clips on BOTH axes, so an absolutely-positioned panel would have its
+   edge sliced off — and a menu you cannot fully see is worse than no menu. */
+type MenuItem = {
+  key: string;
+  label?: string;
+  icon?: React.ReactNode;
+  danger?: boolean;
+  selected?: boolean;
+  separator?: boolean;
+  onSelect?: () => void;
+};
+
+function RowMenu({ label, items }: { label: string; items: MenuItem[] }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+
+  const place = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const W = 208;
+    const GAP = 4;
+    const EDGE = 8;
+    const PREFERRED_H = 320;
+
+    const below = window.innerHeight - r.bottom - GAP - EDGE;
+    const above = r.top - GAP - EDGE;
+    /* Open downwards when there is room, otherwise flip above. When flipping
+       we anchor the panel's BOTTOM edge to the button instead of guessing a
+       top: the menu's height depends on how many projects exist, and a top
+       computed from the maximum height would leave a short menu floating a
+       hundred pixels away from the button that opened it. */
+    const dropDown = below >= Math.min(PREFERRED_H, above) || below >= 200;
+    const left = Math.min(Math.max(EDGE, r.right - W), window.innerWidth - W - EDGE);
+
+    setPos(
+      dropDown
+        ? { top: r.bottom + GAP, left, maxHeight: Math.max(120, below) }
+        : { bottom: window.innerHeight - r.top + GAP, left, maxHeight: Math.max(120, above) },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    /* Any scroll or resize invalidates a fixed position, and re-placing a
+       menu mid-scroll looks broken — closing is the honest response. */
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open) place();
+          setOpen((v) => !v);
+        }}
+        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
+          open ? "opacity-100 text-[var(--text-primary)]" : "opacity-0 group-hover:opacity-100"
+        }`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreHorizontalIcon size={14} />
+      </button>
+
+      {open && pos && (
+        <>
+          {/* Click-catcher. Transparent, not dimmed — this is a small row
+              menu, not a modal, and the house rule about blurring backdrops
+              is about dialogs that take over the screen. */}
+          <div
+            className="fixed inset-0 z-[60]"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            onContextMenu={(e) => { e.preventDefault(); setOpen(false); }}
+          />
+          <div
+            role="menu"
+            className="fixed z-[61] w-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl py-1"
+            style={{
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
+              maxHeight: Math.min(320, pos.maxHeight),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {items.map((it) =>
+              it.separator ? (
+                <div key={it.key} className="px-3 pt-2 pb-1">
+                  {it.label ? (
+                    <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">
+                      {it.label}
+                    </span>
+                  ) : (
+                    <span className="block h-px bg-[var(--border-subtle)]" />
+                  )}
+                </div>
+              ) : (
+                <button
+                  key={it.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    it.onSelect?.();
+                  }}
+                  className={`w-full px-3 py-1.5 text-[12px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] ${
+                    it.danger
+                      ? "text-rose-400"
+                      : it.selected
+                        ? "text-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)]"
+                  }`}
+                >
+                  <span className="w-3 shrink-0 flex justify-center">{it.icon}</span>
+                  <span className="truncate flex-1 min-w-0">{it.label}</span>
+                  {it.selected && <CheckIcon className="h-3 w-3 shrink-0" />}
+                </button>
+              ),
+            )}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

@@ -50,13 +50,59 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     if (notInternal) return notInternal;
   }
   const { id } = await params;
-  const body = (await req.json()) as { title?: string };
-  if (!body.title?.trim()) {
-    return NextResponse.json({ error: "title required" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as {
+    title?: unknown;
+    pinned?: unknown;
+    project_id?: unknown;
+  };
+
+  /* Rename, pin and move-to-folder all land here, and each key is applied only
+     when it was actually sent — pinning a chat must not blank its title, and
+     renaming must not silently unpin it. */
+  const patch: Record<string, unknown> = {};
+
+  if (body.title !== undefined) {
+    const title = typeof body.title === "string" ? body.title.trim() : "";
+    if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
+    patch.title = title;
   }
+
+  if (body.pinned !== undefined) {
+    if (typeof body.pinned !== "boolean") {
+      return NextResponse.json({ error: "pinned must be a boolean" }, { status: 400 });
+    }
+    patch.pinned = body.pinned;
+  }
+
+  /* null is a meaningful value here — it means "take this chat out of its
+     folder" — so it is distinguished from the key being absent. An id that
+     isn't the caller's own is rejected rather than quietly ignored: silently
+     dropping a move would look like the app losing the chat. */
+  if (body.project_id !== undefined) {
+    if (body.project_id === null) {
+      patch.project_id = null;
+    } else if (typeof body.project_id === "string" && body.project_id) {
+      const { data: owned } = await supabaseServer
+        .from("ai_projects")
+        .select("id")
+        .eq("id", body.project_id)
+        .eq("tenant_id", auth.tenant_id)
+        .eq("account_id", auth.account_id)
+        .maybeSingle();
+      if (!owned) return NextResponse.json({ error: "Unknown project" }, { status: 400 });
+      patch.project_id = owned.id;
+    } else {
+      return NextResponse.json({ error: "invalid project_id" }, { status: 400 });
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+  }
+
   const { data, error } = await supabaseServer
     .from("ai_conversations")
-    .update({ title: body.title.trim() })
+    .update(patch)
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .eq("account_id", auth.account_id)
