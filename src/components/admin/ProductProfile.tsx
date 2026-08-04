@@ -160,6 +160,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.updated":     { en: "Last updated",       zh: "最后更新",       ar: "آخر تحديث" },
   "pp.f.schemaVer":   { en: "Schema version",     zh: "模板版本",       ar: "إصدار القالب" },
   "pp.f.supPhoto":    { en: "Supplier product photo", zh: "供应商产品照片", ar: "صورة المنتج لدى المورّد" },
+  "pp.f.costFromSupplier": { en: "From the supplier link — not set on this variant.", zh: "来自供应商关联 — 该型号未单独填写。", ar: "من رابط المورّد — غير محدّد على هذا المتغيّر." },
   "pp.f.classification": { en: "Classification", zh: "分类", ar: "التصنيف" },
   "pp.f.heroPoster":  { en: "Hero poster",        zh: "首页海报",       ar: "بوستر الواجهة" },
   "pp.f.brandMark":   { en: "Brand mark",         zh: "品牌标识",       ar: "علامة العلامة التجارية" },
@@ -386,6 +387,13 @@ export default function ProductProfile() {
   }
 
   const readiness = data.readiness?.overall ?? null;
+  /* Cost lives on the variant OR on the supplier link — read both, so the
+     Price tab never claims "Not set" while the Supplier tab shows a figure. */
+  const primarySupplierCost = (() => {
+    const withCost = data.suppliers.filter((x) => x.unit_cost_cny != null);
+    const pick = withCost.find((x) => x.is_primary === true) ?? withCost[0];
+    return pick ? Number(pick.unit_cost_cny) : null;
+  })();
 
   const s2 = (k: string) => p[k];
 
@@ -676,7 +684,15 @@ export default function ProductProfile() {
                 <div className={rows}>
                   <Row label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
                   <Row label={t("pp.f.priceNote", "Price note")} value={m.price_note} />
-                  {data.costVisible && <Row label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price} />}
+                  {data.costVisible && (
+                    <Row
+                      label={t("pp.f.costPrice", "Cost price (CNY)")}
+                      value={m.cost_price ?? primarySupplierCost}
+                      help={m.cost_price == null && primarySupplierCost != null
+                        ? t("pp.f.costFromSupplier", "From the supplier link — not set on this variant.")
+                        : undefined}
+                    />
+                  )}
                   <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
                   {data.costVisible && <Row label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
                   {data.costVisible && <Row label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}

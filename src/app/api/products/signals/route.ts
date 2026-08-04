@@ -72,7 +72,7 @@ export async function GET() {
       .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
       .eq("contact_type", "supplier")
       .eq("tenant_id", auth.tenant_id),
-    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary"),
+    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny"),
   ]);
 
   if (prodRes.error) {
@@ -127,7 +127,17 @@ export async function GET() {
     }
   }
   const linkedSupplier = new Map<string, string>();
-  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null }>) {
+  /* Cost can be recorded in EITHER place: on the variant (Price tab) or on
+     the supplier link (Supplier tab). The grid only ever read the variant, so
+     a product priced through its supplier showed "Cost not set" and carried a
+     "No cost" gap chip while the cost was sitting right there on the record.
+     Primary link wins, else the first link with a figure. */
+  const linkCost = new Map<string, number>();
+  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null; unit_cost_cny: number | string | null }>) {
+    const c = l.unit_cost_cny == null ? null : Number(l.unit_cost_cny);
+    if (c != null && Number.isFinite(c) && (l.is_primary || !linkCost.has(l.product_id))) {
+      linkCost.set(l.product_id, c);
+    }
     if (!l.supplier_id) continue;
     if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
   }
@@ -186,6 +196,9 @@ export async function GET() {
     const mediaCounts = media.get(p.id) ?? { main: 0, gallery: 0, packing: 0, manual: 0, video: 0 };
     const model = primary.get(p.id);
     const values = (p.schema_specs ?? {}) as Record<string, unknown>;
+    /* One definition of "this product's cost", used by all three consumers
+       below so the bar, the chip and the number can never disagree. */
+    const effectiveCost = model?.cost_price ?? linkCost.get(p.id) ?? null;
     const { schema } = resolveSchema({
       divisionCode: p.division_slug || "",
       categoryCode: p.category_slug || "",
@@ -206,7 +219,7 @@ export async function GET() {
         product_name: p.product_name,
         primary_model: model?.primary_model ?? null,
         supplier_model: model?.model_name ?? null,
-        cost_price: model?.cost_price ?? null,
+        cost_price: effectiveCost,
         global_price: model?.global_price ?? null,
         pricing_mode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
         warranty: p.warranty,
@@ -227,13 +240,13 @@ export async function GET() {
     /* Only a FIXED-price model can be "missing" its cost. A machine quoted
        per configuration has no cost to fill in, and flagging it forever was
        what buried the products that genuinely are unfinished. */
-    if (model?.cost_price == null && (model?.pricing_mode ?? "fixed") === "fixed") missing.push("cost");
+    if (effectiveCost == null && (model?.pricing_mode ?? "fixed") === "fixed") missing.push("cost");
     if (!(p.excerpt || "").trim() && !(p.description || "").trim()) missing.push("description");
 
     signals[p.id] = {
       readiness: report ? report.overall : null,
       missing: missing.slice(0, 3),
-      cost: canSeeCosts ? (model?.cost_price ?? null) : null,
+      cost: canSeeCosts ? effectiveCost : null,
       pricingMode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
       priceNote: model?.price_note ?? null,
       visible: p.visible === true,
