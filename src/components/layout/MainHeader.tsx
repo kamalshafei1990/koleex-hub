@@ -145,10 +145,18 @@ export default function MainHeader() {
           <MenuBurgerIcon size={16} />
         </button>
 
+        {/* The logo is the way home from every screen, so it has to LOOK
+            pressable and be easy to hit. It had neither: no hover state at
+            all, and a hit area exactly the size of the image box — a click a
+            few pixels off the glyph landed on the header and did nothing,
+            which reads as "sometimes it doesn't work". The padding widens the
+            target and the negative margin keeps the logo optically where it
+            was. */}
         <Link
           href="/"
           aria-label="Koleex Hub"
-          className={`shrink-0 flex items-center ${dk ? "text-white" : "text-black"}`}
+          title="Koleex Hub"
+          className={`shrink-0 flex items-center rounded-lg -mx-2 px-2 -my-1 py-1 transition-opacity duration-150 hover:opacity-70 active:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white" : "text-black"}`}
         >
           {/* Hub logo v2 (owner-approved option B) — the script "hub" makes
               the lockup taller than the bare wordmark, so the img runs larger
