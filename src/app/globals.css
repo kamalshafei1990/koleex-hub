@@ -989,11 +989,16 @@ input[type="number"]:not(.kx-spinner) {
   filter: drop-shadow(0 0 7px rgba(188, 216, 240, 0.45));
   opacity: 1 !important;
 }
+/* Hover label: a SOLID brand tint, not gradient-clipped text.
+   The clipped version painted the gradient through `color: transparent`,
+   which only holds while nothing else touches the element's box. This label
+   also carries line-clamp (overflow:hidden + a -webkit-box display), and in
+   Chromium that combination drops the clipped fill — so the tile's caption
+   vanished the moment you hovered it. A solid colour is the same visual
+   intent (the label lifts to Hub Blue) with nothing to clip and nothing to
+   lose. */
 .kx-tile-neon:hover .kx-neon-label {
-  background: linear-gradient(135deg, #7FA9D6, #BCD8F0);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #BCD8F0;
 }
 
 /* Apple-style scroll choreography (ProductPreview): bands drift up and
