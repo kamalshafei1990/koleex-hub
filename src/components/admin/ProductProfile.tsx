@@ -158,6 +158,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.created":     { en: "Created",            zh: "创建时间",       ar: "تاريخ الإنشاء" },
   "pp.f.updated":     { en: "Last updated",       zh: "最后更新",       ar: "آخر تحديث" },
   "pp.f.schemaVer":   { en: "Schema version",     zh: "模板版本",       ar: "إصدار القالب" },
+  "pp.f.supPhoto":    { en: "Supplier product photo", zh: "供应商产品照片", ar: "صورة المنتج لدى المورّد" },
   "pp.f.heroPoster":  { en: "Hero poster",        zh: "首页海报",       ar: "بوستر الواجهة" },
   "pp.f.brandMark":   { en: "Brand mark",         zh: "品牌标识",       ar: "علامة العلامة التجارية" },
   /* empty-state lines */
@@ -377,62 +378,43 @@ export default function ProductProfile() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-4">
-      {/* ── Header — the editor's own: back square, title + status, subtitle,
-             actions on the right. Same sizes, same spacing. ── */}
-      <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            href="/product-data"
-            aria-label={t("pp.back", "Back to Product Data")}
-            className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
+      {/* The edit screen leads with the tabs, not a page title — so does the
+         record. A slim identity strip keeps "what am I looking at?" answered
+         without pushing the tabs down the page. */}
+      <div className="flex items-center gap-3 mb-3 min-w-0">
+        <Link
+          href="/product-data"
+          aria-label={t("pp.back", "Back to Product Data")}
+          className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+        </Link>
+        <h1 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
+          {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
+        </h1>
+        <span className="text-[11px] font-mono text-[var(--text-dim)] shrink-0">{(data.models[0]?.primary_model as string) || ""}</span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0">
+          {(s2("status") as string) || "draft"}
+        </span>
+        {readiness != null && (
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] shrink-0">
+            <span className="inline-block h-1 w-14 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
+              <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
+            </span>
+            {readiness}%
+          </span>
+        )}
+        <span className="flex-1" />
+        {s2("slug") ? (
+          <Link href={`/products/${s2("slug") as string}`} title={t("pp.publicPage", "Public page")}
+            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
+            <ExternalLinkIcon className="h-3.5 w-3.5" /> {t("pp.publicPage", "Public page")}
           </Link>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
-                {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
-              </h1>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                {(s2("status") as string) || "draft"}
-              </span>
-              {s2("visible") !== true && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]">{t("pp.hidden", "Hidden")}</span>
-              )}
-              {readiness != null && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
-                  <span className="inline-block h-1 w-16 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
-                    <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
-                  </span>
-                  {readiness}%
-                </span>
-              )}
-            </div>
-            <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5 truncate">
-              {(data.models[0]?.primary_model as string) || t("pp.noCode", "no code")}
-              {" · "}{(s2("category_slug") as string) || "—"}
-              {data.subcategory ? ` · ${data.subcategory.name}` : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {s2("slug") ? (
-            <Link
-              href={`/products/${s2("slug") as string}`}
-              title="Open the customer-facing page"
-              className="hidden sm:inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-            >
-              <ExternalLinkIcon className="h-4 w-4" /> {t("pp.publicPage", "Public page")}
-            </Link>
-          ) : null}
-          <Link
-            href={editHref}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0"
-          >
-            <PencilIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">{t("action.edit", "Edit")}</span>
-          </Link>
-        </div>
+        ) : null}
+        <Link href={editHref}
+          className="h-8 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shrink-0">
+          <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
+        </Link>
       </div>
 
       <ProfileTabs current={step} onPick={setStep} />
@@ -467,7 +449,20 @@ export default function ProductProfile() {
                   <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{sup.supplier?.name ?? "—"}</span>
                   {sup.is_primary === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
                 </div>
-                <div className={grid}>
+                {/* The supplier tab leads with the supplier's own product photo,
+                    so the record shows that slot too — filled or empty. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
+                  <div>
+                    <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
+                      {t("pp.f.supPhoto", "Supplier product photo")}
+                    </div>
+                    <div className="aspect-square w-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden flex items-center justify-center">
+                      {sup.supplier_product_photo
+                        ? <img src={IMG.card(sup.supplier_product_photo as string)} alt="" className="h-full w-full object-contain p-2" />
+                        : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
+                    </div>
+                  </div>
+                  <div className={grid.replace("lg:grid-cols-4", "lg:grid-cols-2")}>
                   <Field label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
                   <Field label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
                   {data.costVisible && <Field label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
@@ -476,6 +471,7 @@ export default function ProductProfile() {
                   <Field label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
                   <Field label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
                   <Field label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -486,9 +482,30 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "identity" && (
       <div className="space-y-4">
+        {/* Same two-column hero the editor opens with: the product photo owns
+            the left, status/visibility/name the right. */}
         <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+            <div>
+              <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
+                {t("media.slot.main_image.label", "Main Product Photo")}
+              </div>
+              <div className="aspect-square w-full max-w-[320px] rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden flex items-center justify-center">
+                {hero
+                  ? <img src={IMG.card(hero)} alt="" className="h-full w-full object-contain p-2" />
+                  : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
+              </div>
+            </div>
+            <div className={grid.replace("lg:grid-cols-4", "lg:grid-cols-2")}>
+              <Field label={t("pp.f.status", "Status")} value={s2("status")} />
+              <Field label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
+              <Field label={t("pp.f.featured", "Featured")} value={s2("featured")} />
+              <Field label={t("pp.f.level", "Level")} value={s2("level")} />
+              <Field label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
+              <Field label={t("pp.f.koleexCode", "KOLEEX code")} value={data.models[0]?.primary_model} mono />
+            </div>
+          </div>
           <div className={grid}>
-            <Field label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
             <Field label={t("pp.f.publicUrl", "Public URL")} value={s2("slug")} mono />
             <Field label={t("pp.f.brand", "Brand")} value={s2("brand")} />
             <Field label={t("pp.f.manufacturer", "Manufacturer")} value={s2("manufacturer")} />
@@ -504,13 +521,11 @@ export default function ProductProfile() {
             <Field label={t("pp.f.lastOrder", "Last order date")} value={s2("last_order_date")} />
             <Field label={t("pp.f.aliases", "Alternate names")} value={s2("alternate_names")} />
             <Field label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
-            <Field label={t("pp.f.featured", "Featured")} value={s2("featured")} />
-            <Field label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
           </div>
         </Group>
         <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
-            <Field label={t("pp.f.excerpt", "Short description (excerpt)")} value={s2("excerpt")} />
+            <Field label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
             <Field label={t("pp.f.description", "Full description")} value={s2("description")} />
             <Field label={t("pp.f.highlights", "Highlights")} value={s2("highlights")} />
             <Field label={t("pp.f.tags", "Tags")} value={s2("tags")} />
