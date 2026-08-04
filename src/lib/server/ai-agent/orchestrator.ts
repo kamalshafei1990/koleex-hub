@@ -1006,6 +1006,39 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
  *  the tool-routing instructions + brand-knowledge block so the
  *  Groq request stays tiny and fast. Language mirror is kept — it's
  *  the only rule that matters for small-talk. */
+/* ─────────────────────────────────────────────────────────────────────
+   WHO THE AGENT IS TALKING TO.
+
+   Shared by EVERY prompt builder. The first version lived only in the full
+   prompt, so a short question — "do you know who I am?" — took the fast
+   path, hit the minimal prompt, and still answered "I don't have access to
+   your identity". The identity has to be present on every path or it is
+   present on none of the ones users actually hit.
+
+   Naming the SIGNED-IN user is not a disclosure: it is the one identity
+   they already own. Other people and company data stay behind the
+   permission layer, unchanged.
+   ───────────────────────────────────────────────────────────────────── */
+function viewerBlockFor(ctx: UserContext): string {
+  const v = ctx.viewer;
+  const memoryLines = Object.entries(ctx.memory);
+  return `
+Who you are talking to (from their signed-in session — you DO know this):
+- Name: ${v.name || v.username}
+- Username: ${v.username}
+- Role: ${v.role || "not set"}${v.isSuperAdmin ? " (super admin)" : ""}
+- Department: ${v.department || "not set"}
+Use their name naturally when it helps. Never say you don't know who they are.
+${memoryLines.length
+    ? `\nThings they asked you to remember:\n${memoryLines.map(([k, val]) => `- ${k}: ${val}`).join("\n")}`
+    : ""}
+Anything personal NOT listed above (birthday, preferences, family, plans) you genuinely
+do not know. Don't guess and don't invent it — ASK them, in one short question. When they
+answer, call remember_about_user to save it so you still know it next time. Facts about
+OTHER people and company data stay governed by their permissions — this changes nothing there.
+`;
+}
+
 export function buildMinimalSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
@@ -1016,6 +1049,8 @@ export function buildMinimalSystemPrompt(
     userLang === "ar" ? "Arabic" :
     "English";
   return `You are Koleex AI, a friendly general-purpose assistant inside Koleex Hub.
+
+${viewerBlockFor(ctx)}
 
 Reply in the same language the user wrote in. If the message is too short to tell (e.g. "ok"), fall back to ${uiLangHint}.
 
@@ -1053,6 +1088,8 @@ export function buildBrandSystemPrompt(
     userLang === "ar" ? "Arabic" :
     "English";
   return `You are Koleex AI.
+
+${viewerBlockFor(ctx)}
 
 ${ENTITY_GUIDANCE_FULL}
 
@@ -1218,33 +1255,7 @@ function buildSystemPrompt(
      each turn from ctx.timezone (the user's Calendar preference). */
   const nowBlock = buildNowBlock(ctx.timezone);
 
-  /* WHO YOU ARE TALKING TO.
-
-     This was missing entirely, so an agent running inside the user's own
-     authenticated session answered "I don't have access to your identity"
-     when asked its user's name — technically honest about the prompt, and
-     absurd to the person reading it. Naming the SIGNED-IN user is not a
-     disclosure: it is the one identity they already own. Everything about
-     OTHER people stays behind the permission layer exactly as before. */
-  const v = ctx.viewer;
-  const memoryLines = Object.entries(ctx.memory);
-  const viewerBlock = `
-Who you are talking to (from their signed-in session — you DO know this):
-- Name: ${v.name || v.username}
-- Username: ${v.username}
-- Role: ${v.role || "not set"}${v.isSuperAdmin ? " (super admin)" : ""}
-- Department: ${v.department || "not set"}
-Use their name naturally when it helps. Never claim you don't know who they are.
-${memoryLines.length
-    ? `
-Things they asked you to remember:
-${memoryLines.map(([k, val]) => `- ${k}: ${val}`).join("\n")}`
-    : ""}
-Anything personal NOT listed above (birthday, preferences, family, plans) you genuinely
-do not know. Don't guess and don't invent it — ASK them, in one short question. When they
-answer, call remember_about_user to save it so you still know it next time. Facts about
-OTHER people and company data stay governed by their permissions — this changes nothing there.
-`;
+  const viewerBlock = viewerBlockFor(ctx);
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
 

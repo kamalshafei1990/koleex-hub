@@ -477,7 +477,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
   return (
     <div className={embedded ? "h-full overflow-y-auto bg-[var(--bg-primary)]" : "min-h-screen bg-[var(--bg-primary)]"}>
-      <div className={embedded ? "mx-auto w-full max-w-5xl" : "mx-auto w-full max-w-6xl"}>
+      {/* Full width, not a centred column. max-w-5xl/6xl left the page as a
+          narrow strip adrift in a wide window — the sections drifted left and
+          right of centre while the viewport sat empty either side. Same cage,
+          same fix, as the product record. */}
+      <div className="w-full">
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
       <main className="@container pb-24">
