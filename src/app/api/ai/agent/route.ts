@@ -45,6 +45,12 @@ import {
 } from "@/lib/server/ai-agent/orchestrator";
 import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
+import {
+  detectLanguageDirective,
+  getReplyLanguage,
+  setReplyLanguage,
+  replyLanguageLock,
+} from "@/lib/server/ai/reply-language";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
 import { convertFrancoToArabic } from "@/lib/language/franco-converter";
@@ -222,10 +228,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const userLang: "en" | "zh" | "ar" =
+  /* ── Reply language ──
+     The interface language is only the DEFAULT. A user who has said "always
+     answer me in Arabic" gets Arabic even while typing English, and that
+     preference has to survive into conversations that haven't started yet —
+     the previous behaviour lived in the system prompt, so a new chat began
+     with no memory of it at all.
+
+     Detected deterministically rather than through a tool: the fast lanes
+     below carry no tools, and they handle exactly the kind of short message
+     this instruction arrives in. */
+  const uiLang: "en" | "zh" | "ar" =
     body.user_lang === "zh" ? "zh" :
     body.user_lang === "ar" ? "ar" :
     "en";
+
+  const directive = detectLanguageDirective(content);
+  let lockedLang = await getReplyLanguage(auth.account_id);
+  if (directive === "clear") {
+    lockedLang = null;
+    void setReplyLanguage(auth.account_id, null);
+  } else if (directive) {
+    lockedLang = directive;
+    /* Fire-and-forget: the preference write must never delay the reply, and
+       this turn already uses the new value from memory. */
+    void setReplyLanguage(auth.account_id, directive);
+  }
+
+  const userLang: "en" | "zh" | "ar" = lockedLang ?? uiLang;
+  const langLock = lockedLang ? replyLanguageLock(lockedLang) : "";
 
   /* ─── Fast-path: canned reply ────────────────────────────────
      Skips buildUserContext + history SELECT + orchestrate. Writes
@@ -492,8 +523,11 @@ export async function POST(req: Request) {
                       expectedFormat: analysis.expectedFormat,
                       entityScope: entity.scope,
                     })[0].content;
+            /* Every lane, not just the tool loop: the general lane answers
+               most ordinary messages, and it is where "you replied in English
+               again" was coming from. */
             const fastMessages = [
-              { role: "system" as const, content: systemPrompt },
+              { role: "system" as const, content: systemPrompt + langLock },
               ...history,
               { role: "user" as const, content: normalizedContent + attachBlock },
             ];
@@ -569,6 +603,7 @@ export async function POST(req: Request) {
               userLang,
               conversationId: conversationId!,
               webSearchRequested: body.web_search === true,
+              languageLock: langLock,
             });
 
             /* Emit tool-chip steps up front so the UI can render them
@@ -757,6 +792,7 @@ export async function POST(req: Request) {
     userLang,
     conversationId,
     webSearchRequested: body.web_search === true,
+    languageLock: langLock,
   });
   const tOrch = Date.now();
 

@@ -80,6 +80,10 @@ export interface OrchestrateInput {
   /** The composer's globe control was on for this turn. A nudge toward
    *  search_web, never a command — the model still decides. */
   webSearchRequested?: boolean;
+  /** Appended to whichever system prompt this turn builds when the user has
+   *  a stored "always answer me in X" preference. Built by the route, which
+   *  owns the preference, so every lane applies the identical text. */
+  languageLock?: string;
   /** Streaming hook: when set, the ANSWER-phase model call streams and
    *  each content token is forwarded here in real time. */
   onDelta?: (text: string) => void;
@@ -534,7 +538,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   const tStart = Date.now();
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
-    webSearchRequested = false,
+    webSearchRequested = false, languageLock = "",
   } = input;
   const key = process.env.DEEPSEEK_API_KEY;
 
@@ -617,7 +621,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         discipline that bloats buildSystemPrompt by ~4 KB and was
         pushing brand requests over Groq's 413 threshold.
       · everything else → full agent buildSystemPrompt. */
-  const systemPrompt =
+  const basePrompt =
     isBrand
       ? buildBrandSystemPrompt(
           ctx,
@@ -633,6 +637,11 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
           (webSearchRequested
             ? "\n\nThe user turned WEB SEARCH on for this message. Prefer calling search_web before answering, unless the question is purely about Koleex's own records or needs no lookup at all."
             : "");
+  /* The language lock applies to ALL THREE prompts, not just the full one.
+     A brand answer or a one-line greeting in the wrong language is exactly
+     as wrong as a long one, and those two lanes handle the short messages
+     users send most. */
+  const systemPrompt = basePrompt + languageLock;
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without

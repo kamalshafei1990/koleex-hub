@@ -133,7 +133,6 @@ const COPY: Record<Lang, {
   back: string;
   seeMore: string;
   seeLess: string;
-  sources: string;
   webSearchOn: string;
   webSearchOff: string;
   save: string;
@@ -180,7 +179,6 @@ const COPY: Record<Lang, {
     back: "Back",
     seeMore: "See more",
     seeLess: "See less",
-    sources: "Sources",
     webSearchOn: "Web search: on",
     webSearchOff: "Web search: off",
     save: "Save",
@@ -231,7 +229,6 @@ const COPY: Record<Lang, {
     back: "返回",
     seeMore: "查看更多",
     seeLess: "收起",
-    sources: "来源",
     webSearchOn: "联网搜索：开",
     webSearchOff: "联网搜索：关",
     save: "保存",
@@ -283,7 +280,6 @@ const COPY: Record<Lang, {
     back: "رجوع",
     seeMore: "عرض المزيد",
     seeLess: "عرض أقل",
-    sources: "المصادر",
     webSearchOn: "البحث في الويب: مفعّل",
     webSearchOff: "البحث في الويب: متوقّف",
     save: "حفظ",
@@ -2624,31 +2620,6 @@ function Bubble({
      get no actions. */
   const showActions = !isUser && !!msg.content;
 
-  /* Web sources attached to this reply, de-duplicated by host so five
-     pages from one site read as one chip rather than a wall. Only
-     search_web contributes here — internal tools cite record ids, which
-     are not links and would be meaningless as chips. */
-  const webSources = useMemo(() => {
-    const seen = new Set<string>();
-    const out: Array<{ url: string; host: string }> = [];
-    for (const st of steps) {
-      if (st.tool !== "search_web") continue;
-      for (const raw of st.sources ?? []) {
-        try {
-          const u = new URL(raw);
-          if (u.protocol !== "http:" && u.protocol !== "https:") continue;
-          const host = u.hostname.replace(/^www\./, "");
-          if (seen.has(host)) continue;
-          seen.add(host);
-          out.push({ url: u.toString(), host });
-        } catch {
-          /* Not a URL we can render as a link — skip it silently. */
-        }
-      }
-    }
-    return out.slice(0, 6);
-  }, [steps]);
-  const sourcesLabel = (COPY[lang] ?? COPY.en).sources;
 
   /* Phase 13: edit-and-retry state. Only user messages can be
      edited, and only when the parent allows it (not while another
@@ -2817,28 +2788,9 @@ function Bubble({
             )}
           </div>
         )}
-        {/* Sources — the pages search_web actually read for this answer.
-            An answer built from the live web has to show its working, or
-            the user has no way to tell it apart from one the model made
-            up: same tone, same confidence. Only rendered when a tool
-            reported sources, so ordinary replies stay clean. */}
-        {!isUser && webSources.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
-            <span className="shrink-0">{sourcesLabel}</span>
-            {webSources.map((s) => (
-              <a
-                key={s.url}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                title={s.url}
-                className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:border-[var(--text-dim)] max-w-[180px] truncate"
-              >
-                {s.host}
-              </a>
-            ))}
-          </div>
-        )}
+        {/* No Sources row: the owner asked for the answer alone. The URLs
+            still travel in the tool step and stay in the audit trail — this
+            only stops them being drawn under the reply. */}
         {/* Phase 12: assistant action row — Copy + (on last msg)
             Regenerate. User bubbles get no actions. Rendered outside
             the bubble div so it doesn't inherit the bubble's padding /
