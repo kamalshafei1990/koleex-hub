@@ -37,6 +37,7 @@ import {
   isSmallTalk,
   isBusinessDataQuery,
   isWorkDataQuery,
+  isLiveInfoQuery,
   buildBrandSystemPrompt,
   buildMinimalSystemPrompt,
   sealPricingSafety,
@@ -443,6 +444,17 @@ export async function POST(req: Request) {
              instead of reading the user's real data. Exclude them here
              so they always reach orchestrate(). */
           const isWorkData = isWorkDataQuery(normalizedContent);
+          /* Live-information queries need the tool loop for the SAME reason
+             work queries do: the general fast lane below carries no tools, so
+             "what's the weather in Cairo right now?" was answered by a model
+             apologising for having no live access while search_web sat one
+             layer down, never reached. Guarding only the orchestrator's own
+             fast paths was not enough — this route short-circuits BEFORE
+             orchestrate() is ever called, so the exclusion has to exist here
+             too. Any future tool that answers everyday questions needs the
+             same treatment or this lane will swallow it. */
+          const isLiveInfo =
+            isLiveInfoQuery(normalizedContent) || body.web_search === true;
           /* DeepSeek powers the fast lanes now (Groq fully removed).
              USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
@@ -454,7 +466,8 @@ export async function POST(req: Request) {
              question can read as a brand question AND a catalog/data
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
-          const canFastPath = fastPathKey && !isBusinessData && !isWorkData;
+          const canFastPath =
+            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";

@@ -336,6 +336,7 @@ export {
   tryFastReply,
   isBusinessDataQuery,
   isWorkDataQuery,
+  isLiveInfoQuery,
 };
 
 /* ─── Phase 10: business-data detector ────────────────────────────
