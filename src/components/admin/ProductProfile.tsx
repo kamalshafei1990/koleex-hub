@@ -41,6 +41,134 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import TabStrip from "@/components/ui/TabStrip";
 
+/* ── Translation ──────────────────────────────────────────────────────────
+   Per-file dictionary merged over PRODUCTS_UI_I18N, so the media slot labels
+   (media.slot.*) and the shared action keys resolve from the editor's own
+   dictionary and only the record's labels live here. */
+const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
+  "pp.untitled":      { en: "Untitled product",   zh: "未命名产品",     ar: "منتج بلا اسم" },
+  "pp.noCode":        { en: "no code",            zh: "无编码",         ar: "بلا كود" },
+  "pp.hidden":        { en: "Hidden",             zh: "已隐藏",         ar: "مخفي" },
+  "pp.publicPage":    { en: "Public page",        zh: "客户页面",       ar: "صفحة العميل" },
+  "pp.back":          { en: "Back to Product Data", zh: "返回产品数据", ar: "رجوع إلى بيانات المنتجات" },
+  "pp.notSet":        { en: "Not set",            zh: "未填写",         ar: "غير محدّد" },
+  "pp.yes":           { en: "Yes",                zh: "是",             ar: "نعم" },
+  "pp.no":            { en: "No",                 zh: "否",             ar: "لا" },
+  "pp.primary":       { en: "Primary",            zh: "主要",           ar: "أساسي" },
+  "pp.collapse":      { en: "Collapse",           zh: "收起",           ar: "طيّ" },
+  "pp.expand":        { en: "Expand",             zh: "展开",           ar: "توسيع" },
+  /* sections */
+  "pp.sec.classification": { en: "Classification", zh: "分类",          ar: "التصنيف" },
+  "pp.sec.supplier":  { en: "Supplier & Sourcing", zh: "供应商与采购",  ar: "المورّد والتوريد" },
+  "pp.sec.identity":  { en: "Identity & lifecycle", zh: "标识与生命周期", ar: "الهوية ودورة الحياة" },
+  "pp.sec.description": { en: "Description",      zh: "描述",           ar: "الوصف" },
+  "pp.sec.languages": { en: "Languages & markets", zh: "语言与市场",    ar: "اللغات والأسواق" },
+  "pp.sec.specs":     { en: "Specifications",     zh: "技术规格",       ar: "المواصفات" },
+  "pp.sec.variants":  { en: "Variants",           zh: "型号",           ar: "المتغيّرات" },
+  "pp.sec.price":     { en: "Cost & Price",       zh: "成本与价格",     ar: "التكلفة والسعر" },
+  "pp.sec.logistics": { en: "Logistics & Customs", zh: "物流与海关",    ar: "اللوجستيات والجمارك" },
+  "pp.sec.compliance": { en: "Compliance & Warranty", zh: "合规与保修", ar: "المطابقة والضمان" },
+  "pp.sec.media":     { en: "Media & Documents",  zh: "媒体与文件",     ar: "الوسائط والمستندات" },
+  "pp.sec.knowledge": { en: "Knowledge & Relationships", zh: "知识与关联", ar: "المعرفة والعلاقات" },
+  "pp.sec.readiness": { en: "Readiness",          zh: "完整度",         ar: "الجاهزية" },
+  "pp.sec.record":    { en: "Record",             zh: "记录信息",       ar: "بيانات السجل" },
+  /* fields */
+  "pp.f.division":    { en: "Division",           zh: "事业部",         ar: "القطاع" },
+  "pp.f.category":    { en: "Category",           zh: "类别",           ar: "الفئة" },
+  "pp.f.subcategory": { en: "Subcategory",        zh: "子类别",         ar: "الفئة الفرعية" },
+  "pp.f.subCode":     { en: "Subcategory code",   zh: "子类别编码",     ar: "كود الفئة الفرعية" },
+  "pp.f.family":      { en: "Family",             zh: "产品系列",       ar: "العائلة" },
+  "pp.f.level":       { en: "Level",              zh: "等级",           ar: "المستوى" },
+  "pp.f.template":    { en: "Spec template",      zh: "规格模板",       ar: "قالب المواصفات" },
+  "pp.f.supCode":     { en: "Supplier product code", zh: "供应商产品编码", ar: "كود المنتج لدى المورّد" },
+  "pp.f.supName":     { en: "Supplier product name", zh: "供应商产品名称", ar: "اسم المنتج لدى المورّد" },
+  "pp.f.unitCost":    { en: "Unit cost (CNY)",    zh: "单位成本(元)",   ar: "تكلفة الوحدة (يوان)" },
+  "pp.f.supplyType":  { en: "Supply type",        zh: "供应类型",       ar: "نوع التوريد" },
+  "pp.f.incoterms":   { en: "Incoterms",          zh: "贸易术语",       ar: "شروط التسليم" },
+  "pp.f.sourcing":    { en: "Sourcing status",    zh: "采购状态",       ar: "حالة التوريد" },
+  "pp.f.sampleAvail": { en: "Sample available",   zh: "可提供样品",     ar: "عيّنة متاحة" },
+  "pp.f.supWarranty": { en: "Supplier warranty (months)", zh: "供应商保修(月)", ar: "ضمان المورّد (شهور)" },
+  "pp.f.productName": { en: "Product name",       zh: "产品名称",       ar: "اسم المنتج" },
+  "pp.f.publicUrl":   { en: "Public URL",         zh: "公开网址",       ar: "الرابط العام" },
+  "pp.f.brand":       { en: "Brand",              zh: "品牌",           ar: "العلامة" },
+  "pp.f.manufacturer": { en: "Manufacturer",      zh: "制造商",         ar: "الصانع" },
+  "pp.f.mpn":         { en: "MPN",                zh: "制造商编号",     ar: "رقم الصانع" },
+  "pp.f.gtin":        { en: "GTIN",               zh: "全球贸易项目代码", ar: "رمز GTIN" },
+  "pp.f.sku":         { en: "Internal SKU",       zh: "内部SKU",        ar: "رمز داخلي" },
+  "pp.f.legacy":      { en: "Legacy code",        zh: "旧编码",         ar: "الكود القديم" },
+  "pp.f.generation":  { en: "Generation",         zh: "代次",           ar: "الجيل" },
+  "pp.f.modelYear":   { en: "Model year",         zh: "年款",           ar: "سنة الطراز" },
+  "pp.f.launch":      { en: "Launch date",        zh: "上市日期",       ar: "تاريخ الإطلاق" },
+  "pp.f.eol":         { en: "End of life",        zh: "停产日期",       ar: "نهاية العمر" },
+  "pp.f.availFrom":   { en: "Available from",     zh: "可供货日期",     ar: "متاح من" },
+  "pp.f.lastOrder":   { en: "Last order date",    zh: "最后订购日",     ar: "آخر موعد للطلب" },
+  "pp.f.aliases":     { en: "Alternate names",    zh: "别名",           ar: "أسماء بديلة" },
+  "pp.f.statusReason": { en: "Status reason",     zh: "状态原因",       ar: "سبب الحالة" },
+  "pp.f.featured":    { en: "Featured",           zh: "精选",           ar: "مميّز" },
+  "pp.f.visible":     { en: "Visible to customers", zh: "对客户可见",   ar: "ظاهر للعملاء" },
+  "pp.f.excerpt":     { en: "Short description",  zh: "简短描述",       ar: "وصف مختصر" },
+  "pp.f.description": { en: "Full description",   zh: "完整描述",       ar: "الوصف الكامل" },
+  "pp.f.highlights":  { en: "Highlights",         zh: "亮点",           ar: "أبرز المزايا" },
+  "pp.f.tags":        { en: "Tags",               zh: "标签",           ar: "الوسوم" },
+  "pp.f.variantName": { en: "Variant name",       zh: "型号名称",       ar: "اسم المتغيّر" },
+  "pp.f.koleexCode":  { en: "KOLEEX code",        zh: "KOLEEX 编码",    ar: "كود كوليكس" },
+  "pp.f.supRef":      { en: "Supplier reference", zh: "供应商型号",     ar: "مرجع المورّد" },
+  "pp.f.tagline":     { en: "Tagline",            zh: "标语",           ar: "العبارة التعريفية" },
+  "pp.f.stock":       { en: "Stock status",       zh: "库存状态",       ar: "حالة المخزون" },
+  "pp.f.barcode":     { en: "Barcode",            zh: "条形码",         ar: "الباركود" },
+  "pp.f.status":      { en: "Status",             zh: "状态",           ar: "الحالة" },
+  "pp.f.pricingMode": { en: "Pricing mode",       zh: "定价方式",       ar: "طريقة التسعير" },
+  "pp.f.priceNote":   { en: "Price note",         zh: "价格说明",       ar: "ملاحظة السعر" },
+  "pp.f.costPrice":   { en: "Cost price (CNY)",   zh: "成本价(元)",     ar: "سعر التكلفة (يوان)" },
+  "pp.f.globalPrice": { en: "Global price (USD)", zh: "全球价(美元)",   ar: "السعر العالمي (دولار)" },
+  "pp.f.headPrice":   { en: "Head-only price",    zh: "机头价",         ar: "سعر الرأس فقط" },
+  "pp.f.setPrice":    { en: "Complete-set price", zh: "整套价",         ar: "سعر الطقم الكامل" },
+  "pp.f.moq":         { en: "MOQ",                zh: "最小起订量",     ar: "أقل كمية" },
+  "pp.f.leadTime":    { en: "Lead time",          zh: "交货周期",       ar: "مدة التوريد" },
+  "pp.f.origin":      { en: "Country of origin",  zh: "原产国",         ar: "بلد المنشأ" },
+  "pp.f.hs":          { en: "HS code",            zh: "海关编码",       ar: "الرمز الجمركي" },
+  "pp.f.machineWeight": { en: "Machine weight (kg)", zh: "机器重量(kg)", ar: "وزن الماكينة (كجم)" },
+  "pp.f.machineDims": { en: "Machine dimensions", zh: "机器尺寸",       ar: "أبعاد الماكينة" },
+  "pp.f.packingTitle": { en: "Primary variant packing", zh: "主型号包装", ar: "تغليف المتغيّر الأساسي" },
+  "pp.f.netWeight":   { en: "Net weight",         zh: "净重",           ar: "الوزن الصافي" },
+  "pp.f.grossWeight": { en: "Gross weight",       zh: "毛重",           ar: "الوزن القائم" },
+  "pp.f.cbm":         { en: "CBM",                zh: "体积(立方米)",   ar: "الحجم (م³)" },
+  "pp.f.carton":      { en: "Carton dimensions",  zh: "箱规",           ar: "أبعاد الكرتونة" },
+  "pp.f.packingType": { en: "Packing type",       zh: "包装方式",       ar: "نوع التغليف" },
+  "pp.f.q20":         { en: "20ft qty",           zh: "20尺柜数量",     ar: "كمية ٢٠ قدم" },
+  "pp.f.q40":         { en: "40ft qty",           zh: "40尺柜数量",     ar: "كمية ٤٠ قدم" },
+  "pp.f.q40hq":       { en: "40HQ qty",           zh: "40高柜数量",     ar: "كمية ٤٠ عالي" },
+  "pp.f.warrMonths":  { en: "Warranty (months)",  zh: "保修(月)",       ar: "الضمان (شهور)" },
+  "pp.f.warrType":    { en: "Warranty type",      zh: "保修类型",       ar: "نوع الضمان" },
+  "pp.f.warrStart":   { en: "Starts from",        zh: "起算方式",       ar: "يبدأ من" },
+  "pp.f.warrCover":   { en: "Coverage",           zh: "保修范围",       ar: "التغطية" },
+  "pp.f.warrExcl":    { en: "Exclusions",         zh: "不保范围",       ar: "الاستثناءات" },
+  "pp.f.ce":          { en: "CE certified",       zh: "CE认证",         ar: "شهادة CE" },
+  "pp.f.rohs":        { en: "RoHS compliant",     zh: "RoHS合规",       ar: "مطابق RoHS" },
+  "pp.f.spares":      { en: "Spare parts availability", zh: "备件供应", ar: "توفّر قطع الغيار" },
+  "pp.f.serviceLife": { en: "Service life",       zh: "使用寿命",       ar: "العمر التشغيلي" },
+  "pp.f.maintenance": { en: "Maintenance interval", zh: "保养周期",     ar: "دورية الصيانة" },
+  "pp.f.support":     { en: "Technical support",  zh: "技术支持",       ar: "الدعم الفني" },
+  "pp.f.channels":    { en: "Support channels",   zh: "支持渠道",       ar: "قنوات الدعم" },
+  "pp.f.training":    { en: "Training available", zh: "提供培训",       ar: "تدريب متاح" },
+  "pp.f.installation": { en: "Installation service", zh: "安装服务",    ar: "خدمة التركيب" },
+  "pp.f.returns":     { en: "Returns policy",     zh: "退货政策",       ar: "سياسة الإرجاع" },
+  "pp.f.knowledge":   { en: "Knowledge blocks",   zh: "知识条目",       ar: "كتل المعرفة" },
+  "pp.f.productId":   { en: "Product id",         zh: "产品ID",         ar: "معرّف المنتج" },
+  "pp.f.created":     { en: "Created",            zh: "创建时间",       ar: "تاريخ الإنشاء" },
+  "pp.f.updated":     { en: "Last updated",       zh: "最后更新",       ar: "آخر تحديث" },
+  "pp.f.schemaVer":   { en: "Schema version",     zh: "模板版本",       ar: "إصدار القالب" },
+  "pp.f.heroPoster":  { en: "Hero poster",        zh: "首页海报",       ar: "بوستر الواجهة" },
+  "pp.f.brandMark":   { en: "Brand mark",         zh: "品牌标识",       ar: "علامة العلامة التجارية" },
+  /* empty-state lines */
+  "pp.e.noSupplier":  { en: "No supplier linked.", zh: "未关联供应商。", ar: "لا يوجد مورّد مرتبط." },
+  "pp.e.noVariant":   { en: "No variant recorded — a product needs at least one.", zh: "尚无型号 — 产品至少需要一个。", ar: "لا يوجد متغيّر — المنتج يحتاج واحداً على الأقل." },
+  "pp.e.noTemplate":  { en: "No spec template resolves for this classification, so there are no specification fields to fill.", zh: "该分类未匹配规格模板，因此没有可填写的规格字段。", ar: "لا يوجد قالب مواصفات لهذا التصنيف، فلا توجد حقول مواصفات لتعبئتها." },
+  "pp.e.noScore":     { en: "No spec template resolves, so completeness can't be scored.", zh: "未匹配规格模板，无法计算完整度。", ar: "لا يوجد قالب مواصفات، فلا يمكن حساب نسبة الاكتمال." },
+  "pp.e.englishOnly": { en: "English only — no localized names recorded.", zh: "仅英文 — 未录入本地化名称。", ar: "الإنجليزية فقط — لا توجد أسماء مترجمة." },
+  "pp.e.noPrice":     { en: "No variant to price.", zh: "没有可定价的型号。", ar: "لا يوجد متغيّر للتسعير." },
+};
+
 /* ── shapes (loose on purpose: the products table is column-agnostic) ── */
 type Row = Record<string, unknown>;
 interface Profile {
@@ -61,12 +189,16 @@ interface Profile {
 /* ── value rendering ──────────────────────────────────────────────────────
    The whole point of this page is that a blank is information. Empty values
    render as a dim "Not set" rather than collapsing the row away. */
+/* The empty placeholder is set once per render from the active language —
+   threading it through ~90 <Field/> call sites would be pure noise. */
+let NOT_SET = "Not set";
+
 function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   const empty =
     v === null || v === undefined || v === "" ||
     (Array.isArray(v) && v.length === 0) ||
     (typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length === 0);
-  if (empty) return <span className="text-[12px] text-[var(--text-ghost)] italic">Not set</span>;
+  if (empty) return <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>;
   if (typeof v === "boolean") {
     return (
       <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${v ? "text-emerald-400" : "text-[var(--text-dim)]"}`}>
@@ -167,15 +299,34 @@ function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number)
   );
 }
 
+/* The editor's eleven media slots, in its order, resolved through ITS OWN
+   i18n keys (media.slot.*). The record has to show the empty slots too —
+   "no packing photos" is exactly the kind of thing an operator opens this
+   page to discover, and a bare thumbnail grid hides it. */
+const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
+  { type: "main_image",    fallback: "Main Image" },
+  { type: "gallery",       fallback: "Gallery" },
+  { type: "packing_photo", fallback: "Packing Photos" },
+  { type: "label",         fallback: "Labels & Logos" },
+  { type: "manual",        fallback: "User Manual" },
+  { type: "datasheet",     fallback: "Datasheet" },
+  { type: "brochure",      fallback: "Brochure" },
+  { type: "certificate",   fallback: "Certificate" },
+  { type: "parts_list",    fallback: "Parts List" },
+  { type: "ar_3d",         fallback: "3D / AR" },
+  { type: "video",         fallback: "Video" },
+];
+
 const grid = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4";
 
 export default function ProductProfile() {
   const params = useParams<{ id: string }>();
   const handle = params?.id;
   const router = useRouter();
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const { t } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
 
   const [data, setData] = useState<Profile | null>(null);
+  NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -232,7 +383,7 @@ export default function ProductProfile() {
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href="/product-data"
-            aria-label="Back to Product Data"
+            aria-label={t("pp.back", "Back to Product Data")}
             className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -240,13 +391,13 @@ export default function ProductProfile() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
-                {(s2("product_name") as string) || "Untitled product"}
+                {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
               </h1>
               <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 {(s2("status") as string) || "draft"}
               </span>
               {s2("visible") !== true && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]">Hidden</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-ghost)]">{t("pp.hidden", "Hidden")}</span>
               )}
               {readiness != null && (
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
@@ -258,7 +409,7 @@ export default function ProductProfile() {
               )}
             </div>
             <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5 truncate">
-              {(data.models[0]?.primary_model as string) || "no code"}
+              {(data.models[0]?.primary_model as string) || t("pp.noCode", "no code")}
               {" · "}{(s2("category_slug") as string) || "—"}
               {data.subcategory ? ` · ${data.subcategory.name}` : ""}
             </p>
@@ -271,7 +422,7 @@ export default function ProductProfile() {
               title="Open the customer-facing page"
               className="hidden sm:inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              <ExternalLinkIcon className="h-4 w-4" /> Public page
+              <ExternalLinkIcon className="h-4 w-4" /> {t("pp.publicPage", "Public page")}
             </Link>
           ) : null}
           <Link
@@ -288,23 +439,23 @@ export default function ProductProfile() {
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group icon={<FolderTreeIcon className="h-4 w-4" />} title="Classification" onEdit={() => goStep("classify")}>
+      <Group icon={<FolderTreeIcon className="h-4 w-4" />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
         <div className={grid}>
-          <Field label="Division" value={s2("division_slug")} />
-          <Field label="Category" value={s2("category_slug")} />
-          <Field label="Subcategory" value={data.subcategory?.name ?? s2("subcategory_slug")} />
-          <Field label="Subcategory code" value={data.subcategory?.code} mono />
-          <Field label="Family" value={s2("family")} />
-          <Field label="Level" value={s2("level")} />
-          <Field label="Spec template" value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
+          <Field label={t("pp.f.division", "Division")} value={s2("division_slug")} />
+          <Field label={t("pp.f.category", "Category")} value={s2("category_slug")} />
+          <Field label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
+          <Field label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
+          <Field label={t("pp.f.family", "Family")} value={s2("family")} />
+          <Field label={t("pp.f.level", "Level")} value={s2("level")} />
+          <Field label={t("pp.f.template", "Spec template")} value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
         </div>
       </Group>
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group icon={<FactoryIcon className="h-4 w-4" />} title="Supplier & Sourcing" count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
+      <Group icon={<FactoryIcon className="h-4 w-4" />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
         {data.suppliers.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">No supplier linked.</p>
+          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noSupplier", "No supplier linked.")}</p>
         ) : (
           <div className="space-y-3">
             {data.suppliers.map((sup, i) => (
@@ -314,17 +465,17 @@ export default function ProductProfile() {
                     {sup.supplier?.logo ? <img src={IMG.thumb(sup.supplier.logo)} alt="" className="h-full w-full object-contain p-0.5" /> : <FactoryIcon className="h-3.5 w-3.5 text-gray-400" />}
                   </span>
                   <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{sup.supplier?.name ?? "—"}</span>
-                  {sup.is_primary === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">Primary</span>}
+                  {sup.is_primary === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
                 </div>
                 <div className={grid}>
-                  <Field label="Supplier product code" value={sup.supplier_product_code} mono />
-                  <Field label="Supplier product name" value={sup.supplier_product_name} />
-                  {data.costVisible && <Field label="Unit cost (CNY)" value={sup.unit_cost_cny} />}
-                  <Field label="Supply type" value={sup.supply_type} />
-                  <Field label="Incoterms" value={sup.incoterms} />
-                  <Field label="Sourcing status" value={sup.sourcing_status} />
-                  <Field label="Sample available" value={sup.sample_available} />
-                  <Field label="Supplier warranty (months)" value={sup.supplier_warranty_months} />
+                  <Field label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
+                  <Field label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
+                  {data.costVisible && <Field label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
+                  <Field label={t("pp.f.supplyType", "Supply type")} value={sup.supply_type} />
+                  <Field label={t("pp.f.incoterms", "Incoterms")} value={sup.incoterms} />
+                  <Field label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
+                  <Field label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
+                  <Field label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
                 </div>
               </div>
             ))}
@@ -335,49 +486,49 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "identity" && (
       <div className="space-y-4">
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Identity & lifecycle" onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
           <div className={grid}>
-            <Field label="Product name" value={s2("product_name")} />
-            <Field label="Public URL" value={s2("slug")} mono />
-            <Field label="Brand" value={s2("brand")} />
-            <Field label="Manufacturer" value={s2("manufacturer")} />
-            <Field label="MPN" value={s2("mpn")} mono />
-            <Field label="GTIN" value={s2("gtin")} mono />
-            <Field label="Internal SKU" value={s2("internal_sku")} mono />
-            <Field label="Legacy code" value={s2("legacy_code")} mono />
-            <Field label="Generation" value={s2("generation")} />
-            <Field label="Model year" value={s2("model_year")} />
-            <Field label="Launch date" value={s2("launch_date")} />
-            <Field label="End of life" value={s2("eol_date")} />
-            <Field label="Available from" value={s2("available_from")} />
-            <Field label="Last order date" value={s2("last_order_date")} />
-            <Field label="Alternate names" value={s2("alternate_names")} />
-            <Field label="Status reason" value={s2("status_reason")} />
-            <Field label="Featured" value={s2("featured")} />
-            <Field label="Visible to customers" value={s2("visible")} />
+            <Field label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
+            <Field label={t("pp.f.publicUrl", "Public URL")} value={s2("slug")} mono />
+            <Field label={t("pp.f.brand", "Brand")} value={s2("brand")} />
+            <Field label={t("pp.f.manufacturer", "Manufacturer")} value={s2("manufacturer")} />
+            <Field label={t("pp.f.mpn", "MPN")} value={s2("mpn")} mono />
+            <Field label={t("pp.f.gtin", "GTIN")} value={s2("gtin")} mono />
+            <Field label={t("pp.f.sku", "Internal SKU")} value={s2("internal_sku")} mono />
+            <Field label={t("pp.f.legacy", "Legacy code")} value={s2("legacy_code")} mono />
+            <Field label={t("pp.f.generation", "Generation")} value={s2("generation")} />
+            <Field label={t("pp.f.modelYear", "Model year")} value={s2("model_year")} />
+            <Field label={t("pp.f.launch", "Launch date")} value={s2("launch_date")} />
+            <Field label={t("pp.f.eol", "End of life")} value={s2("eol_date")} />
+            <Field label={t("pp.f.availFrom", "Available from")} value={s2("available_from")} />
+            <Field label={t("pp.f.lastOrder", "Last order date")} value={s2("last_order_date")} />
+            <Field label={t("pp.f.aliases", "Alternate names")} value={s2("alternate_names")} />
+            <Field label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
+            <Field label={t("pp.f.featured", "Featured")} value={s2("featured")} />
+            <Field label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
           </div>
         </Group>
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Description" onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
-            <Field label="Short description (excerpt)" value={s2("excerpt")} />
-            <Field label="Full description" value={s2("description")} />
-            <Field label="Highlights" value={s2("highlights")} />
-            <Field label="Tags" value={s2("tags")} />
+            <Field label={t("pp.f.excerpt", "Short description (excerpt)")} value={s2("excerpt")} />
+            <Field label={t("pp.f.description", "Full description")} value={s2("description")} />
+            <Field label={t("pp.f.highlights", "Highlights")} value={s2("highlights")} />
+            <Field label={t("pp.f.tags", "Tags")} value={s2("tags")} />
           </div>
         </Group>
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title="Languages & markets" count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
+        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
-            ? <p className="text-[12px] text-[var(--text-ghost)] italic">English only — no localized names recorded.</p>
+            ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
             : <div className={grid}>{data.translations.map((tr, i) => <Field key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
         </Group>
       </div>
       )}
 
       {STEPS[step].id === "specs" && (
-      <Group icon={<Settings2Icon className="h-4 w-4" />} title="Specifications" count={data.schema ? undefined : "no template"} onEdit={() => goStep("specs")}>
+      <Group icon={<Settings2Icon className="h-4 w-4" />} title={t("pp.sec.specs", "Specifications")} count={data.schema ? undefined : "no template"} onEdit={() => goStep("specs")}>
         {!data.schema ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">
-            No spec template resolves for this classification, so there are no specification fields to fill.
+            {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
           </p>
         ) : (
           <div className="space-y-5">
@@ -401,9 +552,9 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group icon={<BoxesIcon className="h-4 w-4" />} title="Variants" count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
+      <Group icon={<BoxesIcon className="h-4 w-4" />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
         {data.models.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">No variant recorded — a product needs at least one.</p>
+          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noVariant", "No variant recorded — a product needs at least one.")}</p>
         ) : (
           <div className="space-y-3">
             {data.models.map((m, i) => (
@@ -411,17 +562,17 @@ export default function ProductProfile() {
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-[13px] font-semibold text-[var(--text-primary)]">{(m.model_name as string) || "Untitled variant"}</span>
                   <span className="text-[11px] font-mono text-[var(--text-dim)]">{(m.primary_model as string) || "—"}</span>
-                  {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">Primary</span>}
+                  {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
                 </div>
                 <div className={grid}>
-                  <Field label="Variant name" value={m.model_name} />
-                  <Field label="KOLEEX code" value={m.primary_model} mono />
-                  <Field label="Supplier reference" value={m.reference_model} mono />
-                  <Field label="Tagline" value={m.tagline} />
-                  <Field label="Stock status" value={m.stock_status} />
-                  <Field label="Barcode" value={m.barcode} mono />
-                  <Field label="Visible" value={m.visible} />
-                  <Field label="Status" value={m.status} />
+                  <Field label={t("pp.f.variantName", "Variant name")} value={m.model_name} />
+                  <Field label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
+                  <Field label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
+                  <Field label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
+                  <Field label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
+                  <Field label={t("pp.f.barcode", "Barcode")} value={m.barcode} mono />
+                  <Field label={t("pp.f.visible", "Visible")} value={m.visible} />
+                  <Field label={t("pp.f.status", "Status")} value={m.status} />
                 </div>
               </div>
             ))}
@@ -431,9 +582,9 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "pricing" && (
-      <Group icon={<DollarSignIcon className="h-4 w-4" />} title="Cost & Price" count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
+      <Group icon={<DollarSignIcon className="h-4 w-4" />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
         {data.models.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">No variant to price.</p>
+          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noPrice", "No variant to price.")}</p>
         ) : (
           <div className="space-y-3">
             {data.models.map((m, i) => (
@@ -442,14 +593,14 @@ export default function ProductProfile() {
                   {(m.model_name as string) || "Untitled variant"}
                 </div>
                 <div className={grid}>
-                  <Field label="Pricing mode" value={m.pricing_mode ?? "fixed"} />
-                  <Field label="Price note" value={m.price_note} />
-                  {data.costVisible && <Field label="Cost price (CNY)" value={m.cost_price} />}
-                  <Field label="Global price (USD)" value={m.global_price} />
-                  {data.costVisible && <Field label="Head-only price" value={m.head_only_price} />}
-                  {data.costVisible && <Field label="Complete-set price" value={m.complete_set_price} />}
-                  <Field label="MOQ" value={m.moq} />
-                  <Field label="Lead time" value={m.lead_time} />
+                  <Field label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
+                  <Field label={t("pp.f.priceNote", "Price note")} value={m.price_note} />
+                  {data.costVisible && <Field label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price} />}
+                  <Field label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
+                  {data.costVisible && <Field label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
+                  {data.costVisible && <Field label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}
+                  <Field label={t("pp.f.moq", "MOQ")} value={m.moq} />
+                  <Field label={t("pp.f.leadTime", "Lead time")} value={m.lead_time} />
                 </div>
               </div>
             ))}
@@ -459,27 +610,27 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "logistics" && (
-      <Group icon={<GlobeIcon className="h-4 w-4" />} title="Logistics & Customs" onEdit={() => goStep("logistics")}>
+      <Group icon={<GlobeIcon className="h-4 w-4" />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
         <div className={grid}>
-          <Field label="Country of origin" value={s2("country_of_origin")} />
-          <Field label="HS code" value={s2("hs_code")} mono />
-          <Field label="MOQ" value={s2("moq")} />
-          <Field label="Lead time" value={s2("lead_time")} />
-          <Field label="Machine weight (kg)" value={s2("machine_weight_kg")} />
-          <Field label="Machine dimensions" value={s2("machine_dimensions")} />
+          <Field label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
+          <Field label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
+          <Field label={t("pp.f.moq", "MOQ")} value={s2("moq")} />
+          <Field label={t("pp.f.leadTime", "Lead time")} value={s2("lead_time")} />
+          <Field label={t("pp.f.machineWeight", "Machine weight (kg)")} value={s2("machine_weight_kg")} />
+          <Field label={t("pp.f.machineDims", "Machine dimensions")} value={s2("machine_dimensions")} />
         </div>
         {data.models[0] && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
-            <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">Primary variant packing</div>
+            <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">{t("pp.f.packingTitle", "Primary variant packing")}</div>
             <div className={grid}>
-              <Field label="Net weight" value={data.models[0].net_weight} />
-              <Field label="Gross weight" value={data.models[0].weight} />
-              <Field label="CBM" value={data.models[0].cbm} />
-              <Field label="Carton dimensions" value={data.models[0].carton_dimensions} />
-              <Field label="Packing type" value={data.models[0].packing_type} />
-              <Field label="20ft qty" value={data.models[0].container_20ft_qty} />
-              <Field label="40ft qty" value={data.models[0].container_40ft_qty} />
-              <Field label="40HQ qty" value={data.models[0].container_40hq_qty} />
+              <Field label={t("pp.f.netWeight", "Net weight")} value={data.models[0].net_weight} />
+              <Field label={t("pp.f.grossWeight", "Gross weight")} value={data.models[0].weight} />
+              <Field label={t("pp.f.cbm", "CBM")} value={data.models[0].cbm} />
+              <Field label={t("pp.f.carton", "Carton dimensions")} value={data.models[0].carton_dimensions} />
+              <Field label={t("pp.f.packingType", "Packing type")} value={data.models[0].packing_type} />
+              <Field label={t("pp.f.q20", "20ft qty")} value={data.models[0].container_20ft_qty} />
+              <Field label={t("pp.f.q40", "40ft qty")} value={data.models[0].container_40ft_qty} />
+              <Field label={t("pp.f.q40hq", "40HQ qty")} value={data.models[0].container_40hq_qty} />
             </div>
           </div>
         )}
@@ -487,23 +638,23 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group icon={<ShieldCheckIcon className="h-4 w-4" />} title="Compliance & Warranty" count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
+      <Group icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
         <div className={grid}>
-          <Field label="Warranty (months)" value={s2("warranty_months")} />
-          <Field label="Warranty type" value={s2("warranty_type")} />
-          <Field label="Starts from" value={s2("warranty_start_from")} />
-          <Field label="Coverage" value={s2("warranty_coverage")} />
-          <Field label="Exclusions" value={s2("warranty_exclusions")} />
-          <Field label="CE certified" value={s2("ce_certified")} />
-          <Field label="RoHS compliant" value={s2("rohs_compliant")} />
-          <Field label="Spare parts availability" value={s2("spare_parts_availability")} />
-          <Field label="Service life" value={s2("service_life")} />
-          <Field label="Maintenance interval" value={s2("maintenance_interval")} />
-          <Field label="Technical support" value={s2("technical_support")} />
-          <Field label="Support channels" value={s2("support_channels")} />
-          <Field label="Training available" value={s2("training_available")} />
-          <Field label="Installation service" value={s2("installation_service")} />
-          <Field label="Returns policy" value={s2("returns_policy")} />
+          <Field label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
+          <Field label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
+          <Field label={t("pp.f.warrStart", "Starts from")} value={s2("warranty_start_from")} />
+          <Field label={t("pp.f.warrCover", "Coverage")} value={s2("warranty_coverage")} />
+          <Field label={t("pp.f.warrExcl", "Exclusions")} value={s2("warranty_exclusions")} />
+          <Field label={t("pp.f.ce", "CE certified")} value={s2("ce_certified")} />
+          <Field label={t("pp.f.rohs", "RoHS compliant")} value={s2("rohs_compliant")} />
+          <Field label={t("pp.f.spares", "Spare parts availability")} value={s2("spare_parts_availability")} />
+          <Field label={t("pp.f.serviceLife", "Service life")} value={s2("service_life")} />
+          <Field label={t("pp.f.maintenance", "Maintenance interval")} value={s2("maintenance_interval")} />
+          <Field label={t("pp.f.support", "Technical support")} value={s2("technical_support")} />
+          <Field label={t("pp.f.channels", "Support channels")} value={s2("support_channels")} />
+          <Field label={t("pp.f.training", "Training available")} value={s2("training_available")} />
+          <Field label={t("pp.f.installation", "Installation service")} value={s2("installation_service")} />
+          <Field label={t("pp.f.returns", "Returns policy")} value={s2("returns_policy")} />
         </div>
         {data.certifications.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-2">
@@ -521,17 +672,60 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "media" && (
-      <Group icon={<ImageRawIcon className="h-4 w-4" />} title="Media & Documents" count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {data.media.length === 0 && <span className="text-[12px] text-[var(--text-ghost)] italic">No media uploaded.</span>}
-          {data.media.slice(0, 24).map((m, i) => (
-            <span key={i} className="h-16 w-16 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-white flex items-center justify-center">
-              {typeof m.url === "string" && /\.(png|jpe?g|webp|gif)$/i.test(m.url)
-                ? <img src={IMG.thumb(m.url as string)} alt="" className="h-full w-full object-contain p-0.5" />
-                : <span className="text-[9px] text-gray-400 px-1 text-center">{String(m.type)}</span>}
-            </span>
-          ))}
+      <Group icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
+        {/* Photo / file slots — every slot, filled or not. */}
+        <div className="space-y-4">
+          {MEDIA_SLOTS.map((slot) => {
+            const items = data.media.filter((m) => m.type === slot.type);
+            const label = t(`media.slot.${slot.type}.label`, slot.fallback);
+            return (
+              <div key={slot.type}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[11px] font-semibold text-[var(--text-muted)]">{label}</span>
+                  <span className="text-[10px] text-[var(--text-ghost)]">{items.length}</span>
+                </div>
+                {items.length === 0 ? (
+                  <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {items.map((m, i) => {
+                      const url = typeof m.url === "string" ? m.url : "";
+                      const isImg = /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url);
+                      return (
+                        <a key={i} href={url || undefined} target="_blank" rel="noreferrer"
+                           className="h-20 w-20 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-white flex items-center justify-center hover:border-[var(--border-focus)] transition-colors">
+                          {isImg
+                            ? <img src={IMG.thumb(url)} alt="" className="h-full w-full object-contain p-0.5" />
+                            : <span className="text-[9px] text-gray-500 px-1 text-center break-all">{(m.file_name as string) || slot.fallback}</span>}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Identity images live on the product row, not in product_media —
+              but they ARE photos, so an operator looking for "where are the
+              images?" must find them here too. */}
+          <div className="pt-3 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-4">
+            {([["hero_poster_url", t("pp.f.heroPoster", "Hero poster")], ["brand_mark_url", t("pp.f.brandMark", "Brand mark")], ["og_image_url", "OG image"]] as const).map(([key, lbl]) => {
+              const url = s2(key) as string | null;
+              return (
+                <div key={key}>
+                  <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{lbl}</div>
+                  {url
+                    ? <a href={url} target="_blank" rel="noreferrer" className="block h-20 w-full rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-white">
+                        <img src={IMG.thumb(url)} alt="" className="h-full w-full object-contain p-0.5" />
+                      </a>
+                    : <span className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.notSet", "Not set")}</span>}
+                </div>
+              );
+            })}
+          </div>
         </div>
+
         {data.documents.length > 0 && (
           <div className="space-y-1.5">
             {data.documents.map((d, i) => (
@@ -546,9 +740,9 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "knowledge" && (
-      <Group icon={<BookOpenIcon className="h-4 w-4" />} title="Knowledge & Relationships" count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
+      <Group icon={<BookOpenIcon className="h-4 w-4" />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
         <div className={grid}>
-          <Field label="Knowledge blocks" value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
+          <Field label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>
         {data.related.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-1.5">
@@ -567,9 +761,9 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "finalize" && (
       <div className="space-y-4">
-        <Group icon={<CheckIcon className="h-4 w-4" />} title="Readiness">
+        <Group icon={<CheckIcon className="h-4 w-4" />} title={t("pp.sec.readiness", "Readiness")}>
           {readiness == null ? (
-            <p className="text-[12px] text-[var(--text-ghost)] italic">No spec template resolves, so completeness can&apos;t be scored.</p>
+            <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noScore", "No spec template resolves, so completeness can\u2019t be scored.")}</p>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -586,12 +780,12 @@ export default function ProductProfile() {
             </div>
           )}
         </Group>
-        <Group icon={<CheckIcon className="h-4 w-4" />} title="Record">
+        <Group icon={<CheckIcon className="h-4 w-4" />} title={t("pp.sec.record", "Record")}>
           <div className={grid}>
-            <Field label="Product id" value={s2("id")} mono />
-            <Field label="Created" value={s2("created_at")} />
-            <Field label="Last updated" value={s2("updated_at")} />
-            <Field label="Schema version" value={s2("schema_version")} />
+            <Field label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
+            <Field label={t("pp.f.created", "Created")} value={s2("created_at")} />
+            <Field label={t("pp.f.updated", "Last updated")} value={s2("updated_at")} />
+            <Field label={t("pp.f.schemaVer", "Schema version")} value={s2("schema_version")} />
           </div>
         </Group>
       </div>
