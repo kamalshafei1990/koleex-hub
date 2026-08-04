@@ -1261,13 +1261,18 @@ export default function ProductList() {
               {isInternal ? t("list.productData") : t("list.products")}
             </h1>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          {/* On a phone this row had to hold back + icon + title + settings +
+              "Add Product" in ~360px, which left the title about 60px and cut
+              "Product Data" to "Pr…". The actions now take a row of their own
+              below (w-full forces the wrap), so the title gets the full width
+              of the first row. Desktop is untouched — one row, as before. */}
+          <div className="flex items-center gap-2 shrink-0 max-sm:w-full max-sm:mt-2">
             {/* Settings + Add are admin tools — only surface them on
                 the internal /product-data path. The public /products
                 catalog is read-only for customers. */}
             {isInternal && (
               <>
-                <Link href={`${baseRoute}/settings`} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+                <Link href={`${baseRoute}/settings`} className="h-10 px-4 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <SettingsIcon2 className="h-4 w-4" />
                   <span className="hidden sm:inline">{t("list.controlPanel")}</span>
                 </Link>
@@ -1275,7 +1280,7 @@ export default function ProductList() {
                     Database app (Database › Visual Library › Specs & Attributes;
                     /product-data/visual-mapping already redirects there), so a
                     duplicate entry point here was just header clutter. */}
-                <Link href={`${baseRoute}/new`} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+                <Link href={`${baseRoute}/new`} className="h-10 px-5 max-sm:flex-1 max-sm:justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
                   <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
                 </Link>
               </>
