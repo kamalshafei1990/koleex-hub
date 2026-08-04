@@ -104,10 +104,16 @@ export async function GET(
        this supplier yet". product_suppliers is the populated one (52 rows vs
        0) and the one whose FK was repointed at contacts, so it is the source
        of truth; the legacy table is still merged below for any older row. */
+    /* No embedded products(...) join here: product_suppliers has exactly one
+       foreign key, to contacts — product_id was never constrained to
+       products. PostgREST therefore cannot resolve the embed, the request
+       errors, and safe() turns that into an empty list, which is precisely
+       how 52 links rendered as "none". Fetch the link rows plainly and
+       resolve the products by id below. */
     safe(() =>
       supabaseServer
         .from("product_suppliers")
-        .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name, products(id, product_name, slug, category_slug, primary_model)")
+        .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name")
         .eq("supplier_id", id)
         .limit(200),
     ),
@@ -256,9 +262,21 @@ export async function GET(
   /* Most links carry no supplier-specific photo, so without the product's own
      main image the cards would be a wall of empty frames. One extra query,
      scoped to the products actually linked. */
-  const linkedIds = productLinkRows
-    .map((r) => ((r.products as Row | null)?.id))
-    .filter((v): v is string => typeof v === "string");
+  const linkedIds = Array.from(new Set(
+    productLinkRows
+      .map((r) => r.product_id)
+      .filter((v): v is string => typeof v === "string"),
+  ));
+  const productById = new Map<string, Row>();
+  if (linkedIds.length) {
+    const { data: prodRows } = await supabaseServer
+      .from("products")
+      .select("id, product_name, slug, category_slug")
+      .in("id", linkedIds);
+    for (const p of (prodRows ?? []) as Row[]) {
+      if (typeof p.id === "string") productById.set(p.id, p);
+    }
+  }
   const mainImages = new Map<string, string>();
   if (linkedIds.length) {
     const { data: mediaRows } = await supabaseServer
@@ -272,8 +290,8 @@ export async function GET(
     }
   }
   for (const r of productLinkRows) {
-    const p = (r.products as Row | null) ?? null;
-    const pid = p && typeof p.id === "string" ? p.id : null;
+    const pid = typeof r.product_id === "string" ? r.product_id : null;
+    const p = pid ? productById.get(pid) ?? null : null;
     if (!p || !pid || seenProducts.has(pid)) continue;
     seenProducts.add(pid);
     const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -283,7 +301,7 @@ export async function GET(
     products.push({
       ...p,
       photo: s(r.supplier_product_photo) ?? mainImages.get(pid) ?? null,
-      model: s(r.supplier_product_code) ?? s(p.primary_model) ?? null,
+      model: s(r.supplier_product_code) ?? null,
       product_name: s(r.supplier_product_name) ?? s(p.product_name) ?? null,
       is_primary: r.is_primary === true,
     });
