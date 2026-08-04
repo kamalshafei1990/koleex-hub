@@ -110,12 +110,33 @@ function formatHint(ctx: AiContext): string {
    questions; the model does not need the full dialect / Franco /
    translation framework to answer those well. Routed to Groq 8B
    Instant for sub-1s first token. */
+/* ── Who the assistant is talking to ──────────────────────────────────────
+   One line, shared by every prompt shape in this lane. It used to be just
+   " Current user: <username>." and the route never passed a username, so it
+   was always empty — which is why a signed-in user asking "who am I?" was
+   told the assistant had no access to their identity. */
+function viewerLine(ctx: AiContext): string {
+  const v = ctx.viewer;
+  const name = v?.name || v?.username || ctx.username;
+  if (!name) return "";
+  const bits = [`Current user: ${name}`];
+  if (v?.username && v.username !== name) bits.push(`username ${v.username}`);
+  if (v?.role) bits.push(`role ${v.role}`);
+  if (v?.department) bits.push(`department ${v.department}`);
+  const mem = Object.entries(ctx.memory ?? {});
+  const memStr = mem.length
+    ? ` They asked you to remember: ${mem.map(([k, val]) => `${k} = ${val}`).join("; ")}.`
+    : "";
+  return ` ${bits.join(", ")}. You DO know who they are — never say otherwise.${memStr}` +
+    ` Anything else personal you genuinely don't know: ask them, don't guess.`;
+}
+
 export function buildFastPrompt(
   userMsg: string,
   ctx: AiContext = {},
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
-  const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
+  const whoAmI = viewerLine(ctx);
   const persona = personaLock(ctx);
   const shape = formatHint(ctx);
   return [
@@ -134,9 +155,11 @@ export function buildFastPrompt(
         ` Match the user's tone and length — short casual turns get short casual replies;` +
         ` real questions get a couple of sentences or a short list.` +
         ` Plain prose by default — avoid "###" headers, "**bold**" labels, and Q1/Q2 numbering.` +
-        ` Boundaries: (1) you do NOT have live access to the user's Koleex records` +
+        ` Boundaries: (1) you do NOT have live access to the user's Koleex BUSINESS records` +
         ` (customers, invoices, inventory, products, orders, quotations) — tell them to open the` +
-        ` relevant app for specifics. (2) Do not emit specific commercial numbers (prices, totals,` +
+        ` relevant app for specifics. This does NOT cover WHO THEY ARE: their own name, role and` +
+        ` department are given to you above and you may always use them.` +
+        ` (2) Do not emit specific commercial numbers (prices, totals,` +
         ` discounts, margins, tax amounts, quotation values) unless the user supplied them this turn.`,
     },
     { role: "user", content: userMsg },
@@ -153,7 +176,7 @@ export function buildSmartPrompt(
   ctx: AiContext = {},
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
-  const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
+  const whoAmI = viewerLine(ctx);
   const persona = personaLock(ctx);
   const shape = formatHint(ctx);
   return [

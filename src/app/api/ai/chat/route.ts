@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { supabaseServer } from "@/lib/server/supabase-server";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
 import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
@@ -127,6 +128,36 @@ export async function POST(req: Request) {
   {
     const notInternal = requireInternalUser(auth);
     if (notInternal) return notInternal;
+  }
+
+  /* Identity for the prompt. The chat lane never passed one, so its
+     "Current user" slot was always empty and the model concluded it had no
+     idea who it was talking to — inside that user's own session. One extra
+     lookup, same shape the agent lane already uses. */
+  const viewerRes = await supabaseServer
+    .from("accounts")
+    .select("username, person:person_id(full_name), role:role_id(name), preferences")
+    .eq("id", auth.account_id)
+    .maybeSingle();
+  const vRow = viewerRes.data as unknown as {
+    username?: string;
+    person?: { full_name?: string | null } | Array<{ full_name?: string | null }> | null;
+    role?: { name?: string | null } | Array<{ name?: string | null }> | null;
+    preferences?: { ai_memory?: Record<string, string> } | null;
+  } | null;
+  const pickOne = <T,>(v: T | T[] | null | undefined): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+  const viewer = {
+    name: pickOne(vRow?.person)?.full_name ?? null,
+    username: auth.username,
+    role: pickOne(vRow?.role)?.name ?? null,
+    department: auth.department ?? null,
+  };
+  const memory: Record<string, string> = {};
+  for (const [k, val] of Object.entries(vRow?.preferences?.ai_memory ?? {})) {
+    if (typeof k === "string" && typeof val === "string" && k.length <= 40 && val.length <= 200) {
+      memory[k] = val;
+    }
   }
 
   const body = (await req.json()) as {
@@ -296,7 +327,7 @@ export async function POST(req: Request) {
         try {
           for await (const ev of streamRouteAi({
             messages: [{ role: "user", content: clampedUser }],
-            context: { userLang },
+            context: { userLang, viewer, memory },
           })) {
             if (ev.type === "start") {
               lane = ev.lane;
@@ -406,7 +437,7 @@ export async function POST(req: Request) {
   const tPre = Date.now();
   const result = await routeAi({
     messages: [{ role: "user", content: clamp(lastUser, MAX_MESSAGE_CHARS) }],
-    context: { userLang },
+    context: { userLang, viewer, memory },
   });
   const tPost = Date.now();
 

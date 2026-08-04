@@ -44,6 +44,20 @@ export interface AiMessage {
 export interface AiContext {
   /** Shown in the system prompt as "Current user: <username>". */
   username?: string | null;
+  /* ── Who is typing ──────────────────────────────────────────────────
+     The chat lane never received this, so `username` was always empty and
+     the prompt's "you do NOT have live access to the user's records" line
+     got generalised by the model into "I don't know who you are" — inside
+     that user's own authenticated session. Same identity the agent lane
+     carries; naming the signed-in user is not a disclosure. */
+  viewer?: {
+    name?: string | null;
+    username?: string | null;
+    role?: string | null;
+    department?: string | null;
+  } | null;
+  /** Facts the user asked the assistant to remember (accounts.preferences.ai_memory). */
+  memory?: Record<string, string> | null;
   /** UI locale — what the app chrome is rendered in. A fallback for
    *  when no strong signal is present in the user's message. */
   userLang?: "en" | "zh" | "ar";
