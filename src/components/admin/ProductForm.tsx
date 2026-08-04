@@ -523,6 +523,26 @@ export default function ProductForm({ productId }: Props) {
   const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   const isEdit = !!productId;
 
+  /* ── Adopted id: the product exists now, even if the URL still says "new" ──
+     A save is not one write. createProduct() lands the row, then models,
+     media, translations, suppliers, certifications, documents and specs
+     follow. If any of those throws, we land in catch() and the redirect to
+     /<id>/edit never runs — so the form stays in create mode while the
+     product is already in the database. Two things then go wrong:
+
+       · the slug check omits excludeProductId and the product is reported
+         as colliding with ITSELF ("This URL is already used by <its own
+         name>") — what the owner hit;
+       · pressing Save again calls createProduct AGAIN, duplicating the
+         product instead of finishing the one that exists.
+
+     Remembering the new id the moment the row lands fixes both: every
+     uniqueness check excludes it, and a retry updates instead of
+     duplicating. `isEdit` deliberately stays tied to the ROUTE id so
+     adopting an id never re-triggers the initial data load. */
+  const [adoptedId, setAdoptedId] = useState<string | null>(null);
+  const effectiveId = productId ?? adoptedId ?? null;
+
   /* P0 #3 · Draft Autosave — one localStorage slot per product
      (or "new" for a not-yet-saved product). Bumped key version (v1)
      so a future shape change can't try to restore an incompatible
@@ -1806,7 +1826,7 @@ export default function ProductForm({ productId }: Props) {
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ code });
-        if (productId) params.set("excludeProductId", productId);
+        if (effectiveId) params.set("excludeProductId", effectiveId);
         const res = await fetch(
           `/api/products/check-primary-model?${params.toString()}`,
           { credentials: "include" },
@@ -1835,7 +1855,7 @@ export default function ProductForm({ productId }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [primaryModel?.primary_model, productId, resolvedPrefix]);
+  }, [primaryModel?.primary_model, effectiveId, resolvedPrefix]);
 
   /* ── Slug uniqueness check ──────────────────────────────────────
      The public URL is /products/<slug>; two products sharing a slug
@@ -1863,7 +1883,7 @@ export default function ProductForm({ productId }: Props) {
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ slug });
-        if (productId) params.set("excludeProductId", productId);
+        if (effectiveId) params.set("excludeProductId", effectiveId);
         const res = await fetch(`/api/products/check-slug?${params.toString()}`, { credentials: "include" });
         if (cancelled) return;
         if (!res.ok) { setSlugCheck({ status: "error" }); return; }
@@ -1881,7 +1901,7 @@ export default function ProductForm({ productId }: Props) {
       }
     }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [product.slug, productId]);
+  }, [product.slug, effectiveId]);
 
   /* Smart save-button label + styling based on the chosen status.
      Shared between the Review step's preview card and the bottom
@@ -2136,7 +2156,7 @@ export default function ProductForm({ productId }: Props) {
     if (codeToVerify) {
       try {
         const params = new URLSearchParams({ code: codeToVerify });
-        if (productId) params.set("excludeProductId", productId);
+        if (effectiveId) params.set("excludeProductId", effectiveId);
         const res = await fetch(
           `/api/products/check-primary-model?${params.toString()}`,
           { credentials: "include" },
@@ -2276,14 +2296,17 @@ export default function ProductForm({ productId }: Props) {
       );
 
       let pid: string;
-      if (isEdit && productId) {
-        const ok = await updateProduct(productId, productData);
+      if (effectiveId) {
+        const ok = await updateProduct(effectiveId, productData);
         if (!ok) throw new Error("Failed to update product");
-        pid = productId;
+        pid = effectiveId;
       } else {
         const created = await createProduct(productData);
         if (!created) throw new Error("Failed to create product");
         pid = created.id;
+        /* Adopt immediately — everything after this point can still throw,
+           and a retry must finish THIS product, not create a second one. */
+        setAdoptedId(pid);
       }
 
       const tempIdToRealId: Record<string, string> = {};
