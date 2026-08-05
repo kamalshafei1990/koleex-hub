@@ -22,6 +22,9 @@ import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import ConfirmDialog from "./ConfirmDialog";
+import { useState } from "react";
 
 const inp =
   "w-full h-10 px-3.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -33,14 +36,18 @@ export function memberLabel(m: ModelFormState, i: number): string {
 
 /* ── The second tab strip ── */
 export function FamilyStrip({
-  models, active, onPick, onAdd,
+  models, active, onPick, onAdd, onRemove,
 }: {
   models: ModelFormState[];
   active: number;
   onPick: (i: number) => void;
   onAdd: () => void;
+  /* Remove a NON-primary member. The × sits on the ACTIVE pill only —
+     you must be looking at a model to delete it, never a stray tap. */
+  onRemove?: (i: number) => void;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const [askRemove, setAskRemove] = useState<number | null>(null);
   return (
     <div className="mb-4 -mt-1">
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -68,6 +75,19 @@ export function FamilyStrip({
                 />
               )}
               {memberLabel(m, i)}
+              {isActive && i > 0 && onRemove && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t("famGrid.removeModel", "Remove model")}
+                  title={t("famGrid.removeModel", "Remove model")}
+                  onClick={(e) => { e.stopPropagation(); setAskRemove(i); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setAskRemove(i); } }}
+                  className="ms-0.5 -me-1 h-5 w-5 rounded-md inline-flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/10 transition-opacity"
+                >
+                  <CrossIcon className="h-2.5 w-2.5" />
+                </span>
+              )}
             </button>
           );
         })}
@@ -85,6 +105,15 @@ export function FamilyStrip({
             .replace("{code}", memberLabel(models[active], active))}
         </p>
       )}
+      <ConfirmDialog
+        open={askRemove != null}
+        onClose={() => setAskRemove(null)}
+        onConfirm={() => { if (askRemove != null && onRemove) onRemove(askRemove); setAskRemove(null); }}
+        title={t("famGrid.removeModel", "Remove model")}
+        message={t("famGrid.removeConfirm", "Remove this model from the family? Its differences are discarded when you save.")}
+        confirmLabel={t("famGrid.removeModel", "Remove model")}
+        destructive
+      />
     </div>
   );
 }
@@ -104,13 +133,16 @@ export function FamilySharedDivider() {
 
 /* ── Hero panel: the member's identity ── */
 export function MemberIdentityPanel({
-  model, onUpdate, photoUrl, onSetPhoto, onRemovePhoto,
+  model, onUpdate, photoUrl, onSetPhoto, onRemovePhoto, familyProductName,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
   photoUrl?: string | null;
   onSetPhoto?: (f: File) => void;
   onRemovePhoto?: () => void;
+  /* The family's product name — the member's name DEFAULTS to it (shown
+     as placeholder) and stays editable per model. */
+  familyProductName?: string;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   return (
@@ -128,8 +160,18 @@ export function MemberIdentityPanel({
           <input value={model.primary_model || ""} onChange={(e) => onUpdate({ primary_model: e.target.value })} placeholder="XF-600" className={`${inp} font-mono`} />
         </div>
         <div>
-          <label className={lbl}>{t("fam.memberName", "Model name")}</label>
-          <input value={model.model_name} onChange={(e) => onUpdate({ model_name: e.target.value })} placeholder={t("fam.memberNamePh", "Descriptive name")} className={inp} />
+          <label className={lbl}>{t("fam.productName", "Product name (this model)")}</label>
+          <input
+            value={model.model_name}
+            onChange={(e) => onUpdate({ model_name: e.target.value })}
+            placeholder={familyProductName || t("fam.memberNamePh", "Descriptive name")}
+            className={inp}
+          />
+          {familyProductName ? (
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              {t("fam.productNameHint", "Defaults to the family name — edit it freely for this model.")}
+            </p>
+          ) : null}
         </div>
         <div>
           <label className={lbl}>{t("model.referenceModel", "Supplier reference")}</label>

@@ -44,12 +44,14 @@ export default function FamilySpecGrid({
   onChangeProductSpecs,
   models,
   onChange,
+  familyProductName,
 }: {
   specFields: VariantSpecField[];
   productSpecs: Record<string, unknown>;
   onChangeProductSpecs: (next: Record<string, unknown>) => void;
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
+  familyProductName?: string;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [askRemoveIdx, setAskRemoveIdx] = useState<number | null>(null);
@@ -91,7 +93,7 @@ export default function FamilySpecGrid({
     m.order = models.length;
     /* The family's descriptive name rides along so the new member is
        never "Untitled" in lists while the operator is still typing. */
-    m.model_name = models[0]?.model_name || "";
+    m.model_name = familyProductName || models[0]?.model_name || "";
     onChange([...models, m]);
   };
 

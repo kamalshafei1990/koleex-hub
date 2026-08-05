@@ -679,6 +679,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fam.toggle": { en: "This product has a family (multiple models)", zh: "该产品是一个系列（多个型号）", ar: "هذا المنتج له عائلة (عدة موديلات)" },
   "fam.toggleHint": { en: "Turns on the model strip under the main tabs — pick a model there, then Hero, Specs, Price and Logistics edit that model.", zh: "开启主标签下方的型号条——在其中选择型号后，Hero、规格、价格与物流即编辑该型号。", ar: "يُظهر شريط الموديلات تحت التبويبات الرئيسية — اختر موديلاً منه ثم تبويبات Hero والمواصفات والسعر واللوجستيات تحرّر ذلك الموديل." },
   "fam.identityTitle": { en: "This model's identity", zh: "该型号的标识", ar: "هوية هذا الموديل" },
+  "fam.productName": { en: "Product name (this model)", zh: "产品名称（该型号）", ar: "اسم المنتج (لهذا الموديل)" },
+  "fam.productNameHint": { en: "Defaults to the family name — edit it freely for this model.", zh: "默认使用系列名称——可为该型号自由修改。", ar: "افتراضياً اسم العائلة — عدّله بحرية لهذا الموديل." },
   "fam.memberName": { en: "Model name", zh: "型号名称", ar: "اسم الموديل" },
   "fam.memberNamePh": { en: "Descriptive name", zh: "描述性名称", ar: "اسم وصفي" },
   "fam.tagline": { en: "Tagline", zh: "标语", ar: "سطر تعريفي" },

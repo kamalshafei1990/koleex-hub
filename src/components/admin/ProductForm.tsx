@@ -1482,11 +1482,18 @@ export default function ProductForm({ productId }: Props) {
   const addFamilyMember = () => {
     const m = createEmptyModel();
     m.order = models.length;
-    m.model_name = models[0]?.model_name || "";
+    /* Default the member's name to the FAMILY's product name — "same as
+       the main one but editable", per the owner. */
+    m.model_name = product.product_name || models[0]?.model_name || "";
     setModels([...models, m]);
     setActiveMember(models.length);
     const heroIdx = steps.findIndex((st) => st.id === "identity");
     if (heroIdx >= 0) goToStep(heroIdx);
+  };
+  const removeFamilyMember = (i: number) => {
+    if (i <= 0) return; /* the primary anchors the product */
+    setModels(models.filter((_, x) => x !== i).map((m, x) => ({ ...m, order: x })));
+    setActiveMember(0);
   };
 
   /* Product-level packing (Logistics tab, schema_specs) → offered to variant
@@ -2939,6 +2946,7 @@ export default function ProductForm({ productId }: Props) {
             active={safeActiveMember}
             onPick={setActiveMember}
             onAdd={addFamilyMember}
+            onRemove={removeFamilyMember}
           />
         )}
 
@@ -2995,6 +3003,7 @@ export default function ProductForm({ productId }: Props) {
                 <MemberIdentityPanel
                   model={activeModel}
                   onUpdate={updateActiveMember}
+                  familyProductName={product.product_name || ""}
                   photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
                   onSetPhoto={(f) => setModelPhoto(activeModel, f)}
                   onRemovePhoto={() => removeModelPhoto(activeModel)}
@@ -4729,6 +4738,7 @@ export default function ProductForm({ productId }: Props) {
               {familyGridFields.length > 0 && variantsView === "grid" ? (
                 <FamilySpecGrid
                   specFields={familyGridFields}
+                  familyProductName={product.product_name || ""}
                   productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
                   onChangeProductSpecs={(next) => updateProduct_({ schema_specs: next })}
                   models={models}
