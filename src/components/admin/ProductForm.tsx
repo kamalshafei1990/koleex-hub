@@ -103,6 +103,7 @@ import RichTextEditor from "./form-sections/RichTextEditor";
 import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
+import FamilySpecGrid from "./form-sections/FamilySpecGrid";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
@@ -570,6 +571,10 @@ export default function ProductForm({ productId }: Props) {
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
   const [models, setModels] = useState<ModelFormState[]>([]);
   const [media, setMedia] = useState<MediaFormState[]>([]);
+  /* Variants entry mode. "grid" = the catalog-shaped family spec grid
+     (rows = specs, columns = models) — the junior data-entry path;
+     "cards" = the detailed per-model cards (pricing, packing, photo). */
+  const [variantsView, setVariantsView] = useState<"grid" | "cards">("grid");
   const [translations, setTranslations] = useState<TranslationFormState[]>([]);
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
@@ -1439,6 +1444,22 @@ export default function ProductForm({ productId }: Props) {
      detailed certificate records). Avoids entering CE in two tabs. */
   const certsCoveredBySchema = !!activeSpecsSchema?.groups?.some(
     (g) => g.fields?.some((f) => f.key === "certifications"),
+  );
+
+  /* Flat schema fields for the family grid — same filter the ModelsSection
+     override picker uses (no files/images/long text in a table cell). */
+  const familyGridFields = useMemo(
+    () => (activeSpecsSchema?.groups ?? []).flatMap((g) =>
+      g.fields
+        .filter((f) => !["file", "image", "long_text"].includes(f.fieldType))
+        .map((f) => ({
+          key: f.key,
+          label: f.label ?? f.key,
+          unit: f.unit ?? null,
+          fieldType: f.fieldType,
+          options: (f.options ?? []).map((o) => ({ value: o.value, label: o.label })),
+        }))),
+    [activeSpecsSchema],
   );
 
   /* Product-level packing (Logistics tab, schema_specs) → offered to variant
@@ -4578,6 +4599,38 @@ export default function ProductForm({ productId }: Props) {
               title={t("models.title", "Models & Variants")}
               badge={t("models.countBadge", `${models.length} models`).replace("{n}", String(models.length))}
             >
+              {/* Entry-mode toggle — the grid transcribes a catalog page;
+                  the cards hold the per-model commercial detail. */}
+              {familyGridFields.length > 0 && (
+                <div className="mb-4 flex rounded-xl border border-[var(--border-subtle)] overflow-hidden w-fit">
+                  {([
+                    ["grid", t("variants.viewGrid", "Catalog grid")],
+                    ["cards", t("variants.viewCards", "Detailed cards")],
+                  ] as const).map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setVariantsView(v)}
+                      className={`h-9 px-4 text-[12px] font-semibold transition-all ${
+                        variantsView === v
+                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                          : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {familyGridFields.length > 0 && variantsView === "grid" ? (
+                <FamilySpecGrid
+                  specFields={familyGridFields}
+                  productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
+                  onChangeProductSpecs={(next) => updateProduct_({ schema_specs: next })}
+                  models={models}
+                  onChange={setModels}
+                />
+              ) : (
               <ModelsSection
                 specFields={(activeSpecsSchema?.groups ?? []).flatMap((g) =>
                   g.fields
@@ -4609,6 +4662,7 @@ export default function ProductForm({ productId }: Props) {
                   if (heroIdx >= 0) goToStep(heroIdx);
                 }}
               />
+              )}
             </Section>
             )}
 

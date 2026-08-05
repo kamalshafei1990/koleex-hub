@@ -672,7 +672,16 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
 
   /* ── Models step (P0 #5b) ── */
-    "models.photoTitle": { en: "Model photo", zh: "型号图片", ar: "صورة الموديل" },
+    "variants.viewGrid": { en: "Catalog grid", zh: "目录表格", ar: "جدول الكتالوج" },
+  "variants.viewCards": { en: "Detailed cards", zh: "详细卡片", ar: "بطاقات مفصّلة" },
+  "famGrid.hint": { en: "Type in FAMILY once — every model inherits it. Type in a model column only where the catalog shows a different value; that cell becomes the model's difference (blue).", zh: "在“系列”列输入一次——所有型号自动继承。仅当目录中某型号数值不同时，才在该型号列填写；该单元格即成为其差异（蓝色）。", ar: "اكتب في عمود العائلة مرة واحدة — كل الموديلات ترثه. اكتب في عمود الموديل فقط حيث يُظهر الكتالوج قيمة مختلفة؛ تصبح تلك الخلية فرق الموديل (بالأزرق)." },
+  "famGrid.field": { en: "Specification", zh: "规格", ar: "المواصفة" },
+  "famGrid.family": { en: "Family (all models)", zh: "系列（全部型号）", ar: "العائلة (كل الموديلات)" },
+  "famGrid.code": { en: "Model code", zh: "型号编码", ar: "كود الموديل" },
+  "famGrid.addModel": { en: "Model", zh: "型号", ar: "موديل" },
+  "famGrid.removeModel": { en: "Remove model", zh: "移除型号", ar: "إزالة الموديل" },
+  "famGrid.removeConfirm": { en: "Remove this model from the family? Its differences are discarded when you save.", zh: "从系列中移除该型号？保存后其差异将被丢弃。", ar: "إزالة هذا الموديل من العائلة؟ ستُحذف فروقاته عند الحفظ." },
+  "models.photoTitle": { en: "Model photo", zh: "型号图片", ar: "صورة الموديل" },
   "models.photoOwn": { en: "This model shows its own photo.", zh: "该型号使用自己的图片。", ar: "هذا الموديل يعرض صورته الخاصة." },
   "models.photoInherits": { en: "No photo — this model inherits the family's main photo.", zh: "暂无图片——该型号继承系列主图。", ar: "لا توجد صورة — يرث هذا الموديل الصورة الرئيسية للعائلة." },
   "models.photoAdd": { en: "Add photo", zh: "添加图片", ar: "إضافة صورة" },
