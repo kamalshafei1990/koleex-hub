@@ -24,6 +24,25 @@ export const maxDuration = 60;
 
 const KINDS = ["catalog", "manual", "policy", "document", "webpage", "note"];
 
+/* Crude-but-honest HTML → text: drop script/style/nav chrome, keep block
+   boundaries as newlines, decode common entities. Good enough for the
+   Refinery; the approval bench is the quality gate. */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<(nav|footer|header|aside)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<br\s*\/?>(?=.)/gi, "\n")
+    .replace(/<\/(p|div|li|tr|h[1-6]|section|article)>/gi, "\n\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -95,7 +114,35 @@ export async function POST(req: Request) {
       kind = String(body.kind || "document");
       domain = body.domain ? String(body.domain) : null;
       lang = body.lang ? String(body.lang) : null;
-      if (Array.isArray(body.segments) && body.segments.length) {
+      if (typeof body.url === "string" && body.url.trim()) {
+        /* Teach from the web: fetch one page server-side and refine it.
+           Every unit keeps the URL as its origin so citations in Phase 2
+           point back to the exact page. */
+        const url = body.url.trim();
+        if (!/^https?:\/\//i.test(url)) {
+          return NextResponse.json({ error: "URL must start with http(s)://" }, { status: 400 });
+        }
+        const resp = await fetch(url, {
+          headers: { "User-Agent": "KoleexHub-KnowledgeBot/1.0" },
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!resp.ok) {
+          return NextResponse.json({ error: `Fetch failed: HTTP ${resp.status}` }, { status: 400 });
+        }
+        const raw = (await resp.text()).slice(0, 2_000_000);
+        const textContent = htmlToText(raw);
+        if (textContent.length < 200) {
+          return NextResponse.json({ error: "Page has too little readable text (JS-rendered pages are not supported yet)." }, { status: 400 });
+        }
+        segments = [{ page: 0, text: textContent }];
+        origin = url;
+        mime = "text/html";
+        if (!kind || kind === "document") kind = "webpage";
+        if (!title) {
+          const m = raw.match(/<title[^>]*>([\s\S]{1,200}?)<\/title>/i);
+          title = (m ? m[1].replace(/\s+/g, " ").trim() : url).slice(0, 120);
+        }
+      } else if (Array.isArray(body.segments) && body.segments.length) {
         /* Pre-extracted per-page text (e.g. OCR of an image-only PDF) —
            lineage keeps the page numbers the caller supplies. */
         segments = (body.segments as Array<{ page?: number; text?: string }>)

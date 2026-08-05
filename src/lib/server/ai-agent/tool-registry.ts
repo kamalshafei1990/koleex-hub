@@ -41,6 +41,7 @@ import { projectTools } from "./tools/projects";
 import { planningTools } from "./tools/planning";
 import { calendarTools } from "./tools/calendar";
 import { userMemoryTools } from "./tools/user-memory";
+import { teamKnowledgeTools } from "./tools/team-knowledge";
 /* The agent's only route to the public internet — see tools/web-search.ts
    for the public-information-only and brand guards. */
 import { webSearchTools } from "./tools/web-search";
@@ -61,6 +62,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...planningTools,
       ...calendarTools,
   ...userMemoryTools,
+  ...teamKnowledgeTools,
       ...webSearchTools,
     ].map((t) => [t.name, t]),
   ),

@@ -486,6 +486,15 @@ export async function POST(req: Request) {
              same treatment or this lane will swallow it. */
           const isLiveInfo =
             isLiveInfoQuery(normalizedContent) || body.web_search === true;
+          /* Memory/teaching intents ("remember this", "save for the team",
+             "احفظ", "تذكر", "记住") MUST reach the tool loop — the fast
+             lanes carry no tools, so they can only HALLUCINATE a saved
+             confirmation (observed live: "I've noted this for the team"
+             with zero rows written). Same law as work/live-info guards. */
+          const isMemoryIntent =
+            /(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)/i.test(normalizedContent) ||
+            /احفظ|تذكّ?ر|لا تنسى?|أضف .*للمعرفة|سجّ?ل (هذه|هذا|ذلك)/.test(normalizedContent) ||
+            /记住|保存|别忘|加入知识库/.test(normalizedContent);
           /* DeepSeek powers the fast lanes now (Groq fully removed).
              USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
@@ -498,7 +507,7 @@ export async function POST(req: Request) {
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
           const canFastPath =
-            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo;
+            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";

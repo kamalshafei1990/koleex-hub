@@ -509,6 +509,16 @@ function isWorkDataQuery(msg: string): boolean {
    detectors above: a false positive only costs one extra tool-loop turn,
    while a false negative is a wrong answer. Covers en / ar / zh because
    all three are in daily use here. */
+/* Memory/teaching intents must never take a tool-less lane — the model
+   would hallucinate "saved ✓" (observed). Mirrors the agent-route guard. */
+export function isMemoryIntentQuery(msg: string): boolean {
+  return (
+    /\b(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)\b/i.test(msg) ||
+    /احفظ|تذكّ?ر|لا تنسى?|أضف .*للمعرفة|سجّ?ل (هذه|هذا|ذلك)/.test(msg) ||
+    /记住|保存|别忘|加入知识库/.test(msg)
+  );
+}
+
 function isLiveInfoQuery(msg: string): boolean {
   const s = (msg ?? "").toLowerCase();
   if (!s) return false;
@@ -609,7 +619,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        weather in Cairo" would be answered by a model apologising for
        having no live access — with search_web sitting one layer away. */
     webSearchRequested ||
-    isLiveInfoQuery(userMessage);
+    isLiveInfoQuery(userMessage) ||
+    isMemoryIntentQuery(userMessage);
   const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";
   const isSmall = !isDataQuery && isSmallTalk(userMessage);

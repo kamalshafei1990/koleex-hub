@@ -29,6 +29,7 @@ const T: Record<string, { en: string; zh: string; ar: string }> = {
   "kq.sources":    { en: "Sources", zh: "知识来源", ar: "المصادر" },
   "kq.add":        { en: "Add source", zh: "添加来源", ar: "إضافة مصدر" },
   "kq.upload":     { en: "Upload PDF / Markdown", zh: "上传 PDF / Markdown", ar: "ارفع PDF / Markdown" },
+  "kq.url":        { en: "or a web page URL (https://…)", zh: "\u6216\u7f51\u9875\u94fe\u63a5 (https://\u2026)", ar: "\u0623\u0648 \u0631\u0627\u0628\u0637 \u0635\u0641\u062d\u0629 \u0648\u064a\u0628 (https://\u2026)" },
   "kq.orPaste":    { en: "or paste text", zh: "或粘贴文本", ar: "أو الصق نصاً" },
   "kq.titleF":     { en: "Title", zh: "标题", ar: "العنوان" },
   "kq.kind":       { en: "Kind", zh: "类型", ar: "النوع" },
@@ -70,7 +71,7 @@ export default function AiKnowledgePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [form, setForm] = useState({ title: "", kind: "catalog", domain: "garment-machinery", lang: "en", text: "" });
+  const [form, setForm] = useState({ title: "", kind: "catalog", domain: "garment-machinery", lang: "en", text: "", url: "" });
 
   useEffect(() => {
     fetch("/api/me", { credentials: "include" })
@@ -103,10 +104,12 @@ export default function AiKnowledgePage() {
         fd.set("kind", form.kind); fd.set("domain", form.domain); fd.set("lang", form.lang);
         res = await fetch("/api/ai/knowledge/sources", { method: "POST", body: fd, credentials: "include" });
       } else {
+        const payload: Record<string, unknown> = { ...form };
+        if (!form.url.trim()) delete payload.url;
         res = await fetch("/api/ai/knowledge/sources", {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       }
       const j = await res.json();
@@ -201,6 +204,14 @@ export default function AiKnowledgePage() {
                 {t("kq.upload", "Upload PDF / Markdown")}
               </label>
               <span className="text-[11px] text-[var(--text-ghost)]">{t("kq.orPaste", "or paste text")}</span>
+              <span className="text-[11px] text-[var(--text-ghost)]">·</span>
+              <input
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+                placeholder={t("kq.url", "or a web page URL (https://…)")}
+                dir="ltr"
+                className="flex-1 min-w-[220px] h-10 px-3.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] font-mono outline-none focus:border-[var(--border-focus)]"
+              />
             </div>
             <textarea value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })}
               placeholder={t("kq.text", "Text")} rows={4}
