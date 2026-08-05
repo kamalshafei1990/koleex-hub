@@ -285,7 +285,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     translations,
     brand,
     schema,
-    values,
+    values: familyValues,
     knowledge,
     mainImageUrl,
     galleryUrls,
@@ -320,6 +320,28 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       return v ? v.trim().toLowerCase() : null;
     } catch { return null; }
   }, []);
+
+  /* ── Selected member ── clicking a lineup row points the WHOLE page at
+     that model: the spec sheet re-resolves (family ⊕ overrides), the hero
+     code and photo follow. ?model= pre-selects (chips / search links). */
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!wantedModel) return;
+    const hit = (variants ?? []).find((v) => v.code.trim().toLowerCase() === wantedModel);
+    if (hit) setSelectedCode(hit.code);
+  }, [wantedModel, variants]);
+  const activeVariant = useMemo(
+    () => (variants ?? []).find((v) => v.code === selectedCode) ?? null,
+    [variants, selectedCode],
+  );
+  /* Every consumer below reads `values` — the RESOLVED view of whichever
+     member is selected; no selection = the family baseline. */
+  const values = useMemo(
+    () => (activeVariant ? { ...familyValues, ...activeVariant.overrides } : familyValues),
+    [familyValues, activeVariant],
+  );
+  const heroImage = (activeVariant?.photo || mainImageUrl) ?? null;
+  const heroCode = activeVariant?.code || primaryModel;
 
   /* ── Apple-style scroll choreography ──
      One IntersectionObserver arms every top-level band: sections drift up
@@ -617,11 +639,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           {/* THE main product photo — the floating studio shot on a light
               well (this is where the primary image lives; the poster above
               is the campaign banner, this is the product itself). */}
-          {mainImageUrl ? (
+          {heroImage ? (
             <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#f1f2f4]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={mainImageUrl}
+                src={heroImage as string}
                 alt={displayName}
                 className="mx-auto max-h-[560px] w-auto object-contain px-8 py-12 md:py-16"
               />
@@ -655,8 +677,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 {displayTagline}
               </p>
             ) : null}
-            {primaryModel ? (
-              <div className="font-mono text-xs text-[var(--text-faint)] tracking-[0.12em] pt-1">{primaryModel}</div>
+            {heroCode ? (
+              <div className="font-mono text-xs text-[var(--text-faint)] tracking-[0.12em] pt-1">{heroCode}</div>
             ) : null}
           </div>
 
@@ -692,9 +714,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         {/* RIGHT — dominant unframed render */}
         <div className="order-1 lg:order-2 lg:col-span-7">
           <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
-            {mainImageUrl ? (
+            {heroImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={mainImageUrl} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
+              <img src={heroImage as string} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
             ) : (
               <span className="text-sm text-[var(--text-faint)]">{t("preview.noMainImage", "No main image")}</span>
             )}
@@ -1129,10 +1151,106 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })()}
 
+      {/* ═══ 10b2. MODEL LINEUP — "Choose your model." One product
+          platform, several models differing on a few technical axes
+          (the 988LC catalog pattern). Columns = union of the models'
+          override keys; values inherit from the product spec sheet
+          when a model doesn't override them. ═══ */}
+      {(() => {
+        const list = (variants ?? []).filter((v) => v.code);
+        if (list.length < 2) return null;
+        const keySet: string[] = [];
+        for (const v of list) {
+          for (const k of Object.keys(v.overrides)) {
+            if (!keySet.includes(k)) keySet.push(k);
+          }
+        }
+        if (keySet.length === 0) return null;
+        const fieldsByKey = new Map(visibleFields.map((f) => [f.key, f] as const));
+        const cols = keySet
+          .filter((k) => fieldsByKey.has(k))
+          .sort((a, b) => visibleFields.findIndex((f) => f.key === a) - visibleFields.findIndex((f) => f.key === b))
+          .slice(0, 6);
+        if (cols.length === 0) return null;
+        return (
+          <section className="space-y-8">
+            <SectionHead
+              hero
+              eyebrow={t("preview.eyebrowLineup", "Lineup")}
+              title={t("preview.chooseModel", "Choose your model.")}
+            />
+            <div className="overflow-x-auto rounded-[20px] border border-[var(--border-subtle)]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-[var(--bg-surface-subtle)]">
+                    {/* Photo gets its OWN column — never share the model cell. */}
+                    <th className="w-[72px] px-4 py-3.5" aria-label={t("preview.photo", "Photo")} />
+                    <th className="min-w-[200px] px-5 py-3.5 text-start text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)] bg-[var(--bg-surface)] border-e border-[var(--border-subtle)]">
+                      {t("preview.model", "Model")}
+                    </th>
+                    {cols.map((k) => {
+                      const f = fieldsByKey.get(k)!;
+                      return (
+                        <th key={k} className="whitespace-nowrap px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                          {f.label ?? k}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((v) => {
+                    const isWanted = selectedCode != null && v.code === selectedCode;
+                    return (
+                    <tr
+                      key={v.code}
+                      onClick={() => setSelectedCode(v.code)}
+                      ref={isWanted && wantedModel === v.code.trim().toLowerCase() ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
+                      className={`border-t border-[var(--border-subtle)] cursor-pointer transition-colors ${isWanted ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]/40"}`}
+                    >
+                      {/* Photo column — the model's own shot, else the
+                          FAMILY photo (same inheritance story as specs). */}
+                      <td className={`px-4 py-3 ${isWanted ? "border-s-2 border-s-[#567FB2]" : ""}`}>
+                        {(v.photo || mainImageUrl) ? (
+                          <span className="h-11 w-11 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={(v.photo || mainImageUrl) as string} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="min-w-[200px] px-5 py-4 bg-[var(--bg-surface-subtle)]/40 border-e border-[var(--border-subtle)]">
+                        <span className="min-w-0 block">
+                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">{v.code}</div>
+                        {v.tagline ? (
+                          <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
+                        ) : null}
+                        </span>
+                      </td>
+                      {cols.map((k) => {
+                        const f = fieldsByKey.get(k)!;
+                        const raw = k in v.overrides ? v.overrides[k] : familyValues[k];
+                        const inherited = !(k in v.overrides);
+                        return (
+                          <td key={k} className={`px-5 py-4 text-[13.5px] ${inherited ? "text-[var(--text-muted)]" : "font-medium text-[var(--text-primary)]"}`}>
+                            {displayFieldValue(f, raw)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* ═══ LAYER 3 — ADVANCED TECHNICAL DATA (progressive disclosure) ═══
           Primary groups open by default; standard/quiet collapsed so the
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
+
         <div id="specs" data-reveal className="scroll-mt-24">
           <SectionHead hero eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
@@ -1232,99 +1350,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })() : null}
 
-      {/* ═══ 10b2. MODEL LINEUP — "Choose your model." One product
-          platform, several models differing on a few technical axes
-          (the 988LC catalog pattern). Columns = union of the models'
-          override keys; values inherit from the product spec sheet
-          when a model doesn't override them. ═══ */}
-      {(() => {
-        const list = (variants ?? []).filter((v) => v.code);
-        if (list.length < 2) return null;
-        const keySet: string[] = [];
-        for (const v of list) {
-          for (const k of Object.keys(v.overrides)) {
-            if (!keySet.includes(k)) keySet.push(k);
-          }
-        }
-        if (keySet.length === 0) return null;
-        const fieldsByKey = new Map(visibleFields.map((f) => [f.key, f] as const));
-        const cols = keySet
-          .filter((k) => fieldsByKey.has(k))
-          .sort((a, b) => visibleFields.findIndex((f) => f.key === a) - visibleFields.findIndex((f) => f.key === b))
-          .slice(0, 6);
-        if (cols.length === 0) return null;
-        return (
-          <section className="space-y-8">
-            <SectionHead
-              hero
-              eyebrow={t("preview.eyebrowLineup", "Lineup")}
-              title={t("preview.chooseModel", "Choose your model.")}
-            />
-            <div className="overflow-x-auto rounded-[20px] border border-[var(--border-subtle)]">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[var(--bg-surface-subtle)]">
-                    {/* Photo gets its OWN column — never share the model cell. */}
-                    <th className="w-[72px] px-4 py-3.5" aria-label={t("preview.photo", "Photo")} />
-                    <th className="min-w-[200px] px-5 py-3.5 text-start text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)] bg-[var(--bg-surface)] border-e border-[var(--border-subtle)]">
-                      {t("preview.model", "Model")}
-                    </th>
-                    {cols.map((k) => {
-                      const f = fieldsByKey.get(k)!;
-                      return (
-                        <th key={k} className="whitespace-nowrap px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                          {f.label ?? k}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((v) => {
-                    const isWanted = wantedModel != null && v.code.trim().toLowerCase() === wantedModel;
-                    return (
-                    <tr
-                      key={v.code}
-                      ref={isWanted ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
-                      className={`border-t border-[var(--border-subtle)] ${isWanted ? "bg-[var(--bg-surface-subtle)]" : ""}`}
-                    >
-                      {/* Photo column — the model's own shot, else the
-                          FAMILY photo (same inheritance story as specs). */}
-                      <td className={`px-4 py-3 ${isWanted ? "border-s-2 border-s-[#567FB2]" : ""}`}>
-                        {(v.photo || mainImageUrl) ? (
-                          <span className="h-11 w-11 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={(v.photo || mainImageUrl) as string} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="min-w-[200px] px-5 py-4 bg-[var(--bg-surface-subtle)]/40 border-e border-[var(--border-subtle)]">
-                        <span className="min-w-0 block">
-                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">{v.code}</div>
-                        {v.tagline ? (
-                          <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
-                        ) : null}
-                        </span>
-                      </td>
-                      {cols.map((k) => {
-                        const f = fieldsByKey.get(k)!;
-                        const raw = k in v.overrides ? v.overrides[k] : values[k];
-                        const inherited = !(k in v.overrides);
-                        return (
-                          <td key={k} className={`px-5 py-4 text-[13.5px] ${inherited ? "text-[var(--text-muted)]" : "font-medium text-[var(--text-primary)]"}`}>
-                            {displayFieldValue(f, raw)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        );
-      })()}
 
       {/* ═══ 10c. COMPARE — Apple "Worth the upgrade?" against machines of
           the same family. Dropdown picks the rival; both columns read the
@@ -1356,7 +1381,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           {(() => {
             const rival = siblings[Math.min(compareIdx, siblings.length - 1)];
             const cols = [
-              { key: "self", name: displayName, imageUrl: mainImageUrl, vals: values, self: true },
+              { key: "self", name: displayName, imageUrl: mainImageUrl, vals: familyValues, self: true },
               { key: "rival", name: rival.name, imageUrl: rival.imageUrl ?? null, vals: rival.values, self: false },
             ];
             return (
