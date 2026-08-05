@@ -5207,18 +5207,51 @@ function BilingualTooltip({
   if (typeof window !== "undefined" && left + WIDTH + 16 > window.innerWidth) {
     left = Math.max(8, window.innerWidth - WIDTH - 16);
   }
-  let top = anchorRect.bottom + margin;
-  /* If the tooltip would fall below the viewport, render it
-     ABOVE the icon instead. */
-  if (typeof window !== "undefined" && top + 180 > window.innerHeight) {
-    top = Math.max(8, anchorRect.top - 180 - margin);
-  }
+
+  /* MEASURE the tooltip; never assume its height.
+     This used to test `top + 180 > innerHeight` against a hardcoded 180.
+     The real box is ~193px for the shorter clauses and taller for the
+     longest one (Governing law / arbitration carries an EN paragraph AND a
+     中文 paragraph), so on a short window the flip-to-above branch never
+     fired and the bottom of the tooltip fell off the screen — measured at a
+     620px-tall viewport: placed at 433, ran to 626, six pixels past the
+     edge, and worse the longer the clause. The flip branch had the mirror
+     bug: subtracting 180 from a 193px box put its bottom back over the icon.
+
+     Measured in the ref callback and placed by writing `top` straight onto
+     the node — no state, so there is no second render to pay for and nothing
+     to fall out of sync. */
+  const place = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const h = el.getBoundingClientRect().height;
+    const vh = window.innerHeight;
+    const roomBelow = vh - anchorRect.bottom - margin - 8;
+    const roomAbove = anchorRect.top - margin - 8;
+
+    let top = anchorRect.bottom + margin;
+    if (h > roomBelow) {
+      /* Doesn't fit below — flip above using the REAL height. If it fits in
+         neither direction (a very short window), pin to the top edge so the
+         box always ends inside the viewport instead of running off it. */
+      top = roomAbove >= h ? anchorRect.top - h - margin : 8;
+    }
+    el.style.top = `${Math.round(top)}px`;
+    el.style.visibility = "visible";
+  }, [anchorRect]);
+
   return (
     <div
       role="tooltip"
+      ref={place}
       style={{
         position: "fixed",
-        top, left,
+        top: anchorRect.bottom + margin,
+        left,
+        maxHeight: "calc(100vh - 16px)",
+        overflow: "hidden",
+        /* Hidden for the one measuring frame so it is never seen in the
+           wrong place before `place` corrects it. */
+        visibility: "hidden",
         width: WIDTH,
         padding: "10px 12px",
         borderRadius: 8,
