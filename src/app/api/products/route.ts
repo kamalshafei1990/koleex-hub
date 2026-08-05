@@ -38,20 +38,21 @@ export async function GET(req: Request) {
      set, so no access check is needed for it; the full shape keeps the
      public/admin split. */
   const listView = new URL(req.url).searchParams.get("view") === "list";
-  let cols: string;
-  if (listView) {
-    cols = LIST_PRODUCT_COLUMNS;
-  } else {
-    const canSeeSecrets = await hasProductDataAccess(auth);
-    cols = canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
-  }
+  const canSeeSecrets = await hasProductDataAccess(auth);
+  const cols = listView ? LIST_PRODUCT_COLUMNS : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
   _t.mark("auth");
 
-  const { data, error } = await supabaseServer
+  /* Catalog rule (owner, 2026-08-05): only ACTIVE products exist outside
+     Product Data. Enforced HERE, not in the client — anyone without the
+     Product Data grant (staff on /products today, the public website when
+     it goes live) never receives a draft or archived row at all. Privileged
+     staff still get everything; /product-data is the working tool. */
+  let query = supabaseServer
     .from("products")
     .select(cols)
-    .eq("tenant_id", auth.tenant_id)
-    .order("created_at", { ascending: false });
+    .eq("tenant_id", auth.tenant_id);
+  if (!canSeeSecrets) query = query.eq("status", "active");
+  const { data, error } = await query.order("created_at", { ascending: false });
   _t.mark("db");
 
   if (error) {

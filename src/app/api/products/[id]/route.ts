@@ -57,6 +57,12 @@ export async function GET(
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  /* Catalog rule: outside Product Data, a non-active product does not
+     exist. Same 404 as a missing row — a guessed URL reveals nothing. */
+  if (!canSeeSecrets && (row as { status?: string | null }).status !== "active") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json(
     { product: row },
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },

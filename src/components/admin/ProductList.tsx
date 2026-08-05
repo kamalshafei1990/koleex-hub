@@ -513,6 +513,12 @@ export default function ProductList() {
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */
   const isInternal = (pathname || "").startsWith("/product-data");
+
+  /* The /products catalogue shows ONLY active products (owner rule,
+     2026-08-05). The API already refuses non-active rows to callers
+     without the Product Data grant; this filter makes privileged staff
+     see the same catalogue customers do when they browse /products —
+     drafts and archived stock live in /product-data only. */
   const baseRoute = isInternal ? "/product-data" : "/products";
 
   /* Cache the product list per-scope (tenant + view-as) so returning to the
@@ -1144,24 +1150,35 @@ export default function ProductList() {
     const q = deferredSearch.trim().toLowerCase();
     const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     return products.filter(p => {
+      /* /products is the customer-facing catalogue: only ACTIVE products
+         exist there (the API already refuses others to unprivileged
+         callers; this covers privileged staff AND the warm-start cache,
+         which is shared with /product-data and may hold drafts). */
+      if (!isInternal && (p.status || "draft") !== "active") return false;
       if (filterDiv && p.division_slug !== filterDiv) return false;
       if (filterCat && p.category_slug !== filterCat) return false;
       if (filterSub && p.subcategory_slug !== filterSub) return false;
       if (filterBrand && p.brand !== filterBrand) return false;
       if (filterLevel && p.level !== filterLevel) return false;
       if (filterSupplier && !(productSuppliers[p.id] || []).includes(filterSupplier)) return false;
-      if (filterVisible === "visible" && !p.visible) return false;
-      if (filterVisible === "hidden" && p.visible) return false;
+      /* Status/visible are INTERNAL work filters, and the filter state is
+         persisted and SHARED across both routes — without this guard, a
+         "Draft" filter picked while working in /product-data silently
+         empties the /products catalogue for the same operator. */
+      if (isInternal) {
+        if (filterVisible === "visible" && !p.visible) return false;
+        if (filterVisible === "hidden" && p.visible) return false;
+        if (filterStatus && (p.status || "draft") !== filterStatus) return false;
+      }
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
-      if (filterStatus && (p.status || "draft") !== filterStatus) return false;
       if (tokens.length > 0) {
         const hay = searchHaystack[p.id] || "";
         for (const t of tokens) if (!hay.includes(t)) return false;
       }
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, productSuppliers, searchHaystack]);
+  }, [products, isInternal, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, productSuppliers, searchHaystack]);
 
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
@@ -1315,7 +1332,10 @@ export default function ProductList() {
             /products and /product-data since they share this component. */}
         <BackToTop label={t("list.backToTop", "Back to top")} />
         <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
-          <span>{products.length} {t("list.countInCatalog")}</span>
+          <span>
+            {(isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}{" "}
+            {t("list.countInCatalog")}
+          </span>
           {/* The rate every "≈ $" on this page was computed with. Shown once,
               here, rather than repeated on sixty cards — but shown, because a
               converted figure whose rate you cannot see is a number you have
