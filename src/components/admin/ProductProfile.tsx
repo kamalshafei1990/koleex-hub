@@ -467,12 +467,15 @@ export default function ProductProfile() {
         </Link>
       </div>
 
-      {/* ── Family bar ── one product, several sellable models. Every
-          member is visible and tappable; picking one opens a spotlight
-          with its RESOLVED view (family value unless the model overrides
-          it). Display-only — no schema, no new entity. */}
+      {/* Tabs FIRST — always at the top (owner rule); the family bar and
+          the member spotlight live UNDER them. */}
+      <ProfileTabs current={step} onPick={setStep} />
+
+      {/* ── Family bar ── one product, several sellable models. Picking a
+          member opens its spotlight: square photo, tight one-line facts,
+          resolved specs. Display-only. */}
       {data.models.length > 1 && (
-        <div className="mb-3">
+        <div className="mb-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="uppercase tracking-wider text-[10px] text-[var(--text-ghost)]">
               {t("pp.fam.label", "Family")}
@@ -504,8 +507,6 @@ export default function ProductProfile() {
 
           {focusModel >= 0 && data.models[focusModel] && (() => {
             const m = data.models[focusModel];
-            /* Model's own photo, else the family hero — the inheritance
-               story told visually. */
             const mPhoto = (data.media ?? []).find(
               (md) => md.type === "model_image" && (md.model_id as string | null) === (m.id as string),
             )?.url as string | undefined;
@@ -514,10 +515,22 @@ export default function ProductProfile() {
             const ov = (m.specs_overrides as Record<string, unknown> | null) ?? {};
             const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
             const diffCount = Object.entries(ov).filter(([, v]) => !isEmpty(v)).length;
+            /* One-line fact row — dense by design; "Not set" stays visible
+               (this is the record) but costs one thin line, not a block. */
+            const fact = (label: string, value: unknown, mono = false) => (
+              <div key={label} className="flex items-center justify-between gap-3 py-[5px] border-b border-[var(--border-subtle)]/40 last:border-0 text-[12px]">
+                <span className="text-[var(--text-dim)] shrink-0">{label}</span>
+                {value === null || value === undefined || value === "" ? (
+                  <span className="text-[11px] italic text-[var(--text-ghost)]">{t("pp.notSet", "Not set")}</span>
+                ) : (
+                  <span className={`text-[var(--text-primary)] text-end truncate ${mono ? "font-mono text-[11.5px]" : "tabular-nums"}`}>{String(value)}</span>
+                )}
+              </div>
+            );
             return (
               <div className="mt-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden kx-glow-in">
                 {/* Spotlight header */}
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50">
+                <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50">
                   <span className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">
                     {String(m.primary_model ?? m.model_name ?? "")}
                   </span>
@@ -544,28 +557,28 @@ export default function ProductProfile() {
                   </button>
                 </div>
 
-                <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* Identity + price column */}
-                  <div className="space-y-1.5">
+                {/* Body: SQUARE photo + dense facts on the start side; the
+                    resolved spec sheet fills the rest. No dead space —
+                    every fact is a single line. */}
+                <div className="p-4 flex flex-col md:flex-row gap-5">
+                  <div className="shrink-0 w-full md:w-[210px]">
                     {photo && (
-                      <div className="mb-2 h-28 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/5 overflow-hidden flex items-center justify-center">
+                      <div className="aspect-square w-full max-w-[210px] mx-auto md:mx-0 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/5 overflow-hidden flex items-center justify-center">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={IMG.card(photo)} alt="" className="h-full w-full object-contain p-2" loading="lazy" decoding="async" />
+                        <img src={IMG.card(photo)} alt="" className="h-full w-full object-contain p-3" loading="lazy" decoding="async" />
                       </div>
                     )}
-                    <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
-                    <Row label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
-                    <Row label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
-                    <Row label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
-                    <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
-                    {data.costVisible && (
-                      <Row label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price ?? primarySupplierCost} />
-                    )}
+                    <div className="mt-2.5">
+                      {fact(t("pp.f.koleexCode", "KOLEEX code"), m.primary_model, true)}
+                      {fact(t("pp.f.supRef", "Supplier ref"), m.reference_model, true)}
+                      {fact(t("pp.f.tagline", "Tagline"), m.tagline)}
+                      {fact(t("pp.f.stock", "Stock"), m.stock_status)}
+                      {fact(t("pp.f.globalPrice", "Global price (USD)"), m.global_price)}
+                      {data.costVisible && fact(t("pp.f.costPrice", "Cost (CNY)"), m.cost_price ?? primarySupplierCost)}
+                    </div>
                   </div>
 
-                  {/* Resolved specs — family value unless overridden; the
-                      Hub-Blue dot marks exactly what this model changes. */}
-                  <div className="lg:col-span-2">
+                  <div className="flex-1 min-w-0">
                     <div className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-2">
                       {t("pp.fam.resolved", "Specifications for this model")}
                     </div>
@@ -577,7 +590,7 @@ export default function ProductProfile() {
                           const v = overridden ? ov[f.key] : specs[f.key];
                           if (isEmpty(v)) continue;
                           rowsOut.push(
-                            <div key={f.key} className="flex items-baseline justify-between gap-3 text-[12px] py-1">
+                            <div key={f.key} className="flex items-baseline justify-between gap-3 text-[12px] py-[5px] border-b border-[var(--border-subtle)]/40">
                               <span className="flex items-center gap-1.5 text-[var(--text-dim)] min-w-0">
                                 {overridden && <span className="h-1.5 w-1.5 rounded-full bg-[#567FB2] shrink-0" title={t("pp.fam.differs", "Differs from family value")} />}
                                 <span className="truncate">{f.label || f.key}</span>
@@ -595,8 +608,8 @@ export default function ProductProfile() {
                       }
                       return (
                         <>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">{rowsOut}</div>
-                          <p className="mt-2.5 text-[10.5px] text-[var(--text-ghost)]">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10">{rowsOut}</div>
+                          <p className="mt-2 text-[10.5px] text-[var(--text-ghost)]">
                             {diffCount > 0
                               ? t("pp.fam.inheritNote", "Fields without a dot inherit the family value.")
                               : t("pp.fam.allInherit", "This model inherits every family specification.")}
@@ -611,8 +624,6 @@ export default function ProductProfile() {
           })()}
         </div>
       )}
-
-      <ProfileTabs current={step} onPick={setStep} />
 
       {/* The editor keeps the classification visible above every tab but the
          first, so you always know what template you are reading against. */}
