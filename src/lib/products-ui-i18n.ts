@@ -308,6 +308,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "hero.addPhotos": { en: "Add more photos", zh: "添加更多照片", ar: "أضِف صوراً أخرى" },
   "hero.galleryLabel": { en: "Gallery", zh: "图库", ar: "المعرض" },
   "hero.removePhoto": { en: "Remove photo", zh: "移除照片", ar: "إزالة الصورة" },
+  "pp.f.techDiff": { en: "Technical differences vs product specs", zh: "与产品规格的技术差异", ar: "الفروقات التقنية عن مواصفات المنتج" },
+  "pp.f.inheritsSpecs": { en: "Inherits all product specifications — no per-model differences recorded yet.", zh: "继承产品全部规格 — 尚未录入该型号的差异。", ar: "يرث كل مواصفات المنتج — لا فروقات مسجَّلة لهذا الموديل بعد." },
   "hero.galleryHint": { en: "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.", zh: "更多角度与细节 — 显示在产品图库中。全部媒体可在“媒体”标签管理。", ar: "زوايا وتفاصيل إضافية — تظهر في معرض المنتج. أدر كل الوسائط من تبويب الوسائط." },
   "list.searchPlaceholder": {
     en: "Search by name, model code, brand, category, tags…",

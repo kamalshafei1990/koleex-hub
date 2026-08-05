@@ -160,7 +160,7 @@ const FUSING_GROUPS: SpecGroup[] = [
       },
     ],
   },
-  electricalGroup(40),
+  electricalGroup(40, { motorLabel: "Motor Power" }),
   physicalGroup(60),
   packingShippingGroup(65),
   safetyComplianceGroup(70),

@@ -672,6 +672,47 @@ export default function ProductProfile() {
                   <Row label={t("pp.f.visible", "Visible")} value={m.visible} />
                   <Row label={t("pp.f.status", "Status")} value={m.status} />
                 </div>
+                {/* Per-model spec differences — the answer to "what makes
+                    this size different". Labels/units come from the same
+                    schema the Specs tab renders, so the two views can never
+                    name a field differently. Everything not listed inherits
+                    the product's Specifications. */}
+                {(() => {
+                  const ov = (m.specs_overrides as Record<string, unknown> | null) ?? {};
+                  const entries = Object.entries(ov).filter(([, v]) => v !== null && v !== undefined && v !== "");
+                  const fieldByKey = new Map<string, { label: string; unit?: string }>();
+                  for (const g of data.schema?.groups ?? []) {
+                    for (const f of g.fields ?? []) fieldByKey.set(f.key, { label: f.label || f.key, unit: f.unit });
+                  }
+                  if (entries.length === 0) {
+                    return (
+                      <p className="mt-2 text-[11px] text-[var(--text-ghost)] italic">
+                        {t("pp.f.inheritsSpecs", "Inherits all product specifications — no per-model differences recorded yet.")}
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-2.5">
+                      <div className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">
+                        {t("pp.f.techDiff", "Technical differences vs product specs")}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                        {entries.map(([k, v]) => {
+                          const f = fieldByKey.get(k);
+                          return (
+                            <div key={k} className="flex items-baseline justify-between gap-3 text-[12px]">
+                              <span className="text-[var(--text-dim)]">{f?.label ?? k}</span>
+                              <span className="text-[var(--text-primary)] font-medium tabular-nums text-end">
+                                {Array.isArray(v) ? v.join(", ") : String(v)}
+                                {f?.unit ? <span className="text-[var(--text-ghost)] ms-1 font-normal">{f.unit}</span> : null}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
