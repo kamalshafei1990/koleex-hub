@@ -91,7 +91,8 @@
     "validate:skills": "node scripts/validate-skills.mjs",
     "validate:behavior": "node scripts/validate-behavior.mjs",
     "validate:roles": "node scripts/validate-roles.mjs",
-    "validate:ai-orb": "tsx scripts/validate-ai-orb.ts"
+    "validate:ai-orb": "tsx scripts/validate-ai-orb.ts",
+    "validate:ai-platform": "tsx scripts/validate-ai-platform.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

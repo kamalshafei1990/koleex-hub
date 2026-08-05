@@ -1,8 +1,8 @@
 # Koleex AI Intelligence Platform — Architecture Specification
 
-**Version:** 1.0-draft · **Date:** 2026-08-05 · **Status:** Awaiting owner ratification
+**Version:** 1.0 · **Date:** 2026-08-05 · **Status:** **RATIFIED** (owner: Kamal, "ok do it" — 2026-08-05)
 **Author:** Lead Architect, Koleex AI
-**Scope:** The official design foundation for the Intelligence Package platform. No implementation is authorized by this document; implementation begins only after ratification, in gated phases.
+**Scope:** The official design foundation for the Intelligence Package platform. Implementation proceeds in the gated phases defined in [`implementation-phases.md`](./implementation-phases.md). Open decisions D1–D5 were resolved at ratification with the architect's recommended defaults (Appendix A); each remains individually revisable via the ADR-013 discipline.
 
 ---
 
@@ -680,16 +680,18 @@ Why: five layers of narrowing can accidentally produce an inert package (all too
 
 ---
 
-# Appendix A — Open Decisions that gate implementation
+# Appendix A — Open Decisions: RESOLVED at ratification (2026-08-05)
 
-| # | Decision | Gates |
-|---|---|---|
-| D1 | Packages: platform-global, tenant-owned, or both? | Registry tenancy flags default posture |
-| D2 | Who approves knowledge & capabilities per tier? | Governance workflow wiring |
-| D3 | External sale vs. internal-only | Consent/publisher scope, marketplace seam |
-| D4 | Cost ceiling per answered question | Budget classes' concrete numbers |
-| D5 | First production domain (recommended: Garment Machinery — verifiable in-house) | Phase-1 content plan |
+Adopted with the architect's recommended defaults under the owner's blanket approval ("ok do it"). Each is revisable individually; a revision requires an ADR amendment + change-log entry, never a silent edit.
+
+| # | Decision | **Adopted answer** | Rationale |
+|---|---|---|---|
+| D1 | Package tenancy | **Both tiers; tenant-owned is the default.** Platform-global assets are read-only to tenants (ADR-004 flags carry this). | Koleex authors globally today; the flag costs nothing now and a retrofit later costs everything. |
+| D2 | Approvers | **Read-class: domain owner self-approves. Write/irreversible-class capabilities and sensitivity-flagged knowledge: Kamal sign-off.** | Mirrors the coding-governance model that has demonstrably scaled here. Delegation triggers if median time-to-approve exceeds 3 days (R-3). |
+| D3 | External sale | **Internal-only for v1.** Marketplace seam preserved (registry = catalog); no storefront, no publisher identity built. Consent screens are kept — cheap, and valuable even internally. | Cuts the R-8 ceremony without closing the door. |
+| D4 | Cost ceiling | **Provisional budget classes:** S = 8k LLM tokens/turn · M = 32k · L = 100k (write-class only); grounded-answer target ≤ $0.05 P50 at current DeepSeek pricing; tenant eval cap $50/month. **Provisional** — hardened after Phase 0 telemetry produces real numbers (§20). | Guessing ceilings without telemetry would be theater; the meter ships first. |
+| D5 | First production domain | **Garment Machinery.** | The only domain where the owner can verify answer correctness in-house: catalogs, coded taxonomy, and governance already exist. |
 
 # Appendix B — Ratification
 
-This document is the source of truth for the Koleex AI Intelligence Platform architecture upon owner ratification. Amendments follow ADR-013 discipline: a revision ADR + change-log entry; no silent edits.
+Ratified 2026-08-05 by the owner. This document is the source of truth for the Koleex AI Intelligence Platform architecture. Amendments follow ADR-013 discipline: a revision ADR + change-log entry; no silent edits. Phase sequencing and per-phase gates live in [`implementation-phases.md`](./implementation-phases.md).
