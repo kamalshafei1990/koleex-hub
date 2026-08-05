@@ -50,7 +50,7 @@ export async function GET() {
   if (denied) return denied;
   const canSeeCosts = await hasProductCostAccess(auth);
 
-  const [prodRes, subRes, mediaRes, modelRes, supRes, linkRes] = await Promise.all([
+  const [prodRes, subRes, mediaRes, modelRes, supRes, linkRes, trRes] = await Promise.all([
     supabaseServer
       .from("products")
       .select(
@@ -73,6 +73,10 @@ export async function GET() {
       .eq("contact_type", "supplier")
       .eq("tenant_id", auth.tenant_id),
     supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny"),
+    /* Translated product names (中文/العربية) — the grid's search haystack
+       needs them so 熔接机 finds the fusing machine. Names only; nothing
+       cost-side rides on this query. */
+    supabaseServer.from("product_translations").select("product_id, product_name"),
   ]);
 
   if (prodRes.error) {
@@ -106,7 +110,7 @@ export async function GET() {
   /* Supplier lookup — by id AND by every name variant, because most
      products carry the supplier as free TEXT on the model rather than a
      product_suppliers link (only a handful are linked today). */
-  interface SupLite { name: string; logo: string | null }
+  interface SupLite { name: string; logo: string | null; cn: string | null }
   const supById = new Map<string, SupLite>();
   const supByName = new Map<string, SupLite>();
   const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
@@ -120,7 +124,7 @@ export async function GET() {
   }>) {
     const name = c.company_name_en || c.display_name || c.company_name_cn || "";
     if (!name) continue;
-    const lite: SupLite = { name, logo: c.photo_url || c.logo_url || null };
+    const lite: SupLite = { name, logo: c.photo_url || c.logo_url || null, cn: c.company_name_cn };
     supById.set(c.id, lite);
     for (const variant of [c.company_name_en, c.company_name_cn, c.display_name]) {
       if (variant && variant.trim()) supByName.set(norm(variant), lite);
@@ -176,6 +180,22 @@ export async function GET() {
       }
       supplierSet.add(m.supplier);
     }
+  }
+
+  /* The grid's supplier filter/search maps were fed ONLY by the free-text
+     model.supplier column — which is empty on every current row, while the
+     card chip resolves through product_suppliers→contacts. Feed the same
+     link path into the maps, so search/filter agree with what the card
+     shows. supplierAltByProduct carries the Chinese company names so 易利
+     finds YILI's machines. */
+  const supplierAltByProduct: Record<string, string> = {};
+  for (const [pid, sid] of linkedSupplier) {
+    const lite = supById.get(sid);
+    if (!lite) continue;
+    if (!suppliersByProduct[pid]) suppliersByProduct[pid] = [];
+    if (!suppliersByProduct[pid].includes(lite.name)) suppliersByProduct[pid].push(lite.name);
+    supplierSet.add(lite.name);
+    if (lite.cn) supplierAltByProduct[pid] = lite.cn;
   }
 
   const signals: Record<
@@ -280,6 +300,15 @@ export async function GET() {
       models: {
         counts,
         suppliers: suppliersByProduct,
+        supplierAlt: supplierAltByProduct,
+        nameAlts: (() => {
+          const alt: Record<string, string> = {};
+          for (const t of (trRes.data ?? []) as Array<{ product_id: string; product_name: string | null }>) {
+            if (!t.product_name) continue;
+            alt[t.product_id] = alt[t.product_id] ? alt[t.product_id] + " " + t.product_name : t.product_name;
+          }
+          return alt;
+        })(),
         allSuppliers: Array.from(supplierSet).sort(),
         primaryModelNames,
       },

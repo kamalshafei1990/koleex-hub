@@ -89,6 +89,7 @@ export const LIST_PRODUCT_COLUMNS = [
   "tags",
   "excerpt",
   "description",      // part of the client-side search haystack
+  "alternate_names",   // Chinese/other-language product names — search haystack
   "status",
   "visible",
   "featured",

@@ -366,6 +366,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "search.groupCategories": { en: "Categories", zh: "类别", ar: "الفئات" },
   "search.groupSubcategories": { en: "Subcategories", zh: "子类别", ar: "الفئات الفرعية" },
   "search.groupBrands": { en: "Brands", zh: "品牌", ar: "العلامات التجارية" },
+  "search.groupSuppliers": { en: "Suppliers", zh: "供应商", ar: "المورّدون" },
   "search.groupProducts": { en: "Products", zh: "产品", ar: "المنتجات" },
   "search.inCategory": { en: "in", zh: "属于", ar: "في" },
   "search.open": { en: "Open →", zh: "打开 →", ar: "فتح ←" },

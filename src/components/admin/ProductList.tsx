@@ -81,6 +81,13 @@ function divisionIcon(name: string): React.ElementType {
 /* Level is a tier label, NOT a functional status → neutral chips per the
    brand rule (monochrome-first; color reserved for true status). */
 const LEVEL_CHIP = "text-[var(--text-muted)] bg-[var(--bg-surface)] border-[var(--border-subtle)]";
+/* "Smart" code matching: XPRR-2100EF-LC must be findable as xprr2100ef,
+   XPRR 2100, or 2100ef-lc. Squash = drop everything that isn't a letter or
+   digit (Unicode-aware, so 中文/العربية survive) and lowercase. Both the
+   haystack and the typed tokens get squashed, so separator style can never
+   make a code unfindable. */
+const squash = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
 /* Frozen empty array — a fresh [] per render would defeat ProductCard's memo. */
 const EMPTY_SUPPLIERS: string[] = [];
 
@@ -573,6 +580,11 @@ export default function ProductList() {
   }, []);
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
+  /* Translated product names from signals — 中文/عربي names join the search
+     haystack so operators can search in whichever language the name was
+     entered. */
+  const [nameAlts, setNameAlts] = useState<Record<string, string>>({});
+  const [supplierAlt, setSupplierAlt] = useState<Record<string, string>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
   /* Internal work signals — fetched only under /product-data, in parallel
@@ -782,7 +794,7 @@ export default function ProductList() {
             })
             .then((j: {
               signals?: Record<string, ProductSignal>;
-              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; primaryModelNames: Record<string, string> };
+              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; primaryModelNames: Record<string, string>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
               mainImages?: Record<string, string>;
             }) => {
               if (cancelled) return;
@@ -790,6 +802,8 @@ export default function ProductList() {
               if (j?.models) {
                 setModelCounts(j.models.counts);
                 setProductSuppliers(j.models.suppliers);
+                if (j.models.nameAlts) setNameAlts(j.models.nameAlts);
+                if (j.models.supplierAlt) setSupplierAlt(j.models.supplierAlt);
                 setAllSuppliers(j.models.allSuppliers);
                 setPrimaryModelNames(j.models.primaryModelNames || {});
               }
@@ -806,6 +820,8 @@ export default function ProductList() {
                 setModelCounts(ms.counts);
                 setProductSuppliers(ms.suppliers);
                 setAllSuppliers(ms.allSuppliers);
+                if ((ms as { nameAlts?: Record<string, string> }).nameAlts) setNameAlts((ms as { nameAlts?: Record<string, string> }).nameAlts!);
+                if ((ms as { supplierAlt?: Record<string, string> }).supplierAlt) setSupplierAlt((ms as { supplierAlt?: Record<string, string> }).supplierAlt!);
                 setPrimaryModelNames(ms.primaryModelNames || {});
                 applyMainImages(imgs);
               } catch { /* grid still renders without either */ }
@@ -984,11 +1000,26 @@ export default function ProductList() {
      just runs N substring checks instead of rebuilding 600+ joined
      strings every render. Matters when the catalog grows past a few
      hundred products and the user is typing live. */
-  const searchHaystack = useMemo(() => {
+  /* Taxonomy names in ALL interface languages, not just the active one — a
+     Chinese operator must find 整烫 while the UI is English, and vice versa. */
+  const triTaxonomyBySlug = useMemo(() => {
     const map: Record<string, string> = {};
+    const put = (slug: string | null | undefined, row: { name?: string | null; name_zh?: string | null; name_ar?: string | null }) => {
+      if (!slug) return;
+      map[slug] = [row.name, (row as { name_zh?: string | null }).name_zh, (row as { name_ar?: string | null }).name_ar]
+        .filter(Boolean).join(" ").toLowerCase();
+    };
+    for (const d of divisions) put(d.slug, d);
+    for (const c of categories) put(c.slug, c);
+    for (const sc of subcategories) put(sc.slug, sc);
+    return map;
+  }, [divisions, categories, subcategories]);
+
+  const searchHaystack = useMemo(() => {
+    const map: Record<string, { hay: string; sq: string }> = {};
     for (const p of products) {
       const mn = (primaryModelNames[p.id] || "").toLowerCase();
-      map[p.id] = [
+      const hay = [
         p.product_name.toLowerCase(),
         p.slug,
         mn,
@@ -997,14 +1028,25 @@ export default function ProductList() {
         (p.description || "").toLowerCase(),
         (p.level || "").toLowerCase(),
         (p.status || "").toLowerCase(),
-        divNameBySlug[p.division_slug] || "",
-        catNameBySlug[p.category_slug] || "",
-        subNameBySlug[p.subcategory_slug] || "",
+        triTaxonomyBySlug[p.division_slug] || divNameBySlug[p.division_slug] || "",
+        triTaxonomyBySlug[p.category_slug] || catNameBySlug[p.category_slug] || "",
+        triTaxonomyBySlug[p.subcategory_slug] || subNameBySlug[p.subcategory_slug] || "",
         (p.tags || []).join(" ").toLowerCase(),
+        /* Chinese/other-language product names (熔接机 finds the fusing
+           machine) — shipped in the slim list projection for exactly this. */
+        ((p as { alternate_names?: string[] | null }).alternate_names || []).join(" ").toLowerCase(),
+        (nameAlts[p.id] || "").toLowerCase(),
+        /* Supplier names from the model rows — "yili" now finds every
+           product that supplier makes. */
+        (productSuppliers[p.id] || []).join(" ").toLowerCase(),
+        (supplierAlt[p.id] || "").toLowerCase(),
       ].join(" ");
+      /* Squashed twin: codes and names with all separators dropped, so any
+         separator style the operator types still hits. */
+      map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "")) };
     }
     return map;
-  }, [products, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug]);
+  }, [products, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt]);
 
   /* Typeahead suggestions built from the typed query.
        · Categories  → click sets the category filter
@@ -1019,6 +1061,7 @@ export default function ProductList() {
     | { kind: "category"; slug: string; label: string; count: number }
     | { kind: "subcategory"; slug: string; categorySlug: string; label: string; count: number }
     | { kind: "brand"; label: string; count: number }
+    | { kind: "supplier"; label: string; count: number }
     | { kind: "product"; id: string; slug: string; label: string; modelCode?: string; thumb?: string };
 
   /* Tallies for the suggestion dropdown. They depend only on `products`, so
@@ -1028,19 +1071,23 @@ export default function ProductList() {
     const categoryProductCounts: Record<string, number> = {};
     const subcategoryProductCounts: Record<string, number> = {};
     const brandProductCounts: Record<string, number> = {};
+    const supplierProductCounts: Record<string, number> = {};
     for (const p of products) {
       categoryProductCounts[p.category_slug] = (categoryProductCounts[p.category_slug] || 0) + 1;
       subcategoryProductCounts[p.subcategory_slug] = (subcategoryProductCounts[p.subcategory_slug] || 0) + 1;
       if (p.brand) brandProductCounts[p.brand] = (brandProductCounts[p.brand] || 0) + 1;
+      for (const sup of productSuppliers[p.id] || []) {
+        supplierProductCounts[sup] = (supplierProductCounts[sup] || 0) + 1;
+      }
     }
-    return { categoryProductCounts, subcategoryProductCounts, brandProductCounts };
-  }, [products]);
+    return { categoryProductCounts, subcategoryProductCounts, brandProductCounts, supplierProductCounts };
+  }, [products, productSuppliers]);
 
   const suggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q || q.length < 1) return [] as Suggestion[];
 
-    const { categoryProductCounts, subcategoryProductCounts, brandProductCounts } = suggestionCounts;
+    const { categoryProductCounts, subcategoryProductCounts, brandProductCounts, supplierProductCounts } = suggestionCounts;
 
     /* Prefer prefix matches first (typing "i" → Industrial Sewing
        Machines comes before Cutting Equipment), fall back to
@@ -1080,20 +1127,46 @@ export default function ProductList() {
       .slice(0, 3)
       .map(({ b }): Suggestion => ({ kind: "brand", label: b, count: brandProductCounts[b] || 0 }));
 
+    /* Suppliers ride the same dropdown — clicking one filters the grid to
+       that supplier's products, the same gesture brands already have.
+       allSuppliers is cost-side data and only arrives for Product Data
+       staff, so the section simply never exists on /products. */
+    const sups = allSuppliers
+      .map(name => ({ name, score: prefixThenContains(name, q) }))
+      .filter(x => x.score >= 0)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map(({ name }): Suggestion => ({ kind: "supplier", label: name, count: supplierProductCounts[name] || 0 }));
+
+    const qSquashed = squash(q);
     const prods: Suggestion[] = [];
     for (const p of products) {
       const mn = primaryModelNames[p.id] || "";
       const sName = prefixThenContains(p.product_name, q);
       const sModel = mn ? prefixThenContains(mn, q) : -1;
-      const score = Math.min(sName === -1 ? Infinity : sName, sModel === -1 ? Infinity : sModel);
+      /* Two extra ways in: the supplier's name ("yili" lists its machines)
+         and the squashed code ("xprr2100" hits XPRR-2100EF-LC). Ranked after
+         direct name/code hits so exact matches stay on top. */
+      const sSupplier = (productSuppliers[p.id] || []).some(sup => prefixThenContains(sup, q) >= 0) ? 3 : -1;
+      const sSquash = qSquashed && mn && squash(mn).includes(qSquashed) ? 3 : -1;
+      /* Translated names too, so 熔接机 surfaces the product in the dropdown
+         and not only in the grid filter. */
+      const sAlt = (nameAlts[p.id] || "").toLowerCase().includes(q) ? 2 : -1;
+      const score = Math.min(
+        sName === -1 ? Infinity : sName,
+        sModel === -1 ? Infinity : sModel,
+        sSupplier === -1 ? Infinity : sSupplier,
+        sSquash === -1 ? Infinity : sSquash,
+        sAlt === -1 ? Infinity : sAlt,
+      );
       if (!Number.isFinite(score)) continue;
       prods.push({ kind: "product", id: p.id, slug: p.slug || p.id, label: p.product_name, modelCode: mn || undefined, thumb: mainImages[p.id], _score: score } as Suggestion & { _score: number });
     }
     (prods as (Suggestion & { _score: number })[]).sort((a, b) => a._score - b._score);
     const productSuggestions = prods.slice(0, 6);
 
-    return [...cats, ...subs, ...brands, ...productSuggestions];
-  }, [search, categories, subcategories, allBrands, products, primaryModelNames, mainImages]);
+    return [...cats, ...subs, ...brands, ...sups, ...productSuggestions];
+  }, [search, categories, subcategories, allBrands, allSuppliers, products, primaryModelNames, mainImages, productSuppliers, suggestionCounts, nameAlts]);
 
   /* Reset the keyboard cursor whenever the suggestion list changes. */
   /* Functional bail-out: returning the identical value lets React skip the
@@ -1141,6 +1214,8 @@ export default function ProductList() {
       setFilterSub(s.slug);
     } else if (s.kind === "brand") {
       setFilterBrand(s.label);
+    } else if (s.kind === "supplier") {
+      setFilterSupplier(s.label);
     } else if (s.kind === "product") {
       router.push(`${baseRoute}/${s.slug}`);
     }
@@ -1173,8 +1248,15 @@ export default function ProductList() {
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
       if (tokens.length > 0) {
-        const hay = searchHaystack[p.id] || "";
-        for (const t of tokens) if (!hay.includes(t)) return false;
+        const entry = searchHaystack[p.id];
+        const hay = entry?.hay || "";
+        const sq = entry?.sq || "";
+        for (const t of tokens) {
+          if (hay.includes(t)) continue;
+          const st = squash(t);
+          if (st && sq.includes(st)) continue;
+          return false;
+        }
       }
       return true;
     });
@@ -1423,10 +1505,12 @@ export default function ProductList() {
                     const cats = suggestions.filter(s => s.kind === "category");
                     const subs = suggestions.filter(s => s.kind === "subcategory");
                     const brs  = suggestions.filter(s => s.kind === "brand");
+                    const supsG = suggestions.filter(s => s.kind === "supplier");
                     const prs  = suggestions.filter(s => s.kind === "product");
                     if (cats.length) groups.push({ title: t("search.groupCategories"), items: cats });
                     if (subs.length) groups.push({ title: t("search.groupSubcategories"), items: subs });
                     if (brs.length)  groups.push({ title: t("search.groupBrands"), items: brs });
+                    if (supsG.length) groups.push({ title: t("search.groupSuppliers", "Suppliers"), items: supsG });
                     if (prs.length)  groups.push({ title: t("search.groupProducts"), items: prs });
 
                     let idx = -1;
@@ -1468,6 +1552,7 @@ export default function ProductList() {
                                   {s.kind === "category" && <LayersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
                                   {s.kind === "subcategory" && <BoxesIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
                                   {s.kind === "brand" && <TagsIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                  {s.kind === "supplier" && <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
                                 </div>
                               )}
 
