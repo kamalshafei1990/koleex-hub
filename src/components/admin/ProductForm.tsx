@@ -1054,6 +1054,8 @@ export default function ProductForm({ productId }: Props) {
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
 
+        const modelIdToTempIdEarly: Record<string, string> = {};
+        mappedModels.forEach(mm => { if (mm.id) modelIdToTempIdEarly[mm.id] = mm._tempId; });
         const mappedMedia: MediaFormState[] = dbMedia.map(m => ({
           _tempId: crypto.randomUUID(),
           id: m.id,
@@ -1063,6 +1065,7 @@ export default function ProductForm({ productId }: Props) {
           alt_text: m.alt_text || "",
           order: m.order,
           model_id: m.model_id,
+          _modelTempId: m.model_id ? modelIdToTempIdEarly[m.model_id] || "" : "",
         }));
         setMedia(mappedMedia);
         setOriginalMediaIds(dbMedia.map(m => m.id));
@@ -1307,6 +1310,49 @@ export default function ProductForm({ productId }: Props) {
 
   const removeGalleryPhoto = (tempId: string) => {
     setMedia(media.filter((m) => m._tempId !== tempId));
+  };
+
+  /* ── Model photos (family Phase 3) ──
+     One optional hero per model, stored as product_media type
+     "model_image" bound by model_id (or _modelTempId until the model is
+     saved). A model without one inherits the family's main photo. */
+  const modelPhotoOf = (m: { _tempId: string; id?: string }): MediaFormState | undefined =>
+    media.find((x) =>
+      x.type === "model_image" &&
+      ((m.id && x.model_id === m.id) || (x._modelTempId && x._modelTempId === m._tempId)));
+
+  const setModelPhoto = (m: { _tempId: string; id?: string }, file: File) => {
+    const MAX_MB = 8;
+    if (!file.type.startsWith("image/")) {
+      setError(t("media.notImage", "{name} is not an image.").replace("{name}", file.name));
+      return;
+    }
+    if (file.size > MAX_MB * 1024 * 1024) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      setError(
+        t("media.mainTooBig", "{name} is {size} MB — max {max} MB.")
+          .replace("{name}", file.name).replace("{size}", mb).replace("{max}", String(MAX_MB)),
+      );
+      return;
+    }
+    setError("");
+    const keep = media.filter((x) => x !== modelPhotoOf(m));
+    setMedia([...keep, {
+      _tempId: crypto.randomUUID(),
+      type: "model_image",
+      url: "",
+      file_path: null,
+      alt_text: "",
+      order: 0,
+      model_id: m.id ?? null,
+      _modelTempId: m._tempId,
+      _file: file,
+    }]);
+  };
+
+  const removeModelPhoto = (m: { _tempId: string; id?: string }) => {
+    const cur = modelPhotoOf(m);
+    if (cur) setMedia(media.filter((x) => x !== cur));
   };
 
   /* Generic image uploader for the small Identity image fields (brand
@@ -2511,7 +2557,7 @@ export default function ProductForm({ productId }: Props) {
           }
           await createProductMedia({
             product_id: pid,
-            model_id: item.model_id,
+            model_id: item.model_id || (item._modelTempId ? tempIdToRealId[item._modelTempId] ?? null : null),
             type: item.type,
             url: uploaded.url,
             file_path: uploaded.file_path,
@@ -4546,6 +4592,13 @@ export default function ProductForm({ productId }: Props) {
                 )}
                 productPacking={productPackingDefaults}
                 productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
+                modelPhotoUrl={(m) => {
+                  const it = modelPhotoOf(m);
+                  if (!it) return null;
+                  return it._file ? URL.createObjectURL(it._file) : (it.url || null);
+                }}
+                onSetModelPhoto={setModelPhoto}
+                onRemoveModelPhoto={removeModelPhoto}
                 models={models}
                 onChange={setModels}
                 suppliers={suppliers}

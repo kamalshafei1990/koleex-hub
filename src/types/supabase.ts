@@ -220,6 +220,9 @@ export type ProductMediaType =
   /* Document types (Phase 2 — Media & Documents). product_media.type is
      free text in the DB, so these need no migration; they widen the
      hand-maintained union the form + renderers switch on. */
+  /* Per-model hero (family Phase 3): bound via product_media.model_id;
+     a model without one inherits the family's main_image. */
+  | "model_image"
   | "datasheet"
   | "brochure"
   | "certificate"

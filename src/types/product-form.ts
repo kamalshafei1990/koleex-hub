@@ -191,6 +191,9 @@ export interface MediaFormState {
   alt_text: string;
   order: number;
   model_id: string | null;
+  /* Binds media to a model that has no DB id yet (new model in this form
+     session). Resolved to the real id at save via tempIdToRealId. */
+  _modelTempId?: string;
   _file?: File;
 }
 

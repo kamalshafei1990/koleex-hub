@@ -63,6 +63,7 @@ interface ProductPreviewProps {
   warranty?: string | null;
   /** Model lineup with per-model technical overrides — "Choose your model". */
   variants?: Array<{
+    photo?: string | null;
     code: string;
     tagline: string | null;
     overrides: Record<string, unknown>;
@@ -1286,10 +1287,20 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                       className={`border-t border-[var(--border-subtle)] ${isWanted ? "bg-[var(--bg-surface-subtle)]" : ""}`}
                     >
                       <td className={`px-5 py-4 ${isWanted ? "border-s-2 border-[#567FB2]" : ""}`}>
+                        <div className="flex items-center gap-3">
+                          {v.photo ? (
+                            <span className="h-10 w-10 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={v.photo} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                            </span>
+                          ) : null}
+                          <span>
                         <div className="text-[14px] font-semibold text-[var(--text-primary)]">{v.code}</div>
                         {v.tagline ? (
                           <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
                         ) : null}
+                          </span>
+                        </div>
                       </td>
                       {cols.map((k) => {
                         const f = fieldsByKey.get(k)!;

@@ -504,6 +504,12 @@ export default function ProductProfile() {
 
           {focusModel >= 0 && data.models[focusModel] && (() => {
             const m = data.models[focusModel];
+            /* Model's own photo, else the family hero — the inheritance
+               story told visually. */
+            const mPhoto = (data.media ?? []).find(
+              (md) => md.type === "model_image" && (md.model_id as string | null) === (m.id as string),
+            )?.url as string | undefined;
+            const photo = mPhoto || hero;
             const specs = (p["schema_specs"] as Record<string, unknown> | null) ?? {};
             const ov = (m.specs_overrides as Record<string, unknown> | null) ?? {};
             const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
@@ -541,6 +547,12 @@ export default function ProductProfile() {
                 <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {/* Identity + price column */}
                   <div className="space-y-1.5">
+                    {photo && (
+                      <div className="mb-2 h-28 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/5 overflow-hidden flex items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={IMG.card(photo)} alt="" className="h-full w-full object-contain p-2" loading="lazy" decoding="async" />
+                      </div>
+                    )}
                     <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
                     <Row label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
                     <Row label={t("pp.f.tagline", "Tagline")} value={m.tagline} />

@@ -166,12 +166,12 @@ export async function loadPublicSchemaProduct(
       supabase.from("subcategories").select("code").eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
         .from("product_media")
-        .select('url, alt_text, "order", type')
+        .select('url, alt_text, "order", type, model_id')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('model_name, primary_model, tagline, "order", visible, specs_overrides')
+        .select('id, model_name, primary_model, tagline, "order", visible, specs_overrides')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -259,6 +259,11 @@ export async function loadPublicSchemaProduct(
     }
   }
   // ── Model lineup for the "Choose your model" table ──
+  const photoByModel = new Map<string, string>();
+  for (const m of media) {
+    const mid = (m as { model_id?: string | null }).model_id;
+    if (m.type === "model_image" && mid && m.url && !photoByModel.has(mid)) photoByModel.set(mid, m.url);
+  }
   const variants = models
     .filter((m) => m.visible !== false && (m.primary_model || m.model_name))
     .map((m) => {
@@ -269,6 +274,7 @@ export async function loadPublicSchemaProduct(
       return {
         code: (m.primary_model || m.model_name) as string,
         tagline: m.tagline,
+        photo: photoByModel.get((m as { id?: string }).id ?? "") ?? null,
         overrides,
       };
     });

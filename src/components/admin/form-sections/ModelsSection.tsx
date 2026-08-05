@@ -9,6 +9,7 @@ import CopyIcon from "@/components/icons/ui/CopyIcon";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
@@ -52,6 +53,10 @@ interface Props {
      one-click copy on every variant card's packing panel. */
   productPacking?: ProductPackingDefaults | null;
   productSpecs?: Record<string, unknown>;
+  /* Family Phase 3 — per-model photo plumbing (media lives in the form). */
+  modelPhotoUrl?: (m: { _tempId: string; id?: string }) => string | null;
+  onSetModelPhoto?: (m: { _tempId: string; id?: string }, file: File) => void;
+  onRemoveModelPhoto?: (m: { _tempId: string; id?: string }) => void;
 }
 
 /* ── Visual grouped panel ── */
@@ -107,6 +112,7 @@ function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
   onEditInHero, primaryModel, productPacking, specFields = [], productSpecs,
+  photoUrl, onSetPhoto, onRemovePhoto,
 }: {
   model: ModelFormState; idx: number; total: number;
   /* The product's primary variant (models[0]). Non-primary variants
@@ -135,6 +141,10 @@ function ModelCard({
      every override row so "change only the difference" is never blind —
      you see what you are overriding while you type. */
   productSpecs?: Record<string, unknown>;
+  /* This model's own photo (deferred-upload preview or saved URL). */
+  photoUrl?: string | null;
+  onSetPhoto?: (f: File) => void;
+  onRemovePhoto?: () => void;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [open, setOpen] = useState(defaultOpen);
@@ -572,6 +582,53 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               speed, feed configuration…). A model INHERITS the
               product's Specifications and overrides only the keys
               listed here. Feeds the public "Choose your model" table. */}
+          {/* ── Model photo (family Phase 3) ── optional; absent = the
+              model inherits the family's main photo everywhere. */}
+          {onSetPhoto && (
+            <Panel icon={<ImageRawIcon className="h-3.5 w-3.5" />} title={t("models.photoTitle", "Model photo")}>
+              <div className="flex items-center gap-3">
+                {photoUrl ? (
+                  <span className="h-14 w-14 shrink-0 rounded-lg bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photoUrl} alt="" className="h-full w-full object-contain p-1" />
+                  </span>
+                ) : (
+                  <span className="h-14 w-14 shrink-0 rounded-lg border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)]">
+                    <ImageRawIcon className="h-5 w-5" />
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">
+                    {photoUrl
+                      ? t("models.photoOwn", "This model shows its own photo.")
+                      : t("models.photoInherits", "No photo — this model inherits the family's main photo.")}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <label className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold cursor-pointer text-[var(--accent,#0066FF)] bg-[var(--accent,#0066FF)]/10 hover:bg-[var(--accent,#0066FF)]/15 border border-[var(--accent,#0066FF)]/30 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) onSetPhoto(f);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                      {photoUrl ? t("models.photoReplace", "Replace") : t("models.photoAdd", "Add photo")}
+                    </label>
+                    {photoUrl && onRemovePhoto && (
+                      <button type="button" onClick={onRemovePhoto}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] hover:text-rose-300 hover:bg-rose-500/10 border border-[var(--border-subtle)] transition-colors">
+                        {t("models.photoRemove", "Remove")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Panel>
+          )}
+
           {specFields.length > 0 && (
             <Panel icon={<ScaleIcon className="h-3.5 w-3.5" />} title="Technical differences (vs product specs)">
               <div className="space-y-2">
@@ -841,7 +898,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
   );
 }
 
-export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking, productSpecs }: Props) {
+export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking, productSpecs, modelPhotoUrl, onSetModelPhoto, onRemoveModelPhoto }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
@@ -940,6 +997,9 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
                 specFields={specFields}
                 productPacking={productPacking}
                 productSpecs={productSpecs}
+                photoUrl={modelPhotoUrl ? modelPhotoUrl(m) : null}
+                onSetPhoto={onSetModelPhoto ? (f: File) => onSetModelPhoto(m, f) : undefined}
+                onRemovePhoto={onRemoveModelPhoto ? () => onRemoveModelPhoto(m) : undefined}
                 key={m._tempId}
                 model={m}
                 idx={trueIdx}

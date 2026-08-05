@@ -672,7 +672,13 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
 
   /* ── Models step (P0 #5b) ── */
-    "models.familyValue": { en: "Family", zh: "系列值", ar: "قيمة العائلة" },
+    "models.photoTitle": { en: "Model photo", zh: "型号图片", ar: "صورة الموديل" },
+  "models.photoOwn": { en: "This model shows its own photo.", zh: "该型号使用自己的图片。", ar: "هذا الموديل يعرض صورته الخاصة." },
+  "models.photoInherits": { en: "No photo — this model inherits the family's main photo.", zh: "暂无图片——该型号继承系列主图。", ar: "لا توجد صورة — يرث هذا الموديل الصورة الرئيسية للعائلة." },
+  "models.photoAdd": { en: "Add photo", zh: "添加图片", ar: "إضافة صورة" },
+  "models.photoReplace": { en: "Replace", zh: "更换", ar: "استبدال" },
+  "models.photoRemove": { en: "Remove", zh: "移除", ar: "إزالة" },
+  "models.familyValue": { en: "Family", zh: "系列值", ar: "قيمة العائلة" },
   "models.title": { en: "Variants", zh: "变体", ar: "المتغيرات" },
   "models.countBadge": { en: "{n} variant(s)", zh: "{n} 个变体", ar: "{n} متغير" },
   "models.marketPrices": { en: "Market Prices", zh: "市场价格", ar: "أسعار السوق" },
