@@ -28,6 +28,8 @@ import {
   createSalaryRecord,
   fetchPayslips,
   createPayslip,
+  deleteSalaryRecord,
+  deletePayslip,
   type SalaryRecordWithName,
   type PayslipWithName,
 } from "@/lib/hr-admin";
@@ -37,6 +39,14 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { ConfirmDialog } from "@/components/notes/NotesDialog";
+
+/* Salaries here are paid from the Chinese entity, so CNY leads and is the
+   default. Kept as a closed list because the register is read by payroll and
+   by anything that sums it — a typo becomes a currency nobody can convert. */
+const SALARY_CURRENCIES = ["CNY", "USD", "EUR", "EGP", "GBP", "HKD"] as const;
+const DEFAULT_SALARY_CURRENCY = "CNY";
 
 /* ═══════════════════════════════════════════════════
    MAIN COMPONENT
@@ -50,7 +60,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
   const [salaryForm, setSalaryForm] = useState({
     employee_id: "",
     base_salary: "",
-    currency: "USD",
+    currency: DEFAULT_SALARY_CURRENCY,
     pay_frequency: "monthly",
     effective_from: "",
     allowances: "{}",
@@ -69,6 +79,12 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [periodError, setPeriodError] = useState(false);
+  /* Removing pay data is irreversible and unforgiving of a mis-tap, so it
+     goes through the Hub's confirmation dialog rather than deleting on the
+     first click. One piece of state carries both kinds of row. */
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "salary" | "payslip"; id: string; label: string } | null
+  >(null);
 
   /* ── translation helpers ── */
   const { tStatus } = makeTranslationHelpers(t);
@@ -119,7 +135,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
       setSalaryForm({
         employee_id: "",
         base_salary: "",
-        currency: "USD",
+        currency: DEFAULT_SALARY_CURRENCY,
         pay_frequency: "monthly",
         effective_from: "",
         allowances: "{}",
@@ -131,6 +147,21 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const confirmDelete = async () => {
+    const target = pendingDelete;
+    if (!target) return;
+    const ok =
+      target.kind === "salary"
+        ? await deleteSalaryRecord(target.id)
+        : await deletePayslip(target.id);
+    setPendingDelete(null);
+    if (!ok) return;
+    /* Re-read rather than splice: deleting an open salary record re-opens the
+       one before it server-side, so the list's dates change too. */
+    if (target.kind === "salary") setSalaryRecords(await fetchSalaryRecords());
+    else setPayslips(await fetchPayslips());
   };
 
   const handleCreatePayslip = async () => {
@@ -251,6 +282,21 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
                         -{rec.currency} {sumObj(rec.deductions).toLocaleString()}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingDelete({
+                          kind: "salary",
+                          id: rec.id,
+                          label: `${rec.employee_name} · ${rec.currency} ${rec.base_salary.toLocaleString()}`,
+                        })
+                      }
+                      className="h-7 w-7 rounded-lg text-[var(--text-dim)] hover:text-rose-400 hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center"
+                      title={t("hr.delete")}
+                      aria-label={t("hr.delete")}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -306,6 +352,21 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
                       map={PAYSLIP_STATUS_MAP}
                       label={tStatus(ps.status)}
                     />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingDelete({
+                          kind: "payslip",
+                          id: ps.id,
+                          label: `${ps.employee_name} · ${fmtDate(ps.period_start)}`,
+                        })
+                      }
+                      className="h-7 w-7 rounded-lg text-[var(--text-dim)] hover:text-rose-400 hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center"
+                      title={t("hr.delete")}
+                      aria-label={t("hr.delete")}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -365,12 +426,18 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
           </div>
           <div>
             <FieldLabel>{t("hr.currency")}</FieldLabel>
-            <input
-              type="text"
+            {/* Was a free-text box, which is how a salary got saved as "CY".
+                A currency is a closed set; typing it is only an opportunity
+                to be wrong. */}
+            <select
               value={salaryForm.currency}
               onChange={(e) => setSalaryForm((f) => ({ ...f, currency: e.target.value }))}
-              className={inputCls}
-            />
+              className={selectCls}
+            >
+              {SALARY_CURRENCIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -533,6 +600,24 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
           </select>
         </div>
       </ModalShell>
+
+      {/* Pay data is not recoverable from the UI once removed, so the
+          confirmation names the exact row rather than asking a generic
+          "are you sure?". */}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete?.kind === "salary"
+            ? t("hr.deleteSalaryConfirm")
+            : t("hr.deletePayslipConfirm")
+        }
+        description={pendingDelete?.label}
+        variant="danger"
+        confirmLabel={t("hr.delete")}
+        cancelLabel={t("hr.cancel")}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

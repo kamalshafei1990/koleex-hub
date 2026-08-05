@@ -2309,6 +2309,10 @@ export interface AppraisalCycleRow {
   start_date: string;
   end_date: string;
   status: string;
+  /** What the cycle is for, and how it should be scored. Added after the
+   *  first version shipped with only a name and two dates. */
+  description: string | null;
+  notes: string | null;
   created_at: string;
 }
 export type AppraisalCycleInsert = Omit<AppraisalCycleRow, "id" | "created_at">;

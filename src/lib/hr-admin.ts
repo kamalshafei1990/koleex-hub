@@ -1438,6 +1438,58 @@ export async function createPayslip(
   return data as PayslipRow;
 }
 
+/** Delete a salary record.
+ *
+ *  Deleting a salary row leaves a HOLE in the register: createSalaryRecord
+ *  closes the previous record by stamping its `effective_to`, so removing the
+ *  newest row would otherwise leave the one before it permanently closed and
+ *  the employee with no current salary at all. Re-open the immediately
+ *  preceding record whenever the row being removed was the open one. */
+export async function deleteSalaryRecord(id: string): Promise<boolean> {
+  const { data: row } = await supabase
+    .from(SALARY_RECORDS)
+    .select("id, employee_id, effective_from, effective_to")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await supabase.from(SALARY_RECORDS).delete().eq("id", id);
+  if (error) {
+    console.error("[Payroll] Delete salary:", error.message);
+    return false;
+  }
+
+  const target = row as
+    | { employee_id?: string; effective_from?: string; effective_to?: string | null }
+    | null;
+  if (target?.employee_id && !target.effective_to) {
+    const { data: prev } = await supabase
+      .from(SALARY_RECORDS)
+      .select("id")
+      .eq("employee_id", target.employee_id)
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const prevRow = prev as { id?: string } | null;
+    if (prevRow?.id) {
+      await supabase
+        .from(SALARY_RECORDS)
+        .update({ effective_to: null })
+        .eq("id", prevRow.id);
+    }
+  }
+  return true;
+}
+
+/** Delete a payslip. Nothing depends on it, so this is a plain removal. */
+export async function deletePayslip(id: string): Promise<boolean> {
+  const { error } = await supabase.from(PAYSLIPS).delete().eq("id", id);
+  if (error) {
+    console.error("[Payroll] Delete payslip:", error.message);
+    return false;
+  }
+  return true;
+}
+
 /* ═══════════════════════════════════════════════════
    TRAINING
    ═══════════════════════════════════════════════════ */

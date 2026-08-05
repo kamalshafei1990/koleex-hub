@@ -26,8 +26,11 @@ import {
   fetchAppraisals,
   fetchGoals,
   createGoal,
+  createAppraisal,
+  updateAppraisal,
   type AppraisalWithName,
 } from "@/lib/hr-admin";
+import EmployeePicker from "@/components/hr/EmployeePicker";
 import type { AppraisalCycleRow, GoalRow } from "@/types/supabase";
 
 /* ── Icons ── */
@@ -35,6 +38,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── Inline status maps ── */
@@ -62,7 +66,23 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
   const [appraisals, setAppraisals] = useState<AppraisalWithName[]>([]);
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [showCycleModal, setShowCycleModal] = useState(false);
-  const [cycleForm, setCycleForm] = useState({ name: "", start_date: "", end_date: "" });
+  const [cycleForm, setCycleForm] = useState({
+    name: "", start_date: "", end_date: "", status: "active",
+    description: "", notes: "",
+  });
+  /* A cycle with no reviews in it is the state the owner hit: the app could
+     create the container and then offered no way to put anything in it. */
+  const [showAppraisalModal, setShowAppraisalModal] = useState(false);
+  const [appraisalForm, setAppraisalForm] = useState({ employee_id: "", reviewer_id: "" });
+  const [bulkAdding, setBulkAdding] = useState(false);
+  /* The detail panel could DISPLAY ratings and comments but offered no way to
+     enter any of them, so every appraisal stayed permanently blank — the
+     "no information at all" the owner hit. This is the form behind it. */
+  const [editing, setEditing] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    self_rating: "", reviewer_rating: "", self_comments: "", reviewer_comments: "",
+    strengths: "", improvements: "", goals_met: "", overall_score: "", status: "pending",
+  });
   const [selectedAppraisal, setSelectedAppraisal] = useState<AppraisalWithName | null>(null);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -74,6 +94,10 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  /* Cycle facts for the summary strip. */
+  const activeCycle = cycles.find((c) => c.id === selectedCycleId) ?? null;
+  const cycleDone = appraisals.filter((a) => a.status === "completed").length;
 
   /* ── translation helpers ── */
   const { tStatus } = makeTranslationHelpers(t);
@@ -110,14 +134,134 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
         name: cycleForm.name,
         start_date: cycleForm.start_date,
         end_date: cycleForm.end_date,
-        status: "active",
+        description: cycleForm.description.trim() || null,
+        notes: cycleForm.notes.trim() || null,
+        status: cycleForm.status,
       });
       const cs = await fetchAppraisalCycles();
       setCycles(cs);
       setShowCycleModal(false);
-      setCycleForm({ name: "", start_date: "", end_date: "" });
+      setCycleForm({ name: "", start_date: "", end_date: "", status: "active", description: "", notes: "" });
     } catch (err) {
       console.error("[Appraisals] Create cycle error:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* Add one review to the open cycle. */
+  async function handleCreateAppraisal() {
+    if (!selectedCycleId || !appraisalForm.employee_id || saving) return;
+    setSaving(true);
+    try {
+      await createAppraisal({
+        cycle_id: selectedCycleId,
+        employee_id: appraisalForm.employee_id,
+        reviewer_id: appraisalForm.reviewer_id || null,
+        status: "pending",
+        self_rating: null,
+        reviewer_rating: null,
+        self_comments: null,
+        reviewer_comments: null,
+        goals_met: null,
+        strengths: null,
+        improvements: null,
+        overall_score: null,
+        completed_at: null,
+      });
+      setAppraisals(await fetchAppraisals(selectedCycleId));
+      setShowAppraisalModal(false);
+      setAppraisalForm({ employee_id: "", reviewer_id: "" });
+    } catch (err) {
+      console.error("[Appraisals] Create appraisal error:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* Add everyone who isn't in the cycle yet. A cycle normally covers the whole
+     team, and adding eight people one modal at a time is the kind of chore
+     that makes people stop using the module. Skips anyone already present so
+     it is safe to press twice. */
+  async function handleAddEveryone() {
+    if (!selectedCycleId || bulkAdding) return;
+    const already = new Set(appraisals.map((a) => a.employee_id));
+    const missing = employees.filter((e) => !already.has(e.id));
+    if (missing.length === 0) return;
+    setBulkAdding(true);
+    try {
+      for (const e of missing) {
+        await createAppraisal({
+          cycle_id: selectedCycleId,
+          employee_id: e.id,
+          reviewer_id: null,
+          status: "pending",
+          self_rating: null,
+          reviewer_rating: null,
+          self_comments: null,
+          reviewer_comments: null,
+          goals_met: null,
+          strengths: null,
+          improvements: null,
+          overall_score: null,
+          completed_at: null,
+        });
+      }
+      setAppraisals(await fetchAppraisals(selectedCycleId));
+    } catch (err) {
+      console.error("[Appraisals] Bulk add error:", err);
+    } finally {
+      setBulkAdding(false);
+    }
+  }
+
+  function startEditing(a: AppraisalWithName) {
+    setReviewForm({
+      self_rating: a.self_rating != null ? String(a.self_rating) : "",
+      reviewer_rating: a.reviewer_rating != null ? String(a.reviewer_rating) : "",
+      self_comments: a.self_comments ?? "",
+      reviewer_comments: a.reviewer_comments ?? "",
+      strengths: a.strengths ?? "",
+      improvements: a.improvements ?? "",
+      goals_met: a.goals_met ?? "",
+      overall_score: a.overall_score != null ? String(a.overall_score) : "",
+      status: a.status || "pending",
+    });
+    setEditing(true);
+  }
+
+  async function handleSaveReview() {
+    const current = selectedAppraisal;
+    if (!current || saving) return;
+    setSaving(true);
+    try {
+      /* Empty means "not answered yet", not zero — a blank rating must stay
+         NULL or a review nobody has filled in reads as a score of nothing. */
+      const num = (v: string) => (v.trim() === "" ? null : Number(v));
+      const txt = (v: string) => (v.trim() === "" ? null : v.trim());
+      const patch = {
+        self_rating: num(reviewForm.self_rating),
+        reviewer_rating: num(reviewForm.reviewer_rating),
+        self_comments: txt(reviewForm.self_comments),
+        reviewer_comments: txt(reviewForm.reviewer_comments),
+        strengths: txt(reviewForm.strengths),
+        improvements: txt(reviewForm.improvements),
+        goals_met: txt(reviewForm.goals_met),
+        overall_score: num(reviewForm.overall_score),
+        status: reviewForm.status,
+        /* Stamp the completion the moment it is marked completed, and clear
+           it again if it is reopened. */
+        completed_at:
+          reviewForm.status === "completed" ? new Date().toISOString() : null,
+      };
+      const ok = await updateAppraisal(current.id, patch);
+      if (!ok) return;
+      setEditing(false);
+      if (selectedCycleId) {
+        const fresh = await fetchAppraisals(selectedCycleId);
+        setAppraisals(fresh);
+        setSelectedAppraisal(fresh.find((x) => x.id === current.id) ?? null);
+      }
     } finally {
       setSaving(false);
     }
@@ -211,13 +355,41 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
           </h2>
         </div>
 
-        <button
-          className={`${primaryBtnCls} flex items-center gap-2`}
-          onClick={() => selectedAppraisal ? setShowGoalModal(true) : setShowCycleModal(true)}
-        >
-          <PlusIcon size={14} />
-          {selectedAppraisal ? t("hr.addGoal") : t("hr.newCycle")}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* "New Cycle" was the only action on this screen, which is why a
+              cycle could exist with nothing in it and no way in. Adding a
+              review to the OPEN cycle is the common action, so it takes the
+              primary button and New Cycle steps back to secondary. */}
+          {!selectedAppraisal && selectedCycleId && (
+            <button
+              className={`${primaryBtnCls} flex items-center gap-2`}
+              onClick={() => { setAppraisalForm({ employee_id: "", reviewer_id: "" }); setShowAppraisalModal(true); }}
+            >
+              <PlusIcon size={14} />
+              {t("hr.addAppraisal")}
+            </button>
+          )}
+          {selectedAppraisal && !editing && (
+            <button
+              className={`${primaryBtnCls} flex items-center gap-2`}
+              onClick={() => startEditing(selectedAppraisal)}
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+              {t("hr.editReview")}
+            </button>
+          )}
+          <button
+            className={
+              !selectedCycleId
+                ? `${primaryBtnCls} flex items-center gap-2`
+                : `${cancelBtnCls} flex items-center gap-2`
+            }
+            onClick={() => selectedAppraisal ? setShowGoalModal(true) : setShowCycleModal(true)}
+          >
+            <PlusIcon size={14} />
+            {selectedAppraisal ? t("hr.addGoal") : t("hr.newCycle")}
+          </button>
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -240,6 +412,50 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
             </div>
           )}
 
+          {/* ── Cycle summary ──
+              The cycle selector showed a name and two dates and nothing else,
+              so an open cycle told you nothing about its own state. These are
+              the four facts you actually want before opening a review. */}
+          {activeCycle && (
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { label: t("hr.startDate"), value: fmtDate(activeCycle.start_date) },
+                { label: t("hr.endDate"), value: fmtDate(activeCycle.end_date) },
+                { label: t("hr.appraisals"), value: String(appraisals.length) },
+                { label: t("hr.completed"), value: `${cycleDone}/${appraisals.length}` },
+              ].map((chip) => (
+                <span
+                  key={chip.label}
+                  className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[11px] text-[var(--text-dim)]"
+                >
+                  {chip.label}{" "}
+                  <span className="text-[var(--text-primary)] font-medium tabular-nums">{chip.value}</span>
+                </span>
+              ))}
+              <StatusBadge
+                status={activeCycle.status}
+                map={APPRAISAL_STATUS_MAP}
+                label={tStatus(activeCycle.status)}
+              />
+            </div>
+          )}
+
+          {/* What the cycle is for, in the cycle's own words. */}
+          {activeCycle && (activeCycle.description || activeCycle.notes) && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 space-y-2">
+              {activeCycle.description && (
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {activeCycle.description}
+                </p>
+              )}
+              {activeCycle.notes && (
+                <p className="text-[12px] text-[var(--text-dim)] whitespace-pre-wrap">
+                  {activeCycle.notes}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* ── Appraisal list ── */}
           {cycles.length === 0 ? (
             <EmptyState
@@ -248,11 +464,36 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               subtitle={t("hr.selectCyclePrompt")}
             />
           ) : appraisals.length === 0 ? (
-            <EmptyState
-              icon={StarIcon}
-              title={t("hr.noAppraisalsCycle")}
-              subtitle={t("hr.selectCyclePrompt")}
-            />
+            /* Not a dead end any more: the empty cycle now offers the two ways
+               out of it, which is what was missing entirely. */
+            <div className="flex flex-col items-center justify-center py-14 text-center">
+              <div className="h-12 w-12 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-3">
+                <StarIcon size={20} className="text-[var(--text-dim)]" />
+              </div>
+              <div className="text-[13px] text-[var(--text-primary)] font-medium">
+                {t("hr.noAppraisalsCycle")}
+              </div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-1 mb-4">
+                {t("hr.emptyCycleHint")}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className={`${primaryBtnCls} flex items-center gap-2`}
+                  onClick={() => { setAppraisalForm({ employee_id: "", reviewer_id: "" }); setShowAppraisalModal(true); }}
+                >
+                  <PlusIcon size={14} />
+                  {t("hr.addAppraisal")}
+                </button>
+                <button
+                  className={`${cancelBtnCls} flex items-center gap-2`}
+                  onClick={handleAddEveryone}
+                  disabled={bulkAdding || employees.length === 0}
+                >
+                  {bulkAdding ? <SpinnerIcon size={14} className="animate-spin" /> : <UserIcon size={14} />}
+                  {t("hr.addEveryone")}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-2">
               {appraisals.map((a) => (
@@ -294,6 +535,82 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
         /* ── Selected Appraisal detail ── */
         <div className="space-y-6">
           {/* ── Appraisal info ── */}
+          {editing ? (
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>{t("hr.selfRating")}</FieldLabel>
+                  <input
+                    className={inputCls} type="number" min={1} max={5} inputMode="numeric"
+                    placeholder="1-5"
+                    value={reviewForm.self_rating}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, self_rating: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>{t("hr.reviewerRating")}</FieldLabel>
+                  <input
+                    className={inputCls} type="number" min={1} max={5} inputMode="numeric"
+                    placeholder="1-5"
+                    value={reviewForm.reviewer_rating}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, reviewer_rating: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>{t("hr.selfComments")}</FieldLabel>
+                <textarea className={textareaCls} rows={2} value={reviewForm.self_comments}
+                  onChange={(e) => setReviewForm((f) => ({ ...f, self_comments: e.target.value }))} />
+              </div>
+              <div>
+                <FieldLabel>{t("hr.reviewerComments")}</FieldLabel>
+                <textarea className={textareaCls} rows={2} value={reviewForm.reviewer_comments}
+                  onChange={(e) => setReviewForm((f) => ({ ...f, reviewer_comments: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>{t("hr.strengths")}</FieldLabel>
+                  <textarea className={textareaCls} rows={2} value={reviewForm.strengths}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, strengths: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>{t("hr.improvements")}</FieldLabel>
+                  <textarea className={textareaCls} rows={2} value={reviewForm.improvements}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, improvements: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>{t("hr.goalsMet")}</FieldLabel>
+                <textarea className={textareaCls} rows={2} value={reviewForm.goals_met}
+                  onChange={(e) => setReviewForm((f) => ({ ...f, goals_met: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>{t("hr.overallScore")}</FieldLabel>
+                  <input className={inputCls} type="number" step="0.1" inputMode="decimal"
+                    value={reviewForm.overall_score}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, overall_score: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>{t("hr.status")}</FieldLabel>
+                  <select className={selectCls} value={reviewForm.status}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, status: e.target.value }))}>
+                    <option value="pending">{t("hr.pending")}</option>
+                    <option value="in_progress">{t("hr.inProgress")}</option>
+                    <option value="completed">{t("hr.completed")}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button className={cancelBtnCls} onClick={() => setEditing(false)}>
+                  {t("hr.cancel")}
+                </button>
+                <button className={primaryBtnCls} onClick={handleSaveReview} disabled={saving}>
+                  {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.save")}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -336,6 +653,39 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               </div>
             )}
 
+            {selectedAppraisal.strengths && (
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                  {t("hr.strengths")}
+                </div>
+                <div className="text-[13px] text-[var(--text-subtle)] whitespace-pre-wrap">
+                  {selectedAppraisal.strengths}
+                </div>
+              </div>
+            )}
+
+            {selectedAppraisal.improvements && (
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                  {t("hr.improvements")}
+                </div>
+                <div className="text-[13px] text-[var(--text-subtle)] whitespace-pre-wrap">
+                  {selectedAppraisal.improvements}
+                </div>
+              </div>
+            )}
+
+            {selectedAppraisal.goals_met && (
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                  {t("hr.goalsMet")}
+                </div>
+                <div className="text-[13px] text-[var(--text-subtle)] whitespace-pre-wrap">
+                  {selectedAppraisal.goals_met}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1">
                 {t("hr.overallScore")}
@@ -345,6 +695,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               </div>
             </div>
           </div>
+          )}
 
           {/* ── Goals ── */}
           <div>
@@ -419,6 +770,52 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
         </div>
       )}
 
+      {/* ── Add Appraisal Modal ── */}
+      <ModalShell
+        open={showAppraisalModal}
+        onClose={() => setShowAppraisalModal(false)}
+        title={t("hr.addAppraisal")}
+        footer={
+          <>
+            <button className={cancelBtnCls} onClick={() => setShowAppraisalModal(false)}>
+              {t("hr.cancel")}
+            </button>
+            <button
+              className={primaryBtnCls}
+              disabled={!appraisalForm.employee_id || saving}
+              onClick={handleCreateAppraisal}
+            >
+              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.create")}
+            </button>
+          </>
+        }
+      >
+        <div>
+          <FieldLabel>{t("hr.employee")}</FieldLabel>
+          <EmployeePicker
+            employees={employees}
+            value={appraisalForm.employee_id}
+            onChange={(id) => setAppraisalForm((f) => ({ ...f, employee_id: id }))}
+            placeholder={t("hr.selectEmployee")}
+            searchPlaceholder={t("hr.searchEmployees")}
+            emptyLabel={t("hr.noEmployeesFound")}
+          />
+        </div>
+        <div>
+          {/* Optional: a review can be filed before anyone is assigned to
+              conduct it, which is how most cycles actually start. */}
+          <FieldLabel>{t("hr.reviewer")}</FieldLabel>
+          <EmployeePicker
+            employees={employees}
+            value={appraisalForm.reviewer_id}
+            onChange={(id) => setAppraisalForm((f) => ({ ...f, reviewer_id: id }))}
+            placeholder={t("hr.selectReviewerOptional")}
+            searchPlaceholder={t("hr.searchEmployees")}
+            emptyLabel={t("hr.noEmployeesFound")}
+          />
+        </div>
+      </ModalShell>
+
       {/* ── Create Cycle Modal ── */}
       <ModalShell
         open={showCycleModal}
@@ -463,6 +860,40 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
             type="date"
             value={cycleForm.end_date}
             onChange={(e) => setCycleForm({ ...cycleForm, end_date: e.target.value })}
+          />
+        </div>
+        {/* A cycle used to carry a name and two dates and nothing else, so
+            nobody opening it later could tell what it was measuring. */}
+        <div>
+          <FieldLabel>{t("hr.status")}</FieldLabel>
+          <select
+            className={selectCls}
+            value={cycleForm.status}
+            onChange={(e) => setCycleForm({ ...cycleForm, status: e.target.value })}
+          >
+            <option value="draft">{t("hr.draft")}</option>
+            <option value="active">{t("hr.active")}</option>
+            <option value="completed">{t("hr.completed")}</option>
+          </select>
+        </div>
+        <div>
+          <FieldLabel>{t("hr.description")}</FieldLabel>
+          <textarea
+            className={textareaCls}
+            rows={2}
+            value={cycleForm.description}
+            placeholder={t("hr.cycleDescriptionPh")}
+            onChange={(e) => setCycleForm({ ...cycleForm, description: e.target.value })}
+          />
+        </div>
+        <div>
+          <FieldLabel>{t("hr.notes")}</FieldLabel>
+          <textarea
+            className={textareaCls}
+            rows={2}
+            value={cycleForm.notes}
+            placeholder={t("hr.cycleNotesPh")}
+            onChange={(e) => setCycleForm({ ...cycleForm, notes: e.target.value })}
           />
         </div>
       </ModalShell>

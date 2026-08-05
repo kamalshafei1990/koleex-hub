@@ -289,15 +289,52 @@ function SlidingPillNav({
        making it impossible to scroll. Desktop needs no lock at all. */
     const isTouch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
     if (!isTouch) return;
-    const onTouchStart = () => { userScrollingRef.current = true; lockedScrollRef.current = null; };
+    /* The bug this replaces: the lock engaged the instant the finger lifted,
+       but a touch scroll does not end when the finger lifts — iOS keeps the
+       strip coasting. So a deliberate swipe of the tab bar was snapped back
+       to wherever it happened to be at lift-off, and the bar appeared to
+       fight the user. That is the "scroll bug" on the phone.
+
+       Now the lock waits for the coast to finish: after touchend we stay in a
+       SETTLING state that keeps adopting the strip's own position, and only
+       once the scroll events stop for SETTLE_MS does the locked value freeze.
+       Vertical-page leakage still gets caught, because that arrives with no
+       preceding touch on the bar at all. */
+    const SETTLE_MS = 220;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearSettle = () => {
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    };
+
+    const onTouchStart = () => {
+      clearSettle();
+      userScrollingRef.current = true;
+      lockedScrollRef.current = null;
+    };
     const onTouchEnd = () => {
-      userScrollingRef.current = false;
-      // After the user releases, lock the current scroll position.
-      lockedScrollRef.current = track.scrollLeft;
+      /* Stay "user scrolling" through the momentum phase; the scroll handler
+         below arms the timer that eventually ends it. */
+      clearSettle();
+      settleTimer = setTimeout(() => {
+        userScrollingRef.current = false;
+        lockedScrollRef.current = track.scrollLeft;
+      }, SETTLE_MS);
     };
     const onScroll = () => {
+      if (userScrollingRef.current) {
+        /* Momentum is still running — keep pushing the freeze out so the
+           coast completes, and remember where it has reached. */
+        if (settleTimer) {
+          clearSettle();
+          settleTimer = setTimeout(() => {
+            userScrollingRef.current = false;
+            lockedScrollRef.current = track.scrollLeft;
+          }, SETTLE_MS);
+        }
+        return;
+      }
       const locked = lockedScrollRef.current;
-      if (!userScrollingRef.current && locked != null && Math.abs(track.scrollLeft - locked) > 1) {
+      if (locked != null && Math.abs(track.scrollLeft - locked) > 1) {
         track.scrollLeft = locked;
       }
     };
@@ -308,6 +345,7 @@ function SlidingPillNav({
     // Initial lock: whatever the active-pill effect just set.
     lockedScrollRef.current = track.scrollLeft;
     return () => {
+      clearSettle();
       track.removeEventListener("touchstart", onTouchStart);
       track.removeEventListener("touchend", onTouchEnd);
       track.removeEventListener("touchcancel", onTouchEnd);
