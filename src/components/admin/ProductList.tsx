@@ -193,10 +193,6 @@ const ProductCard = memo(function ProductCard({
   fx?: { rate: number; source: string; asOf: string | null } | null;
   fxTitle?: string;
 }) {
-  /* Family chips: 3 visible + an in-place "+N" expander so a 6-model
-     family never doubles the card height (owner: "card became too
-     long"). Pure card-local state — collapses again on "Less". */
-  const [showAllCodes, setShowAllCodes] = useState(false);
   return (
     <div
       key={p.id}
@@ -326,28 +322,22 @@ const ProductCard = memo(function ProductCard({
             for XF-600 spots it from outside without opening XF-450.
             Chips sit ABOVE the stretched card link (z-10) and deep-link
             the profile straight onto that member. */}
+        {/* Family roster — EVERY member code, always visible (owner rule:
+            never hide a code). Compact chips wrap as tightly as the card
+            width allows. */}
         {modelNamesList && modelNamesList.length > 1 && (
-          <div className="relative z-10 mt-2 flex flex-wrap gap-1.5 items-center">
-            {(showAllCodes ? modelNamesList : modelNamesList.slice(0, 3)).map((code) => (
+          <div className="relative z-10 mt-2 flex flex-wrap gap-1">
+            {modelNamesList.map((code) => (
               <Link
                 key={code}
                 href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-2 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-bold tabular-nums tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                className="inline-flex items-center px-1.5 py-[2px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-bold tabular-nums tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                 title={code}
               >
                 {code}
               </Link>
             ))}
-            {modelNamesList.length > 3 && (
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAllCodes(v => !v); }}
-                className="inline-flex items-center px-2 py-0.5 rounded-md border border-dashed border-[var(--border-subtle)] text-[11px] font-bold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
-              >
-                {showAllCodes ? t("list.codesLess", "Less") : `+${modelNamesList.length - 3}`}
-              </button>
-            )}
           </div>
         )}
 
