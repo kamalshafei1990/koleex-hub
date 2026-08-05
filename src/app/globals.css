@@ -984,6 +984,59 @@ input[type="number"]:not(.kx-spinner) {
   filter: drop-shadow(0 0 7px rgba(188, 216, 240, 0.45));
   opacity: 1 !important;
 }
+
+/* ── kx-ai-glow ── STANDING RULE (owner 2026-08-06): every button that
+   triggers AI glows in Hub Blue — the same aura identity as the Koleex
+   glow orb. Static soft glow, brighter on hover; the color is FUNCTIONAL
+   (marks AI), which is exactly the case the monochrome brand reserves
+   blue for. */
+@property --kx-ai-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.kx-ai-glow {
+  position: relative;
+  isolation: isolate;
+  box-shadow: 0 0 8px rgba(86, 127, 178, 0.35), 0 0 18px rgba(86, 127, 178, 0.15);
+  border-color: rgba(86, 127, 178, 0.45) !important;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+/* The moving light: a conic beam CYCLING around the button's edge —
+   drawn as a masked ring on ::before so it rides any border-radius. */
+.kx-ai-glow::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--kx-ai-angle),
+    transparent 0deg,
+    rgba(86, 127, 178, 0.95) 40deg,
+    rgba(188, 216, 240, 1) 70deg,
+    rgba(86, 127, 178, 0.95) 100deg,
+    transparent 140deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: kx-ai-orbit 2.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes kx-ai-orbit {
+  to { --kx-ai-angle: 360deg; }
+}
+.kx-ai-glow:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(86, 127, 178, 0.55), 0 0 26px rgba(86, 127, 178, 0.28);
+}
+.kx-ai-glow:disabled { box-shadow: 0 0 6px rgba(86, 127, 178, 0.15); }
+.kx-ai-glow:disabled::before { animation-play-state: paused; opacity: 0.35; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-ai-glow::before { animation: none; opacity: 0.5; }
+}
+
 .kx-tile-neon:hover .kx-neon-svg {
   color: #7FA9D6;
   filter: drop-shadow(0 0 7px rgba(188, 216, 240, 0.45));
@@ -1210,17 +1263,3 @@ input[type="number"]:not(.kx-spinner) {
   padding: 0;
 }
 
-/* ── kx-ai-glow ── STANDING RULE (owner 2026-08-06): every button that
-   triggers AI glows in Hub Blue — the same aura identity as the Koleex
-   glow orb. Static soft glow, brighter on hover; the color is FUNCTIONAL
-   (marks AI), which is exactly the case the monochrome brand reserves
-   blue for. */
-.kx-ai-glow {
-  box-shadow: 0 0 8px rgba(86, 127, 178, 0.40), 0 0 20px rgba(86, 127, 178, 0.18);
-  border-color: rgba(86, 127, 178, 0.55) !important;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
-}
-.kx-ai-glow:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(86, 127, 178, 0.60), 0 0 28px rgba(86, 127, 178, 0.30);
-}
-.kx-ai-glow:disabled { box-shadow: 0 0 6px rgba(86, 127, 178, 0.18); }
