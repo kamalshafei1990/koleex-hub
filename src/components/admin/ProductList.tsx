@@ -45,6 +45,7 @@ import {
 } from "@/lib/products-admin";
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
+import { useCnyUsd, formatUsd, formatRate, fxSourceTitle } from "@/lib/use-cny-usd";
 
 /* Koleex's flagship division. The hub treats this line as the
    default view on the public catalog and visually emphasises it
@@ -158,7 +159,7 @@ function agoShort(iso: string | null): string {
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, signal, t, onAskDelete,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, signal, t, onAskDelete, fx, fxTitle,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -176,6 +177,11 @@ const ProductCard = memo(function ProductCard({
   signal?: ProductSignal;
   t: (key: string, fallback?: string) => string;
   onAskDelete: (e: React.MouseEvent, id: string, name: string) => void;
+  /* Passed down rather than fetched per card: sixty cards calling the hook
+     would mount sixty effects for one shared number. One object identity
+     also keeps the memo from busting on every render. */
+  fx?: { rate: number; source: string; asOf: string | null } | null;
+  fxTitle?: string;
 }) {
   return (
     <div
@@ -457,6 +463,18 @@ const ProductCard = memo(function ProductCard({
                   <span className="text-[17px] md:text-[18px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] leading-none">
                     {signal.cost.toLocaleString()}
                   </span>
+                  {/* The dollar figure reads at a glance — that is its whole
+                      job. Still one step down from the CNY headline in size
+                      and weight, because CNY is the number the pricing engine
+                      actually uses and the two must never look interchangeable. */}
+                  {fx && (
+                    <span
+                      className="text-[13px] font-semibold text-[var(--text-subtle)] tabular-nums ms-1.5"
+                      title={fxTitle}
+                    >
+                      ≈ {formatUsd(signal.cost, fx.rate)}
+                    </span>
+                  )}
                 </span>
               ) : signal.pricingMode === "on_request" ? (
                 /* Priced per configuration — a real answer, so it reads as
@@ -553,6 +571,11 @@ export default function ProductList() {
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
+  /* Factory costs are quoted and stored in CNY; the "≈ $" beside them is a
+     reading aid so nobody converts in their head at a half-remembered rate.
+     Fetched once for the whole grid and handed down to the cards. */
+  const fx = useCnyUsd();
+  const fxTitle = useMemo(() => (fx ? fxSourceTitle(fx) : undefined), [fx]);
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   // Skip the skeleton on revisit when the list is already cached for this scope.
   const [loading, setLoading] = useState(
@@ -1287,8 +1310,25 @@ export default function ProductList() {
             )}
           </div>
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11">
-          {products.length} {t("list.countInCatalog")}
+        <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
+          <span>{products.length} {t("list.countInCatalog")}</span>
+          {/* The rate every "≈ $" on this page was computed with. Shown once,
+              here, rather than repeated on sixty cards — but shown, because a
+              converted figure whose rate you cannot see is a number you have
+              to take on trust. */}
+          {fx && (
+            <span
+              className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] text-[var(--text-subtle)] tabular-nums"
+              title={fxTitle}
+            >
+              {formatRate(fx.rate)}
+              {fx.source === "fallback" && (
+                <span className="ms-1 text-[var(--text-ghost)]">
+                  {t("list.fxOffline", "(offline)")}
+                </span>
+              )}
+            </span>
+          )}
         </p>
 
         {/* Search + Filters — sticky to the top of the viewport so
@@ -1900,6 +1940,8 @@ export default function ProductList() {
                 signal={signals[p.id]}
                 t={t}
                 onAskDelete={askDelete}
+                fx={fx}
+                fxTitle={fxTitle}
               />
             ))}
               </div>

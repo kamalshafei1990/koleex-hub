@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import { useCnyUsd, formatUsd, formatRate, fxSourceTitle } from "@/lib/use-cny-usd";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -411,6 +412,13 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                           CNY
                         </div>
                       </div>
+                      {/* Live USD reading of what was just typed. Below the
+                          field, not inside it: the entry stays unambiguously
+                          CNY — which is what gets saved and what the pricing
+                          engine uses — while the person entering it can still
+                          sanity-check the number in the currency they think
+                          in. Appears only once the figure is real. */}
+                      <UsdHint cny={l.unit_cost_cny} />
                     </div>
                   </div>
 
@@ -1106,4 +1114,27 @@ function SupplierPickerModal({
       </div>
     </div>
   ), document.body);
+}
+
+/* ── "≈ $" under a CNY cost field ──
+   Its own component so an unparseable or empty entry renders nothing at all —
+   a stray "$0" under a half-typed number reads like a real price of zero.
+   The rate rides alongside the amount: this field is where someone decides
+   whether a cost is right, and a conversion you can't check is one you have
+   to take on trust. */
+function UsdHint({ cny }: { cny: string }) {
+  const fx = useCnyUsd();
+  const amount = Number(String(cny ?? "").replace(/,/g, ""));
+  if (!fx || !Number.isFinite(amount) || amount <= 0) return null;
+  return (
+    <p className="mt-1.5 flex items-baseline gap-2 flex-wrap" title={fxSourceTitle(fx)}>
+      <span className="text-[13px] font-semibold text-[var(--text-secondary)] tabular-nums">
+        ≈ {formatUsd(amount, fx.rate)}
+      </span>
+      <span className="text-[11px] text-[var(--text-ghost)] tabular-nums">
+        {formatRate(fx.rate)}
+        {fx.source === "fallback" ? " (offline)" : ""}
+      </span>
+    </p>
+  );
 }
