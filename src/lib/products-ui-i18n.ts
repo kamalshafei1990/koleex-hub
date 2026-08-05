@@ -672,7 +672,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
 
   /* ── Models step (P0 #5b) ── */
-    "fam.strip": { en: "Family", zh: "系列", ar: "العائلة" },
+    "list.codesLess": { en: "Less", zh: "收起", ar: "أقل" },
+  "fam.strip": { en: "Family", zh: "系列", ar: "العائلة" },
   "fam.addMember": { en: "Add model", zh: "添加型号", ar: "إضافة موديل" },
   "fam.editingNote": { en: "You are editing {code} — Hero, Specs, Price and Logistics save to this model. Other tabs are family-shared.", zh: "正在编辑 {code}——Hero、规格、价格与物流将保存到该型号。其他标签为系列共享。", ar: "أنت تحرّر {code} — Hero والمواصفات والسعر واللوجستيات تُحفظ لهذا الموديل. بقية التبويبات مشتركة للعائلة." },
   "fam.sharedBelow": { en: "Family-shared — applies to all models", zh: "系列共享——适用于全部型号", ar: "مشترك للعائلة — يسري على كل الموديلات" },

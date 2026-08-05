@@ -560,15 +560,19 @@ export default function ProductProfile() {
                 {/* Body: SQUARE photo + dense facts on the start side; the
                     resolved spec sheet fills the rest. No dead space —
                     every fact is a single line. */}
-                <div className="p-4 flex flex-col md:flex-row gap-5">
-                  <div className="shrink-0 w-full md:w-[210px]">
+                {/* Body: square photo + fact list SIDE BY SIDE (their
+                    heights pair up — six thin rows ≈ one square), then a
+                    hairline divider and the spec sheet filling the rest.
+                    Nothing under anything = no dead space. */}
+                <div className="p-4 flex flex-col lg:flex-row gap-5">
+                  <div className="flex gap-4 shrink-0 min-w-0">
                     {photo && (
-                      <div className="aspect-square w-full max-w-[210px] mx-auto md:mx-0 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/5 overflow-hidden flex items-center justify-center">
+                      <div className="h-[150px] w-[150px] max-sm:h-[104px] max-sm:w-[104px] shrink-0 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/5 overflow-hidden flex items-center justify-center">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={IMG.card(photo)} alt="" className="h-full w-full object-contain p-3" loading="lazy" decoding="async" />
+                        <img src={IMG.card(photo)} alt="" className="h-full w-full object-contain p-2.5" loading="lazy" decoding="async" />
                       </div>
                     )}
-                    <div className="mt-2.5">
+                    <div className="w-[240px] max-sm:flex-1 max-sm:w-auto self-center">
                       {fact(t("pp.f.koleexCode", "KOLEEX code"), m.primary_model, true)}
                       {fact(t("pp.f.supRef", "Supplier ref"), m.reference_model, true)}
                       {fact(t("pp.f.tagline", "Tagline"), m.tagline)}
@@ -577,6 +581,8 @@ export default function ProductProfile() {
                       {data.costVisible && fact(t("pp.f.costPrice", "Cost (CNY)"), m.cost_price ?? primarySupplierCost)}
                     </div>
                   </div>
+
+                  <div className="hidden lg:block w-px self-stretch bg-[var(--border-subtle)]/60" />
 
                   <div className="flex-1 min-w-0">
                     <div className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-2">
