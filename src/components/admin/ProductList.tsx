@@ -1549,8 +1549,15 @@ export default function ProductList() {
                                 </div>
                               ) : (
                                 <div className="h-7 w-7 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                                  {s.kind === "category" && <LayersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
-                                  {s.kind === "subcategory" && <BoxesIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                  {/* Real Icon Hub icon per row (same source as the
+                                      category rail); generic glyph only when none
+                                      is assigned yet. */}
+                                  {s.kind === "category" && (classIcons.category?.[s.slug]
+                                    ? <ClassMonoIcon src={classIcons.category[s.slug]} className="h-4 w-4 text-[var(--text-muted)]" />
+                                    : <LayersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />)}
+                                  {s.kind === "subcategory" && (classIcons.subcategory?.[s.slug]
+                                    ? <ClassMonoIcon src={classIcons.subcategory[s.slug]} className="h-4 w-4 text-[var(--text-muted)]" />
+                                    : <BoxesIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />)}
                                   {s.kind === "brand" && <TagsIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
                                   {s.kind === "supplier" && <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
                                 </div>
