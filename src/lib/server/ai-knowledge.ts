@@ -184,3 +184,90 @@ export async function getTaughtAnswersBlock(tenantId: string | null): Promise<st
 export function invalidateTaughtAnswersCache(tenantId: string | null) {
   qaCache.delete(tenantId ?? "platform");
 }
+
+
+/* ── Approved-knowledge keyword search (pre-Phase-2 core) ────────────────
+   One scorer serves BOTH the agent's search_knowledge tool and the fast
+   lanes' knowledge nudge, so every path sees the same truth. Corpus is
+   hundreds of units — ILIKE candidates + in-process scoring stays well
+   under the hop budget. */
+export interface ApprovedHit {
+  title: string | null;
+  body: string;
+  source: string;
+  page: number | null;
+  domain: string | null;
+  score: number;
+}
+
+const SEARCH_STOP = new Set(["the","a","an","of","in","on","for","and","or","to","is","are","what","how","does","do","about","with","من","في","على","ما","هل","عن","的","是","了"]);
+
+export async function searchApprovedUnits(
+  tenantId: string | null,
+  queryText: string,
+  limit = 6,
+): Promise<ApprovedHit[]> {
+  const words = queryText
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3 && !SEARCH_STOP.has(w))
+    .slice(0, 8);
+  if (words.length === 0) return [];
+
+  const ors = words.map((w) => `body.ilike.%${w}%,title.ilike.%${w}%`).join(",");
+  let q = supabaseServer
+    .from("ai_knowledge_units")
+    .select("title, body, locator, domains, ai_sources(title)")
+    .eq("status", "approved")
+    .or(ors)
+    .limit(200);
+  q = tenantId == null ? q.is("tenant_id", null) : q.eq("tenant_id", tenantId);
+  const { data, error } = await q;
+  if (error || !data) return [];
+
+  return (data as Array<{
+    title: string | null; body: string; locator: { page?: number } | null;
+    domains: string[] | null; ai_sources: { title: string } | { title: string }[] | null;
+  }>)
+    .map((r) => {
+      const hay = `${r.title ?? ""} ${r.body}`.toLowerCase();
+      let score = 0;
+      for (const w of words) {
+        const n = hay.split(w).length - 1;
+        score += n * (r.title && r.title.toLowerCase().includes(w) ? 3 : 1);
+      }
+      const src = Array.isArray(r.ai_sources) ? r.ai_sources[0] : r.ai_sources;
+      return {
+        title: r.title,
+        body: r.body,
+        source: src?.title ?? "unknown source",
+        page: r.locator?.page ?? null,
+        domain: (r.domains ?? [])[0] ?? null,
+        score,
+      };
+    })
+    .filter((h) => h.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+/* Fast-lane nudge: top approved hits as a compact prompt block. Empty
+   string when nothing relevant — lanes append it unconditionally. */
+export async function getKnowledgeNudgeBlock(
+  tenantId: string | null,
+  userMessage: string,
+): Promise<string> {
+  try {
+    const hits = await searchApprovedUnits(tenantId, userMessage, 3);
+    const strong = hits.filter((h) => h.score >= 3);
+    if (strong.length === 0) return "";
+    const lines = strong.map((h) =>
+      `• [${h.source}${h.page ? ` p.${h.page}` : ""}] ${(h.title ? h.title + ": " : "")}${h.body.slice(0, 500)}`);
+    return (
+      "\n\nRELEVANT APPROVED KNOWLEDGE (from Koleex's own knowledge base — prefer it over general memory when it answers the question; mention the source naturally):\n" +
+      lines.join("\n")
+    );
+  } catch {
+    return "";
+  }
+}

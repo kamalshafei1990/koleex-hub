@@ -30,7 +30,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
-import { getTaughtAnswersBlock } from "@/lib/server/ai-knowledge";
+import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import {
   orchestrate,
@@ -503,6 +503,11 @@ export async function POST(req: Request) {
              paths too, since brand-ish questions are exactly what gets
              taught. Cached 60s in the lib. */
           const taughtBlock = await getTaughtAnswersBlock(auth.tenant_id ?? null);
+          /* Knowledge nudge: strongest approved-knowledge hits for THIS
+             question ride the fast lanes too — the fast paths carry no
+             tools, so without this the curated knowledge base was
+             invisible exactly where most casual questions land. */
+          const knowledgeNudge = await getKnowledgeNudgeBlock(auth.tenant_id ?? null, normalizedContent);
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
@@ -537,7 +542,7 @@ export async function POST(req: Request) {
                       expectedFormat: analysis.expectedFormat,
                       entityScope: entity.scope,
                     })[0].content;
-            const systemPrompt = systemPromptBase + taughtBlock;
+            const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge;
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */
@@ -619,7 +624,7 @@ export async function POST(req: Request) {
               conversationId: conversationId!,
               webSearchRequested: body.web_search === true,
               languageLock: langLock,
-              taughtAnswers: taughtBlock,
+              taughtAnswers: taughtBlock + knowledgeNudge,
             });
 
             /* Emit tool-chip steps up front so the UI can render them
@@ -808,7 +813,7 @@ export async function POST(req: Request) {
     userLang,
     conversationId,
     webSearchRequested: body.web_search === true,
-    taughtAnswers: await getTaughtAnswersBlock(auth.tenant_id ?? null),
+    taughtAnswers: (await getTaughtAnswersBlock(auth.tenant_id ?? null)) + (await getKnowledgeNudgeBlock(auth.tenant_id ?? null, content)),
     languageLock: langLock,
   });
   const tOrch = Date.now();
