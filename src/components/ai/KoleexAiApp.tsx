@@ -39,6 +39,7 @@ import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
+import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
 import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
@@ -1110,11 +1111,33 @@ export default function KoleexAiApp() {
    *       This runs in places where path 1 is blocked (Claude
    *       Preview's iframe sandbox, some embedded webviews) so the
    *       checkmark still appears for the user. */
-  const handleCopy = useCallback(async (content: string): Promise<boolean> => {
+  const handleCopy = useCallback(async (content: string, renderedEl?: HTMLElement | null): Promise<boolean> => {
     if (!content) return false;
+    /* Never put raw markdown on the clipboard — pasting `**bold**` and
+       `| table |` soup anywhere was the whole complaint. Plain flavor =
+       organized text; rich flavor = the bubble's own rendered HTML, so
+       Word / Mail / WeChat keep headings, lists and tables. */
+    const plain = markdownToPlainText(content);
+    try {
+      if (
+        renderedEl &&
+        typeof navigator !== "undefined" &&
+        typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard?.write
+      ) {
+        const html = bubbleHtmlForClipboard(renderedEl);
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plain], { type: "text/plain" }),
+          }),
+        ]);
+        return true;
+      }
+    } catch { /* fall through — plain text still beats raw markdown */ }
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(content);
+        await navigator.clipboard.writeText(plain);
         return true;
       }
     } catch { /* fall through to legacy path */ }
@@ -1123,7 +1146,7 @@ export default function KoleexAiApp() {
     try {
       if (typeof document === "undefined") return false;
       const ta = document.createElement("textarea");
-      ta.value = content;
+      ta.value = plain;
       ta.setAttribute("readonly", "");
       ta.style.position = "fixed";
       ta.style.top = "0";
@@ -1131,7 +1154,7 @@ export default function KoleexAiApp() {
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      ta.setSelectionRange(0, content.length);
+      ta.setSelectionRange(0, plain.length);
       const ok = document.execCommand("copy");
       document.body.removeChild(ta);
       return ok;
@@ -2586,7 +2609,7 @@ function Bubble({
   orbActivity?: AIOrbActivity;
   canRegenerate?: boolean;
   canEdit?: boolean;
-  onCopy?: (text: string) => Promise<boolean> | boolean;
+  onCopy?: (text: string, renderedEl?: HTMLElement | null) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
   onEdit?: (newText: string) => void;
   /** Per-message TTS replay — gets the bubble's text and the chosen
@@ -2604,9 +2627,10 @@ function Bubble({
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
   const [copied, setCopied] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement | null>(null);
   const handleCopyClick = useCallback(async () => {
     if (!onCopy || !msg.content) return;
-    const ok = await onCopy(msg.content);
+    const ok = await onCopy(msg.content, bubbleRef.current);
     if (ok) {
       setCopied(true);
       /* Hold the ✓ confirmation a bit longer so the swap is
@@ -2693,6 +2717,7 @@ function Bubble({
                whitespace-pre-wrap path (literal text only). Assistant
                bubbles render markdown via MessageMarkdown for bullets,
                headings, code blocks, tables, links. */
+            ref={bubbleRef}
             dir="auto"
             className={`rounded-2xl leading-relaxed ${
               isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
