@@ -672,6 +672,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
 
   /* ── Models step (P0 #5b) ── */
+    "models.familyValue": { en: "Family", zh: "系列值", ar: "قيمة العائلة" },
   "models.title": { en: "Variants", zh: "变体", ar: "المتغيرات" },
   "models.countBadge": { en: "{n} variant(s)", zh: "{n} 个变体", ar: "{n} متغير" },
   "models.marketPrices": { en: "Market Prices", zh: "市场价格", ar: "أسعار السوق" },

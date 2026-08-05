@@ -4545,6 +4545,7 @@ export default function ProductForm({ productId }: Props) {
                     })),
                 )}
                 productPacking={productPackingDefaults}
+                productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
                 models={models}
                 onChange={setModels}
                 suppliers={suppliers}

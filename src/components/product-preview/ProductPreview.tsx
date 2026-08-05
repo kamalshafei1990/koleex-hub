@@ -308,6 +308,18 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   const effectiveSurface: ProductSchemaSurface = surface ?? "website";
 
+  /* ?model= deep-link (family chips / search) — highlight that row in the
+     lineup table. Read-once from location; server render sees null and the
+     client adds the highlight after hydration, which is exactly when the
+     visitor can perceive it. */
+  const wantedModel = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const v = new URLSearchParams(window.location.search).get("model");
+      return v ? v.trim().toLowerCase() : null;
+    } catch { return null; }
+  }, []);
+
   /* ── Apple-style scroll choreography ──
      One IntersectionObserver arms every top-level band: sections drift up
      and fade in as the reader reaches them (.kx-rev/.kx-rev-in in
@@ -1265,9 +1277,15 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((v) => (
-                    <tr key={v.code} className="border-t border-[var(--border-subtle)]">
-                      <td className="px-5 py-4">
+                  {list.map((v) => {
+                    const isWanted = wantedModel != null && v.code.trim().toLowerCase() === wantedModel;
+                    return (
+                    <tr
+                      key={v.code}
+                      ref={isWanted ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
+                      className={`border-t border-[var(--border-subtle)] ${isWanted ? "bg-[var(--bg-surface-subtle)]" : ""}`}
+                    >
+                      <td className={`px-5 py-4 ${isWanted ? "border-s-2 border-[#567FB2]" : ""}`}>
                         <div className="text-[14px] font-semibold text-[var(--text-primary)]">{v.code}</div>
                         {v.tagline ? (
                           <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
@@ -1284,7 +1302,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                         );
                       })}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

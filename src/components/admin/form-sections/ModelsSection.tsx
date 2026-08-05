@@ -51,6 +51,7 @@ interface Props {
   /* Product-level packing defaults (schema products) — offered as a
      one-click copy on every variant card's packing panel. */
   productPacking?: ProductPackingDefaults | null;
+  productSpecs?: Record<string, unknown>;
 }
 
 /* ── Visual grouped panel ── */
@@ -105,7 +106,7 @@ export type ProductPackingDefaults = {
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
-  onEditInHero, primaryModel, productPacking, specFields = [],
+  onEditInHero, primaryModel, productPacking, specFields = [], productSpecs,
 }: {
   model: ModelFormState; idx: number; total: number;
   /* The product's primary variant (models[0]). Non-primary variants
@@ -130,9 +131,19 @@ function ModelCard({
   /* Product-level packing entered on the Logistics tab (schema products).
      One click copies it here — the SAME data must never be typed twice. */
   productPacking?: ProductPackingDefaults | null;
+  /* The FAMILY's spec values (products.schema_specs). Shown greyed beside
+     every override row so "change only the difference" is never blind —
+     you see what you are overriding while you type. */
+  productSpecs?: Record<string, unknown>;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [open, setOpen] = useState(defaultOpen);
+  /* Render a family spec value for display next to an override. */
+  const famVal = (key: string): string => {
+    const v = (productSpecs ?? {})[key];
+    if (v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
+    return Array.isArray(v) ? v.join(", ") : String(v);
+  };
 
   const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
   /* ── Variant packing auto-derivation (mirrors the product-level Logistics
@@ -568,9 +579,15 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   const f = specFields.find((sf) => sf.key === k);
                   return (
                     <div key={k} className="flex items-center gap-2">
-                      <span className="w-[38%] shrink-0 truncate text-[11.5px] text-[var(--text-muted)]" title={f?.label ?? k}>
-                        {f?.label ?? k}
-                        {f?.unit ? <span className="text-[var(--text-ghost)]"> ({f.unit})</span> : null}
+                      <span className="w-[38%] shrink-0 min-w-0 text-[11.5px] text-[var(--text-muted)]" title={f?.label ?? k}>
+                        <span className="block truncate">
+                          {f?.label ?? k}
+                          {f?.unit ? <span className="text-[var(--text-ghost)]"> ({f.unit})</span> : null}
+                        </span>
+                        {/* What you are overriding — the family's value. */}
+                        <span className="block truncate text-[10px] text-[var(--text-ghost)]">
+                          {t("models.familyValue", "Family")}: {famVal(k)}{f?.unit && famVal(k) !== "—" ? ` ${f.unit}` : ""}
+                        </span>
                       </span>
                       {f && (f.fieldType === "select") && f.options.length > 0 ? (
                         <select
@@ -629,7 +646,9 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   {specFields
                     .filter((sf) => !(sf.key in (model.specs_overrides ?? {})))
                     .map((sf) => (
-                      <option key={sf.key} value={sf.key}>{sf.label}</option>
+                      <option key={sf.key} value={sf.key}>
+                        {sf.label}{famVal(sf.key) !== "—" ? ` — ${t("models.familyValue", "Family")}: ${famVal(sf.key)}${sf.unit ? ` ${sf.unit}` : ""}` : ""}
+                      </option>
                     ))}
                 </select>
                 <p className="text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
@@ -822,7 +841,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
   );
 }
 
-export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking }: Props) {
+export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking, productSpecs }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
@@ -920,6 +939,7 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
               <ModelCard
                 specFields={specFields}
                 productPacking={productPacking}
+                productSpecs={productSpecs}
                 key={m._tempId}
                 model={m}
                 idx={trueIdx}
