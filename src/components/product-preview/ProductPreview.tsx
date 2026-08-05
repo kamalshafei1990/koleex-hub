@@ -1204,7 +1204,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     return (
                     <tr
                       key={v.code}
-                      onClick={() => setSelectedCode(v.code)}
+                      /* Click again to UNSELECT — back to the family view. */
+                      onClick={() => setSelectedCode((prev) => (prev === v.code ? null : v.code))}
                       ref={isWanted && wantedModel === v.code.trim().toLowerCase() ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
                       className={`border-t border-[var(--border-subtle)] cursor-pointer transition-colors ${isWanted ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]/40"}`}
                     >
