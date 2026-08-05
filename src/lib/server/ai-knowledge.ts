@@ -132,3 +132,55 @@ export async function persistUnits(opts: {
   }
   return rows.length;
 }
+
+
+/* ── Taught Q&A → prompt block ────────────────────────────────────────────
+   The owner teaches canonical questions with one or more reply variants
+   (bench "Taught Q&A"). Until Phase-2 vector retrieval, MEANING matching
+   is the model's job: the approved pairs ride the system prompt and the
+   model answers with a taught reply whenever the user's question matches
+   one in meaning — any wording, any language. Small by design (≤30
+   pairs, trimmed); cached for a minute per tenant. */
+const qaCache = new Map<string, { at: number; block: string }>();
+
+export async function getTaughtAnswersBlock(tenantId: string | null): Promise<string> {
+  const key = tenantId ?? "platform";
+  const hit = qaCache.get(key);
+  if (hit && Date.now() - hit.at < 60_000) return hit.block;
+
+  let q = supabaseServer
+    .from("ai_knowledge_units")
+    .select("title, body, meta")
+    .contains("tags", ["qa"])
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  q = tenantId === null ? q.is("tenant_id", null) : q.eq("tenant_id", tenantId);
+  const { data } = await q;
+
+  let block = "";
+  const rows = (data ?? []) as Array<{ title: string | null; body: string; meta: { answers?: string[] } | null }>;
+  if (rows.length) {
+    const pairs = rows.map((r) => {
+      const answers = [r.body, ...((r.meta?.answers ?? []).filter((a) => a && a !== r.body))]
+        .slice(0, 4)
+        .map((a, i) => `A${i + 1}: ${a.slice(0, 400)}`)
+        .join("\n");
+      return `Q: ${(r.title || "").slice(0, 200)}\n${answers}`;
+    });
+    block =
+      "\n\nTAUGHT KNOWLEDGE (owner-approved reference answers — LEARN from them, don't recite them). " +
+      "When the user's question matches the MEANING of a Q below — any wording, in ANY language you understand (Arabic, Chinese, English, Turkish, Russian, French… all of them) — ground your reply in that entry and ANSWER IN THE USER'S LANGUAGE: " +
+      "every fact, number and policy must stay EXACTLY as taught, but COMPOSE the reply naturally in your own words for this user's context and language. " +
+      "The A-variants show acceptable ways to express it — absorb their tone and level of detail. " +
+      "Quote a taught reply verbatim only if the user asks for the official wording. " +
+      "If the question goes beyond what was taught, answer the taught part from here and be honest about the rest:\n" +
+      pairs.join("\n---\n");
+  }
+  qaCache.set(key, { at: Date.now(), block });
+  return block;
+}
+
+export function invalidateTaughtAnswersCache(tenantId: string | null) {
+  qaCache.delete(tenantId ?? "platform");
+}

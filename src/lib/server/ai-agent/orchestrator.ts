@@ -84,6 +84,9 @@ export interface OrchestrateInput {
    *  a stored "always answer me in X" preference. Built by the route, which
    *  owns the preference, so every lane applies the identical text. */
   languageLock?: string;
+  /** Owner-taught Q&A block (approved canonical replies) — appended to
+   *  every lane's system prompt; the model does the meaning-matching. */
+  taughtAnswers?: string;
   /** Streaming hook: when set, the ANSWER-phase model call streams and
    *  each content token is forwarded here in real time. */
   onDelta?: (text: string) => void;
@@ -548,7 +551,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   const tStart = Date.now();
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
-    webSearchRequested = false, languageLock = "",
+    webSearchRequested = false, languageLock = "", taughtAnswers = "",
   } = input;
   const key = process.env.DEEPSEEK_API_KEY;
 
@@ -652,7 +655,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      A brand answer or a one-line greeting in the wrong language is exactly
      as wrong as a long one, and those two lanes handle the short messages
      users send most. */
-  const systemPrompt = basePrompt + languageLock;
+  const systemPrompt = basePrompt + taughtAnswers + languageLock;
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without

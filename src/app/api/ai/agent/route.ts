@@ -30,6 +30,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { getTaughtAnswersBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import {
   orchestrate,
@@ -498,6 +499,10 @@ export async function POST(req: Request) {
           /* DeepSeek powers the fast lanes now (Groq fully removed).
              USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
+          /* Owner-taught canonical answers ride EVERY lane — the fast
+             paths too, since brand-ish questions are exactly what gets
+             taught. Cached 60s in the lib. */
+          const taughtBlock = await getTaughtAnswersBlock(auth.tenant_id ?? null);
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
@@ -512,7 +517,7 @@ export async function POST(req: Request) {
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
             const analysis = analyzeIntent(normalizedContent);
-            const systemPrompt =
+            const systemPromptBase =
               fastLane === "brand"
                 ? buildBrandSystemPrompt(
                     ctx,
@@ -532,6 +537,7 @@ export async function POST(req: Request) {
                       expectedFormat: analysis.expectedFormat,
                       entityScope: entity.scope,
                     })[0].content;
+            const systemPrompt = systemPromptBase + taughtBlock;
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */
@@ -613,6 +619,7 @@ export async function POST(req: Request) {
               conversationId: conversationId!,
               webSearchRequested: body.web_search === true,
               languageLock: langLock,
+              taughtAnswers: taughtBlock,
             });
 
             /* Emit tool-chip steps up front so the UI can render them
@@ -801,6 +808,7 @@ export async function POST(req: Request) {
     userLang,
     conversationId,
     webSearchRequested: body.web_search === true,
+    taughtAnswers: await getTaughtAnswersBlock(auth.tenant_id ?? null),
     languageLock: langLock,
   });
   const tOrch = Date.now();
