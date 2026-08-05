@@ -673,6 +673,7 @@ export const PRODUCTS_UI_I18N: Translations = {
 
   /* ── Models step (P0 #5b) ── */
     "list.codesLess": { en: "Less", zh: "收起", ar: "أقل" },
+  "preview.primary": { en: "Primary", zh: "主型号", ar: "أساسي" },
   "fam.strip": { en: "Family", zh: "系列", ar: "العائلة" },
   "fam.addMember": { en: "Add model", zh: "添加型号", ar: "إضافة موديل" },
   "fam.editingNote": { en: "You are editing {code} — Hero, Specs, Price and Logistics save to this model. Other tabs are family-shared.", zh: "正在编辑 {code}——Hero、规格、价格与物流将保存到该型号。其他标签为系列共享。", ar: "أنت تحرّر {code} — Hero والمواصفات والسعر واللوجستيات تُحفظ لهذا الموديل. بقية التبويبات مشتركة للعائلة." },

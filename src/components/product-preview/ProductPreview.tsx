@@ -64,6 +64,7 @@ interface ProductPreviewProps {
   /** Model lineup with per-model technical overrides — "Choose your model". */
   variants?: Array<{
     photo?: string | null;
+    primary?: boolean;
     code: string;
     tagline: string | null;
     overrides: Record<string, unknown>;
@@ -325,10 +326,20 @@ export const ProductPreview = (props: ProductPreviewProps) => {
      that model: the spec sheet re-resolves (family ⊕ overrides), the hero
      code and photo follow. ?model= pre-selects (chips / search links). */
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  /* Seed ONCE: a ?model= deep-link wins; otherwise the PRIMARY member is
+     the page's opening state — the family's headline machine is what a
+     visitor sees first. The ref keeps a manual unselect from being
+     re-seeded on the next render. */
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (!wantedModel) return;
-    const hit = (variants ?? []).find((v) => v.code.trim().toLowerCase() === wantedModel);
-    if (hit) setSelectedCode(hit.code);
+    if (seededRef.current) return;
+    const list = variants ?? [];
+    if (list.length === 0) return;
+    const linked = wantedModel ? list.find((v) => v.code.trim().toLowerCase() === wantedModel) : null;
+    const prim = list.find((v) => v.primary) ?? null;
+    const seed = linked ?? prim;
+    if (seed) setSelectedCode(seed.code);
+    seededRef.current = true;
   }, [wantedModel, variants]);
   const activeVariant = useMemo(
     () => (variants ?? []).find((v) => v.code === selectedCode) ?? null,
@@ -1221,7 +1232,14 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                       </td>
                       <td className="min-w-[200px] px-5 py-4 bg-[var(--bg-surface-subtle)]/40 border-e border-[var(--border-subtle)]">
                         <span className="min-w-0 block">
-                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">{v.code}</div>
+                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">
+                          {v.code}
+                          {v.primary ? (
+                            <span className="ms-2 align-middle text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
+                              {t("preview.primary", "Primary")}
+                            </span>
+                          ) : null}
+                        </div>
                         {v.tagline ? (
                           <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
                         ) : null}

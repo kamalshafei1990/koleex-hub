@@ -259,6 +259,7 @@ export async function loadPublicSchemaProduct(
     }
   }
   // ── Model lineup for the "Choose your model" table ──
+  const primaryModelId = (models[0] as { id?: string } | undefined)?.id ?? null;
   const photoByModel = new Map<string, string>();
   for (const m of media) {
     const mid = (m as { model_id?: string | null }).model_id;
@@ -279,6 +280,7 @@ export async function loadPublicSchemaProduct(
         code: (m.primary_model || m.model_name) as string,
         tagline: m.tagline,
         photo: photoByModel.get((m as { id?: string }).id ?? "") ?? null,
+        primary: primaryModelId != null && (m as { id?: string }).id === primaryModelId,
         overrides,
       };
     });
