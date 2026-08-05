@@ -1475,7 +1475,11 @@ export default function ProductForm({ productId }: Props) {
      NON-primary selection: the primary keeps today's Hero/Price behaviour
      (those sections already edit models[0] / the supplier link). */
   const safeActiveMember = activeMember < models.length ? activeMember : 0;
-  const memberCtx = familyOn && safeActiveMember > 0 && !!models[safeActiveMember];
+  /* Include the PRIMARY (index 0): one strip, one editing model for every
+     member. The primary's code stays governed by the Hero block (the
+     panel shows it read-only and scrolls there); its factory cost binds
+     to the supplier-link sync below. */
+  const memberCtx = familyOn && !!models[safeActiveMember];
   const activeModel = models[safeActiveMember];
   const updateActiveMember = (u: Partial<ModelFormState>) =>
     setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
@@ -3004,6 +3008,11 @@ export default function ProductForm({ productId }: Props) {
                   model={activeModel}
                   onUpdate={updateActiveMember}
                   familyProductName={product.product_name || ""}
+                  isPrimary={safeActiveMember === 0}
+                  excludeProductId={effectiveId || undefined}
+                  onEditCodeInHero={() => {
+                    document.getElementById("primary-code-anchor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
                   photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
                   onSetPhoto={(f) => setModelPhoto(activeModel, f)}
                   onRemovePhoto={() => removeModelPhoto(activeModel)}
@@ -3479,6 +3488,7 @@ export default function ProductForm({ productId }: Props) {
                     )}
                   </div>
 
+                  <span id="primary-code-anchor" aria-hidden="true" />
                   {/* Primary Model — the canonical KOLEEX commercial code.
                       Single source of truth for the 3-layer identity:
                       classification prefix (left chip) + editable code
@@ -4523,11 +4533,13 @@ export default function ProductForm({ productId }: Props) {
                   title={t("specs.productSpecs", "Product Specs")}
                   badge={t("specs.badgeStructured", "Structured · Multi-surface")}
                 >
-                  {memberCtx && activeModel ? (
-                    /* Member context: the SAME spec editor, but bound to the
-                       member's RESOLVED view (family ⊕ overrides). Saving a
-                       field that now equals the family value drops the
-                       override — clearing a field always reverts to family. */
+                  {memberCtx && safeActiveMember > 0 && activeModel ? (
+                    /* NON-primary member: the SAME spec editor, bound to the
+                       member's RESOLVED view (family ⊕ overrides). The
+                       PRIMARY deliberately falls through to the family
+                       editor below — the primary IS the family baseline;
+                       writing its specs as overrides would leave the family
+                       column empty forever. */
                     <>
                       <p className="mb-3 text-[11px] text-[#567FB2] font-medium">
                         {t("fam.specsNote", "Editing specs of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.")
@@ -4802,6 +4814,24 @@ export default function ProductForm({ productId }: Props) {
                     const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
                     return pl?.unit_cost_cny || models[0]?.cost_price || "";
                   })()}
+                  costBinding={safeActiveMember === 0 ? (() => {
+                    const primaryIdx = (() => {
+                      const i = productSuppliers.findIndex((x) => x.is_primary);
+                      return i >= 0 ? i : (productSuppliers.length ? 0 : -1);
+                    })();
+                    const link = primaryIdx >= 0 ? productSuppliers[primaryIdx] : null;
+                    return {
+                      value: String(link ? (link.unit_cost_cny || "") : (models[0]?.cost_price || "")),
+                      onChange: (val: string) => {
+                        if (primaryIdx >= 0) {
+                          setProductSuppliers((prev) => prev.map((x, i) => (i === primaryIdx ? { ...x, unit_cost_cny: val } : x)));
+                          if (models[0]?.cost_price) updatePrimaryModel({ cost_price: "" });
+                        } else {
+                          updatePrimaryModel({ cost_price: val });
+                        }
+                      },
+                    };
+                  })() : undefined}
                 />
                 <FamilySharedDivider />
               </>

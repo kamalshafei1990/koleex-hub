@@ -24,7 +24,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ConfirmDialog from "./ConfirmDialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const inp =
   "w-full h-10 px-3.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -134,6 +134,7 @@ export function FamilySharedDivider() {
 /* ── Hero panel: the member's identity ── */
 export function MemberIdentityPanel({
   model, onUpdate, photoUrl, onSetPhoto, onRemovePhoto, familyProductName,
+  isPrimary = false, onEditCodeInHero, excludeProductId,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -143,8 +144,43 @@ export function MemberIdentityPanel({
   /* The family's product name — the member's name DEFAULTS to it (shown
      as placeholder) and stays editable per model. */
   familyProductName?: string;
+  /* PRIMARY member: its code carries the coding-governance workflow
+     (prefix validation, uniqueness, Approve/Lock) which lives in Hero —
+     the panel shows the code read-only and jumps there. Other members
+     get an editable code WITH its own live uniqueness check below. */
+  isPrimary?: boolean;
+  onEditCodeInHero?: () => void;
+  excludeProductId?: string;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
+  /* Live uniqueness for NON-primary codes — same endpoint the Hero
+     governance block uses; debounced; purely advisory (save-side rules
+     still apply). */
+  const [codeState, setCodeState] = useState<{ s: "idle" | "checking" | "ok" | "taken"; conflict?: string }>({ s: "idle" });
+  const code = (model.primary_model || "").trim();
+  useEffect(() => {
+    if (isPrimary || !code || code.length < 3) { setCodeState({ s: "idle" }); return; }
+    let cancelled = false;
+    setCodeState({ s: "checking" });
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ code });
+        if (excludeProductId) params.set("excludeProductId", excludeProductId);
+        const res = await fetch(`/api/products/check-primary-model?${params.toString()}`, { credentials: "include" });
+        if (cancelled) return;
+        const j = res.ok ? await res.json() : null;
+        if (cancelled) return;
+        if (j?.available === false && j?.conflict) {
+          setCodeState({ s: "taken", conflict: j.conflict.product_name || j.conflict.primary_model });
+        } else if (j) {
+          setCodeState({ s: "ok" });
+        } else {
+          setCodeState({ s: "idle" });
+        }
+      } catch { if (!cancelled) setCodeState({ s: "idle" }); }
+    }, 450);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [code, isPrimary, excludeProductId]);
   return (
     <div className="rounded-2xl border border-[#567FB2]/30 bg-[var(--bg-secondary)] p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -182,21 +218,61 @@ export function MemberIdentityPanel({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className={lbl}>{t("model.primaryModel", "KOLEEX model code")}</label>
-          <input value={model.primary_model || ""} onChange={(e) => onUpdate({ primary_model: e.target.value })} placeholder="XF-600" className={`${inp} font-mono`} />
+          {isPrimary ? (
+            <div className="flex items-center gap-2">
+              <span className={`${inp} font-mono flex items-center bg-[var(--bg-surface)]/60 text-[var(--text-muted)] cursor-default select-all`}>
+                {model.primary_model || "—"}
+              </span>
+              {onEditCodeInHero && (
+                <button type="button" onClick={onEditCodeInHero}
+                  className="shrink-0 h-10 px-3 rounded-lg text-[11px] font-semibold text-[var(--accent,#0066FF)] bg-[var(--accent,#0066FF)]/10 hover:bg-[var(--accent,#0066FF)]/15 border border-[var(--accent,#0066FF)]/30 transition-colors whitespace-nowrap">
+                  {t("fam.codeManagedInHero", "Managed below ↓")}
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <input value={model.primary_model || ""} onChange={(e) => onUpdate({ primary_model: e.target.value })} placeholder="XF-600" className={`${inp} font-mono`} />
+              {codeState.s === "checking" && (
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("fam.codeChecking", "Checking availability…")}</p>
+              )}
+              {codeState.s === "ok" && (
+                <p className="text-[10px] text-emerald-400/90 mt-1">{t("fam.codeAvailable", "Code is available.")}</p>
+              )}
+              {codeState.s === "taken" && (
+                <p className="text-[10px] text-rose-400 mt-1">
+                  {t("fam.codeTaken", "Already used by: {p}").replace("{p}", codeState.conflict || "")}
+                </p>
+              )}
+            </>
+          )}
         </div>
         <div>
           <label className={lbl}>{t("fam.productName", "Product name (this model)")}</label>
-          <input
-            value={model.model_name}
-            onChange={(e) => onUpdate({ model_name: e.target.value })}
-            placeholder={familyProductName || t("fam.memberNamePh", "Descriptive name")}
-            className={inp}
-          />
-          {familyProductName ? (
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              {t("fam.productNameHint", "Defaults to the family name — edit it freely for this model.")}
-            </p>
-          ) : null}
+          {isPrimary ? (
+            <>
+              <span className={`${inp} flex items-center bg-[var(--bg-surface)]/60 text-[var(--text-muted)] cursor-default`}>
+                {familyProductName || model.model_name || "—"}
+              </span>
+              <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+                {t("fam.primaryNameHint", "The primary carries the family name — edit it in the Hero fields below.")}
+              </p>
+            </>
+          ) : (
+            <>
+              <input
+                value={model.model_name}
+                onChange={(e) => onUpdate({ model_name: e.target.value })}
+                placeholder={familyProductName || t("fam.memberNamePh", "Descriptive name")}
+                className={inp}
+              />
+              {familyProductName ? (
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+                  {t("fam.productNameHint", "Defaults to the family name — edit it freely for this model.")}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
         <div>
           <label className={lbl}>{t("model.referenceModel", "Supplier reference")}</label>
@@ -259,7 +335,7 @@ export function MemberIdentityPanel({
 
 /* ── Price panel: the member's commercial numbers ── */
 export function MemberPricingPanel({
-  model, onUpdate, costVisible = true, familyCost,
+  model, onUpdate, costVisible = true, familyCost, costBinding,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -269,6 +345,10 @@ export function MemberPricingPanel({
      model's cost. A member with an empty cost INHERITS it; typing a
      figure here is this model's own cost. */
   familyCost?: string | number | null;
+  /* PRIMARY member: factory cost is the FAMILY baseline, two-way synced
+     with the primary supplier link (the Supplier tab's number). The
+     binding routes writes there instead of the model column. */
+  costBinding?: { value: string; onChange: (v: string) => void };
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const money = (label: string, key: keyof ModelFormState, sign: string, ph = "0.00") => (
@@ -296,7 +376,20 @@ export function MemberPricingPanel({
         <span className="text-[11px] font-mono text-[var(--text-dim)]">{model.primary_model || ""}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {costVisible && (
+        {costVisible && costBinding && (
+          <div>
+            <label className={lbl}>{t("fam.cost", "Factory cost (CNY)")}</label>
+            <div className="relative">
+              <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
+              <input type="number" step="0.01" value={costBinding.value}
+                onChange={(e) => costBinding.onChange(e.target.value)} placeholder="0.00" className={`${inp} ps-8`} />
+            </div>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">
+              {t("fam.costPrimarySync", "Family baseline — two-way synced with the Supplier tab.")}
+            </p>
+          </div>
+        )}
+        {costVisible && !costBinding && (
           <div>
             {money(t("fam.cost", "Factory cost (CNY)"), "cost_price", "¥",
               familyCost != null && familyCost !== "" ? String(familyCost) : "0.00")}
