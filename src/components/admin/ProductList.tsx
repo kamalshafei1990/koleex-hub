@@ -586,6 +586,7 @@ export default function ProductList() {
   const [nameAlts, setNameAlts] = useState<Record<string, string>>({});
   const [supplierAlt, setSupplierAlt] = useState<Record<string, string>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
+  const [supplierLogos, setSupplierLogos] = useState<Record<string, string>>({});
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
@@ -794,7 +795,7 @@ export default function ProductList() {
             })
             .then((j: {
               signals?: Record<string, ProductSignal>;
-              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; primaryModelNames: Record<string, string>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
+              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
               mainImages?: Record<string, string>;
             }) => {
               if (cancelled) return;
@@ -805,6 +806,7 @@ export default function ProductList() {
                 if (j.models.nameAlts) setNameAlts(j.models.nameAlts);
                 if (j.models.supplierAlt) setSupplierAlt(j.models.supplierAlt);
                 setAllSuppliers(j.models.allSuppliers);
+                if (j.models.supplierLogos) setSupplierLogos(j.models.supplierLogos);
                 setPrimaryModelNames(j.models.primaryModelNames || {});
               }
               if (j?.mainImages) applyMainImages(j.mainImages);
@@ -1559,7 +1561,10 @@ export default function ProductList() {
                                     ? <ClassMonoIcon src={classIcons.subcategory[s.slug]} className="h-4 w-4 text-[var(--text-muted)]" />
                                     : <BoxesIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />)}
                                   {s.kind === "brand" && <TagsIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
-                                  {s.kind === "supplier" && <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                  {s.kind === "supplier" && (supplierLogos[s.label]
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    ? <img src={supplierLogos[s.label]} alt="" className="h-full w-full object-contain rounded-md p-0.5" />
+                                    : <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />)}
                                 </div>
                               )}
 

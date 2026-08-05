@@ -189,6 +189,7 @@ export async function GET() {
      shows. supplierAltByProduct carries the Chinese company names so 易利
      finds YILI's machines. */
   const supplierAltByProduct: Record<string, string> = {};
+  const supplierLogos: Record<string, string> = {};
   for (const [pid, sid] of linkedSupplier) {
     const lite = supById.get(sid);
     if (!lite) continue;
@@ -196,6 +197,7 @@ export async function GET() {
     if (!suppliersByProduct[pid].includes(lite.name)) suppliersByProduct[pid].push(lite.name);
     supplierSet.add(lite.name);
     if (lite.cn) supplierAltByProduct[pid] = lite.cn;
+    if (lite.logo) supplierLogos[lite.name] = lite.logo;
   }
 
   const signals: Record<
@@ -310,6 +312,7 @@ export async function GET() {
           return alt;
         })(),
         allSuppliers: Array.from(supplierSet).sort(),
+        supplierLogos,
         primaryModelNames,
       },
       mainImages,
