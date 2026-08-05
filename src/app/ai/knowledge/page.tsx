@@ -149,7 +149,10 @@ export default function AiKnowledgePage() {
   }, [sel, loadSources, t]);
 
   if (allowed === false) {
-    return <div className="p-8 text-[13px] text-[var(--text-muted)]">{t("kq.denied", "Super admin only.")}</div>;
+    /* Owner rule: this bench must not even LOOK like a page to anyone
+       but the super admin — silent redirect, no denial screen. */
+    if (typeof window !== "undefined") window.location.replace("/ai");
+    return null;
   }
 
   const drafts = units.filter((u) => u.status === "draft").length;

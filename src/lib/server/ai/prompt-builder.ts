@@ -131,6 +131,17 @@ function viewerLine(ctx: AiContext): string {
     ` Anything else personal you genuinely don't know: ask them, don't guess.`;
 }
 
+
+/* OWNER RULE (2026-08-06, standing): supplier identities are INTERNAL.
+   Injected into EVERY system prompt — Koleex AI is internal-only today,
+   but any text it drafts may travel to customers, and future surfaces
+   must inherit the law, not rediscover it. */
+export const SUPPLIER_CONFIDENTIALITY =
+  " SUPPLIER CONFIDENTIALITY (ABSOLUTE RULE): supplier and manufacturer identities are Koleex-internal data." +
+  " In ANY text intended for customers or the public — marketing copy, quotation wording, emails, product descriptions, website content —" +
+  " NEVER mention any company name other than KOLEEX and never use factory/supplier reference codes; use KOLEEX product codes only." +
+  " You may discuss supplier names and factory codes with this internal user for internal work, but mark such details as internal-only when you do.";
+
 export function buildFastPrompt(
   userMsg: string,
   ctx: AiContext = {},
@@ -144,6 +155,7 @@ export function buildFastPrompt(
       role: "system",
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
+        SUPPLIER_CONFIDENTIALITY +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` ${ENTITY_GUIDANCE_SHORT}` +
@@ -184,6 +196,7 @@ export function buildSmartPrompt(
       role: "system",
       content:
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
+        SUPPLIER_CONFIDENTIALITY +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         `${ENTITY_GUIDANCE_FULL}\n\n` +
@@ -244,6 +257,7 @@ export function buildChatPrompt(
       role: "system",
       content:
         `You are Koleex AI, a friendly general-purpose assistant living inside Koleex Hub.${whoAmI}` +
+        SUPPLIER_CONFIDENTIALITY +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Language: reply in the user's current message language by default (fall back to ${lang} for very short turns). If the user explicitly tells you which language to use for replies ("reply in Arabic", "answer in English", "رد بالعربية", "请用中文回答"), honor that for ALL subsequent replies until they ask you to switch again — even if they keep writing to you in a different language. Request-language and reply-language can legitimately be different.` +
@@ -297,6 +311,7 @@ export function buildBusinessPrompt(
       role: "system",
       content:
         `You are Koleex AI's business reasoning assistant for Koleex Hub.${whoAmI}` +
+        SUPPLIER_CONFIDENTIALITY +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Reply in ${lang}. Structure answers as short bullet points or numbered steps.` +

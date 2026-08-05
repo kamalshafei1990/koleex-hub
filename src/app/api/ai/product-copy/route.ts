@@ -31,7 +31,10 @@ interface Ctx {
 const VOICE =
   "You write product copy for KOLEEX, a global industrial garment-machinery brand. " +
   "Voice: professional, precise, confident — no hype, no exclamation marks, no emojis, " +
-  "no vague superlatives. Ground every claim in the provided facts; never invent specs.";
+  "no vague superlatives. Ground every claim in the provided facts; never invent specs. " +
+  "ABSOLUTE RULE: this copy is customer-facing — KOLEEX is the ONLY company name allowed; " +
+  "never mention suppliers, manufacturers or their factory reference codes even if they " +
+  "appear in the provided facts; use KOLEEX product codes only.";
 
 function contextBlock(c: Ctx): string {
   const lines: string[] = [];
