@@ -323,19 +323,20 @@ const ProductCard = memo(function ProductCard({
             Chips sit ABOVE the stretched card link (z-10) and deep-link
             the profile straight onto that member. */}
         {/* Family roster — EVERY member code, always visible (owner rule:
-            never hide a code). Compact chips wrap as tightly as the card
-            width allows. */}
+            never hide a code). An ALIGNED mini-grid, not ragged pills:
+            two tidy columns on desktop, one full-width column on phones —
+            reads like the catalog's own model list. */}
         {modelNamesList && modelNamesList.length > 1 && (
-          <div className="relative z-10 mt-2 flex flex-wrap gap-1">
+          <div className="relative z-10 mt-2 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
             {modelNamesList.map((code) => (
               <Link
                 key={code}
                 href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-1.5 py-[2px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-bold tabular-nums tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
                 title={code}
               >
-                {code}
+                <span className="truncate">{code}</span>
               </Link>
             ))}
           </div>
