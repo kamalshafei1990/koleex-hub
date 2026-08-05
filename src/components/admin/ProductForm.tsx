@@ -104,6 +104,7 @@ import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
+import { FamilyStrip, FamilySharedDivider, MemberIdentityPanel, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
@@ -575,6 +576,13 @@ export default function ProductForm({ productId }: Props) {
      (rows = specs, columns = models) — the junior data-entry path;
      "cards" = the detailed per-model cards (pricing, packing, photo). */
   const [variantsView, setVariantsView] = useState<"grid" | "cards">("grid");
+  /* ── Family mode (owner's model) ──
+     familyOn reveals the SECOND tab strip under the main tabs; the strip
+     picks WHICH member the form is pointed at. activeMember 0 = the
+     primary → the form behaves exactly as before; >0 = Hero/Specs/Price/
+     Logistics bind to that member. */
+  const [familyOn, setFamilyOn] = useState(false);
+  const [activeMember, setActiveMember] = useState(0);
   const [translations, setTranslations] = useState<TranslationFormState[]>([]);
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
@@ -1058,6 +1066,7 @@ export default function ProductForm({ productId }: Props) {
         }));
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
+        if (mappedModels.length > 1) setFamilyOn(true);
 
         const modelIdToTempIdEarly: Record<string, string> = {};
         mappedModels.forEach(mm => { if (mm.id) modelIdToTempIdEarly[mm.id] = mm._tempId; });
@@ -1461,6 +1470,24 @@ export default function ProductForm({ productId }: Props) {
         }))),
     [activeSpecsSchema],
   );
+
+  /* Member-context plumbing (family mode). memberCtx is true only for a
+     NON-primary selection: the primary keeps today's Hero/Price behaviour
+     (those sections already edit models[0] / the supplier link). */
+  const safeActiveMember = activeMember < models.length ? activeMember : 0;
+  const memberCtx = familyOn && safeActiveMember > 0 && !!models[safeActiveMember];
+  const activeModel = models[safeActiveMember];
+  const updateActiveMember = (u: Partial<ModelFormState>) =>
+    setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+  const addFamilyMember = () => {
+    const m = createEmptyModel();
+    m.order = models.length;
+    m.model_name = models[0]?.model_name || "";
+    setModels([...models, m]);
+    setActiveMember(models.length);
+    const heroIdx = steps.findIndex((st) => st.id === "identity");
+    if (heroIdx >= 0) goToStep(heroIdx);
+  };
 
   /* Product-level packing (Logistics tab, schema_specs) → offered to variant
      cards as a one-click copy. mm → cm for carton dims; enum → readable. */
@@ -2904,6 +2931,17 @@ export default function ProductForm({ productId }: Props) {
           />
         )}
 
+        {/* ═══ FAMILY STRIP — the second tab slider. Picks WHICH member the
+            main tabs edit; "+" appends a member and jumps to Hero. ═══ */}
+        {familyOn && !isAccessory && (
+          <FamilyStrip
+            models={models}
+            active={safeActiveMember}
+            onPick={setActiveMember}
+            onAdd={addFamilyMember}
+          />
+        )}
+
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
         {divisionName && steps[currentStep]?.id !== "classify" && (
           <div className="flex items-center gap-2 text-[11px] text-[var(--text-ghost)] mb-4 px-1">
@@ -2928,6 +2966,42 @@ export default function ProductForm({ productId }: Props) {
         <div className={onePage ? "space-y-10" : ""}>
         {(onePage || steps[currentStep]?.id === "identity") && (
           <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {/* ── HAS FAMILY ── the owner's switch: ON reveals the member
+                strip under the main tabs. OFF is only possible while the
+                product still has a single model. */}
+            {!isAccessory && (
+              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                    {t("fam.toggle", "This product has a family (multiple models)")}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">
+                    {t("fam.toggleHint", "Turns on the model strip under the main tabs — pick a model there, then Hero, Specs, Price and Logistics edit that model.")}
+                  </p>
+                </div>
+                <Toggle
+                  checked={familyOn}
+                  onChange={(v) => {
+                    if (!v && models.length > 1) return; /* delete members first */
+                    setFamilyOn(v);
+                    if (!v) setActiveMember(0);
+                  }}
+                  label=""
+                />
+              </div>
+            )}
+            {memberCtx && activeModel && (
+              <>
+                <MemberIdentityPanel
+                  model={activeModel}
+                  onUpdate={updateActiveMember}
+                  photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
+                  onSetPhoto={(f) => setModelPhoto(activeModel, f)}
+                  onRemovePhoto={() => removeModelPhoto(activeModel)}
+                />
+                <FamilySharedDivider />
+              </>
+            )}
             {/* ═══ PRODUCT POSTER / HERO BANNER (first field) ═══
                 Optional designed banner shown full-bleed at the top of the
                 public product page. Blank = the page auto-builds its hero from
@@ -4440,11 +4514,41 @@ export default function ProductForm({ productId }: Props) {
                   title={t("specs.productSpecs", "Product Specs")}
                   badge={t("specs.badgeStructured", "Structured · Multi-surface")}
                 >
+                  {memberCtx && activeModel ? (
+                    /* Member context: the SAME spec editor, but bound to the
+                       member's RESOLVED view (family ⊕ overrides). Saving a
+                       field that now equals the family value drops the
+                       override — clearing a field always reverts to family. */
+                    <>
+                      <p className="mb-3 text-[11px] text-[#567FB2] font-medium">
+                        {t("fam.specsNote", "Editing specs of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.")
+                          .replace("{code}", (activeModel.primary_model || activeModel.model_name || ""))}
+                      </p>
+                      <SchemaSpecsSection
+                        schema={specsSchema}
+                        values={{ ...((product.schema_specs || {}) as Record<string, unknown>), ...((activeModel.specs_overrides || {}) as Record<string, unknown>) }}
+                        onChange={(next) => {
+                          const fam = (product.schema_specs || {}) as Record<string, unknown>;
+                          const ov: Record<string, string> = {};
+                          const norm = (v: unknown) =>
+                            v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0)
+                              ? "" : Array.isArray(v) ? v.map(String).join("\u0001") : String(v);
+                          for (const [k, v] of Object.entries(next)) {
+                            if (norm(v) === "") continue;              /* empty → inherit */
+                            if (norm(v) === norm(fam[k])) continue;    /* same as family → inherit */
+                            ov[k] = Array.isArray(v) ? v.map(String).join(", ") : String(v);
+                          }
+                          updateActiveMember({ specs_overrides: ov });
+                        }}
+                      />
+                    </>
+                  ) : (
                   <SchemaSpecsSection
                     schema={specsSchema}
                     values={product.schema_specs || {}}
                     onChange={(next) => updateProduct_({ schema_specs: next })}
                   />
+                  )}
                 </Section>
               ) : null}
 
@@ -4679,6 +4783,12 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "pricing") && (
           <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {memberCtx && activeModel && (
+              <>
+                <MemberPricingPanel model={activeModel} onUpdate={updateActiveMember} />
+                <FamilySharedDivider />
+              </>
+            )}
             {/* Cost price (editable) — drives the FOB pricing engine below */}
             <Section id="selling-price" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.costPriceTitle", "Cost Price")} badge={t("pricing.costPriceBadge", "Factory · CNY")} defaultOpen>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4772,6 +4882,12 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "logistics") && (
           <div id="sec-logistics" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {memberCtx && activeModel && (
+              <>
+                <MemberLogisticsPanel model={activeModel} onUpdate={updateActiveMember} />
+                <FamilySharedDivider />
+              </>
+            )}
             <Section id="logistics-origin" icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} badge={t("logistics.badge", "Shipping · Customs")}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
