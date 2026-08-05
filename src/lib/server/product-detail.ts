@@ -171,7 +171,7 @@ export async function loadPublicSchemaProduct(
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('id, model_name, primary_model, tagline, "order", visible, specs_overrides')
+        .select('id, model_name, primary_model, tagline, "order", visible, status, specs_overrides')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -265,7 +265,11 @@ export async function loadPublicSchemaProduct(
     if (m.type === "model_image" && mid && m.url && !photoByModel.has(mid)) photoByModel.set(mid, m.url);
   }
   const variants = models
-    .filter((m) => m.visible !== false && (m.primary_model || m.model_name))
+    /* Member exposure = the PRODUCT's status is the family gate (the page
+       itself only renders for active products); a member follows it
+       automatically UNLESS someone manually discontinued or hid that
+       member — the owner's inheritance rule for status. */
+    .filter((m) => m.visible !== false && (m as { status?: string | null }).status !== "discontinued" && (m.primary_model || m.model_name))
     .map((m) => {
       const overrides: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(m.specs_overrides ?? {})) {

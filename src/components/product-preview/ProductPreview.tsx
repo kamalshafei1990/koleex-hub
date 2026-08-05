@@ -1264,7 +1264,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-[var(--bg-surface-subtle)]">
-                    <th className="px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    {/* Photo gets its OWN column — never share the model cell. */}
+                    <th className="w-[72px] px-4 py-3.5" aria-label={t("preview.photo", "Photo")} />
+                    <th className="min-w-[200px] px-5 py-3.5 text-start text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)] bg-[var(--bg-surface)] border-e border-[var(--border-subtle)]">
                       {t("preview.model", "Model")}
                     </th>
                     {cols.map((k) => {
@@ -1286,21 +1288,23 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                       ref={isWanted ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
                       className={`border-t border-[var(--border-subtle)] ${isWanted ? "bg-[var(--bg-surface-subtle)]" : ""}`}
                     >
-                      <td className={`px-5 py-4 ${isWanted ? "border-s-2 border-[#567FB2]" : ""}`}>
-                        <div className="flex items-center gap-3">
-                          {v.photo ? (
-                            <span className="h-10 w-10 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={v.photo} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                            </span>
-                          ) : null}
-                          <span>
-                        <div className="text-[14px] font-semibold text-[var(--text-primary)]">{v.code}</div>
+                      {/* Photo column — the model's own shot, else the
+                          FAMILY photo (same inheritance story as specs). */}
+                      <td className={`px-4 py-3 ${isWanted ? "border-s-2 border-s-[#567FB2]" : ""}`}>
+                        {(v.photo || mainImageUrl) ? (
+                          <span className="h-11 w-11 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={(v.photo || mainImageUrl) as string} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="min-w-[200px] px-5 py-4 bg-[var(--bg-surface-subtle)]/40 border-e border-[var(--border-subtle)]">
+                        <span className="min-w-0 block">
+                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">{v.code}</div>
                         {v.tagline ? (
                           <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
                         ) : null}
-                          </span>
-                        </div>
+                        </span>
                       </td>
                       {cols.map((k) => {
                         const f = fieldsByKey.get(k)!;

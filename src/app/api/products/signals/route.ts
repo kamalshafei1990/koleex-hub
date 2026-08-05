@@ -63,7 +63,7 @@ export async function GET() {
       .order("order", { ascending: true }),
     supabaseServer
       .from("product_models")
-      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, "order"')
+      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, visible, status, "order"')
       .order("order", { ascending: true }),
     /* Supplier directory — 145 rows, logo columns are URLs (verified: 0
        base64), so shipping them in a bulk payload is safe. */
@@ -177,7 +177,13 @@ export async function GET() {
     counts[m.product_id] = (counts[m.product_id] || 0) + 1;
     const label = m.primary_model?.trim() || m.model_name;
     if (label && !primaryModelNames[m.product_id]) primaryModelNames[m.product_id] = label;
-    if (label) {
+    /* The roster advertises SELLABLE members (card chips, search).
+       Status inherits from the product; a member leaves the roster only
+       when someone manually discontinued or hid it. The profile and the
+       edit form still show every member — this is advertising, not the
+       record. */
+    const mv = m as unknown as { visible?: boolean | null; status?: string | null };
+    if (label && mv.visible !== false && mv.status !== "discontinued") {
       if (!modelNamesByProduct[m.product_id]) modelNamesByProduct[m.product_id] = [];
       if (!modelNamesByProduct[m.product_id].includes(label)) modelNamesByProduct[m.product_id].push(label);
     }

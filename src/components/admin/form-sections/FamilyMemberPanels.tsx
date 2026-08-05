@@ -153,6 +153,31 @@ export function MemberIdentityPanel({
           {t("fam.identityTitle", "This model's identity")}
         </h3>
         <span className="text-[11px] font-mono text-[var(--text-dim)]">{model.primary_model || ""}</span>
+        <span className="flex-1" />
+        {/* Status inherits from the product: while the product is active
+            every member is sellable AUTOMATICALLY. This switch is the
+            manual exception — off = discontinued, this member alone
+            leaves the customer card, search and lineup. */}
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">
+            {model.status === "discontinued"
+              ? t("fam.memberInactive", "Inactive (manual)")
+              : t("fam.memberActive", "Active — follows product")}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={model.status !== "discontinued"}
+            onClick={() => onUpdate({ status: model.status === "discontinued" ? "active" : "discontinued" })}
+            className={`relative h-5 w-9 rounded-full transition-colors ${
+              model.status !== "discontinued" ? "bg-emerald-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+            }`}
+          >
+            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+              model.status !== "discontinued" ? "start-[18px]" : "start-0.5"
+            }`} />
+          </button>
+        </label>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
