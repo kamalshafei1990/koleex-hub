@@ -121,6 +121,32 @@ const FUSING_GROUPS: SpecGroup[] = [
         ...pub, visualRenderType: "spec_card",
       },
       {
+        /* The catalog's per-model table splits motor power from heating-plate
+           power (60 W motor vs 24 kW plates) — collapsing them into one
+           "power" number would make every model comparison wrong. */
+        id: "heating_plate_power", key: "heating_plate_power", label: "Heating Plate Power", order: 32,
+        fieldType: "unit_number", dataType: "number", unit: "kW", required: false,
+        description: "Heating-plate power (separate from the drive motor).",
+        suggestions: [3.6, 6, 7.2, 9, 12, 16, 20, 24],
+        ...pub, comparable: true, visualRenderType: "spec_card",
+      },
+      {
+        id: "fusing_time", key: "fusing_time", label: "Fusing Time", order: 34,
+        fieldType: "text", dataType: "string", required: false,
+        description: "Dwell-time range (e.g. 5–20 sec, 7–34 sec).",
+        ...pub, visualRenderType: "spec_card",
+      },
+      {
+        id: "pressurization_method", key: "pressurization_method", label: "Pressurization Method", order: 36,
+        fieldType: "select", dataType: "string", required: false,
+        description: "How roller pressure is generated.",
+        options: [
+          { value: "spring", label: "Spring Pressurization" },
+          { value: "pneumatic", label: "Pneumatic Pressurization" },
+        ],
+        ...pub, comparable: true, visualRenderType: "technical_badge",
+      },
+      {
         id: "cooling_section", key: "cooling_section", label: "Cooling Section", order: 40,
         fieldType: "boolean", dataType: "boolean", required: false,
         description: "Built-in cooling zone after the fusing zone.",
