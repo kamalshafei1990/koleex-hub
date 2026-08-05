@@ -38,6 +38,7 @@ import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
@@ -58,6 +59,15 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.primary":       { en: "Primary",            zh: "主要",           ar: "أساسي" },
   "pp.collapse":      { en: "Collapse",           zh: "收起",           ar: "طيّ" },
   "pp.expand":        { en: "Expand",             zh: "展开",           ar: "توسيع" },
+  "pp.fam.label":     { en: "Family",             zh: "系列",           ar: "العائلة" },
+  "pp.fam.membersOne":{ en: "model",              zh: "个型号",         ar: "موديل" },
+  "pp.fam.members":   { en: "models",             zh: "个型号",         ar: "موديلات" },
+  "pp.fam.differs":   { en: "Differs from family value", zh: "与系列值不同", ar: "يختلف عن قيمة العائلة" },
+  "pp.fam.diffCount": { en: "differences",        zh: "项差异",         ar: "فروقات" },
+  "pp.fam.inheritNote":{ en: "Fields without a dot inherit the family value.", zh: "未标点的字段继承系列值。", ar: "الحقول بدون نقطة ترث قيمة العائلة." },
+  "pp.fam.allInherit":{ en: "This model inherits every family specification.", zh: "该型号继承系列的全部规格。", ar: "هذا الموديل يرث كل مواصفات العائلة." },
+  "pp.fam.close":     { en: "Close model view",   zh: "关闭型号视图",   ar: "إغلاق عرض الموديل" },
+  "pp.fam.resolved":  { en: "Specifications for this model", zh: "该型号的规格", ar: "مواصفات هذا الموديل" },
   /* sections */
   "pp.sec.classification": { en: "Classification", zh: "分类",          ar: "التصنيف" },
   "pp.sec.supplier":  { en: "Supplier & Sourcing", zh: "供应商与采购",  ar: "المورّد والتوريد" },
@@ -345,6 +355,15 @@ export default function ProductProfile() {
   NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  /* Family focus — which member the record is spotlighting. -1 = family
+     view. Seeded from ?model= (card chips and search deep-link here);
+     window.location instead of useSearchParams keeps the page out of the
+     CSR-bailout/Suspense contract for one read-once param. */
+  const [focusModel, setFocusModel] = useState(-1);
+  const wantedModel = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try { return new URLSearchParams(window.location.search).get("model"); } catch { return null; }
+  }, []);
 
   useEffect(() => {
     if (!handle) return;
@@ -354,13 +373,22 @@ export default function ProductProfile() {
         const res = await fetch(`/api/products/${handle}/profile`, { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as Profile;
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setData(json);
+          if (wantedModel) {
+            const w = wantedModel.trim().toLowerCase();
+            const idx = (json.models ?? []).findIndex((m) =>
+              String(m.primary_model ?? "").trim().toLowerCase() === w ||
+              String(m.model_name ?? "").trim().toLowerCase() === w);
+            if (idx >= 0) setFocusModel(idx);
+          }
+        }
       } catch (e) {
         if (!cancelled) setError(humanizeError(e));
       }
     })();
     return () => { cancelled = true; };
-  }, [handle]);
+  }, [handle, wantedModel]);
 
   const p = data?.product;
   const editHref = p ? `/product-data/${p.id as string}/edit` : "#";
@@ -438,6 +466,139 @@ export default function ProductProfile() {
           <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
         </Link>
       </div>
+
+      {/* ── Family bar ── one product, several sellable models. Every
+          member is visible and tappable; picking one opens a spotlight
+          with its RESOLVED view (family value unless the model overrides
+          it). Display-only — no schema, no new entity. */}
+      {data.models.length > 1 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="uppercase tracking-wider text-[10px] text-[var(--text-ghost)]">
+              {t("pp.fam.label", "Family")}
+            </span>
+            <span className="text-[10px] text-[var(--text-dim)] tabular-nums">
+              {data.models.length} {t("pp.fam.members", "models")}
+            </span>
+            <span className="h-4 w-px bg-[var(--border-subtle)] mx-0.5" />
+            {data.models.map((m, i) => {
+              const code = String(m.primary_model ?? m.model_name ?? `#${i + 1}`);
+              const active = focusModel === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setFocusModel(active ? -1 : i)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold tabular-nums transition-colors ${
+                    active
+                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                  }`}
+                >
+                  {i === 0 && <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[var(--text-inverted)]" : "bg-[var(--text-ghost)]"}`} title={t("pp.primary", "Primary")} />}
+                  {code}
+                </button>
+              );
+            })}
+          </div>
+
+          {focusModel >= 0 && data.models[focusModel] && (() => {
+            const m = data.models[focusModel];
+            const specs = (p["schema_specs"] as Record<string, unknown> | null) ?? {};
+            const ov = (m.specs_overrides as Record<string, unknown> | null) ?? {};
+            const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+            const diffCount = Object.entries(ov).filter(([, v]) => !isEmpty(v)).length;
+            return (
+              <div className="mt-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden kx-glow-in">
+                {/* Spotlight header */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50">
+                  <span className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">
+                    {String(m.primary_model ?? m.model_name ?? "")}
+                  </span>
+                  {Boolean(m.model_name && m.primary_model && String(m.model_name) !== String(m.primary_model)) && (
+                    <span className="text-[12px] text-[var(--text-muted)] truncate">{String(m.model_name)}</span>
+                  )}
+                  {focusModel === 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>
+                  )}
+                  {diffCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-dim)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#567FB2]" />
+                      {diffCount} {t("pp.fam.diffCount", "differences")}
+                    </span>
+                  )}
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => setFocusModel(-1)}
+                    aria-label={t("pp.fam.close", "Close model view")}
+                    className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  >
+                    <CrossIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* Identity + price column */}
+                  <div className="space-y-1.5">
+                    <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
+                    <Row label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
+                    <Row label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
+                    <Row label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
+                    <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
+                    {data.costVisible && (
+                      <Row label={t("pp.f.costPrice", "Cost price (CNY)")} value={m.cost_price ?? primarySupplierCost} />
+                    )}
+                  </div>
+
+                  {/* Resolved specs — family value unless overridden; the
+                      Hub-Blue dot marks exactly what this model changes. */}
+                  <div className="lg:col-span-2">
+                    <div className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-2">
+                      {t("pp.fam.resolved", "Specifications for this model")}
+                    </div>
+                    {(() => {
+                      const rowsOut: React.ReactNode[] = [];
+                      for (const g of data.schema?.groups ?? []) {
+                        for (const f of g.fields ?? []) {
+                          const overridden = !isEmpty(ov[f.key]);
+                          const v = overridden ? ov[f.key] : specs[f.key];
+                          if (isEmpty(v)) continue;
+                          rowsOut.push(
+                            <div key={f.key} className="flex items-baseline justify-between gap-3 text-[12px] py-1">
+                              <span className="flex items-center gap-1.5 text-[var(--text-dim)] min-w-0">
+                                {overridden && <span className="h-1.5 w-1.5 rounded-full bg-[#567FB2] shrink-0" title={t("pp.fam.differs", "Differs from family value")} />}
+                                <span className="truncate">{f.label || f.key}</span>
+                              </span>
+                              <span className={`text-end tabular-nums ${overridden ? "text-[var(--text-primary)] font-semibold" : "text-[var(--text-secondary)]"}`}>
+                                {Array.isArray(v) ? v.join(", ") : String(v)}
+                                {f.unit ? <span className="text-[var(--text-ghost)] ms-1 font-normal">{f.unit}</span> : null}
+                              </span>
+                            </div>
+                          );
+                        }
+                      }
+                      if (rowsOut.length === 0) {
+                        return <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.fam.allInherit", "This model inherits every family specification.")}</p>;
+                      }
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">{rowsOut}</div>
+                          <p className="mt-2.5 text-[10.5px] text-[var(--text-ghost)]">
+                            {diffCount > 0
+                              ? t("pp.fam.inheritNote", "Fields without a dot inherit the family value.")
+                              : t("pp.fam.allInherit", "This model inherits every family specification.")}
+                          </p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <ProfileTabs current={step} onPick={setStep} />
 

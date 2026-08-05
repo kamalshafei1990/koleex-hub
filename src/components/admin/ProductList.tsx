@@ -167,7 +167,7 @@ function agoShort(iso: string | null): string {
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, signal, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, t, onAskDelete, fx, fxTitle,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -180,6 +180,8 @@ const ProductCard = memo(function ProductCard({
   subMap: Record<string, string>;
   divMap: Record<string, string>;
   primaryModelNames: Record<string, string>;
+  /* Family roster (all member codes, primary first). Empty/1 → no chips. */
+  modelNamesList?: string[];
   /* Internal work signals (Product Data only) — readiness, gaps, cost,
      visibility, staleness. Undefined on the public /products card. */
   signal?: ProductSignal;
@@ -314,6 +316,32 @@ const ProductCard = memo(function ProductCard({
             </>
           );
         })()}
+
+        {/* ── Family chips ── A product that carries several models is a
+            FAMILY; show every member code on the card so someone hunting
+            for XF-600 spots it from outside without opening XF-450.
+            Chips sit ABOVE the stretched card link (z-10) and deep-link
+            the profile straight onto that member. */}
+        {modelNamesList && modelNamesList.length > 1 && (
+          <div className="relative z-10 mt-1.5 flex flex-wrap gap-1">
+            {modelNamesList.slice(0, 4).map((code) => (
+              <Link
+                key={code}
+                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center px-1.5 py-[1px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[10px] font-semibold tabular-nums tracking-tight text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+                title={code}
+              >
+                {code}
+              </Link>
+            ))}
+            {modelNamesList.length > 4 && (
+              <span className="inline-flex items-center px-1.5 py-[1px] rounded-md text-[10px] font-semibold text-[var(--text-ghost)]">
+                +{modelNamesList.length - 4}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Category + Subcategory line.
             PUBLIC card only: the internal grid is already grouped by
@@ -588,6 +616,10 @@ export default function ProductList() {
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
   const [supplierLogos, setSupplierLogos] = useState<Record<string, string>>({});
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
+  /* Full model roster per product — feeds the family chips on the card and
+     lets search find a member code that is NOT the primary (the "XF-600
+     lives inside XF-450" problem). */
+  const [modelNames, setModelNames] = useState<Record<string, string[]>>({});
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
@@ -795,7 +827,7 @@ export default function ProductList() {
             })
             .then((j: {
               signals?: Record<string, ProductSignal>;
-              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
+              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; modelNames?: Record<string, string[]>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
               mainImages?: Record<string, string>;
             }) => {
               if (cancelled) return;
@@ -808,6 +840,7 @@ export default function ProductList() {
                 setAllSuppliers(j.models.allSuppliers);
                 if (j.models.supplierLogos) setSupplierLogos(j.models.supplierLogos);
                 setPrimaryModelNames(j.models.primaryModelNames || {});
+                setModelNames(j.models.modelNames || {});
               }
               if (j?.mainImages) applyMainImages(j.mainImages);
             })
@@ -825,6 +858,7 @@ export default function ProductList() {
                 if ((ms as { nameAlts?: Record<string, string> }).nameAlts) setNameAlts((ms as { nameAlts?: Record<string, string> }).nameAlts!);
                 if ((ms as { supplierAlt?: Record<string, string> }).supplierAlt) setSupplierAlt((ms as { supplierAlt?: Record<string, string> }).supplierAlt!);
                 setPrimaryModelNames(ms.primaryModelNames || {});
+            setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
                 applyMainImages(imgs);
               } catch { /* grid still renders without either */ }
             });
@@ -875,6 +909,7 @@ export default function ProductList() {
             setProductSuppliers(ms.suppliers);
             setAllSuppliers(ms.allSuppliers);
             setPrimaryModelNames(ms.primaryModelNames || {});
+            setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
           }
           if (imgs) applyMainImages(imgs);
           /* Public catalog lands on Garment Machinery by default — it's
@@ -1021,10 +1056,12 @@ export default function ProductList() {
     const map: Record<string, { hay: string; sq: string }> = {};
     for (const p of products) {
       const mn = (primaryModelNames[p.id] || "").toLowerCase();
+      const allModels = (modelNames[p.id] || []).join(" ").toLowerCase();
       const hay = [
         p.product_name.toLowerCase(),
         p.slug,
         mn,
+        allModels,
         (p.brand || "").toLowerCase(),
         (p.excerpt || "").toLowerCase(),
         (p.description || "").toLowerCase(),
@@ -1048,7 +1085,7 @@ export default function ProductList() {
       map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "")) };
     }
     return map;
-  }, [products, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt]);
+  }, [products, primaryModelNames, modelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt]);
 
   /* Typeahead suggestions built from the typed query.
        · Categories  → click sets the category filter
@@ -1064,7 +1101,7 @@ export default function ProductList() {
     | { kind: "subcategory"; slug: string; categorySlug: string; label: string; count: number }
     | { kind: "brand"; label: string; count: number }
     | { kind: "supplier"; label: string; count: number }
-    | { kind: "product"; id: string; slug: string; label: string; modelCode?: string; thumb?: string };
+    | { kind: "product"; id: string; slug: string; label: string; modelCode?: string; matchedModel?: string; thumb?: string };
 
   /* Tallies for the suggestion dropdown. They depend only on `products`, so
      keeping them inside the search-keyed memo meant a full 705-product pass
@@ -1144,13 +1181,28 @@ export default function ProductList() {
     const prods: Suggestion[] = [];
     for (const p of products) {
       const mn = primaryModelNames[p.id] || "";
+      const roster = modelNames[p.id] || (mn ? [mn] : []);
       const sName = prefixThenContains(p.product_name, q);
-      const sModel = mn ? prefixThenContains(mn, q) : -1;
+      /* Match against EVERY family member, not just the primary — typing
+         XF-600 must surface the family even though the card is headed
+         XF-450. The member that matched becomes the suggestion's code and
+         the profile deep-link target. */
+      let sModel = -1;
+      let matched: string | undefined;
+      for (const name of roster) {
+        const sc = prefixThenContains(name, q);
+        if (sc >= 0 && (sModel === -1 || sc < sModel)) { sModel = sc; matched = name; }
+      }
       /* Two extra ways in: the supplier's name ("yili" lists its machines)
          and the squashed code ("xprr2100" hits XPRR-2100EF-LC). Ranked after
          direct name/code hits so exact matches stay on top. */
       const sSupplier = (productSuppliers[p.id] || []).some(sup => prefixThenContains(sup, q) >= 0) ? 3 : -1;
-      const sSquash = qSquashed && mn && squash(mn).includes(qSquashed) ? 3 : -1;
+      let sSquash = -1;
+      if (qSquashed) {
+        for (const name of roster) {
+          if (squash(name).includes(qSquashed)) { sSquash = 3; if (!matched) matched = name; break; }
+        }
+      }
       /* Translated names too, so 熔接机 surfaces the product in the dropdown
          and not only in the grid filter. */
       const sAlt = (nameAlts[p.id] || "").toLowerCase().includes(q) ? 2 : -1;
@@ -1162,13 +1214,13 @@ export default function ProductList() {
         sAlt === -1 ? Infinity : sAlt,
       );
       if (!Number.isFinite(score)) continue;
-      prods.push({ kind: "product", id: p.id, slug: p.slug || p.id, label: p.product_name, modelCode: mn || undefined, thumb: mainImages[p.id], _score: score } as Suggestion & { _score: number });
+      prods.push({ kind: "product", id: p.id, slug: p.slug || p.id, label: p.product_name, modelCode: matched || mn || undefined, matchedModel: matched && matched !== mn ? matched : undefined, thumb: mainImages[p.id], _score: score } as Suggestion & { _score: number });
     }
     (prods as (Suggestion & { _score: number })[]).sort((a, b) => a._score - b._score);
     const productSuggestions = prods.slice(0, 6);
 
     return [...cats, ...subs, ...brands, ...sups, ...productSuggestions];
-  }, [search, categories, subcategories, allBrands, allSuppliers, products, primaryModelNames, mainImages, productSuppliers, suggestionCounts, nameAlts]);
+  }, [search, categories, subcategories, allBrands, allSuppliers, products, primaryModelNames, modelNames, mainImages, productSuppliers, suggestionCounts, nameAlts]);
 
   /* Reset the keyboard cursor whenever the suggestion list changes. */
   /* Functional bail-out: returning the identical value lets React skip the
@@ -1219,7 +1271,9 @@ export default function ProductList() {
     } else if (s.kind === "supplier") {
       setFilterSupplier(s.label);
     } else if (s.kind === "product") {
-      router.push(`${baseRoute}/${s.slug}`);
+      router.push(s.matchedModel
+        ? `${baseRoute}/${s.slug}?model=${encodeURIComponent(s.matchedModel)}`
+        : `${baseRoute}/${s.slug}`);
     }
   };
 
@@ -2058,6 +2112,7 @@ export default function ProductList() {
                 subMap={subMap}
                 divMap={divMap}
                 primaryModelNames={primaryModelNames}
+                modelNamesList={modelNames[p.id]}
                 signal={signals[p.id]}
                 t={t}
                 onAskDelete={askDelete}
@@ -2160,6 +2215,14 @@ export default function ProductList() {
                           </div>
                         );
                       })()}
+                      {/* Family roster — same visibility the grid chips give:
+                          every member code readable from the list row. */}
+                      {(modelNames[p.id]?.length ?? 0) > 1 && (
+                        <p className="text-[10px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-0.5">
+                          {modelNames[p.id].slice(0, 5).join(" · ")}
+                          {modelNames[p.id].length > 5 ? ` · +${modelNames[p.id].length - 5}` : ""}
+                        </p>
+                      )}
                       {/* Mobile: show all meta inline */}
                       <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>

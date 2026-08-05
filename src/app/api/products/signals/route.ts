@@ -153,6 +153,10 @@ export async function GET() {
   const suppliersByProduct: Record<string, string[]> = {};
   const supplierSet = new Set<string>();
   const primaryModelNames: Record<string, string> = {};
+  /* EVERY model label per product, in order — the family chips on the card
+     and "find XF-600 even though it lives inside XF-450" both need the full
+     roster, not just the primary. ~700 short strings ≈ a few KB. */
+  const modelNamesByProduct: Record<string, string[]> = {};
 
   /* first model per product (rows pre-sorted by order) */
   const primary = new Map<
@@ -173,6 +177,10 @@ export async function GET() {
     counts[m.product_id] = (counts[m.product_id] || 0) + 1;
     const label = m.primary_model?.trim() || m.model_name;
     if (label && !primaryModelNames[m.product_id]) primaryModelNames[m.product_id] = label;
+    if (label) {
+      if (!modelNamesByProduct[m.product_id]) modelNamesByProduct[m.product_id] = [];
+      if (!modelNamesByProduct[m.product_id].includes(label)) modelNamesByProduct[m.product_id].push(label);
+    }
     if (canSeeCosts && m.supplier) {
       if (!suppliersByProduct[m.product_id]) suppliersByProduct[m.product_id] = [];
       if (!suppliersByProduct[m.product_id].includes(m.supplier)) {
@@ -303,6 +311,7 @@ export async function GET() {
         counts,
         suppliers: suppliersByProduct,
         supplierAlt: supplierAltByProduct,
+        modelNames: modelNamesByProduct,
         nameAlts: (() => {
           const alt: Record<string, string> = {};
           for (const t of (trRes.data ?? []) as Array<{ product_id: string; product_name: string | null }>) {
