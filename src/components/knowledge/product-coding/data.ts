@@ -216,6 +216,7 @@ export const CATEGORIES: Category[] = [
       { code: "XFTS", label: "Thread Sucking Machines" },
       { code: "XFFP", label: "Fusing Press Machines" },
       { code: "XFTT", label: "Trouser Pressing Machines" },
+      { code: "XFGR", label: "Garment Reversing Machines" },
       { code: "XFWM", label: "Washing Machines" },
     ],
   },

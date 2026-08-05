@@ -92,6 +92,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Steam Tunnel | XFST | Proposed | throughput, zones | multi_zone | knitwear | new |
 | Thread Sucking/Trimming | XFTS | **Confirmed** | format, suction | blow_gun | all | live |
 | Spotting/Stain Removal | XFSP | Proposed | gun_types, vacuum_table | heated_table | all | new |
+| Garment Reversing/Turning | XFGR | **Confirmed** | garment_type, suction_pressure | electric_eye_sensor | tops, trousers, pillowcases | live (CL-0016) |
 | Seam Sealing / Bonding | XFSS | Proposed (CL-0012) | process_type, working_width / +tape_feed | hot_air, hot_cold_press, ultrasonic | waterproof/seamless, PPE | new — Hank/中性款/Dison; ultrasonic stitch head = XSUS |
 
 ## F. Embroidery Equipment — Parent Category: **XE · Embroidery**
@@ -160,7 +161,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 ---
 
 ## 1. Confirmed Product Types (38)
-XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
+XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT, XFGR (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
 
 ## 2. Proposed Product Types (50)
 XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP, **XFSS** · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV, **XPCI** · **XMKP, XMKD, XMKS** (CAD & Marker) · **XWIC, XWIR, XWIB, XWIA** (Workshop Infra) · **XMDS, XMDD, XMDC, XMDH, XMDN** (Motors & Drives).

@@ -97,7 +97,7 @@ XI-TDZ-B1 · XI-TDG-B1 · XL-TDZ-B1 (vacuum ironing tables)
 | Product | Model | Note / suggested home |
 |---|---|---|
 | "138" | 138 | Name + code are bare "138". Likely an incomplete draft. **Suggest: identify or delete.** |
-| Pants reversing machine | XI-138 | Garment-turning; no matching subcategory. **Suggest: new subcat `finishing-equipment/garment-turning` OR leave.** |
+| Pants reversing machine | XI-138 | **RESOLVED (CL-0016).** Home now exists: `finishing-equipment/garment-reversing-machines` (**XFGR**). The row itself is gone (deleted in the 2026-08-04 catalogue cleanup); the subcategory is ready for the YILI YL-128/138/148 series when they are entered. |
 | Rechargeable scissor | XC-C2 | Electric scissors; not a knife/end-cutter. **Suggest: `cutting-equipment/straight-knife-cutting-machines` OR new `electric-scissors`.** |
 | XA-1105PTC | XA-1105PTC | Name = code only. Unknown type (XA prefix unused elsewhere). **Suggest: identify first.** |
 | XP-10120-D2 | XP-10120-D2 | XP prefix = likely fusing/pressing. Name = code only. **Suggest: confirm → `printing-heat-press-equipment/heat-press-machines`.** |
