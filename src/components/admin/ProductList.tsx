@@ -46,6 +46,7 @@ import {
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
 import { useCnyUsd, formatUsd, formatRate, fxSourceTitle } from "@/lib/use-cny-usd";
+import BackToTop from "@/components/ui/BackToTop";
 
 /* Koleex's flagship division. The hub treats this line as the
    default view on the public catalog and visually emphasises it
@@ -1310,6 +1311,9 @@ export default function ProductList() {
             )}
           </div>
         </div>
+        {/* Long catalogues need a way back up — one control serves both
+            /products and /product-data since they share this component. */}
+        <BackToTop label={t("list.backToTop", "Back to top")} />
         <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
           <span>{products.length} {t("list.countInCatalog")}</span>
           {/* The rate every "≈ $" on this page was computed with. Shown once,

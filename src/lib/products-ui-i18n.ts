@@ -304,6 +304,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   /* ── List surface: header, search, filters, results (P0 #5a) ────── */
   "list.controlPanel": { en: "Control Panel", zh: "控制面板", ar: "لوحة التحكم" },
   "list.countInCatalog": { en: "products in catalog", zh: "个产品（共计）", ar: "منتج في الكتالوج" },
+  "list.backToTop": { en: "Back to top", zh: "回到顶部", ar: "العودة إلى الأعلى" },
   "list.searchPlaceholder": {
     en: "Search by name, model code, brand, category, tags…",
     zh: "按名称、型号编码、品牌、类别、标签搜索…",
