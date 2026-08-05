@@ -39,6 +39,7 @@ import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
+import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
 import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
@@ -391,6 +392,17 @@ export default function KoleexAiApp() {
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
+  /* Knowledge queue entry — super-admin only (D2: the approval bench
+     is the owner's). */
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j) setIsSuperAdmin(!!j.is_super_admin); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   /* Desktop sidebar collapse — defaults to EXPANDED on first visit
      (the sidebar is the primary nav into chat history; hiding it by
      default was confusing — users couldn't find it). Persisted after
@@ -1720,6 +1732,15 @@ export default function KoleexAiApp() {
             <PlusIcon size={14} />
             {copy.newChat}
           </button>
+          {isSuperAdmin && (
+            <Link
+              href="/ai/knowledge"
+              className="kx-ai-glow h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10 shrink-0"
+              title="AI Knowledge"
+            >
+              <BookOpenIcon className="h-4 w-4" />
+            </Link>
+          )}
           {/* Mobile-only close button. On mobile the sidebar is a
               z-[40] overlay that covers the top-bar burger, so users
               need a close control INSIDE the drawer. Hidden on
