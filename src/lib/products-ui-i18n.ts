@@ -305,6 +305,10 @@ export const PRODUCTS_UI_I18N: Translations = {
   "list.controlPanel": { en: "Control Panel", zh: "控制面板", ar: "لوحة التحكم" },
   "list.countInCatalog": { en: "products in catalog", zh: "个产品（共计）", ar: "منتج في الكتالوج" },
   "list.backToTop": { en: "Back to top", zh: "回到顶部", ar: "العودة إلى الأعلى" },
+  "hero.addPhotos": { en: "Add more photos", zh: "添加更多照片", ar: "أضِف صوراً أخرى" },
+  "hero.galleryLabel": { en: "Gallery", zh: "图库", ar: "المعرض" },
+  "hero.removePhoto": { en: "Remove photo", zh: "移除照片", ar: "إزالة الصورة" },
+  "hero.galleryHint": { en: "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.", zh: "更多角度与细节 — 显示在产品图库中。全部媒体可在“媒体”标签管理。", ar: "زوايا وتفاصيل إضافية — تظهر في معرض المنتج. أدر كل الوسائط من تبويب الوسائط." },
   "list.searchPlaceholder": {
     en: "Search by name, model code, brand, category, tags…",
     zh: "按名称、型号编码、品牌、类别、标签搜索…",

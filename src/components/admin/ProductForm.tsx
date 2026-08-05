@@ -833,6 +833,7 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Derived: Stand / Table accessory? Its "specs & variants" are the
         configurable option axes (shape/size/quality · thickness/lifting/
@@ -1265,6 +1266,47 @@ export default function ProductForm({ productId }: Props) {
       _file: file,
     };
     setMedia([...filtered, newItem]);
+  };
+
+  /* ── Gallery photos, right beside the main photo ──
+     The Media tab always accepted multiple gallery images, but nothing on
+     the identity step said so — operators saw one photo box and concluded
+     the product could only hold one photo. Same deferred-upload contract as
+     the main image (`_file` rides until save), same validation limits. */
+  const handleGalleryAdd = (files: FileList | null) => {
+    if (!files?.length) return;
+    const MAX_MB = 8;
+    const existing = media.filter((m) => m.type === "gallery").length;
+    const additions: MediaFormState[] = [];
+    for (const file of Array.from(files)) {
+      if (!/^image\//.test(file.type)) {
+        setError(t("media.mainNotImage", "{name} is not an image.").replace("{name}", file.name));
+        continue;
+      }
+      if (file.size > MAX_MB * 1024 * 1024) {
+        const mb = (file.size / (1024 * 1024)).toFixed(1);
+        setError(
+          t("media.mainTooBig", "{name} is {size} MB — max {max} MB.")
+            .replace("{name}", file.name).replace("{size}", mb).replace("{max}", String(MAX_MB)),
+        );
+        continue;
+      }
+      additions.push({
+        _tempId: crypto.randomUUID(),
+        type: "gallery",
+        url: "",
+        file_path: null,
+        alt_text: "",
+        order: existing + additions.length,
+        model_id: null,
+        _file: file,
+      });
+    }
+    if (additions.length) { setError(""); setMedia([...media, ...additions]); }
+  };
+
+  const removeGalleryPhoto = (tempId: string) => {
+    setMedia(media.filter((m) => m._tempId !== tempId));
   };
 
   /* Generic image uploader for the small Identity image fields (brand
@@ -2963,6 +3005,54 @@ export default function ProductForm({ productId }: Props) {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* ── Gallery strip ──
+                      More photos live here, not in a hidden tab. Items are
+                      type:"gallery" in the same media state the Media step
+                      edits — the two views can never disagree. */}
+                  <div className="mt-3">
+                    <input
+                      ref={galleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => { handleGalleryAdd(e.target.files); e.target.value = ""; }}
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {media.filter((m) => m.type === "gallery").map((g) => {
+                        const src = g._file ? URL.createObjectURL(g._file) : g.url;
+                        return (
+                          <div key={g._tempId} className="relative group/g h-16 w-16 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt={g.alt_text || ""} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeGalleryPhoto(g._tempId)}
+                              className="absolute inset-0 bg-black/55 opacity-0 group-hover/g:opacity-100 transition-opacity flex items-center justify-center text-white"
+                              title={t("hero.removePhoto", "Remove photo")}
+                              aria-label={t("hero.removePhoto", "Remove photo")}
+                            >
+                              <TrashIcon size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="h-16 w-16 rounded-lg border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] flex flex-col items-center justify-center gap-0.5 transition-colors shrink-0"
+                        title={t("hero.addPhotos", "Add more photos")}
+                        aria-label={t("hero.addPhotos", "Add more photos")}
+                      >
+                        <PlusIcon size={14} />
+                        <span className="text-[8.5px] font-semibold uppercase tracking-wide">{t("hero.galleryLabel", "Gallery")}</span>
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-[var(--text-faint)]">
+                      {t("hero.galleryHint", "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.")}
+                    </p>
                   </div>
                 </div>
 

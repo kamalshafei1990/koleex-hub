@@ -5,6 +5,17 @@ import { FABRIC_INSPECTION_SCHEMA } from "./schemas/fabric-inspection";
 import { FABRIC_ROLLING_SCHEMA } from "./schemas/fabric-rolling";
 import { FABRIC_CUTTING_TABLE_SCHEMA } from "./schemas/fabric-cutting-table";
 import { FABRIC_PRESHRINK_SCHEMA } from "./schemas/fabric-preshrink";
+import {
+  FUSING_MACHINE_SCHEMA,
+  FUSING_MACHINE_FABRIC_PREP_SCHEMA,
+  IRONING_TABLE_SCHEMA,
+  VACUUM_IRONING_TABLE_SCHEMA,
+  TROUSER_PRESSING_SCHEMA,
+  STEAM_GENERATOR_SCHEMA,
+  FORM_FINISHING_SCHEMA,
+  NEEDLE_DETECTOR_SCHEMA,
+  GARMENT_REVERSING_SCHEMA,
+} from "./schemas/finishing-batch-2026-08";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -16,6 +27,20 @@ registerSchema(FABRIC_INSPECTION_SCHEMA);
 registerSchema(FABRIC_ROLLING_SCHEMA);
 registerSchema(FABRIC_CUTTING_TABLE_SCHEMA);
 registerSchema(FABRIC_PRESHRINK_SCHEMA);
+
+/* Finishing-equipment batch (2026-08-05, owner-approved) — the YILI catalog
+   audit found 18 live fusing products and a whole finishing catalog with no
+   structured spec home. Nine registrations, seven families (XFFP binds under
+   both its live categories; XFVT shares the XFIT family). */
+registerSchema(FUSING_MACHINE_SCHEMA);
+registerSchema(FUSING_MACHINE_FABRIC_PREP_SCHEMA);
+registerSchema(IRONING_TABLE_SCHEMA);
+registerSchema(VACUUM_IRONING_TABLE_SCHEMA);
+registerSchema(TROUSER_PRESSING_SCHEMA);
+registerSchema(STEAM_GENERATOR_SCHEMA);
+registerSchema(FORM_FINISHING_SCHEMA);
+registerSchema(NEEDLE_DETECTOR_SCHEMA);
+registerSchema(GARMENT_REVERSING_SCHEMA);
 
 export {
   registerSchema,
