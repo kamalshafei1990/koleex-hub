@@ -317,7 +317,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
             <img
               src="/brand/hub-logo/koleex-hub-logo-for-dark.webp"
               alt="Koleex Hub"
-              className="h-8 w-auto drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
+              /* Same reason as the header: a double-click on an image selects
+                 it, and a blue selection box across the wordmark is the first
+                 thing a new user would see on the sign-in screen. */
+              draggable={false}
+              className="h-8 w-auto select-none [-webkit-user-drag:none] drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
             />
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />

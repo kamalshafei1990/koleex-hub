@@ -156,7 +156,11 @@ export default function MainHeader() {
           href="/"
           aria-label="Koleex Hub"
           title="Koleex Hub"
-          className={`shrink-0 flex items-center rounded-lg -mx-2 px-2 -my-1 py-1 transition-opacity duration-150 hover:opacity-70 active:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white" : "text-black"}`}
+          /* select-none: the logo is an <img>, and a double-click selects an
+             image the way it selects a word — painting a blue selection box
+             over the wordmark. It is chrome, not content; there is nothing
+             here anyone would want to copy. */
+          className={`select-none shrink-0 flex items-center rounded-lg -mx-2 px-2 -my-1 py-1 transition-opacity duration-150 hover:opacity-70 active:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white" : "text-black"}`}
         >
           {/* Hub logo v2 (owner-approved option B) — the script "hub" makes
               the lockup taller than the bare wordmark, so the img runs larger
@@ -178,7 +182,11 @@ export default function MainHeader() {
             height={99}
             decoding="async"
             fetchPriority="high"
-            className="w-auto h-5 md:h-8"
+            /* Dragging the logo out of the header does nothing useful and, in
+               the desktop shell, drops a stray image onto whatever is behind
+               the window. */
+            draggable={false}
+            className="w-auto h-5 md:h-8 select-none [-webkit-user-drag:none]"
           />
         </Link>
         {appName && (
