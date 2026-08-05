@@ -180,6 +180,10 @@ export interface ModelFormState {
   primary_model: string;
   code_prefix: string;
   coding_status: string;
+  /* Localized member name/tagline ({zh, ar, …}) — family-level locales
+     stay in product_translations; these cover non-primary members. */
+  name_i18n?: Record<string, string>;
+  tagline_i18n?: Record<string, string>;
 }
 
 export interface MediaFormState {
@@ -408,6 +412,8 @@ export const EMPTY_PRODUCT: ProductFormState = {
 export function createEmptyModel(): ModelFormState {
   return {
     specs_overrides: {},
+    name_i18n: {},
+    tagline_i18n: {},
     _tempId: crypto.randomUUID(),
     model_name: "",
     slug: "",

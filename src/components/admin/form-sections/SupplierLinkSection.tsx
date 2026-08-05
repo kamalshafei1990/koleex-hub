@@ -371,7 +371,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                                 type="button"
                                 onClick={() => autoTranslateName(l._tempId, l.supplier_product_name, loc)}
                                 disabled={!l.supplier_product_name.trim() || translatingName === l._tempId}
-                                className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                                className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                               >
                                 {translatingName === l._tempId
                                   ? t("sup.translating", "Translating…")

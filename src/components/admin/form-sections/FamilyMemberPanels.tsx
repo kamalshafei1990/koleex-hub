@@ -30,6 +30,67 @@ const inp =
   "w-full h-10 px-3.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
 const lbl = "block text-[11px] font-semibold text-[var(--text-muted)] mb-1.5";
 
+/* Per-member localized text rows (中文 + العربية) with one-tap AI
+   translate — the same /api/ai/translate service the Hero uses. Rows sit
+   STACKED under their English field; a filled row never disappears. */
+function MemberI18nRows({
+  source, value, onChange,
+}: {
+  source: string;
+  value: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const [busy, setBusy] = useState<string | null>(null);
+  const set = (loc: string, v: string) => {
+    const next = { ...value };
+    if (v) next[loc] = v; else delete next[loc];
+    onChange(next);
+  };
+  const auto = async (loc: string) => {
+    if (!source.trim() || busy) return;
+    setBusy(loc);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: source.trim(), target_lang: loc, source_lang: "en" }),
+      });
+      const j = res.ok ? await res.json() : null;
+      if (j?.translated) set(loc, j.translated);
+    } catch { /* advisory only */ }
+    setBusy(null);
+  };
+  const row = (loc: string, label: string, rtl = false) => (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <span className="shrink-0 w-8 text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</span>
+      <input
+        dir={rtl ? "rtl" : "ltr"}
+        value={value[loc] || ""}
+        onChange={(e) => set(loc, e.target.value)}
+        placeholder={t("fam.i18nPh", "Translation")}
+        className={`flex-1 h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${rtl ? "text-right" : ""}`}
+      />
+      <button
+        type="button"
+        onClick={() => auto(loc)}
+        disabled={!source.trim() || busy != null}
+        title={t("fam.autoTranslate", "AI translate")}
+        className="kx-ai-glow shrink-0 h-8 px-2 rounded-lg text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/30 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 transition-colors"
+      >
+        {busy === loc ? "…" : "AI"}
+      </button>
+    </div>
+  );
+  return (
+    <div>
+      {row("zh", "中文")}
+      {row("ar", "عربي", true)}
+    </div>
+  );
+}
+
 export function memberLabel(m: ModelFormState, i: number): string {
   return (m.primary_model || "").trim() || (m.model_name || "").trim() || `#${i + 1}`;
 }
@@ -134,7 +195,7 @@ export function FamilySharedDivider() {
 /* ── Hero panel: the member's identity ── */
 export function MemberIdentityPanel({
   model, onUpdate, photoUrl, onSetPhoto, onRemovePhoto, familyProductName,
-  isPrimary = false, onEditCodeInHero, excludeProductId,
+  isPrimary = false, onEditCodeInHero, excludeProductId, refBinding,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -151,6 +212,10 @@ export function MemberIdentityPanel({
   isPrimary?: boolean;
   onEditCodeInHero?: () => void;
   excludeProductId?: string;
+  /* PRIMARY member: the supplier reference is the SAME fact as the
+     primary supplier link's "supplier product code" — this binding keeps
+     the two in lock-step (writes mirror both stores). */
+  refBinding?: { value: string; onChange: (v: string) => void };
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* Live uniqueness for NON-primary codes — same endpoint the Hero
@@ -271,25 +336,38 @@ export function MemberIdentityPanel({
                   {t("fam.productNameHint", "Defaults to the family name — edit it freely for this model.")}
                 </p>
               ) : null}
+              <MemberI18nRows
+                source={model.model_name || familyProductName || ""}
+                value={model.name_i18n || {}}
+                onChange={(next) => onUpdate({ name_i18n: next })}
+              />
             </>
           )}
         </div>
         <div>
           <label className={lbl}>{t("model.referenceModel", "Supplier reference")}</label>
-          <input value={model.reference_model} onChange={(e) => onUpdate({ reference_model: e.target.value })} placeholder="YL-600D" className={`${inp} font-mono`} />
+          <input
+            value={refBinding ? refBinding.value : model.reference_model}
+            onChange={(e) => refBinding ? refBinding.onChange(e.target.value) : onUpdate({ reference_model: e.target.value })}
+            placeholder="YL-600D"
+            className={`${inp} font-mono`}
+          />
+          {refBinding && (
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              {t("fam.refPrimarySync", "Synced with the Supplier tab's model number.")}
+            </p>
+          )}
         </div>
         <div>
           <label className={lbl}>{t("fam.tagline", "Tagline")}</label>
           <input value={model.tagline} onChange={(e) => onUpdate({ tagline: e.target.value })} placeholder={t("fam.taglinePh", "One-line pitch")} className={inp} />
+          <MemberI18nRows
+            source={model.tagline || ""}
+            value={model.tagline_i18n || {}}
+            onChange={(next) => onUpdate({ tagline_i18n: next })}
+          />
         </div>
-        <div>
-          <label className={lbl}>{t("fam.stock", "Stock status")}</label>
-          <input value={model.stock_status} onChange={(e) => onUpdate({ stock_status: e.target.value })} placeholder="In stock / 15 days" className={inp} />
-        </div>
-        <div>
-          <label className={lbl}>{t("fam.barcode", "Barcode")}</label>
-          <input value={model.barcode || ""} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder="EAN / UPC" className={`${inp} font-mono`} />
-        </div>
+
       </div>
       {onSetPhoto && (
         <div className="flex items-center gap-3 pt-1">

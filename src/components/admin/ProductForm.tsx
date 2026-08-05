@@ -523,6 +523,16 @@ export default function ProductForm({ productId }: Props) {
      list → form → back loop never jumps apps. */
   const baseRoute = (pathname || "").startsWith("/product-data") ? "/product-data" : "/products";
   const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  /* Locale names in the VIEWER's language (中文 UI → 阿拉伯语, عربي UI →
+     الصينية …) — Intl.DisplayNames, no hand dictionaries. */
+  const localeDisplay = useCallback((code: string) => {
+    try {
+      const dn = new Intl.DisplayNames([lang === "zh" ? "zh" : lang === "ar" ? "ar" : "en"], { type: "language" });
+      return dn.of(code) || LOCALES.find((l) => l.code === code)?.name || code;
+    } catch {
+      return LOCALES.find((l) => l.code === code)?.name || code;
+    }
+  }, [lang]);
   const isEdit = !!productId;
 
   /* ── Adopted id: the product exists now, even if the URL still says "new" ──
@@ -1063,6 +1073,8 @@ export default function ProductForm({ productId }: Props) {
               ([k, v]) => [k, Array.isArray(v) ? v.map(String).join(", ") : String(v)],
             ),
           ),
+          name_i18n: ((m as { name_i18n?: Record<string, string> | null }).name_i18n) ?? {},
+          tagline_i18n: ((m as { tagline_i18n?: Record<string, string> | null }).tagline_i18n) ?? {},
         }));
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
@@ -1483,13 +1495,34 @@ export default function ProductForm({ productId }: Props) {
   const activeModel = models[safeActiveMember];
   const updateActiveMember = (u: Partial<ModelFormState>) =>
     setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
-  const addFamilyMember = () => {
+  /* New member = a COPY of the primary's identity you then edit — code,
+     supplier reference, tagline and its zh/ar translations all start
+     synced from the primary/family (owner rule: "synced with the primary
+     then I edit manually"). The live uniqueness check flags the code
+     until its suffix is changed. */
+  const seedMemberFromPrimary = useCallback((): ModelFormState => {
     const m = createEmptyModel();
+    const p0 = models[0];
     m.order = models.length;
-    /* Default the member's name to the FAMILY's product name — "same as
-       the main one but editable", per the owner. */
-    m.model_name = product.product_name || models[0]?.model_name || "";
-    setModels([...models, m]);
+    m.model_name = product.product_name || p0?.model_name || "";
+    m.primary_model = p0?.primary_model || "";
+    m.reference_model = p0?.reference_model || "";
+    m.tagline = p0?.tagline || "";
+    const trZh = translations.find((x) => x.locale === "zh");
+    const trAr = translations.find((x) => x.locale === "ar");
+    m.name_i18n = {
+      ...(trZh?.product_name ? { zh: trZh.product_name } : {}),
+      ...(trAr?.product_name ? { ar: trAr.product_name } : {}),
+    };
+    m.tagline_i18n = {
+      ...(trZh?.tagline ? { zh: trZh.tagline } : {}),
+      ...(trAr?.tagline ? { ar: trAr.tagline } : {}),
+    };
+    return m;
+  }, [models, product.product_name, translations]);
+
+  const addFamilyMember = () => {
+    setModels([...models, seedMemberFromPrimary()]);
     setActiveMember(models.length);
     const heroIdx = steps.findIndex((st) => st.id === "identity");
     if (heroIdx >= 0) goToStep(heroIdx);
@@ -2588,6 +2621,19 @@ export default function ProductForm({ productId }: Props) {
           const created = await createModel({ ...modelData, sku: "auto" });
           if (created) tempIdToRealId[m._tempId] = created.id;
         }
+        /* Member translations ride a SEPARATE best-effort write: if the
+           name_i18n/tagline_i18n columns aren't migrated yet, this fails
+           quietly and the product save is untouched. */
+        const realId = m.id || tempIdToRealId[m._tempId];
+        const hasI18n = (m.name_i18n && Object.keys(m.name_i18n).length) || (m.tagline_i18n && Object.keys(m.tagline_i18n).length);
+        if (realId && hasI18n) {
+          try {
+            await updateModel(realId, {
+              name_i18n: m.name_i18n && Object.keys(m.name_i18n).length ? m.name_i18n : null,
+              tagline_i18n: m.tagline_i18n && Object.keys(m.tagline_i18n).length ? m.tagline_i18n : null,
+            });
+          } catch { /* pending migration — advisory only */ }
+        }
       }
 
       if (isEdit) {
@@ -3013,6 +3059,22 @@ export default function ProductForm({ productId }: Props) {
                   onEditCodeInHero={() => {
                     document.getElementById("primary-code-anchor")?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
+                  refBinding={safeActiveMember === 0 ? (() => {
+                    const primaryIdx = (() => {
+                      const i = productSuppliers.findIndex((x) => x.is_primary);
+                      return i >= 0 ? i : (productSuppliers.length ? 0 : -1);
+                    })();
+                    const link = primaryIdx >= 0 ? productSuppliers[primaryIdx] : null;
+                    return {
+                      value: (link?.supplier_product_code || models[0]?.reference_model || ""),
+                      onChange: (val: string) => {
+                        if (primaryIdx >= 0) {
+                          setProductSuppliers((prev) => prev.map((x, i) => (i === primaryIdx ? { ...x, supplier_product_code: val } : x)));
+                        }
+                        updatePrimaryModel({ reference_model: val });
+                      },
+                    };
+                  })() : undefined}
                   photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
                   onSetPhoto={(f) => setModelPhoto(activeModel, f)}
                   onRemovePhoto={() => removeModelPhoto(activeModel)}
@@ -3414,10 +3476,7 @@ export default function ProductForm({ productId }: Props) {
                         Writes into the shared `translations` state so it also
                         appears in Languages & Markets and on the public page. */}
                     {(() => {
-                      const isRtl = heroNameLocale === "ar" || heroNameLocale === "ur";
                       const canAuto = true; // every offered locale is a translatable target
-                      const localeName =
-                        LOCALES.find((l) => l.code === heroNameLocale)?.name ?? heroNameLocale;
                       const hasNameTr = translations.some((tr) => (tr.product_name || "").trim().length > 0);
                       /* Collapsed by default — keep the hero clean. */
                       if (!showNameTr && !hasNameTr) {
@@ -3431,47 +3490,80 @@ export default function ProductForm({ productId }: Props) {
                           </button>
                         );
                       }
+                      /* Every language that HAS a name gets its own stacked
+                         row — added names never disappear when you pick the
+                         next language (owner rule). The adder row below
+                         appends more. */
+                      const filledLocales = LOCALES.filter((l) => (heroLocaleName(l.code) || "").trim().length > 0);
+                      const filledCodes = new Set(filledLocales.map((l) => l.code));
+                      const adderLocale = filledCodes.has(heroNameLocale)
+                        ? (LOCALES.find((l) => !filledCodes.has(l.code))?.code ?? heroNameLocale)
+                        : heroNameLocale;
                       return (
-                        /* Stacked: a slim controls row (language + auto-translate)
-                           above a full-width localized field that matches the
-                           English name's size — so the translation isn't cramped. */
                         <div className="mt-3 space-y-2">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
-                                {t("hero.nameOtherLang", "Other language")}
-                              </span>
-                              <select
-                                value={heroNameLocale}
-                                onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
-                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
-                              >
-                                {LOCALES.map((l) => (
-                                  <option key={l.code} value={l.code}>{l.name}</option>
-                                ))}
-                              </select>
-                            </div>
+                          {filledLocales.map((l) => {
+                            const rtl = l.code === "ar" || l.code === "ur";
+                            return (
+                              <div key={l.code} className="flex items-center gap-2">
+                                <span className="shrink-0 w-16 text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] text-start">
+                                  {localeDisplay(l.code)}
+                                </span>
+                                <input
+                                  type="text"
+                                  dir={rtl ? "rtl" : "ltr"}
+                                  value={heroLocaleName(l.code)}
+                                  onChange={(e) => setHeroLocaleName(l.code, e.target.value)}
+                                  className={`flex-1 h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-lg font-bold text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all ${rtl ? "text-right" : ""}`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setHeroLocaleName(l.code, "")}
+                                  aria-label={t("hero.removeLang", "Remove this language")}
+                                  className="shrink-0 h-8 w-8 rounded-lg inline-flex items-center justify-center text-[var(--text-ghost)] hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                          {/* Adder: pick a language that has no name yet, then
+                              auto-translate or type — the row above appears the
+                              moment it has content and stays. */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                              {t("hero.nameOtherLang", "Other language")}
+                            </span>
+                            <select
+                              value={adderLocale}
+                              onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
+                              className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
+                            >
+                              {LOCALES.filter((l) => !filledCodes.has(l.code)).map((l) => (
+                                <option key={l.code} value={l.code}>{localeDisplay(l.code)}</option>
+                              ))}
+                            </select>
                             {canAuto && (
                               <button
                                 type="button"
                                 onClick={autoTranslateHeroName}
                                 disabled={!product.product_name.trim() || translatingHeroName}
-                                className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                                className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                               >
                                 {translatingHeroName
                                   ? t("hero.translating", "Translating…")
                                   : t("hero.autoTranslate", "Auto-translate")}
                               </button>
                             )}
+                            <input
+                              type="text"
+                              dir={adderLocale === "ar" || adderLocale === "ur" ? "rtl" : "ltr"}
+                              value={heroLocaleName(adderLocale)}
+                              onChange={(e) => { setHeroNameLocale(adderLocale); setHeroLocaleName(adderLocale, e.target.value); }}
+                              placeholder={t("hero.nameInLangPlaceholder", "Product name in {lang}").replace("{lang}", localeDisplay(adderLocale))}
+                              className="flex-1 min-w-[180px] h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                            />
                           </div>
-                          <input
-                            type="text"
-                            dir={isRtl ? "rtl" : "ltr"}
-                            value={heroLocaleName(heroNameLocale)}
-                            onChange={(e) => setHeroLocaleName(heroNameLocale, e.target.value)}
-                            placeholder={t("hero.nameInLangPlaceholder", "Product name in {lang}").replace("{lang}", localeName)}
-                            className={`w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all ${isRtl ? "text-right" : ""}`}
-                          />
                         </div>
                       );
                     })()}
@@ -3770,7 +3862,7 @@ export default function ProductForm({ productId }: Props) {
                         type="button"
                         onClick={() => aiSuggest("excerpt")}
                         disabled={aiBusy !== null}
-                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        className="kx-ai-glow h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       >
                         {aiBusy === "excerpt" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
                       </button>
@@ -3825,7 +3917,7 @@ export default function ProductForm({ productId }: Props) {
                               type="button"
                               onClick={autoTranslateHeroExcerpt}
                               disabled={!product.excerpt.trim() || translatingHeroExcerpt}
-                              className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                              className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                             >
                               {translatingHeroExcerpt
                                 ? t("hero.translating", "Translating…")
@@ -3876,7 +3968,7 @@ export default function ProductForm({ productId }: Props) {
                         type="button"
                         onClick={() => aiSuggest("tagline")}
                         disabled={aiBusy !== null}
-                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        className="kx-ai-glow h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       >
                         {aiBusy === "tagline" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
                       </button>
@@ -3930,7 +4022,7 @@ export default function ProductForm({ productId }: Props) {
                               type="button"
                               onClick={autoTranslateHeroTagline}
                               disabled={!(primaryModel?.tagline || "").trim() || translatingHeroTagline}
-                              className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                              className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                             >
                               {translatingHeroTagline
                                 ? t("hero.translating", "Translating…")
@@ -4124,7 +4216,7 @@ export default function ProductForm({ productId }: Props) {
                         type="button"
                         onClick={autoTranslateDescription}
                         disabled={!(product.description || "").trim() || translatingDesc}
-                        className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                        className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                       >
                         {translatingDesc
                           ? t("hero.translating", "Translating…")
@@ -4173,7 +4265,7 @@ export default function ProductForm({ productId }: Props) {
                         type="button"
                         onClick={() => aiSuggest("highlights")}
                         disabled={aiBusy !== null}
-                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        className="kx-ai-glow h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       >
                         {aiBusy === "highlights" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
                       </button>
@@ -4212,7 +4304,7 @@ export default function ProductForm({ productId }: Props) {
                         type="button"
                         onClick={() => aiSuggest("tags")}
                         disabled={aiBusy !== null}
-                        className="h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        className="kx-ai-glow h-6 px-2 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       >
                         {aiBusy === "tags" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
                       </button>
@@ -4751,6 +4843,7 @@ export default function ProductForm({ productId }: Props) {
                 <FamilySpecGrid
                   specFields={familyGridFields}
                   familyProductName={product.product_name || ""}
+                  seedModel={seedMemberFromPrimary}
                   productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
                   onChangeProductSpecs={(next) => updateProduct_({ schema_specs: next })}
                   models={models}

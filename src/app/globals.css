@@ -1209,3 +1209,18 @@ input[type="number"]:not(.kx-spinner) {
   background: transparent;
   padding: 0;
 }
+
+/* ── kx-ai-glow ── STANDING RULE (owner 2026-08-06): every button that
+   triggers AI glows in Hub Blue — the same aura identity as the Koleex
+   glow orb. Static soft glow, brighter on hover; the color is FUNCTIONAL
+   (marks AI), which is exactly the case the monochrome brand reserves
+   blue for. */
+.kx-ai-glow {
+  box-shadow: 0 0 8px rgba(86, 127, 178, 0.40), 0 0 20px rgba(86, 127, 178, 0.18);
+  border-color: rgba(86, 127, 178, 0.55) !important;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.kx-ai-glow:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(86, 127, 178, 0.60), 0 0 28px rgba(86, 127, 178, 0.30);
+}
+.kx-ai-glow:disabled { box-shadow: 0 0 6px rgba(86, 127, 178, 0.18); }

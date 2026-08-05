@@ -45,6 +45,7 @@ export default function FamilySpecGrid({
   models,
   onChange,
   familyProductName,
+  seedModel,
 }: {
   specFields: VariantSpecField[];
   productSpecs: Record<string, unknown>;
@@ -52,6 +53,8 @@ export default function FamilySpecGrid({
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
   familyProductName?: string;
+  /* Preferred member factory — seeds identity from the primary. */
+  seedModel?: () => ModelFormState;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [askRemoveIdx, setAskRemoveIdx] = useState<number | null>(null);
@@ -89,11 +92,12 @@ export default function FamilySpecGrid({
   };
 
   const addModel = () => {
-    const m = createEmptyModel();
+    const m = seedModel ? seedModel() : (() => {
+      const x = createEmptyModel();
+      x.model_name = familyProductName || models[0]?.model_name || "";
+      return x;
+    })();
     m.order = models.length;
-    /* The family's descriptive name rides along so the new member is
-       never "Untitled" in lists while the operator is still typing. */
-    m.model_name = familyProductName || models[0]?.model_name || "";
     onChange([...models, m]);
   };
 
