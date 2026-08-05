@@ -4795,7 +4795,14 @@ export default function ProductForm({ productId }: Props) {
           <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {memberCtx && activeModel && (
               <>
-                <MemberPricingPanel model={activeModel} onUpdate={updateActiveMember} />
+                <MemberPricingPanel
+                  model={activeModel}
+                  onUpdate={updateActiveMember}
+                  familyCost={(() => {
+                    const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    return pl?.unit_cost_cny || models[0]?.cost_price || "";
+                  })()}
+                />
                 <FamilySharedDivider />
               </>
             )}

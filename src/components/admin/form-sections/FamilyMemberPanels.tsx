@@ -259,11 +259,16 @@ export function MemberIdentityPanel({
 
 /* ── Price panel: the member's commercial numbers ── */
 export function MemberPricingPanel({
-  model, onUpdate, costVisible = true,
+  model, onUpdate, costVisible = true, familyCost,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
   costVisible?: boolean;
+  /* The FAMILY's baseline factory cost — the primary supplier link's
+     unit_cost_cny (the number the Supplier tab edits), else the primary
+     model's cost. A member with an empty cost INHERITS it; typing a
+     figure here is this model's own cost. */
+  familyCost?: string | number | null;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const money = (label: string, key: keyof ModelFormState, sign: string, ph = "0.00") => (
@@ -291,7 +296,17 @@ export function MemberPricingPanel({
         <span className="text-[11px] font-mono text-[var(--text-dim)]">{model.primary_model || ""}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {costVisible && money(t("fam.cost", "Factory cost (CNY)"), "cost_price", "¥")}
+        {costVisible && (
+          <div>
+            {money(t("fam.cost", "Factory cost (CNY)"), "cost_price", "¥",
+              familyCost != null && familyCost !== "" ? String(familyCost) : "0.00")}
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">
+              {familyCost != null && familyCost !== ""
+                ? t("fam.costInherit", "Empty = inherits the supplier cost (¥{v}). Type a figure for this model's own cost.").replace("{v}", String(familyCost))
+                : t("fam.costOwn", "This model's own factory cost — the Supplier tab's cost is the family baseline.")}
+            </p>
+          </div>
+        )}
         {money(t("fam.global", "Global price (USD)"), "global_price", "$")}
         {costVisible && money(t("fam.headOnly", "Head-only price"), "head_only_price", "¥")}
         {costVisible && money(t("fam.setPrice", "Complete-set price"), "complete_set_price", "¥")}

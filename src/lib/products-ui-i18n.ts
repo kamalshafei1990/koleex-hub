@@ -692,6 +692,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fam.stock": { en: "Stock status", zh: "库存状态", ar: "حالة المخزون" },
   "fam.barcode": { en: "Barcode", zh: "条码", ar: "الباركود" },
   "fam.pricingTitle": { en: "This model's cost & price", zh: "该型号的成本与价格", ar: "تكلفة هذا الموديل وسعره" },
+  "fam.costInherit": { en: "Empty = inherits the supplier cost (¥{v}). Type a figure for this model's own cost.", zh: "留空＝继承供应商成本（¥{v}）。填写数字即该型号自己的成本。", ar: "فارغ = يرث تكلفة المورّد (¥{v}). اكتب رقماً لتكون تكلفة هذا الموديل الخاصة." },
+  "fam.costOwn": { en: "This model's own factory cost — the Supplier tab's cost is the family baseline.", zh: "该型号自身的出厂成本——供应商标签页的成本是系列基准。", ar: "تكلفة هذا الموديل الخاصة — تكلفة تبويب المورّد هي خط أساس العائلة." },
   "fam.cost": { en: "Factory cost (CNY)", zh: "出厂成本（元）", ar: "تكلفة المصنع (يوان)" },
   "fam.global": { en: "Global price (USD)", zh: "全球价（美元）", ar: "السعر العالمي (دولار)" },
   "fam.headOnly": { en: "Head-only price", zh: "单机头价", ar: "سعر الرأس فقط" },
