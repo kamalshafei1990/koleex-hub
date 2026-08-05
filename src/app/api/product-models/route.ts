@@ -42,8 +42,8 @@ export async function GET(req: Request) {
        second round-trip. Fetch only the minimal columns we need —
        don't return a row shape that could later leak cost. */
     const selectCols = canSeeSecrets
-      ? `product_id, supplier, model_name, primary_model, "order"`
-      : `product_id, model_name, primary_model, "order"`;
+      ? `product_id, supplier, model_name, primary_model, visible, status, "order"`
+      : `product_id, model_name, primary_model, visible, status, "order"`;
     const { data, error } = await supabaseServer
       .from("product_models")
       .select(selectCols)
@@ -56,11 +56,17 @@ export async function GET(req: Request) {
     const suppliers: Record<string, string[]> = {};
     const supplierSet = new Set<string>();
     const primaryModelNames: Record<string, string> = {};
+    /* Full SELLABLE roster per product — the family chips on the public
+       card. Model codes are public catalog data; a member drops out only
+       when manually discontinued or hidden (status inheritance rule). */
+    const modelNames: Record<string, string[]> = {};
     const rows = (data ?? []) as unknown as Array<{
       product_id: string;
       supplier?: string | null;
       model_name?: string | null;
       primary_model?: string | null;
+      visible?: boolean | null;
+      status?: string | null;
       order?: number | null;
     }>;
     for (const row of rows) {
@@ -70,6 +76,10 @@ export async function GET(req: Request) {
       const label = row.primary_model?.trim() || row.model_name;
       if (label && !primaryModelNames[row.product_id]) {
         primaryModelNames[row.product_id] = label;
+      }
+      if (label && row.visible !== false && row.status !== "discontinued") {
+        if (!modelNames[row.product_id]) modelNames[row.product_id] = [];
+        if (!modelNames[row.product_id].includes(label)) modelNames[row.product_id].push(label);
       }
       if (canSeeSecrets && row.supplier) {
         if (!suppliers[row.product_id]) suppliers[row.product_id] = [];
@@ -85,6 +95,7 @@ export async function GET(req: Request) {
         suppliers,
         allSuppliers: Array.from(supplierSet).sort(),
         primaryModelNames,
+        modelNames,
       },
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
     );
