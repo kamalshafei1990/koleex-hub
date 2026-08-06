@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- KOLEEX AI face — the KoleexGlowOrb, faithfully reproduced from
+       src/components/ai-orb/AIOrb.tsx (idle state).
+       Sphere #0b0d11 · rim rgba(188,216,240,.25) · Hub Blue aura
+       #567FB2 → #7FA9D6 → #BCD8F0 · twin indicators 16×48 r8, 40px apart
+       (scaled ×3.4 onto a 680px sphere). -->
+  <defs>
+    <!-- Aura blobs (CSS: blur(24px) over a 214px field → 81.6 here) -->
+    <filter id="auraBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="66"/>
+    </filter>
+    <radialGradient id="auraA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#567FB2"/>
+      <stop offset="0.3" stop-color="#567FB2" stop-opacity="0.6"/>
+      <stop offset="0.64" stop-color="#567FB2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="auraB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7FA9D6"/>
+      <stop offset="0.26" stop-color="#7FA9D6" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#7FA9D6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="auraC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#BCD8F0"/>
+      <stop offset="0.52" stop-color="#BCD8F0" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Sphere body: near-black glass -->
+    <radialGradient id="body" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#101319"/>
+      <stop offset="0.72" stop-color="#0B0D11"/>
+      <stop offset="1" stop-color="#07080B"/>
+    </radialGradient>
+    <!-- inset 0 3px 12px rgba(255,255,255,.16): top inner light -->
+    <linearGradient id="topLight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.14" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="0.3" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <!-- inset 0 -12px 30px rgba(0,0,0,.55): bottom inner shade -->
+    <linearGradient id="bottomShade" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.55"/>
+      <stop offset="0.22" stop-color="#000000" stop-opacity="0.18"/>
+      <stop offset="0.42" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <!-- .spec: soft white specular, blur(6px) -->
+    <radialGradient id="specG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.13"/>
+      <stop offset="0.75" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="specBlur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <!-- .inner: faint internal energy -->
+    <radialGradient id="innerA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#567FB2" stop-opacity="0.2"/>
+      <stop offset="0.55" stop-color="#567FB2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="innerB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7FA9D6" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#7FA9D6" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="sphereClip"><circle cx="512" cy="512" r="340"/></clipPath>
+  </defs>
+
+  <!-- ── Aura (behind, Hub Blue energy field) ── -->
+  <defs>
+    <radialGradient id="bloom" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.62" stop-color="#567FB2" stop-opacity="0.55"/>
+      <stop offset="0.74" stop-color="#567FB2" stop-opacity="0.34"/>
+      <stop offset="0.88" stop-color="#7FA9D6" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#BCD8F0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="512" cy="512" r="470" fill="url(#bloom)"/>
+  <g filter="url(#auraBlur)">
+    <circle cx="392" cy="668" r="290" fill="url(#auraA)"/>
+    <circle cx="592" cy="392" r="280" fill="url(#auraB)"/>
+    <circle cx="572" cy="716" r="240" fill="url(#auraC)"/>
+  </g>
+
+  <!-- ── Sphere ── -->
+  <circle cx="512" cy="512" r="340" fill="url(#body)"/>
+  <g clip-path="url(#sphereClip)">
+    <!-- internal energy circulation -->
+    <circle cx="410" cy="580" r="300" fill="url(#innerA)"/>
+    <circle cx="655" cy="400" r="260" fill="url(#innerB)"/>
+    <!-- inset lights -->
+    <circle cx="512" cy="512" r="340" fill="url(#topLight)"/>
+    <circle cx="512" cy="512" r="340" fill="url(#bottomShade)"/>
+    <!-- specular highlight, upper left -->
+    <ellipse cx="472" cy="337" rx="150" ry="102" fill="url(#specG)" filter="url(#specBlur)"/>
+  </g>
+  <!-- rim -->
+  <circle cx="512" cy="512" r="340" fill="none" stroke="#BCD8F0" stroke-opacity="0.25" stroke-width="7"/>
+
+  <!-- ── The identity indicators (the face) ──
+       CSS: 16×48 r8 white @ (47%,44%) of a 200px sphere + twin at +40px.
+       ×3.4 → 54.4×163.2 r27.2, centers x 491.6 / 627.6, y 471.2. -->
+  <rect x="464.4" y="389.6" width="54.4" height="163.2" rx="27.2" fill="#FFFFFF"/>
+  <rect x="600.4" y="389.6" width="54.4" height="163.2" rx="27.2" fill="#FFFFFF"/>
+</svg>
