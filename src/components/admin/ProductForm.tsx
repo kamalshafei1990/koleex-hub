@@ -4560,7 +4560,27 @@ export default function ProductForm({ productId }: Props) {
         {(onePage || steps[currentStep]?.id === "supplier") && (
           <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
-              {memberCtx && safeActiveMember > 0 && activeModel ? (() => {
+              {(() => {
+                /* Spec lines offered by the cost-note "Import from product
+                   specs" picker: resolved per selected member (override ??
+                   family), family values otherwise. Computed here so both
+                   branches share it. */
+                const specEntries = (activeSpecsSchema?.groups ?? []).flatMap((g) =>
+                  g.fields
+                    .filter((f) => !["file", "image", "long_text"].includes(f.fieldType))
+                    .map((f) => {
+                      const fam = ((product.schema_specs || {}) as Record<string, unknown>)[f.key];
+                      const ovv = memberCtx && safeActiveMember > 0 && activeModel
+                        ? (activeModel.specs_overrides ?? {})[f.key]
+                        : undefined;
+                      const v = ovv ?? fam;
+                      return v === undefined || v === null || String(v).trim() === ""
+                        ? null
+                        : { label: f.label ?? f.key, value: String(v), unit: f.unit ?? null };
+                    })
+                    .filter((x): x is { label: string; value: string; unit: string | null } => x !== null),
+                );
+                return memberCtx && safeActiveMember > 0 && activeModel ? (() => {
                 /* MEMBER VIEW (owner rule): the SAME full supplier page as
                    the primary. Values render as primary-link ⊕ this
                    member's supplier_overrides; edits are diffed against the
@@ -4598,6 +4618,7 @@ export default function ProductForm({ productId }: Props) {
                   <SupplierLinkSection
                     links={[merged]}
                     suppliers={suppliers}
+                    productSpecs={specEntries}
                     memberMode={{
                       memberCode: activeModel.primary_model || activeModel.model_name || "",
                       onMakePrimary: () => {
@@ -4627,8 +4648,9 @@ export default function ProductForm({ productId }: Props) {
                   />
                 );
               })() : (
-                <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
-              )}
+                <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} productSpecs={specEntries} />
+              );
+              })()}
             </Section>
           </div>
         )}

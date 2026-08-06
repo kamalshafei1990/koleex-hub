@@ -74,13 +74,16 @@ interface Props {
      add/remove controls disappear, and the star button PROMOTES this
      member to be the family's primary model. */
   memberMode?: { memberCode: string; onMakePrimary: () => void };
+  /* Resolved product/member specs offered by "Import from product specs"
+     under the cost note. */
+  productSpecs?: { label: string; value: string; unit?: string | null }[];
 }
 
 const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
 const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
-export default function SupplierLinkSection({ links, suppliers, onChange, memberMode }: Props) {
+export default function SupplierLinkSection({ links, suppliers, onChange, memberMode, productSpecs }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -95,6 +98,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
   const [nameTrMsg, setNameTrMsg] = useState<Record<string, { kind: "ok" | "error"; text: string }>>({});
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
+  const [specPickerFor, setSpecPickerFor] = useState<string | null>(null); // link whose spec-import list is open
 
   /* Self-healing supplier list. The form loads suppliers at mount in a big
      parallel batch with a timeout; /api/suppliers occasionally spikes to
@@ -473,6 +477,53 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       ⚠ {t("sup.costWarnA", "This cost is NOT full-landed/tax-in. Its margin isn\u2019t directly comparable to delivered costs — add the missing")} {l.cost_basis === "factory_only" ? t("sup.missPackDelivery", "packing + delivery") : l.cost_basis === "packing" ? t("sup.missDelivery", "delivery") : t("sup.missComponents", "components")}{!l.cost_includes_tax ? " + VAT" : ""} {t("sup.costWarnB", "before relying on the auto-detected level.")}
                     </p>
                   )}
+
+                  {/* Cost note — what exactly this price covers. Free text,
+                      plus a picker that pulls "Label: value" lines straight
+                      from the product/member specs (owner request). Saves to
+                      the existing product_suppliers.notes — no new column. */}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={`${lbl} mb-0`}>{t("sup.notes", "Notes")}<FieldHelp {...H.notes} /></label>
+                      {(productSpecs ?? []).length > 0 && (
+                        <button type="button"
+                          onClick={() => setSpecPickerFor(specPickerFor === l._tempId ? null : l._tempId)}
+                          className="text-[10.5px] font-medium text-[var(--accent,#567FB2)] hover:underline inline-flex items-center gap-1">
+                          {specPickerFor === l._tempId ? t("sup.importSpecsClose", "Close specs") : t("sup.importSpecs", "Import from product specs")}
+                        </button>
+                      )}
+                    </div>
+                    <textarea rows={2} className={`${inp} h-auto min-h-[64px] py-2 resize-y`} value={l.notes}
+                      placeholder={t("sup.costNotePh", "What this price covers — configuration, included parts, spec lines…")}
+                      onChange={(e) => update(l._tempId, { notes: e.target.value })} />
+                    {specPickerFor === l._tempId && (productSpecs ?? []).length > 0 && (
+                      <div className="mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2 max-h-56 overflow-y-auto space-y-0.5">
+                        <div className="flex items-center justify-between px-1.5 pb-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.importSpecsHint", "Click a line to add it to the note")}</span>
+                          <button type="button"
+                            onClick={() => {
+                              const all = (productSpecs ?? []).map((sp) => `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`)
+                                .filter((line) => !(l.notes || "").includes(line));
+                              if (all.length) update(l._tempId, { notes: [l.notes, ...all].filter(Boolean).join("\n") });
+                            }}
+                            className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                            {t("sup.importSpecsAll", "Insert all")}
+                          </button>
+                        </div>
+                        {(productSpecs ?? []).map((sp, si) => {
+                          const line = `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`;
+                          const used = (l.notes || "").includes(line);
+                          return (
+                            <button key={si} type="button" disabled={used}
+                              onClick={() => update(l._tempId, { notes: [l.notes, line].filter(Boolean).join("\n") })}
+                              className={`w-full text-start px-1.5 py-1 rounded-lg text-[11px] transition-colors ${used ? "text-[var(--text-ghost)] line-through cursor-default" : "text-[var(--text-muted)] hover:bg-[var(--bg-inverted)]/[0.05] hover:text-[var(--text-primary)]"}`}>
+                              <span className="font-medium">{sp.label}:</span> {sp.value}{sp.unit ? ` ${sp.unit}` : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* From the supplier (Suppliers app) — source of truth, read-only here */}
@@ -660,11 +711,6 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   </div>
                 </div>
 
-                <div>
-                  <label className={lbl}>{t("sup.notes", "Notes")}<FieldHelp {...H.notes} /></label>
-                  <input className={inp} value={l.notes} placeholder={t("sup.notesPh", "Sourcing notes specific to this product…")}
-                    onChange={(e) => update(l._tempId, { notes: e.target.value })} />
-                </div>
               </div>
             );
           })}
