@@ -2001,6 +2001,18 @@ export default function ProductForm({ productId }: Props) {
   const primarySupplierModel =
     (productSuppliers.find((s) => s.is_primary) || productSuppliers[0])?.supplier_product_code ||
     primaryModel?.reference_model || "";
+  /* Hero mirror must follow the SELECTED family member: a sub-model's
+     supplier model = its supplier_overrides / reference_model, falling
+     back to the primary's (inheritance). Only the KOLEEX code
+     auto-suggest keeps reading the primary. */
+  const shownSupplierModel =
+    memberCtx && safeActiveMember > 0 && activeModel
+      ? String(
+          ((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).supplier_product_code ??
+            activeModel.reference_model ??
+            "",
+        ) || primarySupplierModel
+      : primarySupplierModel;
   const suggestedPrimaryModel = suggestPrimaryModel(
     resolvedPrefix,
     primarySupplierModel,
@@ -3813,7 +3825,7 @@ export default function ProductForm({ productId }: Props) {
                           with a shortcut to edit it where it actually lives. */}
                       <input
                         type="text"
-                        value={primarySupplierModel}
+                        value={shownSupplierModel}
                         readOnly
                         placeholder={t("hero.supplierModelPlaceholder", "e.g. JUKI DDL-8700H")}
                         title={t("hero.supplierModelReadonly", "Read from the primary supplier in the Supplier tab.")}
@@ -3824,7 +3836,7 @@ export default function ProductForm({ productId }: Props) {
                         onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
                         className="mt-1.5 text-[10px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
                       >
-                        {primarySupplierModel
+                        {shownSupplierModel
                           ? t("hero.supplierModelEditInTab", "Edit in the Supplier tab")
                           : t("hero.supplierModelSetInTab", "Set in the Supplier tab →")}
                       </button>
@@ -4564,7 +4576,18 @@ export default function ProductForm({ productId }: Props) {
                   );
                 }
                 const ov = (activeModel.supplier_overrides ?? {}) as Record<string, unknown>;
-                const merged = { ...primaryLink, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
+                /* Legacy members (pre-supplier_overrides) keep their model
+                   number in reference_model and their cost in cost_price —
+                   surface those ahead of the primary's values so the page
+                   never LOOKS like it ignores the member's own data. */
+                const legacy: Record<string, unknown> = {};
+                if (!("supplier_product_code" in ov) && activeModel.reference_model && activeModel.reference_model !== primaryLink.supplier_product_code) {
+                  legacy.supplier_product_code = activeModel.reference_model;
+                }
+                if (!("unit_cost_cny" in ov) && activeModel.cost_price && activeModel.cost_price !== primaryLink.unit_cost_cny) {
+                  legacy.unit_cost_cny = activeModel.cost_price;
+                }
+                const merged = { ...primaryLink, ...legacy, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
                 const EDITABLE: (keyof typeof primaryLink)[] = [
                   "supplier_product_code", "moq", "lead_time_days", "unit_cost_cny", "currency",
                   "cost_basis", "cost_includes_tax", "payment_terms", "notes",
@@ -4594,8 +4617,10 @@ export default function ProductForm({ productId }: Props) {
                       const patch: Partial<ModelFormState> = { supplier_overrides: nextOv };
                       /* Mirror the two canonical member columns so profile,
                          quotations and the engine keep reading the truth. */
+                      /* Mirror the code ONLY when the member actually
+                         overrides it — never stomp a legacy per-member
+                         reference_model just because another field changed. */
                       if ("supplier_product_code" in nextOv) patch.reference_model = String(nextOv.supplier_product_code ?? "");
-                      else if (activeModel.reference_model !== String(primaryLink.supplier_product_code ?? "")) patch.reference_model = String(primaryLink.supplier_product_code ?? "");
                       if ("unit_cost_cny" in nextOv) patch.cost_price = String(nextOv.unit_cost_cny ?? "");
                       updateActiveMember(patch);
                     }}
