@@ -84,7 +84,7 @@ const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
 export default function SupplierLinkSection({ links, suppliers, onChange, memberMode, productSpecs }: Props) {
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -100,6 +100,9 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
   const [specPickerFor, setSpecPickerFor] = useState<string | null>(null); // link whose spec-import list is open
   const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);      // link whose price-note editor is expanded
+  const [noteLocale, setNoteLocale] = useState<Record<string, string>>({});
+  const [translatingNote, setTranslatingNote] = useState<string | null>(null);
+  const [noteTrMsg, setNoteTrMsg] = useState<Record<string, { kind: "ok" | "error"; text: string }>>({});
 
   /* Self-healing supplier list. The form loads suppliers at mount in a big
      parallel batch with a timeout; /api/suppliers occasionally spikes to
@@ -159,6 +162,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
         cost_includes_tax: true,
         payment_terms: "",
         notes: "",
+        notes_i18n: {},
         supplier_product_name: "",
         supplier_product_name_i18n: {},
         supplier_product_photo: "",
@@ -241,6 +245,46 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
         }));
       } finally {
         setTranslatingName(null);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [links, t],
+  );
+
+  /* Same contract as autoTranslateName, for the price note. */
+  const autoTranslateNote = useCallback(
+    async (tempId: string, source: string, target: string) => {
+      const text = source.trim();
+      if (!text) return;
+      setTranslatingNote(tempId);
+      setNoteTrMsg((m) => ({ ...m, [tempId]: undefined as never }));
+      try {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ text, target_lang: target, source_lang: "auto" }),
+        });
+        const data = (await res.json()) as { translated?: string; fallback?: boolean; reason?: string };
+        if (!res.ok || data?.fallback || !data?.translated) {
+          setNoteTrMsg((m) => ({
+            ...m,
+            [tempId]: {
+              kind: "error",
+              text: data?.reason === "no_provider"
+                ? t("sup.trNoProvider", "Auto-translate is off — no translation service is configured. Type it manually for now.")
+                : t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually."),
+            },
+          }));
+          return;
+        }
+        const row = links.find((l) => l._tempId === tempId);
+        update(tempId, { notes_i18n: { ...(row?.notes_i18n ?? {}), [target]: data.translated } });
+        setNoteTrMsg((m) => ({ ...m, [tempId]: { kind: "ok", text: t("sup.trDone", "Translated — review before saving.") } }));
+      } catch {
+        setNoteTrMsg((m) => ({ ...m, [tempId]: { kind: "error", text: t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually.") } }));
+      } finally {
+        setTranslatingNote(null);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -455,6 +499,37 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                           <textarea autoFocus rows={2} className={`${inp} h-auto min-h-[56px] py-2 resize-y`} value={l.notes}
                             placeholder={t("sup.costNotePh", "What this price covers — configuration, included parts, spec lines…")}
                             onChange={(e) => update(l._tempId, { notes: e.target.value })} />
+                          {/* Note in other languages — same contract as the
+                              supplier product name (select locale + glow
+                              Auto-translate + per-locale text). */}
+                          {(() => {
+                            const nloc = noteLocale[l._tempId] ?? "zh";
+                            const nRtl = nloc === "ar" || nloc === "ur";
+                            const ni18n = l.notes_i18n ?? {};
+                            const nmsg = noteTrMsg[l._tempId];
+                            return (
+                              <div className="mt-1.5 space-y-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <select value={nloc}
+                                    onChange={(e) => { setNoteLocale((m) => ({ ...m, [l._tempId]: e.target.value })); setNoteTrMsg((m) => ({ ...m, [l._tempId]: undefined as never })); }}
+                                    className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+                                    {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+                                  </select>
+                                  <button type="button"
+                                    onClick={() => autoTranslateNote(l._tempId, l.notes, nloc)}
+                                    disabled={!l.notes.trim() || translatingNote === l._tempId}
+                                    className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0">
+                                    {translatingNote === l._tempId ? t("sup.translating", "Translating…") : t("sup.autoTranslate", "Auto-translate")}
+                                  </button>
+                                </div>
+                                <textarea dir={nRtl ? "rtl" : "ltr"} rows={2} value={ni18n[nloc] ?? ""}
+                                  onChange={(e) => update(l._tempId, { notes_i18n: { ...ni18n, [nloc]: e.target.value } })}
+                                  placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === nloc)?.name ?? nloc)}
+                                  className={`${inp} h-auto min-h-[48px] py-2 resize-y`} />
+                                {nmsg && <p className={`text-[10.5px] ${nmsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{nmsg.text}</p>}
+                              </div>
+                            );
+                          })()}
                           <div className="mt-1 flex items-center justify-between">
                             {(productSpecs ?? []).length > 0 ? (
                               <button type="button"
@@ -500,7 +575,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                         <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
                           title={t("sup.notePriceEdit", "Edit price note")}
                           className="mt-1 w-full text-start text-[10.5px] italic leading-snug text-[var(--text-muted)] hover:text-[var(--text-primary)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap transition-colors">
-                          {l.notes}
+                          {((l.notes_i18n ?? {})[lang] || "").trim() || l.notes}
                         </button>
                       ) : (
                         <button type="button" onClick={() => setNoteOpenFor(l._tempId)}

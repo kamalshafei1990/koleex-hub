@@ -1162,6 +1162,11 @@ export default function ProductForm({ productId }: Props) {
           cost_includes_tax: s.cost_includes_tax === undefined || s.cost_includes_tax === null ? true : !!s.cost_includes_tax,
           payment_terms: str(s.payment_terms),
           notes: str(s.notes),
+          notes_i18n: Object.fromEntries(
+            Object.entries(
+              ((s as { notes_i18n?: Record<string, unknown> | null }).notes_i18n) ?? {},
+            ).map(([k, v]) => [k, String(v ?? "")]),
+          ),
           supplier_product_name: str(s.supplier_product_name),
           supplier_product_name_i18n: Object.fromEntries(
             Object.entries(
@@ -2013,10 +2018,19 @@ export default function ProductForm({ productId }: Props) {
             "",
         ) || primarySupplierModel
       : primarySupplierModel;
+  /* THE KOLEEX-code block edits the SELECTED family member, not always
+     the primary (owner: "when I change the model number even I press
+     the sub product it affects the primary only — big problem"). */
+  const isMemberCodeTarget = memberCtx && safeActiveMember > 0 && !!activeModel;
+  const codeModel = isMemberCodeTarget ? activeModel : primaryModel;
+  const updateCodeModel = isMemberCodeTarget ? updateActiveMember : updatePrimaryModel;
   const suggestedPrimaryModel = suggestPrimaryModel(
     resolvedPrefix,
     primarySupplierModel,
   );
+  const suggestedCodeForTarget = isMemberCodeTarget
+    ? suggestPrimaryModel(resolvedPrefix, shownSupplierModel)
+    : suggestedPrimaryModel;
   useEffect(() => {
     if (!primaryModel) return;
     if (!resolvedPrefix || !primarySupplierModel) return;
@@ -2069,9 +2083,27 @@ export default function ProductForm({ productId }: Props) {
   const [codeCheck, setCodeCheck] = useState<CodeCheck>({ status: "idle" });
 
   useEffect(() => {
-    const code = (primaryModel?.primary_model || "").trim();
+    const code = (codeModel?.primary_model || "").trim();
     if (!code) {
       setCodeCheck({ status: "idle" });
+      return;
+    }
+    /* Same-family duplicate — the server check excludes this product,
+       so two members sharing a code must be caught locally. */
+    const selfIdx = isMemberCodeTarget ? safeActiveMember : 0;
+    const dupIdx = models.findIndex((m, i) => i !== selfIdx && (m.primary_model || "").trim().toUpperCase() === code.toUpperCase());
+    if (dupIdx >= 0) {
+      setCodeCheck({
+        status: "taken",
+        conflict: {
+          product_id: effectiveId || "",
+          product_name: product.product_name || "",
+          product_slug: null,
+          model_id: "",
+          model_name: models[dupIdx].model_name || models[dupIdx].primary_model || "",
+          primary_model: models[dupIdx].primary_model || "",
+        },
+      });
       return;
     }
     /* Bail on incomplete / structurally invalid codes — the
@@ -2117,7 +2149,8 @@ export default function ProductForm({ productId }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [primaryModel?.primary_model, effectiveId, resolvedPrefix]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeModel?.primary_model, effectiveId, resolvedPrefix, safeActiveMember, models.length]);
 
   /* ── Slug uniqueness check ──────────────────────────────────────
      The public URL is /products/<slug>; two products sharing a slug
@@ -2763,6 +2796,14 @@ export default function ProductForm({ productId }: Props) {
         cost_includes_tax: s.cost_includes_tax,
         payment_terms: null,
         notes: s.notes || null,
+        notes_i18n: (() => {
+          const clean = Object.fromEntries(
+            Object.entries(s.notes_i18n ?? {})
+              .map(([k, v]) => [k, String(v ?? "").trim()])
+              .filter(([, v]) => v.length > 0),
+          );
+          return Object.keys(clean).length > 0 ? clean : null;
+        })(),
         supplier_product_name: s.supplier_product_name || null,
         supplier_product_name_i18n: (() => {
           const clean = Object.fromEntries(
@@ -3584,8 +3625,8 @@ export default function ProductForm({ productId }: Props) {
                       mirrored into model_name + slug so the downstream
                       barcode / URL / SKU paths keep working. */}
                   {(() => {
-                    const code = primaryModel?.primary_model || primaryModel?.model_name || "";
-                    const status = primaryModel?.coding_status;
+                    const code = codeModel?.primary_model || codeModel?.model_name || "";
+                    const status = codeModel?.coding_status;
                     const validation = code ? validatePrimaryModel(code, resolvedPrefix) : null;
                     const validationError = validation && !validation.ok ? validation.reason : null;
                     const validationWarning = validation && validation.ok ? validation.warning : null;
@@ -3601,7 +3642,7 @@ export default function ProductForm({ productId }: Props) {
                       !isChecking &&
                       status !== "approved" &&
                       status !== "locked";
-                    const canReset = !!suggestedPrimaryModel && code !== suggestedPrimaryModel && status !== "locked";
+                    const canReset = !!suggestedCodeForTarget && code !== suggestedCodeForTarget && status !== "locked";
                     const isLocked = status === "locked";
                     const statusLabel =
                       status === "edited" ? t("hero.statusEdited", "Edited") :
@@ -3624,9 +3665,14 @@ export default function ProductForm({ productId }: Props) {
                             <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("hero.primaryModelLabel", "Primary Model · KOLEEX Code")}</span>
                           </label>
                           <div className="flex items-center gap-2">
-                            {suggestedPrimaryModel && code && code !== suggestedPrimaryModel && (
+                            {isMemberCodeTarget && (
+                              <span className="text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-[#567FB2]/60 text-[#7FA9D6]">
+                                {t("hero.selectedModelChip", "Selected model")}
+                              </span>
+                            )}
+                            {suggestedCodeForTarget && code && code !== suggestedCodeForTarget && (
                               <span className="text-[10px] text-[var(--text-ghost)]">
-                                {t("hero.suggested", "Suggested:")} <span className="font-mono font-semibold text-[var(--text-primary)]">{suggestedPrimaryModel}</span>
+                                {t("hero.suggested", "Suggested:")} <span className="font-mono font-semibold text-[var(--text-primary)]">{suggestedCodeForTarget}</span>
                               </span>
                             )}
                             {statusLabel && (
@@ -3666,13 +3712,13 @@ export default function ProductForm({ productId }: Props) {
                             disabled={isLocked}
                             onChange={(e) => {
                               const next = e.target.value.toUpperCase().replace(/\s+/g, "");
-                              updatePrimaryModel({
+                              updateCodeModel({
                                 primary_model: next,
                                 model_name: next,
                                 slug: slugify(next),
-                                code_prefix: resolvedPrefix || primaryModel?.code_prefix || "",
+                                code_prefix: resolvedPrefix || codeModel?.code_prefix || "",
                                 coding_status:
-                                  next === suggestedPrimaryModel
+                                  next === suggestedCodeForTarget
                                     ? "auto_suggested"
                                     : "edited",
                               });
@@ -3680,7 +3726,7 @@ export default function ProductForm({ productId }: Props) {
                             onBlur={(e) => {
                               const normalized = normalizeKoleexCode(e.target.value);
                               if (normalized !== e.target.value) {
-                                updatePrimaryModel({
+                                updateCodeModel({
                                   primary_model: normalized,
                                   model_name: normalized,
                                   slug: slugify(normalized),
@@ -3688,7 +3734,7 @@ export default function ProductForm({ productId }: Props) {
                               }
                             }}
                             placeholder={
-                              suggestedPrimaryModel ||
+                              suggestedCodeForTarget ||
                               (resolvedPrefix ? `${resolvedPrefix}-…` : t("hero.codePlaceholder", "e.g. XCS-7800"))
                             }
                             className={`flex-1 min-w-[180px] h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border ${
@@ -3703,11 +3749,11 @@ export default function ProductForm({ productId }: Props) {
                           <button
                             type="button"
                             onClick={() => {
-                              if (!suggestedPrimaryModel) return;
-                              updatePrimaryModel({
-                                primary_model: suggestedPrimaryModel,
-                                model_name: suggestedPrimaryModel,
-                                slug: slugify(suggestedPrimaryModel),
+                              if (!suggestedCodeForTarget) return;
+                              updateCodeModel({
+                                primary_model: suggestedCodeForTarget,
+                                model_name: suggestedCodeForTarget,
+                                slug: slugify(suggestedCodeForTarget),
                                 code_prefix: resolvedPrefix,
                                 coding_status: "auto_suggested",
                               });
@@ -3726,7 +3772,7 @@ export default function ProductForm({ productId }: Props) {
                             type="button"
                             onClick={() => {
                               if (!canApprove) return;
-                              updatePrimaryModel({ coding_status: "approved" });
+                              updateCodeModel({ coding_status: "approved" });
                             }}
                             disabled={!canApprove}
                             className="h-12 px-3.5 rounded-xl border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
@@ -3773,7 +3819,7 @@ export default function ProductForm({ productId }: Props) {
                           <p className="text-[11px] text-[var(--text-ghost)] mt-2">
                             {t("model.checking", "Checking if this code is available…")}
                           </p>
-                        ) : codeCheck.status === "available" && code && code !== suggestedPrimaryModel ? (
+                        ) : codeCheck.status === "available" && code && code !== suggestedCodeForTarget ? (
                           <p className="text-[11px] text-[var(--state-success,#00CC66)] mt-2">
                             ✓ {t("model.availableInline", "Available — no other product uses this code.")}
                           </p>
@@ -4645,7 +4691,7 @@ export default function ProductForm({ productId }: Props) {
                 const merged = { ...primaryLink, ...legacy, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
                 const EDITABLE: (keyof typeof primaryLink)[] = [
                   "supplier_product_code", "moq", "lead_time_days", "unit_cost_cny", "currency",
-                  "cost_basis", "cost_includes_tax", "payment_terms", "notes",
+                  "cost_basis", "cost_includes_tax", "payment_terms", "notes", "notes_i18n",
                   "supplier_product_name", "supplier_product_name_i18n", "supplier_product_photo",
                   "quotation_file_url", "quotation_file_name",
                 ];
@@ -5025,10 +5071,11 @@ export default function ProductForm({ productId }: Props) {
                   onUpdate={updateActiveMember}
                   costNote={(() => {
                     const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
-                    const ovNote = safeActiveMember > 0
-                      ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
-                      : undefined;
-                    return String(ovNote ?? pl?.notes ?? "").trim() || null;
+                    const ov = safeActiveMember > 0 ? ((activeModel.supplier_overrides ?? {}) as Record<string, unknown>) : {};
+                    const ovI18n = (ov.notes_i18n ?? null) as Record<string, string> | null;
+                    const ovNote = (ovI18n?.[lang] || "").trim() || (ov.notes as string | undefined);
+                    const plNote = ((pl?.notes_i18n ?? {})[lang] || "").trim() || pl?.notes;
+                    return String(ovNote ?? plNote ?? "").trim() || null;
                   })()}
                   familyCost={(() => {
                     const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
@@ -5101,10 +5148,14 @@ export default function ProductForm({ productId }: Props) {
                       {/* The price's own note (Supplier tab) rides along
                           wherever the price is shown — member note first. */}
                       {(() => {
-                        const memberNote = memberCtx && safeActiveMember > 0 && activeModel
-                          ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
-                          : undefined;
-                        const note = String(memberNote ?? primaryLink?.notes ?? "").trim();
+                        const ov = memberCtx && safeActiveMember > 0 && activeModel
+                          ? ((activeModel.supplier_overrides ?? {}) as Record<string, unknown>)
+                          : {};
+                        const ovI18n = (ov.notes_i18n ?? null) as Record<string, string> | null;
+                        const plI18n = primaryLink?.notes_i18n ?? null;
+                        const memberNote = (ovI18n?.[lang] || "").trim() || (ov.notes as string | undefined);
+                        const primaryNote = (plI18n?.[lang] || "").trim() || primaryLink?.notes;
+                        const note = String(memberNote ?? primaryNote ?? "").trim();
                         if (!note) return null;
                         return (
                           <p className="mt-1.5 text-[10.5px] italic leading-snug text-[var(--text-muted)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap">

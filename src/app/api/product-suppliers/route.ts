@@ -27,7 +27,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const LINK_COLS =
-  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, supplier_product_name, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax";
+  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, notes_i18n, supplier_product_name, supplier_product_name_i18n, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax";
 
 /* Confirm the product exists AND belongs to the caller's tenant before
    reading/writing its supplier links. Returns the product id or null. */
@@ -110,8 +110,10 @@ export async function PUT(req: Request) {
       currency: (r.currency as string) || null,
       payment_terms: (r.payment_terms as string) || null,
       notes: (r.notes as string) || null,
+      notes_i18n: r.notes_i18n && typeof r.notes_i18n === "object" && !Array.isArray(r.notes_i18n) ? (r.notes_i18n as Record<string, string>) : null,
       /* product-as-supplied facts (pd_supplier_product_facts) */
       supplier_product_name: (r.supplier_product_name as string) || null,
+      supplier_product_name_i18n: r.supplier_product_name_i18n && typeof r.supplier_product_name_i18n === "object" && !Array.isArray(r.supplier_product_name_i18n) ? (r.supplier_product_name_i18n as Record<string, string>) : null,
       supplier_product_photo: (r.supplier_product_photo as string) || null,
       supply_type: (r.supply_type as string) || null,
       sample_available: r.sample_available === undefined || r.sample_available === null ? null : !!r.sample_available,

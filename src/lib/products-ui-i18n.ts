@@ -705,6 +705,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fam.promoteConfirm": { en: "Make this model the PRIMARY of the family? The current primary becomes a regular member.", zh: "\u5c06\u8be5\u578b\u53f7\u8bbe\u4e3a\u7cfb\u5217\u4e3b\u578b\u53f7\uff1f\u5f53\u524d\u4e3b\u578b\u53f7\u5c06\u53d8\u4e3a\u666e\u901a\u6210\u5458\u3002", ar: "\u062c\u0639\u0644 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u062f\u064a\u0644 \u0623\u0633\u0627\u0633\u064a \u0627\u0644\u0639\u0627\u0626\u0644\u0629\u061f \u0627\u0644\u0623\u0633\u0627\u0633\u064a \u0627\u0644\u062d\u0627\u0644\u064a \u064a\u0635\u0628\u062d \u0639\u0636\u0648\u0627\u064b \u0639\u0627\u062f\u064a\u0627\u064b." },
   "pricing.costNote": { en: "Cost note — what this price covers", zh: "成本备注——该价格包含的内容", ar: "ملاحظة التكلفة — ما يغطيه هذا السعر" },
   "pricing.costNoteEdit": { en: "Edit in the Supplier tab", zh: "在供应商标签页编辑", ar: "عدّلها في تبويب المورّد" },
+  "hero.selectedModelChip": { en: "Selected model", zh: "当前型号", ar: "الموديل المحدد" },
+  "sup.noteInLang": { en: "Price note in {lang}", zh: "{lang}价格备注", ar: "ملاحظة السعر بلغة {lang}" },
   "sup.addPriceNote": { en: "Add price note", zh: "添加价格备注", ar: "أضف ملاحظة للسعر" },
   "sup.noteDone": { en: "Done", zh: "完成", ar: "تم" },
   "sup.notePriceEdit": { en: "Edit price note", zh: "编辑价格备注", ar: "عدّل ملاحظة السعر" },

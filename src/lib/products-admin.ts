@@ -409,6 +409,7 @@ export interface ProductSupplierLinkRow {
   cost_includes_tax?: boolean | null;
   payment_terms?: string | null;
   notes?: string | null;
+  notes_i18n?: Record<string, string> | null;
   /* product-as-supplied facts (pd_supplier_product_facts) */
   supplier_product_name?: string | null;
   supplier_product_name_i18n?: Record<string, string> | null;

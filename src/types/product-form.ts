@@ -266,6 +266,9 @@ export interface ProductSupplierFormState {
   cost_includes_tax: boolean;
   payment_terms: string;
   notes: string;
+  /* Locale-keyed translations of the price note. Base note above is the
+     source text in whatever language it was written. */
+  notes_i18n: Record<string, string>;
   /* product-as-supplied facts (migration pd_supplier_product_facts). */
   supplier_product_name: string;
   /* Locale-keyed translations of the supplier's product name (owner
