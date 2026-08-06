@@ -128,8 +128,8 @@ export function FamilyStrip({
               className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[12px] font-semibold tabular-nums transition-colors ${
                 i === 0
                   ? isActive
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-amber-400 ring-2 ring-amber-400/50"
-                    : "bg-amber-400/15 text-amber-200 border-amber-400/70 hover:bg-amber-400/25"
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[#567FB2] ring-2 ring-[#567FB2]/45"
+                    : "bg-[#567FB2]/15 text-[#BCD8F0] border-[#567FB2]/70 hover:bg-[#567FB2]/25"
                   : isActive
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
@@ -137,7 +137,7 @@ export function FamilyStrip({
             >
               {i === 0 && (
                 <span title={t("pp.primary", "Primary")} className="inline-flex">
-                  <CrownIcon className={`h-3 w-3 shrink-0 ${isActive ? "text-amber-300" : "text-amber-400/80"}`} />
+                  <CrownIcon className={`h-3 w-3 shrink-0 ${isActive ? "text-[#7FA9D6]" : "text-[#7FA9D6]"}`} />
                 </span>
               )}
               {memberLabel(m, i)}

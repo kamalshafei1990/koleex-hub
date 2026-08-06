@@ -294,7 +294,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                         type="button"
                         onClick={memberMode.onMakePrimary}
                         title={t("sup.makeModelPrimary", "Make this model the PRIMARY of the family")}
-                        className="h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors bg-[var(--bg-surface)] text-amber-300 border-amber-400/50 hover:bg-amber-400/10"
+                        className="h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors bg-[var(--bg-surface)] text-[#7FA9D6] border-[#567FB2]/50 hover:bg-[#567FB2]/10"
                       >
                         <StarIcon className="h-3 w-3" /> {t("sup.makeModelPrimary2", "Make primary model")}
                       </button>
@@ -677,8 +677,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
           disabled button when the directory simply hasn't arrived. */}
       {memberMode ? (
         /* Member view: supplier management is LOCKED — family-level. */
-        <div className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/[0.06] px-3.5 py-2.5">
-          <StarIcon className="h-3.5 w-3.5 text-amber-300 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-[#567FB2]/30 bg-[#567FB2]/[0.06] px-3.5 py-2.5">
+          <StarIcon className="h-3.5 w-3.5 text-[#7FA9D6] shrink-0" />
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
             {t("sup.memberLocked", "You are editing model {code}: the values below start as the PRIMARY's and save to this model when you change them. The supplier itself is family-level — switch to the primary model to change or add suppliers.").replace("{code}", memberMode.memberCode)}
           </p>
