@@ -48,7 +48,7 @@ import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
-import StickyNoteIcon from "@/components/icons/ui/StickyNoteIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import { FieldHelp, SUPPLIER_LINK_HELP as H } from "@/components/admin/form-sections/FieldHelp";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
@@ -115,11 +115,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
   const [specPickerFor, setSpecPickerFor] = useState<string | null>(null); // link whose spec-import list is open
-  const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);      // link whose price-note editor is expanded
-  const [noteLocale, setNoteLocale] = useState<Record<string, string>>({});
-  const [translatingNote, setTranslatingNote] = useState<string | null>(null);
-  const [noteTrMsg, setNoteTrMsg] = useState<Record<string, { kind: "ok" | "error"; text: string }>>({});
-  const [extraLocale, setExtraLocale] = useState<Record<string, string>>({});   // key `${tempId}:${idx}`
+  const [langOpenFor, setLangOpenFor] = useState<string | null>(null);       // price row whose language line is open
+  const [extraLocale, setExtraLocale] = useState<Record<string, string>>({});  // per-row locale, key `main:${tempId}` / `${tempId}:${idx}`
   const [translatingExtra, setTranslatingExtra] = useState<string | null>(null);
 
   /* Self-healing supplier list. The form loads suppliers at mount in a big
@@ -264,46 +261,6 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
         }));
       } finally {
         setTranslatingName(null);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [links, t],
-  );
-
-  /* Same contract as autoTranslateName, for the price note. */
-  const autoTranslateNote = useCallback(
-    async (tempId: string, source: string, target: string) => {
-      const text = source.trim();
-      if (!text) return;
-      setTranslatingNote(tempId);
-      setNoteTrMsg((m) => ({ ...m, [tempId]: undefined as never }));
-      try {
-        const res = await fetch("/api/ai/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ text, target_lang: target, source_lang: "auto" }),
-        });
-        const data = (await res.json()) as { translated?: string; fallback?: boolean; reason?: string };
-        if (!res.ok || data?.fallback || !data?.translated) {
-          setNoteTrMsg((m) => ({
-            ...m,
-            [tempId]: {
-              kind: "error",
-              text: data?.reason === "no_provider"
-                ? t("sup.trNoProvider", "Auto-translate is off — no translation service is configured. Type it manually for now.")
-                : t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually."),
-            },
-          }));
-          return;
-        }
-        const row = links.find((l) => l._tempId === tempId);
-        update(tempId, { notes_i18n: { ...(row?.notes_i18n ?? {}), [target]: data.translated } });
-        setNoteTrMsg((m) => ({ ...m, [tempId]: { kind: "ok", text: t("sup.trDone", "Translated — review before saving.") } }));
-      } catch {
-        setNoteTrMsg((m) => ({ ...m, [tempId]: { kind: "error", text: t("sup.trFailed", "Couldn't translate right now. Try again, or type it manually.") } }));
-      } finally {
-        setTranslatingNote(null);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -494,181 +451,157 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                     </div>
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><CircleDollarSignIcon className="h-3 w-3" /> {t("sup.costPrice", "Cost price")}</span><FieldHelp {...H.costPrice} /></label>
-                      <div className="flex gap-1.5">
-                        <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 1850`}
-                          onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title={t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}>
-                          CNY
-                        </div>
-                      </div>
-                      {/* Live USD reading of what was just typed. Below the
-                          field, not inside it: the entry stays unambiguously
-                          CNY — which is what gets saved and what the pricing
-                          engine uses — while the person entering it can still
-                          sanity-check the number in the currency they think
-                          in. Appears only once the figure is real. */}
-                      <UsdHint cny={l.unit_cost_cny} />
-                      {/* Price note — an annotation OF this price, not a
-                          separate section (owner). Collapsed = one muted
-                          italic line; expanded = tiny editor + spec import.
-                          Anywhere the price is displayed, this note rides
-                          along as its caption. */}
-                      {noteOpenFor === l._tempId ? (
-                        <div className="mt-1.5">
-                          <textarea autoFocus rows={2} className={`${inp} h-auto min-h-[56px] py-2 resize-y`} value={l.notes}
-                            placeholder={t("sup.costNotePh", "What this price covers — configuration, included parts, spec lines…")}
-                            onChange={(e) => update(l._tempId, { notes: e.target.value })} />
-                          {/* Note in other languages — same contract as the
-                              supplier product name (select locale + glow
-                              Auto-translate + per-locale text). */}
-                          {(() => {
-                            const nloc = noteLocale[l._tempId] ?? "zh";
-                            const nRtl = nloc === "ar" || nloc === "ur";
-                            const ni18n = l.notes_i18n ?? {};
-                            const nmsg = noteTrMsg[l._tempId];
-                            return (
-                              <div className="mt-1.5 space-y-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <select value={nloc}
-                                    onChange={(e) => { setNoteLocale((m) => ({ ...m, [l._tempId]: e.target.value })); setNoteTrMsg((m) => ({ ...m, [l._tempId]: undefined as never })); }}
-                                    className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
-                                    {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-                                  </select>
+                      {/* PRICES & NOTES — one flat list, no nested boxes
+                          (owner: "shell inside shell"). The first row is the
+                          MAIN price's note; each extra price is one row of
+                          ¥ + note. A small language button opens ONE compact
+                          translation line under its row, on demand. */}
+                      {(() => {
+                        const doTranslate = async (rkey: string, source: string, target: string, write: (v: string) => void) => {
+                          const text = source.trim();
+                          if (!text) return;
+                          setTranslatingExtra(rkey);
+                          try {
+                            const res = await fetch("/api/ai/translate", {
+                              method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                              body: JSON.stringify({ text, target_lang: target, source_lang: "auto" }),
+                            });
+                            const data = (await res.json()) as { translated?: string; fallback?: boolean };
+                            if (res.ok && data?.translated && !data.fallback) write(data.translated);
+                          } catch { /* manual entry stays possible */ }
+                          setTranslatingExtra(null);
+                        };
+                        const rowCls = "flex items-center gap-1.5";
+                        const miniBtn = "h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-colors";
+                        const rows = [
+                          { key: `main:${l._tempId}`, pi: -1 },
+                          ...(l.price_options ?? []).map((_, pi) => ({ key: `${l._tempId}:${pi}`, pi })),
+                        ];
+                        return (
+                          <div className="mt-2 space-y-1.5">
+                            {rows.map(({ key: rkey, pi }) => {
+                              const main = pi < 0;
+                              const po = main ? null : (l.price_options ?? [])[pi];
+                              const note = main ? l.notes : (po?.note ?? "");
+                              const i18n = (main ? l.notes_i18n : po?.note_i18n) ?? {};
+                              const setNote = (v: string) => main
+                                ? update(l._tempId, { notes: v })
+                                : update(l._tempId, { price_options: (l.price_options ?? []).map((x, xi) => (xi === pi ? { ...x, note: v } : x)) });
+                              const setI18n = (m: Record<string, string>) => main
+                                ? update(l._tempId, { notes_i18n: m })
+                                : update(l._tempId, { price_options: (l.price_options ?? []).map((x, xi) => (xi === pi ? { ...x, note_i18n: m } : x)) });
+                              const loc = extraLocale[rkey] ?? "zh";
+                              const rtl = loc === "ar" || loc === "ur";
+                              const open = langOpenFor === rkey;
+                              const hasTr = Object.values(i18n).some((v) => (v || "").trim());
+                              return (
+                                <div key={rkey}>
+                                  <div className={rowCls}>
+                                    {main ? (
+                                      <div className="relative w-[110px] shrink-0" title={t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}>
+                                        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[var(--text-ghost)]">¥</span>
+                                        <input inputMode="decimal" value={l.unit_cost_cny} placeholder={`${t("sup.eg", "e.g.")} 1850`}
+                                          onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })}
+                                          className={`${inp} ps-7 border-[var(--border-strong)]`} />
+                                      </div>
+                                    ) : (
+                                      <div className="relative w-[110px] shrink-0">
+                                        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[var(--text-ghost)]">¥</span>
+                                        <input inputMode="decimal" value={po?.price ?? ""} placeholder="0"
+                                          onChange={(e) => update(l._tempId, { price_options: (l.price_options ?? []).map((x, xi) => (xi === pi ? { ...x, price: e.target.value.replace(/[^0-9.]/g, "") } : x)) })}
+                                          className={`${inp} ps-7`} />
+                                      </div>
+                                    )}
+                                    <input value={note}
+                                      placeholder={main ? t("sup.costNotePh2", "Note for this price (optional)…") : t("sup.priceOptNotePh", "What this price covers…")}
+                                      onChange={(e) => setNote(e.target.value)}
+                                      className={`${inp} flex-1 min-w-0`} />
+                                    <button type="button"
+                                      onClick={() => setLangOpenFor(open ? null : rkey)}
+                                      className={`${miniBtn} ${open || hasTr ? "border-[var(--accent,#567FB2)]/60 text-[var(--accent,#567FB2)]" : "border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"}`}
+                                      title={t("sup.noteLanguages", "Note in other languages")}>
+                                      <LanguagesIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                    {main ? (
+                                      <span className="h-9 px-2 shrink-0 rounded-lg border border-[#567FB2]/50 text-[#7FA9D6] text-[9.5px] font-bold uppercase tracking-[0.14em] flex items-center"
+                                        title={t("sup.mainPriceIs", "The main factory cost — the pricing engine works from this figure.")}>
+                                        {t("sup.mainChip", "Main")}
+                                      </span>
+                                    ) : (
+                                      <button type="button" onClick={() => { update(l._tempId, { price_options: (l.price_options ?? []).filter((_, xi) => xi !== pi) }); if (open) setLangOpenFor(null); }}
+                                        className={`${miniBtn} border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] hover:border-[var(--state-error,#FF3333)]/50`}
+                                        title={t("sup.removePrice", "Remove this price")}>
+                                        <TrashIcon className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {open && (
+                                    <div className="mt-1.5 ms-[42px] flex items-center gap-1.5">
+                                      <select value={loc}
+                                        onChange={(e) => setExtraLocale((m) => ({ ...m, [rkey]: e.target.value }))}
+                                        className="h-8 px-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] shrink-0">
+                                        {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+                                      </select>
+                                      <input dir={rtl ? "rtl" : "ltr"} value={i18n[loc] ?? ""}
+                                        onChange={(e) => setI18n({ ...i18n, [loc]: e.target.value })}
+                                        placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === loc)?.name ?? loc)}
+                                        className={`${inp} flex-1 min-w-0 h-8`} />
+                                      <button type="button"
+                                        onClick={() => doTranslate(rkey, note, loc, (v) => setI18n({ ...i18n, [loc]: v }))}
+                                        disabled={!note.trim() || translatingExtra === rkey}
+                                        className="kx-ai-glow h-8 px-2.5 rounded-lg text-[10.5px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0">
+                                        {translatingExtra === rkey ? t("sup.translating", "Translating…") : t("sup.autoTranslate", "Auto-translate")}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {main && <UsdHint cny={l.unit_cost_cny} />}
+                                </div>
+                              );
+                            })}
+                            <div className="flex items-center gap-4">
+                              <button type="button"
+                                onClick={() => update(l._tempId, { price_options: [...(l.price_options ?? []), { price: "", note: "", note_i18n: {} }] })}
+                                className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                                + {t("sup.addAnotherPrice", "Add another price")}
+                              </button>
+                              {(productSpecs ?? []).length > 0 && (
+                                <button type="button"
+                                  onClick={() => setSpecPickerFor(specPickerFor === l._tempId ? null : l._tempId)}
+                                  className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                                  {specPickerFor === l._tempId ? t("sup.importSpecsClose", "Close specs") : t("sup.importSpecs", "Import from product specs")}
+                                </button>
+                              )}
+                            </div>
+                            {specPickerFor === l._tempId && (productSpecs ?? []).length > 0 && (
+                              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2 max-h-56 overflow-y-auto space-y-0.5">
+                                <div className="flex items-center justify-between px-1.5 pb-1">
+                                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.importSpecsHint", "Click a line to add it to the note")}</span>
                                   <button type="button"
-                                    onClick={() => autoTranslateNote(l._tempId, l.notes, nloc)}
-                                    disabled={!l.notes.trim() || translatingNote === l._tempId}
-                                    className="kx-ai-glow h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0">
-                                    {translatingNote === l._tempId ? t("sup.translating", "Translating…") : t("sup.autoTranslate", "Auto-translate")}
+                                    onClick={() => {
+                                      const all = (productSpecs ?? []).map((sp) => `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`)
+                                        .filter((line) => !(l.notes || "").includes(line));
+                                      if (all.length) update(l._tempId, { notes: [l.notes, ...all].filter(Boolean).join("\n") });
+                                    }}
+                                    className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                                    {t("sup.importSpecsAll", "Insert all")}
                                   </button>
                                 </div>
-                                <textarea dir={nRtl ? "rtl" : "ltr"} rows={2} value={ni18n[nloc] ?? ""}
-                                  onChange={(e) => update(l._tempId, { notes_i18n: { ...ni18n, [nloc]: e.target.value } })}
-                                  placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === nloc)?.name ?? nloc)}
-                                  className={`${inp} h-auto min-h-[48px] py-2 resize-y`} />
-                                {nmsg && <p className={`text-[10.5px] ${nmsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{nmsg.text}</p>}
+                                {(productSpecs ?? []).map((sp, si) => {
+                                  const line = `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`;
+                                  const used = (l.notes || "").includes(line);
+                                  return (
+                                    <button key={si} type="button" disabled={used}
+                                      onClick={() => update(l._tempId, { notes: [l.notes, line].filter(Boolean).join("\n") })}
+                                      className={`w-full text-start px-1.5 py-1 rounded-lg text-[11px] transition-colors ${used ? "text-[var(--text-ghost)] line-through cursor-default" : "text-[var(--text-muted)] hover:bg-[var(--bg-inverted)]/[0.05] hover:text-[var(--text-primary)]"}`}>
+                                      <span className="font-medium">{sp.label}:</span> {sp.value}{sp.unit ? ` ${sp.unit}` : ""}
+                                    </button>
+                                  );
+                                })}
                               </div>
-                            );
-                          })()}
-                          <div className="mt-1 flex items-center justify-between">
-                            {(productSpecs ?? []).length > 0 ? (
-                              <button type="button"
-                                onClick={() => setSpecPickerFor(specPickerFor === l._tempId ? null : l._tempId)}
-                                className="text-[10.5px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                                {specPickerFor === l._tempId ? t("sup.importSpecsClose", "Close specs") : t("sup.importSpecs", "Import from product specs")}
-                              </button>
-                            ) : <span />}
-                            <button type="button" onClick={() => { setNoteOpenFor(null); setSpecPickerFor(null); }}
-                              className="text-[10.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                              {t("sup.noteDone", "Done")}
-                            </button>
-                          </div>
-                          {specPickerFor === l._tempId && (productSpecs ?? []).length > 0 && (
-                            <div className="mt-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2 max-h-56 overflow-y-auto space-y-0.5">
-                              <div className="flex items-center justify-between px-1.5 pb-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.importSpecsHint", "Click a line to add it to the note")}</span>
-                                <button type="button"
-                                  onClick={() => {
-                                    const all = (productSpecs ?? []).map((sp) => `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`)
-                                      .filter((line) => !(l.notes || "").includes(line));
-                                    if (all.length) update(l._tempId, { notes: [l.notes, ...all].filter(Boolean).join("\n") });
-                                  }}
-                                  className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                                  {t("sup.importSpecsAll", "Insert all")}
-                                </button>
-                              </div>
-                              {(productSpecs ?? []).map((sp, si) => {
-                                const line = `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`;
-                                const used = (l.notes || "").includes(line);
-                                return (
-                                  <button key={si} type="button" disabled={used}
-                                    onClick={() => update(l._tempId, { notes: [l.notes, line].filter(Boolean).join("\n") })}
-                                    className={`w-full text-start px-1.5 py-1 rounded-lg text-[11px] transition-colors ${used ? "text-[var(--text-ghost)] line-through cursor-default" : "text-[var(--text-muted)] hover:bg-[var(--bg-inverted)]/[0.05] hover:text-[var(--text-primary)]"}`}>
-                                    <span className="font-medium">{sp.label}:</span> {sp.value}{sp.unit ? ` ${sp.unit}` : ""}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ) : l.notes ? (
-                        <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
-                          title={t("sup.notePriceEdit", "Edit price note")}
-                          className="mt-1 w-full text-start text-[10.5px] italic leading-snug text-[var(--text-muted)] hover:text-[var(--text-primary)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap transition-colors">
-                          {((l.notes_i18n ?? {})[lang] || "").trim() || l.notes}
-                        </button>
-                      ) : (
-                        <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
-                          className="mt-1 text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                          <StickyNoteIcon className="h-3 w-3 inline-block align-[-2px] me-1" /> + {t("sup.addPriceNote", "Add price note")}
-                        </button>
-                      )}
-
-                      {/* EXTRA PRICES — the same supplier can quote several
-                          prices (configurations, sets, options); each carries
-                          its own note and rides along wherever the price is
-                          shown. Saved in price_options (+ member overrides). */}
-                      {(l.price_options ?? []).map((po, pi) => {
-                        const updPO = (patch: Partial<typeof po>) =>
-                          update(l._tempId, { price_options: (l.price_options ?? []).map((x, xi) => (xi === pi ? { ...x, ...patch } : x)) });
-                        const ekey = `${l._tempId}:${pi}`;
-                        const eloc = extraLocale[ekey] ?? "zh";
-                        const eRtl = eloc === "ar" || eloc === "ur";
-                        return (
-                          <div key={pi} className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 p-2 space-y-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-[var(--text-ghost)] shrink-0">¥</span>
-                              <input inputMode="decimal" value={po.price} placeholder="0"
-                                onChange={(e) => updPO({ price: e.target.value.replace(/[^0-9.]/g, "") })}
-                                className={`${inp} w-[110px] shrink-0`} />
-                              <input value={po.note} placeholder={t("sup.priceOptNotePh", "What this price covers…")}
-                                onChange={(e) => updPO({ note: e.target.value })}
-                                className={`${inp} flex-1 min-w-0`} />
-                              <button type="button" onClick={() => update(l._tempId, { price_options: (l.price_options ?? []).filter((_, xi) => xi !== pi) })}
-                                className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] hover:border-[var(--state-error,#FF3333)]/50 flex items-center justify-center transition-colors"
-                                title={t("sup.removePrice", "Remove this price")}>
-                                <TrashIcon className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <select value={eloc}
-                                onChange={(e) => setExtraLocale((m) => ({ ...m, [ekey]: e.target.value }))}
-                                className="h-8 px-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] shrink-0">
-                                {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-                              </select>
-                              <input dir={eRtl ? "rtl" : "ltr"} value={(po.note_i18n ?? {})[eloc] ?? ""}
-                                onChange={(e) => updPO({ note_i18n: { ...(po.note_i18n ?? {}), [eloc]: e.target.value } })}
-                                placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === eloc)?.name ?? eloc)}
-                                className={`${inp} flex-1 min-w-0 h-8`} />
-                              <button type="button"
-                                onClick={async () => {
-                                  const text = po.note.trim();
-                                  if (!text) return;
-                                  setTranslatingExtra(ekey);
-                                  try {
-                                    const res = await fetch("/api/ai/translate", {
-                                      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-                                      body: JSON.stringify({ text, target_lang: eloc, source_lang: "auto" }),
-                                    });
-                                    const data = (await res.json()) as { translated?: string; fallback?: boolean };
-                                    if (res.ok && data?.translated && !data.fallback) {
-                                      updPO({ note_i18n: { ...(po.note_i18n ?? {}), [eloc]: data.translated } });
-                                    }
-                                  } catch { /* leave the field for manual entry */ }
-                                  setTranslatingExtra(null);
-                                }}
-                                disabled={!po.note.trim() || translatingExtra === ekey}
-                                className="kx-ai-glow h-8 px-2.5 rounded-lg text-[10.5px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0">
-                                {translatingExtra === ekey ? t("sup.translating", "Translating…") : t("sup.autoTranslate", "Auto-translate")}
-                              </button>
-                            </div>
+                            )}
                           </div>
                         );
-                      })}
-                      <button type="button"
-                        onClick={() => update(l._tempId, { price_options: [...(l.price_options ?? []), { price: "", note: "", note_i18n: {} }] })}
-                        className="mt-1.5 text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline block">
-                        + {t("sup.addAnotherPrice", "Add another price")}
-                      </button>
+                      })()}
                     </div>
                   </div>
                   {/* What the cost already includes. Display + warning only —
