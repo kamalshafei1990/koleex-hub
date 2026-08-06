@@ -523,10 +523,18 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                                       <LanguagesIcon className="h-3.5 w-3.5" />
                                     </button>
                                     {main ? (
-                                      <span className="h-9 px-2 shrink-0 rounded-lg border border-[#567FB2]/50 text-[#7FA9D6] text-[9.5px] font-bold uppercase tracking-[0.14em] flex items-center"
-                                        title={t("sup.mainPriceIs", "The main factory cost — the pricing engine works from this figure.")}>
-                                        {t("sup.mainChip", "Main")}
-                                      </span>
+                                      /* OWNER RULE: one price only → it IS the main.
+                                         More than one price → there is NO main price,
+                                         so the chip disappears (a spacer keeps the
+                                         rows aligned with the delete buttons). */
+                                      (l.price_options ?? []).length === 0 ? (
+                                        <span className="h-9 px-2 shrink-0 rounded-lg border border-[#567FB2]/50 text-[#7FA9D6] text-[9.5px] font-bold uppercase tracking-[0.14em] flex items-center"
+                                          title={t("sup.mainPriceIs", "The main factory cost — the pricing engine works from this figure.")}>
+                                          {t("sup.mainChip", "Main")}
+                                        </span>
+                                      ) : (
+                                        <span className="h-9 w-9 shrink-0" aria-hidden />
+                                      )
                                     ) : (
                                       <button type="button" onClick={() => { update(l._tempId, { price_options: (l.price_options ?? []).filter((_, xi) => xi !== pi) }); if (open) setLangOpenFor(null); }}
                                         className={`${miniBtn} border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] hover:border-[var(--state-error,#FF3333)]/50`}
