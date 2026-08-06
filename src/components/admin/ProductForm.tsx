@@ -4565,21 +4565,56 @@ export default function ProductForm({ productId }: Props) {
                    specs" picker: resolved per selected member (override ??
                    family), family values otherwise. Computed here so both
                    branches share it. */
-                const specEntries = (activeSpecsSchema?.groups ?? []).flatMap((g) =>
+                const specFmt = (v: unknown): string => {
+                  if (Array.isArray(v)) return v.map(String).filter(Boolean).join(", ");
+                  if (v && typeof v === "object") {
+                    const vals = Object.values(v as Record<string, unknown>).filter((x) => x !== null && x !== undefined && String(x).trim() !== "");
+                    return vals.map(String).join(" × ");
+                  }
+                  return String(v ?? "");
+                };
+                const prettify = (k: string) => k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                const schemaMeta = new Map<string, { label: string; unit: string | null }>();
+                (activeSpecsSchema?.groups ?? []).forEach((g) =>
                   g.fields
                     .filter((f) => !["file", "image", "long_text"].includes(f.fieldType))
-                    .map((f) => {
-                      const fam = ((product.schema_specs || {}) as Record<string, unknown>)[f.key];
-                      const ovv = memberCtx && safeActiveMember > 0 && activeModel
-                        ? (activeModel.specs_overrides ?? {})[f.key]
-                        : undefined;
-                      const v = ovv ?? fam;
-                      return v === undefined || v === null || String(v).trim() === ""
-                        ? null
-                        : { label: f.label ?? f.key, value: String(v), unit: f.unit ?? null };
-                    })
-                    .filter((x): x is { label: string; value: string; unit: string | null } => x !== null),
+                    .forEach((f) => schemaMeta.set(f.key, { label: f.label ?? f.key, unit: f.unit ?? null })),
                 );
+                const famSpecs = (product.schema_specs || {}) as Record<string, unknown>;
+                const memberOv = memberCtx && safeActiveMember > 0 && activeModel ? ((activeModel.specs_overrides ?? {}) as Record<string, unknown>) : {};
+                const resolvedSpecs: Record<string, unknown> = { ...famSpecs, ...memberOv };
+                const specEntries: { label: string; value: string; unit: string | null }[] = [];
+                const seenKeys = new Set<string>();
+                for (const [k, v] of Object.entries(resolvedSpecs)) {
+                  const val = specFmt(v);
+                  if (!val.trim()) continue;
+                  const meta = schemaMeta.get(k);
+                  specEntries.push({ label: meta?.label ?? prettify(k), value: val, unit: meta?.unit ?? null });
+                  seenKeys.add(k);
+                }
+                /* Legacy typed columns (products.*) — most existing products
+                   keep their specs here, not in schema_specs. Skip columns a
+                   schema entry above already represents. */
+                const LEGACY_SPECS: { key: string; schemaKey?: string; label: string; unit: string | null; get: () => unknown }[] = [
+                  { key: "voltage", schemaKey: "voltage_options", label: "Voltage", unit: null, get: () => product.voltage },
+                  { key: "frequency_hz", label: "Frequency", unit: "Hz", get: () => product.frequency_hz },
+                  { key: "phase", label: "Phase", unit: null, get: () => product.phase },
+                  { key: "motor_power_w", label: "Motor power", unit: "W", get: () => product.motor_power_w },
+                  { key: "power_consumption_w", label: "Power consumption", unit: "W", get: () => product.power_consumption_w },
+                  { key: "plug_types", label: "Plug types", unit: null, get: () => product.plug_types },
+                  { key: "machine_dimensions", label: "Dimensions", unit: null, get: () => product.machine_dimensions },
+                  { key: "machine_weight_kg", label: "Machine weight", unit: "kg", get: () => product.machine_weight_kg },
+                  { key: "hs_code", label: "HS code", unit: null, get: () => product.hs_code },
+                  { key: "ip_rating", label: "IP rating", unit: null, get: () => product.ip_rating },
+                  { key: "operating_temp", label: "Operating temperature", unit: null, get: () => product.operating_temp },
+                  { key: "colors", label: "Colors", unit: null, get: () => product.colors },
+                ];
+                for (const c of LEGACY_SPECS) {
+                  if (seenKeys.has(c.key) || (c.schemaKey && seenKeys.has(c.schemaKey))) continue;
+                  const val = specFmt(c.get());
+                  if (!val.trim()) continue;
+                  specEntries.push({ label: c.label, value: val, unit: c.unit });
+                }
                 return memberCtx && safeActiveMember > 0 && activeModel ? (() => {
                 /* MEMBER VIEW (owner rule): the SAME full supplier page as
                    the primary. Values render as primary-link ⊕ this
@@ -5060,6 +5095,28 @@ export default function ProductForm({ productId }: Props) {
                   );
                 })()}
               </div>
+              {/* The supplier-tab cost note travels WITH the price: whoever
+                  sets the selling price sees exactly what the cost covers.
+                  Member view resolves the member's own note first. */}
+              {(() => {
+                const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                const memberNote = memberCtx && safeActiveMember > 0 && activeModel
+                  ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
+                  : undefined;
+                const note = String(memberNote ?? pl?.notes ?? "").trim();
+                if (!note) return null;
+                return (
+                  <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("pricing.costNote", "Cost note — what this price covers")}</span>
+                      <button type="button" onClick={() => goToStep(steps.findIndex((st) => st.id === "supplier"))} className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                        {t("pricing.costNoteEdit", "Edit in the Supplier tab")}
+                      </button>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[var(--text-muted)] whitespace-pre-wrap">{note}</p>
+                  </div>
+                );
+              })()}
             </Section>
 
             {/* Base FOB — auto from cost via product level (Commercial Setup) */}
