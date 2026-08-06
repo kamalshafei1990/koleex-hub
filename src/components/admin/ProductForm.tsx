@@ -104,7 +104,7 @@ import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
-import { FamilyStrip, FamilySharedDivider, MemberSupplierPanel, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
+import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
@@ -1089,6 +1089,7 @@ export default function ProductForm({ productId }: Props) {
             ),
           ),
           name_i18n: ((m as { name_i18n?: Record<string, string> | null }).name_i18n) ?? {},
+          supplier_overrides: ((m as { supplier_overrides?: Record<string, unknown> | null }).supplier_overrides) ?? {},
           tagline_i18n: ((m as { tagline_i18n?: Record<string, string> | null }).tagline_i18n) ?? {},
         }));
         setModels(mappedModels);
@@ -2588,6 +2589,7 @@ export default function ProductForm({ productId }: Props) {
           container_40ft_qty: m.container_40ft_qty ? parseInt(m.container_40ft_qty, 10) : null,
           container_40hq_qty: m.container_40hq_qty ? parseInt(m.container_40hq_qty, 10) : null,
           stock_status: m.stock_status || null,
+          supplier_overrides: m.supplier_overrides && Object.keys(m.supplier_overrides).length ? m.supplier_overrides : null,
           order: m.order,
           visible: m.visible,
           status: m.status,
@@ -4546,35 +4548,60 @@ export default function ProductForm({ productId }: Props) {
         {(onePage || steps[currentStep]?.id === "supplier") && (
           <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
-              {memberCtx && safeActiveMember > 0 && activeModel ? (
-                /* NON-primary member (owner rule): the SUPPLIER is
-                   family-level — only the primary changes it, so members
-                   get this focused card (model number, cost, name, photo)
-                   instead of the full link editor. The primary falls
-                   through to the full editor below. */
-                <MemberSupplierPanel
-                  model={activeModel}
-                  onUpdate={updateActiveMember}
-                  supplierName={(() => {
-                    const link = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
-                    const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                    return sup?.name ?? null;
-                  })()}
-                  supplierLogo={(() => {
-                    const link = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
-                    const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                    return sup?.logo ?? null;
-                  })()}
-                  familyCost={(() => {
-                    const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
-                    return pl?.unit_cost_cny || models[0]?.cost_price || "";
-                  })()}
-                  familyProductName={product.product_name || ""}
-                  photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
-                  onSetPhoto={(f) => setModelPhoto(activeModel, f)}
-                  onRemovePhoto={() => removeModelPhoto(activeModel)}
-                />
-              ) : (
+              {memberCtx && safeActiveMember > 0 && activeModel ? (() => {
+                /* MEMBER VIEW (owner rule): the SAME full supplier page as
+                   the primary. Values render as primary-link ⊕ this
+                   member's supplier_overrides; edits are diffed against the
+                   primary and stored per member. The supplier itself is
+                   locked (family-level); the star promotes this model to
+                   PRIMARY. */
+                const primaryLink = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                if (!primaryLink) {
+                  return (
+                    <p className="text-[12px] text-[var(--text-ghost)] rounded-xl border border-dashed border-[var(--border-subtle)] p-4">
+                      {t("fam.noLinkYet", "No supplier linked yet — switch to the PRIMARY model and link one first; members then inherit it.")}
+                    </p>
+                  );
+                }
+                const ov = (activeModel.supplier_overrides ?? {}) as Record<string, unknown>;
+                const merged = { ...primaryLink, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
+                const EDITABLE: (keyof typeof primaryLink)[] = [
+                  "supplier_product_code", "moq", "lead_time_days", "unit_cost_cny", "currency",
+                  "cost_basis", "cost_includes_tax", "payment_terms", "notes",
+                  "supplier_product_name", "supplier_product_name_i18n", "supplier_product_photo",
+                  "quotation_file_url", "quotation_file_name",
+                ];
+                return (
+                  <SupplierLinkSection
+                    links={[merged]}
+                    suppliers={suppliers}
+                    memberMode={{
+                      memberCode: activeModel.primary_model || activeModel.model_name || "",
+                      onMakePrimary: () => {
+                        if (!window.confirm(t("fam.promoteConfirm", "Make this model the PRIMARY of the family? The current primary becomes a regular member."))) return;
+                        const reordered = [activeModel, ...models.filter((x) => x !== activeModel)].map((mm, i) => ({ ...mm, order: i }));
+                        setModels(reordered);
+                        setActiveMember(0);
+                      },
+                    }}
+                    onChange={(newLinks) => {
+                      const upd = newLinks[0];
+                      if (!upd) return;
+                      const nextOv: Record<string, unknown> = {};
+                      for (const f of EDITABLE) {
+                        if (JSON.stringify(upd[f]) !== JSON.stringify(primaryLink[f])) nextOv[f as string] = upd[f];
+                      }
+                      const patch: Partial<ModelFormState> = { supplier_overrides: nextOv };
+                      /* Mirror the two canonical member columns so profile,
+                         quotations and the engine keep reading the truth. */
+                      if ("supplier_product_code" in nextOv) patch.reference_model = String(nextOv.supplier_product_code ?? "");
+                      else if (activeModel.reference_model !== String(primaryLink.supplier_product_code ?? "")) patch.reference_model = String(primaryLink.supplier_product_code ?? "");
+                      if ("unit_cost_cny" in nextOv) patch.cost_price = String(nextOv.unit_cost_cny ?? "");
+                      updateActiveMember(patch);
+                    }}
+                  />
+                );
+              })() : (
                 <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
               )}
             </Section>

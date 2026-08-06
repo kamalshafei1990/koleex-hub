@@ -184,6 +184,11 @@ export interface ModelFormState {
      stay in product_translations; these cover non-primary members. */
   name_i18n?: Record<string, string>;
   tagline_i18n?: Record<string, string>;
+  /* Member's SUPPLIER-PAGE overrides: partial ProductSupplier link
+     fields this member changed; unset keys inherit the primary link
+     live (owner rule: sub-product supplier page = the primary's values
+     until edited manually). */
+  supplier_overrides?: Record<string, unknown>;
 }
 
 export interface MediaFormState {
@@ -414,6 +419,7 @@ export function createEmptyModel(): ModelFormState {
     specs_overrides: {},
     name_i18n: {},
     tagline_i18n: {},
+    supplier_overrides: {},
     _tempId: crypto.randomUUID(),
     model_name: "",
     slug: "",

@@ -69,13 +69,18 @@ interface Props {
   links: ProductSupplierFormState[];
   suppliers: SupplierOption[];
   onChange: (links: ProductSupplierFormState[]) => void;
+  /* Family member view: the SAME full page, but the supplier itself is
+     locked (family-level; only the primary product changes it), the
+     add/remove controls disappear, and the star button PROMOTES this
+     member to be the family's primary model. */
+  memberMode?: { memberCode: string; onMakePrimary: () => void };
 }
 
 const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
 const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
-export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
+export default function SupplierLinkSection({ links, suppliers, onChange, memberMode }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -281,6 +286,20 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     </div>
                   </button>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {memberMode ? (
+                      /* Member view: the star PROMOTES this model to be the
+                         family's primary (owner rule) — supplier link
+                         management stays on the primary. */
+                      <button
+                        type="button"
+                        onClick={memberMode.onMakePrimary}
+                        title={t("sup.makeModelPrimary", "Make this model the PRIMARY of the family")}
+                        className="h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors bg-[var(--bg-surface)] text-amber-300 border-amber-400/50 hover:bg-amber-400/10"
+                      >
+                        <StarIcon className="h-3 w-3" /> {t("sup.makeModelPrimary2", "Make primary model")}
+                      </button>
+                    ) : (
+                    <>
                     <button
                       type="button"
                       onClick={() => setPrimary(l._tempId)}
@@ -302,6 +321,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
                     </button>
+                    </>
+                    )}
                   </div>
                 </div>
 
@@ -654,7 +675,15 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
           The empty supplier list is treated honestly: "loading", "couldn't
           load → Retry", or genuinely "all linked" — never a misleading
           disabled button when the directory simply hasn't arrived. */}
-      {supList.length === 0 ? (
+      {memberMode ? (
+        /* Member view: supplier management is LOCKED — family-level. */
+        <div className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/[0.06] px-3.5 py-2.5">
+          <StarIcon className="h-3.5 w-3.5 text-amber-300 shrink-0" />
+          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+            {t("sup.memberLocked", "You are editing model {code}: the values below start as the PRIMARY's and save to this model when you change them. The supplier itself is family-level — switch to the primary model to change or add suppliers.").replace("{code}", memberMode.memberCode)}
+          </p>
+        </div>
+      ) : supList.length === 0 ? (
         <div className="flex items-center gap-2">
           <button
             type="button"

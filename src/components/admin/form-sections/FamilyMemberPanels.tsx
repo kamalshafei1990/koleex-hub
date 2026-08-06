@@ -126,10 +126,12 @@ export function FamilyStrip({
               type="button"
               onClick={() => onPick(i)}
               className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[12px] font-semibold tabular-nums transition-colors ${
-                isActive
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                  : i === 0
-                    ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] border-amber-400/40 hover:border-amber-300/70"
+                i === 0
+                  ? isActive
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-amber-400 ring-2 ring-amber-400/50"
+                    : "bg-amber-400/15 text-amber-200 border-amber-400/70 hover:bg-amber-400/25"
+                  : isActive
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
               }`}
             >
