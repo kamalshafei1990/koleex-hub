@@ -27,7 +27,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const LINK_COLS =
-  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, notes_i18n, supplier_product_name, supplier_product_name_i18n, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax";
+  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, notes_i18n, price_options, supplier_product_name, supplier_product_name_i18n, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax";
 
 /* Confirm the product exists AND belongs to the caller's tenant before
    reading/writing its supplier links. Returns the product id or null. */
@@ -111,6 +111,17 @@ export async function PUT(req: Request) {
       payment_terms: (r.payment_terms as string) || null,
       notes: (r.notes as string) || null,
       notes_i18n: r.notes_i18n && typeof r.notes_i18n === "object" && !Array.isArray(r.notes_i18n) ? (r.notes_i18n as Record<string, string>) : null,
+      /* Additional prices, each with its own note (+ translations). */
+      price_options: Array.isArray(r.price_options)
+        ? (r.price_options as Array<{ price?: unknown; note?: unknown; note_i18n?: unknown }>)
+            .map((o) => ({
+              price: num(o.price),
+              note: String(o.note ?? "").slice(0, 2000),
+              note_i18n: o.note_i18n && typeof o.note_i18n === "object" && !Array.isArray(o.note_i18n) ? (o.note_i18n as Record<string, string>) : null,
+            }))
+            .filter((o) => o.price !== null || o.note.length > 0)
+            .slice(0, 20)
+        : null,
       /* product-as-supplied facts (pd_supplier_product_facts) */
       supplier_product_name: (r.supplier_product_name as string) || null,
       supplier_product_name_i18n: r.supplier_product_name_i18n && typeof r.supplier_product_name_i18n === "object" && !Array.isArray(r.supplier_product_name_i18n) ? (r.supplier_product_name_i18n as Record<string, string>) : null,

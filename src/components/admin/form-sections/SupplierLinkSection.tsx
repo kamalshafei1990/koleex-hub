@@ -119,6 +119,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
   const [noteLocale, setNoteLocale] = useState<Record<string, string>>({});
   const [translatingNote, setTranslatingNote] = useState<string | null>(null);
   const [noteTrMsg, setNoteTrMsg] = useState<Record<string, { kind: "ok" | "error"; text: string }>>({});
+  const [extraLocale, setExtraLocale] = useState<Record<string, string>>({});   // key `${tempId}:${idx}`
+  const [translatingExtra, setTranslatingExtra] = useState<string | null>(null);
 
   /* Self-healing supplier list. The form loads suppliers at mount in a big
      parallel batch with a timeout; /api/suppliers occasionally spikes to
@@ -179,6 +181,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
         payment_terms: "",
         notes: "",
         notes_i18n: {},
+        price_options: [],
         supplier_product_name: "",
         supplier_product_name_i18n: {},
         supplier_product_photo: "",
@@ -599,6 +602,73 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                           <StickyNoteIcon className="h-3 w-3 inline-block align-[-2px] me-1" /> + {t("sup.addPriceNote", "Add price note")}
                         </button>
                       )}
+
+                      {/* EXTRA PRICES — the same supplier can quote several
+                          prices (configurations, sets, options); each carries
+                          its own note and rides along wherever the price is
+                          shown. Saved in price_options (+ member overrides). */}
+                      {(l.price_options ?? []).map((po, pi) => {
+                        const updPO = (patch: Partial<typeof po>) =>
+                          update(l._tempId, { price_options: (l.price_options ?? []).map((x, xi) => (xi === pi ? { ...x, ...patch } : x)) });
+                        const ekey = `${l._tempId}:${pi}`;
+                        const eloc = extraLocale[ekey] ?? "zh";
+                        const eRtl = eloc === "ar" || eloc === "ur";
+                        return (
+                          <div key={pi} className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 p-2 space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-semibold text-[var(--text-ghost)] shrink-0">¥</span>
+                              <input inputMode="decimal" value={po.price} placeholder="0"
+                                onChange={(e) => updPO({ price: e.target.value.replace(/[^0-9.]/g, "") })}
+                                className={`${inp} w-[110px] shrink-0`} />
+                              <input value={po.note} placeholder={t("sup.priceOptNotePh", "What this price covers…")}
+                                onChange={(e) => updPO({ note: e.target.value })}
+                                className={`${inp} flex-1 min-w-0`} />
+                              <button type="button" onClick={() => update(l._tempId, { price_options: (l.price_options ?? []).filter((_, xi) => xi !== pi) })}
+                                className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] hover:border-[var(--state-error,#FF3333)]/50 flex items-center justify-center transition-colors"
+                                title={t("sup.removePrice", "Remove this price")}>
+                                <TrashIcon className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <select value={eloc}
+                                onChange={(e) => setExtraLocale((m) => ({ ...m, [ekey]: e.target.value }))}
+                                className="h-8 px-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] shrink-0">
+                                {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+                              </select>
+                              <input dir={eRtl ? "rtl" : "ltr"} value={(po.note_i18n ?? {})[eloc] ?? ""}
+                                onChange={(e) => updPO({ note_i18n: { ...(po.note_i18n ?? {}), [eloc]: e.target.value } })}
+                                placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === eloc)?.name ?? eloc)}
+                                className={`${inp} flex-1 min-w-0 h-8`} />
+                              <button type="button"
+                                onClick={async () => {
+                                  const text = po.note.trim();
+                                  if (!text) return;
+                                  setTranslatingExtra(ekey);
+                                  try {
+                                    const res = await fetch("/api/ai/translate", {
+                                      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                                      body: JSON.stringify({ text, target_lang: eloc, source_lang: "auto" }),
+                                    });
+                                    const data = (await res.json()) as { translated?: string; fallback?: boolean };
+                                    if (res.ok && data?.translated && !data.fallback) {
+                                      updPO({ note_i18n: { ...(po.note_i18n ?? {}), [eloc]: data.translated } });
+                                    }
+                                  } catch { /* leave the field for manual entry */ }
+                                  setTranslatingExtra(null);
+                                }}
+                                disabled={!po.note.trim() || translatingExtra === ekey}
+                                className="kx-ai-glow h-8 px-2.5 rounded-lg text-[10.5px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0">
+                                {translatingExtra === ekey ? t("sup.translating", "Translating…") : t("sup.autoTranslate", "Auto-translate")}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <button type="button"
+                        onClick={() => update(l._tempId, { price_options: [...(l.price_options ?? []), { price: "", note: "", note_i18n: {} }] })}
+                        className="mt-1.5 text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline block">
+                        + {t("sup.addAnotherPrice", "Add another price")}
+                      </button>
                     </div>
                   </div>
                   {/* What the cost already includes. Display + warning only —

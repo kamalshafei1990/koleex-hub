@@ -148,6 +148,9 @@ export interface ProductSignal {
   visible: boolean;
   updatedAt: string | null;
   supplier: { id?: string | null; name: string; logo: string | null } | null;
+  /* The price's own annotations (Supplier tab) — note + extra prices. */
+  costNote?: string | null;
+  costExtras?: { price: number | null; note: string }[];
 }
 
 /** "3d" / "5h" / "now" — compact staleness for the internal card. */
@@ -508,7 +511,14 @@ const ProductCard = memo(function ProductCard({
                 dim currency mark, large tabular figure. */}
             <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
-                <span className="flex items-baseline gap-1 shrink-0" title={signal.priceNote || undefined}>
+                <span
+                  className="flex items-baseline gap-1 shrink-0"
+                  title={[
+                    signal.priceNote || "",
+                    signal.costNote || "",
+                    ...(signal.costExtras ?? []).map((o) => `¥${o.price ?? "—"}${o.note ? ` — ${o.note}` : ""}`),
+                  ].filter(Boolean).join("\n") || undefined}
+                >
                   {/* "From" tells the operator this figure is a floor, not the
                       price — the options add to it. */}
                   {signal.pricingMode === "from" && (

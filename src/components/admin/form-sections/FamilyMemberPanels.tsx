@@ -424,7 +424,7 @@ export function MemberIdentityPanel({
 
 /* ── Price panel: the member's commercial numbers ── */
 export function MemberPricingPanel({
-  model, onUpdate, costVisible = true, familyCost, costBinding, costNote,
+  model, onUpdate, costVisible = true, familyCost, costBinding, costNote, costExtras,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -440,6 +440,8 @@ export function MemberPricingPanel({
   costBinding?: { value: string; onChange: (v: string) => void };
   /* The price's note (Supplier tab) — shown as a caption under the cost. */
   costNote?: string | null;
+  /* Extra prices (price_options), locale-resolved by the parent. */
+  costExtras?: { price: string; note: string }[];
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const money = (label: string, key: keyof ModelFormState, sign: string, ph = "0.00") => (
@@ -483,6 +485,16 @@ export function MemberPricingPanel({
                 {costNote}
               </p>
             ) : null}
+            {(costExtras ?? []).length > 0 && (
+              <div className="mt-1 space-y-0.5 border-s-2 border-[var(--border-strong)] ps-2">
+                {(costExtras ?? []).map((o, oi) => (
+                  <p key={oi} className="text-[10.5px] leading-snug text-[var(--text-muted)]">
+                    <span className="font-semibold text-[var(--text-subtle)] tabular-nums">¥{o.price || "—"}</span>
+                    {o.note ? <span className="italic"> — {o.note}</span> : null}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {costVisible && !costBinding && (
@@ -499,6 +511,16 @@ export function MemberPricingPanel({
                 {costNote}
               </p>
             ) : null}
+            {(costExtras ?? []).length > 0 && (
+              <div className="mt-1 space-y-0.5 border-s-2 border-[var(--border-strong)] ps-2">
+                {(costExtras ?? []).map((o, oi) => (
+                  <p key={oi} className="text-[10.5px] leading-snug text-[var(--text-muted)]">
+                    <span className="font-semibold text-[var(--text-subtle)] tabular-nums">¥{o.price || "—"}</span>
+                    {o.note ? <span className="italic"> — {o.note}</span> : null}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {money(t("fam.global", "Global price (USD)"), "global_price", "$")}

@@ -410,6 +410,8 @@ export interface ProductSupplierLinkRow {
   payment_terms?: string | null;
   notes?: string | null;
   notes_i18n?: Record<string, string> | null;
+  /* Extra prices beyond unit_cost_cny, each with its own note. */
+  price_options?: { price: number | null; note: string; note_i18n?: Record<string, string> | null }[] | null;
   /* product-as-supplied facts (pd_supplier_product_facts) */
   supplier_product_name?: string | null;
   supplier_product_name_i18n?: Record<string, string> | null;

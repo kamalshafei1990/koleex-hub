@@ -1186,6 +1186,11 @@ export default function ProductForm({ productId }: Props) {
               ((s as { notes_i18n?: Record<string, unknown> | null }).notes_i18n) ?? {},
             ).map(([k, v]) => [k, String(v ?? "")]),
           ),
+          price_options: (s.price_options ?? []).map((o) => ({
+            price: str(o.price),
+            note: String(o.note ?? ""),
+            note_i18n: Object.fromEntries(Object.entries(o.note_i18n ?? {}).map(([k, v]) => [k, String(v ?? "")])),
+          })),
           supplier_product_name: str(s.supplier_product_name),
           supplier_product_name_i18n: Object.fromEntries(
             Object.entries(
@@ -2822,6 +2827,21 @@ export default function ProductForm({ productId }: Props) {
               .filter(([, v]) => v.length > 0),
           );
           return Object.keys(clean).length > 0 ? clean : null;
+        })(),
+        price_options: (() => {
+          const rows = (s.price_options || [])
+            .map((o) => ({
+              price: o.price === "" ? null : Number(o.price),
+              note: (o.note || "").trim(),
+              note_i18n: (() => {
+                const clean = Object.fromEntries(
+                  Object.entries(o.note_i18n ?? {}).map(([k, v]) => [k, String(v ?? "").trim()]).filter(([, v]) => v.length > 0),
+                );
+                return Object.keys(clean).length ? clean : null;
+              })(),
+            }))
+            .filter((o) => (o.price !== null && Number.isFinite(o.price)) || o.note.length > 0);
+          return rows.length ? rows : null;
         })(),
         supplier_product_name: s.supplier_product_name || null,
         supplier_product_name_i18n: (() => {
@@ -4710,7 +4730,7 @@ export default function ProductForm({ productId }: Props) {
                 const merged = { ...primaryLink, ...legacy, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
                 const EDITABLE: (keyof typeof primaryLink)[] = [
                   "supplier_product_code", "moq", "lead_time_days", "unit_cost_cny", "currency",
-                  "cost_basis", "cost_includes_tax", "payment_terms", "notes", "notes_i18n",
+                  "cost_basis", "cost_includes_tax", "payment_terms", "notes", "notes_i18n", "price_options",
                   "supplier_product_name", "supplier_product_name_i18n", "supplier_product_photo",
                   "quotation_file_url", "quotation_file_name",
                 ];
@@ -5096,6 +5116,13 @@ export default function ProductForm({ productId }: Props) {
                     const plNote = ((pl?.notes_i18n ?? {})[lang] || "").trim() || pl?.notes;
                     return String(ovNote ?? plNote ?? "").trim() || null;
                   })()}
+                  costExtras={(() => {
+                    const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    const ov = safeActiveMember > 0 ? ((activeModel.supplier_overrides ?? {}) as Record<string, unknown>) : {};
+                    type PO = { price: string; note: string; note_i18n?: Record<string, string> };
+                    const opts = ((ov.price_options as PO[] | undefined) ?? pl?.price_options ?? []) as PO[];
+                    return opts.map((o) => ({ price: String(o.price ?? ""), note: ((o.note_i18n ?? {})[lang] || "").trim() || o.note || "" }));
+                  })()}
                   familyCost={(() => {
                     const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
                     return pl?.unit_cost_cny || models[0]?.cost_price || "";
@@ -5175,11 +5202,24 @@ export default function ProductForm({ productId }: Props) {
                         const memberNote = (ovI18n?.[lang] || "").trim() || (ov.notes as string | undefined);
                         const primaryNote = (plI18n?.[lang] || "").trim() || primaryLink?.notes;
                         const note = String(memberNote ?? primaryNote ?? "").trim();
-                        if (!note) return null;
+                        type PO = { price: string; note: string; note_i18n?: Record<string, string> };
+                        const options = ((ov.price_options as PO[] | undefined) ?? primaryLink?.price_options ?? []) as PO[];
+                        if (!note && options.length === 0) return null;
                         return (
-                          <p className="mt-1.5 text-[10.5px] italic leading-snug text-[var(--text-muted)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap">
-                            {note}
-                          </p>
+                          <div className="mt-1.5 space-y-1 border-s-2 border-[var(--border-strong)] ps-2">
+                            {note && (
+                              <p className="text-[10.5px] italic leading-snug text-[var(--text-muted)] whitespace-pre-wrap">{note}</p>
+                            )}
+                            {options.map((o, oi) => {
+                              const onote = ((o.note_i18n ?? {})[lang] || "").trim() || o.note;
+                              return (
+                                <p key={oi} className="text-[10.5px] leading-snug text-[var(--text-muted)]">
+                                  <span className="font-semibold text-[var(--text-subtle)] tabular-nums">¥{o.price || "—"}</span>
+                                  {onote ? <span className="italic"> — {onote}</span> : null}
+                                </p>
+                              );
+                            })}
+                          </div>
                         );
                       })()}
                     </div>

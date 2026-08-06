@@ -72,7 +72,7 @@ export async function GET() {
       .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
       .eq("contact_type", "supplier")
       .eq("tenant_id", auth.tenant_id),
-    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny"),
+    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options"),
     /* Translated product names (中文/العربية) — the grid's search haystack
        needs them so 熔接机 finds the fusing machine. Names only; nothing
        cost-side rides on this query. */
@@ -137,10 +137,22 @@ export async function GET() {
      "No cost" gap chip while the cost was sitting right there on the record.
      Primary link wins, else the first link with a figure. */
   const linkCost = new Map<string, number>();
-  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null; unit_cost_cny: number | string | null }>) {
+  /* Price annotations ride with the cost so the CARD can show them. */
+  const linkNote = new Map<string, string>();
+  const linkExtras = new Map<string, { price: number | null; note: string }[]>();
+  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null; unit_cost_cny: number | string | null; notes?: string | null; price_options?: Array<{ price?: unknown; note?: unknown }> | null }>) {
     const c = l.unit_cost_cny == null ? null : Number(l.unit_cost_cny);
     if (c != null && Number.isFinite(c) && (l.is_primary || !linkCost.has(l.product_id))) {
       linkCost.set(l.product_id, c);
+    }
+    if (l.is_primary || !linkNote.has(l.product_id)) {
+      if (l.notes && String(l.notes).trim()) linkNote.set(l.product_id, String(l.notes).trim());
+      if (Array.isArray(l.price_options) && l.price_options.length) {
+        linkExtras.set(l.product_id, l.price_options.map((o) => ({
+          price: o.price == null || o.price === "" ? null : Number(o.price),
+          note: String(o.note ?? "").trim(),
+        })).filter((o) => o.price !== null || o.note));
+      }
     }
     if (!l.supplier_id) continue;
     if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
@@ -225,6 +237,8 @@ export async function GET() {
       visible: boolean;
       updatedAt: string | null;
       supplier: { id: string | null; name: string; logo: string | null } | null;
+      costNote: string | null;
+      costExtras: { price: number | null; note: string }[];
     }
   > = {};
 
@@ -287,6 +301,8 @@ export async function GET() {
       priceNote: model?.price_note ?? null,
       visible: p.visible === true,
       updatedAt: p.updated_at,
+      costNote: canSeeCosts ? (linkNote.get(p.id) ?? null) : null,
+      costExtras: canSeeCosts ? (linkExtras.get(p.id) ?? []) : [],
       supplier: (() => {
         /* id rides along so the card can deep-link to the Suppliers app. */
         const pick = (l: SupLite) => ({ id: l.id, name: l.name, logo: l.logo });
