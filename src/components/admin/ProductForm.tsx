@@ -5023,6 +5023,13 @@ export default function ProductForm({ productId }: Props) {
                 <MemberPricingPanel
                   model={activeModel}
                   onUpdate={updateActiveMember}
+                  costNote={(() => {
+                    const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    const ovNote = safeActiveMember > 0
+                      ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
+                      : undefined;
+                    return String(ovNote ?? pl?.notes ?? "").trim() || null;
+                  })()}
                   familyCost={(() => {
                     const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
                     return pl?.unit_cost_cny || models[0]?.cost_price || "";
@@ -5091,32 +5098,24 @@ export default function ProductForm({ productId }: Props) {
                           ? t("pricing.costPriceHintSynced", "Synced with the Supplier tab") + (sup?.name ? ` (${sup.name})` : "") + ". " + t("pricing.costPriceHint2", "Editing here updates the supplier cost too. The FOB Pricing below is derived from it via Commercial Setup.")
                           : t("pricing.costPriceHintNew", "The KOLEEX factory cost. Once you link a supplier it becomes the supplier cost (Supplier tab). The FOB Pricing below auto-detects level, margin, band and channel prices from Commercial Setup.")}
                       </p>
+                      {/* The price's own note (Supplier tab) rides along
+                          wherever the price is shown — member note first. */}
+                      {(() => {
+                        const memberNote = memberCtx && safeActiveMember > 0 && activeModel
+                          ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
+                          : undefined;
+                        const note = String(memberNote ?? primaryLink?.notes ?? "").trim();
+                        if (!note) return null;
+                        return (
+                          <p className="mt-1.5 text-[10.5px] italic leading-snug text-[var(--text-muted)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap">
+                            {note}
+                          </p>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
               </div>
-              {/* The supplier-tab cost note travels WITH the price: whoever
-                  sets the selling price sees exactly what the cost covers.
-                  Member view resolves the member's own note first. */}
-              {(() => {
-                const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
-                const memberNote = memberCtx && safeActiveMember > 0 && activeModel
-                  ? (((activeModel.supplier_overrides ?? {}) as Record<string, unknown>).notes as string | undefined)
-                  : undefined;
-                const note = String(memberNote ?? pl?.notes ?? "").trim();
-                if (!note) return null;
-                return (
-                  <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("pricing.costNote", "Cost note — what this price covers")}</span>
-                      <button type="button" onClick={() => goToStep(steps.findIndex((st) => st.id === "supplier"))} className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                        {t("pricing.costNoteEdit", "Edit in the Supplier tab")}
-                      </button>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-[var(--text-muted)] whitespace-pre-wrap">{note}</p>
-                  </div>
-                );
-              })()}
             </Section>
 
             {/* Base FOB — auto from cost via product level (Commercial Setup) */}

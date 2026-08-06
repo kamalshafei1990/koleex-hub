@@ -418,7 +418,7 @@ export function MemberIdentityPanel({
 
 /* ── Price panel: the member's commercial numbers ── */
 export function MemberPricingPanel({
-  model, onUpdate, costVisible = true, familyCost, costBinding,
+  model, onUpdate, costVisible = true, familyCost, costBinding, costNote,
 }: {
   model: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -432,6 +432,8 @@ export function MemberPricingPanel({
      with the primary supplier link (the Supplier tab's number). The
      binding routes writes there instead of the model column. */
   costBinding?: { value: string; onChange: (v: string) => void };
+  /* The price's note (Supplier tab) — shown as a caption under the cost. */
+  costNote?: string | null;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const money = (label: string, key: keyof ModelFormState, sign: string, ph = "0.00") => (
@@ -470,6 +472,11 @@ export function MemberPricingPanel({
             <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">
               {t("fam.costPrimarySync", "Family baseline — two-way synced with the Supplier tab.")}
             </p>
+            {costNote?.trim() ? (
+              <p className="mt-1.5 text-[10.5px] italic leading-snug text-[var(--text-muted)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap">
+                {costNote}
+              </p>
+            ) : null}
           </div>
         )}
         {costVisible && !costBinding && (
@@ -481,6 +488,11 @@ export function MemberPricingPanel({
                 ? t("fam.costInherit", "Empty = inherits the supplier cost (¥{v}). Type a figure for this model's own cost.").replace("{v}", String(familyCost))
                 : t("fam.costOwn", "This model's own factory cost — the Supplier tab's cost is the family baseline.")}
             </p>
+            {costNote?.trim() ? (
+              <p className="mt-1.5 text-[10.5px] italic leading-snug text-[var(--text-muted)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap">
+                {costNote}
+              </p>
+            ) : null}
           </div>
         )}
         {money(t("fam.global", "Global price (USD)"), "global_price", "$")}

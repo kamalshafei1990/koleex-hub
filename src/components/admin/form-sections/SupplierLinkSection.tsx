@@ -99,6 +99,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
   const [specPickerFor, setSpecPickerFor] = useState<string | null>(null); // link whose spec-import list is open
+  const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);      // link whose price-note editor is expanded
 
   /* Self-healing supplier list. The form loads suppliers at mount in a big
      parallel batch with a timeout; /api/suppliers occasionally spikes to
@@ -444,9 +445,71 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                           sanity-check the number in the currency they think
                           in. Appears only once the figure is real. */}
                       <UsdHint cny={l.unit_cost_cny} />
+                      {/* Price note — an annotation OF this price, not a
+                          separate section (owner). Collapsed = one muted
+                          italic line; expanded = tiny editor + spec import.
+                          Anywhere the price is displayed, this note rides
+                          along as its caption. */}
+                      {noteOpenFor === l._tempId ? (
+                        <div className="mt-1.5">
+                          <textarea autoFocus rows={2} className={`${inp} h-auto min-h-[56px] py-2 resize-y`} value={l.notes}
+                            placeholder={t("sup.costNotePh", "What this price covers — configuration, included parts, spec lines…")}
+                            onChange={(e) => update(l._tempId, { notes: e.target.value })} />
+                          <div className="mt-1 flex items-center justify-between">
+                            {(productSpecs ?? []).length > 0 ? (
+                              <button type="button"
+                                onClick={() => setSpecPickerFor(specPickerFor === l._tempId ? null : l._tempId)}
+                                className="text-[10.5px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                                {specPickerFor === l._tempId ? t("sup.importSpecsClose", "Close specs") : t("sup.importSpecs", "Import from product specs")}
+                              </button>
+                            ) : <span />}
+                            <button type="button" onClick={() => { setNoteOpenFor(null); setSpecPickerFor(null); }}
+                              className="text-[10.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                              {t("sup.noteDone", "Done")}
+                            </button>
+                          </div>
+                          {specPickerFor === l._tempId && (productSpecs ?? []).length > 0 && (
+                            <div className="mt-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2 max-h-56 overflow-y-auto space-y-0.5">
+                              <div className="flex items-center justify-between px-1.5 pb-1">
+                                <span className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.importSpecsHint", "Click a line to add it to the note")}</span>
+                                <button type="button"
+                                  onClick={() => {
+                                    const all = (productSpecs ?? []).map((sp) => `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`)
+                                      .filter((line) => !(l.notes || "").includes(line));
+                                    if (all.length) update(l._tempId, { notes: [l.notes, ...all].filter(Boolean).join("\n") });
+                                  }}
+                                  className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                                  {t("sup.importSpecsAll", "Insert all")}
+                                </button>
+                              </div>
+                              {(productSpecs ?? []).map((sp, si) => {
+                                const line = `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`;
+                                const used = (l.notes || "").includes(line);
+                                return (
+                                  <button key={si} type="button" disabled={used}
+                                    onClick={() => update(l._tempId, { notes: [l.notes, line].filter(Boolean).join("\n") })}
+                                    className={`w-full text-start px-1.5 py-1 rounded-lg text-[11px] transition-colors ${used ? "text-[var(--text-ghost)] line-through cursor-default" : "text-[var(--text-muted)] hover:bg-[var(--bg-inverted)]/[0.05] hover:text-[var(--text-primary)]"}`}>
+                                    <span className="font-medium">{sp.label}:</span> {sp.value}{sp.unit ? ` ${sp.unit}` : ""}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : l.notes ? (
+                        <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
+                          title={t("sup.notePriceEdit", "Edit price note")}
+                          className="mt-1 w-full text-start text-[10.5px] italic leading-snug text-[var(--text-muted)] hover:text-[var(--text-primary)] border-s-2 border-[var(--border-strong)] ps-2 whitespace-pre-wrap transition-colors">
+                          {l.notes}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
+                          className="mt-1 text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
+                          + {t("sup.addPriceNote", "Add price note")}
+                        </button>
+                      )}
                     </div>
                   </div>
-
                   {/* What the cost already includes. Display + warning only —
                       lets the same machine quoted ex-works vs full-landed be
                       told apart so it isn't silently mis-leveled. */}
@@ -478,52 +541,6 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                     </p>
                   )}
 
-                  {/* Cost note — what exactly this price covers. Free text,
-                      plus a picker that pulls "Label: value" lines straight
-                      from the product/member specs (owner request). Saves to
-                      the existing product_suppliers.notes — no new column. */}
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className={`${lbl} mb-0`}>{t("sup.notes", "Notes")}<FieldHelp {...H.notes} /></label>
-                      {(productSpecs ?? []).length > 0 && (
-                        <button type="button"
-                          onClick={() => setSpecPickerFor(specPickerFor === l._tempId ? null : l._tempId)}
-                          className="text-[10.5px] font-medium text-[var(--accent,#567FB2)] hover:underline inline-flex items-center gap-1">
-                          {specPickerFor === l._tempId ? t("sup.importSpecsClose", "Close specs") : t("sup.importSpecs", "Import from product specs")}
-                        </button>
-                      )}
-                    </div>
-                    <textarea rows={2} className={`${inp} h-auto min-h-[64px] py-2 resize-y`} value={l.notes}
-                      placeholder={t("sup.costNotePh", "What this price covers — configuration, included parts, spec lines…")}
-                      onChange={(e) => update(l._tempId, { notes: e.target.value })} />
-                    {specPickerFor === l._tempId && (productSpecs ?? []).length > 0 && (
-                      <div className="mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2 max-h-56 overflow-y-auto space-y-0.5">
-                        <div className="flex items-center justify-between px-1.5 pb-1">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.importSpecsHint", "Click a line to add it to the note")}</span>
-                          <button type="button"
-                            onClick={() => {
-                              const all = (productSpecs ?? []).map((sp) => `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`)
-                                .filter((line) => !(l.notes || "").includes(line));
-                              if (all.length) update(l._tempId, { notes: [l.notes, ...all].filter(Boolean).join("\n") });
-                            }}
-                            className="text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                            {t("sup.importSpecsAll", "Insert all")}
-                          </button>
-                        </div>
-                        {(productSpecs ?? []).map((sp, si) => {
-                          const line = `${sp.label}: ${sp.value}${sp.unit ? ` ${sp.unit}` : ""}`;
-                          const used = (l.notes || "").includes(line);
-                          return (
-                            <button key={si} type="button" disabled={used}
-                              onClick={() => update(l._tempId, { notes: [l.notes, line].filter(Boolean).join("\n") })}
-                              className={`w-full text-start px-1.5 py-1 rounded-lg text-[11px] transition-colors ${used ? "text-[var(--text-ghost)] line-through cursor-default" : "text-[var(--text-muted)] hover:bg-[var(--bg-inverted)]/[0.05] hover:text-[var(--text-primary)]"}`}>
-                              <span className="font-medium">{sp.label}:</span> {sp.value}{sp.unit ? ` ${sp.unit}` : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* From the supplier (Suppliers app) — source of truth, read-only here */}
