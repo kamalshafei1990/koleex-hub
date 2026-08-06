@@ -104,7 +104,7 @@ import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
-import { FamilyStrip, FamilySharedDivider, MemberIdentityPanel, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
+import { FamilyStrip, FamilySharedDivider, MemberSupplierPanel, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
@@ -630,6 +630,21 @@ export default function ProductForm({ productId }: Props) {
      the same `translations` state as the Languages & Markets section
      (product_translations.product_name), so there's one source of truth. */
   const [heroNameLocale, setHeroNameLocale] = useState<string>("zh");
+  /* Keep the Auto-translate TARGET aligned with the visible adder row:
+     once a locale has a name it becomes a stacked row, so the adder (and
+     the button) must advance to the first UNFILLED locale — otherwise
+     "Auto-translate" silently retranslates an already-filled language and
+     looks broken for the one on screen. */
+  useEffect(() => {
+    const filled = new Set(
+      translations.filter((tr) => (tr.product_name || "").trim()).map((tr) => tr.locale),
+    );
+    if (filled.has(heroNameLocale)) {
+      const next = LOCALES.find((l) => !filled.has(l.code));
+      if (next) setHeroNameLocale(next.code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translations]);
   const [translatingHeroName, setTranslatingHeroName] = useState(false);
   /* Inline status for the auto-translate action so a failure / unconfigured
      provider is surfaced honestly instead of silently copying the English. */
@@ -3048,41 +3063,7 @@ export default function ProductForm({ productId }: Props) {
                 />
               </div>
             )}
-            {memberCtx && activeModel && (
-              <>
-                <MemberIdentityPanel
-                  model={activeModel}
-                  onUpdate={updateActiveMember}
-                  familyProductName={product.product_name || ""}
-                  isPrimary={safeActiveMember === 0}
-                  excludeProductId={effectiveId || undefined}
-                  onEditCodeInHero={() => {
-                    document.getElementById("primary-code-anchor")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }}
-                  refBinding={safeActiveMember === 0 ? (() => {
-                    const primaryIdx = (() => {
-                      const i = productSuppliers.findIndex((x) => x.is_primary);
-                      return i >= 0 ? i : (productSuppliers.length ? 0 : -1);
-                    })();
-                    const link = primaryIdx >= 0 ? productSuppliers[primaryIdx] : null;
-                    return {
-                      value: (link?.supplier_product_code || models[0]?.reference_model || ""),
-                      onChange: (val: string) => {
-                        if (primaryIdx >= 0) {
-                          setProductSuppliers((prev) => prev.map((x, i) => (i === primaryIdx ? { ...x, supplier_product_code: val } : x)));
-                        }
-                        updatePrimaryModel({ reference_model: val });
-                      },
-                    };
-                  })() : undefined}
-                  photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
-                  onSetPhoto={(f) => setModelPhoto(activeModel, f)}
-                  onRemovePhoto={() => removeModelPhoto(activeModel)}
-                />
-                <FamilySharedDivider />
-              </>
-            )}
-            {/* ═══ PRODUCT POSTER / HERO BANNER (first field) ═══
+                        {/* ═══ PRODUCT POSTER / HERO BANNER (first field) ═══
                 Optional designed banner shown full-bleed at the top of the
                 public product page. Blank = the page auto-builds its hero from
                 the product photo + name + tagline. Placed first so it reads as
@@ -4565,7 +4546,37 @@ export default function ProductForm({ productId }: Props) {
         {(onePage || steps[currentStep]?.id === "supplier") && (
           <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
-              <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
+              {memberCtx && safeActiveMember > 0 && activeModel ? (
+                /* NON-primary member (owner rule): the SUPPLIER is
+                   family-level — only the primary changes it, so members
+                   get this focused card (model number, cost, name, photo)
+                   instead of the full link editor. The primary falls
+                   through to the full editor below. */
+                <MemberSupplierPanel
+                  model={activeModel}
+                  onUpdate={updateActiveMember}
+                  supplierName={(() => {
+                    const link = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                    return sup?.name ?? null;
+                  })()}
+                  supplierLogo={(() => {
+                    const link = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                    return sup?.logo ?? null;
+                  })()}
+                  familyCost={(() => {
+                    const pl = productSuppliers.find((x) => x.is_primary) ?? productSuppliers[0];
+                    return pl?.unit_cost_cny || models[0]?.cost_price || "";
+                  })()}
+                  familyProductName={product.product_name || ""}
+                  photoUrl={(() => { const it = modelPhotoOf(activeModel); return it ? (it._file ? URL.createObjectURL(it._file) : it.url || null) : null; })()}
+                  onSetPhoto={(f) => setModelPhoto(activeModel, f)}
+                  onRemovePhoto={() => removeModelPhoto(activeModel)}
+                />
+              ) : (
+                <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
+              )}
             </Section>
           </div>
         )}

@@ -23,6 +23,8 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import CrownIcon from "@/components/icons/ui/CrownIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import ConfirmDialog from "./ConfirmDialog";
 import { useEffect, useState } from "react";
 
@@ -126,14 +128,15 @@ export function FamilyStrip({
               className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[12px] font-semibold tabular-nums transition-colors ${
                 isActive
                   ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                  : i === 0
+                    ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] border-amber-400/40 hover:border-amber-300/70"
+                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
               }`}
             >
               {i === 0 && (
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-[var(--text-inverted)]" : "bg-[var(--text-ghost)]"}`}
-                  title={t("pp.primary", "Primary")}
-                />
+                <span title={t("pp.primary", "Primary")} className="inline-flex">
+                  <CrownIcon className={`h-3 w-3 shrink-0 ${isActive ? "text-amber-300" : "text-amber-400/80"}`} />
+                </span>
               )}
               {memberLabel(m, i)}
               {isActive && i > 0 && onRemove && (
@@ -533,6 +536,144 @@ export function MemberLogisticsPanel({
         {f(t("fam.c40", "Qty / 40ft"), "container_40ft_qty", "54", "number")}
         {f(t("fam.c40hq", "Qty / 40HQ"), "container_40hq_qty", "60", "number")}
       </div>
+    </div>
+  );
+}
+
+
+/* ── Supplier panel (member view) ────────────────────────────────────────
+   Owner rule: the SUPPLIER is a family-level fact — only the primary
+   product can change which company supplies the family. A member opens
+   this panel to type ITS OWN supplier-side facts: the supplier's model
+   number, its cost, its name (+ zh/ar), its photo. */
+export function MemberSupplierPanel({
+  model, onUpdate, supplierName, supplierLogo, familyCost, familyProductName,
+  photoUrl, onSetPhoto, onRemovePhoto,
+}: {
+  model: ModelFormState;
+  onUpdate: (u: Partial<ModelFormState>) => void;
+  supplierName: string | null;
+  supplierLogo: string | null;
+  familyCost?: string | number | null;
+  familyProductName?: string;
+  photoUrl?: string | null;
+  onSetPhoto?: (f: File) => void;
+  onRemovePhoto?: () => void;
+}) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  return (
+    <div className="rounded-2xl border border-[#567FB2]/30 bg-[var(--bg-secondary)] p-5 space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#567FB2]" />
+        <h3 className="text-[13px] font-bold text-[var(--text-primary)]">
+          {t("fam.supTitle", "This model — as supplied")}
+        </h3>
+        <span className="text-[11px] font-mono text-[var(--text-dim)]">{model.primary_model || ""}</span>
+      </div>
+
+      {/* Locked supplier identity — family-level. */}
+      <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3.5 py-2.5">
+        {supplierLogo ? (
+          <span className="h-9 w-9 shrink-0 rounded-lg bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={supplierLogo} alt="" className="h-full w-full object-contain p-0.5" />
+          </span>
+        ) : (
+          <span className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)]">
+            <FactoryIcon className="h-4 w-4" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
+            {supplierName || t("fam.supNone", "No supplier linked yet")}
+          </p>
+          <p className="text-[10.5px] text-[var(--text-ghost)]">
+            {t("fam.supLocked", "Family-level — the supplier is changed from the PRIMARY product only.")}
+          </p>
+        </div>
+        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]">
+          {t("fam.locked", "Locked")}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={lbl}>{t("fam.supModelNo", "Supplier model number")}</label>
+          <input
+            value={model.reference_model}
+            onChange={(e) => onUpdate({ reference_model: e.target.value })}
+            placeholder="YL-600D"
+            className={`${inp} font-mono`}
+          />
+        </div>
+        <div>
+          <label className={lbl}>{t("fam.cost", "Factory cost (CNY)")}</label>
+          <div className="relative">
+            <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
+            <input
+              type="number" step="0.01"
+              value={model.cost_price || ""}
+              onChange={(e) => onUpdate({ cost_price: e.target.value })}
+              placeholder={familyCost != null && familyCost !== "" ? String(familyCost) : "0.00"}
+              className={`${inp} ps-8`}
+            />
+          </div>
+          <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">
+            {familyCost != null && familyCost !== ""
+              ? t("fam.costInherit", "Empty = inherits the supplier cost (¥{v}). Type a figure for this model's own cost.").replace("{v}", String(familyCost))
+              : t("fam.costOwn", "This model's own factory cost — the Supplier tab's cost is the family baseline.")}
+          </p>
+        </div>
+        <div className="md:col-span-2">
+          <label className={lbl}>{t("fam.productName", "Product name (this model)")}</label>
+          <input
+            value={model.model_name}
+            onChange={(e) => onUpdate({ model_name: e.target.value })}
+            placeholder={familyProductName || t("fam.memberNamePh", "Descriptive name")}
+            className={inp}
+          />
+          <MemberI18nRows
+            source={model.model_name || familyProductName || ""}
+            value={model.name_i18n || {}}
+            onChange={(next) => onUpdate({ name_i18n: next })}
+          />
+        </div>
+      </div>
+
+      {onSetPhoto && (
+        <div className="flex items-center gap-3 pt-1">
+          {photoUrl ? (
+            <span className="h-14 w-14 shrink-0 rounded-lg bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoUrl} alt="" className="h-full w-full object-contain p-1" />
+            </span>
+          ) : (
+            <span className="h-14 w-14 shrink-0 rounded-lg border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)]">
+              <ImageRawIcon className="h-5 w-5" />
+            </span>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">
+              {photoUrl
+                ? t("models.photoOwn", "This model shows its own photo.")
+                : t("models.photoInherits", "No photo — this model inherits the family's main photo.")}
+            </p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <label className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold cursor-pointer text-[var(--accent,#0066FF)] bg-[var(--accent,#0066FF)]/10 hover:bg-[var(--accent,#0066FF)]/15 border border-[var(--accent,#0066FF)]/30 transition-colors">
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onSetPhoto(f); e.currentTarget.value = ""; }} />
+                {photoUrl ? t("models.photoReplace", "Replace") : t("models.photoAdd", "Add photo")}
+              </label>
+              {photoUrl && onRemovePhoto && (
+                <button type="button" onClick={onRemovePhoto}
+                  className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] hover:text-rose-300 hover:bg-rose-500/10 border border-[var(--border-subtle)] transition-colors">
+                  {t("models.photoRemove", "Remove")}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
