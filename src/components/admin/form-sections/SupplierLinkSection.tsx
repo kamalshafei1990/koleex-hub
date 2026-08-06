@@ -282,7 +282,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
           {links.map((l) => {
             const logo = logoOf(l.supplier_id);
             return (
-              <div key={l._tempId} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
+              <div key={l._tempId} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 sm:p-5 space-y-4">
                 {/* ── Supplier identity — clear header (logo + name) + actions ── */}
                 <div className="flex items-center justify-between gap-3">
                   <button
@@ -351,8 +351,10 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   </div>
                 </div>
 
-                {/* ── HERO — big centered product photo, then name · model · cost ── */}
-                <div className="rounded-xl bg-[var(--bg-surface)]/40 border border-[var(--border-subtle)] p-4 space-y-4">
+                {/* ── HERO — big centered product photo, then name · model · cost.
+                    FLAT (owner: "shell inside shell") — the card is the only
+                    box; groups below separate with hairlines, not borders. ── */}
+                <div className="pt-1 space-y-4">
                   <SupplierPhoto
                     url={l.supplier_product_photo}
                     uploading={uploadingId === l._tempId}
@@ -656,7 +658,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                     { label: t("sup.currency", "Currency"), value: sup?.currency },
                   ];
                   return (
-                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                    <div className="border-t border-[var(--border-subtle)] pt-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.fromSupplier", "From the supplier")}</span>
                         <span className="text-[10px] text-[var(--text-ghost)]">{t("sup.editInSuppliers", "edit in the Suppliers app")}</span>
@@ -674,7 +676,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                 })()}
 
                 {/* Quotation & volume pricing — per product, from this supplier */}
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
+                <div className="border-t border-[var(--border-subtle)] pt-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.quoteVolume", "Quotation & volume pricing")}</span>
                     {l.price_valid_until && (() => {
@@ -790,7 +792,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   </div>
                 </div>
                 {/* Sourcing strategy — how this supplier is positioned for THIS product */}
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
+                <div className="border-t border-[var(--border-subtle)] pt-3 space-y-3">
                   <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.sourcingStrategy", "Sourcing strategy")}</span>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
