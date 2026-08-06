@@ -36,6 +36,25 @@ import StarIcon from "@/components/icons/ui/StarIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import RocketIcon from "@/components/icons/ui/RocketIcon";
+import TimerIcon from "@/components/icons/ui/TimerIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import GemIcon from "@/components/icons/ui/GemIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import CircleDollarSignIcon from "@/components/icons/ui/CircleDollarSignIcon";
+import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import ShieldOffIcon from "@/components/icons/ui/ShieldOffIcon";
+import CogIcon from "@/components/icons/ui/CogIcon";
+import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import HeadphonesIcon from "@/components/icons/ui/HeadphonesIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
@@ -4399,17 +4418,17 @@ export default function ProductForm({ productId }: Props) {
             <Section id="identifiers" icon={<PackageIcon className="h-4 w-4" />} title={t("identity.identifiers", "Identifiers & Lifecycle")} badge={t("identity.identifiersBadge", "MPN · GTIN · Lifecycle")} defaultOpen={false}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className={lbl}>{t("idf.manufacturer", "Manufacturer (OEM)")}<FieldHelp {...IDENTIFIER_HELP.manufacturer} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> {t("idf.manufacturer", "Manufacturer (OEM)")}</span><FieldHelp {...IDENTIFIER_HELP.manufacturer} /></label>
                   <input className={inp} value={product.manufacturer} placeholder={t("idf.manufacturerPh", "Actual maker, if rebranded")}
                     onChange={(e) => updateProduct_({ manufacturer: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>{t("idf.mpn", "MPN (manufacturer part no.)")}<FieldHelp {...IDENTIFIER_HELP.mpn} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><HashtagIcon className="h-3 w-3" /> {t("idf.mpn", "MPN (manufacturer part no.)")}</span><FieldHelp {...IDENTIFIER_HELP.mpn} /></label>
                   <input className={inp} value={product.mpn} placeholder={`${t("sup.eg", "e.g.")} JK-9500`}
                     onChange={(e) => updateProduct_({ mpn: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>{t("idf.generation", "Generation / version")}<FieldHelp {...IDENTIFIER_HELP.generation} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><LayersIcon className="h-3 w-3" /> {t("idf.generation", "Generation / version")}</span><FieldHelp {...IDENTIFIER_HELP.generation} /></label>
                   <input className={inp} value={product.generation} placeholder={`${t("sup.eg", "e.g.")} Gen 2 / v3`}
                     onChange={(e) => updateProduct_({ generation: e.target.value })} />
                 </div>
@@ -4417,12 +4436,12 @@ export default function ProductForm({ productId }: Props) {
                     once, in the hero identity block next to the KOLEEX code
                     (same product.legacy_code column). One meaning = one input. */}
                 <div>
-                  <label className={lbl}>{t("idf.launchDate", "Launch date")}<FieldHelp {...IDENTIFIER_HELP.launchDate} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><RocketIcon className="h-3 w-3" /> {t("idf.launchDate", "Launch date")}</span><FieldHelp {...IDENTIFIER_HELP.launchDate} /></label>
                   <input type="date" className={inp} value={product.launch_date}
                     onChange={(e) => updateProduct_({ launch_date: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>{t("idf.eolDate", "End-of-life date")}<FieldHelp {...IDENTIFIER_HELP.eolDate} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><TimerIcon className="h-3 w-3" /> {t("idf.eolDate", "End-of-life date")}</span><FieldHelp {...IDENTIFIER_HELP.eolDate} /></label>
                   <input type="date" className={inp} value={product.eol_date}
                     onChange={(e) => updateProduct_({ eol_date: e.target.value })} />
                   {product.launch_date && product.eol_date && product.eol_date <= product.launch_date && (
@@ -4430,7 +4449,7 @@ export default function ProductForm({ productId }: Props) {
                   )}
                 </div>
                 <div>
-                  <label className={lbl}>{t("idf.statusReason", "Status reason")}<FieldHelp {...IDENTIFIER_HELP.statusReason} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><InfoIcon className="h-3 w-3" /> {t("idf.statusReason", "Status reason")}</span><FieldHelp {...IDENTIFIER_HELP.statusReason} /></label>
                   <input className={inp} value={product.status_reason} placeholder={`${t("sup.eg", "e.g.")} Replaced by XSL-9100`}
                     onChange={(e) => updateProduct_({ status_reason: e.target.value })} />
                 </div>
@@ -4438,7 +4457,7 @@ export default function ProductForm({ productId }: Props) {
                 {/* Brand mark / logo override — falls back to the brand's logo
                     on the public page when left empty. */}
                 <div className="md:col-span-3">
-                  <label className={lbl}>{t("idf.brandMark", "Brand mark / logo override")}<FieldHelp {...IDENTIFIER_HELP.brandMark} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><GemIcon className="h-3 w-3" /> {t("idf.brandMark", "Brand mark / logo override")}</span><FieldHelp {...IDENTIFIER_HELP.brandMark} /></label>
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                       {product.brand_mark_url ? (
@@ -4463,7 +4482,7 @@ export default function ProductForm({ productId }: Props) {
                 {/* Revision / version history — small inline log. */}
                 <div className="md:col-span-3">
                   <div className="flex items-center justify-between mb-2">
-                    <label className={lbl}>{t("idf.revisionHistory", "Revision history")}<FieldHelp {...IDENTIFIER_HELP.revisionHistory} /></label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><HistoryIcon className="h-3 w-3" /> {t("idf.revisionHistory", "Revision history")}</span><FieldHelp {...IDENTIFIER_HELP.revisionHistory} /></label>
                     <button type="button"
                       onClick={() => updateProduct_({ revision_history: [...product.revision_history, { version: "", date: "", note: "" }] })}
                       className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1">
@@ -4493,7 +4512,7 @@ export default function ProductForm({ productId }: Props) {
                 </div>
 
                 <div className="md:col-span-3">
-                  <label className={lbl}>{t("idf.alternateNames", "Alternate names / aliases")}<FieldHelp {...IDENTIFIER_HELP.alternateNames} /></label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("idf.alternateNames", "Alternate names / aliases")}</span><FieldHelp {...IDENTIFIER_HELP.alternateNames} /></label>
                   <TagsInput
                     tags={product.alternate_names}
                     onChange={(alternate_names) => updateProduct_({ alternate_names })}
@@ -5128,7 +5147,7 @@ export default function ProductForm({ productId }: Props) {
                   };
                   return (
                     <div>
-                      <label className={lbl}>{t("pricing.factoryCostCny", "Factory cost (CNY)")}</label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><CircleDollarSignIcon className="h-3 w-3" /> {t("pricing.factoryCostCny", "Factory cost (CNY)")}</span></label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
                         <input
@@ -5239,7 +5258,7 @@ export default function ProductForm({ productId }: Props) {
                 </div>
                 {!schemaCoveredCols.has("hs_code") ? (
                   <div>
-                    <label className={lbl}>{t("logistics.hsCode", "HS Code")}</label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><ScanLineIcon className="h-3 w-3" /> {t("logistics.hsCode", "HS Code")}</span></label>
                     <input
                       type="text"
                       value={product.hs_code}
@@ -5296,7 +5315,7 @@ export default function ProductForm({ productId }: Props) {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={lbl}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><BoxesIcon className="h-3 w-3" /> {t("technical.defaultMoq", "Default MOQ (Product-level)")}</span></label>
                     <input
                       type="number"
                       value={product.moq}
@@ -5307,7 +5326,7 @@ export default function ProductForm({ productId }: Props) {
                     <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.moqOverrideHint", "Per-model MOQ in the Models step overrides this.")}</p>
                   </div>
                   <div>
-                    <label className={lbl}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><ClockIcon className="h-3 w-3" /> {t("technical.defaultLeadTime", "Default Lead Time")}</span></label>
                     <input
                       type="text"
                       value={product.lead_time}
@@ -5382,12 +5401,12 @@ export default function ProductForm({ productId }: Props) {
                     onChange={(e) => updateProduct_({ warranty: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Warranty (months)</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><TimerIcon className="h-3 w-3" /> Warranty (months)</span></label>
                   <input className={inp} inputMode="numeric" value={product.warranty_months} placeholder="e.g. 36"
                     onChange={(e) => updateProduct_({ warranty_months: e.target.value.replace(/[^0-9]/g, "") })} />
                 </div>
                 <div>
-                  <label className={lbl}>Warranty type</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><ListIcon className="h-3 w-3" /> Warranty type</span></label>
                   <select className={inp} value={product.warranty_type} onChange={(e) => updateProduct_({ warranty_type: e.target.value })}>
                     <option value="">—</option>
                     <option value="parts-only">Parts only</option>
@@ -5396,7 +5415,7 @@ export default function ProductForm({ productId }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Starts from</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><CalendarRawIcon className="h-3 w-3" /> Starts from</span></label>
                   <select className={inp} value={product.warranty_start_from} onChange={(e) => updateProduct_({ warranty_start_from: e.target.value })}>
                     <option value="">—</option>
                     <option value="shipment">Shipment</option>
@@ -5405,47 +5424,47 @@ export default function ProductForm({ productId }: Props) {
                   </select>
                 </div>
                 <div className="md:col-span-3">
-                  <label className={lbl}>Coverage</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><ShieldIcon className="h-3 w-3" /> Coverage</span></label>
                   <input className={inp} value={product.warranty_coverage} placeholder="What the warranty covers…"
                     onChange={(e) => updateProduct_({ warranty_coverage: e.target.value })} />
                 </div>
                 <div className="md:col-span-3">
-                  <label className={lbl}>Exclusions</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><ShieldOffIcon className="h-3 w-3" /> Exclusions</span></label>
                   <input className={inp} value={product.warranty_exclusions} placeholder="What is not covered (wear parts, misuse…)"
                     onChange={(e) => updateProduct_({ warranty_exclusions: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Spare-parts availability</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><CogIcon className="h-3 w-3" /> Spare-parts availability</span></label>
                   <input className={inp} value={product.spare_parts_availability} placeholder="e.g. 10 years"
                     onChange={(e) => updateProduct_({ spare_parts_availability: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Spare-parts stock</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><BoxIcon className="h-3 w-3" /> Spare-parts stock</span></label>
                   <input className={inp} value={product.spare_parts_stock} placeholder="e.g. In stock — Shenzhen DC"
                     onChange={(e) => updateProduct_({ spare_parts_stock: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Service life</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><GaugeIcon className="h-3 w-3" /> Service life</span></label>
                   <input className={inp} value={product.service_life} placeholder="e.g. 8–10 years"
                     onChange={(e) => updateProduct_({ service_life: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Maintenance interval</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><WrenchIcon className="h-3 w-3" /> Maintenance interval</span></label>
                   <input className={inp} value={product.maintenance_interval} placeholder="e.g. every 6 months"
                     onChange={(e) => updateProduct_({ maintenance_interval: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Technical support</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><HeadphonesIcon className="h-3 w-3" /> Technical support</span></label>
                   <input className={inp} value={product.technical_support} placeholder="e.g. 24/7 remote + on-site"
                     onChange={(e) => updateProduct_({ technical_support: e.target.value })} />
                 </div>
                 <div>
-                  <label className={lbl}>Returns policy</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><Undo2Icon className="h-3 w-3" /> Returns policy</span></label>
                   <input className={inp} value={product.returns_policy} placeholder="e.g. 14-day DOA replacement"
                     onChange={(e) => updateProduct_({ returns_policy: e.target.value })} />
                 </div>
                 <div className="md:col-span-3">
-                  <label className={lbl}>Support channels</label>
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><PhoneCallIcon className="h-3 w-3" /> Support channels</span></label>
                   <div className="flex flex-wrap gap-2">
                     {["Phone", "Email", "WeChat", "WhatsApp", "On-site", "Remote"].map((ch) => {
                       const on = product.support_channels.includes(ch);

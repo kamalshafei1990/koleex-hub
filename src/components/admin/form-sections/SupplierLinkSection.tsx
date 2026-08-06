@@ -33,6 +33,22 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import CircleDollarSignIcon from "@/components/icons/ui/CircleDollarSignIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
+import PercentIcon from "@/components/icons/ui/PercentIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import TimerIcon from "@/components/icons/ui/TimerIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import FlaskConicalIcon from "@/components/icons/ui/FlaskConicalIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import WalletIcon from "@/components/icons/ui/WalletIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
+import StickyNoteIcon from "@/components/icons/ui/StickyNoteIcon";
 import { FieldHelp, SUPPLIER_LINK_HELP as H } from "@/components/admin/form-sections/FieldHelp";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
@@ -392,7 +408,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
 
                   <div className="space-y-3">
                     <div>
-                      <label className={lbl}>{t("sup.productName", "Product name")}<FieldHelp {...H.productName} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><TypeIcon className="h-3 w-3" /> {t("sup.productName", "Product name")}</span><FieldHelp {...H.productName} /></label>
                       <input
                         className="w-full h-11 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[16px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-dim)] placeholder:font-normal outline-none focus:border-[var(--border-focus)]"
                         value={l.supplier_product_name}
@@ -469,12 +485,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       })()}
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.modelNumber", "Model number")}<FieldHelp {...H.modelNumber} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><HashtagIcon className="h-3 w-3" /> {t("sup.modelNumber", "Model number")}</span><FieldHelp {...H.modelNumber} /></label>
                       <input className={inp} value={l.supplier_product_code} placeholder={`${t("sup.eg", "e.g.")} JK-58420`}
                         onChange={(e) => update(l._tempId, { supplier_product_code: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.costPrice", "Cost price")}<FieldHelp {...H.costPrice} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><CircleDollarSignIcon className="h-3 w-3" /> {t("sup.costPrice", "Cost price")}</span><FieldHelp {...H.costPrice} /></label>
                       <div className="flex gap-1.5">
                         <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 1850`}
                           onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
@@ -580,7 +596,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       ) : (
                         <button type="button" onClick={() => setNoteOpenFor(l._tempId)}
                           className="mt-1 text-[10px] font-medium text-[var(--accent,#567FB2)] hover:underline">
-                          + {t("sup.addPriceNote", "Add price note")}
+                          <StickyNoteIcon className="h-3 w-3 inline-block align-[-2px] me-1" /> + {t("sup.addPriceNote", "Add price note")}
                         </button>
                       )}
                     </div>
@@ -590,7 +606,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       told apart so it isn't silently mis-leveled. */}
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className={lbl}>{t("sup.costIncludes", "Cost includes")}<FieldHelp {...H.costIncludes} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><BoxIcon className="h-3 w-3" /> {t("sup.costIncludes", "Cost includes")}</span><FieldHelp {...H.costIncludes} /></label>
                       <select className={inp} value={l.cost_basis}
                         onChange={(e) => update(l._tempId, { cost_basis: e.target.value as ProductSupplierFormState["cost_basis"] })}>
                         <option value="delivered">{t("sup.costDelivered", "Delivered to Koleex (full landed)")}</option>
@@ -599,7 +615,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.taxVat", "Tax (VAT)")}<FieldHelp {...H.taxVat} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><PercentIcon className="h-3 w-3" /> {t("sup.taxVat", "Tax (VAT)")}</span><FieldHelp {...H.taxVat} /></label>
                       <button type="button"
                         onClick={() => update(l._tempId, { cost_includes_tax: !l.cost_includes_tax })}
                         className={`h-9 w-full px-3 rounded-lg border text-[12px] font-medium flex items-center justify-between transition-colors ${l.cost_includes_tax ? "border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.05] text-[var(--text-primary)]" : "border-amber-500/40 bg-amber-500/[0.06] text-amber-400"}`}>
@@ -664,12 +680,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   {/* Quote dates */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={lbl}>{t("sup.quotedOn", "Quoted on")}<FieldHelp {...H.quotedOn} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><CalendarRawIcon className="h-3 w-3" /> {t("sup.quotedOn", "Quoted on")}</span><FieldHelp {...H.quotedOn} /></label>
                       <input type="date" className={inp} value={l.price_quoted_on}
                         onChange={(e) => update(l._tempId, { price_quoted_on: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.validUntil", "Valid until")}<FieldHelp {...H.validUntil} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><TimerIcon className="h-3 w-3" /> {t("sup.validUntil", "Valid until")}</span><FieldHelp {...H.validUntil} /></label>
                       <input type="date" className={inp} value={l.price_valid_until}
                         onChange={(e) => update(l._tempId, { price_valid_until: e.target.value })} />
                     </div>
@@ -677,7 +693,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
 
                   {/* Volume price tiers */}
                   <div>
-                    <label className={lbl}>{t("sup.volumePricing", "Volume pricing (qty → unit price)")}<FieldHelp {...H.volumePricing} /></label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><BarChart3Icon className="h-3 w-3" /> {t("sup.volumePricing", "Volume pricing (qty → unit price)")}</span><FieldHelp {...H.volumePricing} /></label>
                     <div className="space-y-1.5">
                       {l.price_tiers.map((tier, ti) => (
                         <div key={ti} className="flex items-center gap-1.5">
@@ -703,7 +719,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
 
                   {/* Supplier quotation file */}
                   <div>
-                    <label className={lbl}>{t("sup.quoteFile", "Supplier quotation / spec file")}<FieldHelp {...H.quoteFile} /></label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><DocumentIcon className="h-3 w-3" /> {t("sup.quoteFile", "Supplier quotation / spec file")}</span><FieldHelp {...H.quoteFile} /></label>
                     {l.quotation_file_url ? (
                       <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                         <a href={l.quotation_file_url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">
@@ -740,12 +756,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       Quotations. Column kept; reintroduce per-supplier if
                       overseas sourcing ever starts. */}
                   <div>
-                    <label className={lbl}>{t("sup.sampleCost", "Sample cost")}<FieldHelp {...H.sampleCost} /></label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><FlaskConicalIcon className="h-3 w-3" /> {t("sup.sampleCost", "Sample cost")}</span><FieldHelp {...H.sampleCost} /></label>
                     <input className={inp} value={l.sample_cost} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 200`}
                       onChange={(e) => update(l._tempId, { sample_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
                   </div>
                   <div>
-                    <label className={lbl}>{t("sup.warrantyMonths", "Supplier warranty (months)")}<FieldHelp {...H.warrantyMonths} /></label>
+                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("sup.warrantyMonths", "Supplier warranty (months)")}</span><FieldHelp {...H.warrantyMonths} /></label>
                     <input className={inp} value={l.supplier_warranty_months} inputMode="numeric" placeholder={`${t("sup.eg", "e.g.")} 12`}
                       onChange={(e) => update(l._tempId, { supplier_warranty_months: e.target.value.replace(/[^0-9]/g, "") })} />
                   </div>
@@ -767,19 +783,19 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{t("sup.sourcingStrategy", "Sourcing strategy")}</span>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
-                      <label className={lbl}>{t("sup.sourcingStatus", "Sourcing status")}<FieldHelp {...H.sourcingStatus} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><ActivityIcon className="h-3 w-3" /> {t("sup.sourcingStatus", "Sourcing status")}</span><FieldHelp {...H.sourcingStatus} /></label>
                       <select className={inp} value={l.sourcing_status} onChange={(e) => update(l._tempId, { sourcing_status: e.target.value })}>
                         <option value="">—</option>
                         {SOURCING_STATUS.map((s) => <option key={s.value} value={s.value}>{t(`sup.st.${s.value}`, s.label)}</option>)}
                       </select>
                     </div>
                     <div className="md:col-span-2">
-                      <label className={lbl}>{t("sup.whyThisSupplier", "Why this supplier")}<FieldHelp {...H.whyThisSupplier} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> {t("sup.whyThisSupplier", "Why this supplier")}</span><FieldHelp {...H.whyThisSupplier} /></label>
                       <input className={inp} value={l.preferred_reason} placeholder={t("sup.whyPh", "e.g. best price / quality / fastest lead time")}
                         onChange={(e) => update(l._tempId, { preferred_reason: e.target.value })} />
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.minOrderValue", "Min order value")}<FieldHelp {...H.minOrderValue} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><WalletIcon className="h-3 w-3" /> {t("sup.minOrderValue", "Min order value")}</span><FieldHelp {...H.minOrderValue} /></label>
                       <div className="flex gap-1.5">
                         <input className={`${inp} flex-1 min-w-0`} value={l.min_order_value} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 5000`}
                           onChange={(e) => update(l._tempId, { min_order_value: e.target.value.replace(/[^0-9.]/g, "") })} />
@@ -789,14 +805,14 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.toolingOwner", "Tooling / mold owner")}<FieldHelp {...H.toolingOwner} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><WrenchIcon className="h-3 w-3" /> {t("sup.toolingOwner", "Tooling / mold owner")}</span><FieldHelp {...H.toolingOwner} /></label>
                       <select className={inp} value={l.tooling_owner} onChange={(e) => update(l._tempId, { tooling_owner: e.target.value })}>
                         <option value="">—</option>
                         {TOOLING_OWNERS.map((o) => <option key={o.value} value={o.value}>{t(`sup.to.${o.value}`, o.label)}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>{t("sup.toolingCost", "Tooling / mold cost")}<FieldHelp {...H.toolingCost} /></label>
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><HandCoinsIcon className="h-3 w-3" /> {t("sup.toolingCost", "Tooling / mold cost")}</span><FieldHelp {...H.toolingCost} /></label>
                       <input className={inp} value={l.tooling_cost} inputMode="decimal" placeholder={`${t("sup.eg", "e.g.")} 12000`}
                         onChange={(e) => update(l._tempId, { tooling_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
                     </div>

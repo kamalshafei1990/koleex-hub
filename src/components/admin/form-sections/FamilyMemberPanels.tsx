@@ -20,6 +20,12 @@ import type { ModelFormState } from "@/types/product-form";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import QuoteIcon from "@/components/icons/ui/QuoteIcon";
+import CircleDollarSignIcon from "@/components/icons/ui/CircleDollarSignIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -287,7 +293,7 @@ export function MemberIdentityPanel({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>{t("model.primaryModel", "KOLEEX model code")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("model.primaryModel", "KOLEEX model code")}</span></label>
           {isPrimary ? (
             <div className="flex items-center gap-2">
               <span className={`${inp} font-mono flex items-center bg-[var(--bg-surface)]/60 text-[var(--text-muted)] cursor-default select-all`}>
@@ -318,7 +324,7 @@ export function MemberIdentityPanel({
           )}
         </div>
         <div>
-          <label className={lbl}>{t("fam.productName", "Product name (this model)")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><TypeIcon className="h-3 w-3" /> {t("fam.productName", "Product name (this model)")}</span></label>
           {isPrimary ? (
             <>
               <span className={`${inp} flex items-center bg-[var(--bg-surface)]/60 text-[var(--text-muted)] cursor-default`}>
@@ -350,7 +356,7 @@ export function MemberIdentityPanel({
           )}
         </div>
         <div>
-          <label className={lbl}>{t("model.referenceModel", "Supplier reference")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><HashtagIcon className="h-3 w-3" /> {t("model.referenceModel", "Supplier reference")}</span></label>
           <input
             value={refBinding ? refBinding.value : model.reference_model}
             onChange={(e) => refBinding ? refBinding.onChange(e.target.value) : onUpdate({ reference_model: e.target.value })}
@@ -364,7 +370,7 @@ export function MemberIdentityPanel({
           )}
         </div>
         <div>
-          <label className={lbl}>{t("fam.tagline", "Tagline")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><QuoteIcon className="h-3 w-3" /> {t("fam.tagline", "Tagline")}</span></label>
           <input value={model.tagline} onChange={(e) => onUpdate({ tagline: e.target.value })} placeholder={t("fam.taglinePh", "One-line pitch")} className={inp} />
           <MemberI18nRows
             source={model.tagline || ""}
@@ -463,7 +469,7 @@ export function MemberPricingPanel({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {costVisible && costBinding && (
           <div>
-            <label className={lbl}>{t("fam.cost", "Factory cost (CNY)")}</label>
+            <label className={lbl}><span className="inline-flex items-center gap-1.5"><CircleDollarSignIcon className="h-3 w-3" /> {t("fam.cost", "Factory cost (CNY)")}</span></label>
             <div className="relative">
               <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
               <input type="number" step="0.01" value={costBinding.value}
@@ -499,11 +505,11 @@ export function MemberPricingPanel({
         {costVisible && money(t("fam.headOnly", "Head-only price"), "head_only_price", "¥")}
         {costVisible && money(t("fam.setPrice", "Complete-set price"), "complete_set_price", "¥")}
         <div>
-          <label className={lbl}>{t("fam.moq", "MOQ")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><BoxesIcon className="h-3 w-3" /> {t("fam.moq", "MOQ")}</span></label>
           <input type="number" value={model.moq || ""} onChange={(e) => onUpdate({ moq: e.target.value })} placeholder="1" className={inp} />
         </div>
         <div>
-          <label className={lbl}>{t("fam.leadTime", "Lead time")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><ClockIcon className="h-3 w-3" /> {t("fam.leadTime", "Lead time")}</span></label>
           <input value={model.lead_time || ""} onChange={(e) => onUpdate({ lead_time: e.target.value })} placeholder="15–20 days" className={inp} />
         </div>
       </div>
@@ -612,7 +618,7 @@ export function MemberSupplierPanel({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>{t("fam.supModelNo", "Supplier model number")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><HashtagIcon className="h-3 w-3" /> {t("fam.supModelNo", "Supplier model number")}</span></label>
           <input
             value={model.reference_model}
             onChange={(e) => onUpdate({ reference_model: e.target.value })}
@@ -621,7 +627,7 @@ export function MemberSupplierPanel({
           />
         </div>
         <div>
-          <label className={lbl}>{t("fam.cost", "Factory cost (CNY)")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><CircleDollarSignIcon className="h-3 w-3" /> {t("fam.cost", "Factory cost (CNY)")}</span></label>
           <div className="relative">
             <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
             <input
@@ -639,7 +645,7 @@ export function MemberSupplierPanel({
           </p>
         </div>
         <div className="md:col-span-2">
-          <label className={lbl}>{t("fam.productName", "Product name (this model)")}</label>
+          <label className={lbl}><span className="inline-flex items-center gap-1.5"><TypeIcon className="h-3 w-3" /> {t("fam.productName", "Product name (this model)")}</span></label>
           <input
             value={model.model_name}
             onChange={(e) => onUpdate({ model_name: e.target.value })}
