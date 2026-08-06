@@ -147,7 +147,7 @@ export interface ProductSignal {
   priceNote: string | null;
   visible: boolean;
   updatedAt: string | null;
-  supplier: { name: string; logo: string | null } | null;
+  supplier: { id?: string | null; name: string; logo: string | null } | null;
 }
 
 /** "3d" / "5h" / "now" — compact staleness for the internal card. */
@@ -164,6 +164,23 @@ function agoShort(iso: string | null): string {
   if (d < 30) return `${d}d`;
   const mo = Math.floor(d / 30);
   return mo < 12 ? `${mo}mo` : `${Math.floor(mo / 12)}y`;
+}
+
+/* Supplier row wrapper: a real link into the Suppliers app when the id is
+   known, otherwise the same static div it always was. Sits ABOVE the card's
+   inset-0 stretched link so the click goes to the supplier, not the product. */
+function SupplierRowShell({ supplierId, children }: { supplierId: string | null; children: React.ReactNode }) {
+  if (!supplierId) return <div className="flex items-center gap-2 min-w-0">{children}</div>;
+  return (
+    <Link
+      href={`/suppliers/${supplierId}`}
+      onClick={(e) => e.stopPropagation()}
+      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
+      title="Open in the Suppliers app"
+    >
+      {children}
+    </Link>
+  );
 }
 
 const ProductCard = memo(function ProductCard({
@@ -455,7 +472,10 @@ const ProductCard = memo(function ProductCard({
                 gets a real row with the factory's mark, not a grey
                 comma-separated tail. */}
             {(signal.supplier || suppliers.length > 0) ? (
-              <div className="flex items-center gap-2 min-w-0">
+              /* Clickable when we know WHO it is: rides above the card's
+                 stretched link (z-[6] > z-[5]) straight into the Suppliers
+                 app. Free-text suppliers with no id stay plain text. */
+              <SupplierRowShell supplierId={signal.supplier?.id ?? null}>
                 <span className="h-6 w-6 shrink-0 rounded-md bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
                   {signal.supplier?.logo ? (
                     <img
@@ -475,7 +495,7 @@ const ProductCard = memo(function ProductCard({
                 {suppliers.length > 1 && (
                   <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">+{suppliers.length - 1}</span>
                 )}
-              </div>
+              </SupplierRowShell>
             ) : (
               /* Keep the slot so cost stays on the same line across cards. */
               <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden">

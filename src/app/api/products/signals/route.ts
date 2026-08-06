@@ -110,7 +110,7 @@ export async function GET() {
   /* Supplier lookup — by id AND by every name variant, because most
      products carry the supplier as free TEXT on the model rather than a
      product_suppliers link (only a handful are linked today). */
-  interface SupLite { name: string; logo: string | null; cn: string | null }
+  interface SupLite { id: string | null; name: string; logo: string | null; cn: string | null }
   const supById = new Map<string, SupLite>();
   const supByName = new Map<string, SupLite>();
   const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
@@ -124,7 +124,7 @@ export async function GET() {
   }>) {
     const name = c.company_name_en || c.display_name || c.company_name_cn || "";
     if (!name) continue;
-    const lite: SupLite = { name, logo: c.photo_url || c.logo_url || null, cn: c.company_name_cn };
+    const lite: SupLite = { id: c.id, name, logo: c.photo_url || c.logo_url || null, cn: c.company_name_cn };
     supById.set(c.id, lite);
     for (const variant of [c.company_name_en, c.company_name_cn, c.display_name]) {
       if (variant && variant.trim()) supByName.set(norm(variant), lite);
@@ -224,7 +224,7 @@ export async function GET() {
       priceNote: string | null;
       visible: boolean;
       updatedAt: string | null;
-      supplier: { name: string; logo: string | null } | null;
+      supplier: { id: string | null; name: string; logo: string | null } | null;
     }
   > = {};
 
@@ -288,12 +288,15 @@ export async function GET() {
       visible: p.visible === true,
       updatedAt: p.updated_at,
       supplier: (() => {
+        /* id rides along so the card can deep-link to the Suppliers app. */
+        const pick = (l: SupLite) => ({ id: l.id, name: l.name, logo: l.logo });
         const linkId = linkedSupplier.get(p.id);
-        if (linkId && supById.has(linkId)) return supById.get(linkId)!;
+        if (linkId && supById.has(linkId)) return pick(supById.get(linkId)!);
         const txt = (model?.supplier || "").trim();
         if (!txt) return null;
-        /* Known supplier → real logo; unknown free text → name only. */
-        return supByName.get(norm(txt)) ?? { name: txt, logo: null };
+        /* Known supplier → real logo+id; unknown free text → name only. */
+        const byName = supByName.get(norm(txt));
+        return byName ? pick(byName) : { id: null, name: txt, logo: null };
       })(),
     };
   }
