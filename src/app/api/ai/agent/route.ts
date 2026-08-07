@@ -496,6 +496,21 @@ export async function POST(req: Request) {
             /(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)/i.test(normalizedContent) ||
             /احفظ|تذكّ?ر|لا تنسى?|أضف .*للمعرفة|سجّ?ل (هذه|هذا|ذلك)/.test(normalizedContent) ||
             /记住|保存|别忘|加入知识库/.test(normalizedContent);
+          /* WRITE-WITH-CONFIRM turn 2 ("yes" / "ايوه" / "确认") carries no
+             work nouns, so isWorkDataQuery misses it — and the tool-less
+             general lane would swallow the confirmation, letting the model
+             narrate success with NOTHING written (the fabricated-create
+             failure 5676a3d6 fixed inside the loop, reintroduced one layer
+             up). If the previous assistant turn asked for a confirmation
+             and this message is short, force the tool loop; a short "no /
+             cancel" lands there too, which is exactly where a cancel
+             should be handled. */
+          const lastAssistantTurn =
+            [...history].reverse().find((m) => m.role === "assistant")?.content ?? "";
+          const assistantAskedConfirm =
+            /confirm|تأكيد|أكّ?د|أؤكد|确认|هل أنفذ/i.test(lastAssistantTurn);
+          const isConfirmTurn =
+            assistantAskedConfirm && normalizedContent.trim().length <= 120;
           /* DeepSeek powers the fast lanes now (Groq fully removed).
              USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
@@ -517,7 +532,7 @@ export async function POST(req: Request) {
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
           const canFastPath =
-            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent;
+            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isConfirmTurn;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";

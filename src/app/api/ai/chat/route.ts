@@ -6,7 +6,13 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
-import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
+import {
+  sealPricingSafety,
+  orchestrate,
+  isWorkDataQuery,
+  stripProcessNarration,
+} from "@/lib/server/ai-agent/orchestrator";
+import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import { findLocalAnswer, pickLocalAnswer } from "@/lib/server/ai/local-knowledge";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { preprocessUserQuery } from "@/lib/server/ai/preprocess";
@@ -291,6 +297,149 @@ export async function POST(req: Request) {
       },
       { status: 503 },
     );
+  }
+
+  /* ─── Work-tools lane (Discuss pinned Koleex AI parity) ──────────
+     This route backs the Discuss "Koleex AI" chat (useAiChat), which
+     historically had NO tools — "what are my tasks?" deflected, and a
+     "create/assign a task" request could only be hallucinated. Work &
+     schedule queries — and the short "yes" confirmation turn that
+     follows a WRITE-WITH-CONFIRM preview — now run through the SAME
+     orchestrator the /ai app uses: identical tools, identical
+     permission gates, identical preview→confirm protocol. Everything
+     else keeps the light tool-less lanes below. The client history is
+     what the browser sent — same trust level as `content` itself; the
+     orchestrator treats it as conversation text only. */
+  const historyForAgent = msgs.slice(-7, -1).map((m) => ({
+    role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+    content: String(m.content ?? "").slice(0, MAX_MESSAGE_CHARS),
+  }));
+  const lastAssistantTurn =
+    [...historyForAgent].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const assistantAskedConfirm =
+    /confirm|تأكيد|أكّ?د|أؤكد|确认|هل أنفذ/i.test(lastAssistantTurn);
+  const isConfirmTurn = assistantAskedConfirm && lastUser.trim().length <= 120;
+  if (isWorkDataQuery(lastUser) || isConfirmTurn) {
+    /* Groups this surface's rows in ai_tool_calls (uuid column, no FK).
+       account_id already identifies the person; this marks the lane. */
+    const DISCUSS_AGENT_CONVERSATION_ID = "00000000-0000-0000-0000-00000000d15c";
+    const detectedWork = detectLanguage(lastUser);
+    const wantsRewrite =
+      detectedWork.language === "EGY" || detectedWork.language === "FRANCO";
+    const ctx = await buildUserContext(auth);
+    const langForAgent: "en" | "zh" | "ar" =
+      userLang === "zh" ? "zh" : userLang === "ar" ? "ar" : "en";
+
+    const polish = (raw: string): string => {
+      let out = stripProcessNarration(raw);
+      if (wantsRewrite) {
+        out = buildEgyptianResponse(out, {
+          intentType: analyzeIntent(lastUser).type,
+          seed: lastUser,
+        });
+      } else {
+        out = removeRepetition(out);
+      }
+      return out;
+    };
+
+    if (wantsStream) {
+      const encoder = new TextEncoder();
+      const send = (obj: unknown) =>
+        encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          let alive = true;
+          /* SSE ":" comments keep proxies from closing the connection
+             while the tool loop runs — the client parser ignores them. */
+          const keepalive = setInterval(() => {
+            if (!alive) return;
+            try {
+              controller.enqueue(encoder.encode(": ping\n\n"));
+            } catch {
+              /* Controller closed — nothing to do. */
+            }
+          }, 1500);
+          try {
+            controller.enqueue(
+              send({ type: "start", lane: "AGENT", intent: "work", mode: "agent" }),
+            );
+            let liveDeltaCount = 0;
+            const agent = await orchestrate({
+              dialect: wantsRewrite ? ("egyptian" as const) : null,
+              onDelta: (text) => {
+                liveDeltaCount++;
+                controller.enqueue(send({ type: "delta", text }));
+              },
+              ctx,
+              history: historyForAgent,
+              userMessage: clamp(lastUser, MAX_MESSAGE_CHARS),
+              userLang: langForAgent,
+              conversationId: DISCUSS_AGENT_CONVERSATION_ID,
+            });
+            const finalReply = polish(agent.finalReply ?? "");
+            if (liveDeltaCount === 0 && finalReply) {
+              controller.enqueue(send({ type: "delta", text: finalReply }));
+            }
+            controller.enqueue(
+              send({
+                type: "end",
+                provider: agent.provider,
+                lane: "AGENT",
+                intent: "work",
+                reply: finalReply,
+                fallback: 0,
+                ttfb_ms: 0,
+                total_ms: Date.now() - t0,
+              }),
+            );
+            console.log(
+              `[ai] lane=agent ep=chat provider=${agent.provider} intent=work` +
+                ` confirm_turn=${isConfirmTurn ? 1 : 0} fallback=0` +
+                ` in_bytes=${lastUser.length} hist=${historyForAgent.length}` +
+                ` ms=${Date.now() - t0} stream=1 reply_bytes=${finalReply.length}`,
+            );
+          } catch (e) {
+            controller.enqueue(
+              send({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e),
+              }),
+            );
+          } finally {
+            alive = false;
+            clearInterval(keepalive);
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
+    /* Non-streaming callers get the same lane as plain JSON. */
+    const agent = await orchestrate({
+      dialect: wantsRewrite ? ("egyptian" as const) : null,
+      ctx,
+      history: historyForAgent,
+      userMessage: clamp(lastUser, MAX_MESSAGE_CHARS),
+      userLang: langForAgent,
+      conversationId: DISCUSS_AGENT_CONVERSATION_ID,
+    });
+    const reply = polish(agent.finalReply ?? "");
+    console.log(
+      `[ai] lane=agent ep=chat provider=${agent.provider} intent=work` +
+        ` confirm_turn=${isConfirmTurn ? 1 : 0} fallback=0` +
+        ` in_bytes=${lastUser.length} hist=${historyForAgent.length}` +
+        ` ms=${Date.now() - t0} stream=0 reply_bytes=${reply.length}`,
+    );
+    return NextResponse.json({ reply, provider: agent.provider });
   }
 
   /* ─── Streaming branch (Phase 2) ─────────────────────────────────
