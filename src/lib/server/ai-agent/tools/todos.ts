@@ -8,7 +8,12 @@ import "server-only";
    - listMyTodos       ← /api/todos GET visibility scope (creator / assigner /
                           assignee / observer / department / broadcast, plus
                           the private-task overlay; SA skips row scope).
-   - createTodo        ← /api/todos POST (personal task, with confirm).
+   - findTeamMember    ← /api/todos/assignees (assignable employees =
+                          internal + active + human; read-only lookup).
+   - createTodo        ← /api/todos POST (personal or assigned-to-colleagues
+                          task incl. assignee rows + inbox fan-out, with
+                          confirm; assignee ids must resolve against the
+                          assignable-employees list = INTERNAL ONLY).
    - completeTodo      ← /api/todos/[id]/toggle (owners flip; participants
                           submit for the assigner's approval, with confirm).
    - updateTodo        ← /api/todos/[id] PATCH owner rules (with confirm).
@@ -22,6 +27,7 @@ import "server-only";
 
 import { supabaseServer } from "../../supabase-server";
 import { sendPushToAccounts } from "../../web-push";
+import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
 
 const TODO_MODULE = "To-do";
@@ -174,13 +180,80 @@ const listMyTodos: ToolDef<
   },
 };
 
+/* ── Find a colleague to assign to ──
+   Same source as every "pick a person" control in the apps:
+   listAssignableEmployees — internal + active + human accounts only, so a
+   customer/portal login can never be resolved as an assignee. Read-only;
+   gated like the app's own /api/todos/assignees endpoint. */
+const findTeamMember: ToolDef<
+  { query?: string; limit?: number },
+  Array<Record<string, unknown>>
+> = {
+  name: "findTeamMember",
+  description:
+    "Find a colleague (an internal Koleex employee) by name or username, returning their account_id, full name, native name, department and position. Use this BEFORE createTodo with assign_to_account_ids when the user wants to assign a task to someone. If several people match the name, show them to the user and ask which one — never pick for them. Internal employees only; customers can never be assigned.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The person's name (any part — full, native, or username)." },
+      limit: { type: "integer", description: "Max matches. Default 6, cap 10." },
+    },
+    required: ["query"],
+  },
+  requiredModule: TODO_MODULE,
+  requiredAction: "view",
+  minRole: "internal",
+  handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
+    const query = String(args.query ?? "").trim().toLowerCase();
+    if (!query) return { ok: false, permissionStatus: "denied", data: null, message: "Whose name should I look up?" };
+    const limit = Math.min(Math.max(Number(args.limit ?? 6) || 6, 1), 10);
+
+    let all;
+    try {
+      all = await listAssignableEmployees(ctx.auth.tenant_id);
+    } catch (e) {
+      console.error("[tool.findTeamMember]", e instanceof Error ? e.message : e);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't search the team right now." };
+    }
+
+    const matches = all
+      .filter((a) =>
+        [a.full_name, a.name_alt, a.username]
+          .some((n) => typeof n === "string" && n.toLowerCase().includes(query)),
+      )
+      .slice(0, limit)
+      .map((a) => ({
+        account_id: a.account_id,
+        full_name: a.full_name,
+        name_alt: a.name_alt,
+        username: a.username,
+        department: a.department,
+        position: a.position,
+      }));
+
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: matches,
+      message: matches.length
+        ? `Found ${matches.length} team member(s) matching "${args.query}".`
+        : `No team member matches "${args.query}". Check the spelling or try another part of the name.`,
+      sources: ["accounts(assignable employees)"],
+    };
+  },
+};
+
 /* ── Create (with confirm) ──
    Two-phase by design: the FIRST call (no confirm) returns a preview and
    writes NOTHING; only a second call with confirm:true actually inserts.
    The orchestrator prompt instructs the model to preview → get the user's
    explicit yes → then call again with confirm:true. The dispatcher's
    module guard (requiredAction:"create") already enforced can_create before
-   we got here, so a user who can't create tasks can't create via AI. */
+   we got here, so a user who can't create tasks can't create via AI.
+   Assignment to colleagues mirrors /api/todos POST: assignee rows in
+   koleex_todo_assignees + the same inbox "New task" fan-out; every id must
+   resolve against the assignable-employees list (internal/active/human),
+   which is the server-side INTERNAL-ONLY rule the route enforces. */
 const createTodo: ToolDef<
   {
     title?: string;
@@ -188,13 +261,14 @@ const createTodo: ToolDef<
     priority?: string;
     due_date?: string;
     label?: string;
+    assign_to_account_ids?: string[];
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
 > = {
   name: "createTodo",
   description:
-    "Create a NEW personal to-do task for the current user. ALWAYS call this first WITHOUT confirm to preview what will be created; show the user the details and only call again with confirm:true after they explicitly agree. Creates the task as the user's own (assigned to them). It cannot assign tasks to other people yet.",
+    "Create a NEW to-do task — personal by default, or ASSIGNED TO COLLEAGUES by passing assign_to_account_ids (resolve each person with findTeamMember first; if a name matches several people, ask the user which one before calling this). ALWAYS call this first WITHOUT confirm to preview what will be created; show the user the details — including WHO it will be assigned to — and only call again with confirm:true after they explicitly agree. Assigned colleagues are notified automatically.",
   parameters: {
     type: "object",
     properties: {
@@ -203,6 +277,11 @@ const createTodo: ToolDef<
       priority: { type: "string", description: "low | medium | high. Default medium.", enum: ["low", "medium", "high"] },
       due_date: { type: "string", description: "Optional ISO date/datetime the task is due." },
       label: { type: "string", description: "Optional short label/category." },
+      assign_to_account_ids: {
+        type: "array",
+        items: { type: "string" },
+        description: "Account ids of colleagues to assign this task to — each id MUST come from a findTeamMember result in this conversation. Omit for a personal task.",
+      },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user has explicitly confirmed the previewed task." },
     },
     required: ["title"],
@@ -223,15 +302,56 @@ const createTodo: ToolDef<
       label: args.label ? String(args.label) : null,
     };
 
+    /* Resolve requested assignees against the assignable-employees list —
+       the same internal/active/human source every app picker uses. An id
+       that isn't on that list (hallucinated, or a portal account) is a
+       hard error, never silently dropped. */
+    const requestedIds = Array.isArray(args.assign_to_account_ids)
+      ? Array.from(new Set(args.assign_to_account_ids.map((v) => String(v).trim()).filter(Boolean)))
+      : [];
+    let assignees: Array<{ account_id: string; name: string }> = [];
+    if (requestedIds.length > 0) {
+      let all;
+      try {
+        all = await listAssignableEmployees(ctx.auth.tenant_id);
+      } catch (e) {
+        console.error("[tool.createTodo.assignees]", e instanceof Error ? e.message : e);
+        return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't verify the assignees right now — please try again." };
+      }
+      const byId = new Map(all.map((a) => [a.account_id, a]));
+      const unknown = requestedIds.filter((id) => !byId.has(id));
+      if (unknown.length > 0) {
+        return {
+          ok: false,
+          permissionStatus: "denied",
+          data: null,
+          message: "One or more assignees didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
+        };
+      }
+      assignees = requestedIds.map((id) => {
+        const a = byId.get(id)!;
+        return { account_id: id, name: a.full_name || a.username };
+      });
+    }
+    const assigneeNames = assignees.map((a) => a.name).join(", ");
+
     // Phase 1: preview only — nothing is written.
     if (args.confirm !== true) {
       const due = normalized.due_date ? ` · due ${normalized.due_date}` : "";
+      const who = assignees.length > 0 ? ` assigned to ${assigneeNames}` : " for you";
       return {
         ok: true,
         permissionStatus: "approval_required",
-        data: { preview: normalized },
-        message: `Ready to create this to-do for you: "${title}" (priority ${priority}${due}). Confirm and I'll add it.`,
-        pendingAction: { tool: "createTodo", args: { ...normalized, confirm: true } },
+        data: { preview: { ...normalized, assignees } },
+        message: `Ready to create this to-do${who}: "${title}" (priority ${priority}${due}). Confirm and I'll add it${assignees.length > 0 ? " and notify them" : ""}.`,
+        pendingAction: {
+          tool: "createTodo",
+          args: {
+            ...normalized,
+            ...(requestedIds.length > 0 ? { assign_to_account_ids: requestedIds } : {}),
+            confirm: true,
+          },
+        },
       };
     }
 
@@ -268,11 +388,39 @@ const createTodo: ToolDef<
       console.error("[tool.createTodo]", error);
       return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the task — please try again." };
     }
+
+    /* Assignment fan-out — mirrors /api/todos POST: assignee rows, then an
+       inbox "New task" notification to every assignee except the creator. */
+    if (assignees.length > 0) {
+      const todoId = (data as { id: string }).id;
+      const { error: asgErr } = await supabaseServer.from("koleex_todo_assignees").insert(
+        assignees.map((a) => ({ todo_id: todoId, account_id: a.account_id })),
+      );
+      if (asgErr) console.error("[tool.createTodo.assignRows]", asgErr);
+      const recipients = assignees.map((a) => a.account_id).filter((id) => id !== ctx.auth.account_id);
+      if (recipients.length > 0) {
+        await supabaseServer.from("inbox_messages").insert(
+          recipients.map((recipientId) => ({
+            recipient_account_id: recipientId,
+            sender_account_id: ctx.auth.account_id,
+            category: "task",
+            subject: `New task: ${normalized.title}`,
+            body: normalized.description || normalized.title,
+            link: `/todo?task=${todoId}`,
+            metadata: { type: "todo_assignment", todo_id: todoId, priority: normalized.priority },
+          })),
+        );
+      }
+    }
+
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: data as Record<string, unknown>,
-      message: `Created the to-do "${title}". You'll find it in your To-do app.`,
+      data: { ...(data as Record<string, unknown>), assignees },
+      message:
+        assignees.length > 0
+          ? `Created the to-do "${title}" and assigned it to ${assigneeNames} — they've been notified.`
+          : `Created the to-do "${title}". You'll find it in your To-do app.`,
       sources: ["koleex_todos(insert)"],
     };
   },
@@ -597,6 +745,7 @@ const deleteTodo: ToolDef<
 
 export const todoTools: ToolDef[] = [
   listMyTodos as ToolDef,
+  findTeamMember as ToolDef,
   createTodo as ToolDef,
   completeTodo as ToolDef,
   updateTodo as ToolDef,
