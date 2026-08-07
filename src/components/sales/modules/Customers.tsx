@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
@@ -55,7 +56,7 @@ export default function CustomersModule({ t }: SalesModuleProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className={sectionTitleCls}><UsersIcon className="h-3 w-3" />{t("sales.topCustomers")}</h2>
+        <h2 className={sectionTitleCls}><BoundIcon semanticKey="entity.customer" className="h-3 w-3" fallback={<UsersIcon className="h-3 w-3" />} />{t("sales.topCustomers")}</h2>
         <Link href="/customers" className={linkBtnCls}>{t("sales.openInApp")}<AngleRightIcon className="h-3 w-3" /></Link>
       </div>
 

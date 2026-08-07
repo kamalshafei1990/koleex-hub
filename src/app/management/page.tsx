@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
 import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
@@ -1500,7 +1501,7 @@ function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: 
         {directReports.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <UsersIcon size={14} className="text-[var(--text-dim)]" />
+              <BoundIcon semanticKey="entity.employee" className="h-3.5 w-3.5 text-[var(--text-dim)]" fallback={<UsersIcon size={14} />} />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.directReports")} ({directReports.length})</span>
             </div>
             <div className="space-y-1.5">
@@ -2300,7 +2301,7 @@ export default function ManagementPage() {
                     <span className="text-[11px] font-medium text-[var(--text-secondary)]">{analytics.totalPositions} {t("mgmt.nPositions")}</span>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/10">
-                    <UsersIcon size={12} className="text-emerald-400/70" />
+                    <BoundIcon semanticKey="entity.employee" className="h-3 w-3 text-emerald-400/70" fallback={<UsersIcon size={12} />} />
                     <span className="text-[11px] font-medium text-emerald-400/70">{analytics.totalAssigned} {t("mgmt.assigned")}</span>
                   </div>
                   {analytics.emptyPositions > 0 && (

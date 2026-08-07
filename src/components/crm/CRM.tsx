@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
+import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import {
@@ -1386,7 +1387,7 @@ const OpportunityCard = memo(
 
       {/* Customer */}
       <div className="pl-1 text-[11.5px] text-[var(--text-dim)] truncate flex items-center gap-1">
-        <UsersIcon className="h-3 w-3 shrink-0 text-[var(--text-ghost)]" />
+        <BoundIcon semanticKey="entity.customer" className="h-3 w-3 shrink-0 text-[var(--text-ghost)]" fallback={<UsersIcon className="h-3 w-3" />} />
         {customerLine}
       </div>
 

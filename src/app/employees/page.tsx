@@ -6,6 +6,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -292,7 +293,7 @@ export default function EmployeesPage() {
             which is exactly what the shared component exists to stop: the Hub
             is monochrome-first and colour is reserved for real status. */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <KpiCard label={t("list.all", "Total")} value={employees.length} icon={<UsersIcon size={15} />} loading={loading} />
+          <KpiCard label={t("list.all", "Total")} value={employees.length} icon={<BoundIcon semanticKey="entity.employee" className="h-[15px] w-[15px]" fallback={<UsersIcon size={15} />} />} loading={loading} />
           <KpiCard label={t("status.active")} value={totalActive} icon={<CheckIcon size={15} />} loading={loading} />
           <KpiCard label={t("list.department")} value={totalDepts} icon={<Building2Icon size={15} />} loading={loading} />
           <KpiCard
@@ -315,7 +316,7 @@ export default function EmployeesPage() {
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <div className="w-14 h-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center mx-auto mb-4">
-              <UsersIcon size={24} className="text-[var(--text-dim)] opacity-40" />
+              <BoundIcon semanticKey="entity.employee" className="h-6 w-6 text-[var(--text-dim)] opacity-40" fallback={<UsersIcon size={24} />} />
             </div>
             <p className="text-[14px] font-semibold text-[var(--text-secondary)] mb-1">
               {employees.length === 0 ? t("list.empty.title") : t("list.noResults")}

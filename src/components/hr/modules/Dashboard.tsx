@@ -6,6 +6,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import {
   StatusBadge,
@@ -104,7 +105,7 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
         <KpiCard
           label={t("hr.totalEmployees")}
           value={dashStats?.headcount ?? "—"}
-          icon={<UsersIcon size={14} />}
+          icon={<BoundIcon semanticKey="entity.employee" className="h-3.5 w-3.5" fallback={<UsersIcon size={14} />} />}
         />
         <KpiCard
           label={t("hr.onLeaveToday")}
