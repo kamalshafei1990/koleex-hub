@@ -25,9 +25,14 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
+  /* CL-registry unification (owner 2026-08-07): classification icons now
+     LIVE in visual_icon_bindings (semantic_key classification.level.slug) —
+     one registry, one uniqueness law. This route keeps its legacy response
+     shape so every existing consumer stays untouched. */
   const { data, error } = await supabaseServer
-    .from("classification_icons")
-    .select("level, slug, icon_url");
+    .from("visual_icon_bindings")
+    .select("semantic_key, icon_url")
+    .eq("domain", "classification");
   if (error) {
     console.error("[api/classification-icons GET]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -36,7 +41,9 @@ export async function GET() {
   const icons: Record<Level, Record<string, string>> = {
     division: {}, category: {}, subcategory: {}, kind: {},
   };
-  for (const row of data ?? []) {
+  for (const raw of data ?? []) {
+    const parts = String(raw.semantic_key ?? "").split(".");
+    const row = { level: parts[1], slug: parts.slice(2).join("."), icon_url: raw.icon_url };
     const lvl = row.level as Level;
     if (LEVELS.includes(lvl) && row.slug && row.icon_url) {
       /* Strip any whitespace on the way out too — a corrupted URL (e.g. a
@@ -82,10 +89,9 @@ export async function PUT(req: Request) {
   // Both empty → clear the override.
   if (!icon_asset_id && !icon_url) {
     const { error } = await supabaseServer
-      .from("classification_icons")
+      .from("visual_icon_bindings")
       .delete()
-      .eq("level", level)
-      .eq("slug", slug);
+      .eq("semantic_key", `classification.${level}.${slug}`);
     if (error) {
       console.error("[api/classification-icons PUT clear]", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -93,14 +99,29 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: true, cleared: true });
   }
 
+  const semanticKey = `classification.${level}.${slug}`;
+  /* One icon = one meaning (system-wide, not just classification). */
+  const { data: taken } = await supabaseServer
+    .from("visual_icon_bindings")
+    .select("semantic_key, label_en")
+    .eq("icon_url", icon_url as string)
+    .neq("semantic_key", semanticKey)
+    .maybeSingle();
+  if (taken) {
+    return NextResponse.json(
+      { error: `This icon already carries another meaning: ${taken.label_en || taken.semantic_key}. Pick a different icon.`, taken_by: taken.semantic_key },
+      { status: 409 },
+    );
+  }
   const { error } = await supabaseServer
-    .from("classification_icons")
+    .from("visual_icon_bindings")
     .upsert(
-      { level, slug, icon_asset_id, icon_url, updated_at: new Date().toISOString() },
-      { onConflict: "level,slug" },
+      { semantic_key: semanticKey, domain: "classification", icon_url, source: "manual", updated_by: auth.account_id ?? null, updated_at: new Date().toISOString() },
+      { onConflict: "semantic_key" },
     );
   if (error) {
     console.error("[api/classification-icons PUT]", error.message);
+    if (error.code === "23505") return NextResponse.json({ error: "This icon already carries another meaning." }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

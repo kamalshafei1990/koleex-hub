@@ -25,6 +25,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchClassificationIcons } from "@/lib/products-admin";
+import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
@@ -216,6 +217,8 @@ let NOT_SET = "Not set";
    automatically — new fields inherit one with zero wiring. */
 const VL_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/";
 
+let BINDINGS_SNAPSHOT: Record<string, string> = {};
+
 function RowGlyph({ src, className = "h-3 w-3" }: { src: string; className?: string }) {
   return (
     <span
@@ -226,60 +229,98 @@ function RowGlyph({ src, className = "h-3 w-3" }: { src: string; className?: str
   );
 }
 
-const VL_ICON_RULES: Array<[RegExp, string]> = [
-  [/visible|visibility/i, "general/security/eye.svg"],
-  [/featured/i, "pack/status/ranking-star.svg"],
-  [/sourcing status/i, "pack/status/memo-circle-check.svg"],
-  [/status|lifecycle/i, "general/status/info.svg"],
-  [/level/i, "pack/actions/layers.svg"],
-  [/division/i, "general/business/building.svg"],
-  [/subcategory code|category code|koleex code|^code|model code|barcode/i, "general/inventory/barcode.svg"],
-  [/subcategory/i, "pack/actions/layers.svg"],
-  [/category/i, "pack/files/folder-tree.svg"],
-  [/family/i, "general/inventory/boxes.svg"],
-  [/template/i, "general/database/settings.svg"],
-  [/supplier product code|reference/i, "pack/devices/barcode-read.svg"],
-  [/supplier/i, "general/manufacturing/factory.svg"],
-  [/url|slug|link/i, "pack/actions/link.svg"],
-  [/brand/i, "pack/documents/crown.svg"],
-  [/name|title/i, "pack/commerce/label.svg"],
-  [/tagline|description|excerpt|note/i, "general/documents/document.svg"],
-  [/cost/i, "pack/finance/dollar.svg"],
-  [/pricing mode/i, "pack/actions/settings-sliders.svg"],
-  [/price/i, "pack/finance/money-bill-wave.svg"],
-  [/margin|percent|tax|vat/i, "pack/misc/percentage.svg"],
-  [/moq|quantity|stock/i, "general/inventory/boxes.svg"],
-  [/lead|time/i, "general/time/clock.svg"],
-  [/payment/i, "pack/finance/money-bill-wave.svg"],
-  [/currency/i, "general/finance/coins.svg"],
-  [/incoterm/i, "pack/maps/passport.svg"],
-  [/sample/i, "pack/status/cube.svg"],
-  [/warranty|shield/i, "general/security/shield.svg"],
-  [/supply|warehouse|container/i, "pack/misc/container-storage.svg"],
-  [/sku/i, "pack/commerce/label.svg"],
-  [/weight/i, "pack/actions/scale.svg"],
-  [/cbm|volume/i, "pack/status/cube.svg"],
-  [/packing|carton|box/i, "general/inventory/box.svg"],
-  [/hs /i, "general/maps/globe.svg"],
-  [/origin|country/i, "pack/maps/flag.svg"],
-  [/voltage|power|watt|frequency|phase|electric|plug|motor/i, "pack/manufacturing/bolt.svg"],
-  [/colou?r/i, "pack/actions/palette.svg"],
-  [/dimension|size|length|width|height|diameter/i, "pack/manufacturing/ruler-combined.svg"],
-  [/speed|rpm/i, "pack/analytics/chart-line-up-down.svg"],
-  [/capacity/i, "pack/devices/battery-full.svg"],
-  [/certificat|cert |diploma|compliance/i, "pack/documents/diploma.svg"],
-  [/manual|datasheet|brochure|document|file/i, "general/documents/document.svg"],
-  [/photo|image|media|gallery|video/i, "pack/files/camera.svg"],
-  [/language|market/i, "pack/actions/language.svg"],
-  [/date|created|updated|quoted|valid/i, "general/time/calendar.svg"],
-  [/knowledge|related/i, "pack/actions/book-open-cover.svg"],
-  [/readiness/i, "pack/status/memo-circle-check.svg"],
+const FIELD_KEY_RULES: Array<[RegExp, string]> = [
+  [/visible|visibility/i, "visible"],
+  [/featured/i, "featured"],
+  [/readiness/i, "readiness"],
+  [/status|lifecycle/i, "status"],
+  [/level/i, "level"],
+  [/division/i, "division"],
+  [/subcategory code|category code|koleex code|^code|model code/i, "koleex_code"],
+  [/barcode/i, "barcode"],
+  [/subcategory/i, "subcategory"],
+  [/category/i, "category"],
+  [/family/i, "family"],
+  [/template/i, "spec_template"],
+  [/supplier product code|reference/i, "supplier_code"],
+  [/supplier/i, "supplier"],
+  [/url|slug|link/i, "public_url"],
+  [/brand/i, "brand"],
+  [/tagline/i, "tagline"],
+  [/excerpt|short description/i, "excerpt"],
+  [/description/i, "description"],
+  [/price note/i, "price_note"],
+  [/note/i, "notes"],
+  [/name|title/i, "product_name"],
+  [/cost/i, "cost_price"],
+  [/pricing mode/i, "pricing_mode"],
+  [/price/i, "price"],
+  [/margin|percent|tax|vat/i, "tax"],
+  [/moq/i, "moq"],
+  [/stock|quantity/i, "stock"],
+  [/lead|time/i, "lead_time"],
+  [/payment/i, "payment_terms"],
+  [/currency/i, "currency"],
+  [/incoterm/i, "incoterms"],
+  [/sample/i, "sample"],
+  [/warranty/i, "warranty"],
+  [/supply|warehouse|container/i, "supply_type"],
+  [/sku/i, "sku"],
+  [/weight/i, "weight"],
+  [/cbm|volume/i, "cbm"],
+  [/box include/i, "box_include"],
+  [/packing|carton|box/i, "packing"],
+  [/hs /i, "hs_code"],
+  [/origin|country/i, "origin"],
+  [/voltage|power|watt|frequency|phase|electric|plug|motor/i, "voltage"],
+  [/colou?r/i, "colors"],
+  [/dimension|size|length|width|height|diameter/i, "dimensions"],
+  [/speed|rpm/i, "speed"],
+  [/capacity/i, "capacity"],
+  [/certificat|cert |diploma|compliance/i, "certifications"],
+  [/video/i, "video"],
+  [/photo|image|media|gallery/i, "photos"],
+  [/manual|datasheet|brochure|document|file/i, "documents"],
+  [/language|market/i, "languages"],
+  [/date|created|updated|quoted|valid/i, "dates"],
+  [/knowledge|related/i, "knowledge"],
 ];
 
-function iconForLabel(label: string): string {
-  for (const [re, path] of VL_ICON_RULES) if (re.test(label)) return VL_BASE + path;
-  return VL_BASE + "general/status/info.svg";
+/* Offline fallback = the registry's own seed URLs, so a failed fetch never
+   blanks the tiles. The registry (visual_icon_bindings) always wins. */
+const FIELD_ICON_FALLBACK: Record<string, string> = {
+  status: "general/status/info.svg", visible: "general/security/eye.svg", featured: "pack/status/ranking-star.svg",
+  level: "pack/actions/layers.svg", product_name: "pack/commerce/label.svg", koleex_code: "general/inventory/barcode.svg",
+  public_url: "pack/actions/link.svg", brand: "pack/documents/crown.svg", family: "general/inventory/boxes.svg",
+  tagline: "pack/actions/text.svg", description: "pack/actions/paragraph.svg", excerpt: "pack/misc/memo.svg",
+  spec_template: "general/database/settings.svg", supplier: "general/business/supplier.svg", supplier_code: "pack/devices/barcode-read.svg",
+  cost_price: "pack/finance/dollar.svg", price: "pack/finance/money-bill-wave.svg", pricing_mode: "pack/actions/settings-sliders.svg",
+  price_note: "pack/misc/memo-pad.svg", currency: "general/finance/coins.svg", payment_terms: "pack/finance/money-check.svg",
+  moq: "general/inventory/pallet.svg", lead_time: "general/time/timer.svg", incoterms: "pack/maps/passport.svg",
+  sample: "pack/status/cube.svg", warranty: "general/security/shield.svg", supply_type: "pack/misc/container-storage.svg",
+  sku: "pack/finance/ticket.svg", barcode: "pack/devices/qrcode.svg", weight: "pack/actions/scale.svg",
+  cbm: "pack/misc/cubes.svg", packing: "general/inventory/box.svg", box_include: "pack/actions/box-open.svg",
+  hs_code: "general/maps/globe.svg", origin: "pack/maps/flag.svg", voltage: "pack/devices/plug-alt.svg",
+  colors: "pack/actions/palette.svg", dimensions: "pack/manufacturing/ruler-combined.svg", speed: "pack/analytics/chart-line-up-down.svg",
+  capacity: "pack/devices/battery-full.svg", certifications: "pack/documents/diploma.svg", documents: "general/documents/document.svg",
+  photos: "pack/files/camera.svg", video: "general/files/video.svg", languages: "pack/actions/language.svg",
+  dates: "general/time/calendar.svg", knowledge: "pack/actions/book-open-cover.svg", readiness: "pack/status/memo-circle-check.svg",
+  stock: "general/inventory/warehouse.svg", tax: "pack/misc/percentage.svg", notes: "general/documents/clipboard.svg",
+  division: "general/business/building.svg", category: "pack/files/folder-tree.svg", subcategory: "pack/actions/layers.svg",
+};
+
+function fieldKeyForLabel(label: string): string {
+  for (const [re, k] of FIELD_KEY_RULES) if (re.test(label)) return k;
+  return "status";
 }
+
+function iconForField(bindings: Record<string, string>, fieldKey: string): string {
+  return (
+    bindings[`field.${fieldKey}`] ||
+    (FIELD_ICON_FALLBACK[fieldKey] ? VL_BASE + FIELD_ICON_FALLBACK[fieldKey] : VL_BASE + "general/status/info.svg")
+  );
+}
+
 
 function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   const empty =
@@ -409,7 +450,7 @@ function Row({ label, value, help, mono, badge, iconSrc }: {
       {/* Icon tile — the eye's anchor while scanning down the sheet.
           Always a Visual Library glyph (owner rule). */}
       <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-        <RowGlyph src={iconSrc || iconForLabel(label)} className="h-4 w-4" />
+        <RowGlyph src={iconSrc || iconForField(BINDINGS_SNAPSHOT, fieldKeyForLabel(label))} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3 mb-0.5">
@@ -453,9 +494,11 @@ export default function ProductProfile() {
      changing an icon in the Database app changes it here too (owner:
      "linked"). 60s shared cache; absent entry = keyword fallback. */
   const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
+  const [bindings, setBindings] = useState<BindingsMap>({});
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((m) => { if (alive) setClassIcons(m); }).catch(() => {});
+    fetchIconBindings().then((m) => { if (alive) { BINDINGS_SNAPSHOT = m; setBindings(m); } }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
@@ -914,7 +957,7 @@ export default function ProductProfile() {
                   {fields.map((f) => (
                     <div key={f.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                       <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                        <RowGlyph src={iconForLabel(f.label || f.key)} className="h-4 w-4" />
+                        <RowGlyph src={bindings[`spec.${f.key}`] || iconForField(bindings, fieldKeyForLabel(f.label || f.key))} className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3 mb-0.5">

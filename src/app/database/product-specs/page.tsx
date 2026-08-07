@@ -11,10 +11,14 @@
 
 import PermissionGate from "@/components/layout/PermissionGate";
 import ProductVisualLibrary from "@/components/admin/ProductVisualLibrary";
+import SpecIconHub from "@/components/database/SpecIconHub";
 
 export default function DatabaseSpecsAttributesPage() {
   return (
     <PermissionGate module="Database">
+      <div className="px-4 md:px-6 pt-6 max-w-[1400px] mx-auto">
+        <SpecIconHub />
+      </div>
       <ProductVisualLibrary embedded />
     </PermissionGate>
   );
