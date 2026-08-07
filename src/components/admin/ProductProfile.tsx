@@ -24,6 +24,7 @@ import { IMG } from "@/lib/cdn";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { fetchClassificationIcons } from "@/lib/products-admin";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
@@ -397,15 +398,18 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
 
 /* The editor's field row: label on top, value under it, help line beneath.
    Used by every tab so a reader never meets two different field shapes. */
-function Row({ label, value, help, mono, badge }: {
+function Row({ label, value, help, mono, badge, iconSrc }: {
   label: string; value: unknown; help?: string; mono?: boolean; badge?: string;
+  /** Explicit glyph URL (e.g. the classification icon HUB) — overrides the
+      keyword match so hub edits reflect here automatically. */
+  iconSrc?: string | null;
 }) {
   return (
     <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       {/* Icon tile — the eye's anchor while scanning down the sheet.
           Always a Visual Library glyph (owner rule). */}
       <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-        <RowGlyph src={iconForLabel(label)} className="h-4 w-4" />
+        <RowGlyph src={iconSrc || iconForLabel(label)} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3 mb-0.5">
@@ -443,6 +447,16 @@ export default function ProductProfile() {
   const wantedModel = useMemo(() => {
     if (typeof window === "undefined") return null;
     try { return new URLSearchParams(window.location.search).get("model"); } catch { return null; }
+  }, []);
+
+  /* Classification icon HUB — the SAME live map the classify tab uses, so
+     changing an icon in the Database app changes it here too (owner:
+     "linked"). 60s shared cache; absent entry = keyword fallback. */
+  const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
+  useEffect(() => {
+    let alive = true;
+    fetchClassificationIcons().then((m) => { if (alive) setClassIcons(m); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
@@ -731,9 +745,9 @@ export default function ProductProfile() {
       {STEPS[step].id === "classify" && (
       <Group icon={<FolderTreeIcon className="h-4 w-4" />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
         <div className={rows}>
-          <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} />
-          <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} />
-          <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
+          <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
+          <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
+          <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} iconSrc={classIcons.subcategory?.[String(s2("subcategory_slug") ?? "")]} />
           <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
           {/* "Not set" reads as MISSING data, but a standalone product
               legitimately has no family (owner). Real family → member
