@@ -11,6 +11,7 @@
 import { usePathname } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
+import { AppHeaderProvider } from "./AppHeaderSlot";
 import NavigationProgress from "./NavigationProgress";
 import AppLaunchSplash from "./AppLaunchSplash";
 import Sidebar from "./Sidebar";
@@ -262,7 +263,9 @@ export default function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate title="Koleex Hub" subtitle="Sign in to access the platform">
       <SidebarProvider>
-        <ShellContent>{children}</ShellContent>
+        <AppHeaderProvider>
+          <ShellContent>{children}</ShellContent>
+        </AppHeaderProvider>
       </SidebarProvider>
     </AuthGate>
   );

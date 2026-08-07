@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { useAppHeader } from "@/components/layout/AppHeaderSlot";
 import MoonIcon from "@/components/icons/ui/MoonIcon";
 import SunIcon from "@/components/icons/ui/SunIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -108,6 +110,8 @@ export default function MainHeader() {
   const dk = theme === "dark";
   const isHome = pathname === "/";
   const { mobileOpen, setMobileOpen } = useSidebar();
+  /* App-registered header (Discuss conversation, …). Null → classic crumb. */
+  const appHeader = useAppHeader();
 
   /* Find the current app name from route — exact match first, then
      longest-prefix match so /finance/orders/123 still resolves to
@@ -160,7 +164,7 @@ export default function MainHeader() {
              image the way it selects a word — painting a blue selection box
              over the wordmark. It is chrome, not content; there is nothing
              here anyone would want to copy. */
-          className={`select-none shrink-0 flex items-center rounded-lg -mx-2 px-2 -my-1 py-1 transition-opacity duration-150 hover:opacity-70 active:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white" : "text-black"}`}
+          className={`select-none shrink-0 ${appHeader ? "hidden md:flex" : "flex"} items-center rounded-lg -mx-2 px-2 -my-1 py-1 transition-opacity duration-150 hover:opacity-70 active:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white" : "text-black"}`}
         >
           {/* Hub logo v2 (owner-approved option B) — the script "hub" makes
               the lockup taller than the bare wordmark, so the img runs larger
@@ -189,7 +193,47 @@ export default function MainHeader() {
             className="w-auto h-5 md:h-8 select-none [-webkit-user-drag:none]"
           />
         </Link>
-        {appName && (
+        {appHeader ? (
+          <>
+            {appHeader.onBack && (
+              <button
+                type="button"
+                onClick={appHeader.onBack}
+                aria-label="Back"
+                className={`md:hidden ${btnCls}`}
+              >
+                <ArrowLeftIcon size={16} />
+              </button>
+            )}
+            <span
+              aria-hidden
+              className={`hidden md:inline-block w-px h-4 ${
+                dk ? "bg-white/[0.14]" : "bg-black/[0.14]"
+              }`}
+            />
+            {appHeader.avatar && (
+              <span className="shrink-0 flex items-center">{appHeader.avatar}</span>
+            )}
+            <span className="min-w-0 flex flex-col leading-tight">
+              <span
+                className={`text-[13px] font-semibold truncate max-w-[46vw] md:max-w-[280px] tracking-tight ${
+                  dk ? "text-white/85" : "text-black/85"
+                }`}
+              >
+                {appHeader.title}
+              </span>
+              {appHeader.subtitle && (
+                <span
+                  className={`text-[10.5px] truncate max-w-[46vw] md:max-w-[280px] ${
+                    dk ? "text-white/45" : "text-black/45"
+                  }`}
+                >
+                  {appHeader.subtitle}
+                </span>
+              )}
+            </span>
+          </>
+        ) : appName && (
           <>
             <span
               aria-hidden
@@ -210,6 +254,9 @@ export default function MainHeader() {
 
       {/* Right: Language + Theme + Notifications + Account */}
       <div className="flex items-center gap-2 shrink-0">
+        {appHeader?.actions && (
+          <div className="flex items-center gap-1 md:gap-1.5">{appHeader.actions}</div>
+        )}
         {/* Language — desktop pill bar */}
         <div
           className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${
