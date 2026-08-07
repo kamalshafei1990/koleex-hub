@@ -12,6 +12,7 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
   busy,
+  tone = "danger",
 }: {
   open: boolean;
   title: React.ReactNode;
@@ -21,6 +22,9 @@ export default function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  /** "danger" (default) = rose destructive confirm (the elected CF-1 look).
+   *  "neutral" = benign confirms ("Add another copy") — inverted primary. */
+  tone?: "danger" | "neutral";
 }) {
   if (!open) return null;
   return (
@@ -51,7 +55,9 @@ export default function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className="rounded-lg border border-rose-500/[0.30] bg-rose-500/[0.10] px-3 py-1.5 text-[12px] font-medium text-rose-300 transition-colors hover:bg-rose-500/[0.16] disabled:opacity-50"
+            className={tone === "danger"
+              ? "rounded-lg border border-rose-500/[0.30] bg-rose-500/[0.10] px-3 py-1.5 text-[12px] font-medium text-rose-300 transition-colors hover:bg-rose-500/[0.16] disabled:opacity-50"
+              : "rounded-lg border border-transparent bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90 disabled:opacity-50"}
           >
             {confirmLabel}
           </button>

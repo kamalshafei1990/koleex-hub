@@ -106,7 +106,7 @@ import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ClassificationSection from "./form-sections/ClassificationSection";
 import SelectWithCreate from "./form-sections/SelectWithCreate";
 import CreateDivisionModal from "./form-sections/CreateDivisionModal";
-import ConfirmDialog from "./form-sections/ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import SupplierLinkSection from "./form-sections/SupplierLinkSection";
 import CertificationsSection from "./form-sections/CertificationsSection";
 import ProductDocumentsSection from "./form-sections/ProductDocumentsSection";
@@ -6217,13 +6217,12 @@ export default function ProductForm({ productId }: Props) {
 
       <ConfirmDialog
         open={discardOpen}
-        onClose={() => setDiscardOpen(false)}
+        onCancel={() => setDiscardOpen(false)}
         onConfirm={() => { setDiscardOpen(false); leaveNow(); }}
         title={t("wizard.confirmDiscardTitle", "Discard unsaved changes?")}
         message={t("wizard.confirmDiscard", "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost.")}
         confirmLabel={t("wizard.discardConfirm", "Discard & leave")}
         cancelLabel={t("wizard.discardCancel", "Keep editing")}
-        destructive
       />
     </div>
   );

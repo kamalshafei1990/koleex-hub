@@ -18,7 +18,7 @@ import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import { slugify } from "@/types/product-form";
-import ConfirmDialog from "./form-sections/ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 /* ---------------------------------------------------------------------------
@@ -547,7 +547,7 @@ export default function TaxonomyAdmin({
       {/* Themed delete confirmation — replaces window.confirm() */}
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
+        onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
         title={deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete?"}
         message={
@@ -556,7 +556,6 @@ export default function TaxonomyAdmin({
             : "This cannot be undone."
         }
         confirmLabel="Delete"
-        destructive
       />
     </div>
   );

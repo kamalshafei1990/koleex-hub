@@ -31,7 +31,7 @@ import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import CrownIcon from "@/components/icons/ui/CrownIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { useEffect, useState } from "react";
 
 const inp =
@@ -179,12 +179,11 @@ export function FamilyStrip({
       )}
       <ConfirmDialog
         open={askRemove != null}
-        onClose={() => setAskRemove(null)}
+        onCancel={() => setAskRemove(null)}
         onConfirm={() => { if (askRemove != null && onRemove) onRemove(askRemove); setAskRemove(null); }}
         title={t("famGrid.removeModel", "Remove model")}
         message={t("famGrid.removeConfirm", "Remove this model from the family? Its differences are discarded when you save.")}
         confirmLabel={t("famGrid.removeModel", "Remove model")}
-        destructive
       />
     </div>
   );

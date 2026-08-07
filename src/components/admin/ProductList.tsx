@@ -44,7 +44,7 @@ import {
   fetchClassificationIcons,
 } from "@/lib/products-admin";
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
-import ConfirmDialog from "./form-sections/ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { useCnyUsd, formatUsd, formatRate, fxSourceTitle } from "@/lib/use-cny-usd";
 import BackToTop from "@/components/ui/BackToTop";
 
@@ -2401,12 +2401,11 @@ export default function ProductList() {
       {/* Themed confirm for product delete — replaces window.confirm() */}
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
+        onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
         title={deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete product?"}
         message="This also removes all its models, media, translations, and saved prices. This cannot be undone."
         confirmLabel="Delete"
-        destructive
       />
     </div>
   );

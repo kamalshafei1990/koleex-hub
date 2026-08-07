@@ -7,7 +7,7 @@ import TargetIcon from "@/components/icons/ui/TargetIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import type { ProductFormState } from "@/types/product-form";
 import RichTextEditor from "./RichTextEditor";
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { getDescriptionTemplates } from "@/lib/description-templates";
 import { getKindBySlug } from "@/lib/machine-kinds";
 
@@ -266,8 +266,9 @@ export default function DescriptionSection({
           description. Lets them choose between adding a duplicate
           section or cancelling out of the click. */}
       <ConfirmDialog
+        tone="neutral"
         open={pendingDupBlock !== null}
-        onClose={() => setPendingDupBlock(null)}
+        onCancel={() => setPendingDupBlock(null)}
         onConfirm={confirmDuplicate}
         title={pendingDupBlock ? `${pendingDupBlock.label} is already added` : ""}
         message="This section already appears in the description. Add another copy below anyway?"

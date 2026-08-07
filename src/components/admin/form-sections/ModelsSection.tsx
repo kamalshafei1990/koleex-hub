@@ -24,7 +24,7 @@ import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
 import SelectWithCreate from "./SelectWithCreate";
 const BarcodeQRDisplay = dynamic(() => import("./BarcodeQRDisplay"), { ssr: false, loading: () => null });
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 
 export interface VariantSpecField {
   key: string;
@@ -1025,12 +1025,11 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
       {/* Themed remove confirmation — replaces window.confirm() */}
       <ConfirmDialog
         open={removeTempId !== null}
-        onClose={() => setRemoveTempId(null)}
+        onCancel={() => setRemoveTempId(null)}
         onConfirm={confirmRemove}
         title="Remove this variant?"
         message="The variant and its saved prices are removed from this draft. Nothing is deleted from the database until you save the product."
         confirmLabel="Remove"
-        destructive
       />
     </div>
   );

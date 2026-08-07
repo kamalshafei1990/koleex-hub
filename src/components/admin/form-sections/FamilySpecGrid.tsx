@@ -31,7 +31,7 @@ import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import type { VariantSpecField } from "./ModelsSection";
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 
 const isEmptyVal = (v: unknown) =>
   v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
@@ -246,12 +246,11 @@ export default function FamilySpecGrid({
 
       <ConfirmDialog
         open={askRemoveIdx != null}
-        onClose={() => setAskRemoveIdx(null)}
+        onCancel={() => setAskRemoveIdx(null)}
         onConfirm={() => { if (askRemoveIdx != null) removeModel(askRemoveIdx); setAskRemoveIdx(null); }}
         title={t("famGrid.removeModel", "Remove model")}
         message={t("famGrid.removeConfirm", "Remove this model from the family? Its differences are discarded when you save.")}
         confirmLabel={t("famGrid.removeModel", "Remove model")}
-        destructive
       />
     </div>
   );
