@@ -29,14 +29,14 @@ chunks came from browser cache; the file COUNT stays comparable).
 | SYS-1 | P2 | DevReload (localhost-only) ticked on every pointermove unthrottled → 11-24 junk API calls/visit, polluted all localhost measurements | ✅ fixed 2026-08-08 (3s throttle) |
 | SYS-2 | P1 | Duplicate same-screen API calls everywhere (bootstrap ×2-4, inbox/feed ×3, discuss/read ×5, assignees ×4, avatars ×8…) — request coalescing (client-cache cachedGet) exists but many call sites bypass it. On a ~1s/request network each dup is a full second of user time | 🛠 pass 1 ✅ 2026-08-08: discuss.ts bootstrap → shared me-bootstrap; todos/assignees+todo-labels+me/work+taxonomy/all → cachedGet; avatars CHUNK 30→120. Measured: /home 18→14, /todo 21→14, /customers avatars ×8→×2. Remaining ×2s (bootstrap, visual-bindings, contacts) pattern-match module duplication → folded into SYS-4. discuss/read ×5 = invalidation churn → Discuss app session |
 | SYS-3 | P1 | /customers pulls 2.7 MB of route JS chunks (47 files) on first visit — heaviest screen measured | ⬜ |
-| SYS-4 | P2 | Same-route RSC prefetch fetched under many distinct `_rsc` hashes (workflows ×5, finance/accounting/queue ×6 on /home) — prefetch variant churn, wasted bytes | ⬜ |
+| SYS-4 | P2→P1 | ROOT CAUSE FOUND 2026-08-08: Turbopack DUPLICATES small modules across chunks (visual-bindings code present in 3 chunk files) → module-level singleton caches split into independent copies → parallel duplicate fetches (vb ×2 @15ms apart, proven by timestamps). FIX: anchor singletons on globalThis — applied to visual-bindings + client-cache; verified vb ×2→×1. me-bootstrap single-copy today (left untouched — auth-critical, own session if it ever duplicates). RSC `_rsc`-variant prefetch churn = Next prefetch TTL behavior, accepted for now | 🛠 core fixed |
 | SYS-5 | P2 | 28-58 images per screen (cached in this run) — cold-load behavior, sizing and placeholders to verify per wave | ⬜ |
 
 ## Apps × lenses
 
 | # | Wave | App | Route | B1 | B2 | B3 | B4 | F1 | F2 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | W1 | Home | / + /home | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1 | W1 | Home | / + /home | 🛠 | ✅ | 🛠 | 🔍 | ✅ | ✅ |
 | 2 | W1 | Discuss | /discuss | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 3 | W1 | To-do | /todo | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | W1 | Calendar | /calendar | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

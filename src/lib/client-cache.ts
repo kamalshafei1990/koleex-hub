@@ -46,7 +46,13 @@ interface Entry {
   inflight?: Promise<unknown>;
 }
 
-const cache = new Map<string, Entry>();
+/* SYS-4: bundlers may duplicate small modules across chunks, which would
+   split this map into per-chunk copies and silently disable coalescing —
+   exactly what happened to visual-bindings (3 copies in one build). The
+   globalThis anchor guarantees one shared map no matter how many chunk
+   graphs include this file. */
+const g = globalThis as typeof globalThis & { __kxCachedGet?: Map<string, Entry> };
+const cache: Map<string, Entry> = g.__kxCachedGet ?? (g.__kxCachedGet = new Map());
 
 /** GET `url` as JSON, coalescing concurrent callers and reusing the body for
  *  `ttlMs`. Throws on a non-OK response so callers keep their error handling. */

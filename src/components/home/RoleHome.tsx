@@ -21,6 +21,7 @@ import {
   type ErpStatus,
 } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { APP_REGISTRY } from "@/lib/navigation";
 import NotificationBell from "@/components/operations/NotificationBell";
 import MobileActionBar from "@/components/ui/mobile/MobileActionBar";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
@@ -61,16 +62,17 @@ export default function RoleHome() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const [eRes, sRes, setRes] = await Promise.all([
-      fetch("/api/me/preferences", { credentials: "include", cache: "no-store" }),
-      fetch("/api/workflows/status", { credentials: "include", cache: "no-store" }),
-      fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" }),
+    /* Coalesced (SYS-2): remounting /home inside the TTL reuses the bodies
+       instead of refiring three round-trips. Saving preferences invalidates
+       its entry (see PersonalizeDrawer.save). */
+    const { cachedGet } = await import("@/lib/client-cache");
+    const [eJ, sJ, setupJ] = await Promise.all([
+      cachedGet<{ experience?: Experience }>("/api/me/preferences", 60_000).catch(() => null),
+      cachedGet<WorkflowStatus>("/api/workflows/status", 30_000).catch(() => null),
+      cachedGet<{ snapshot?: { completion?: number } }>("/api/finance/setup/status", 60_000).catch(() => null),
     ]);
-    const eJ = await eRes.json();
-    const sJ = sRes.ok ? await sRes.json() : null;
-    const setupJ = setRes.ok ? await setRes.json() : null;
-    if (eRes.ok) setExp(eJ.experience as Experience);
-    if (sJ) setStatus(sJ as WorkflowStatus);
+    if (eJ?.experience) setExp(eJ.experience);
+    if (sJ) setStatus(sJ);
     if (setupJ?.snapshot?.completion != null) setSetupCompletion(setupJ.snapshot.completion);
   }, []);
 
@@ -83,9 +85,11 @@ export default function RoleHome() {
     <ErpPage
       title="Home"
       subtitle={exp ? `${ROLE_LABEL[exp.dashboard_role]} dashboard · ${exp.ui_mode === "simple" ? "Simple" : "Advanced"} mode` : "Loading…"}
-      icon="coins"
+      icon="home"
       action={
-        <div className="flex items-center gap-2">
+        /* flex-wrap: on 375px the four actions overflowed and "Personalize"
+           was clipped off-screen — wrapping keeps every control reachable. */
+        <div className="flex flex-wrap items-center gap-2">
           {/* Universal Smart-Create launcher — opens the drawer everywhere.
               Uses the Hub's canonical primary CTA style (inverted) to match
               quotations/invoices/sales. */}
@@ -111,7 +115,7 @@ export default function RoleHome() {
           <FocusToggle />
           <button
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
           >
             <RrIcon name="tools" size={12} />
             Personalize
@@ -122,11 +126,11 @@ export default function RoleHome() {
       {showSetupBanner && (
         <Link
           href="/finance/setup"
-          className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-500/[0.06] px-4 py-3 text-[12px] text-amber-200 hover:bg-amber-500/[0.10]"
+          className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-200"
         >
           <RrIcon name="shield-check" size={14} />
           Finance setup is only {Math.round(setupCompletion * 100)}% complete. Finish onboarding to unlock posting flows.
-          <span className="ml-auto text-amber-300">→</span>
+          <span className="ml-auto text-amber-600 dark:text-amber-300">→</span>
         </Link>
       )}
 
@@ -162,9 +166,14 @@ export default function RoleHome() {
               <div>
                 <ErpEyebrow>Favorite apps</ErpEyebrow>
                 <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {exp.favorite_apps.map((id) => (
-                    <ErpQuickAction key={id} href={`/${id}`} icon="box-open" label={id} hint="Pinned" />
-                  ))}
+                  {exp.favorite_apps.map((id) => {
+                    /* Show the app's REAL registry name and route — the raw
+                       slug ("product-data") used to leak into the card. */
+                    const reg = APP_REGISTRY.find((a) => a.id === id);
+                    return (
+                      <ErpQuickAction key={id} href={reg?.route ?? `/${id}`} icon="box-open" label={reg?.name ?? id} hint="Pinned" />
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -268,8 +277,8 @@ function WarehouseDashboard({ status }: { status: WorkflowStatus | null }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <ErpKpi label="Items"          value={String(i.items ?? 0)}     hint="Universal master" />
         <ErpKpi label="Movements"      value={String(i.movements ?? 0)} hint="Posted IN/OUT" tone="info" />
-        <ErpKpi label="Stock balances" value={String(i.balances ?? 0)}  hint="Per item × location" />
-        <ErpKpi label="Locations"      value={String(i.balances ?? 0)}  hint="Warehouses + virtual" />
+        <ErpKpi label="Stock balances" value={String(i.balances ?? 0)}   hint="Per item × location" />
+        <ErpKpi label="Warehouses"     value={String(i.warehouses ?? 0)} hint="Storage locations" />
       </div>
       <ErpHairline />
       <Quicks heading="Top actions">
@@ -404,6 +413,10 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "Failed"); return; }
+      /* Drop the coalesced copy so the next /home mount reads the saved
+         preferences, not the 60s-old cached body. */
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/me/preferences");
       onSaved(j.experience as Experience);
     } finally { setSaving(false); }
   };
@@ -412,17 +425,17 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">Personalize</h2>
-            <p className="text-[11px] text-gray-500">Choose how the home screen behaves for you.</p>
+            <p className="text-[11px] text-[var(--text-tertiary)]">Choose how the home screen behaves for you.</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">Dashboard role</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Dashboard role</div>
             <div className="grid grid-cols-2 gap-2">
               {ROLES.map((r) => {
                 const active = role === r;
@@ -432,18 +445,18 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
                     type="button"
                     onClick={() => setRole(r)}
                     className={`rounded-md border px-2.5 py-2 text-left text-[11.5px] transition-colors ${
-                      active ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                      active ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     <div className="font-medium">{ROLE_LABEL[r]}</div>
-                    <div className="text-[10.5px] text-gray-500">{ROLE_DESC[r]}</div>
+                    <div className="text-[10.5px] text-[var(--text-tertiary)]">{ROLE_DESC[r]}</div>
                   </button>
                 );
               })}
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">Mode</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Mode</div>
             <div className="flex gap-2 text-[11.5px]">
               {(["simple","advanced"] as UiMode[]).map((m) => (
                 <button
@@ -451,11 +464,11 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
                   type="button"
                   onClick={() => setMode(m)}
                   className={`flex-1 rounded-md border px-3 py-2 text-left transition-colors ${
-                    mode === m ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                    mode === m ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   <div className="font-medium">{m === "simple" ? "Simple" : "Advanced"}</div>
-                  <div className="text-[10.5px] text-gray-500">{m === "simple"
+                  <div className="text-[10.5px] text-[var(--text-tertiary)]">{m === "simple"
                     ? "Operational actions, fewer accounting details."
                     : "Accounting, journals, reconciliation, adjustments."}
                   </div>
@@ -464,7 +477,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">Pinned workflows</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Pinned workflows</div>
             <div className="flex flex-wrap gap-1.5 text-[11.5px]">
               {WORKFLOW_OPTIONS.map((w) => {
                 const active = pinned.includes(w.id);
@@ -474,7 +487,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
                     type="button"
                     onClick={() => toggle(pinned, setPinned, w.id)}
                     className={`rounded-md border px-2.5 py-1 transition-colors ${
-                      active ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                      active ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {w.label}
@@ -484,7 +497,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">Favorite apps</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Favorite apps</div>
             <div className="flex flex-wrap gap-1.5 text-[11.5px]">
               {APP_OPTIONS.map((a) => {
                 const active = favorites.includes(a.id);
@@ -494,7 +507,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
                     type="button"
                     onClick={() => toggle(favorites, setFavorites, a.id)}
                     className={`rounded-md border px-2.5 py-1 transition-colors ${
-                      active ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                      active ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {a.label}
@@ -503,11 +516,11 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
               })}
             </div>
           </section>
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
+          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</div>}
         </div>
-        <div className="flex justify-end gap-2 border-t border-white/[0.06] px-4 py-3">
-          <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">Cancel</button>
-          <button onClick={save} disabled={saving} className="rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
+        <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
+          <button onClick={onClose} className="rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Cancel</button>
+          <button onClick={save} disabled={saving} className="rounded-md border border-[var(--border-strong)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
         </div>
       </div>
     </div>

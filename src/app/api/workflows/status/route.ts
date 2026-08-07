@@ -36,7 +36,7 @@ export async function GET() {
     shipmentsPosted, invoicesIssued, invoicesPaid, payIn,
     expDraft, expSubmitted, expApproved, expPosted,
     cogsDraft, journalDraft,
-    invItems, invMovements, invBalances, invValuation,
+    invItems, invMovements, invBalances, invValuation, invWarehouses,
   ] = await Promise.all([
     countRows("purchase_orders", t, { status: "draft" }),
     countRows("purchase_orders", t, { status: "confirmed" }),
@@ -64,6 +64,9 @@ export async function GET() {
     countRows("inventory_stock_movements", t, { status: "posted" }),
     countRows("inventory_stock_balances", t),
     countRows("inventory_valuation", t),
+    /* Warehouse dashboard's "Locations" KPI was showing the BALANCES count
+       for lack of a real figure — count the actual warehouses instead. */
+    countRows("inventory_warehouses", t),
   ]);
 
   return NextResponse.json({
@@ -81,6 +84,7 @@ export async function GET() {
     },
     inventory: {
       items: invItems, movements: invMovements, balances: invBalances, valuation: invValuation,
+      warehouses: invWarehouses,
     },
   });
 }
