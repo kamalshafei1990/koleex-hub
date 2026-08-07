@@ -14,11 +14,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 
-/* The commit this BUNDLE was compiled from (Vercel exposes it automatically).
-   Comparing against this — rather than against whatever /api/version returned
-   at mount — means a tab that was already open before a deploy is caught on
-   its very first check, not only if it happens to be open across a second one. */
-const BUILD = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "";
+/* The commit this BUNDLE was compiled from. Primary source: the kx-build
+   <meta> the root layout bakes into the HTML at build time (deterministic —
+   no dependency on Vercel's "expose system env" setting). Fallback: the
+   NEXT_PUBLIC_ inline if it happens to exist. Comparing against this — rather
+   than against whatever /api/version returned at mount — means a tab that was
+   already open before a deploy is caught on its very first check. */
+function bootBuildId(): string {
+  if (typeof document !== "undefined") {
+    const meta = document.querySelector('meta[name="kx-build"]') as HTMLMetaElement | null;
+    const v = meta?.content?.trim();
+    if (v && v !== "dev") return v;
+  }
+  return process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "";
+}
 
 const T = {
   "u.available": { en: "A new version is available", zh: "有新版本可用", ar: "يتوفر إصدار جديد" },
@@ -27,11 +36,12 @@ const T = {
 
 export default function UpdateWatcher() {
   const { t } = useTranslation(T);
-  const boot = useRef<string | null>(BUILD || null);
+  const boot = useRef<string | null>(null);
   const [stale, setStale] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    if (boot.current == null) boot.current = bootBuildId() || null;
     const check = async () => {
       try {
         const r = await fetch("/api/version", { cache: "no-store" });

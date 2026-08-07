@@ -13,6 +13,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  /* Build id baked into the HTML at build time so UpdateWatcher can compare
+     the RUNNING bundle against /api/version without relying on NEXT_PUBLIC_*
+     env exposure (which silently breaks the stale-tab detector when Vercel's
+     system-env exposure is off). Renders as <meta name="kx-build" …>. */
+  other: { "kx-build": process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "dev" },
   title: "KOLEEX — Enterprise Platform",
   description: "Koleex ERP — Manage products, operations, and more",
   /* Links /manifest.webmanifest → installable PWA (required for iOS Web Push). */
