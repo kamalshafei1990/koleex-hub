@@ -2336,7 +2336,11 @@ export default function DiscussApp() {
        = `h-14` on MainHeader. */
     <div
       className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      /* Header height comes from the shell's CSS var so the installed
+          iOS PWA (safe-top) and the desktop shell (title bar) stay in
+          sync — the hardcoded 3.5rem drifted on both (documented
+          follow-up of the unified-header design). */
+      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}
     >
       {confirmDialog}
       {/* ═══ Top bar ═══
