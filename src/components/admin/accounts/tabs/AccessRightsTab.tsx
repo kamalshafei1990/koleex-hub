@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -229,13 +230,16 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
   // name, creates a row in koleex_roles, upserts all the module perms
   // against that new role, then refreshes the dropdown. The result is
   // a reusable template other admins can pick from this same dropdown.
-  const saveAsNewTemplate = useCallback(async () => {
-    const name = window.prompt(
+  const { askInput, inputDialog } = useInput();
+  const saveAsNewTemplate = useCallback(() => {
+    askInput(
       "Name for the new role template (you can rename later in Roles & Permissions):",
-      "",
+      (v) => doSaveAsNewTemplate(v.trim()),
+      { confirmLabel: "Create", validate: (v) => (v.trim() ? null : "Name is required") },
     );
-    const trimmed = name?.trim();
-    if (!trimmed) return;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askInput]);
+  const doSaveAsNewTemplate = useCallback(async (trimmed: string) => {
 
     setApplyingTemplate(true);
     const { data: newRole, error: createErr } = await createRole({
@@ -787,6 +791,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
         );
       })}
 
+      {inputDialog}
       <ConfirmDialog
         open={resetAsk}
         tone="neutral"

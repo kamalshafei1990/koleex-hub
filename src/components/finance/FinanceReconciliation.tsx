@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -103,8 +104,12 @@ export default function FinanceReconciliation() {
     }
   }, [load, filter]);
 
-  const reject = useCallback(async (id: string) => {
-    const reason = window.prompt(t("reconciliation.rejectPrompt", "Why is this match wrong? (optional)")) ?? undefined;
+  const { askInput, inputDialog } = useInput();
+  const reject = useCallback((id: string) => {
+    askInput(t("reconciliation.rejectPrompt", "Why is this match wrong? (optional)"), (v) => void doReject(id, v.trim() || undefined), { confirmLabel: "Reject" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askInput, t]);
+  const doReject = useCallback(async (id: string, reason?: string) => {
     setActing(id);
     setError(null);
     try {
@@ -136,6 +141,7 @@ export default function FinanceReconciliation() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {inputDialog}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("reconciliation.title", "Reconciliation Queue")}

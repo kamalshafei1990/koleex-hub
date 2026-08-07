@@ -10,6 +10,7 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel,
@@ -89,13 +90,18 @@ export default function FinanceApprovals() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  async function transition(it: PendingItem, action: "submit" | "approve" | "reject") {
-    let reason: string | undefined;
+  const { askInput, inputDialog } = useInput();
+  function transition(it: PendingItem, action: "submit" | "approve" | "reject") {
     if (action === "reject") {
-      const v = window.prompt(t("approvals.rejectPrompt", "Reason for rejection (min 3 chars):"));
-      if (!v || v.trim().length < 3) return;
-      reason = v.trim();
+      askInput(t("approvals.rejectPrompt", "Reason for rejection (min 3 chars):"), (v) => void doTransition(it, action, v.trim()), {
+        confirmLabel: "Reject",
+        validate: (v) => (v.trim().length >= 3 ? null : "At least 3 characters"),
+      });
+      return;
     }
+    void doTransition(it, action, undefined);
+  }
+  async function doTransition(it: PendingItem, action: "submit" | "approve" | "reject", reason: string | undefined) {
     setBusyId(`${it.kind}-${it.id}`);
     try {
       const r = await fetch("/api/approvals", {
@@ -127,6 +133,7 @@ export default function FinanceApprovals() {
         </Link>
       }
     >
+      {inputDialog}
       {loading && <div className="text-sm text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>}
       {error && <div className="text-sm text-rose-600 dark:text-rose-300">{error}</div>}
 

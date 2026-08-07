@@ -22,6 +22,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -305,6 +306,7 @@ const SIDEBAR_W = 248;
 const PROJECTS_COLLAPSED = 4;
 
 export default function KoleexAiApp() {
+  const { askInput, inputDialog } = useInput();
   const { lang } = useTranslation({}) as unknown as { lang: Lang };
   const copy = COPY[lang] ?? COPY.en;
   const { account } = useCurrentAccount();
@@ -1283,8 +1285,13 @@ export default function KoleexAiApp() {
   }, [activeId, pendingDeleteId, activeIdKey]);
 
   const renameConversation = useCallback(
-    async (id: string, currentTitle: string) => {
-      const next = prompt(copy.renamePrompt, currentTitle);
+    (id: string, currentTitle: string) => {
+      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
+    },
+    [askInput, copy],
+  );
+  const doRenameConversation = useCallback(
+    async (id: string, currentTitle: string, next: string) => {
       if (!next || next.trim() === currentTitle) return;
       const res = await fetch(`/api/ai/conversations/${id}`, {
         method: "PATCH",
@@ -1675,6 +1682,7 @@ export default function KoleexAiApp() {
       className="text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       style={{ height: stageHeight }}
     >
+      {inputDialog}
       {/* Hub design system: solid bg-primary surface, no animated halo.
           Matches FinanceHome / InvoicesApp / Sales etc. The previous
           Gemini-style breathing radial-gradient lived here and was

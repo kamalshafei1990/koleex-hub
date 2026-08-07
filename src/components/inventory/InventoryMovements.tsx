@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { MovementStatus, MovementType } from "@/lib/inventory/types";
 import {
@@ -451,10 +452,15 @@ export default function InventoryMovements() {
     selection.clear();
     await loadMovements();
   };
-  const bulkVoid = async () => {
+  const { askInput, inputDialog } = useInput();
+  const bulkVoid = () => {
     if (selection.count === 0) return;
-    const reason = window.prompt("Void reason (min 3 chars)?") ?? "";
-    if (reason.trim().length < 3) return;
+    askInput("Void reason (min 3 chars)?", (v) => void doBulkVoid(v.trim()), {
+      confirmLabel: "Void",
+      validate: (v) => (v.trim().length >= 3 ? null : "At least 3 characters"),
+    });
+  };
+  const doBulkVoid = async (reason: string) => {
     const ids = [...selection.ids];
     for (const id of ids) {
       try {
@@ -462,7 +468,7 @@ export default function InventoryMovements() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ void_reason: reason.trim() }),
+          body: JSON.stringify({ void_reason: reason }),
         });
       } catch { /* */ }
     }
@@ -473,6 +479,7 @@ export default function InventoryMovements() {
   /* Page wrapper + InventoryHeader are provided by /app/inventory/layout.tsx. */
   return (
     <>
+      {inputDialog}
       <div className="space-y-5">
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">

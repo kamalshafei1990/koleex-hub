@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -208,6 +209,7 @@ export default function FinanceNotifications() {
 }
 
 function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: string, act: "done" | "snooze" | "cancel", snooze_days?: number) => void }) {
+  const { askInput, inputDialog } = useInput();
   const today = new Date().toISOString().slice(0, 10);
   const sev = severityOf(n.due_date);
   const sevStyle = SEVERITY_STYLE[sev];
@@ -224,6 +226,7 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
 
   return (
     <div className={`rounded-lg border bg-[var(--bg-primary)] p-3 ${sevStyle.ring}`}>
+      {inputDialog}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -253,11 +256,10 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
         <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">3d</button>
         <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">7d</button>
         <button
-          onClick={() => {
-            const v = prompt("Snooze how many days?");
-            const n_days = v ? parseInt(v, 10) : NaN;
+          onClick={() => askInput("Snooze how many days?", (v) => {
+            const n_days = parseInt(v, 10);
             if (Number.isFinite(n_days) && n_days > 0) onAction(n.id, "snooze", n_days);
-          }}
+          }, { placeholder: "e.g. 5", confirmLabel: "Snooze", validate: (v) => (Number.isFinite(parseInt(v, 10)) && parseInt(v, 10) > 0 ? null : "Enter a number of days") })}
           className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
         >
           Custom…

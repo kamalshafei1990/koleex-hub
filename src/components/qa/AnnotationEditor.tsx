@@ -22,6 +22,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 
 const ACCENT = "#0066FF";
 const HIGHLIGHT = "rgba(255, 204, 0, 0.45)"; // brand warning tint, translucent
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export default function AnnotationEditor({ file, onSave, onCancel, labels }: Props) {
+  const { askInput, inputDialog } = useInput();
   const [tool, setTool] = useState<Tool>("arrow");
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [drag, setDrag] = useState<{ from: [number, number]; to: [number, number] } | null>(null);
@@ -115,10 +117,12 @@ export default function AnnotationEditor({ file, onSave, onCancel, labels }: Pro
     e.preventDefault();
     if (tool === "text") {
       const p = toLocal(e);
-      const text = window.prompt(labels.textPrompt, "");
-      if (text && text.trim()) {
-        setShapes((prev) => [...prev, { kind: "text", at: p, text: text.trim(), color: ACCENT, size: 22 * (dims.w / dims.cssW) }]);
-      }
+      const scale = 22 * (dims.w / dims.cssW);
+      askInput(labels.textPrompt, (text) => {
+        if (text.trim()) {
+          setShapes((prev) => [...prev, { kind: "text", at: p, text: text.trim(), color: ACCENT, size: scale }]);
+        }
+      });
       return;
     }
     const p = toLocal(e);
@@ -184,6 +188,7 @@ export default function AnnotationEditor({ file, onSave, onCancel, labels }: Pro
 
   return (
     <div className="fixed inset-0 z-[220] flex flex-col bg-black/85 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={labels.title}>
+      {inputDialog}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-white">{labels.title}</span>
         <div className="ms-2 flex flex-wrap items-center gap-1.5">

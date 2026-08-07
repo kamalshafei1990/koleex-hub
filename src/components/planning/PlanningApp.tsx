@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -1366,15 +1367,16 @@ function ResourceRow({
     await deleteResource(resource.id);
     await onReload();
   }, { confirmLabel: t("btn.delete") });
-  const rename = async () => {
-    const next = prompt(t("cfg.resources.renamePrompt"), resource.name);
+  const { askInput, inputDialog } = useInput();
+  const rename = () => askInput(t("cfg.resources.renamePrompt"), async (next) => {
     if (!next || next === resource.name) return;
     await updateResource(resource.id, { name: next });
     await onReload();
-  };
+  }, { initial: resource.name, confirmLabel: t("btn.save", "Save") });
   return (
     <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
       {confirmDialog}
+      {inputDialog}
       <span className="px-1.5 py-0.5 rounded-md bg-[var(--bg-surface)] text-[9px] uppercase tracking-wider font-bold text-[var(--text-dim)] border border-[var(--border-subtle)]">
         {resource.type}
       </span>

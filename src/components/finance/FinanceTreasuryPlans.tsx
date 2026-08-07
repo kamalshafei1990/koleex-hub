@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useInput } from "@/components/kds/useInput";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -168,6 +169,8 @@ export default function FinanceTreasuryPlans() {
   }, [openId, loadList, loadDetail]);
 
   const [archiveAsk, setArchiveAsk] = useState(false);
+  const { askInput, inputDialog } = useInput();
+
   const archive = useCallback(() => { if (openId) setArchiveAsk(true); }, [openId]);
   const doArchive = useCallback(async () => {
     if (!openId) return;
@@ -278,8 +281,9 @@ export default function FinanceTreasuryPlans() {
               onCompareCurrent={compareAgainstCurrent}
               onApprove={() => review("approve")}
               onRequestChanges={() => {
-                const notes = window.prompt(t("treasuryPlans.review.notesPrompt", "Notes for the operator?"), "") ?? undefined;
-                void review("request_changes", notes);
+                askInput(t("treasuryPlans.review.notesPrompt", "Notes for the operator?"), (notes) => {
+                  void review("request_changes", notes.trim() || undefined);
+                }, { confirmLabel: t("treasuryPlans.review.requestDo", "Request changes") });
               }}
               onArchive={archive}
               onClose={() => setOpenId(null)}
@@ -288,6 +292,7 @@ export default function FinanceTreasuryPlans() {
         )}
       </div>
     </div>
+    {inputDialog}
     <ConfirmDialog
       open={archiveAsk}
       tone="neutral"

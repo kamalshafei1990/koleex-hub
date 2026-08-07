@@ -23,6 +23,7 @@
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/kds/useToast";
+import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -174,9 +175,13 @@ export default function FinanceAccountingQueue() {
   const doRetry = useCallback(async (it: QueueItem) => {
     if (await callAction("retry", { kind: it.kind, source_id: it.source_id })) await load();
   }, [callAction, load]);
-  const doVoid = useCallback(async (it: QueueItem) => {
+  const { askInput, inputDialog } = useInput();
+  const doVoid = useCallback((it: QueueItem) => {
     if (!it.accounting_entry_id) return;
-    const reason = window.prompt(t("accounting.queue.voidPrompt", "Reason for voiding this entry?")) ?? "voided via queue";
+    askInput(t("accounting.queue.voidPrompt", "Reason for voiding this entry?"), (v) => void runVoid(it, v.trim() || "voided via queue"), { confirmLabel: "Void" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askInput, t]);
+  const runVoid = useCallback(async (it: QueueItem, reason: string) => {
     const res = await fetch(`/api/accounting/journals/${it.accounting_entry_id}/void`, {
       method: "POST",
       credentials: "include",
@@ -191,6 +196,7 @@ export default function FinanceAccountingQueue() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {inputDialog}
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("accounting.queue.title", "Accounting Queue")}
