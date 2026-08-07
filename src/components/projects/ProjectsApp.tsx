@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -524,6 +525,7 @@ function ProjectDetailView({
   onBack: () => void;
   reloadTags: () => void;
 }) {
+  const { askConfirm, confirmDialog } = useConfirm();
   const { t, lang } = useTranslation(projectsT);
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [stages, setStages] = useState<ProjectStage[]>([]);
@@ -677,6 +679,7 @@ function ProjectDetailView({
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
+      {confirmDialog}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
           <div className="flex items-center gap-3 pt-4 pb-3">
@@ -713,8 +716,7 @@ function ProjectDetailView({
             </div>
             {project.is_billable && (
               <button
-                onClick={async () => {
-                  if (!confirm(t("bill.confirm", "Create a draft invoice for all unbilled logged time on this project?"))) return;
+                onClick={() => askConfirm(t("bill.confirm", "Create a draft invoice for all unbilled logged time on this project?"), async () => {
                   const res = await fetch("/api/invoices/from-project-time", {
                     method: "POST",
                     credentials: "include",
@@ -730,7 +732,7 @@ function ProjectDetailView({
                   }
                   alert(`${json.invoice.inv_no} created — ${json.hours ?? 0}h billed.`);
                   window.location.assign("/invoices");
-                }}
+                }, { confirmLabel: t("bill.do", "Create invoice"), tone: "neutral" })}
                 className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 text-[11px] font-semibold shrink-0"
                 title={t("bill.tip", "Invoice all unbilled logged time (uses the project's billing rate)")}
               >
@@ -931,14 +933,15 @@ function StageHeader({
     setEditing(false);
     onReload();
   };
-  const remove = async () => {
-    if (!confirm("Delete this stage?")) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => askConfirm("Delete this stage?", async () => {
     await deleteStage(stage.id);
     onReload();
-  };
+  }, { confirmLabel: "Delete" });
 
   return (
     <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border-subtle)]">
+      {confirmDialog}
       <div className="w-1 h-5 rounded-full shrink-0" style={{ background: stage.color ?? "var(--border-subtle)" }} />
       {editing ? (
         <>
@@ -1523,14 +1526,15 @@ function TagRow({ tag, onReload }: { tag: ProjectTag; onReload: () => void }) {
     setEditing(false);
     onReload();
   };
-  const remove = async () => {
-    if (!confirm("Delete this tag?")) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => askConfirm("Delete this tag?", async () => {
     await deleteTag(tag.id);
     onReload();
-  };
+  }, { confirmLabel: "Delete" });
 
   return (
     <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+      {confirmDialog}
       {editing ? (
         <>
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-8 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)]" />
@@ -1723,15 +1727,18 @@ function ProjectFormModal({
     onSaved();
   };
 
-  const remove = async () => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => {
     if (!editing) return;
-    if (!confirm("Delete this project and all its tasks?")) return;
-    await deleteProject(editing.id);
-    onDeleted();
+    askConfirm("Delete this project and all its tasks?", async () => {
+      await deleteProject(editing.id);
+      onDeleted();
+    }, { confirmLabel: "Delete" });
   };
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+      {confirmDialog}
       <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">
@@ -1980,11 +1987,13 @@ function TaskFormModal({
     onSaved();
   };
 
-  const remove = async () => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => {
     if (!editing) return;
-    if (!confirm(t("task.deleteConfirm"))) return;
-    await deleteTask(editing.id);
-    onSaved();
+    askConfirm(t("task.deleteConfirm"), async () => {
+      await deleteTask(editing.id);
+      onSaved();
+    }, { confirmLabel: "Delete" });
   };
 
   const toggleTag = (id: string) => {
@@ -2027,6 +2036,7 @@ function TaskFormModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+      {confirmDialog}
       <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">

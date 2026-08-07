@@ -34,6 +34,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { record, event } from "@/lib/perf/client";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
@@ -163,6 +164,7 @@ const SWATCH_COLORS = [
 const CRM_BOARD_SNAP_KEY = "kx-crm-board-v1";
 
 export default function CRM() {
+  const { askConfirm, confirmDialog } = useConfirm();
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
   const { t } = useTranslation(crmT);
@@ -526,13 +528,14 @@ export default function CRM() {
     [reload],
   );
   const handleDeleteStage = useCallback(
-    async (stage: CrmStageRow) => {
-      if (!confirm(t("stage.edit.deleteConfirm"))) return;
-      const ok = await deleteStage(stage.id);
-      if (ok) await reload({ soft: true });
-      else event("crm.mutation.error");
+    (stage: CrmStageRow) => {
+      askConfirm(t("stage.edit.deleteConfirm"), async () => {
+        const ok = await deleteStage(stage.id);
+        if (ok) await reload({ soft: true });
+        else event("crm.mutation.error");
+      }, { confirmLabel: t("stage.edit.deleteDo", "Delete") });
     },
-    [reload, t],
+    [askConfirm, reload, t],
   );
 
   /* ── Generate leads ─────────────────────────────────────────────── */
@@ -557,6 +560,7 @@ export default function CRM() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {confirmDialog}
       {/* ── Page header — canonical Hub PageHeader with sliding-pill nav ── */}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
         <PageHeader
@@ -2197,23 +2201,25 @@ function OpportunityModal({
     onSaved();
   }
 
-  async function handleArchive() {
+  const { askConfirm, confirmDialog } = useConfirm();
+  function handleArchive() {
     if (isNew || !opportunity) return;
-    if (!confirm("Archive this opportunity?")) return;
-    setSaving(true);
-    await archiveOpportunity(opportunity.id);
-    setSaving(false);
-    onSaved();
+    askConfirm("Archive this opportunity?", async () => {
+      setSaving(true);
+      await archiveOpportunity(opportunity.id);
+      setSaving(false);
+      onSaved();
+    }, { confirmLabel: "Archive", tone: "neutral" });
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (isNew || !opportunity) return;
-    if (!confirm("Delete this opportunity permanently? This cannot be undone."))
-      return;
-    setSaving(true);
-    await deleteOpportunity(opportunity.id);
-    setSaving(false);
-    onSaved();
+    askConfirm("Delete this opportunity permanently? This cannot be undone.", async () => {
+      setSaving(true);
+      await deleteOpportunity(opportunity.id);
+      setSaving(false);
+      onSaved();
+    }, { confirmLabel: "Delete" });
   }
 
   return (
@@ -2224,6 +2230,7 @@ function OpportunityModal({
       }}
       className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-6"
     >
+      {confirmDialog}
       <div className="bg-[var(--bg-primary)] w-full md:max-w-4xl md:max-h-[92vh] h-full md:h-auto md:rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3.5 border-b border-[var(--border-subtle)] shrink-0">
@@ -2747,14 +2754,17 @@ function ActivitiesPanel({
     onChange();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this activity?")) return;
-    await deleteActivity(id);
-    onChange();
+  const { askConfirm, confirmDialog } = useConfirm();
+  function handleDelete(id: string) {
+    askConfirm("Delete this activity?", async () => {
+      await deleteActivity(id);
+      onChange();
+    }, { confirmLabel: "Delete" });
   }
 
   return (
     <div className="space-y-2">
+      {confirmDialog}
       {showForm && (
         <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2">
           <div className="grid grid-cols-2 gap-2">
@@ -3955,17 +3965,19 @@ function StageEditModal({
     onSaved();
   }
 
-  async function handleDelete() {
+  const { askConfirm, confirmDialog } = useConfirm();
+  function handleDelete() {
     if (!stage) return;
-    if (!confirm(t("stage.edit.deleteConfirm"))) return;
-    setBusy(true);
-    const ok = await deleteStage(stage.id);
-    setBusy(false);
-    if (!ok) {
-      setError("Failed to delete stage");
-      return;
-    }
-    onSaved();
+    askConfirm(t("stage.edit.deleteConfirm"), async () => {
+      setBusy(true);
+      const ok = await deleteStage(stage.id);
+      setBusy(false);
+      if (!ok) {
+        setError("Failed to delete stage");
+        return;
+      }
+      onSaved();
+    }, { confirmLabel: "Delete" });
   }
 
   return (
@@ -3976,6 +3988,7 @@ function StageEditModal({
       }}
       className="fixed inset-0 z-[210] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
     >
+      {confirmDialog}
       <div className="bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
