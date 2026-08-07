@@ -191,4 +191,201 @@ const createPlanningItem: ToolDef<
   },
 };
 
-export const planningTools: ToolDef[] = [listMyPlanning as ToolDef, createPlanningItem as ToolDef];
+/* ── Shared loader for mutations ──
+   The app's PATCH/DELETE gate on module action + tenant; the agent holds
+   itself to the caller's OWN slice of the schedule: an item is mutable
+   via AI only if the caller created it or it sits on their own resource
+   (SA skips). Open shifts and other people's shifts stay app-only. */
+interface PlanningRow {
+  id: string;
+  type: string | null;
+  title: string | null;
+  notes: string | null;
+  resource_id: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  status: string | null;
+  created_by_account_id: string | null;
+}
+
+async function loadOwnPlanningItem(
+  ctx: { auth: { account_id: string; tenant_id: string }; isSuperAdmin: boolean },
+  id: string,
+): Promise<PlanningRow | null> {
+  const { data } = await supabaseServer
+    .from("planning_items")
+    .select("id, type, title, notes, resource_id, start_at, end_at, status, created_by_account_id")
+    .eq("id", id)
+    .eq("tenant_id", ctx.auth.tenant_id)
+    .maybeSingle();
+  const item = (data as PlanningRow | null) ?? null;
+  if (!item) return null;
+  if (ctx.isSuperAdmin) return item;
+  if (item.created_by_account_id === ctx.auth.account_id) return item;
+  if (item.resource_id) {
+    const { data: res } = await supabaseServer
+      .from("planning_resources")
+      .select("id")
+      .eq("id", item.resource_id)
+      .eq("tenant_id", ctx.auth.tenant_id)
+      .eq("account_id", ctx.auth.account_id)
+      .maybeSingle();
+    if (res) return item;
+  }
+  return null;
+}
+
+/* ── Edit / cancel a planning item (with confirm) ──
+   Fields mirror the PATCH whitelist we expose (title/notes/times) plus
+   status:"cancelled" with the route's cancelled_at stamp. "completed" is
+   deliberately NOT offered here: the app's completion path logs the
+   item's hours onto a linked project task, and the AI must not complete
+   items while skipping that side effect. */
+const updatePlanningItem: ToolDef<
+  {
+    item_id?: string;
+    title?: string;
+    notes?: string;
+    start_at?: string;
+    end_at?: string;
+    status?: string;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "updatePlanningItem",
+  description:
+    "Update one of the current user's own planning items / shifts: title, notes, start/end times — or CANCEL it (status:\"cancelled\"). Resolve the item id via listMyPlanning FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview; only call again with confirm:true after the user explicitly agrees. Marking an item COMPLETED is not available here — that's done in the Planning app (it logs hours to linked tasks).",
+  parameters: {
+    type: "object",
+    properties: {
+      item_id: { type: "string", description: "The item's id, taken from a listMyPlanning result." },
+      title: { type: "string", description: "New title." },
+      notes: { type: "string", description: "New notes." },
+      start_at: { type: "string", description: "New ISO start datetime." },
+      end_at: { type: "string", description: "New ISO end datetime." },
+      status: { type: "string", description: "Only \"cancelled\" is allowed — cancels the shift/item.", enum: ["cancelled"] },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
+    },
+    required: ["item_id"],
+  },
+  requiredModule: PLANNING_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.item_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+
+    const item = await loadOwnPlanningItem(ctx, id);
+    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
+
+    const changes: Record<string, unknown> = {};
+    if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
+    if (typeof args.notes === "string") changes.notes = args.notes;
+    if (typeof args.start_at === "string" && args.start_at.trim()) changes.start_at = args.start_at.trim();
+    if (typeof args.end_at === "string" && args.end_at.trim()) changes.end_at = args.end_at.trim();
+    if (args.status === "cancelled") {
+      changes.status = "cancelled";
+      changes.cancelled_at = new Date().toISOString();
+    }
+    if (Object.keys(changes).length === 0) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
+    }
+
+    const label = item.title || item.type || "planning item";
+    if (args.confirm !== true) {
+      const cancelling = changes.status === "cancelled";
+      const parts = Object.entries(changes)
+        .filter(([k]) => k !== "cancelled_at")
+        .map(([k, v]) => `${k.replace("_", " ")} → ${String(v)}`);
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { item_id: item.id, title: label, changes } },
+        message: cancelling
+          ? `Ready to CANCEL "${label}" (${item.start_at ?? ""}). Confirm?`
+          : `Ready to update "${label}": ${parts.join(", ")}. Confirm?`,
+        pendingAction: { tool: "updatePlanningItem", args: { ...args, item_id: item.id, confirm: true } },
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("planning_items")
+      .update(changes)
+      .eq("id", id)
+      .eq("tenant_id", ctx.auth.tenant_id);
+    if (error) {
+      console.error("[tool.updatePlanningItem]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the planning item — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: item.id, updated: Object.keys(changes) },
+      message: changes.status === "cancelled" ? `Cancelled "${label}".` : `Updated "${label}".`,
+      sources: ["planning_items(update)"],
+    };
+  },
+};
+
+/* ── Delete a planning item (with confirm) ── */
+const deletePlanningItem: ToolDef<
+  { item_id?: string; confirm?: boolean },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "deletePlanningItem",
+  description:
+    "PERMANENTLY delete one of the current user's own planning items / shifts. Resolve the item id via listMyPlanning FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview exactly which item will be deleted; only call again with confirm:true after the user explicitly agrees. This cannot be undone — to keep the record, cancel it instead (updatePlanningItem status:\"cancelled\").",
+  parameters: {
+    type: "object",
+    properties: {
+      item_id: { type: "string", description: "The item's id, taken from a listMyPlanning result." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed deleting the previewed item." },
+    },
+    required: ["item_id"],
+  },
+  requiredModule: PLANNING_MODULE,
+  requiredAction: "delete",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.item_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+
+    const item = await loadOwnPlanningItem(ctx, id);
+    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };
+
+    const label = item.title || item.type || "planning item";
+    const when = item.start_at ? ` (${item.start_at})` : "";
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { item_id: item.id, title: label, start_at: item.start_at, action: "delete" } },
+        message: `This will PERMANENTLY delete "${label}"${when} from your schedule — it cannot be undone. Confirm?`,
+        pendingAction: { tool: "deletePlanningItem", args: { item_id: item.id, confirm: true } },
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("planning_items")
+      .delete()
+      .eq("id", id)
+      .eq("tenant_id", ctx.auth.tenant_id);
+    if (error) {
+      console.error("[tool.deletePlanningItem]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the planning item — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: item.id, title: label, deleted: true },
+      message: `Deleted "${label}" from your schedule.`,
+      sources: ["planning_items(delete)"],
+    };
+  },
+};
+
+export const planningTools: ToolDef[] = [
+  listMyPlanning as ToolDef,
+  createPlanningItem as ToolDef,
+  updatePlanningItem as ToolDef,
+  deletePlanningItem as ToolDef,
+];

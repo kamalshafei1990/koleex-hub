@@ -15,9 +15,55 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
+import { recomputeProjectProgress } from "../../project-progress";
 import type { ToolDef, ToolResult } from "../types";
 
 const PROJECTS_MODULE = "Projects";
+
+/* Loads a task the CALLER CAN SEE, or null. The app's PATCH/DELETE routes
+   gate on the module action + tenant only (projects are collaborative),
+   but the agent holds itself to the stricter read scope: a task is
+   mutable via AI only if listProjectTasks would have shown it (assignee /
+   creator / in a project the caller manages or created; SA skips). */
+interface TaskRow {
+  id: string;
+  project_id: string | null;
+  title: string | null;
+  description: string | null;
+  priority: string | null;
+  status: string | null;
+  due_date: string | null;
+  assignee_account_id: string | null;
+  created_by_account_id: string | null;
+}
+
+async function loadVisibleTask(
+  ctx: { auth: { account_id: string; tenant_id: string }; isSuperAdmin: boolean },
+  id: string,
+): Promise<TaskRow | null> {
+  const { data } = await supabaseServer
+    .from("project_tasks")
+    .select("id, project_id, title, description, priority, status, due_date, assignee_account_id, created_by_account_id")
+    .eq("id", id)
+    .eq("tenant_id", ctx.auth.tenant_id)
+    .maybeSingle();
+  const t = (data as TaskRow | null) ?? null;
+  if (!t) return null;
+  if (ctx.isSuperAdmin) return t;
+  if (t.assignee_account_id === ctx.auth.account_id) return t;
+  if (t.created_by_account_id === ctx.auth.account_id) return t;
+  if (t.project_id) {
+    const { data: proj } = await supabaseServer
+      .from("projects")
+      .select("id")
+      .eq("tenant_id", ctx.auth.tenant_id)
+      .eq("id", t.project_id)
+      .or(`manager_account_id.eq.${ctx.auth.account_id},created_by_account_id.eq.${ctx.auth.account_id}`)
+      .maybeSingle();
+    if (proj) return t;
+  }
+  return null;
+}
 
 const PROJECT_COLS = `id, name, code, description, status, is_template,
   is_favorite, planned_start, planned_end, progress_pct, created_at, updated_at`;
@@ -265,8 +311,216 @@ const createProjectTask: ToolDef<
   },
 };
 
+/* ── Complete / reopen a project task (with confirm) ──
+   Ports the PATCH route's done-transition side effects verbatim:
+   status→done stamps closed_at + progress 100; leaving done clears
+   closed_at; project progress is recomputed after the write. */
+const completeProjectTask: ToolDef<
+  { task_id?: string; done?: boolean; confirm?: boolean },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "completeProjectTask",
+  description:
+    "Mark a project task as done — or reopen it (done:false). Resolve the task id via listProjectTasks FIRST (match by title; if several match, ask which one) — never invent an id. ALWAYS call first WITHOUT confirm to preview which task will change; only call again with confirm:true after the user explicitly agrees.",
+  parameters: {
+    type: "object",
+    properties: {
+      task_id: { type: "string", description: "The task's id, taken from a listProjectTasks result." },
+      done: { type: "boolean", description: "true = mark done (default); false = reopen." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
+    },
+    required: ["task_id"],
+  },
+  requiredModule: PROJECTS_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.task_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    const done = args.done !== false;
+
+    const t = await loadVisibleTask(ctx, id);
+    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+
+    const title = t.title ?? "Task";
+    if (done && t.status === "done") {
+      return { ok: true, permissionStatus: "allowed", data: { id: t.id, title, status: "done" }, message: `"${title}" is already done.` };
+    }
+    if (!done && t.status !== "done") {
+      return { ok: true, permissionStatus: "allowed", data: { id: t.id, title, status: t.status }, message: `"${title}" is already open (status: ${t.status ?? "todo"}).` };
+    }
+
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { task_id: t.id, title, action: done ? "mark_done" : "reopen" } },
+        message: done ? `Ready to mark the project task "${title}" as done. Confirm?` : `Ready to reopen the project task "${title}". Confirm?`,
+        pendingAction: { tool: "completeProjectTask", args: { task_id: t.id, done, confirm: true } },
+      };
+    }
+
+    const patch: Record<string, unknown> = done
+      ? { status: "done", closed_at: new Date().toISOString(), progress_pct: 100 }
+      : { status: "todo", closed_at: null };
+    const { error } = await supabaseServer
+      .from("project_tasks")
+      .update(patch)
+      .eq("id", id)
+      .eq("tenant_id", ctx.auth.tenant_id);
+    if (error) {
+      console.error("[tool.completeProjectTask]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+    }
+    void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: t.id, title, status: done ? "done" : "todo" },
+      message: done ? `Done — project task "${title}" is marked complete.` : `Reopened "${title}".`,
+      sources: ["project_tasks(update)"],
+    };
+  },
+};
+
+/* ── Edit a project task's details (with confirm) ── */
+const updateProjectTask: ToolDef<
+  {
+    task_id?: string;
+    title?: string;
+    description?: string;
+    priority?: string;
+    due_date?: string;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "updateProjectTask",
+  description:
+    "Update details of a project task: title, description, priority, or due date. Resolve the task id via listProjectTasks FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed. To clear the due date, pass \"none\". For marking done/reopening use completeProjectTask instead.",
+  parameters: {
+    type: "object",
+    properties: {
+      task_id: { type: "string", description: "The task's id, taken from a listProjectTasks result." },
+      title: { type: "string", description: "New title." },
+      description: { type: "string", description: "New description." },
+      priority: { type: "string", description: "New priority.", enum: ["low", "normal", "high"] },
+      due_date: { type: "string", description: "New ISO due date, or \"none\" to clear it." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
+    },
+    required: ["task_id"],
+  },
+  requiredModule: PROJECTS_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.task_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+
+    const t = await loadVisibleTask(ctx, id);
+    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+
+    const changes: Record<string, unknown> = {};
+    if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
+    if (typeof args.description === "string") changes.description = args.description;
+    if (["low", "normal", "high"].includes(String(args.priority))) changes.priority = String(args.priority);
+    if (typeof args.due_date === "string" && args.due_date.trim()) {
+      changes.due_date = args.due_date.trim().toLowerCase() === "none" ? null : args.due_date.trim();
+    }
+    if (Object.keys(changes).length === 0) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, description, priority, or due date)." };
+    }
+
+    const title = t.title ?? "Task";
+    if (args.confirm !== true) {
+      const parts = Object.entries(changes).map(([k, v]) => `${k.replace("_", " ")} → ${v === null ? "(cleared)" : String(v)}`);
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { task_id: t.id, title, changes } },
+        message: `Ready to update the project task "${title}": ${parts.join(", ")}. Confirm?`,
+        pendingAction: { tool: "updateProjectTask", args: { ...args, task_id: t.id, confirm: true } },
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("project_tasks")
+      .update(changes)
+      .eq("id", id)
+      .eq("tenant_id", ctx.auth.tenant_id);
+    if (error) {
+      console.error("[tool.updateProjectTask]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: t.id, updated: Object.keys(changes) },
+      message: `Updated "${typeof changes.title === "string" ? changes.title : title}".`,
+      sources: ["project_tasks(update)"],
+    };
+  },
+};
+
+/* ── Delete a project task (with confirm) ── */
+const deleteProjectTask: ToolDef<
+  { task_id?: string; confirm?: boolean },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "deleteProjectTask",
+  description:
+    "PERMANENTLY delete a project task. Resolve the task id via listProjectTasks FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview exactly which task will be deleted; only call again with confirm:true after the user explicitly agrees. This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: {
+      task_id: { type: "string", description: "The task's id, taken from a listProjectTasks result." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed deleting the previewed task." },
+    },
+    required: ["task_id"],
+  },
+  requiredModule: PROJECTS_MODULE,
+  requiredAction: "delete",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.task_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+
+    const t = await loadVisibleTask(ctx, id);
+    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+
+    const title = t.title ?? "Task";
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { task_id: t.id, title, action: "delete" } },
+        message: `This will PERMANENTLY delete the project task "${title}" — it cannot be undone. Confirm?`,
+        pendingAction: { tool: "deleteProjectTask", args: { task_id: t.id, confirm: true } },
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("project_tasks")
+      .delete()
+      .eq("id", id)
+      .eq("tenant_id", ctx.auth.tenant_id);
+    if (error) {
+      console.error("[tool.deleteProjectTask]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the task — please try again." };
+    }
+    void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: t.id, title, deleted: true },
+      message: `Deleted the project task "${title}".`,
+      sources: ["project_tasks(delete)"],
+    };
+  },
+};
+
 export const projectTools: ToolDef[] = [
   listMyProjects as ToolDef,
   listProjectTasks as ToolDef,
   createProjectTask as ToolDef,
+  completeProjectTask as ToolDef,
+  updateProjectTask as ToolDef,
+  deleteProjectTask as ToolDef,
 ];
