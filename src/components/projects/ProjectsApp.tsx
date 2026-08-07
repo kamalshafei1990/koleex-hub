@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -526,6 +527,7 @@ function ProjectDetailView({
   reloadTags: () => void;
 }) {
   const { askConfirm, confirmDialog } = useConfirm();
+  const { showToast, toastElement } = useToast();
   const { t, lang } = useTranslation(projectsT);
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [stages, setStages] = useState<ProjectStage[]>([]);
@@ -680,6 +682,7 @@ function ProjectDetailView({
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
       {confirmDialog}
+      {toastElement}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
           <div className="flex items-center gap-3 pt-4 pb-3">
@@ -727,10 +730,10 @@ function ProjectDetailView({
                     | { invoice?: { inv_no: string }; hours?: number; error?: string }
                     | null;
                   if (!res.ok || !json?.invoice) {
-                    alert(json?.error ?? `HTTP ${res.status}`);
+                    showToast(json?.error ?? `HTTP ${res.status}`, "error");
                     return;
                   }
-                  alert(`${json.invoice.inv_no} created — ${json.hours ?? 0}h billed.`);
+                  showToast(`${json.invoice.inv_no} created — ${json.hours ?? 0}h billed.`, "success");
                   window.location.assign("/invoices");
                 }, { confirmLabel: t("bill.do", "Create invoice"), tone: "neutral" })}
                 className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 text-[11px] font-semibold shrink-0"

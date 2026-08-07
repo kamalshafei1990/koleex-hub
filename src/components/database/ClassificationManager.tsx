@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useToast } from "@/components/kds/useToast";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -211,7 +212,7 @@ export default function ClassificationManager() {
       }
     } catch { /* surfaced below */ }
     setBusyId(null); setNewName(""); setAdding(false);
-    if (!res) alert(t("vl.class.createFail", "Couldn't create — the name/slug may already exist."));
+    if (!res) showToast(t("vl.class.createFail", "Couldn't create — the name/slug may already exist."), "error");
     refresh();
   };
 
@@ -226,6 +227,8 @@ export default function ClassificationManager() {
   };
 
   const { askConfirm, confirmDialog } = useConfirm();
+  const { showToast, toastElement } = useToast();
+
   const remove = (id: string) => {
     if (isTypes) return;
     askConfirm(t("vl.class.removeConfirm", "Remove this from the product taxonomy? Products that use it may be affected."), () => doRemove(id), { confirmLabel: t("vl.class.removeDo", "Remove") });
@@ -237,7 +240,7 @@ export default function ClassificationManager() {
     else if (level === "categories") ok = await deleteCategory(id);
     else if (level === "subcategories") ok = await deleteSubcategory(id);
     setBusyId(null);
-    if (!ok) { alert(t("vl.class.deleteFail", "Couldn't delete — it may still be in use by products.")); refresh(); return; }
+    if (!ok) { showToast(t("vl.class.deleteFail", "Couldn't delete — it may still be in use by products."), "error"); refresh(); return; }
     if (trail.some((t) => t.id === id)) setTrail((prev) => prev.slice(0, prev.findIndex((t) => t.id === id)));
     refresh();
   };
@@ -263,9 +266,9 @@ export default function ClassificationManager() {
         method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ level: HUB_LEVEL[pLevel], slug, icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
       });
-      if (!r.ok) alert(t("vl.class.iconSaveFail", "Couldn't save the icon. Please try again."));
+      if (!r.ok) showToast(t("vl.class.iconSaveFail", "Couldn't save the icon. Please try again."), "error");
     } catch {
-      alert(t("vl.class.iconSaveNetwork", "Couldn't save the icon — network error. Please try again."));
+      showToast(t("vl.class.iconSaveNetwork", "Couldn't save the icon — network error. Please try again."), "error");
     } finally {
       setBusyId(null); setPicker(null); refresh();
     }
@@ -286,6 +289,7 @@ export default function ClassificationManager() {
   return (
     <div className="flex gap-5">
       {confirmDialog}
+      {toastElement}
       {/* Divisions sidebar (Library-style) */}
       <aside className="hidden w-56 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">

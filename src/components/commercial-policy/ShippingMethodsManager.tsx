@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -134,6 +135,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
+  const { showToast, toastElement } = useToast();
   /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
   const [pendingDelete, setPendingDelete] = useState<ShippingMethodRow | null>(null);
   const handleDelete = useCallback((row: ShippingMethodRow) => setPendingDelete(row), []);
@@ -142,7 +144,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
     if (!row) return;
     setPendingDelete(null);
     const err = await deleteCatalogRow("/api/shipping-methods", row.id);
-    if (err) { alert(err); return; }
+    if (err) { showToast(err, "error"); return; }
     void refresh();
   }, [pendingDelete, refresh]);
 
@@ -269,6 +271,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
           onSaved={() => void refresh()}
         />
       )}
+      {toastElement}
       <ConfirmDialog
         open={pendingDelete !== null}
         title={pendingDelete ? `Delete "${pendingDelete.name}"?` : ""}

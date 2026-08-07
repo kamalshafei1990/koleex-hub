@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import { useSearchParams } from "next/navigation";
 import type { VisualAsset, DisplayState } from "@/lib/visual-library/types";
 import { displayState } from "@/lib/visual-library/types";
@@ -96,6 +97,8 @@ export default function VisualLibraryBrowser() {
   const [bindings, setBindings] = useState<BindingsMap>({});
   const [bindFilter, setBindFilter] = useState("");
   const [dupesOnly, setDupesOnly] = useState(false);
+  const { showToast, toastElement } = useToast();
+
   const [bulkBusy, setBulkBusy] = useState(false);
   const [categories, setCategories] = useState<FetchedIconCategory[]>(
     GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })),
@@ -116,7 +119,7 @@ export default function VisualLibraryBrowser() {
       setCategories(await fetchIconCategories());
       setNewCat(""); setAddingCat(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("vl.browse.add-category-failed", "Failed to add category"));
+      showToast(e instanceof Error ? e.message : t("vl.browse.add-category-failed", "Failed to add category"), "error");
     } finally { setCatBusy(false); }
   };
 
@@ -264,6 +267,7 @@ export default function VisualLibraryBrowser() {
 
   return (
     <div className="flex gap-5">
+      {toastElement}
       {/* Category sidebar (desktop) */}
       <aside className="hidden w-52 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">

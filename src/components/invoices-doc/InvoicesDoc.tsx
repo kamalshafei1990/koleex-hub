@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -865,6 +866,7 @@ const PRINT_AND_DOC_STYLES = `
    ══════════════════════════════════════════════════════════ */
 
 export default function Quotations() {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(docsT);
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
@@ -1036,7 +1038,7 @@ export default function Quotations() {
       try {
         const full = await fetchDocOne(INVOICES_DOC_SYNC, id);
         if (!full) {
-          alert("Could not load the invoice to duplicate.");
+          showToast("Could not load the invoice to duplicate.", "error");
           return;
         }
         const source = fromRow(full);
@@ -1063,7 +1065,7 @@ export default function Quotations() {
         setCurrent(next);
         setView("editor");
       } catch (e) {
-        alert(`Duplicate failed: ${e instanceof Error ? e.message : String(e)}`);
+        showToast(`Duplicate failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       } finally {
         setDuplicatingId(null);
       }
@@ -1316,7 +1318,7 @@ export default function Quotations() {
       const saved = await saveInvoiceRemote(intent);
       if (!saved) {
         setPdfState("error");
-        alert("Save failed before export. Please click Save and try Export PDF again.");
+        showToast("Save failed before export. Please click Save and try Export PDF again.", "error");
         setTimeout(() => setPdfState("idle"), 2_500);
         return;
       }
@@ -1328,7 +1330,7 @@ export default function Quotations() {
       const invoiceId = match?.id ?? saved.id;
       if (invoiceId.length !== 36) {
         setPdfState("error");
-        alert("Please save the invoice before exporting.");
+        showToast("Please save the invoice before exporting.", "error");
         setTimeout(() => setPdfState("idle"), 2_000);
         return;
       }
@@ -1369,7 +1371,7 @@ export default function Quotations() {
               win.focus();
               win.print();
             } catch (err) {
-              alert(`Print failed: ${err instanceof Error ? err.message : String(err)}`);
+              showToast(`Print failed: ${err instanceof Error ? err.message : String(err)}`, "error");
             }
             setPdfState("idle");
           } else {
@@ -1381,7 +1383,7 @@ export default function Quotations() {
       iframe.addEventListener("load", onLoad);
     } catch (e) {
       setPdfState("error");
-      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+      showToast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       setTimeout(() => setPdfState("idle"), 2_000);
     }
   }, [current, handleSave]);
@@ -1403,7 +1405,7 @@ export default function Quotations() {
     if (!current) return;
     const to = (current.toEmail || "").trim();
     if (!to) {
-      alert("Add the customer's email in the QUOTATION TO card before sending.");
+      showToast("Add the customer's email in the QUOTATION TO card before sending.", "error");
       return;
     }
     /* Open the print window inside the user-gesture stack so the
@@ -1411,7 +1413,7 @@ export default function Quotations() {
        the canonical id below. */
     const win = window.open("about:blank", "_blank", "noopener,noreferrer");
     if (!win) {
-      alert("The browser blocked the print window. Please allow popups for this site and try again.");
+      showToast("The browser blocked the print window. Please allow popups for this site and try again.", "error");
       return;
     }
     try {
@@ -1432,7 +1434,7 @@ export default function Quotations() {
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
         win.close();
-        alert("Please save the invoice before sending.");
+        showToast("Please save the invoice before sending.", "error");
         return;
       }
 
@@ -1474,7 +1476,7 @@ export default function Quotations() {
       }, 600);
     } catch (e) {
       try { win.close(); } catch { /* already closed */ }
-      alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
+      showToast(`Send failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }, [current, handleSave]);
 
@@ -1639,7 +1641,7 @@ export default function Quotations() {
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          alert(`Upload failed: ${j.error ?? res.status}`);
+          showToast(`Upload failed: ${j.error ?? res.status}`, "error");
           return;
         }
         const json = (await res.json()) as { kind: string; url: string };
@@ -1651,7 +1653,7 @@ export default function Quotations() {
           if (current) setCurrent({ ...current, signatureUrl: json.url });
         }
       } catch (e) {
-        alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+        showToast(`Upload failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       }
     },
     [current],
@@ -1938,6 +1940,7 @@ export default function Quotations() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
+      {toastElement}
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div

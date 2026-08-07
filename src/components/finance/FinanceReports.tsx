@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -37,6 +38,7 @@ export default function FinanceReports({
   initialType?: ReportType;
   initialFilters?: ReportFilters;
 }) {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
   const [templates, setTemplates] = useState<ReportTemplateDescriptor[]>([]);
   const [activeType, setActiveType] = useState<ReportType | null>(initialType ?? null);
@@ -130,7 +132,7 @@ export default function FinanceReports({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({ error: `PDF failed (${res.status})` }));
-        alert(j.error ?? `PDF failed (${res.status})`);
+        showToast(j.error ?? `PDF failed (${res.status})`, "error");
         return;
       }
       const blob = await res.blob();
@@ -161,7 +163,7 @@ export default function FinanceReports({
       });
       const j = await res.json();
       if (!res.ok) {
-        alert(j.error ?? `Print failed (${res.status})`);
+        showToast(j.error ?? `Print failed (${res.status})`, "error");
         return;
       }
       const id = j.export_id as string;
@@ -178,6 +180,7 @@ export default function FinanceReports({
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("reports.centre.title", "Reporting Centre")}

@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -141,6 +142,7 @@ export default function PaymentTermsManager({
     void refresh();
   }, [refresh]);
 
+  const { showToast, toastElement } = useToast();
   /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
   const [pendingDelete, setPendingDelete] = useState<PaymentTermRow | null>(null);
   const handleDelete = useCallback((term: PaymentTermRow) => setPendingDelete(term), []);
@@ -149,7 +151,7 @@ export default function PaymentTermsManager({
     if (!row) return;
     setPendingDelete(null);
     const err = await deleteCatalogRow("/api/payment-terms", row.id);
-    if (err) { alert(err); return; }
+    if (err) { showToast(err, "error"); return; }
     void refresh();
   }, [pendingDelete, refresh]);
 
@@ -350,6 +352,7 @@ export default function PaymentTermsManager({
           onSaved={() => void refresh()}
         />
       )}
+      {toastElement}
       <ConfirmDialog
         open={pendingDelete !== null}
         title={pendingDelete ? `Delete "${pendingDelete.label}"?` : ""}

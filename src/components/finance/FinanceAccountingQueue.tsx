@@ -22,6 +22,7 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -353,6 +354,8 @@ interface CogsRow {
 }
 
 function InventoryCogsSection() {
+  const { showToast, toastElement } = useToast();
+
   const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<CogsRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -385,7 +388,7 @@ function InventoryCogsSection() {
         body: JSON.stringify({ entry_id: id }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { alert(j.error ?? t("accounting.cogs.postFailed", "Post failed")); return; }
+      if (!r.ok || !j.ok) { showToast(j.error ?? t("accounting.cogs.postFailed", "Post failed"), "error"); return; }
       await load();
     } finally {
       setBusy(null);
@@ -404,7 +407,7 @@ function InventoryCogsSection() {
         body: JSON.stringify({ reason }),
       });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? t("accounting.cogs.voidFailed", "Void failed")); return; }
+      if (!r.ok) { showToast(j.error ?? t("accounting.cogs.voidFailed", "Void failed"), "error"); return; }
       await load();
     } finally {
       setBusy(null);
@@ -485,6 +488,7 @@ function InventoryCogsSection() {
           </tbody>
         </table>
       </div>
+      {toastElement}
       <VoidJournalDialog
         open={voidAsk !== null}
         title={t("accounting.cogs.voidConfirm", "Void this COGS journal? A reversing entry will be posted.")}
@@ -706,6 +710,8 @@ interface RevenueQueueRow {
 }
 
 function SalesRevenueSection() {
+  const { showToast, toastElement } = useToast();
+
   const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<RevenueQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -738,7 +744,7 @@ function SalesRevenueSection() {
         body: JSON.stringify({ entry_id: id }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { alert(j.error ?? t("accounting.cogs.postFailed", "Post failed")); return; }
+      if (!r.ok || !j.ok) { showToast(j.error ?? t("accounting.cogs.postFailed", "Post failed"), "error"); return; }
       await load();
     } finally {
       setBusy(null);
@@ -757,7 +763,7 @@ function SalesRevenueSection() {
         body: JSON.stringify({ reason }),
       });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? t("accounting.cogs.voidFailed", "Void failed")); return; }
+      if (!r.ok) { showToast(j.error ?? t("accounting.cogs.voidFailed", "Void failed"), "error"); return; }
       await load();
     } finally {
       setBusy(null);
@@ -828,6 +834,7 @@ function SalesRevenueSection() {
           </tbody>
         </table>
       </div>
+      {toastElement}
       <VoidJournalDialog
         open={voidAsk !== null}
         title={t("accounting.revenue.voidConfirm", "Void this revenue journal? A reversing entry will be posted.")}

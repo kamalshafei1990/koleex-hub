@@ -25,6 +25,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useToast } from "@/components/kds/useToast";
 import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -209,6 +210,8 @@ async function fetchRoles(): Promise<FetchResult<RoleRow[]>> {
 }
 
 export default function ViewAsPicker({ dk }: { dk: boolean }) {
+  const { showToast, toastElement } = useToast();
+
   const router = useRouter();
   const { data: bootstrap } = useMeBootstrap();
   const [accounts, setAccounts] = useState<AccountRow[] | null>(moduleCache.users);
@@ -327,14 +330,14 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert(j.error ?? `view-as failed (${res.status})`);
+        showToast(j.error ?? `view-as failed (${res.status})`, "error");
         setBusy(false);
         return;
       }
       setOpen(false);
       await softSwitch();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "view-as failed");
+      showToast(e instanceof Error ? e.message : "view-as failed", "error");
     } finally {
       setBusy(false);
     }
@@ -352,14 +355,14 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert(j.error ?? `view-as failed (${res.status})`);
+        showToast(j.error ?? `view-as failed (${res.status})`, "error");
         setBusy(false);
         return;
       }
       setOpen(false);
       await softSwitch();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "view-as failed");
+      showToast(e instanceof Error ? e.message : "view-as failed", "error");
     } finally {
       setBusy(false);
     }
@@ -425,6 +428,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
 
   return (
     <div ref={wrapRef} className="relative">
+      {toastElement}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

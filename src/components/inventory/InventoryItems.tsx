@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useToast } from "@/components/kds/useToast";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { ColorToken, IconName, UnitOfMeasure } from "@/lib/inventory/types";
 import { ALLOWED_COLORS, ALLOWED_ICONS, ALLOWED_UNITS } from "@/lib/inventory/types";
@@ -875,6 +876,7 @@ function ItemDetailDrawer({
   }, [itemId]);
 
   const { askConfirm, confirmDialog } = useConfirm();
+  const { showToast, toastElement } = useToast();
   const archive = () => {
     if (!item) return;
     askConfirm(`Archive ${item.item_code} — ${item.item_name}? It will stop showing in active pickers.`, doArchive, { confirmLabel: "Archive", tone: "neutral" });
@@ -884,7 +886,7 @@ function ItemDetailDrawer({
     try {
       const r = await fetch(`/api/inventory/items/${itemId}`, { method: "DELETE", credentials: "include" });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? "Archive failed"); return; }
+      if (!r.ok) { showToast(j.error ?? "Archive failed", "error"); return; }
       onChanged();
       onClose();
     } finally {
@@ -902,7 +904,7 @@ function ItemDetailDrawer({
         body: JSON.stringify({ status: "active" }),
       });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? "Restore failed"); return; }
+      if (!r.ok) { showToast(j.error ?? "Restore failed", "error"); return; }
       onChanged();
       onClose();
     } finally {
@@ -936,6 +938,7 @@ function ItemDetailDrawer({
       }
     >
       {confirmDialog}
+      {toastElement}
       {loading && <div className="text-[12px] text-[var(--text-dim)]">Loading…</div>}
       {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
       {item && (
@@ -1133,17 +1136,19 @@ function TypesPanel({
   };
 
   const { askConfirm, confirmDialog } = useConfirm();
+  const { showToast, toastElement } = useToast();
   const archive = (id: string) => askConfirm("Archive this custom type? Items already using it keep their reference.", () => doArchive(id), { confirmLabel: "Archive", tone: "neutral" });
   const doArchive = async (id: string) => {
     const r = await fetch(`/api/inventory/item-types/${id}`, { method: "DELETE", credentials: "include" });
     const j = await r.json();
-    if (!r.ok) { alert(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+    if (!r.ok) { showToast(humanizeError(j.error ?? `HTTP ${r.status}`), "error"); return; }
     onChanged();
   };
 
   return (
     <DrawerShell title="Item Types" onClose={onClose}>
       {confirmDialog}
+      {toastElement}
       <div className="space-y-4">
         <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className="flex items-center justify-between">

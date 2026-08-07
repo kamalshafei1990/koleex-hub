@@ -15,6 +15,7 @@ import ConfirmDialog from "@/components/kds/ConfirmDialog";
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -116,6 +117,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  const { showToast, toastElement } = useToast();
   /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
   const [pendingDelete, setPendingDelete] = useState<IncotermRow | null>(null);
   const handleDelete = useCallback((row: IncotermRow) => setPendingDelete(row), []);
@@ -124,7 +126,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
     if (!row) return;
     setPendingDelete(null);
     const err = await deleteCatalogRow("/api/incoterms", row.id);
-    if (err) { alert(err); return; }
+    if (err) { showToast(err, "error"); return; }
     void refresh();
   }, [pendingDelete, refresh]);
 
@@ -241,6 +243,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
           onSaved={() => void refresh()}
         />
       )}
+      {toastElement}
       <ConfirmDialog
         open={pendingDelete !== null}
         title={pendingDelete ? `Delete "${pendingDelete.code} — ${pendingDelete.name}"?` : ""}

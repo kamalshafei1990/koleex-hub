@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -15,6 +16,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
 export default function FinanceSuppliers() {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<FinanceSupplierAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export default function FinanceSuppliers() {
         body: JSON.stringify({ type: "supplier_statement", filters: { supplier_id: supplierId } }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error ?? t("suppliers.exportFailed", "Failed ({n})").replace("{n}", String(res.status))); return; }
+      if (!res.ok) { showToast(j.error ?? t("suppliers.exportFailed", "Failed ({n})").replace("{n}", String(res.status)), "error"); return; }
       window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
     } finally {
       setGenerating(null);
@@ -61,6 +63,7 @@ export default function FinanceSuppliers() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("suppliers.title", "Supplier Accounts")}

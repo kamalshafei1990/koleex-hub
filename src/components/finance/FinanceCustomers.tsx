@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, ProgressBar, StatusBadge } from "@/components/finance/FinanceUi";
 import { formatCompact } from "@/components/finance/FinanceUiX";
@@ -15,6 +16,7 @@ import { financeT } from "@/lib/translations/finance";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
 
 export default function FinanceCustomers() {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<FinanceCustomerAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function FinanceCustomers() {
         body: JSON.stringify({ type: "customer_statement", filters: { customer_id: customerId } }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error ?? t("customers.exportFailed", "Failed ({n})").replace("{n}", String(res.status))); return; }
+      if (!res.ok) { showToast(j.error ?? t("customers.exportFailed", "Failed ({n})").replace("{n}", String(res.status)), "error"); return; }
       window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
     } finally {
       setGenerating(null);
@@ -63,6 +65,7 @@ export default function FinanceCustomers() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("customers.title", "Customer Accounts")}

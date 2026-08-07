@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import ConfirmWithReason from "@/components/kds/ConfirmWithReason";
 import { useState as useVoidState } from "react";
 import Link from "next/link";
@@ -118,6 +119,8 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const [voidAsk, setVoidAsk] = useVoidState<string | null>(null);
+  const { showToast, toastElement } = useToast();
+
   const voidShipment = (id: string) => setVoidAsk(id);
   const doVoidShipment = async (id: string, reason: string | null) => {
     const r = await fetch(`/api/sales/shipments/${id}/void`, {
@@ -127,7 +130,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
       body: JSON.stringify({ reason }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(humanizeError(j.error)); return; }
+    if (!r.ok) { showToast(humanizeError(j.error), "error"); return; }
     await load();
   };
 
@@ -139,7 +142,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
       body: JSON.stringify({ shipment_id: id }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(humanizeError(j.error)); return; }
+    if (!r.ok) { showToast(humanizeError(j.error), "error"); return; }
     await load();
   };
 
@@ -184,6 +187,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <ConfirmWithReason open={voidAsk !== null} title="Void this shipment? Stock will be restored and qty_shipped will roll back." confirmLabel="Void" onCancel={() => setVoidAsk(null)} onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoidShipment(id, reason || null); }} />
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         {/* Page bar */}

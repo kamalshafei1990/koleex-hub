@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -32,6 +33,7 @@ const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
 };
 
 export default function FinanceOrders() {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
   /* Currency: sales-side surface, so we keep USD as the form default
      per the brief — but the KPI cards use the tenant base so a Chinese
@@ -134,7 +136,7 @@ export default function FinanceOrders() {
       body: JSON.stringify(body),
     });
     if (!r.ok) {
-      alert(t("orders.err.saveFailed", "Save failed — please try again."));
+      showToast(t("orders.err.saveFailed", "Save failed — please try again."), "error");
       return;
     }
     setDraft(null);
@@ -170,6 +172,7 @@ export default function FinanceOrders() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("orders.title", "Order Profitability")}

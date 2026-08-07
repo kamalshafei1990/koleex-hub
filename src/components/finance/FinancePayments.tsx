@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -16,6 +17,7 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
+  const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const [rows, setRows] = useState<FinancePayment[]>([]);
@@ -69,7 +71,7 @@ export default function FinancePayments() {
 
   const save = async () => {
     if (!editing?.amount || !editing.party_name?.trim()) {
-      alert(t("payments.err.missing", "Please add a party name and amount."));
+      showToast(t("payments.err.missing", "Please add a party name and amount."), "error");
       return;
     }
     const r = await fetch("/api/finance/payments", {
@@ -77,13 +79,14 @@ export default function FinancePayments() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editing),
     });
-    if (!r.ok) { alert(t("payments.err.saveFailed", "Save failed")); return; }
+    if (!r.ok) { showToast(t("payments.err.saveFailed", "Save failed"), "error"); return; }
     setEditing(null);
     void load();
   };
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("payments.title", "Payments")}

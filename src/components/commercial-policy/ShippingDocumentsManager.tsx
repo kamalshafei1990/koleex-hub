@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -101,6 +102,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
+  const { showToast, toastElement } = useToast();
   /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
   const [pendingDelete, setPendingDelete] = useState<DocRow | null>(null);
   const handleDelete = useCallback((row: DocRow) => setPendingDelete(row), []);
@@ -109,7 +111,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
     if (!row) return;
     setPendingDelete(null);
     const err = await deleteCatalogRow("/api/shipping-documents", row.id);
-    if (err) { alert(err); return; }
+    if (err) { showToast(err, "error"); return; }
     void refresh();
   }, [pendingDelete, refresh]);
 
@@ -226,6 +228,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
           onSaved={() => void refresh()}
         />
       )}
+      {toastElement}
       <ConfirmDialog
         open={pendingDelete !== null}
         title={pendingDelete ? `Delete "${pendingDelete.name}"?` : ""}

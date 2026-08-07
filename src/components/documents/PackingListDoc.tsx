@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useToast } from "@/components/kds/useToast";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import DocToolbar, { type SaveState } from "@/components/documents/DocToolbar";
@@ -240,11 +241,11 @@ export default function PackingListDoc({
     form.append("file", file);
     try {
       const res = await fetch("/api/quotations/saved-assets", { method: "POST", credentials: "include", body: form });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert(`Upload failed: ${humanizeError(j.error)}`); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast(`Upload failed: ${humanizeError(j.error)}`, "error"); return; }
       const json = (await res.json()) as { kind: string; url: string };
       if (kind === "stamp") { setSavedStampUrl(json.url); setMedia("stampUrl", json.url); }
       else { setSavedSignatureUrl(json.url); setMedia("signatureUrl", json.url); }
-    } catch (e) { alert(`Upload failed: ${humanizeError(e)}`); }
+    } catch (e) { showToast(`Upload failed: ${humanizeError(e)}`, "error"); }
   }, []);
   const set = (i: number, key: keyof PackingRow, v: string) => setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)));
 
@@ -385,6 +386,8 @@ export default function PackingListDoc({
   }, [meta, doSave, status]);
 
   const { askConfirm, confirmDialog } = useConfirm();
+  const { showToast, toastElement } = useToast();
+
   const handleDelete = useCallback(() => {
     if (!docId) { onBack(); return; }
     askConfirm("Delete this saved packing list? This cannot be undone.", async () => {
@@ -435,6 +438,7 @@ export default function PackingListDoc({
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {confirmDialog}
+      {toastElement}
       <style>{`
         .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
         /* LANDSCAPE A4 for the packing list — the table is wide (14 columns incl.
