@@ -20,6 +20,8 @@ import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/comp
 import WatchControl from "@/components/qa/WatchControl";
 import FixEvidenceSection from "@/components/qa/FixEvidenceSection";
 import type { QaAttachment } from "@/lib/qa/types";
+import { SEVERITY_TONE, STATUS_TONE_SOFT as STATUS_TONE } from "@/lib/qa/tones";
+import Avatar from "@/components/kds/Avatar";
 import {
   SEVERITY_LABEL,
   STATUS_LABEL,
@@ -75,25 +77,7 @@ interface SafeActivity {
   created_at: string;
 }
 
-const SEVERITY_TONE: Record<string, string> = {
-  low: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  medium: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
-  high: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  critical: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-};
-const STATUS_TONE: Record<string, string> = {
-  new: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
-  triaged: "bg-[var(--bg-surface)] text-[var(--text-secondary)]",
-  in_progress: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  fixed: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
-  verified: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-200",
-  rejected: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-  duplicate: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  needs_more_info: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
-  closed: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  reopened: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
-};
-
+/* Tone maps → @/lib/qa/tones (soft set — reporter-facing surfaces). */
 function fmt(iso: string | null): string {
   if (!iso) return "—";
   try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch { return iso; }
@@ -108,10 +92,6 @@ function rel(iso: string | null): string {
   const h = Math.round(m / 60); if (h < 24) return `${h}h ago`;
   const day = Math.round(h / 24); if (day < 30) return `${day}d ago`;
   try { return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }); } catch { return ""; }
-}
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
 /* Persist a text draft to localStorage so nothing typed is lost on navigate /
@@ -560,7 +540,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
             {comments.map((c) => (
               <li key={c.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                 <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px]">
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]">{initials(c.user_name)}</span>
+                  <Avatar name={c.user_name} size={16} />
                   <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
                   {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
                   <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? ` · ${t("qa.discussion.edited", "edited")}` : ""}</span>

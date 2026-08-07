@@ -12,15 +12,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
+import Avatar from "@/components/kds/Avatar";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
 import type { QaWatcher } from "@/lib/qa/types";
 
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 export default function WatchControl({ issueId, showWatchers = false }: { issueId: string; showWatchers?: boolean }) {
   const { t } = useTranslation(qaT);
@@ -101,12 +98,8 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
       {showWatchers && shown.length > 0 && (
         <div className="flex items-center -space-x-1.5">
           {shown.map((w) => (
-            <span
-              key={w.account_id}
-              title={w.name}
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--bg-secondary)] bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]"
-            >
-              {initials(w.name)}
+            <span key={w.account_id} title={w.name} className="inline-flex">
+              <Avatar name={w.name} size={20} className="border border-[var(--bg-secondary)]" />
             </span>
           ))}
           {extra > 0 && (

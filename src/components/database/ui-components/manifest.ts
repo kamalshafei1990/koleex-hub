@@ -731,7 +731,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "qa",
     "fileCount": 12,
-    "kitFiles": 0,
+    "kitFiles": 5,
     "components": [
       "AnnotationEditor",
       "AttachmentStrip",

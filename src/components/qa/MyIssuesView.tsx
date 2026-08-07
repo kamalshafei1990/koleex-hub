@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
+import { STATUS_TONE_SOFT as STATUS_TONE } from "@/lib/qa/tones";
+import EmptyState from "@/components/kds/EmptyState";
 import {
   SEVERITY_LABEL,
   STATUS_LABEL,
@@ -37,17 +39,7 @@ interface MyIssue {
   resolved_at: string | null;
 }
 
-const STATUS_TONE: Record<string, string> = {
-  new: "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]",
-  triaged: "bg-[var(--bg-surface-active)] text-[var(--text-secondary)]",
-  needs_more_info: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  in_progress: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  reopened: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  fixed: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  verified: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  closed: "bg-[var(--bg-surface-active)] text-[var(--text-dim)]",
-};
-
+/* Status tones → @/lib/qa/tones (soft set). */
 const OPEN_STATUSES = new Set(["new", "triaged", "needs_more_info", "in_progress", "reopened"]);
 
 function fmt(iso: string | null): string {
@@ -130,11 +122,11 @@ export default function MyIssuesView() {
       )}
 
       {!error && issues !== null && visible.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">
-          {tab === "open"
+        <EmptyState
+          title={tab === "open"
             ? t("qa.myIssues.emptyOpen", "You have no open reports.")
             : t("qa.myIssues.emptyAll", "You haven’t reported any issues yet.")}
-        </div>
+        />
       )}
 
       <div className="space-y-2">

@@ -45,53 +45,12 @@ import {
   type Priority,
   type SavedViewId,
 } from "@/lib/qa/types";
+import { SEVERITY_TONE, STATUS_TONE_BOLD as STATUS_TONE, STATUS_STRIPE, PRIORITY_TONE, PILL } from "@/lib/qa/tones";
+import Avatar from "@/components/kds/Avatar";
+import EmptyState from "@/components/kds/EmptyState";
 
-/* ── tone maps ─────────────────────────────────────────────────────────── */
-const SEVERITY_TONE: Record<string, string> = {
-  low: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  medium: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
-  high: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  critical: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-};
-/* Status visualization. Two coordinated layers that make state readable from
- * across the room (Kamal — issue f548b45e follow-up):
- *   1. STATUS_STRIPE — a 3px coloured bar on the LEFT edge of every list row.
- *      The eye locks on shape + position, so a glance down the list tells you
- *      counts/clusters of each state without reading any text.
- *   2. STATUS_TONE — the pill itself: saturated bg + light text, bigger and
- *      bolder than before, moved BEFORE the title in the row so it anchors
- *      the line. */
-const STATUS_TONE: Record<string, string> = {
-  new:             "bg-blue-600 text-white",
-  triaged:         "bg-slate-500 text-white",
-  in_progress:     "bg-amber-500 text-black",
-  fixed:           "bg-emerald-600 text-white",
-  verified:        "bg-emerald-700 text-white",
-  rejected:        "bg-rose-600 text-white",
-  duplicate:       "bg-violet-600 text-white",
-  needs_more_info: "bg-yellow-500 text-black",
-  closed:          "bg-zinc-500 text-white",
-  reopened:        "bg-red-600 text-white",
-};
-const STATUS_STRIPE: Record<string, string> = {
-  new:             "bg-blue-500",
-  triaged:         "bg-slate-400",
-  in_progress:     "bg-amber-500",
-  fixed:           "bg-emerald-500",
-  verified:        "bg-emerald-600",
-  rejected:        "bg-rose-500",
-  duplicate:       "bg-violet-500",
-  needs_more_info: "bg-yellow-500",
-  closed:          "bg-zinc-400",
-  reopened:        "bg-red-500",
-};
-// Priority stays monochrome (brand): urgency reads through weight, not colour.
-const PRIORITY_TONE: Record<Priority, string> = {
-  low: "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-transparent",
-  normal: "bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-transparent",
-  high: "bg-transparent text-[var(--text-primary)] border border-[var(--text-muted)]",
-  urgent: "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-transparent",
-};
+/* Tone maps live in @/lib/qa/tones — ONE source for every QA surface
+   (bold pills here; soft tints on the reporter views). */
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
@@ -113,13 +72,6 @@ function rel(iso: string | null): string {
   if (day < 30) return `${day}d ago`;
   try { return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }); } catch { return ""; }
 }
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-}
-
-const PILL = "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide";
-
 /* Days since creation — used both for sort comparison and for the age tone. */
 function ageDays(iso: string | null): number {
   if (!iso) return 0;
@@ -746,7 +698,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           {loading ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
           ) : sorted.length === 0 ? (
-            <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.noMatch", "No issues match this view.")}</div>
+            <div className="p-4"><EmptyState title={t("qa.list.noMatch", "No issues match this view.")} /></div>
           ) : (
             <>
               {/* Select-all header */}
@@ -1397,7 +1349,7 @@ function AssigneePicker({
       >
         {current ? (
           <>
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(current)}</span>
+            <Avatar name={current} size={20} />
             <span className="truncate">{current}</span>
           </>
         ) : (
@@ -1425,7 +1377,7 @@ function AssigneePicker({
             {filtered.map((a) => (
               <li key={a.id}>
                 <button type="button" onClick={() => choose(a.id)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${a.id === effectiveValue ? "bg-[var(--bg-surface-active)]" : ""}`}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(a.name)}</span>
+                  <Avatar name={a.name} size={20} />
                   <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? t("qa.common.me", " (me)") : ""}</span>
                   {a.id === effectiveValue && <span className="text-[var(--text-secondary)]">✓</span>}
                 </button>
@@ -1589,7 +1541,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
           {comments.map((c) => (
             <li key={c.id} className={`rounded-lg border px-3 py-2 ${c.is_internal_note ? "border-amber-500/30 bg-amber-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"} ${c.user_id === myId ? "ms-6" : "me-6"}`}>
               <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px]">
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]">{initials(c.user_name)}</span>
+                <Avatar name={c.user_name} size={16} />
                 <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
                 {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
                 {c.is_internal_note && <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-300">{t("qa.discussion.internalBadge", "Internal")}</span>}

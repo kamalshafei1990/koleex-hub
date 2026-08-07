@@ -14,6 +14,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Avatar from "@/components/kds/Avatar";
 import { fpAvatar } from "@/lib/cdn";
 import { usePathname } from "next/navigation";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
@@ -70,15 +71,10 @@ const OK_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SHOTS = 6;
 
 /** Small round avatar (photo or initial) for the assignee picker. */
+/* Thin adapter over the KDS Avatar (elected AV-3) — keeps the fpAvatar URL
+   transform, drops the bespoke circle. */
 function AssigneeAvatar({ a }: { a: { name: string; avatar_url?: string | null } }) {
-  return a.avatar_url ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={fpAvatar(a.avatar_url)} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
-  ) : (
-    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--bg-surface-bright)] text-[10px] font-bold text-[var(--text-secondary)]">
-      {(a.name || "?").slice(0, 1).toUpperCase()}
-    </span>
-  );
+  return <Avatar src={a.avatar_url ? fpAvatar(a.avatar_url) : null} name={a.name} size={24} />;
 }
 
 export default function ReportIssueButton() {
