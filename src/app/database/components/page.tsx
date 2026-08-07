@@ -1,6 +1,7 @@
 import PermissionGate from "@/components/layout/PermissionGate";
 import UiComponentsCatalog from "@/components/database/ui-components/UiComponentsCatalog";
 import KdsShowcase from "@/components/database/ui-components/KdsShowcase";
+import PlatformShowcase from "@/components/database/ui-components/PlatformShowcase";
 
 /* The "UI Components" section of the Visual Library — a catalog of every UI
    component in the system, organized by module and built on the design system. */
@@ -9,6 +10,7 @@ export default function UiComponentsPage() {
     <PermissionGate module="Database">
       <div className="px-4 md:px-6 pt-6 max-w-[1400px] mx-auto">
         <KdsShowcase />
+        <PlatformShowcase />
       </div>
       <UiComponentsCatalog />
     </PermissionGate>

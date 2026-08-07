@@ -16,6 +16,8 @@ import { displayState } from "@/lib/visual-library/types";
 import { ASSET_TYPES } from "@/lib/visual-library/types";
 import { GENERAL_ICON_CATEGORIES, fetchIconCategories, createIconCategory, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import VisualAssetCard, { STATE_PILL } from "@/components/database/VisualAssetCard";
+import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
 import AddToCollectionModal from "@/components/database/AddToCollectionModal";
@@ -33,6 +35,12 @@ import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 const T: Translations = {
+  "vl.browse.binding-any":   { en: "Bound & free", zh: "绑定+空闲", ar: "المرتبطة والحرة" },
+  "vl.browse.binding-free":  { en: "Free icons only", zh: "仅空闲图标", ar: "الأيقونات الحرة فقط" },
+  "vl.browse.binding-bound": { en: "Bound icons only", zh: "仅已绑定图标", ar: "الأيقونات المرتبطة فقط" },
+  "vl.reg.bound":            { en: "{n} meanings bound", zh: "已绑定 {n} 个含义", ar: "{n} معنى مرتبط" },
+  "vl.reg.collisions":       { en: "0 collisions · DB-enforced", zh: "0 冲突 · 数据库强制", ar: "0 تعارض · مفروض من قاعدة البيانات" },
+  "vl.reg.dupes":            { en: "Duplicate titles · {n}", zh: "重复标题 · {n}", ar: "عناوين مكررة · {n}" },
   ...VL_LABELS_T,
   "vl.browse.add-category-failed": { en: "Failed to add category", zh: "添加分类失败", ar: "فشل في إضافة الفئة" },
   "vl.browse.all-categories":      { en: "All categories", zh: "全部分类", ar: "جميع الفئات" },
@@ -85,6 +93,9 @@ export default function VisualLibraryBrowser() {
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkCol, setShowBulkCol] = useState(false);
+  const [bindings, setBindings] = useState<BindingsMap>({});
+  const [bindFilter, setBindFilter] = useState("");
+  const [dupesOnly, setDupesOnly] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [categories, setCategories] = useState<FetchedIconCategory[]>(
     GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })),
@@ -94,6 +105,7 @@ export default function VisualLibraryBrowser() {
   const [catBusy, setCatBusy] = useState(false);
 
   useEffect(() => { fetchIconCategories().then(setCategories).catch(() => {}); }, []);
+  useEffect(() => { fetchIconBindings().then(setBindings).catch(() => {}); }, []);
 
   const addCategory = async () => {
     const label = newCat.trim();
@@ -183,6 +195,30 @@ export default function VisualLibraryBrowser() {
     return m;
   }, [all]);
 
+  /* Semantic Icon Registry overlay — url → meaning. Cards show a lock on
+     bound icons; the Binding filter surfaces free ones for new meanings. */
+  const boundBy = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [k, u] of Object.entries(bindings)) if (u) m.set(u.replace(/\s+/g, ""), k);
+    return m;
+  }, [bindings]);
+  const dupTitles = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of all) { const k = (a.title ?? "").trim().toLowerCase(); if (k) counts.set(k, (counts.get(k) ?? 0) + 1); }
+    const dup = new Set<string>();
+    for (const [k, n] of counts) if (n > 1) dup.add(k);
+    return dup;
+  }, [all]);
+  const domainCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const k of Object.keys(bindings)) { const d = k.split(".")[0] || "?"; m.set(d, (m.get(d) ?? 0) + 1); }
+    return Array.from(m.entries()).sort((x, y) => y[1] - x[1]);
+  }, [bindings]);
+  const boundKeyOf = useCallback(
+    (a: VisualAsset) => (a.public_url ? boundBy.get(a.public_url.replace(/\s+/g, "")) ?? null : null),
+    [boundBy],
+  );
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return all.filter((a) => {
@@ -190,6 +226,9 @@ export default function VisualLibraryBrowser() {
       if (assetType && a.asset_type !== assetType) return false;
       if (state && displayState(a) !== state) return false;
       if (contextIds && !contextIds.has(a.id)) return false;
+      if (bindFilter === "bound" && !boundKeyOf(a)) return false;
+      if (bindFilter === "free" && boundKeyOf(a)) return false;
+      if (dupesOnly && !dupTitles.has((a.title ?? "").trim().toLowerCase())) return false;
       if (term) {
         const hay = [
           a.title, a.visual_asset_code, a.slug, a.source_name, a.description,
@@ -199,10 +238,10 @@ export default function VisualLibraryBrowser() {
       }
       return true;
     });
-  }, [all, q, category, assetType, state, contextIds]);
+  }, [all, q, category, assetType, state, contextIds, bindFilter, dupesOnly, boundKeyOf, dupTitles]);
 
   // Render in slices so 5,000+ rows never all mount at once.
-  useEffect(() => { setLimit(300); }, [q, category, assetType, state, view, contextSlug]);
+  useEffect(() => { setLimit(300); }, [q, category, assetType, state, view, contextSlug, bindFilter, dupesOnly]);
   const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
 
   const toggleSelect = (id: string) =>
@@ -253,6 +292,27 @@ export default function VisualLibraryBrowser() {
       </aside>
 
       <div className="min-w-0 flex-1 space-y-4">
+        {/* Registry coverage — the Library is the control room, so the live
+            health of the Semantic Icon Registry sits right on top. */}
+        {Object.keys(bindings).length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 text-[11px] text-[var(--text-dim)]">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+              <LockIcon size={11} /> {t("vl.reg.bound", "{n} meanings bound").replace("{n}", String(Object.keys(bindings).length))}
+            </span>
+            {domainCounts.map(([d, n]) => (
+              <span key={d} className="tabular-nums">{d} · {n}</span>
+            ))}
+            <span className="text-emerald-400">{t("vl.reg.collisions", "0 collisions · DB-enforced")}</span>
+            <button
+              type="button"
+              onClick={() => setDupesOnly((v) => !v)}
+              className={`ms-auto rounded-full border px-2 py-0.5 transition-colors ${dupesOnly ? "border-[var(--text-primary)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] hover:text-[var(--text-primary)]"}`}
+            >
+              {t("vl.reg.dupes", "Duplicate titles · {n}").replace("{n}", String(dupTitles.size))}
+            </button>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
@@ -292,14 +352,19 @@ export default function VisualLibraryBrowser() {
             <option value="">{t("vl.browse.all-types", "All types")}</option>
             {ASSET_TYPES.map((v) => <option key={v} value={v}>{t(`vl.type.${v}`, v.replace(/_/g, " "))}</option>)}
           </select>
+          <select className={SELECT} value={bindFilter} onChange={(e) => setBindFilter(e.target.value)}>
+            <option value="">{t("vl.browse.binding-any", "Bound & free")}</option>
+            <option value="free">{t("vl.browse.binding-free", "Free icons only")}</option>
+            <option value="bound">{t("vl.browse.binding-bound", "Bound icons only")}</option>
+          </select>
           {contexts.length > 0 && (
             <select className={SELECT} value={contextSlug} onChange={(e) => setContextSlug(e.target.value)} title={t("vl.browse.allowed-in-context", "Allowed in context")}>
               <option value="">{t("vl.browse.any-context", "Any context")}</option>
               {contexts.map((c) => <option key={c.slug} value={c.slug}>✓ {c.name}</option>)}
             </select>
           )}
-          {(category || state || assetType || q || contextSlug) && (
-            <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); setContextSlug(""); }}
+          {(category || state || assetType || q || contextSlug || bindFilter || dupesOnly) && (
+            <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); setContextSlug(""); setBindFilter(""); setDupesOnly(false); }}
               className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("vl.browse.clear", "Clear")}</button>
           )}
           <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : t("vl.browse.count-of", "{a} of {b}").replace("{a}", String(filtered.length)).replace("{b}", String(all.length))}</span>
@@ -317,7 +382,7 @@ export default function VisualLibraryBrowser() {
         ) : view === "grid" ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9">
             {visible.map((a) => (
-              <VisualAssetCard key={a.id} asset={a} selected={selected.has(a.id)} onToggleSelect={() => toggleSelect(a.id)} onOpen={() => setOpenAsset(a)} />
+              <VisualAssetCard key={a.id} asset={a} boundKey={boundKeyOf(a)} selected={selected.has(a.id)} onToggleSelect={() => toggleSelect(a.id)} onOpen={() => setOpenAsset(a)} />
             ))}
           </div>
         ) : (

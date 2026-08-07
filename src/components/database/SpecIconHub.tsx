@@ -18,6 +18,25 @@ import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/l
 import IconBindingPicker from "./IconBindingPicker";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 
+/* Legacy technical columns on the products table — pre-schema fields that
+   still render on records. Their icons are field.* bindings (many seeded);
+   listed here so the control center covers EVERYTHING, not just templates. */
+const LEGACY_FIELDS: Array<{ key: string; label: string }> = [
+  { key: "voltage", label: "Voltage / power" },
+  { key: "colors", label: "Colors" },
+  { key: "dimensions", label: "Machine dimensions" },
+  { key: "weight", label: "Machine weight" },
+  { key: "hs_code", label: "HS code" },
+  { key: "origin", label: "Country of origin" },
+  { key: "moq", label: "MOQ" },
+  { key: "lead_time", label: "Lead time" },
+  { key: "warranty", label: "Warranty" },
+  { key: "packing", label: "Packing" },
+  { key: "cbm", label: "CBM / volume" },
+  { key: "barcode", label: "Barcode" },
+  { key: "sku", label: "SKU" },
+];
+
 const ATTRIBUTES: Array<{ key: string; label: string }> = [
   { key: "voltage", label: "Voltage options" },
   { key: "plug_types", label: "Plug types" },
@@ -39,7 +58,7 @@ function Glyph({ url, className = "h-4 w-4" }: { url: string; className?: string
 
 export default function SpecIconHub() {
   const [bindings, setBindings] = useState<BindingsMap>({});
-  const [editing, setEditing] = useState<{ key: string; label: string; domain: "spec" | "attribute" } | null>(null);
+  const [editing, setEditing] = useState<{ key: string; label: string; domain: "spec" | "attribute" | "field" } | null>(null);
   const [openSchema, setOpenSchema] = useState<string | null>(null);
 
   useEffect(() => { void fetchIconBindings().then(setBindings); }, []);
@@ -58,7 +77,7 @@ export default function SpecIconHub() {
 
   const refresh = () => { invalidateIconBindings(); void fetchIconBindings().then(setBindings); };
 
-  const FieldRow = ({ k, label, domain, unit }: { k: string; label: string; domain: "spec" | "attribute"; unit?: string | null }) => {
+  const FieldRow = ({ k, label, domain, unit }: { k: string; label: string; domain: "spec" | "attribute" | "field"; unit?: string | null }) => {
     const url = bindings[`${domain}.${k}`];
     return (
       <button
@@ -92,6 +111,13 @@ export default function SpecIconHub() {
         <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">Attributes · {ATTRIBUTES.length}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
           {ATTRIBUTES.map((a) => <FieldRow key={a.key} k={a.key} label={a.label} domain="attribute" />)}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+        <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">Legacy technical columns · {LEGACY_FIELDS.length}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+          {LEGACY_FIELDS.map((a) => <FieldRow key={a.key} k={a.key} label={a.label} domain="field" />)}
         </div>
       </section>
 

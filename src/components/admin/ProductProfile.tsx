@@ -28,6 +28,7 @@ import { fetchClassificationIcons } from "@/lib/products-admin";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
+import BoundIcon from "@/components/common/BoundIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
@@ -786,7 +787,7 @@ export default function ProductProfile() {
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group icon={<FolderTreeIcon className="h-4 w-4" />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
+      <Group icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
         <div className={rows}>
           <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
           <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
@@ -820,7 +821,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group icon={<FactoryIcon className="h-4 w-4" />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
+      <Group icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
         {data.suppliers.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noSupplier", "No supplier linked.")}</p>
         ) : (
@@ -869,7 +870,7 @@ export default function ProductProfile() {
       <div className="space-y-4">
         {/* Same two-column hero the editor opens with: the product photo owns
             the left, status/visibility/name the right. */}
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
+        <Group icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
             <div>
               <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
@@ -908,7 +909,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
           </div>
         </Group>
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
+        <Group icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
             <Row label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
             <Row label={t("pp.f.description", "Full description")} value={s2("description")} />
@@ -916,7 +917,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.tags", "Tags")} value={s2("tags")} />
           </div>
         </Group>
-        <Group icon={<SparklesIcon className="h-4 w-4" />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
+        <Group icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
             ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
             : <div className={rows}>{data.translations.map((tr, i) => <Row key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
@@ -926,7 +927,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "specs" && (
       !data.schema ? (
-        <Group icon={<Settings2Icon className="h-4 w-4" />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
+        <Group icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
           <p className="text-[12px] text-[var(--text-ghost)] italic">
             {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
           </p>
@@ -993,7 +994,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group icon={<BoxesIcon className="h-4 w-4" />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
+      <Group icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noVariant", "No variant recorded — a product needs at least one.")}</p>
         ) : (
@@ -1064,7 +1065,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "pricing" && (
-      <Group icon={<DollarSignIcon className="h-4 w-4" />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
+      <Group icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noPrice", "No variant to price.")}</p>
         ) : (
@@ -1100,7 +1101,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "logistics" && (
-      <Group icon={<GlobeIcon className="h-4 w-4" />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
+      <Group icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
         <div className={rows}>
           <Row label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
           <Row label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
@@ -1128,7 +1129,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
+      <Group icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
         <div className={rows}>
           <Row label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
           <Row label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
@@ -1162,7 +1163,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "media" && (
-      <Group icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
+      <Group icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
         {/* Photo / file slots — every slot, filled or not. */}
         <div className="space-y-4">
           {MEDIA_SLOTS.map((slot) => {
@@ -1230,7 +1231,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "knowledge" && (
-      <Group icon={<BookOpenIcon className="h-4 w-4" />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
+      <Group icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
         <div className={rows}>
           <Row label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>
@@ -1251,7 +1252,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "finalize" && (
       <div className="space-y-4">
-        <Group icon={<CheckIcon className="h-4 w-4" />} title={t("pp.sec.readiness", "Readiness")}>
+        <Group icon={<BoundIcon semanticKey="field.readiness" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.readiness", "Readiness")}>
           {readiness == null ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noScore", "No spec template resolves, so completeness can\u2019t be scored.")}</p>
           ) : (
@@ -1270,7 +1271,7 @@ export default function ProductProfile() {
             </div>
           )}
         </Group>
-        <Group icon={<CheckIcon className="h-4 w-4" />} title={t("pp.sec.record", "Record")}>
+        <Group icon={<BoundIcon semanticKey="field.dates" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.record", "Record")}>
           <div className={rows}>
             <Row label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
             <Row label={t("pp.f.created", "Created")} value={s2("created_at")} />

@@ -8,6 +8,9 @@
 
 import { usePathname } from "next/navigation";
 import DatabaseHeader from "@/components/database/DatabaseHeader";
+import PageHeader from "@/components/ui/PageHeader";
+import BoundIcon from "@/components/common/BoundIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 
 interface RouteMeta { titleKey: string; titleEn: string; subKey: string; subEn: string }
@@ -60,7 +63,20 @@ export default function DatabaseLayout({ children }: { children: React.ReactNode
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <DatabaseHeader title={t(meta.titleKey, meta.titleEn)} subtitle={t(meta.subKey, meta.subEn)} />
+        {pathname.startsWith("/database/issues") ? (
+          /* Issue Reports is a standalone app — same route for old links, but
+             its own header instead of the Database dataset tabs. Icon resolves
+             from the Semantic Icon Registry (app.issue-reports). */
+          <PageHeader
+            title={t(meta.titleKey, meta.titleEn)}
+            subtitle={t(meta.subKey, meta.subEn)}
+            icon={<BoundIcon semanticKey="app.issue-reports" className="h-4 w-4" fallback={<RrIcon name="megaphone" size={16} />} />}
+            searchPlaceholder={t("db.search.issues", "Search issue reports…")}
+            searchHref="/database/issues"
+          />
+        ) : (
+          <DatabaseHeader title={t(meta.titleKey, meta.titleEn)} subtitle={t(meta.subKey, meta.subEn)} />
+        )}
         {children}
       </div>
     </div>

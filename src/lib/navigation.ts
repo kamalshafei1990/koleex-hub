@@ -51,6 +51,7 @@ import EventsIcon from "@/components/icons/EventsIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
@@ -246,6 +247,10 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── Knowledge ── */
   { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: true,  newSince: "2026-06-03" },
+  /* Owner 2026-08-07: Issue Reports is TOTALLY separate from the Visual
+     Library — its own app tile. Route kept under /database/issues so every
+     existing link and permission gate keeps working. */
+  { id: "issue-reports",    tKey: "app.issueReports",     name: "Issue Reports",     icon: ExclamationIcon, route: "/database/issues", active: true, newSince: "2026-08-07" },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
 
   /* ── System ── */
@@ -320,7 +325,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.knowledge",
     label: "Knowledge",
     icon: KnowledgeSidebarIcon,
-    appIds: ["knowledge", "database", "ai", "translator"],
+    appIds: ["knowledge", "database", "issue-reports", "ai", "translator"],
   },
   {
     id: "system",

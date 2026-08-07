@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
 import { useTranslation } from "@/lib/i18n";
@@ -210,9 +211,12 @@ export default function FamilySpecGrid({
               return (
                 <tr key={f.key} className="border-t border-[var(--border-subtle)]/60 hover:bg-[var(--bg-surface-subtle)]/30">
                   <td className="sticky start-0 z-10 bg-[var(--bg-secondary)] px-3 py-1 text-[11.5px] text-[var(--text-muted)]">
-                    <span className="block truncate" title={f.label}>
-                      {f.label}
-                      {f.unit ? <span className="text-[var(--text-ghost)]"> ({f.unit})</span> : null}
+                    <span className="flex items-center gap-1.5 truncate" title={f.label}>
+                      <BoundIcon semanticKey={`spec.${f.key}`} className="h-3 w-3 text-[var(--text-ghost)]" fallback={null} />
+                      <span className="truncate">
+                        {f.label}
+                        {f.unit ? <span className="text-[var(--text-ghost)]"> ({f.unit})</span> : null}
+                      </span>
                     </span>
                   </td>
                   <td className="px-1 py-1">

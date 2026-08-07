@@ -8,8 +8,10 @@
    A 409 shows WHO owns the icon instead of failing silently.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
-import { invalidateIconBindings } from "@/lib/visual-bindings";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
+import { fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
+import LockIcon from "@/components/icons/ui/LockIcon";
 
 const MEDIA_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
 
@@ -37,14 +39,31 @@ export default function IconBindingPicker({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [bindings, setBindings] = useState<BindingsMap>({});
+  const [cats, setCats] = useState<FetchedIconCategory[]>([]);
+  const [cat, setCat] = useState("");
+  const [freeOnly, setFreeOnly] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetchIconBindings().then(setBindings).catch(() => {});
+    fetchIconCategories().then(setCats).catch(() => {});
+  }, []);
+
+  /* url → owning meaning, so bound icons are visibly locked (and filterable)
+     BEFORE the server would 409. */
+  const boundBy = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [k, u] of Object.entries(bindings)) if (u) m.set(u.replace(/\s+/g, ""), k);
+    return m;
+  }, [bindings]);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/visual-library?view=list&q=${encodeURIComponent(q)}&pageSize=60`, { credentials: "include" });
+        const res = await fetch(`/api/visual-library?view=list&q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}&pageSize=60`, { credentials: "include" });
         const json = (await res.json().catch(() => null)) as { assets?: AssetRow[]; rows?: AssetRow[] } | null;
         const list = (json?.assets ?? json?.rows ?? []) as AssetRow[];
         setRows(list.filter((a) => a.svg_path));
@@ -52,7 +71,7 @@ export default function IconBindingPicker({
       setLoading(false);
     }, 300);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [q]);
+  }, [q, cat]);
 
   const save = async (url: string | null) => {
     setSaving(url ?? "__clear__");
@@ -87,6 +106,23 @@ export default function IconBindingPicker({
             placeholder="Search the General Icons library…"
             className="mt-3 w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
           />
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <select
+              value={cat}
+              onChange={(e) => setCat(e.target.value)}
+              className="h-8 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] px-2.5 text-[12px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]"
+            >
+              <option value="">All categories</option>
+              {cats.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => setFreeOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[12px] transition-colors ${freeOnly ? "border-[var(--text-primary)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
+            >
+              <LockIcon size={11} /> Free icons only
+            </button>
+          </div>
           {err && <p className="mt-2 text-[12px] text-rose-400">{err}</p>}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
@@ -96,18 +132,28 @@ export default function IconBindingPicker({
             <p className="text-center text-[12px] text-[var(--text-ghost)] py-8">No icons matched.</p>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
-              {rows.map((a) => {
+              {rows.filter((a) => {
+                if (!freeOnly) return true;
+                const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
+                const owner = boundBy.get(url);
+                return !owner || owner === semanticKey;
+              }).map((a) => {
                 const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
                 const active = currentUrl === url;
+                const owner = boundBy.get(url);
+                const takenByOther = !!owner && owner !== semanticKey;
                 return (
                   <button
                     key={a.id}
                     type="button"
-                    disabled={saving !== null}
+                    disabled={saving !== null || takenByOther}
                     onClick={() => save(url)}
-                    title={a.title ?? ""}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${active ? "border-[var(--text-primary)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]/60"} disabled:opacity-50`}
+                    title={takenByOther ? `Bound: ${owner}` : a.title ?? ""}
+                    className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${active ? "border-[var(--text-primary)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]/60"} disabled:opacity-50`}
                   >
+                    {takenByOther && (
+                      <span className="absolute right-1.5 top-1.5 text-[var(--text-ghost)]"><LockIcon size={10} /></span>
+                    )}
                     <span
                       aria-hidden
                       className="h-7 w-7 bg-current text-[var(--text-primary)]"

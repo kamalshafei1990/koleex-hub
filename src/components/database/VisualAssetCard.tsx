@@ -9,6 +9,7 @@
 import type { VisualAsset } from "@/lib/visual-library/types";
 import { displayState } from "@/lib/visual-library/types";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
@@ -18,6 +19,7 @@ const T: Translations = {
   "vl.card.deselect":         { en: "Deselect", zh: "取消选择", ar: "إلغاء التحديد" },
   "vl.card.select":           { en: "Select", zh: "选择", ar: "تحديد" },
   "vl.card.no-icon":          { en: "No icon", zh: "无图标", ar: "بدون أيقونة" },
+  "vl.card.bound":            { en: "Bound: {k}", zh: "已绑定：{k}", ar: "مرتبطة بـ: {k}" },
   "vl.state.missing":         { en: "missing", zh: "缺失", ar: "مفقود" },
   "vl.state.draft":           { en: "draft", zh: "草稿", ar: "مسودة" },
   "vl.state.pending":         { en: "pending", zh: "待审核", ar: "قيد الانتظار" },
@@ -50,11 +52,14 @@ export default function VisualAssetCard({
   selected,
   onToggleSelect,
   onOpen,
+  boundKey,
 }: {
   asset: VisualAsset;
   selected: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
+  /** Semantic Icon Registry meaning this icon is bound to (null = free). */
+  boundKey?: string | null;
 }) {
   const { t } = useTranslation(T);
   const state = displayState(asset);
@@ -77,6 +82,15 @@ export default function VisualAssetCard({
       >
         <CheckIcon size={11} />
       </button>
+
+      {boundKey && (
+        <span
+          title={t("vl.card.bound", "Bound: {k}").replace("{k}", boundKey)}
+          className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-md border border-white/20 bg-neutral-900/80 text-white"
+        >
+          <LockIcon size={10} />
+        </span>
+      )}
 
       <button type="button" onClick={onOpen} className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
         {asset.public_url ? (

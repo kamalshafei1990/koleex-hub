@@ -5,7 +5,8 @@
 
    Two-level navigation that mirrors the real hierarchy:
 
-   • Top row (always): Database datasets — Home · Visual Library · Issue Reports.
+   • Top row (always): Database datasets — Home · Visual Library. (Issue
+     Reports moved OUT to its own app — owner: totally separate.)
    • Sub row (only inside Visual Library): the Visual Library's own sub-sections —
      General Icons · Collections · Classification · Review Board.
 
@@ -75,17 +76,13 @@ export default function DatabaseHeader({
   const { t } = useTranslation(T);
   const pathname = usePathname() ?? "/database";
   const inVL = VL_PREFIXES.some((p) => isOn(pathname, p));
-  const inIssues = isOn(pathname, "/database/issues");
-  // The main header search is context-aware: on Issue Reports it searches
-  // issues (Enter → /database/issues?q=…, which the issues list reads and
-  // filters by); elsewhere it searches the Visual Library.
+  // Header search targets the Visual Library. (Issue Reports is its own app
+  // now and carries its own search inside the workspace.)
   const isHome = pathname === "/database";
-  const searchPlaceholder = inIssues
-    ? t("db.search.issues", "Search issue reports…")
-    : isHome
-      ? t("db.search.home", "Search the database…")
-      : t("db.search.placeholder", "Search the Visual Library…");
-  const searchHref = inIssues ? "/database/issues" : "/database/visual-library";
+  const searchPlaceholder = isHome
+    ? t("db.search.home", "Search the database…")
+    : t("db.search.placeholder", "Search the Visual Library…");
+  const searchHref = "/database/visual-library";
 
   /* Top-level dataset tabs. Active state is forced so the Visual Library tab
      stays lit on every sub-section route (Collections, Classification, …),
@@ -93,7 +90,6 @@ export default function DatabaseHeader({
   const topTabs: PageTab[] = [
     { key: "/database",                label: t("db.nav.home"),          icon: "home",      active: pathname === "/database" },
     { key: "/database/visual-library", label: t("db.nav.visualLibrary"), icon: "palette",   active: inVL },
-    { key: "/database/issues",         label: t("db.nav.issues"),        icon: "megaphone", active: isOn(pathname, "/database/issues") },
   ];
 
   return (
