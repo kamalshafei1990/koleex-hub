@@ -82,6 +82,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 |---|---|---|---|---|---|---|
 | Steam Iron | XFSI | **Confirmed** | steam_source, soleplate | — | all | live |
 | Steam Boiler/Generator | XFSB | **Confirmed** | capacity, irons_supported | auto_fill | all | live |
+| Steam Generator (Electric) | XFSG | **Confirmed** | power_kw, steam_output | auto_water_feed | all | live (CL-0017) |
 | Ironing Table (Vac/Heat/Blow) | XFIT | **Confirmed** | surface_features | vacuum, blow, heated | all | live (absorbs XFVT) |
 | Pressing Machine (Buck/Cabinet) | XFPB | Proposed | press_type, actuation | dual_buck | shirts, trousers | new |
 | Collar & Cuff Press | XFCP | **Confirmed** | actuation, stations | double_station | shirts | live |
@@ -128,6 +129,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Shrink Wrapping | XPCK | Packing | Proposed | type, product_size | multi_zone | new |
 | Vacuum/Compression Packing | XPCV | Packing | Proposed | type, bag_size | gas_flush | new |
 | Carton Sealing | XPCC | Packing | **Confirmed** | sealing_mode, range | random_size | live |
+| Garment Hanging System | XPCH | Packing | **Confirmed** | system_type, capacity | powered_conveyor | live (CL-0017) |
 | Strapping | XPCP | Packing | **Needs Decision** | type, strap_material | side_seal | proposed XPCT **collides with live XPCT=Packing Tables** → use XPCP |
 | Final Garment/Fabric Inspection | XPCI | Inspection | Proposed (CL-0012) | width, method / +ai_defect | ai_defect, marking | final QC | **de-dup**: incoming inspection = `XPRI` (Fabric Prep); this is the final-stage one (Stao/YILI) |
 
@@ -161,7 +163,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 ---
 
 ## 1. Confirmed Product Types (38)
-XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT, XFGR (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
+XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFSG, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT, XFGR (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC, XPCH (packing).
 
 ## 2. Proposed Product Types (50)
 XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP, **XFSS** · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV, **XPCI** · **XMKP, XMKD, XMKS** (CAD & Marker) · **XWIC, XWIR, XWIB, XWIA** (Workshop Infra) · **XMDS, XMDD, XMDC, XMDH, XMDN** (Motors & Drives).

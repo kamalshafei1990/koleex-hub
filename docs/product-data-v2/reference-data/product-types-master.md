@@ -82,6 +82,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 |---|---|---|---|---|
 | ✅ XFSI | Steam Iron | steam_source, soleplate, weight | steam_source, soleplate | — |
 | ✅ XFSB | Steam Boiler / Generator | boiler_capacity, irons_supported, heating_method | capacity, irons_supported, heating_method | auto_fill, descaling |
+| ✅ XFSG | Steam Generator (Electric, compact) | power_kw, steam_output, irons_supported | power_kw, steam_output, irons_supported | auto_water_feed, dual_outlet |
 | ✅ XFIT | Ironing Table (Vacuum/Heated/Blowing) | surface_features, size | vacuum, up_blow, heated_buck, with_boiler | vacuum, up_blow, heated_buck |
 | ▲ XFPB | Pressing Machine (Buck/Cabinet) | press_type, actuation, application | press_type, actuation, dual_buck | dual_buck, programmable_cycle |
 | ✅ XFCP | Collar & Cuff Press | actuation, station_count | actuation, double_station | double_station, programmable |
@@ -127,6 +128,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XPCW2| Shrink Wrapping Machine | Packing | type, max_product_size, film | type, max_product_size, automation | auto_feed, multi_zone_tunnel |
 | ▲ XPCV | Vacuum / Compression Packing Machine | Packing | type, bag_size, vacuum_power | type, bag_size, throughput | compression_rollers, gas_flush |
 | ✅ XPCC | Carton Sealing Machine | Packing | sealing_mode, carton_range, tape_width | top_vs_topbottom, uniform_vs_random | random_autosize, flap_folder |
+| ✅ XPCH | Garment Hanging System | Packing | system_type, rail_length, capacity | system_type, capacity, automation | powered_conveyor, sorting_gates |
 | ▲ XPCT | Strapping Machine | Packing | type, strap_material, arch_size | automation, arch_size, strap_material | auto_carton_feed, side_seal |
 
 ## I. CAD / Marker-Making & Digitizing  (Category XMK · *new — CL-0012*)

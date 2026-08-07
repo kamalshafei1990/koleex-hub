@@ -209,6 +209,7 @@ export const CATEGORIES: Category[] = [
     subcategories: [
       { code: "XFSI", label: "Steam Irons" },
       { code: "XFSB", label: "Steam Boilers" },
+      { code: "XFSG", label: "Steam Generators" },
       { code: "XFIT", label: "Ironing Tables" },
       { code: "XFVT", label: "Vacuum Ironing Tables" },
       { code: "XFFF", label: "Form Finishing Machines" },
@@ -235,6 +236,7 @@ export const CATEGORIES: Category[] = [
       { code: "XPCF", label: "Folding Machines" },
       { code: "XPCT", label: "Packing Tables" },
       { code: "XPCC", label: "Carton Sealing Machines" },
+      { code: "XPCH", label: "Garment Hanging Systems" },
     ],
   },
   {
