@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { softDeleteAccount, recordBinEntry } from "@/lib/server/recycle-bin";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { derivePasswordState } from "@/lib/server/password-state";
 import { guardAccountAvatarField } from "@/lib/server/persist-account-avatar";
@@ -193,43 +194,31 @@ export async function DELETE(
     );
   }
 
-  /* Offboarding hygiene BEFORE the row goes: the person's PRIVATE
-     to-dos are personal workspace garbage once the account is gone
-     (nobody could ever see them again). Shared/team tasks stay —
-     their creator/assigner become NULL via the SET NULL FKs and the
-     To-do app shows them as a former member; assignment rows CASCADE. */
-  await supabaseServer
-    .from("koleex_todos")
-    .delete()
-    .eq("created_by_account_id", id)
-    .eq("is_private", true);
-
-  // Same belt-and-braces — the existsInTenant() check above protects
-  // the happy path, but the DELETE itself must also be tenant-scoped
-  // so a race / crafted request can't wipe another tenant's account.
-  let del = supabaseServer
-    .from("accounts")
-    .delete()
-    .eq("id", id);
-  if (auth.tenant_id) del = del.eq("tenant_id", auth.tenant_id);
-  const { error } = await del;
-  if (error) {
-    console.error("[api/accounts/[id] DELETE]", error.message);
-    /* FK block (23503): tell the operator WHICH record family is holding
-       the account instead of a silent/raw failure — this exact silence is
-       how a "deleted" account once survived and kept showing in To-do. */
-    if (error.code === "23503") {
-      const table = /table "([^"]+)"/.exec(error.details ?? "")?.[1] ?? null;
-      return NextResponse.json(
-        {
-          error: table
-            ? `This account is still referenced by records in "${table}" (audit/approval trails). Those records must keep their author — suspend the account instead of deleting it, or clear those records first.`
-            : "This account is still referenced by audit/approval records in another module. Suspend it instead of deleting, or clear those records first.",
-        },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  /* RECOVERABLE delete (owner directive): the row is never hard-dropped.
+     Snapshot the account + its To-do footprint into the recycle bin,
+     sweep that footprint from the live system, and set status='deleted' —
+     login blocked, hidden from every list/picker, restorable any time
+     from the Recycle Bin. */
+  const { data: person } = await supabaseServer
+    .from("accounts").select("person_id, username").eq("id", id).maybeSingle();
+  let label: string | null = (person?.username as string) ?? null;
+  if (person?.person_id) {
+    const { data: p } = await supabaseServer
+      .from("people").select("full_name").eq("id", person.person_id).maybeSingle();
+    if (p?.full_name) label = p.full_name as string;
   }
-  return NextResponse.json({ ok: true });
+  const { account, swept } = await softDeleteAccount(id);
+  if (!account) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  await recordBinEntry({
+    tenantId: auth.tenant_id ?? null,
+    kind: "account",
+    label,
+    accountId: id,
+    personId: (account.person_id as string) ?? null,
+    deletedBy: auth.account_id ?? null,
+    snapshot: { account, swept },
+  });
+  return NextResponse.json({ ok: true, recoverable: true });
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { recordBinEntry } from "@/lib/server/recycle-bin";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { deptsFromFields, recordSectionEdits } from "@/lib/suppliers/section-audit";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
@@ -245,6 +246,16 @@ export async function DELETE(
      contact, so it targets only accounts tied to the contact being deleted —
      and some legacy/seed accounts are linked cross-tenant, which a tenant
      filter would miss, leaving the delete blocked. */
+  /* RECOVERABLE (owner directive): snapshot the contact and its linked
+     login account(s) into the recycle bin BEFORE they go, so a deleted
+     customer can be brought back any time. (Soft-keeping the account is
+     impossible here: the identity CHECK requires a customer account to
+     keep its contact_id.) */
+  const { data: fullContact } = await supabaseServer
+    .from("contacts").select("*").eq("id", id).maybeSingle();
+  const { data: linkedAccounts } = await supabaseServer
+    .from("accounts").select("*").eq("contact_id", id);
+
   const { error: acctErr } = await supabaseServer
     .from("accounts")
     .delete()
@@ -261,6 +272,16 @@ export async function DELETE(
   if (error) {
     console.error("[api/contacts/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (existing.contact_type === "customer" && fullContact) {
+    await recordBinEntry({
+      tenantId: auth.tenant_id ?? null,
+      kind: "customer",
+      label: (fullContact.company_name_en as string) || (fullContact.display_name as string) || null,
+      deletedBy: auth.account_id ?? null,
+      snapshot: { contact: fullContact, accounts: linkedAccounts ?? [] },
+    });
   }
 
   /* Don't leave the Catalogs app showing catalogues attached to a supplier

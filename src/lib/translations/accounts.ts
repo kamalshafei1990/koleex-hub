@@ -70,7 +70,15 @@ export const accountsT: Translations = {
   "acc.action.clearForceReset":      { en: "Clear Force Reset",                                                  zh: "取消强制重置",                                                        ar: "إلغاء فرض إعادة التعيين" },
   "acc.action.forcePasswordReset":   { en: "Force Password Reset",                                               zh: "强制重置密码",                                                        ar: "فرض إعادة تعيين كلمة المرور" },
   "acc.action.delete":               { en: "Delete Account",                                                     zh: "删除账户",                                                            ar: "حذف الحساب" },
-  "acc.action.confirmDelete":        { en: "Are you sure you want to delete this account? This cannot be undone.", zh: "确定要删除此账户吗？此操作无法撤消。",                                    ar: "هل أنت متأكد من حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء." },
+  "acc.action.confirmDelete":        { en: "Delete this account? It will be signed out and hidden everywhere, and its task assignments and private to-dos will be removed from the system. You can restore it any time from the Recycle Bin.", zh: "删除此账户？该账户将被登出并在全系统隐藏，其任务分配和私人待办将被移除。你可以随时从回收站恢复。", ar: "حذف هذا الحساب؟ سيُسجَّل خروجه ويُخفى من كل النظام، وتُزال إسناداته ومهامه الخاصة. يمكنك استرجاعه في أي وقت من سلة الاسترجاع." },
+  "acc.bin.title":                   { en: "Recycle Bin", zh: "回收站", ar: "سلة الاسترجاع" },
+  "acc.bin.empty":                   { en: "Nothing deleted yet — deleted employees, accounts and customers appear here and can be restored.", zh: "尚无删除记录——被删除的员工、账户和客户会出现在这里并可恢复。", ar: "لا شيء محذوف بعد — الموظفون والحسابات والعملاء المحذوفون يظهرون هنا ويمكن استرجاعهم." },
+  "acc.bin.restore":                 { en: "Restore", zh: "恢复", ar: "استرجاع" },
+  "acc.bin.restored":                { en: "Restored", zh: "已恢复", ar: "تم الاسترجاع" },
+  "acc.bin.restoreOk":               { en: "Restored — the account is active again and its tasks are back.", zh: "已恢复——账户重新激活，任务已恢复。", ar: "تم الاسترجاع — الحساب نشط مجددًا ومهامه عادت." },
+  "acc.bin.kind.employee":           { en: "Employee", zh: "员工", ar: "موظف" },
+  "acc.bin.kind.customer":           { en: "Customer", zh: "客户", ar: "عميل" },
+  "acc.bin.kind.account":            { en: "Account", zh: "账户", ar: "حساب" },
 
   /* ── Detail page buttons ── */
   "acc.btn.backToAccounts":          { en: "Back to accounts",                                                   zh: "返回账户列表",                                                        ar: "العودة إلى الحسابات" },

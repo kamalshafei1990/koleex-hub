@@ -97,6 +97,36 @@ export default function AccountsList() {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newTempPw, setNewTempPw] = useState<{ id: string; pw: string } | null>(null);
+  /* ── Recycle Bin (recoverable offboarding) ── */
+  interface BinRow { id: string; kind: "employee" | "customer" | "account"; label: string | null; deleted_at: string; restored_at: string | null }
+  const [binOpen, setBinOpen] = useState(false);
+  const [binRows, setBinRows] = useState<BinRow[] | null>(null);
+  const [binBusy, setBinBusy] = useState<string | null>(null);
+  const loadBin = async () => {
+    try {
+      const r = await fetch("/api/recycle-bin", { credentials: "include" });
+      const j = await r.json().catch(() => null);
+      setBinRows((j?.entries ?? []) as BinRow[]);
+    } catch { setBinRows([]); }
+  };
+  const restoreBin = async (id: string) => {
+    setBinBusy(id);
+    try {
+      const r = await fetch("/api/recycle-bin", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok) {
+        setToast(t("acc.bin.restoreOk"));
+        await loadBin();
+        const fresh = await fetchAccounts();
+        if (fresh) setAccounts(fresh);
+      }
+      else setError(j?.error || "Restore failed");
+    } finally { setBinBusy(null); }
+  };
 
   const { t } = useTranslation(accountsT);
 
@@ -333,6 +363,14 @@ export default function AccountsList() {
             >
               Security
             </Link>
+            <button
+              type="button"
+              onClick={() => { setBinOpen((o) => !o); if (!binOpen) loadBin(); }}
+              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              title={t("acc.bin.title")}
+            >
+              <TrashIcon className="h-3.5 w-3.5" /> {t("acc.bin.title")}
+            </button>
             <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
               <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
             </Link>
@@ -341,6 +379,45 @@ export default function AccountsList() {
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
           {accounts.length} {t("acc.subtitle")}
         </p>
+
+        {/* Recycle Bin — deleted employees / accounts / customers, restorable. */}
+        {binOpen && (
+          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrashIcon className="h-4 w-4 text-[var(--text-ghost)]" />
+              <h2 className="text-[13.5px] font-bold text-[var(--text-primary)]">{t("acc.bin.title")}</h2>
+            </div>
+            {binRows === null ? (
+              <p className="text-[12px] text-[var(--text-ghost)]">…</p>
+            ) : binRows.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-ghost)]">{t("acc.bin.empty")}</p>
+            ) : (
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {binRows.map((b) => (
+                  <div key={b.id} className="flex items-center gap-3 py-2.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-ghost)] shrink-0">
+                      {t(`acc.bin.kind.${b.kind}`)}
+                    </span>
+                    <span className="text-[13px] font-medium text-[var(--text-primary)] truncate flex-1">{b.label || "—"}</span>
+                    <span className="text-[11px] text-[var(--text-ghost)] shrink-0">{new Date(b.deleted_at).toLocaleString()}</span>
+                    {b.restored_at ? (
+                      <span className="text-[11px] font-semibold text-emerald-400 shrink-0">{t("acc.bin.restored")}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => restoreBin(b.id)}
+                        disabled={binBusy === b.id}
+                        className="h-8 px-3.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 disabled:opacity-50 transition-all shrink-0"
+                      >
+                        {binBusy === b.id ? "…" : t("acc.bin.restore")}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Toasts */}
         {toast && (

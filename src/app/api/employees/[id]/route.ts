@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { softDeleteAccount, recordBinEntry } from "@/lib/server/recycle-bin";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import {
   EMPLOYEE_PRIVATE_COLUMNS,
@@ -278,17 +279,29 @@ export async function DELETE(
     ? await supabaseServer.from("people").select("full_name").eq("id", emp.person_id).maybeSingle()
     : { data: null };
 
-  /* End assignments + suspend the login BEFORE deleting the HR row, so a
-     failed delete still leaves the org chart consistent with intent. */
+  /* RECOVERABLE offboarding (owner directive): snapshot everything into
+     the recycle bin, sweep the person's activity, soft-delete the login.
+     End assignments BEFORE deleting the HR row, so a failed delete still
+     leaves the org chart consistent with intent. */
+  let activeAssignments: Array<Record<string, unknown>> = [];
   if (emp.person_id) {
+    const { data: asg } = await supabaseServer
+      .from("koleex_assignments")
+      .select("*")
+      .eq("person_id", emp.person_id)
+      .eq("is_active", true);
+    activeAssignments = (asg ?? []) as Array<Record<string, unknown>>;
     await supabaseServer
       .from("koleex_assignments")
       .update({ is_active: false, end_date: new Date().toISOString().split("T")[0] })
       .eq("person_id", emp.person_id)
       .eq("is_active", true);
   }
+  let acctSnap: { account: Record<string, unknown> | null; swept: { todo_assignees: Record<string, unknown>[]; private_todos: Record<string, unknown>[] } } = {
+    account: null, swept: { todo_assignees: [], private_todos: [] },
+  };
   if (emp.account_id) {
-    await supabaseServer.from("accounts").update({ status: "suspended" }).eq("id", emp.account_id);
+    acctSnap = await softDeleteAccount(emp.account_id);
   }
 
   const { error } = await supabaseServer.from("koleex_employees").delete().eq("id", id);
@@ -305,6 +318,21 @@ export async function DELETE(
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await recordBinEntry({
+    tenantId: auth.tenant_id ?? null,
+    kind: "employee",
+    label: person?.full_name ?? null,
+    accountId: emp.account_id ?? null,
+    personId: emp.person_id ?? null,
+    deletedBy: auth.account_id ?? null,
+    snapshot: {
+      employee: emp,
+      assignments: activeAssignments,
+      account: acctSnap.account,
+      swept: acctSnap.swept,
+    },
+  });
 
   await logAudit({
     auth,

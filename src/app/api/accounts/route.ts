@@ -30,6 +30,8 @@ export async function GET() {
        last_login_at, created_at, updated_at, preferences`,
     )
     .eq("tenant_id", auth.tenant_id)
+    /* Soft-deleted accounts live in the Recycle Bin, not the directory. */
+    .neq("status", "deleted")
     .order("created_at", { ascending: false });
   _t.mark("db");
 

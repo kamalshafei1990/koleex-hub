@@ -443,8 +443,10 @@ export default function EmployeesPage() {
               <div className="min-w-0">
                 <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Delete {confirmTarget.person.full_name}?</h3>
                 <p className="text-[12.5px] text-[var(--text-dim)] mt-1 leading-relaxed">
-                  This permanently removes the employee record and their HR history.
-                  Their login account will be suspended. This cannot be undone.
+                  This removes the employee record and their HR history, DELETES
+                  their login account, and clears their task assignments across
+                  the system. Everything is kept in the Recycle Bin (Accounts app)
+                  — you can restore them any time.
                 </p>
               </div>
             </div>

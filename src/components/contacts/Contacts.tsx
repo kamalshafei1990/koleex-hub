@@ -4805,7 +4805,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
    just to open the confirm dialog.
    ═══════════════════════════════════════════════════════════════════════════ */
 type DeleteResult = { ok: boolean; error?: string };
-type PendingDelete = { id: string; name: string; title?: string; onConfirm: () => Promise<DeleteResult> | DeleteResult | void };
+type PendingDelete = { id: string; name: string; title?: string; note?: string; onConfirm: () => Promise<DeleteResult> | DeleteResult | void };
 function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => string }) {
   const [pending, setPending] = useState<PendingDelete | null>(null);
   const [busy, setBusy] = useState(false);
@@ -4831,9 +4831,12 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
     <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={close}>
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{pending.title || t("delete.title")}</h3>
-        <p className="text-sm text-[var(--text-subtle)] mb-6">
+        <p className={`text-sm text-[var(--text-subtle)] ${pending.note ? "mb-2" : "mb-6"}`}>
           {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{pending.name}</strong>{t("delete.cannotUndo")}
         </p>
+        {pending.note ? (
+          <p className="text-[12px] leading-relaxed text-[var(--text-muted)] mb-6 border-s-2 border-[var(--border-strong)] ps-2">{pending.note}</p>
+        ) : null}
         {err ? <div className="mb-4 text-[12px] text-rose-400">{err}</div> : null}
         <div className="flex gap-3 justify-end">
           <button onClick={close} disabled={busy} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
@@ -5723,8 +5726,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       : c.contact_type === "customer"
         ? t("delete.titleCustomer", "Delete customer")
         : t("delete.title", "Delete Contact");
+    const note = c.contact_type === "customer"
+      ? t("delete.customerRecoverable", "The customer's portal login account will be deleted with them. Both are kept in the Recycle Bin (Accounts app) and can be restored any time.")
+      : undefined;
     window.dispatchEvent(new CustomEvent("koleex:confirm-delete", {
-      detail: { id: c.id, name: contactDisplayName(c), title, onConfirm: () => handleDelete(c.id) },
+      detail: { id: c.id, name: contactDisplayName(c), title, note, onConfirm: () => handleDelete(c.id) },
     }));
   };
 
