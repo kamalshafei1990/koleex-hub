@@ -15,7 +15,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 const TABLE = "landed_cost_simulations";
 
@@ -58,6 +58,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Landed Cost", "create");
+  if (deny) return deny;
 
   const body = (await req.json()) as Record<string, unknown>;
   const row = pickWritable(body);

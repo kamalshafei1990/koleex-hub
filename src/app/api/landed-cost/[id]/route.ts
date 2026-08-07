@@ -11,7 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { pickWritable } from "../route";
 
 const TABLE = "landed_cost_simulations";
@@ -37,6 +37,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Landed Cost", "edit");
+  if (deny) return deny;
   const { id } = await ctx.params;
 
   const body = (await req.json()) as Record<string, unknown>;
@@ -54,6 +56,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Landed Cost", "delete");
+  if (deny) return deny;
   const { id } = await ctx.params;
 
   const { error } = await supabaseServer.from(TABLE).delete().eq("id", id);
