@@ -163,4 +163,186 @@ const createCalendarEvent: ToolDef<
   },
 };
 
-export const calendarTools: ToolDef[] = [listMyCalendar as ToolDef, createCalendarEvent as ToolDef];
+/* ── Shared loader for mutations — same shape as the route's loadEvent(),
+   plus display fields so previews can echo the REAL event. Tenant is part
+   of the query, so cross-tenant ids simply read as not-found. */
+interface EventRow {
+  id: string;
+  account_id: string;
+  tenant_id: string | null;
+  title: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  all_day: boolean | null;
+  description: string | null;
+  is_private: boolean | null;
+}
+
+async function loadEventRow(id: string, tenantId: string | null): Promise<EventRow | null> {
+  let q = supabaseServer
+    .from("koleex_calendar_events")
+    .select("id, account_id, tenant_id, title, start_at, end_at, all_day, description, is_private")
+    .eq("id", id);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data } = await q.maybeSingle();
+  return (data as EventRow | null) ?? null;
+}
+
+/* ── Edit event (with confirm) ──
+   Ports /api/calendar/events/[id] PATCH: caller must own the calendar
+   (account_id = me) or be Super Admin; server-managed fields can never be
+   rewritten because only whitelisted fields are built into the patch. */
+const updateCalendarEvent: ToolDef<
+  {
+    event_id?: string;
+    title?: string;
+    start_at?: string;
+    end_at?: string;
+    all_day?: boolean;
+    description?: string;
+    is_private?: boolean;
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "updateCalendarEvent",
+  description:
+    "Update (reschedule, rename, edit) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed; times are ISO datetimes resolved from the current date block.",
+  parameters: {
+    type: "object",
+    properties: {
+      event_id: { type: "string", description: "The event's id, taken from a listMyCalendar result." },
+      title: { type: "string", description: "New title." },
+      start_at: { type: "string", description: "New ISO start datetime." },
+      end_at: { type: "string", description: "New ISO end datetime." },
+      all_day: { type: "boolean", description: "Whether it becomes an all-day event." },
+      description: { type: "string", description: "New details text." },
+      is_private: { type: "boolean", description: "Whether the event is private." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
+    },
+    required: ["event_id"],
+  },
+  requiredModule: CALENDAR_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.event_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
+
+    const ev = await loadEventRow(id, ctx.auth.tenant_id);
+    if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
+    if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "You can only edit events on your own calendar." };
+    }
+
+    const changes: Record<string, unknown> = {};
+    if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
+    if (typeof args.start_at === "string" && args.start_at.trim()) changes.start_at = args.start_at.trim();
+    if (typeof args.end_at === "string" && args.end_at.trim()) changes.end_at = args.end_at.trim();
+    if (typeof args.all_day === "boolean") changes.all_day = args.all_day;
+    if (typeof args.description === "string") changes.description = args.description;
+    if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
+    if (Object.keys(changes).length === 0) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, times, description, all-day, or privacy)." };
+    }
+
+    const title = ev.title ?? "Event";
+    if (args.confirm !== true) {
+      const parts = Object.entries(changes).map(([k, v]) => `${k.replace("_", " ")} → ${String(v)}`);
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: {
+          preview: {
+            event_id: ev.id,
+            title,
+            current: { title: ev.title, start_at: ev.start_at, end_at: ev.end_at, all_day: ev.all_day },
+            changes,
+          },
+        },
+        message: `Ready to update "${title}": ${parts.join(", ")}. Confirm?`,
+        pendingAction: { tool: "updateCalendarEvent", args: { ...args, event_id: ev.id, confirm: true } },
+      };
+    }
+
+    const { data, error } = await supabaseServer
+      .from("koleex_calendar_events")
+      .update(changes)
+      .eq("id", id)
+      .select("id, title, start_at, end_at, all_day")
+      .maybeSingle();
+    if (error) {
+      console.error("[tool.updateCalendarEvent]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the event — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: (data ?? { id: ev.id }) as Record<string, unknown>,
+      message: `Updated "${typeof changes.title === "string" ? changes.title : title}".`,
+      sources: ["koleex_calendar_events(update)"],
+    };
+  },
+};
+
+/* ── Delete event (with confirm) ──
+   Ports /api/calendar/events/[id] DELETE: own calendar or Super Admin. */
+const deleteCalendarEvent: ToolDef<
+  { event_id?: string; confirm?: boolean },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "deleteCalendarEvent",
+  description:
+    "PERMANENTLY delete (cancel) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview exactly which event will be deleted; only call again with confirm:true after the user explicitly agrees. This cannot be undone.",
+  parameters: {
+    type: "object",
+    properties: {
+      event_id: { type: "string", description: "The event's id, taken from a listMyCalendar result." },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed deleting the previewed event." },
+    },
+    required: ["event_id"],
+  },
+  requiredModule: CALENDAR_MODULE,
+  requiredAction: "delete",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.event_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
+
+    const ev = await loadEventRow(id, ctx.auth.tenant_id);
+    if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
+    if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "You can only delete events on your own calendar." };
+    }
+
+    const title = ev.title ?? "Event";
+    const when = ev.start_at ? ` (${ev.start_at})` : "";
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { event_id: ev.id, title, start_at: ev.start_at, action: "delete" } },
+        message: `This will PERMANENTLY delete "${title}"${when} from your calendar — it cannot be undone. Confirm?`,
+        pendingAction: { tool: "deleteCalendarEvent", args: { event_id: ev.id, confirm: true } },
+      };
+    }
+
+    const { error } = await supabaseServer.from("koleex_calendar_events").delete().eq("id", id);
+    if (error) {
+      console.error("[tool.deleteCalendarEvent]", error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the event — please try again." };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: ev.id, title, deleted: true },
+      message: `Deleted "${title}" from your calendar.`,
+      sources: ["koleex_calendar_events(delete)"],
+    };
+  },
+};
+
+export const calendarTools: ToolDef[] = [
+  listMyCalendar as ToolDef,
+  createCalendarEvent as ToolDef,
+  updateCalendarEvent as ToolDef,
+  deleteCalendarEvent as ToolDef,
+];
