@@ -60,21 +60,88 @@ export default function ClassificationIconHub() {
   };
   useEffect(() => { void load(); }, []);
 
-  /* No selection = show EVERYTHING (owner: "where's the rest?" — all four
-     tiers must be visible at a glance). Picking a parent narrows children. */
+  /* No selection = show EVERYTHING, ORGANIZED (owner: children grouped
+     under their parent — categories by division, subcategories by category,
+     kinds by subcategory). Picking a parent narrows the cascade below it. */
   const cats = useMemo(
     () => (pickDivId ? categories.filter((c) => c.division_id === pickDivId) : categories),
     [categories, pickDivId],
   );
-  const subs = useMemo(
-    () => (pickCatId ? subcategories.filter((s) => s.category_id === pickCatId) : subcategories),
-    [subcategories, pickCatId],
-  );
-  /* 4th tier — machine kinds registered for the picked subcategory (strict
-     match only; the picker's "show all" fallback would mislead here). */
-  const kinds = useMemo(
-    () => (pickSubSlug ? MACHINE_KINDS.filter((k) => k.subcategory === pickSubSlug) : MACHINE_KINDS),
-    [pickSubSlug],
+  const catGroups = useMemo(() => {
+    const byDiv = new Map<string, CategoryRow[]>();
+    for (const c of cats) {
+      const k = c.division_id ?? "?";
+      const arr = byDiv.get(k) ?? [];
+      arr.push(c);
+      byDiv.set(k, arr);
+    }
+    return divisions
+      .filter((d) => byDiv.has(d.id))
+      .map((d) => ({ id: d.id, label: d.name, items: byDiv.get(d.id)! }));
+  }, [cats, divisions]);
+
+  const subs = useMemo(() => {
+    if (pickCatId) return subcategories.filter((s) => s.category_id === pickCatId);
+    if (pickDivId) {
+      const catIds = new Set(cats.map((c) => c.id));
+      return subcategories.filter((s) => (s.category_id ? catIds.has(s.category_id) : false));
+    }
+    return subcategories;
+  }, [subcategories, pickCatId, pickDivId, cats]);
+  const subGroups = useMemo(() => {
+    const byCat = new Map<string, SubcategoryRow[]>();
+    for (const sc of subs) {
+      const k = sc.category_id ?? "?";
+      const arr = byCat.get(k) ?? [];
+      arr.push(sc);
+      byCat.set(k, arr);
+    }
+    /* Order follows the division cascade (same order the Categories column
+       shows), so the two columns read in parallel. */
+    const orderedCats = catGroups.flatMap((g) => g.items);
+    const rest = categories.filter((c) => byCat.has(c.id) && !orderedCats.some((o) => o.id === c.id));
+    return [...orderedCats, ...rest]
+      .filter((c) => byCat.has(c.id))
+      .map((c) => ({ id: c.id, label: c.name, items: byCat.get(c.id)! }));
+  }, [subs, categories, catGroups]);
+
+  /* 4th tier — machine kinds, grouped under their subcategory. The cascade
+     follows whatever the columns to the left are showing. */
+  const kinds = useMemo(() => {
+    if (pickSubSlug) return MACHINE_KINDS.filter((k) => k.subcategory === pickSubSlug);
+    if (pickCatId || pickDivId) {
+      const subSlugs = new Set(subs.map((s) => s.slug));
+      return MACHINE_KINDS.filter((k) => subSlugs.has(k.subcategory));
+    }
+    return MACHINE_KINDS;
+  }, [pickSubSlug, pickCatId, pickDivId, subs]);
+  const kindGroups = useMemo(() => {
+    const bySub = new Map<string, typeof MACHINE_KINDS>();
+    for (const k of kinds) {
+      const arr = bySub.get(k.subcategory) ?? [];
+      arr.push(k);
+      bySub.set(k.subcategory, arr);
+    }
+    const nameOf = new Map(subcategories.map((s) => [s.slug, s.name]));
+    const cascade = subGroups.flatMap((g) => g.items);
+    const ordered: { id: string; label: string; items: typeof MACHINE_KINDS }[] = [];
+    const seen = new Set<string>();
+    for (const sc of cascade) {
+      if (bySub.has(sc.slug) && !seen.has(sc.slug)) { ordered.push({ id: sc.slug, label: sc.name, items: bySub.get(sc.slug)! }); seen.add(sc.slug); }
+    }
+    for (const [slug, items] of bySub) {
+      if (!seen.has(slug)) ordered.push({ id: slug, label: nameOf.get(slug) ?? slug, items });
+    }
+    return ordered;
+  }, [kinds, subcategories, subGroups]);
+
+  /* Parent hairline header inside a column — same style the owner sees on
+     the catalog sections. */
+  const GroupHead = ({ label }: { label: string }) => (
+    <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+      <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-dim)] truncate">{label}</span>
+      <span className="h-px flex-1 bg-[var(--border-faint)]" />
+    </div>
   );
 
   const iconOf = (level: string, slug: string) => bindings[`classification.${level}.${slug}`];
@@ -128,9 +195,14 @@ export default function ClassificationIconHub() {
             {t("vh.categories", "Categories")} · {cats.length}{pickDivId ? "" : ` — ${t("vh.allShown", "all shown; pick a parent to narrow")}`}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
-            {cats.map((c) => (
-              <div key={c.id} className={pickCatId === c.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => { setPickCatId(c.id); setPickSubSlug(""); }}>
-                <NodeRow node={{ slug: c.slug, name: c.name, level: "category" }} />
+            {catGroups.map((g) => (
+              <div key={g.id}>
+                <GroupHead label={g.label} />
+                {g.items.map((c) => (
+                  <div key={c.id} className={pickCatId === c.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => { setPickCatId(c.id); setPickSubSlug(""); }}>
+                    <NodeRow node={{ slug: c.slug, name: c.name, level: "category" }} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -141,9 +213,14 @@ export default function ClassificationIconHub() {
             {t("vh.subcategories", "Subcategories")} · {subs.length}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
-            {subs.map((sc) => (
-              <div key={sc.id} className={pickSubSlug === sc.slug ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => setPickSubSlug(sc.slug)}>
-                <NodeRow node={{ slug: sc.slug, name: sc.name, level: "subcategory" }} />
+            {subGroups.map((g) => (
+              <div key={g.id}>
+                <GroupHead label={g.label} />
+                {g.items.map((sc) => (
+                  <div key={sc.id} className={pickSubSlug === sc.slug ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => setPickSubSlug(sc.slug)}>
+                    <NodeRow node={{ slug: sc.slug, name: sc.name, level: "subcategory" }} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -154,8 +231,13 @@ export default function ClassificationIconHub() {
             {t("vh.kinds", "Machine kinds")} · {kinds.length}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
-            {kinds.map((k) => (
-              <NodeRow key={k.slug} node={{ slug: k.slug, name: k.name, level: "kind" }} />
+            {kindGroups.map((g) => (
+              <div key={g.id}>
+                <GroupHead label={g.label} />
+                {g.items.map((k) => (
+                  <NodeRow key={k.slug} node={{ slug: k.slug, name: k.name, level: "kind" }} />
+                ))}
+              </div>
             ))}
             {pickSubSlug && kinds.length === 0 && (
               <p className="px-3 py-4 text-[11px] text-[var(--text-ghost)]">{t("vh.noKinds", "This subcategory has no machine kinds registered.")}</p>
