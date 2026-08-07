@@ -1289,6 +1289,8 @@ export default function ProductForm({ productId }: Props) {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  /* Family promote-to-primary confirmation (KDS CF-1, neutral tone). */
+  const [promoteAsk, setPromoteAsk] = useState<ModelFormState | null>(null);
   const [supplierTarget, setSupplierTarget] = useState<"hero" | string>("hero");
 
   /* ── Hero: main image helpers ── */
@@ -4741,12 +4743,7 @@ export default function ProductForm({ productId }: Props) {
                     productSpecs={specEntries}
                     memberMode={{
                       memberCode: activeModel.primary_model || activeModel.model_name || "",
-                      onMakePrimary: () => {
-                        if (!window.confirm(t("fam.promoteConfirm", "Make this model the PRIMARY of the family? The current primary becomes a regular member."))) return;
-                        const reordered = [activeModel, ...models.filter((x) => x !== activeModel)].map((mm, i) => ({ ...mm, order: i }));
-                        setModels(reordered);
-                        setActiveMember(0);
-                      },
+                      onMakePrimary: () => setPromoteAsk(activeModel),
                     }}
                     onChange={(newLinks) => {
                       const upd = newLinks[0];
@@ -6215,6 +6212,21 @@ export default function ProductForm({ productId }: Props) {
         existingBrands={brands}
       />
 
+      <ConfirmDialog
+        open={promoteAsk !== null}
+        tone="neutral"
+        title={t("fam.promoteConfirm", "Make this model the PRIMARY of the family? The current primary becomes a regular member.")}
+        confirmLabel={t("fam.promoteDo", "Make primary")}
+        onCancel={() => setPromoteAsk(null)}
+        onConfirm={() => {
+          const target = promoteAsk;
+          setPromoteAsk(null);
+          if (!target) return;
+          const reordered = [target, ...models.filter((x) => x !== target)].map((mm, i) => ({ ...mm, order: i }));
+          setModels(reordered);
+          setActiveMember(0);
+        }}
+      />
       <ConfirmDialog
         open={discardOpen}
         onCancel={() => setDiscardOpen(false)}

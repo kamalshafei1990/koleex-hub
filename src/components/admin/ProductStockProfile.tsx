@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -127,12 +128,10 @@ export default function ProductStockProfile({ productId }: { productId: string }
 
   useEffect(() => { void load(); }, [load]);
 
-  const save = useCallback(async () => {
-    setError(null);
-    setFlash(null);
-    if (!track && profile && (stock?.total_on_hand ?? 0) > 0) {
-      if (!confirm(t("stock.disable_confirm"))) return;
-    }
+  /* Disabling tracking while stock is on hand asks through the elected
+     KDS ConfirmDialog instead of the native browser confirm. */
+  const [confirmDisable, setConfirmDisable] = useState(false);
+  const doSave = useCallback(async () => {
     setSaving(true);
     try {
       const body = track
@@ -164,10 +163,23 @@ export default function ProductStockProfile({ productId }: { productId: string }
     } finally {
       setSaving(false);
     }
-  }, [track, trackSerials, profile, stock, t, unit, warehouseId, cost, currency, reorder, minStock, maxStock, productId, load]);
+  }, [track, trackSerials, t, unit, warehouseId, cost, currency, reorder, minStock, maxStock, productId, load]);
+  const save = useCallback(async () => {
+    setError(null);
+    setFlash(null);
+    if (!track && profile && (stock?.total_on_hand ?? 0) > 0) { setConfirmDisable(true); return; }
+    void doSave();
+  }, [track, profile, stock, doSave]);
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={confirmDisable}
+        title={t("stock.disable_confirm")}
+        confirmLabel="Disable"
+        onCancel={() => setConfirmDisable(false)}
+        onConfirm={() => { setConfirmDisable(false); void doSave(); }}
+      />
       <div className="flex items-start gap-3">
         <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
           <BoxIcon className="h-4 w-4" />

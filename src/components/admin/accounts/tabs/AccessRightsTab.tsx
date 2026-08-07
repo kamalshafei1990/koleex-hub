@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import UndoIcon from "@/components/icons/ui/UndoIcon";
@@ -391,8 +392,11 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
   /* Clear ALL per-account overrides → fall back to the account's role defaults.
      Sets every module to the role baseline; once saved, no module differs from
      the role so all override rows are removed. Review, then Save to apply. */
+  const [resetAsk, setResetAsk] = useState(false);
   function resetToRoleDefaults() {
-    if (typeof window !== "undefined" && !window.confirm(t("acc.access.confirmResetDefaults", "Clear all custom permissions for this account and use its role's defaults? Review the grid, then Save to apply."))) return;
+    setResetAsk(true);
+  }
+  function doResetToRoleDefaults() {
     const reset: Record<string, ModulePerms> = {};
     ALL_MODULES.forEach((m) => { reset[m] = { ...(rolePerms[m] || EMPTY_PERMS) }; });
     setPerms(reset);
@@ -782,6 +786,15 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
           </section>
         );
       })}
+
+      <ConfirmDialog
+        open={resetAsk}
+        tone="neutral"
+        title={t("acc.access.confirmResetDefaults", "Clear all custom permissions for this account and use its role's defaults? Review the grid, then Save to apply.")}
+        confirmLabel={t("acc.access.resetDo", "Use role defaults")}
+        onCancel={() => setResetAsk(false)}
+        onConfirm={() => { setResetAsk(false); doResetToRoleDefaults(); }}
+      />
 
       {/* Action bar */}
       <section className={tabCardClass}>
