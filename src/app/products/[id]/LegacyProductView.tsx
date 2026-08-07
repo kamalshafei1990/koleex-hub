@@ -2205,7 +2205,7 @@ export default function LegacyProductView() {
                                 from the imported icon set.
                              3) If neither matches, use the group's
                                 icon as a last resort. */
-                        const techByLabel: Record<string, typeof GaugeIcon> = {
+                        const techByLabel: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
                           "Voltage": ZapIcon,
                           "Frequency": ActivityIcon,
                           "Motor Power": CpuIcon,

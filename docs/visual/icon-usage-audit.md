@@ -111,3 +111,36 @@ splits into distinct keys in later waves.
 
 `entity.*` meanings are editable from Specs & Attributes (they list in the
 "Record fields & sections" block).
+
+## FINAL DISPOSITIONS (2026-08-07 — program complete)
+
+Every semantic icon from the collision matrix now has a ruling:
+
+| Icon | Ruling | Registry key |
+|---|---|---|
+| Building2Icon | component-bound | entity.company |
+| FactoryIcon | component-bound | entity.factory |
+| DollarSignIcon | component-bound | entity.money |
+| BookOpenIcon | component-bound | field.knowledge (reuse) |
+| UsersIcon | SPLIT — generic bound, 7 precise sites re-keyed | entity.people (+ entity.employee / entity.customer at sites) |
+| PackageIcon | component-bound (product/goods root meaning; stock-item reads fine) | entity.product |
+| DocumentIcon | component-bound | entity.document |
+| UserIcon | component-bound | entity.person |
+| BriefcaseIcon | component-bound | entity.position |
+| PhoneIcon | component-bound | field.phone |
+| EnvelopeIcon | component-bound | field.email |
+| MapPinIcon | component-bound | field.address |
+| TagsIcon | component-bound | attribute.tags |
+| ImageRawIcon | component-bound | field.photos (reuse) |
+| HashtagIcon | DEFERRED — no clean free glyph; meaning ("code/number") weak | — |
+| BoxesIcon | DEFERRED — mixed (variants / container preference / orders); per-site split when needed | — |
+| GlobeIcon | DEFERRED — genuinely multi (website / language / logistics / origin) | — |
+| ShieldCheckIcon | DEFERRED — multi (compliance / verified / security) | — |
+| StarIcon | CHROME — interactive favorite toggle + rating widget | — |
+| LayersIcon | CHROME-ish — visual stack metaphor, not an entity | — |
+| ExclamationIcon / TriangleWarningIcon | CHROME — status furniture (app.issue-reports governs the app meaning) | — |
+| CheckCircleIcon / ShieldIcon / ClockIcon / EyeIcon / InfoIcon / Download / LayoutGrid / List … | CHROME — exempt by the boundary rule | — |
+
+**State: 14 semantic icons registry-governed (~430 call sites follow the
+Library), 4 deferred with reasons, the rest chrome by rule. New deferred
+work only opens if a deferred icon's meaning starts colliding in practice.**
