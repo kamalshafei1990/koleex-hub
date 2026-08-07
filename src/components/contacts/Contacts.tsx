@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -7253,7 +7254,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers) */}
         {c.contact_type !== "supplier" && detailTab("overview") && (websitesList.length > 0 || c.website) && (
-          <Section title={t("detail.website")} icon={<GlobeIcon size={14} />}>
+          <Section title={t("detail.website")} icon={<BoundIcon semanticKey="field.website" className="h-3.5 w-3.5" fallback={<GlobeIcon size={14} />} />}>
             {websitesList.map((w, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{w.label}</span>
@@ -9166,7 +9167,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && showTab("overview") && (
-        <FormSection title={t("section.websites")} icon={<GlobeIcon size={14} />}>
+        <FormSection title={t("section.websites")} icon={<BoundIcon semanticKey="field.website" className="h-3.5 w-3.5" fallback={<GlobeIcon size={14} />} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeWebsite(i)} />
@@ -10119,7 +10120,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <SelectInput label={t("field.industry")} tier="optional" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                   <SelectInput label={t("field.source")} tier="optional" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
-                <Input label={t("field.supplierProfileUrl", "Platform profile link")} tier="optional" type="url" value={form.supplier_profile_url} onChange={v => setField("supplier_profile_url", v)} placeholder={t("placeholder.supplierProfileUrl", "Made-in-China / Alibaba / AliExpress profile URL")} icon={<GlobeIcon size={14} />} invalid={!!form.supplier_profile_url.trim() && (/\s/.test(form.supplier_profile_url.trim()) || !/\./.test(form.supplier_profile_url))} />
+                <Input label={t("field.supplierProfileUrl", "Platform profile link")} tier="optional" type="url" value={form.supplier_profile_url} onChange={v => setField("supplier_profile_url", v)} placeholder={t("placeholder.supplierProfileUrl", "Made-in-China / Alibaba / AliExpress profile URL")} icon={<BoundIcon semanticKey="field.website" className="h-3.5 w-3.5" fallback={<GlobeIcon size={14} />} />} invalid={!!form.supplier_profile_url.trim() && (/\s/.test(form.supplier_profile_url.trim()) || !/\./.test(form.supplier_profile_url))} />
                 {/* Supplier "type" is no longer a separate field — it's the PRIMARY
                     classification (star one in the Classifications section below).
                     On save it mirrors into contacts.supplier_type, so Purchase, the

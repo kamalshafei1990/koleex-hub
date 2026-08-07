@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
@@ -5280,7 +5281,7 @@ export default function ProductForm({ productId }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> {t("logistics.countryOfOrigin", "Country of Origin")}</span>
+                    <span className="inline-flex items-center gap-1.5"><BoundIcon semanticKey="field.origin" className="h-3 w-3" fallback={<GlobeIcon className="h-3 w-3" />} /> {t("logistics.countryOfOrigin", "Country of Origin")}</span>
                   </label>
                   <select
                     value={product.country_of_origin}
@@ -5771,7 +5772,7 @@ export default function ProductForm({ productId }: Props) {
                           <ReviewPill icon={<ShieldCheckIcon className="h-3 w-3" />}>{t("review.warrantyPill", "{warranty} warranty").replace("{warranty}", product.warranty)}</ReviewPill>
                         )}
                         {originName && (
-                          <ReviewPill icon={<GlobeIcon className="h-3 w-3" />}>{t("review.madeInPill", "Made in {country}").replace("{country}", originName)}</ReviewPill>
+                          <ReviewPill icon={<BoundIcon semanticKey="field.origin" className="h-3 w-3" fallback={<GlobeIcon className="h-3 w-3" />} />}>{t("review.madeInPill", "Made in {country}").replace("{country}", originName)}</ReviewPill>
                         )}
                         {models.length > 0 && (
                           <ReviewPill icon={<BoxesIcon className="h-3 w-3" />}>

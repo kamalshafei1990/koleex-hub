@@ -132,10 +132,10 @@ Every semantic icon from the collision matrix now has a ruling:
 | MapPinIcon | component-bound | field.address |
 | TagsIcon | component-bound | attribute.tags |
 | ImageRawIcon | component-bound | field.photos (reuse) |
-| HashtagIcon | DEFERRED — no clean free glyph; meaning ("code/number") weak | — |
+| HashtagIcon | component-bound (all 9 sites are tax / registration / customs identifiers) | field.code |
 | BoxesIcon | DEFERRED — mixed (variants / container preference / orders); per-site split when needed | — |
-| GlobeIcon | DEFERRED — genuinely multi (website / language / logistics / origin) | — |
-| ShieldCheckIcon | DEFERRED — multi (compliance / verified / security) | — |
+| GlobeIcon | SPLIT per meaning — component left generic; origin sites → field.origin, website/profile sites → field.website. Language / timezone / incoterms sites stay generic by design | field.origin · field.website |
+| ShieldCheckIcon | component-bound (root meaning = verified trust; product certifications override per-site) | entity.compliance |
 | StarIcon | CHROME — interactive favorite toggle + rating widget | — |
 | LayersIcon | CHROME-ish — visual stack metaphor, not an entity | — |
 | ExclamationIcon / TriangleWarningIcon | CHROME — status furniture (app.issue-reports governs the app meaning) | — |
@@ -144,3 +144,11 @@ Every semantic icon from the collision matrix now has a ruling:
 **State: 14 semantic icons registry-governed (~430 call sites follow the
 Library), 4 deferred with reasons, the rest chrome by rule. New deferred
 work only opens if a deferred icon's meaning starts colliding in practice.**
+
+**Update 2026-08-08 — deferred list worked down.** Of the four deferred
+icons, three are now governed (Hashtag, ShieldCheck component-bound; Globe
+split per meaning). **BoxesIcon remains the single deliberate deferral**: its
+sites genuinely mean three different things (product variants in the editor,
+sales/purchase ORDERS, and shipping CONTAINER preference) with no dominant
+root — binding it either way would misname two of the three. It stays chrome
+until one of those clusters needs its own registry meaning.
