@@ -29,6 +29,7 @@ import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import BoundIcon from "@/components/common/BoundIcon";
+import Drawer from "@/components/kds/Drawer";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
@@ -131,6 +132,11 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.stock":       { en: "Stock status",       zh: "库存状态",       ar: "حالة المخزون" },
   "pp.f.barcode":     { en: "Barcode",            zh: "条形码",         ar: "الباركود" },
   "pp.f.status":      { en: "Status",             zh: "状态",           ar: "الحالة" },
+  "pp.f.costMeta":    { en: "Updated {date} by {name} · via {src}", zh: "{date} 由 {name} 更新 · 来自{src}", ar: "حُدّثت {date} بواسطة {name} · عبر {src}" },
+  "pp.f.costHistory": { en: "Cost history", zh: "成本历史", ar: "سجل التكلفة" },
+  "pp.h.empty":       { en: "No cost changes recorded for this variant yet.", zh: "此型号尚无成本变更记录。", ar: "لا توجد تغييرات تكلفة مسجّلة لهذا الموديل بعد." },
+  "pp.h.src.quotation_module": { en: "Quotation", zh: "报价单", ar: "عرض السعر" },
+  "pp.h.src.product_form":     { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
   "pp.f.pricingMode": { en: "Pricing mode",       zh: "定价方式",       ar: "طريقة التسعير" },
   "pp.f.priceNote":   { en: "Price note",         zh: "价格说明",       ar: "ملاحظة السعر" },
   "pp.f.costPrice":   { en: "Cost price (CNY)",   zh: "成本价(元)",     ar: "سعر التكلفة (يوان)" },
@@ -478,6 +484,7 @@ export default function ProductProfile() {
   const { t } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
 
   const [data, setData] = useState<Profile | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -1072,8 +1079,19 @@ export default function ProductProfile() {
           <div className="space-y-3">
             {data.models.map((m, i) => (
               <div key={i} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <div className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">
-                  {(m.model_name as string) || "Untitled variant"}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] flex-1 truncate">
+                    {(m.model_name as string) || "Untitled variant"}
+                  </div>
+                  {data.costVisible && (
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFor({ id: String(m.id), name: (m.model_name as string) || "" })}
+                      className="shrink-0 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-lg px-2 py-1 transition-colors"
+                    >
+                      {t("pp.f.costHistory", "Cost history")}
+                    </button>
+                  )}
                 </div>
                 <div className={rows}>
                   <Row label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
@@ -1087,6 +1105,14 @@ export default function ProductProfile() {
                         : undefined}
                     />
                   )}
+                  {data.costVisible && m.cost_updated_at ? (
+                    <div className="col-span-full text-[10.5px] text-[var(--text-ghost)]">
+                      {t("pp.f.costMeta", "Updated {date} by {name} · via {src}")
+                        .replace("{date}", new Date(String(m.cost_updated_at)).toLocaleDateString())
+                        .replace("{name}", String(m.cost_updated_by_name ?? "—"))
+                        .replace("{src}", t("pp.h.src." + String(m.cost_source ?? ""), String(m.cost_source ?? "—")))}
+                    </div>
+                  ) : null}
                   <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
                   {data.costVisible && <Row label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
                   {data.costVisible && <Row label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}
@@ -1099,6 +1125,8 @@ export default function ProductProfile() {
         )}
       </Group>
       )}
+
+      <CostHistoryDrawer target={historyFor} onClose={() => setHistoryFor(null)} t={t} />
 
       {STEPS[step].id === "logistics" && (
       <Group icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
@@ -1283,5 +1311,66 @@ export default function ProductProfile() {
       )}
       </div>
     </div>
+  );
+}
+
+/* ── P6: Cost history drawer ─────────────────────────────────────────────
+   Read-only view over the append-only product_cost_history ledger (the
+   GET /api/products/cost-history API shipped in P2). Opened per variant
+   from the Cost & Price group; visible only to cost-visible viewers. */
+function CostHistoryDrawer({ target, onClose, t }: {
+  target: { id: string; name: string } | null;
+  onClose: () => void;
+  t: (k: string, f?: string) => string;
+}) {
+  const [rows, setRows] = useState<Row[] | null>(null);
+  useEffect(() => {
+    if (!target) { setRows(null); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/products/cost-history?model_id=${encodeURIComponent(target.id)}`, { credentials: "include" });
+        const j = (await r.json().catch(() => null)) as { history?: Row[] } | null;
+        if (alive) setRows(j?.history ?? []);
+      } catch { if (alive) setRows([]); }
+    })();
+    return () => { alive = false; };
+  }, [target]);
+
+  return (
+    <Drawer
+      open={target !== null}
+      onClose={onClose}
+      eyebrow={t("pp.f.costHistory", "Cost history")}
+      title={target?.name || ""}
+    >
+      {rows === null ? (
+        <div className="space-y-2 p-1">
+          {[0, 1, 2].map((i) => <div key={i} className="h-12 rounded-xl bg-[var(--bg-surface-subtle)] animate-pulse" />)}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-[12.5px] text-[var(--text-dim)] py-8 text-center">{t("pp.h.empty", "No cost changes recorded for this variant yet.")}</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((h) => (
+            <div key={String(h.id)} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 py-2.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums">
+                  {h.previous_head_cost != null ? `¥${Number(h.previous_head_cost).toLocaleString()} → ` : ""}
+                  ¥{Number(h.new_head_cost ?? 0).toLocaleString()}
+                </span>
+                <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">
+                  {new Date(String(h.created_at)).toLocaleString()}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">
+                {String(h.user_name ?? "—")} · {t("pp.h.src." + String(h.source ?? ""), String(h.source ?? "—"))}
+                {h.note ? <span className="text-[var(--text-ghost)]"> — {String(h.note)}</span> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
   );
 }
