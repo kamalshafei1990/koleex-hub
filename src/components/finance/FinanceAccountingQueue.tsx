@@ -392,9 +392,9 @@ function InventoryCogsSection() {
     }
   };
 
-  const voidEntry = async (id: string) => {
-    if (!confirm(t("accounting.cogs.voidConfirm", "Void this COGS journal? A reversing entry will be posted."))) return;
-    const reason = prompt(t("accounting.cogs.reasonPrompt", "Reason (optional):")) ?? "voided from queue";
+  const [voidAsk, setVoidAsk] = useState<string | null>(null);
+  const voidEntry = (id: string) => setVoidAsk(id);
+  const doVoid = async (id: string, reason: string) => {
     setBusy(id);
     try {
       const r = await fetch(`/api/accounting/journals/${id}/void`, {
@@ -485,6 +485,13 @@ function InventoryCogsSection() {
           </tbody>
         </table>
       </div>
+      <VoidJournalDialog
+        open={voidAsk !== null}
+        title={t("accounting.cogs.voidConfirm", "Void this COGS journal? A reversing entry will be posted.")}
+        reasonPlaceholder={t("accounting.cogs.reasonPrompt", "Reason (optional):")}
+        onCancel={() => setVoidAsk(null)}
+        onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoid(id, reason); }}
+      />
     </div>
   );
 }
@@ -738,9 +745,9 @@ function SalesRevenueSection() {
     }
   };
 
-  const voidEntry = async (id: string) => {
-    if (!confirm(t("accounting.revenue.voidConfirm", "Void this revenue journal? A reversing entry will be posted."))) return;
-    const reason = prompt(t("accounting.cogs.reasonPrompt", "Reason (optional):")) ?? "voided from queue";
+  const [voidAsk, setVoidAsk] = useState<string | null>(null);
+  const voidEntry = (id: string) => setVoidAsk(id);
+  const doVoid = async (id: string, reason: string) => {
     setBusy(id);
     try {
       const r = await fetch(`/api/accounting/journals/${id}/void`, {
@@ -820,6 +827,53 @@ function SalesRevenueSection() {
             )}
           </tbody>
         </table>
+      </div>
+      <VoidJournalDialog
+        open={voidAsk !== null}
+        title={t("accounting.revenue.voidConfirm", "Void this revenue journal? A reversing entry will be posted.")}
+        reasonPlaceholder={t("accounting.cogs.reasonPrompt", "Reason (optional):")}
+        onCancel={() => setVoidAsk(null)}
+        onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoid(id, reason); }}
+      />
+    </div>
+  );
+}
+
+/* ── VoidJournalDialog ────────────────────────────────────────────────────
+   Replaces the native confirm() + prompt() pair for voiding journals with
+   one themed dialog: message + optional reason field + rose Void action.
+   Styled after the elected KDS CF-1 (hairline card, dim+blur backdrop). */
+function VoidJournalDialog({ open, title, reasonPlaceholder, onCancel, onConfirm }: {
+  open: boolean;
+  title: string;
+  reasonPlaceholder: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  useEffect(() => { if (open) setReason(""); }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm" onClick={onCancel} role="alertdialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-4 py-3.5">
+          <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</p>
+          <input
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={reasonPlaceholder}
+            className="mt-2.5 w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-white/[0.05] px-4 py-3">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.05] hover:text-[var(--text-primary)]">
+            Cancel
+          </button>
+          <button type="button" onClick={() => onConfirm(reason.trim() || "voided from queue")} className="rounded-lg border border-rose-500/[0.30] bg-rose-500/[0.10] px-3 py-1.5 text-[12px] font-medium text-rose-300 transition-colors hover:bg-rose-500/[0.16]">
+            Void
+          </button>
+        </div>
       </div>
     </div>
   );

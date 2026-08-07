@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -457,14 +458,22 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
     } finally { setSubmitting(false); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm(t("setup.fx.removeConfirm", "Remove this rate?"))) return;
+  const [removeAsk, setRemoveAsk] = useState<string | null>(null);
+  const remove = (id: string) => setRemoveAsk(id);
+  const doRemove = async (id: string) => {
     await fetch(`/api/finance/setup/fx-rates/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
 
   return (
     <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
+      <ConfirmDialog
+        open={removeAsk !== null}
+        title={t("setup.fx.removeConfirm", "Remove this rate?")}
+        confirmLabel="Remove"
+        onCancel={() => setRemoveAsk(null)}
+        onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
+      />
       <div className="space-y-4">
         <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
@@ -564,14 +573,23 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
     } finally { setSubmitting(false); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm(t("setup.assets.archiveConfirm", "Archive this asset?"))) return;
+  const [removeAsk, setRemoveAsk] = useState<string | null>(null);
+  const remove = (id: string) => setRemoveAsk(id);
+  const doRemove = async (id: string) => {
     await fetch(`/api/finance/setup/assets/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
 
   return (
     <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
+      <ConfirmDialog
+        open={removeAsk !== null}
+        tone="neutral"
+        title={t("setup.assets.archiveConfirm", "Archive this asset?")}
+        confirmLabel="Archive"
+        onCancel={() => setRemoveAsk(null)}
+        onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
+      />
       <div className="space-y-4">
         <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
@@ -679,8 +697,9 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
     } finally { setSubmitting(false); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm(t("setup.ob.removeConfirm", "Remove this entry?"))) return;
+  const [removeAsk, setRemoveAsk] = useState<string | null>(null);
+  const remove = (id: string) => setRemoveAsk(id);
+  const doRemove = async (id: string) => {
     await fetch(`/api/finance/setup/opening-balances/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
@@ -693,6 +712,13 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
 
   return (
     <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
+      <ConfirmDialog
+        open={removeAsk !== null}
+        title={t("setup.ob.removeConfirm", "Remove this entry?")}
+        confirmLabel="Remove"
+        onCancel={() => setRemoveAsk(null)}
+        onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
+      />
       <div className="space-y-4">
         <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>

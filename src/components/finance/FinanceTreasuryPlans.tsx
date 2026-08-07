@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -166,9 +167,10 @@ export default function FinanceTreasuryPlans() {
     }
   }, [openId, loadList, loadDetail]);
 
-  const archive = useCallback(async () => {
+  const [archiveAsk, setArchiveAsk] = useState(false);
+  const archive = useCallback(() => { if (openId) setArchiveAsk(true); }, [openId]);
+  const doArchive = useCallback(async () => {
     if (!openId) return;
-    if (!window.confirm(t("treasuryPlans.archiveConfirm", "Archive this plan? It will remain visible in the archive list."))) return;
     setActionBusy(true);
     try {
       const r = await fetch(`/api/finance/treasury-plans/${openId}/archive`, { method: "POST" });
@@ -196,7 +198,7 @@ export default function FinanceTreasuryPlans() {
     return STATUS_BUCKETS.map((b) => ({ ...b, items: map.get(b.key) ?? [] }));
   }, [plans]);
 
-  return (
+  return (<>
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -286,7 +288,15 @@ export default function FinanceTreasuryPlans() {
         )}
       </div>
     </div>
-  );
+    <ConfirmDialog
+      open={archiveAsk}
+      tone="neutral"
+      title={t("treasuryPlans.archiveConfirm", "Archive this plan? It will remain visible in the archive list.")}
+      confirmLabel={t("treasuryPlans.archiveDo", "Archive")}
+      onCancel={() => setArchiveAsk(false)}
+      onConfirm={() => { setArchiveAsk(false); void doArchive(); }}
+    />
+  </>);
 }
 
 /* ────────────────────────────────────────────────────────────────────────

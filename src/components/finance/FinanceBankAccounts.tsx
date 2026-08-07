@@ -15,6 +15,7 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -70,6 +71,9 @@ export default function FinanceBankAccounts() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Partial<BankAccount> | null>(null);
   const [openAccountId, setOpenAccountId] = useState<string | null>(null);
+  /* Archive asks through the elected KDS ConfirmDialog (neutral — the
+     account stays visible in the archive). */
+  const [archiveAsk, setArchiveAsk] = useState<{ id: string; label: string } | null>(null);
   const [detail, setDetail] = useState<BankAccountDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [movementDrawer, setMovementDrawer] = useState<{ accountId: string } | null>(null);
@@ -88,6 +92,15 @@ export default function FinanceBankAccounts() {
       setLoading(false);
     }
   }, []);
+
+  const doArchive = useCallback(async (id: string) => {
+    const r = await fetch(`/api/finance/bank-accounts/${id}/archive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "archived" }),
+    });
+    if (r.ok) void loadList();
+  }, [loadList]);
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -150,7 +163,7 @@ export default function FinanceBankAccounts() {
     if (openAccountId) await loadDetail(openAccountId);
   }, [loadList, loadDetail, openAccountId]);
 
-  return (
+  return (<>
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -223,15 +236,7 @@ export default function FinanceBankAccounts() {
                       active={a.id === openAccountId}
                       onEdit={() => setEditing(a)}
                       onAddMovement={() => setMovementDrawer({ accountId: a.id })}
-                      onArchive={async () => {
-                        if (!window.confirm(t("bankAccounts.archiveConfirm", "Archive {bank} · {account}?").replace("{bank}", a.bank_name).replace("{account}", a.account_name))) return;
-                        const r = await fetch(`/api/finance/bank-accounts/${a.id}/archive`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ status: "archived" }),
-                        });
-                        if (r.ok) void loadList();
-                      }}
+                      onArchive={() => setArchiveAsk({ id: a.id, label: `${a.bank_name} · ${a.account_name}` })}
                       onSetPrimary={async () => {
                         const r = await fetch(`/api/finance/bank-accounts/${a.id}/set-primary`, { method: "POST" });
                         if (r.ok) void loadList();
@@ -280,7 +285,15 @@ export default function FinanceBankAccounts() {
         onSaved={async () => { setMovementDrawer(null); await onSaved(); }}
       />
     </div>
-  );
+    <ConfirmDialog
+      open={archiveAsk !== null}
+      tone="neutral"
+      title={archiveAsk ? t("bankAccounts.archiveConfirm", "Archive {bank} · {account}?").replace("{bank} · {account}", archiveAsk.label) : ""}
+      confirmLabel={t("bankAccounts.archiveDo", "Archive")}
+      onCancel={() => setArchiveAsk(null)}
+      onConfirm={() => { const ask = archiveAsk; setArchiveAsk(null); if (ask) void doArchive(ask.id); }}
+    />
+  </>);
 }
 
 /* ────────────────────────────────────────────────────────────────────────

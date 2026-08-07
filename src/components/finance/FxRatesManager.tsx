@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel, ErpTable,
@@ -114,8 +115,9 @@ export default function FxRatesManager() {
     } finally { setBusy(false); }
   }
 
-  async function deleteRate(id: string) {
-    if (!window.confirm(t("fx.deleteConfirm", "Delete this FX rate?"))) return;
+  const [deleteAsk, setDeleteAsk] = useState<string | null>(null);
+  function deleteRate(id: string) { setDeleteAsk(id); }
+  async function doDeleteRate(id: string) {
     setBusy(true);
     try {
       const r = await fetch(`/api/finance/fx/rates?id=${id}`, { method: "DELETE" });
@@ -152,7 +154,7 @@ export default function FxRatesManager() {
     ) },
   ];
 
-  return (
+  return (<>
     <ErpPage
       title={t("fx.pageTitle", "Exchange Rates")}
       subtitle={t("fx.pageSubtitle", "Main operating currency: {ccy}").replace("{ccy}", baseCurrency)}
@@ -333,5 +335,12 @@ export default function FxRatesManager() {
       </section>
       <ErpHairline />
     </ErpPage>
-  );
+    <ConfirmDialog
+      open={deleteAsk !== null}
+      title={t("fx.deleteConfirm", "Delete this FX rate?")}
+      confirmLabel="Delete"
+      onCancel={() => setDeleteAsk(null)}
+      onConfirm={() => { const id = deleteAsk; setDeleteAsk(null); if (id) void doDeleteRate(id); }}
+    />
+  </>);
 }
