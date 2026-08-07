@@ -31,13 +31,20 @@ function bootBuildId(): string {
 
 const T = {
   "u.available": { en: "A new version is available", zh: "有新版本可用", ar: "يتوفر إصدار جديد" },
-  "u.refresh":   { en: "Refresh",                    zh: "刷新",       ar: "تحديث" },
+  "u.sub": {
+    en: "Update to load the latest improvements — takes a second and keeps you signed in.",
+    zh: "更新即可加载最新改进 — 只需一秒，且无需重新登录。",
+    ar: "حدّث لتحميل أحدث التحسينات — ثانية واحدة وبدون تسجيل خروج.",
+  },
+  "u.refresh":  { en: "Update",      zh: "更新",       ar: "تحديث" },
+  "u.updating": { en: "Updating…",   zh: "正在更新…",  ar: "جارٍ التحديث…" },
 };
 
 export default function UpdateWatcher() {
   const { t } = useTranslation(T);
   const boot = useRef<string | null>(null);
   const [stale, setStale] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -75,16 +82,36 @@ export default function UpdateWatcher() {
   }, []);
 
   if (!stale) return null;
+
+  const onUpdate = () => {
+    if (updating) return;
+    setUpdating(true);
+    /* Give the pressed/spinner state one frame to paint before the reload
+       tears the page down — otherwise the tap feels ignored. */
+    window.setTimeout(() => window.location.reload(), 180);
+  };
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2 py-2 shadow-2xl shadow-black/40">
-        <span className="text-[13px] font-medium">{t("u.available")}</span>
+      <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2.5 py-2.5 shadow-2xl shadow-black/40 max-w-[min(92vw,26rem)]">
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold leading-tight">{t("u.available")}</div>
+          <div className="mt-0.5 text-[11px] leading-snug opacity-70">{t("u.sub")}</div>
+        </div>
         <button
           type="button"
-          onClick={() => window.location.reload()}
-          className="h-7 px-3 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[12px] font-semibold hover:opacity-90"
+          onClick={onUpdate}
+          disabled={updating}
+          aria-busy={updating}
+          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[12px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-60 disabled:pointer-events-none"
         >
-          {t("u.refresh")}
+          {updating && (
+            <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
+          {updating ? t("u.updating") : t("u.refresh")}
         </button>
       </div>
     </div>
