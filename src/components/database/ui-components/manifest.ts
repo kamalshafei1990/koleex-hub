@@ -1,7 +1,7 @@
 /* AUTO-GENERATED component inventory — regenerated 2026-08-07 by a
    directory-aware crawl over src/components AND src/app. kitFiles =
    how many of the module's files import from the shared kit
-   (@/components/kds or @/components/ui) — the convergence signal the
+   (@/components/kds, /ui or /common) — the convergence signal the
    catalog shows as a percentage. Do not hand-edit; rerun the crawl. */
 export interface UiModule { key: string; fileCount: number; kitFiles: number; components: string[] }
 export const UI_COMPONENT_TOTALS = { components: 842, files: 1031, modules: 111 };
@@ -17,7 +17,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "admin",
     "fileCount": 60,
-    "kitFiles": 8,
+    "kitFiles": 9,
     "components": [
       "AccessRightsTab",
       "AccessoryOptionsSection",
@@ -538,7 +538,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "knowledge",
     "fileCount": 13,
-    "kitFiles": 0,
+    "kitFiles": 1,
     "components": [
       "AIParseFlow",
       "BreakdownCard",
@@ -568,7 +568,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "layout",
     "fileCount": 15,
-    "kitFiles": 1,
+    "kitFiles": 2,
     "components": [
       "AppLaunchLink",
       "AppLaunchSplash",
@@ -826,7 +826,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "settings",
     "fileCount": 12,
-    "kitFiles": 2,
+    "kitFiles": 3,
     "components": [
       "AboutTab",
       "AdminTab",
@@ -1525,7 +1525,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 root",
     "fileCount": 5,
-    "kitFiles": 1,
+    "kitFiles": 2,
     "components": [
       "HomePage",
       "Loading",

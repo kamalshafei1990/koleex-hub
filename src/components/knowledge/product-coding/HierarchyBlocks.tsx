@@ -17,6 +17,7 @@
 import { useState } from "react";
 import type { Category, Division, Subcategory } from "./data";
 import { taxonomyLogoUrl } from "./taxonomy-logo";
+import BoundIcon from "@/components/common/BoundIcon";
 import { useT, useTL } from "./i18n";
 
 /* Set of subcategory codes that ship full technical decoding today.
@@ -44,16 +45,18 @@ function TaxonomyLogo({
   size?: number;
 }) {
   const url = taxonomyLogoUrl(folder, slug);
-  if (!url) return null;
-  /* eslint-disable-next-line @next/next/no-img-element */
+  /* Registry-first (owner law: one icon = one meaning, controlled from the
+     Visual Library — change it there, this document follows). The legacy
+     storage logo stays only as offline fallback. */
+  const level = folder === "divisions" ? "division" : folder === "categories" ? "category" : "subcategory";
+  const fallback = url ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img src={url} alt={alt} width={size} height={size} style={{ width: size, height: size }} />
+  ) : null;
   return (
-    <img
-      src={url}
-      alt={alt}
-      width={size}
-      height={size}
-      style={{ width: size, height: size }}
-    />
+    <span aria-label={alt} className="inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <BoundIcon semanticKey={`classification.${level}.${slug}`} className="h-full w-full text-[var(--text-primary)]" fallback={fallback} />
+    </span>
   );
 }
 
