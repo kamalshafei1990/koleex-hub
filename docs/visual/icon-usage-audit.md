@@ -93,3 +93,21 @@ Chrome icons from the same crawl (exempt, listed for completeness): `RrIcon`·71
 - **Wave 3 — status & commerce.** ShieldCheck/Star/CheckCircle/DollarSign/Tags/Globe family.
 - Each wave: seed keys first (free icons only — the Library's *Free icons only* filter),
   migrate call sites via `BoundIcon`, keep the code icon as fallback. No big-bang renames.
+
+## Wave 2 technique — component-level binding (2026-08-07)
+
+For a semantic code icon whose meaning is UNIFORM across all its call sites,
+don't touch the call sites at all: rewrite the icon component itself to
+resolve the registry (BoundIcon) with its old SVG as offline fallback.
+
+**Shipped:** `Building2Icon` → `entity.company` (65 uses / 17 files follow the
+Library instantly; sizing contract preserved — className wins over the size
+prop, exactly like CSS classes used to override svg width/height attributes).
+
+**Rule of application:** uniform meaning only. Multi-meaning icons
+(`UsersIcon` = employees/customers/attendees, `PackageIcon` =
+product/stock/shipment) must NOT be component-bound — those need per-site
+splits into distinct keys in later waves.
+
+`entity.*` meanings are editable from Specs & Attributes (they list in the
+"Record fields & sections" block).

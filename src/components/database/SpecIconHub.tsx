@@ -93,7 +93,7 @@ export default function SpecIconHub() {
       if (dot < 1) continue;
       const domain = full.slice(0, dot);
       const key = full.slice(dot + 1);
-      if (domain === "field" || domain === "section") {
+      if (domain === "field" || domain === "section" || domain === "entity") {
         if (!fields.has(full)) fields.set(full, { key, label: humanize(key), domain });
       } else if (domain === "app") {
         apps.push({ key, label: humanize(key), domain });
