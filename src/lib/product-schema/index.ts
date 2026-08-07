@@ -15,6 +15,7 @@ import {
   FORM_FINISHING_SCHEMA,
   NEEDLE_DETECTOR_SCHEMA,
   GARMENT_REVERSING_SCHEMA,
+  IRONING_SYSTEMS_BINDINGS,
 } from "./schemas/finishing-batch-2026-08";
 import { registerSchema } from "./registry";
 
@@ -41,6 +42,10 @@ registerSchema(STEAM_GENERATOR_SCHEMA);
 registerSchema(FORM_FINISHING_SCHEMA);
 registerSchema(NEEDLE_DETECTOR_SCHEMA);
 registerSchema(GARMENT_REVERSING_SCHEMA);
+
+/* CL-0018 — ironing family re-bound under the new "ironing-systems"
+   category (tokens unchanged; see finishing-batch-2026-08.ts). */
+for (const binding of IRONING_SYSTEMS_BINDINGS) registerSchema(binding);
 
 export {
   registerSchema,

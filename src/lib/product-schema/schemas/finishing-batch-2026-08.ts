@@ -843,3 +843,20 @@ export const GARMENT_REVERSING_SCHEMA: ProductSchemaDefinition = {
   appliesTo: { description: "Vacuum turning machines inverting sewn pieces right-side-out — tops, trousers, pillowcases." },
   groups: REVERSING_GROUPS,
 };
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CL-0018 (2026-08-07) — the ironing family moved to the NEW live category
+   "ironing-systems". Tokens and existing schema ids are PERMANENT (saved
+   products keep resolving by id); each moving family simply re-binds under
+   the new category so the division|category|subcategory key keeps hitting —
+   the same dual-binding pattern XFFP already uses. XFSG (Steam Generators,
+   CL-0017) shares the steam-generator template.
+   ───────────────────────────────────────────────────────────────────────── */
+export const IRONING_SYSTEMS_BINDINGS: ProductSchemaDefinition[] = [
+  { ...IRONING_TABLE_SCHEMA, id: "ironing-table.ironing-systems.v1", categoryCode: "ironing-systems" },
+  { ...VACUUM_IRONING_TABLE_SCHEMA, id: "vacuum-ironing-table.ironing-systems.v1", categoryCode: "ironing-systems" },
+  { ...TROUSER_PRESSING_SCHEMA, id: "trouser-pressing.ironing-systems.v1", categoryCode: "ironing-systems" },
+  { ...STEAM_GENERATOR_SCHEMA, id: "steam-generator.ironing-systems.v1", categoryCode: "ironing-systems" },
+  { ...STEAM_GENERATOR_SCHEMA, id: "steam-generator.xfsg.v1", categoryCode: "ironing-systems", subcategoryCode: "XFSG", name: "Steam Generator (Electric)" },
+  { ...FORM_FINISHING_SCHEMA, id: "form-finishing.ironing-systems.v1", categoryCode: "ironing-systems" },
+];

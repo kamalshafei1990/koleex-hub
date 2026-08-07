@@ -23,6 +23,7 @@ const CATEGORY_CN: Record<string, string> = {
   "Embroidery Equipment": "刺绣设备",
   "Printing & Heat Press Equipment": "印花与热压设备",
   "Finishing Equipment": "整理设备",
+  "Ironing Systems": "熨烫系统",
   "Packing & Inspection": "包装与检验",
   "Domestic Sewing Machines": "家用缝纫机",
   "Spare Parts & Accessories": "零配件与附件",

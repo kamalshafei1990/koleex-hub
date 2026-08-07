@@ -77,7 +77,8 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Roll Storage/Racking | XPRSR | Proposed | system_type, capacity | auto_retrieval | warehouse | from Handling split |
 | Cradle/Feeding System | XPRCF | Proposed | feed_type, motorized | turntable | feed to spreader | from Handling split |
 
-## E. Finishing Equipment — Parent Category: **XF · Finishing**
+## E. Finishing Equipment & Ironing Systems — Token family: **XF**
+> **CL-0018:** XFSI/XFSB/XFSG/XFIT/XFVT/XFFF/XFCP/XFTT → live category **Ironing Systems**; XFTS/XFFP/XFGR/XFWM stay in Finishing. Tokens unchanged (grandfathered).
 | Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
 |---|---|---|---|---|---|---|
 | Steam Iron | XFSI | **Confirmed** | steam_source, soleplate | — | all | live |
@@ -163,7 +164,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 ---
 
 ## 1. Confirmed Product Types (38)
-XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFSG, XFIT, XFCP, XFFP, XFFF, XFTS, XFTT, XFGR (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC, XPCH (packing).
+XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFTS, XFFP, XFGR, XFWM (finishing) · XFSI, XFSB, XFSG, XFIT, XFVT, XFCP, XFFF, XFTT (ironing systems) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC, XPCH (packing).
 
 ## 2. Proposed Product Types (50)
 XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP, **XFSS** · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV, **XPCI** · **XMKP, XMKD, XMKS** (CAD & Marker) · **XWIC, XWIR, XWIB, XWIA** (Workshop Infra) · **XMDS, XMDD, XMDC, XMDH, XMDN** (Motors & Drives).

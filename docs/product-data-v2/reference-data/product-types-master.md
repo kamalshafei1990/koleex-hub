@@ -77,7 +77,8 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XPRCF| Fabric Cradle/Feeding System | feed_type, max_roll_weight, motorized | feed_type, motorized | motorized_letoff, turntable, splice_table |
 | ✅ XPRP | Fabric Pre-shrinking / Sponging Machine | fabric_suitability, max_width, heating_method | heating_method, cooling_method, max_working_speed | steam_generator, edge_alignment, cooling_zone |
 
-## E. Finishing Equipment  (Category XF)
+## E. Finishing Equipment & Ironing Systems  (Token family XF)
+> **CL-0018 (2026-08-07):** the ironing family (XFSI, XFSB, XFSG, XFIT, XFVT, XFFF, XFCP, XFTT) now lives under the LIVE category **Ironing Systems** (`ironing-systems`); XFTS, XFFP, XFGR, XFWM stay under **Finishing Equipment**. XF tokens are PERMANENT and grandfathered across both shelves — the category is a shelf, the token is the identity. New ironing subcategories continue the XF family.
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |
 |---|---|---|---|---|
 | ✅ XFSI | Steam Iron | steam_source, soleplate, weight | steam_source, soleplate | — |
