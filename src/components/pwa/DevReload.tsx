@@ -13,7 +13,15 @@ export default function DevReload() {
     if (!["localhost", "127.0.0.1"].includes(window.location.hostname)) return;
     let current: string | null = null;
     let alive = true;
+    let lastTick = 0;
     const tick = async () => {
+      /* Throttle: wake signals include pointermove, which fires
+         continuously — without this floor the poller was hitting the
+         API a dozen+ times per screen visit and polluting every
+         network measurement taken on localhost. */
+      const now = Date.now();
+      if (now - lastTick < 3000) return;
+      lastTick = now;
       try {
         const r = await fetch("/api/dev/build-stamp", { cache: "no-store" });
         const { id } = (await r.json()) as { id?: string };
@@ -28,11 +36,11 @@ export default function DevReload() {
       }
     };
     tick();
-    const iv = setInterval(tick, 3000);
+    const iv = setInterval(tick, 3100);
     /* The embedded preview pane FREEZES timers while backgrounded and
        does not resume them — so also tick on every wake signal, making
        the reload land the instant the owner looks back at the tab. */
-    const wake = () => tick();
+    const wake = () => void tick();
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("focus", wake);
     window.addEventListener("pageshow", wake);
