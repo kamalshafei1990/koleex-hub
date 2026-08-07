@@ -585,7 +585,14 @@ export async function POST(req: Request) {
                   controller.enqueue(send({ type: "delta", text: ch.text }));
                 } else if (ch.type === "done") {
                   fastReply = ch.text ?? accumulated;
-                  fastProvider = ch.provider ?? "deepseek:stream";
+                  /* Lane-truthful label. deepseekChatStream reports the
+                     bare model id ("deepseek:deepseek-chat") — identical
+                     to orchestrate()'s label, which made ai_messages
+                     .provider useless for telling "tool loop ran" from
+                     "tool-less fast lane answered" (it cost a full
+                     mis-diagnosis on 2026-08-08). fast-<lane> keeps the
+                     distinction queryable. */
+                  fastProvider = `deepseek:fast-${fastLane}`;
                 } else if (ch.type === "error") {
                   /* Drop what we have and fall through to orchestrate.
                      Can't "un-emit" the deltas the client already got —
@@ -594,7 +601,7 @@ export async function POST(req: Request) {
                      token failure mode. */
                   if (gotFirst) {
                     fastReply = accumulated || null;
-                    fastProvider = "deepseek:stream";
+                    fastProvider = `deepseek:fast-${fastLane}`;
                   }
                   break;
                 }

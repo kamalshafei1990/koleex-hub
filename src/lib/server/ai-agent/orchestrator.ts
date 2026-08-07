@@ -478,7 +478,7 @@ function isWorkDataQuery(msg: string): boolean {
 
   /* A work-module noun … */
   const workNoun =
-    /\b(task|tasks|to-?do|to-?dos|todo|todos|assignment|assignments|project|projects|schedule|shift|shifts|calendar|meeting|meetings|deadline|deadlines|reminder|reminders|planning|agenda)\b/;
+    /\b(task|tasks|to-?do|to-?dos|todo|todos|assignment|assignments|project|projects|schedule|shift|shifts|calendar|meeting|meetings|event|events|appointment|appointments|deadline|deadlines|reminder|reminders|planning|agenda)\b/;
   /* … combined with personal / temporal / status framing. */
   const framing =
     /\b(my|our|mine|assigned\s+to\s+me|assigned|today|tonight|tomorrow|this\s+(week|month)|next\s+(week|month)|due|overdue|upcoming|pending|open|do\s+i|does\s+i|i\s+have|have\s+any|remind\s+me)\b/;
@@ -490,8 +490,20 @@ function isWorkDataQuery(msg: string): boolean {
   if (/\bremind\s+me\s+to\b/.test(s)) return true;
   if (/\b(add|create)\s+(a\s+)?(task|to-?do|reminder|shift|event)\b/.test(s)) return true;
 
+  /* WRITE intents: a work-action verb + a work noun is work data even
+     WITHOUT personal/temporal framing — "set a meeting", "book a meeting
+     with the supplier", "cancel the meeting", "mark the task done". The
+     owner's live failure ("set a meeting for me in calendar" → "I can't
+     access your calendar") slipped this gate: "for me" isn't in the
+     framing list and the add|create rule above only knows task-ish nouns.
+     A false positive costs one tool-loop turn; a false negative is a
+     refusal or a hallucinated write. */
+  const writeVerb =
+    /\b(set(\s+up)?|schedule|book|arrange|plan|make|create|add|cancel|delete|remove|move|reschedule|postpone|push\s+back|complete|finish|mark|close|reopen|assign|reassign|transfer|update|change|rename|edit)\b/;
+  if (writeVerb.test(s) && workNoun.test(s)) return true;
+
   /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي. */
-  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|تذكير|ذكرني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
+  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|ذكرني|فكرني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
 
   /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排. */
   if (/任务|日程|日历|会议|提醒|待办|项目|安排/.test(msg)) return true;
@@ -1383,13 +1395,14 @@ Tool routing:
   · "my projects" / "what projects am I on" → listMyProjects; "my project tasks" / "assigned to me on projects" → listProjectTasks.
   · "my schedule" / "my shifts" / "what am I planned for" / "open shifts" → listMyPlanning.
   · "my calendar" / "meetings this week" / "am I free" → listMyCalendar.
-  · Creating: "add a task / remind me to…" → createTodo; "add a task to project X" → createProjectTask (resolve the project via listMyProjects first); "add … to my calendar / schedule a meeting" → createCalendarEvent; "block time / add a shift" → createPlanningItem.
+  · Creating: "add a task / remind me to…" → createTodo; "add a task to project X" → createProjectTask (resolve the project via listMyProjects first); "add … to my calendar / schedule a meeting / set (up) a meeting / book a meeting / اعمل ميتنج / 安排会议" → createCalendarEvent; "block time / add a shift" → createPlanningItem.
   · Assigning to a colleague: "assign X to <name> / give <name> a task / كلّف فلان بـ…" → findTeamMember(<name>) FIRST, then createTodo with assign_to_account_ids. If findTeamMember returns MORE THAN ONE person, list them (name + department) and ask which one — NEVER pick for the user. The preview must name the assignee(s); they get notified only after the user confirms.
   · Reassigning an EXISTING task: "move / transfer task X to <name>", "add <name> to task X", "take <name> off task X" → reassignTodo (task id via listMyTodos, people via findTeamMember, same multiple-match rule). Use add_account_ids / remove_account_ids for add/take-off, replace_with_account_ids for a full handover. The preview shows current → new assignees.
   · Completing: "I finished X / mark X done / تم / خلصت X" → completeTodo; "reopen X / it's not done" → completeTodo with done:false. Resolve the task id via listMyTodos in the SAME turn (match the title; if several tasks match, ask which one before previewing).
   · Editing: "rename / change priority / postpone / move the due date of task X" → updateTodo (id via listMyTodos; owner-only). "move / reschedule / rename my meeting" → updateCalendarEvent (id via listMyCalendar).
   · Deleting: "delete / remove task X" → deleteTodo; "cancel / delete my meeting" → deleteCalendarEvent. Deletion is permanent — relay the tool's warning as-is.
 - CRITICAL — you CAN read the user's own tasks, projects, schedule and calendar directly via the tools above. When the user asks anything like "what tasks do I have", "what tasks do I have today", "what's due", "what's on my plate", "my to-dos", "what's on my calendar / schedule", "what am I working on", "أعمالي / مهامي النهاردة", "我今天有什么任务" — you MUST call the matching tool (listMyTodos / listMyProjects / listProjectTasks / listMyPlanning / listMyCalendar) and answer from its result. NEVER reply with "check Koleex Hub", "please log in", "you can see your tasks in the app", or any variation that tells the user to look it up themselves — that is a wrong answer; the user is already logged in and you have live access. If a tool returns zero rows, say they have nothing matching — do not deflect.
+- CRITICAL — the same applies to WRITING: you CAN create, complete, update, reassign and delete the user's own tasks and calendar events via the write tools above. When the user tells you to do one of those ("set a meeting", "add a task", "mark it done", "delete that event", "اعمل ميتنج", "ضيف مهمة", "安排会议") NEVER say "I can't access your calendar/tasks", "that's outside what I can do here", or tell them to open the app and do it themselves — that is a wrong answer; the write tools are right there. If required details are missing (title, date/time, which task), reply affirmatively and ASK for exactly what's missing — e.g. "Sure — what's the meeting about, and when should it start and end?" — then run the WRITE-WITH-CONFIRM flow once you have them. Refusing is only correct when a TOOL returned a denial (permissionStatus denied) — then relay that it needs permission, nothing else.
 - CRITICAL — you CAN look things up on the public internet with search_web. For anything that depends on the world TODAY (weather, news, exchange rates, shipping conditions, public specs, "latest"/"current" anything) you MUST call search_web and answer from the results. NEVER say "I don't have live access", "I can't browse the internet", "check a weather app", or any variation — that is a wrong answer, the tool is right there. If search_web itself reports it is unavailable or returns nothing, THEN say plainly you couldn't check right now; never fall back to answering from memory as though it were current. Cite the source URL for figures, and say how fresh they are when a date is given. NEVER put Koleex data (customer names, prices, quotations, employees, internal codes) into a search query, and NEVER use web results to suggest another manufacturer's machines — Koleex only ever recommends Koleex.
 - WRITE-WITH-CONFIRM (mandatory for EVERY write tool — createTodo / createProjectTask / createCalendarEvent / createPlanningItem / completeTodo / updateTodo / reassignTodo / deleteTodo / updateCalendarEvent / deleteCalendarEvent):
   · You MUST actually CALL the tool. NEVER hand-write a preview table, and NEVER say something was "created"/"added"/"scheduled"/"updated"/"deleted"/"done" unless the write tool CALL returned a successful result (ok) in THIS turn. Describing the action in text without calling the tool is a failure — nothing gets saved.
@@ -1401,6 +1414,7 @@ Tool routing:
 Ask-first rules (critical — never call a tool with empty or missing required arguments):
 - If the user says "search customer" / "find customer" / "look up a customer" WITHOUT naming one, do NOT call a tool. Ask: "Which customer should I look up? You can send a name or customer code."
 - If the user says "I want a quotation" / "create a quotation" WITHOUT giving the customer and at least one product with quantity, do NOT call any tool. Ask for whatever is missing.
+- If the user says "set a meeting" / "add a task" / "schedule something" WITHOUT the required details (title, date/time), do NOT call the create tool yet — and do NOT say you can't do it. Confirm you'll do it and ask for the missing details, then start the WRITE-WITH-CONFIRM flow.
 - If a tool returns a message starting with "I need" or "Which …", DO NOT echo it verbatim. Rephrase it into a natural question addressed to the user.
 - Never invent a customer, product code, id, or quantity to satisfy a required field.
 
