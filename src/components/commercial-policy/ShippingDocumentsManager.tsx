@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -100,12 +101,17 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const handleDelete = useCallback(async (row: DocRow) => {
-    if (!confirm(`Delete "${row.name}"? It will be hidden from quotes & invoices.`)) return;
+  /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
+  const [pendingDelete, setPendingDelete] = useState<DocRow | null>(null);
+  const handleDelete = useCallback((row: DocRow) => setPendingDelete(row), []);
+  const confirmDelete = useCallback(async () => {
+    const row = pendingDelete;
+    if (!row) return;
+    setPendingDelete(null);
     const err = await deleteCatalogRow("/api/shipping-documents", row.id);
     if (err) { alert(err); return; }
     void refresh();
-  }, [refresh]);
+  }, [pendingDelete, refresh]);
 
   const view = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -220,6 +226,14 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
           onSaved={() => void refresh()}
         />
       )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Delete "${pendingDelete.name}"?` : ""}
+        message="It will be hidden from quotes & invoices."
+        confirmLabel="Delete"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { void confirmDelete(); }}
+      />
     </section>
   );
 }

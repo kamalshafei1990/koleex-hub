@@ -1,5 +1,7 @@
 "use client";
 
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
+
 /* ---------------------------------------------------------------------------
    IncotermsManager — admin UI for the Incoterms 2020 master list.
 
@@ -114,12 +116,17 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const handleDelete = useCallback(async (row: IncotermRow) => {
-    if (!confirm(`Delete "${row.code} — ${row.name}"? It will be hidden from quotes.`)) return;
+  /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
+  const [pendingDelete, setPendingDelete] = useState<IncotermRow | null>(null);
+  const handleDelete = useCallback((row: IncotermRow) => setPendingDelete(row), []);
+  const confirmDelete = useCallback(async () => {
+    const row = pendingDelete;
+    if (!row) return;
+    setPendingDelete(null);
     const err = await deleteCatalogRow("/api/incoterms", row.id);
     if (err) { alert(err); return; }
     void refresh();
-  }, [refresh]);
+  }, [pendingDelete, refresh]);
 
   const view = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -234,6 +241,14 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
           onSaved={() => void refresh()}
         />
       )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Delete "${pendingDelete.code} — ${pendingDelete.name}"?` : ""}
+        message="It will be hidden from quotes."
+        confirmLabel="Delete"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { void confirmDelete(); }}
+      />
     </section>
   );
 }

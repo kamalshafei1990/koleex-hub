@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
@@ -140,12 +141,17 @@ export default function PaymentTermsManager({
     void refresh();
   }, [refresh]);
 
-  const handleDelete = useCallback(async (term: PaymentTermRow) => {
-    if (!confirm(`Delete "${term.label}"? It will be hidden from quotes, invoices & contracts.`)) return;
-    const err = await deleteCatalogRow("/api/payment-terms", term.id);
+  /* Native confirm() → the elected KDS ConfirmDialog (CF-1). */
+  const [pendingDelete, setPendingDelete] = useState<PaymentTermRow | null>(null);
+  const handleDelete = useCallback((term: PaymentTermRow) => setPendingDelete(term), []);
+  const confirmDelete = useCallback(async () => {
+    const row = pendingDelete;
+    if (!row) return;
+    setPendingDelete(null);
+    const err = await deleteCatalogRow("/api/payment-terms", row.id);
     if (err) { alert(err); return; }
     void refresh();
-  }, [refresh]);
+  }, [pendingDelete, refresh]);
 
   const RISK_OPTS = [
     { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" },
@@ -344,6 +350,14 @@ export default function PaymentTermsManager({
           onSaved={() => void refresh()}
         />
       )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Delete "${pendingDelete.label}"?` : ""}
+        message="It will be hidden from quotes, invoices & contracts."
+        confirmLabel="Delete"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { void confirmDelete(); }}
+      />
     </section>
   );
 }
