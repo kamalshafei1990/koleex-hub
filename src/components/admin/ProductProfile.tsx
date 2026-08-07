@@ -215,7 +215,7 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   if (empty) return <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>;
   if (typeof v === "boolean") {
     return (
-      <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${v ? "text-emerald-400" : "text-[var(--text-dim)]"}`}>
+      <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${v ? "text-emerald-400" : "text-[var(--text-dim)]"}`}>
         <span className={`h-1.5 w-1.5 rounded-full ${v ? "bg-emerald-500" : "bg-[var(--border-subtle)]"}`} />
         {v ? "Yes" : "No"}
       </span>
@@ -225,7 +225,7 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
     return (
       <span className="flex flex-wrap gap-1">
         {v.map((x, i) => (
-          <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[11px] text-[var(--text-subtle)]">
+          <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-primary)]">
             {String(x)}
           </span>
         ))}
@@ -235,7 +235,7 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   if (typeof v === "object") {
     return <span className="text-[11px] font-mono text-[var(--text-subtle)] break-all">{JSON.stringify(v)}</span>;
   }
-  return <span className={`text-[13px] text-[var(--text-primary)] ${mono ? "font-mono text-[12px]" : ""} break-words`}>{String(v)}</span>;
+  return <span className={`text-[13.5px] font-semibold text-[var(--text-primary)] ${mono ? "font-mono text-[12.5px] font-medium" : ""} break-words`}>{String(v)}</span>;
 }
 
 /* The editor's Section card, field-for-field: icon in a rounded square,
@@ -247,7 +247,7 @@ function Group({
   return (
     <section className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <div className="w-full flex items-center gap-3 px-6 py-4">
-        <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] shrink-0">
           {icon}
         </div>
         <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left truncate">{title}</h2>
@@ -263,7 +263,7 @@ function Group({
           <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
-      {open && <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>}
+      {open && <div className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">{children}</div>}
     </section>
   );
 }
@@ -329,14 +329,14 @@ function Row({ label, value, help, mono, badge }: {
 }) {
   return (
     <div className="py-3 first:pt-0 last:pb-0">
-      <div className="flex items-start justify-between gap-3 mb-1.5">
-        <span className="text-[12.5px] font-medium text-[var(--text-primary)]">{label}</span>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{label}</span>
         {badge && (
           <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">{badge}</span>
         )}
       </div>
       <div className="mb-1"><Val v={value} mono={mono} /></div>
-      {help && <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">{help}</p>}
+      {help && <p className="text-[10.5px] text-[var(--text-ghost)]/80 leading-relaxed">{help}</p>}
     </div>
   );
 }
@@ -809,7 +809,7 @@ export default function ProductProfile() {
                   {fields.map((f) => (
                     <div key={f.key} className="py-3 first:pt-0 last:pb-0">
                       <div className="flex items-start justify-between gap-3 mb-1.5">
-                        <span className="text-[12.5px] font-medium text-[var(--text-primary)]">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">
                           {f.label || f.key}
                           {f.required && <span className="text-rose-400 ms-1">*</span>}
                         </span>
