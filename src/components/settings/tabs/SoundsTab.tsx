@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import {
   LIBRARY_LABELS,
   SOUND_ACTIVITIES,
@@ -198,6 +199,7 @@ export default function SoundsTab() {
           return (
             <NavRow
               key={act}
+              icon={<BoundIcon semanticKey={`activity.${act}`} className="h-3.5 w-3.5" fallback={null} />}
               label={t(ACTIVITY_KEYS[act])}
               value={toneLabel(override, t)}
               onClick={() => setPicker({ kind: "activity", activity: act })}
@@ -220,11 +222,13 @@ function NavRow({
   value,
   onClick,
   last,
+  icon,
 }: {
   label: string;
   value: string;
   onClick: () => void;
   last?: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
@@ -236,7 +240,12 @@ function NavRow({
         last ? "" : "border-b border-[var(--border-faint)]"
       }`}
     >
-      <span className="min-w-0 truncate text-[13px] font-medium text-[var(--text-primary)]">
+      <span className="min-w-0 flex items-center gap-2.5 truncate text-[13px] font-medium text-[var(--text-primary)]">
+        {icon && (
+          <span className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+            {icon}
+          </span>
+        )}
         {label}
       </span>
       <span className="flex shrink-0 items-center gap-1.5">

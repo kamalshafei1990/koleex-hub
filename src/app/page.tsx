@@ -28,6 +28,7 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
+import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
 import { markHomeInteractive } from "@/lib/perf/client";
@@ -287,7 +288,7 @@ const AppCard = memo(function AppCard({
               }>;
               return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
             }
-            return <Icon size={34} />;
+            return <BoundIcon semanticKey={`app.${app.id}`} className="h-[34px] w-[34px]" fallback={<Icon size={34} />} />;
           })()}
         </span>
       </span>
@@ -345,7 +346,7 @@ const CompactCard = memo(function CompactCard({
           ? dk ? "text-white opacity-100" : "text-black opacity-100"
           : dk ? "text-white opacity-25" : "text-black opacity-25"
       }`}>
-        <Icon size={17} />
+        <BoundIcon semanticKey={`app.${app.id}`} className="h-[17px] w-[17px]" fallback={<Icon size={17} />} />
       </span>
       <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
         app.active

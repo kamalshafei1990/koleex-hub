@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import { usePathname } from "next/navigation";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
@@ -111,7 +112,7 @@ function AppLink({
           className={`pointer-events-none absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`}
         />
       )}
-      <Icon size={compact ? 13 : 15} className="shrink-0" />
+      <BoundIcon semanticKey={`app.${app.id}`} className={compact ? "h-[13px] w-[13px]" : "h-[15px] w-[15px]"} fallback={<Icon size={compact ? 13 : 15} className="shrink-0" />} />
       <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
         {label}
       </span>

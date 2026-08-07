@@ -25,7 +25,6 @@ import UsageGovernance from "@/components/database/UsageGovernance";
 import AssetQuality from "@/components/database/AssetQuality";
 import AssetDna from "@/components/database/AssetDna";
 import AssetReview from "@/components/database/AssetReview";
-import AssetRegistry from "@/components/database/AssetRegistry";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -199,7 +198,11 @@ function AiField({ label, value, placeholder, onChange }: { label: string; value
   );
 }
 
-const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History", "Quality", "DNA", "Review", "Registry"] as const;
+/* "Registry" tab removed (owner cleanup 2026-08-07): it managed links to the
+   old PARALLEL taxonomy tables (archived_visual_*) that never connected to
+   the real classification. The live control center is Database › Visual
+   Library › Classification (Semantic Icon Registry). */
+const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History", "Quality", "DNA", "Review"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function VisualAssetDetailDrawer({
@@ -286,7 +289,6 @@ export default function VisualAssetDetailDrawer({
           {tab === "Quality" && <AssetQuality asset={{ id: asset.id, title: asset.title, public_url: asset.public_url }} onOpenAsset={onOpenAsset} />}
           {tab === "DNA" && <AssetDna asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />}
           {tab === "Review" && <AssetReview asset={{ id: asset.id, title: asset.title, public_url: asset.public_url }} onOpenAsset={onOpenAsset} onChanged={onChanged} />}
-          {tab === "Registry" && <AssetRegistry asset={{ id: asset.id, title: asset.title }} onChanged={onChanged} />}
         </div>
 
         {/* Footer actions (always available) */}

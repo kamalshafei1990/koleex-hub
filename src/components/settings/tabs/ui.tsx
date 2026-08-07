@@ -70,12 +70,19 @@ export function Segmented<T extends string | number>({ value, onChange, options 
 /** iOS-style on/off switch row. ON = emerald green with a white knob — the
  *  ONE toggle design for the whole system (standing rule): green track when
  *  on, neutral track when off, white circle always. */
-export function SwitchRow({ label, hint, checked, onChange, last }: {
+export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
   label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean;
+  /** Optional leading glyph (Semantic Icon Registry). */
+  icon?: React.ReactNode;
 }) {
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
-      <div className="min-w-0">
+      {icon && (
+        <span className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+          {icon}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium text-[var(--text-primary)]">{label}</p>
         {hint && <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{hint}</p>}
       </div>

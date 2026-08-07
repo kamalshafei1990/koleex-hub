@@ -1,5 +1,10 @@
 "use client";
 
+/* Spec-field glyphs come from the Semantic Icon Registry (Database › Visual
+   Library › Specs & Attributes) — the SAME binding the product record shows,
+   so the editor and the record always agree. No binding → no glyph (the
+   editor stays clean rather than guessing). */
+
 /* ---------------------------------------------------------------------------
    SchemaSpecsSection — the schema-driven specs editor.
 
@@ -19,6 +24,7 @@ import { useTranslation } from "@/lib/i18n";
 import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "@/lib/product-schema/spec-i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { createPortal } from "react-dom";
+import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import type {
   ProductSchemaDefinition,
   SpecField,
@@ -619,6 +625,7 @@ function GroupCard({
             <div key={f.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <label className="text-[11px] font-semibold text-[var(--text-secondary)] inline-flex items-center gap-1.5">
+                  <SpecGlyph fieldKey={f.key} />
                   {ts(`f:${f.key}`, f.label)}
                   {f.required ? <span className="text-red-500">*</span> : null}
                 </label>
@@ -650,7 +657,29 @@ function GroupCard({
 
 /* ── main editor ───────────────────────────────────────────────── */
 
+let SPEC_BINDINGS: BindingsMap = {};
+
+function SpecGlyph({ fieldKey }: { fieldKey: string }) {
+  const url = SPEC_BINDINGS[`spec.${fieldKey}`];
+  if (!url) return null;
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-3.5 w-3.5 shrink-0 bg-current text-[var(--text-ghost)]"
+      style={{ maskImage: `url("${url}")`, maskRepeat: "no-repeat", maskPosition: "center", maskSize: "contain", WebkitMaskImage: `url("${url}")`, WebkitMaskRepeat: "no-repeat", WebkitMaskPosition: "center", WebkitMaskSize: "contain" }}
+    />
+  );
+}
+
 export default function SchemaSpecsSection({ schema, values, onChange, hideHeader }: Props) {
+  /* Registry glyphs beside field labels (record parity). */
+  const [, forceBindings] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetchIconBindings().then((m) => { if (alive) { SPEC_BINDINGS = m; forceBindings((x) => x + 1); } }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const { t: tui2 } = useTranslation(PRODUCTS_UI_I18N);
   const { t: tName } = useTranslation(SPEC_NAME_I18N);
   /* source field key → the computed fields that derive from it. Lets a single

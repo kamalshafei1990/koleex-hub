@@ -16,11 +16,12 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchDivisions, fetchCategories, fetchSubcategories } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
+import { MACHINE_KINDS } from "@/lib/machine-kinds";
 import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import IconBindingPicker from "./IconBindingPicker";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 
-interface Node { slug: string; name: string; level: "division" | "category" | "subcategory"; parent?: string }
+interface Node { slug: string; name: string; level: "division" | "category" | "subcategory" | "kind"; parent?: string }
 
 function Glyph({ url, className = "h-4 w-4" }: { url: string; className?: string }) {
   return (
@@ -40,6 +41,7 @@ export default function ClassificationIconHub() {
   const [bindings, setBindings] = useState<BindingsMap>({});
   const [pickDivId, setPickDivId] = useState<string>("");
   const [pickCatId, setPickCatId] = useState<string>("");
+  const [pickSubSlug, setPickSubSlug] = useState<string>("");
   const [editing, setEditing] = useState<Node | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,6 +67,12 @@ export default function ClassificationIconHub() {
   const subs = useMemo(
     () => (pickCatId ? subcategories.filter((s) => s.category_id === pickCatId) : []),
     [subcategories, pickCatId],
+  );
+  /* 4th tier — machine kinds registered for the picked subcategory (strict
+     match only; the picker's "show all" fallback would mislead here). */
+  const kinds = useMemo(
+    () => (pickSubSlug ? MACHINE_KINDS.filter((k) => k.subcategory === pickSubSlug) : []),
+    [pickSubSlug],
   );
 
   const iconOf = (level: string, slug: string) => bindings[`classification.${level}.${slug}`];
@@ -101,12 +109,12 @@ export default function ClassificationIconHub() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
           <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{t("vh.divisions", "Divisions")} · {divisions.length}</h3>
           <div className="space-y-0.5">
             {divisions.map((d) => (
-              <div key={d.id} className={pickDivId === d.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => { setPickDivId(d.id); setPickCatId(""); }}>
+              <div key={d.id} className={pickDivId === d.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => { setPickDivId(d.id); setPickCatId(""); setPickSubSlug(""); }}>
                 <NodeRow node={{ slug: d.slug, name: d.name, level: "division" }} />
               </div>
             ))}
@@ -119,7 +127,7 @@ export default function ClassificationIconHub() {
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
             {cats.map((c) => (
-              <div key={c.id} className={pickCatId === c.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => setPickCatId(c.id)}>
+              <div key={c.id} className={pickCatId === c.id ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => { setPickCatId(c.id); setPickSubSlug(""); }}>
                 <NodeRow node={{ slug: c.slug, name: c.name, level: "category" }} />
               </div>
             ))}
@@ -132,8 +140,24 @@ export default function ClassificationIconHub() {
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
             {subs.map((sc) => (
-              <NodeRow key={sc.id} node={{ slug: sc.slug, name: sc.name, level: "subcategory" }} />
+              <div key={sc.id} className={pickSubSlug === sc.slug ? "rounded-xl ring-1 ring-[var(--border-focus)]" : ""} onClickCapture={() => setPickSubSlug(sc.slug)}>
+                <NodeRow node={{ slug: sc.slug, name: sc.name, level: "subcategory" }} />
+              </div>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+          <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">
+            {t("vh.kinds", "Machine kinds")} · {kinds.length}{pickSubSlug ? "" : ` (${t("vh.pickSubcategory", "pick a subcategory")})`}
+          </h3>
+          <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
+            {kinds.map((k) => (
+              <NodeRow key={k.slug} node={{ slug: k.slug, name: k.name, level: "kind" }} />
+            ))}
+            {pickSubSlug && kinds.length === 0 && (
+              <p className="px-3 py-4 text-[11px] text-[var(--text-ghost)]">{t("vh.noKinds", "This subcategory has no machine kinds registered.")}</p>
+            )}
           </div>
         </section>
       </div>

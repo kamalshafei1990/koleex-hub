@@ -6,6 +6,7 @@
    dedicated /settings/notifications page. */
 
 import { useEffect, useRef, useState } from "react";
+import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
@@ -263,6 +264,7 @@ export default function NotificationsTab({ account, onChanged }: {
         {ACTIVITIES.map((a, i) => (
           <SwitchRow
             key={a.key}
+            icon={<BoundIcon semanticKey={`activity.${a.key}`} className="h-4 w-4" fallback={null} />}
             label={t(a.tKey)}
             hint={t(`${a.tKey}.hint`)}
             checked={n[a.key] ?? true}
