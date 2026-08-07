@@ -39,7 +39,6 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
-import { useSetAppHeader, type AppHeaderContent } from "@/components/layout/AppHeaderSlot";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import BellOffIcon from "@/components/icons/ui/BellOffIcon";
@@ -2018,95 +2017,6 @@ export default function DiscussApp() {
     );
   }, [selectedChannelId, accountId, channels, showToast, t]);
 
-  /* ── Unified header (approved Step 1) ─────────────────────────────────
-     The conversation header renders INSIDE MainHeader through the
-     AppHeaderSlot. Same avatar, same title/subtitle, same translate /
-     mute / details controls — relocated, not recreated. Cleared when no
-     conversation is selected (and on unmount by the hook). */
-  const appHeaderContent = useMemo<AppHeaderContent | null>(() => {
-    if (!selectedChannel) return null;
-    return {
-      onBack: () => setMobileView("list"),
-      avatar:
-        selectedChannel.kind === "direct" ? (
-          <Avatar
-            name={displayNameFor(selectedChannel)}
-            url={selectedChannel.other?.avatar_url}
-            size={30}
-          />
-        ) : (
-          <span className="h-[30px] w-[30px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-            {selectedChannel.kind === "channel" ? (
-              <HashtagIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-            ) : (
-              <UsersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-            )}
-          </span>
-        ),
-      title: (
-        <>
-          {displayNameFor(selectedChannel)}
-          {altNameFor(selectedChannel) && (
-            <span lang="zh" className="ms-1.5 text-[12px] font-normal text-[var(--text-dim)]">
-              {altNameFor(selectedChannel)}
-            </span>
-          )}
-        </>
-      ),
-      subtitle:
-        selectedChannel.kind === "direct"
-          ? selectedChannel.other?.username
-            ? `@${selectedChannel.other.username}`
-            : ""
-          : selectedChannel.description ||
-            t("header.memberCount").replace("{count}", String(members.length)),
-      actions: (
-        <>
-          <TranslateControl
-            prefs={translatePrefs}
-            open={translateMenuOpen}
-            onOpenChange={setTranslateMenuOpen}
-            onChange={updateTranslatePrefs}
-            t={t}
-          />
-          <button
-            type="button"
-            onClick={() => void handleToggleMute()}
-            className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
-              selectedChannel.muted
-                ? "text-red-300 hover:bg-red-500/10"
-                : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-            }`}
-            title={selectedChannel.muted ? t("header.unmute", "Unmute") : t("header.mute", "Mute")}
-          >
-            {selectedChannel.muted ? <BellOffIcon className="h-4 w-4" /> : <BellIcon className="h-4 w-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDetailsOpen((v) => !v);
-              setMobileView("details");
-            }}
-            className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-            title={t("header.details")}
-          >
-            <InfoIcon className="h-4 w-4" />
-          </button>
-        </>
-      ),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedChannel,
-    members.length,
-    translatePrefs,
-    translateMenuOpen,
-    updateTranslatePrefs,
-    handleToggleMute,
-    t,
-  ]);
-  useSetAppHeader(appHeaderContent);
-
   const handleSetNotificationPref = useCallback(
     async (pref: DiscussNotificationPref) => {
       if (!selectedChannelId || !accountId) return;
@@ -2632,9 +2542,94 @@ export default function DiscussApp() {
             </div>
           ) : (
             <>
-              {/* Thread header now lives in the global MainHeader via
-                  AppHeaderSlot — one 56px band instead of two (approved
-                  Step 1 design). Registration is below, near the handlers. */}
+              {/* Thread header */}
+              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
+                {/* Mobile back to the conversation list. This is the ONLY place
+                    it now lives — the app bar that used to host it is gone. */}
+                <button
+                  type="button"
+                  onClick={() => setMobileView("list")}
+                  className="md:hidden -ms-2 h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  aria-label={t("mobile.list")}
+                >
+                  <ArrowLeftIcon className="h-5 w-5" />
+                </button>
+                {selectedChannel.kind === "direct" ? (
+                  <Avatar
+                    name={displayNameFor(selectedChannel)}
+                    url={selectedChannel.other?.avatar_url}
+                    size={34}
+                  />
+                ) : (
+                  <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                    {selectedChannel.kind === "channel" ? (
+                      <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                    ) : (
+                      <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
+                    {displayNameFor(selectedChannel)}
+                    {altNameFor(selectedChannel) && (
+                      <span lang="zh" className="ms-1.5 text-[12px] font-normal text-[var(--text-dim)]">
+                        {altNameFor(selectedChannel)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-[var(--text-dim)] truncate">
+                    {selectedChannel.kind === "direct"
+                      ? selectedChannel.other?.username
+                        ? `@${selectedChannel.other.username}`
+                        : ""
+                      : selectedChannel.description ||
+                        t("header.memberCount").replace(
+                          "{count}",
+                          String(members.length),
+                        )}
+                  </div>
+                </div>
+                <TranslateControl
+                  prefs={translatePrefs}
+                  open={translateMenuOpen}
+                  onOpenChange={setTranslateMenuOpen}
+                  onChange={updateTranslatePrefs}
+                  t={t}
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleToggleMute()}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
+                    selectedChannel.muted
+                      ? "text-red-300 hover:bg-red-500/10"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                  }`}
+                  title={
+                    selectedChannel.muted
+                      ? t("header.unmute", "Unmute")
+                      : t("header.mute", "Mute")
+                  }
+                >
+                  {selectedChannel.muted ? (
+                    <BellOffIcon className="h-4 w-4" />
+                  ) : (
+                    <BellIcon className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailsOpen((v) => !v);
+                    setMobileView("details");
+                  }}
+                  className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  title={t("header.details")}
+                >
+                  <InfoIcon className="h-4 w-4" />
+                </button>
+              </div>
+
               {/* Message list */}
               <div
                 ref={threadScrollRef}
