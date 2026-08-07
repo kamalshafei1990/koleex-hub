@@ -14,6 +14,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -294,10 +295,7 @@ export default function InboxPage() {
   const [deepLinkConsumed, setDeepLinkConsumed] = useState(false);
   /* Small inline toast for membership approve/reject so we don't have
      to wire up a global notification system. */
-  const [toast, setToast] = useState<{
-    kind: "success" | "error";
-    text: string;
-  } | null>(null);
+  const { showToast: kdsShowToast, toastElement } = useToast();
 
   const loadMessages = useCallback(async () => {
     if (!accountId) {
@@ -919,30 +917,14 @@ export default function InboxPage() {
       </div>
 
       {/* Inline toast for approve / reject / reply success & errors */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 ${
-            toast.kind === "success"
-              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-200"
-              : "bg-red-500/15 border-red-500/30 text-red-200"
-          }`}
-        >
-          {toast.kind === "success" ? (
-            <CheckCircleIcon className="h-3.5 w-3.5" />
-          ) : (
-            <ExclamationIcon className="h-3.5 w-3.5" />
-          )}
-          {toast.text}
-        </div>
-      )}
+      {toastElement}
     </div>
   );
 
   /* ── Action handlers (defined here so they can close over page state) ── */
 
   function showToast(kind: "success" | "error", text: string) {
-    setToast({ kind, text });
-    setTimeout(() => setToast(null), 3000);
+    kdsShowToast(text, kind);
   }
 
   function handleReply(msg: InboxMessageWithSender) {

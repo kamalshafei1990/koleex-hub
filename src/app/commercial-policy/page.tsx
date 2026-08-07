@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -59,7 +60,8 @@ function CommercialPolicyView() {
   const [snapshot, setSnapshot] = useState<CommercialPolicySnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const { showToast, toastElement } = useToast();
+  const setToast = (msg: string | null) => { if (msg) showToast(msg); };
   const { data: bootstrap } = useMeBootstrap();
   const isSuperAdmin = bootstrap?.auth?.is_super_admin ?? false;
 
@@ -84,11 +86,6 @@ function CommercialPolicyView() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const patchSection = useCallback(
     <K extends keyof CommercialPolicySnapshot>(key: K, payload: CommercialPolicySnapshot[K]) => {
@@ -136,12 +133,7 @@ function CommercialPolicyView() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed bottom-5 end-5 z-40 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.12] backdrop-blur px-4 py-3 text-[12px] font-medium text-emerald-300 flex items-center gap-2 shadow-lg">
-          <CheckCircleIcon className="h-4 w-4" />
-          {toast}
-        </div>
-      )}
+      {toastElement}
     </div>
   );
 }

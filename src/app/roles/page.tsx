@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
+import { useToast } from "@/components/kds/useToast";
 import FormModal from "@/components/kds/FormModal";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -631,7 +632,8 @@ export default function RolesPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RoleRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [toast, setToast] = useState("");
+  const { showToast, toastElement } = useToast();
+  const setToast = (msg: string) => { if (msg) showToast(msg); };
 
   /* ── Load ── */
   const loadRoles = useCallback(async () => {
@@ -647,12 +649,6 @@ export default function RolesPage() {
   }, [loadRoles, boot, isSA]);
 
   /* ── Toast ── */
-  useEffect(() => {
-    if (!toast) return;
-    // Named `timer` to avoid shadowing the `t` translation helper.
-    const timer = setTimeout(() => setToast(""), 3000);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   /* ── Handlers ── */
   const handleRoleSaved = async () => {
@@ -891,11 +887,7 @@ export default function RolesPage() {
       </div>
 
       {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium shadow-lg flex items-center gap-2">
-          <CheckIcon size={14} /> {toast}
-        </div>
-      )}
+      {toastElement}
 
       {/* Modals */}
       <RoleModal open={showRoleModal} onClose={() => setShowRoleModal(false)} role={editRole} onSaved={handleRoleSaved} />

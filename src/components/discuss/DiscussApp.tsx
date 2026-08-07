@@ -38,6 +38,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
+import { useToast } from "@/components/kds/useToast";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -506,7 +507,7 @@ export default function DiscussApp() {
   );
   /** Transient toast at the bottom of the thread — used for "Link
    *  copied!", "Pinned", etc. Auto-clears after 2 seconds. */
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { showToast: kdsShowToast, toastElement } = useToast();
   /** Voice recorder panel toggle. Shown inline inside the composer
    *  when the user clicks the mic button. */
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -1457,9 +1458,8 @@ export default function DiscussApp() {
      ═══════════════════════════════════════════════════════════════════════ */
 
   const showToast = useCallback((text: string) => {
-    setToastMessage(text);
-    window.setTimeout(() => setToastMessage(null), 2000);
-  }, []);
+    kdsShowToast(text, "success", 2000);
+  }, [kdsShowToast]);
 
   const handleSelectChannel = useCallback((channelId: string) => {
     /* Switching conversations tears down every pending bubble in the old one,
@@ -2820,11 +2820,7 @@ export default function DiscussApp() {
       )}
 
       {/* Toast (Phase B-C) */}
-      {toastMessage && (
-        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium shadow-lg">
-          {toastMessage}
-        </div>
-      )}
+      {toastElement}
 
       {/* ═══ Conversation context menu (WeChat-style right-click / long-press) ═══ */}
       {convMenu &&
