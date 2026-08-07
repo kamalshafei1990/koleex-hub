@@ -146,6 +146,14 @@ export const settingsT: Translations = {
   "sounds.footer":        { en: "Koleex tones are real recordings, loudness-matched so none is louder than another; only the tone you pick is downloaded. Basic tones are generated on this device and always work offline. Sound settings are per-device, like a phone's ringtone.", zh: "Koleex 铃声为真实录音，已统一响度，不会有铃声突然过响；只下载您选择的铃声。基本铃声在本设备生成，始终可离线使用。声音设置按设备保存，就像手机铃声一样。", ar: "نغمات Koleex تسجيلات حقيقية بمستوى صوت موحَّد؛ تُنزَّل فقط النغمة التي تختارها. النغمات الأساسية تُولَّد على جهازك وتعمل دائمًا دون اتصال. إعدادات الصوت خاصة بكل جهاز، مثل نغمة الهاتف." },
 
   /* ── Activities (shared: Sounds + Notification preferences) ── */
+  "act.calendar": { en: "Calendar & meetings", zh: "日历与会议", ar: "التقويم والاجتماعات" },
+  "act.projects": { en: "Projects & planning", zh: "项目与计划", ar: "المشاريع والتخطيط" },
+  "act.inventory": { en: "Inventory movements", zh: "库存变动", ar: "حركات المخزون" },
+  "act.finance": { en: "Finance activity", zh: "财务动态", ar: "النشاط المالي" },
+  "act.hr": { en: "HR & employees", zh: "人事与员工", ar: "الموارد البشرية والموظفون" },
+  "act.discuss": { en: "Discuss messages", zh: "Discuss 消息", ar: "رسائل Discuss" },
+  "act.security": { en: "Security alerts", zh: "安全警报", ar: "تنبيهات الأمان" },
+  "act.comments": { en: "Comments & notes", zh: "评论与备注", ar: "التعليقات والملاحظات" },
   "act.mentions":         { en: "Mentions and replies", zh: "提及与回复", ar: "الإشارات والردود" },
   "act.mentions.hint":    { en: "When someone @mentions or replies to you.", zh: "当有人 @提及或回复您时。", ar: "عندما يشير إليك أحد أو يرد عليك." },
   "act.approvals":        { en: "Approvals", zh: "审批", ar: "الموافقات" },

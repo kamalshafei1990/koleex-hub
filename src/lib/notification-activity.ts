@@ -17,7 +17,10 @@
 
 export const NOTIFICATION_ACTIVITIES = [
   "mentions", "approvals", "assignments", "tasks_due",
-  "quotation_activity", "low_stock", "qa_reports", "price_fx",
+  "calendar_events", "projects_planning",
+  "quotation_activity", "low_stock", "inventory_activity",
+  "finance_activity", "qa_reports", "price_fx",
+  "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
 ] as const;
 export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 
@@ -26,17 +29,38 @@ export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 export function classifyNotificationActivity(raw: unknown): NotificationActivity | null {
   const type = typeof raw === "string" ? raw : "";
   if (!type) return null;
+  /* Order matters: specific families before generic word matches. */
   if (type.includes("mention")) return "mentions";
   if (type.includes("approval")) return "approvals";
-  if (type.includes("assign") || type.includes("observer")) return "assignments";
   if (
-    type.includes("reminder") || type.includes("overdue") || type.includes("due") ||
-    type.includes("recurring") || type.startsWith("calendar")
-  ) return "tasks_due";
+    type.includes("login") || type.includes("device") ||
+    type.includes("password") || type.includes("security") || type.includes("2fa")
+  ) return "security_alerts";
+  if (type.startsWith("qa")) return "qa_reports";
   if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
   if (type.includes("stock")) return "low_stock";
-  if (type.startsWith("qa")) return "qa_reports";
+  if (
+    type.includes("movement") || type.includes("transfer") || type.includes("warehouse") ||
+    type.includes("inventory") || type.includes("requisition") || type.startsWith("return")
+  ) return "inventory_activity";
+  if (
+    type.includes("payment") || type.includes("expense") || type.includes("invoice") ||
+    type.includes("cash") || type.includes("finance")
+  ) return "finance_activity";
   if (type.includes("price") || type.includes("fx") || type.includes("rate")) return "price_fx";
+  if (type.includes("discuss")) return "discuss_messages";
+  if (type.startsWith("calendar")) return "calendar_events";
+  if (type.startsWith("project") || type.includes("planning")) return "projects_planning";
+  if (
+    type.startsWith("hr") || type.includes("leave") || type.includes("payroll") ||
+    type.includes("appraisal") || type.includes("behavior") || type.includes("onboard")
+  ) return "hr_activity";
+  if (type.includes("comment")) return "comments_activity";
+  if (type.includes("assign") || type.includes("observer") || type.includes("watcher")) return "assignments";
+  if (
+    type.includes("reminder") || type.includes("overdue") || type.includes("due") ||
+    type.includes("recurring")
+  ) return "tasks_due";
   return null;
 }
 

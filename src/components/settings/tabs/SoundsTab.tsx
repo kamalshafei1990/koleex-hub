@@ -75,10 +75,18 @@ const ACTIVITY_KEYS: Record<SoundActivity, string> = {
   approvals: "act.approvals",
   assignments: "act.assignments",
   tasks_due: "act.tasksDue",
+  calendar_events: "act.calendar",
+  projects_planning: "act.projects",
   quotation_activity: "act.quotation",
   low_stock: "act.lowStock",
+  inventory_activity: "act.inventory",
+  finance_activity: "act.finance",
   qa_reports: "act.qa",
   price_fx: "act.priceFx",
+  hr_activity: "act.hr",
+  discuss_messages: "act.discuss",
+  security_alerts: "act.security",
+  comments_activity: "act.comments",
 };
 
 /** What the picker screen is currently editing. */

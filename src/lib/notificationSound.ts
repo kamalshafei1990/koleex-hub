@@ -92,7 +92,10 @@ export type SoundCategory = "notification" | "message";
    activity", so the two screens describe the same events. */
 export const SOUND_ACTIVITIES = [
   "mentions", "approvals", "assignments", "tasks_due",
-  "quotation_activity", "low_stock", "qa_reports", "price_fx",
+  "calendar_events", "projects_planning",
+  "quotation_activity", "low_stock", "inventory_activity",
+  "finance_activity", "qa_reports", "price_fx",
+  "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
 ] as const;
 export type SoundActivity = (typeof SOUND_ACTIVITIES)[number];
 

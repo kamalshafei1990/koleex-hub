@@ -30,10 +30,18 @@ const ACTIVITIES: { key: ActivityKey; tKey: string }[] = [
   { key: "approvals", tKey: "act.approvals" },
   { key: "assignments", tKey: "act.assignments" },
   { key: "tasks_due", tKey: "act.tasksDue" },
+  { key: "calendar_events", tKey: "act.calendar" },
+  { key: "projects_planning", tKey: "act.projects" },
   { key: "quotation_activity", tKey: "act.quotation" },
   { key: "low_stock", tKey: "act.lowStock" },
+  { key: "inventory_activity", tKey: "act.inventory" },
+  { key: "finance_activity", tKey: "act.finance" },
   { key: "qa_reports", tKey: "act.qa" },
   { key: "price_fx", tKey: "act.priceFx" },
+  { key: "hr_activity", tKey: "act.hr" },
+  { key: "discuss_messages", tKey: "act.discuss" },
+  { key: "security_alerts", tKey: "act.security" },
+  { key: "comments_activity", tKey: "act.comments" },
 ];
 
 function PushEnableCard() {

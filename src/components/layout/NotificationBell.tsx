@@ -91,10 +91,18 @@ type NotifFilter =
   | "approvals"
   | "assignments"
   | "tasks_due"
+  | "calendar_events"
+  | "projects_planning"
   | "quotation_activity"
   | "low_stock"
+  | "inventory_activity"
+  | "finance_activity"
   | "qa_reports"
   | "price_fx"
+  | "hr_activity"
+  | "discuss_messages"
+  | "security_alerts"
+  | "comments_activity"
   | "other";
 
 const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: string }> = [
@@ -104,10 +112,18 @@ const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: str
   { key: "approvals", settingsKey: "act.approvals" },
   { key: "assignments", settingsKey: "act.assignments" },
   { key: "tasks_due", settingsKey: "act.tasksDue" },
+  { key: "calendar_events", settingsKey: "act.calendar" },
+  { key: "projects_planning", settingsKey: "act.projects" },
   { key: "quotation_activity", settingsKey: "act.quotation" },
   { key: "low_stock", settingsKey: "act.lowStock" },
+  { key: "inventory_activity", settingsKey: "act.inventory" },
+  { key: "finance_activity", settingsKey: "act.finance" },
   { key: "qa_reports", settingsKey: "act.qa" },
   { key: "price_fx", settingsKey: "act.priceFx" },
+  { key: "hr_activity", settingsKey: "act.hr" },
+  { key: "discuss_messages", settingsKey: "act.discuss" },
+  { key: "security_alerts", settingsKey: "act.security" },
+  { key: "comments_activity", settingsKey: "act.comments" },
   { key: "other", hubKey: "notif.filter.other" },
 ];
 

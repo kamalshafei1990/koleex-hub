@@ -248,6 +248,14 @@ export interface NotificationPrefs {
   low_stock?: boolean;
   qa_reports?: boolean;
   price_fx?: boolean;
+  calendar_events?: boolean;
+  projects_planning?: boolean;
+  inventory_activity?: boolean;
+  finance_activity?: boolean;
+  hr_activity?: boolean;
+  discuss_messages?: boolean;
+  security_alerts?: boolean;
+  comments_activity?: boolean;
   /* Quiet hours — a daily window (recipient-local) during which push and
      chimes stay silent. `tz` is snapshotted from the browser at save time so
      the SERVER can evaluate the window without guessing the user's zone.
@@ -368,6 +376,14 @@ export const DEFAULT_PREFERENCES: Required<
     low_stock: true,
     qa_reports: true,
     price_fx: true,
+    calendar_events: true,
+    projects_planning: true,
+    inventory_activity: true,
+    finance_activity: true,
+    hr_activity: true,
+    discuss_messages: true,
+    security_alerts: true,
+    comments_activity: true,
   },
   display: {
     text_size: "default",
