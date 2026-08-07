@@ -6,6 +6,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
@@ -74,14 +75,9 @@ const LOCATION_LABELS: Record<string, string> = {
    AVATAR
    ═══════════════════════════════════════════════════ */
 
+/* Thin adapter over the elected KDS Avatar (AV-3). */
 function Avatar({ src, name, size = 40 }: { src?: string | null; name: string; size?: number }) {
-  if (src) return <img src={src} alt={name} className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />;
-  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  return (
-    <div className="rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0 text-[var(--text-dim)]" style={{ width: size, height: size }}>
-      {initials ? <span className="font-semibold" style={{ fontSize: size * 0.38 }}>{initials}</span> : <UserIcon size={size * 0.45} />}
-    </div>
-  );
+  return <KdsAvatar src={src ?? null} name={name} size={size} />;
 }
 
 /** Warm-start cache key. Bump the suffix if the cached shape changes, so an

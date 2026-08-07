@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
+import KdsEmptyState from "@/components/kds/EmptyState";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
@@ -861,6 +862,7 @@ export default function CRM() {
    Empty state
    ════════════════════════════════════════════════════════════════════════ */
 
+/* Thin adapter over the elected KDS EmptyState (ES-3). */
 function EmptyState({
   onCreate,
   t,
@@ -869,25 +871,21 @@ function EmptyState({
   t: (key: string) => string;
 }) {
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
-      <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mx-auto mb-4">
-        <TrendingUpIcon className="h-6 w-6 text-[var(--text-barely)]" />
-      </div>
-      <p className="text-[var(--text-primary)] text-[15px] font-semibold">
-        {t("empty.all")}
-      </p>
-      <p className="text-[var(--text-ghost)] text-[13px] mt-1">
-        {t("empty.allHint")}
-      </p>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="inline-flex items-center gap-2 mt-5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
-      >
-        <PlusIcon className="h-4 w-4" />
-        {t("newOpp")}
-      </button>
-    </div>
+    <KdsEmptyState
+      icon={<TrendingUpIcon className="h-6 w-6" />}
+      title={t("empty.all")}
+      hint={t("empty.allHint")}
+      action={
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
+        >
+          <PlusIcon className="h-4 w-4" />
+          {t("newOpp")}
+        </button>
+      }
+    />
   );
 }
 

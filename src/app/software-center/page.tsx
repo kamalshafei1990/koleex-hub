@@ -9,6 +9,7 @@
  */
 
 import { useMemo, useState, useSyncExternalStore } from "react";
+import KdsEmptyState from "@/components/kds/EmptyState";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
 import PageHeader from "@/components/ui/PageHeader";
@@ -387,16 +388,9 @@ function Badge({ tone, children }: { tone: Tone; children: React.ReactNode }) {
   );
 }
 
+/* Thin adapter over the elected KDS EmptyState (ES-3). */
 function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-6 py-12 text-center">
-      <div className="h-12 w-12 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto mb-4 text-[var(--text-ghost)]">
-        <PackageIcon size={20} />
-      </div>
-      <div className="text-[14px] font-semibold text-[var(--text-secondary)]">{title}</div>
-      <p className="text-[12.5px] text-[var(--text-dim)] mt-1 max-w-sm mx-auto leading-relaxed">{body}</p>
-    </div>
-  );
+  return <KdsEmptyState icon={<PackageIcon size={20} />} title={title} hint={body} />;
 }
 
 function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => void }) {

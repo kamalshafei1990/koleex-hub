@@ -17,6 +17,9 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import FormModal from "@/components/kds/FormModal";
+import KdsEmptyState from "@/components/kds/EmptyState";
+import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
@@ -201,34 +204,12 @@ const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--t
 const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all shadow-lg";
 const dangerBtnCls = "h-10 px-6 rounded-xl text-[13px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 transition-all";
 
+/* Thin adapter over the kit FormModal (promoted second modal tier). */
 function ModalShell({ open, onClose, title, width, children, footer }: {
   open: boolean; onClose: () => void; title: string; width?: string;
   children: React.ReactNode; footer?: React.ReactNode;
 }) {
-  /* Lock background scroll when modal is open */
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onTouchMove={(e) => e.stopPropagation()}>
-      <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${width || "max-w-[520px]"} bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl flex flex-col max-h-[85vh]`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
-          <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
-            <CrossIcon size={16} className="text-[var(--text-dim)]" />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-color)] shrink-0">{footer}</div>}
-      </div>
-    </div>
-  );
+  return <FormModal open={open} onClose={onClose} title={title} width={width} footer={footer}>{children}</FormModal>;
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -240,26 +221,14 @@ function ErrorBanner({ message }: { message: string }) {
   return <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex items-center gap-2"><ExclamationIcon size={14} /> {message}</div>;
 }
 
+/* Thin adapter over the elected KDS Avatar (AV-3). */
 function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; size?: number }) {
-  if (src) return <img src={src} alt={name} className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />;
-  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  return (
-    <div className="rounded-full bg-[var(--bg-surface)] flex items-center justify-center shrink-0 text-[var(--text-dim)]" style={{ width: size, height: size }}>
-      {size >= 28 ? <span className="font-semibold" style={{ fontSize: size * 0.38 }}>{initials || <UserIcon size={size * 0.45} />}</span> : <UserIcon size={size * 0.5} />}
-    </div>
-  );
+  return <KdsAvatar src={src ?? null} name={name} size={size} />;
 }
 
+/* Thin adapter over the elected KDS EmptyState (ES-3). */
 function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-[var(--text-dim)]">
-      <div className="w-14 h-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center mb-4">
-        <Icon size={24} className="opacity-40" />
-      </div>
-      <p className="text-[14px] font-semibold text-[var(--text-secondary)] mb-1">{title}</p>
-      {subtitle && <p className="text-[12px] text-[var(--text-dim)]">{subtitle}</p>}
-    </div>
-  );
+  return <KdsEmptyState icon={<Icon size={22} />} title={title} hint={subtitle} />;
 }
 
 function Spinner() {

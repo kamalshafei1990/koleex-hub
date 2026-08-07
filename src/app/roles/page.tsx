@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
+import FormModal from "@/components/kds/FormModal";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
@@ -74,33 +75,12 @@ const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--
    MODAL SHELL
    ═══════════════════════════════════════════════════ */
 
+/* Thin adapter over the kit FormModal (promoted second modal tier). */
 function ModalShell({ open, onClose, title, width, children, footer }: {
   open: boolean; onClose: () => void; title: string; width?: string;
   children: React.ReactNode; footer?: React.ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onTouchMove={(e) => e.stopPropagation()}>
-      <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${width || "max-w-[520px]"} bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl flex flex-col max-h-[85vh]`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
-          <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
-            <CrossIcon size={16} className="text-[var(--text-dim)]" />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-color)] shrink-0">{footer}</div>}
-      </div>
-    </div>
-  );
+  return <FormModal open={open} onClose={onClose} title={title} width={width} footer={footer}>{children}</FormModal>;
 }
 
 /* ═══════════════════════════════════════════════════

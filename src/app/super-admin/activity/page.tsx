@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import KdsAvatar from "@/components/kds/Avatar";
 import { fpAvatar } from "@/lib/cdn";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
@@ -85,35 +86,9 @@ function rel(ts: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function initials(a: AccountInfo): string {
-  const n = a.name || a.username || a.email || "?";
-  return n
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
+/* Thin adapter over the elected KDS Avatar (AV-3). */
 function Avatar({ a, size = 32 }: { a: AccountInfo; size?: number }) {
-  if (a.avatar_url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={fpAvatar(a.avatar_url)}
-        alt=""
-        className="rounded-full object-cover shrink-0"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  return (
-    <div
-      className="rounded-full shrink-0 inline-flex items-center justify-center bg-[var(--bg-inverted)]/[0.08] text-[var(--text-muted)] font-semibold"
-      style={{ width: size, height: size, fontSize: size * 0.36 }}
-    >
-      {initials(a)}
-    </div>
-  );
+  return <KdsAvatar src={a.avatar_url ? fpAvatar(a.avatar_url) : null} name={a.name || a.username || a.email || "?"} size={size} />;
 }
 
 const STATUS_DOT: Record<string, string> = {

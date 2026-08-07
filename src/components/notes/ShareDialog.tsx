@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import KdsAvatar from "@/components/kds/Avatar";
 import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
@@ -29,29 +30,9 @@ import {
   type ShareAccount,
 } from "@/lib/notes";
 
+/* Thin adapter over the elected KDS Avatar (AV-3). */
 function Avatar({ name, src }: { name: string; src?: string | null }) {
-  const initials = name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={name}
-        className="h-8 w-8 shrink-0 rounded-full object-cover border border-[var(--border-subtle)]"
-      />
-    );
-  }
-  return (
-    <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
-      {initials || "?"}
-    </div>
-  );
+  return <KdsAvatar src={src ?? null} name={name} size={28} className="text-[10px]" />;
 }
 
 export default function ShareDialog({
