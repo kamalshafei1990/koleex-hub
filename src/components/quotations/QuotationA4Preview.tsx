@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useToast } from "@/components/kds/useToast";
 import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-labels";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
@@ -7389,6 +7390,7 @@ function PictureCell({
   onUpload: (file: File) => void;
   onClear: () => void;
 }) {
+  const { showToast, toastElement } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
   const [shotOpen, setShotOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -7418,7 +7420,7 @@ function PictureCell({
       if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
       const blob = await res.blob();
       if (!/^image\//.test(blob.type)) {
-        alert("Dropped link doesn't look like an image.");
+        showToast("Dropped link doesn't look like an image.", "error");
         return;
       }
       const name = url.split("/").pop()?.split("?")[0] || "image.jpg";
@@ -7426,14 +7428,13 @@ function PictureCell({
     } catch {
       /* CORS-blocked cross-origin fetch is the typical failure
          mode. Tell the user how to recover. */
-      alert(
-        "Couldn't fetch the dragged image. Save it to your desktop first, then drag the file in.",
-      );
+      showToast("Couldn't fetch the dragged image. Save it to your desktop first, then drag the file in.", "error");
     }
   };
 
   return (
     <>
+    {toastElement}
     <div
       className={`quot-img-cell${image ? " has-img" : ""}`}
       title={image ? "Click to view full size" : "Click to choose a photo"}
