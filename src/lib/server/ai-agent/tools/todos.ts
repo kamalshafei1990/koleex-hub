@@ -17,6 +17,8 @@ import "server-only";
    - completeTodo      ← /api/todos/[id]/toggle (owners flip; participants
                           submit for the assigner's approval, with confirm).
    - updateTodo        ← /api/todos/[id] PATCH owner rules (with confirm).
+   - reassignTodo      ← /api/todos/[id] PATCH newAssigneeIds path (owner
+                          resync + internal-only + notify newly added).
    - deleteTodo        ← /api/todos/[id] DELETE owner rules (with confirm).
    Every mutation is two-phase: first call previews and writes NOTHING;
    only a second call with confirm:true executes.
@@ -684,6 +686,171 @@ const updateTodo: ToolDef<
   },
 };
 
+/* ── Reassign (with confirm) ──
+   Ports the PATCH newAssigneeIds path of /api/todos/[id]: owner-only
+   (SA / creator / assigner), full-set resync of koleex_todo_assignees,
+   INTERNAL-ONLY assignees, and an inbox "New task" ping to NEWLY added
+   people only (never a re-ping of existing assignees, no ping on remove).
+   The tool speaks add/remove/replace; the confirm call collapses to the
+   exact previewed replacement list so what the user approved is what
+   gets written even if the set changed in between. */
+const reassignTodo: ToolDef<
+  {
+    task_id?: string;
+    add_account_ids?: string[];
+    remove_account_ids?: string[];
+    replace_with_account_ids?: string[];
+    confirm?: boolean;
+  },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "reassignTodo",
+  description:
+    "Change WHO an existing to-do task is assigned to: add colleagues, remove colleagues, or replace the whole assignee list. Resolve the task id via listMyTodos and every person via findTeamMember FIRST — never invent ids (if a name matches several people, ask which one). Only the task's owner (its creator or assigner) can reassign. ALWAYS call first WITHOUT confirm to preview the before → after assignees; only call again with confirm:true after the user explicitly agrees. Newly added colleagues are notified automatically.",
+  parameters: {
+    type: "object",
+    properties: {
+      task_id: { type: "string", description: "The task's id, taken from a listMyTodos result." },
+      add_account_ids: {
+        type: "array",
+        items: { type: "string" },
+        description: "Account ids (from findTeamMember) to ADD to the current assignees.",
+      },
+      remove_account_ids: {
+        type: "array",
+        items: { type: "string" },
+        description: "Account ids (from findTeamMember) to REMOVE from the current assignees.",
+      },
+      replace_with_account_ids: {
+        type: "array",
+        items: { type: "string" },
+        description: "The COMPLETE new assignee list (replaces everyone). Empty array = unassign everyone. Don't combine with add/remove.",
+      },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
+    },
+    required: ["task_id"],
+  },
+  requiredModule: TODO_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const id = String(args.task_id ?? "").trim();
+    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
+
+    const t = await loadTodoRow(id, ctx.auth.tenant_id);
+    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
+
+    const acc = ctx.auth.account_id;
+    const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
+    if (!isOwner) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Only the task's owner (its creator or assigner) can change who it's assigned to." };
+    }
+
+    const norm = (v: unknown): string[] =>
+      Array.isArray(v) ? Array.from(new Set(v.map((x) => String(x).trim()).filter(Boolean))) : [];
+    const addIds = norm(args.add_account_ids);
+    const removeIds = norm(args.remove_account_ids);
+    const hasReplace = args.replace_with_account_ids !== undefined;
+    const replaceIds = norm(args.replace_with_account_ids);
+    if (!hasReplace && addIds.length === 0 && removeIds.length === 0) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Tell me who to add or remove — or give me the complete new assignee list." };
+    }
+    if (hasReplace && (addIds.length > 0 || removeIds.length > 0)) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Use either add/remove OR a full replacement list — not both in one call." };
+    }
+
+    const { data: curRows } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("account_id")
+      .eq("todo_id", id);
+    const currentIds = (curRows ?? []).map((r) => (r as { account_id: string }).account_id);
+
+    const nextIds = hasReplace
+      ? replaceIds
+      : Array.from(new Set([...currentIds.filter((i) => !removeIds.includes(i)), ...addIds]));
+
+    /* Every id in the NEW set must be a real assignable employee —
+       internal + active + human, the same server-side rule the route
+       enforces. Unknown / portal ids are a hard error. */
+    let all;
+    try {
+      all = await listAssignableEmployees(ctx.auth.tenant_id);
+    } catch (e) {
+      console.error("[tool.reassignTodo]", e instanceof Error ? e.message : e);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't verify the assignees right now — please try again." };
+    }
+    const byId = new Map(all.map((a) => [a.account_id, a]));
+    if (nextIds.some((i) => !byId.has(i))) {
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "One or more people didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
+      };
+    }
+    const nameOf = (aid: string): string => {
+      const a = byId.get(aid);
+      return a ? a.full_name || a.username : "a former team member";
+    };
+    const title = t.title ?? "Task";
+    const currentNames = currentIds.map(nameOf).join(", ") || "nobody";
+    const nextNames = nextIds.map(nameOf).join(", ") || "nobody";
+
+    const same = nextIds.length === currentIds.length && nextIds.every((i) => currentIds.includes(i));
+    if (same) {
+      return { ok: true, permissionStatus: "allowed", data: { id: t.id, title, assignees: currentIds }, message: `"${title}" is already assigned exactly that way (${currentNames}).` };
+    }
+
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { task_id: t.id, title, current: currentNames, next: nextNames } },
+        message: `Ready to change who "${title}" is assigned to: ${currentNames} → ${nextNames}. Newly added people will be notified. Confirm?`,
+        pendingAction: { tool: "reassignTodo", args: { task_id: t.id, replace_with_account_ids: nextIds, confirm: true } },
+      };
+    }
+
+    /* Confirmed — resync exactly like the route: wipe + insert. */
+    const { error: delErr } = await supabaseServer.from("koleex_todo_assignees").delete().eq("todo_id", id);
+    if (delErr) {
+      console.error("[tool.reassignTodo.delete]", delErr);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the assignees — please try again." };
+    }
+    if (nextIds.length > 0) {
+      const { error: insErr } = await supabaseServer.from("koleex_todo_assignees").insert(
+        nextIds.map((accountId) => ({ todo_id: id, account_id: accountId })),
+      );
+      if (insErr) {
+        console.error("[tool.reassignTodo.insert]", insErr);
+        return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the assignees — please try again." };
+      }
+    }
+
+    const added = nextIds.filter((aid) => aid !== acc && !currentIds.includes(aid));
+    if (added.length > 0) {
+      await supabaseServer.from("inbox_messages").insert(
+        added.map((recipientId) => ({
+          recipient_account_id: recipientId,
+          sender_account_id: acc,
+          category: "task",
+          subject: `New task: ${title}`,
+          body: t.description || title,
+          link: `/todo?task=${t.id}`,
+          metadata: { type: "todo_assignment", todo_id: t.id, priority: t.priority ?? "medium" },
+        })),
+      );
+    }
+
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { id: t.id, title, assignees: nextIds },
+      message: `Done — "${title}" is now assigned to ${nextNames}.${added.length > 0 ? " Newly added people have been notified." : ""}`,
+      sources: ["koleex_todo_assignees(resync)"],
+    };
+  },
+};
+
 /* ── Delete (with confirm) ──
    Ports /api/todos/[id] DELETE: SA / creator / assigner only. Deletion is
    permanent (assignees/notes cascade) — the preview says so explicitly. */
@@ -749,5 +916,6 @@ export const todoTools: ToolDef[] = [
   createTodo as ToolDef,
   completeTodo as ToolDef,
   updateTodo as ToolDef,
+  reassignTodo as ToolDef,
   deleteTodo as ToolDef,
 ];
