@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import DocToolbar, { type SaveState } from "@/components/documents/DocToolbar";
@@ -383,13 +384,15 @@ export default function PackingListDoc({
     window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }, [meta, doSave, status]);
 
-  const handleDelete = useCallback(async () => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const handleDelete = useCallback(() => {
     if (!docId) { onBack(); return; }
-    if (!window.confirm("Delete this saved packing list? This cannot be undone.")) return;
-    await removeDocument(docId);
-    onChanged();
-    onBack();
-  }, [docId, onBack, onChanged]);
+    askConfirm("Delete this saved packing list? This cannot be undone.", async () => {
+      await removeDocument(docId);
+      onChanged();
+      onBack();
+    }, { confirmLabel: "Delete" });
+  }, [askConfirm, docId, onBack, onChanged]);
 
   const numInput = (i: number, key: keyof PackingRow, align: "left" | "center" = "center") => (
     <input
@@ -431,6 +434,7 @@ export default function PackingListDoc({
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
+      {confirmDialog}
       <style>{`
         .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
         /* LANDSCAPE A4 for the packing list — the table is wide (14 columns incl.

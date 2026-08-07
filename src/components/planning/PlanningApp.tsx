@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -1194,14 +1195,15 @@ function RoleRow({
     setEditing(false);
     await onReload();
   };
-  const remove = async () => {
-    if (!confirm(t("cfg.roles.deleteConfirm"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => askConfirm(t("cfg.roles.deleteConfirm"), async () => {
     await deleteRole(role.id);
     await onReload();
-  };
+  }, { confirmLabel: t("btn.delete") });
 
   return (
     <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+      {confirmDialog}
       {editing ? (
         <>
           <input
@@ -1359,11 +1361,11 @@ function ResourceRow({
   onReload: () => Promise<void>;
 }) {
   const { t } = useTranslation(planningT);
-  const remove = async () => {
-    if (!confirm(t("cfg.resources.deleteConfirm"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = () => askConfirm(t("cfg.resources.deleteConfirm"), async () => {
     await deleteResource(resource.id);
     await onReload();
-  };
+  }, { confirmLabel: t("btn.delete") });
   const rename = async () => {
     const next = prompt(t("cfg.resources.renamePrompt"), resource.name);
     if (!next || next === resource.name) return;
@@ -1372,6 +1374,7 @@ function ResourceRow({
   };
   return (
     <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+      {confirmDialog}
       <span className="px-1.5 py-0.5 rounded-md bg-[var(--bg-surface)] text-[9px] uppercase tracking-wider font-bold text-[var(--text-dim)] border border-[var(--border-subtle)]">
         {resource.type}
       </span>
@@ -1419,6 +1422,7 @@ function ItemModal({
   onDelete: (id: string) => void | Promise<void>;
   onPublish: (id: string) => void | Promise<void>;
 }) {
+  const { askConfirm, confirmDialog } = useConfirm();
   const { t } = useTranslation(planningT);
   const [type, setType] = useState<PlanningItemType>("shift");
   const [title, setTitle] = useState("");
@@ -1499,6 +1503,7 @@ function ItemModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+      {confirmDialog}
       <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
@@ -1702,9 +1707,7 @@ function ItemModal({
           <div className="shrink-0">
             {editing && (
               <button
-                onClick={() => {
-                  if (confirm(t("modal.deleteConfirm"))) onDelete(editing.id);
-                }}
+                onClick={() => askConfirm(t("modal.deleteConfirm"), () => onDelete(editing.id), { confirmLabel: t("btn.delete") })}
                 className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors"
               >
                 <TrashIcon className="h-3.5 w-3.5" />

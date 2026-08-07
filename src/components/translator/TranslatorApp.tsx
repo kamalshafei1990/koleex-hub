@@ -20,6 +20,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import PageHeader from "@/components/ui/PageHeader";
 import { useTranslation } from "@/lib/i18n";
 import type { Lang as UiLang } from "@/lib/i18n";
@@ -395,6 +396,7 @@ function EntryList({
 
 export default function TranslatorApp() {
   const { t, lang: uiLang } = useTranslation(translatorT);
+  const { askConfirm, confirmDialog } = useConfirm();
   const ui = (uiLang ?? "en") as UiLang;
 
   const [tab, setTab] = useState<Tab>("text");
@@ -1883,16 +1885,16 @@ export default function TranslatorApp() {
               {panel === "history" && history.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!confirm(t("tr.clearHistoryConfirm", "Clear all translation history on this device?"))) return;
+                  onClick={() => askConfirm(t("tr.clearHistoryConfirm", "Clear all translation history on this device?"), () => {
                     setHistory([]);
                     writeLocal(HISTORY_KEY, []);
-                  }}
+                  }, { confirmLabel: t("tr.clearDo", "Clear") })}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 >
                   <VlIcon slug="trash-xmark" size={13} /> {t("tr.clearHistory", "Clear history")}
                 </button>
               )}
+              {confirmDialog}
               <button type="button" onClick={() => setPanel(null)} title={t("tr.close", "Close")} aria-label={t("tr.close", "Close")} className={iconBtn}>
                 <VlIcon slug="cross-small" size={15} />
               </button>

@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -224,9 +225,12 @@ export default function ClassificationManager() {
     setBusyId(null); setEditId(null); refresh();
   };
 
-  const remove = async (id: string) => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = (id: string) => {
     if (isTypes) return;
-    if (!confirm(t("vl.class.removeConfirm", "Remove this from the product taxonomy? Products that use it may be affected."))) return;
+    askConfirm(t("vl.class.removeConfirm", "Remove this from the product taxonomy? Products that use it may be affected."), () => doRemove(id), { confirmLabel: t("vl.class.removeDo", "Remove") });
+  };
+  const doRemove = async (id: string) => {
     setBusyId(id);
     let ok = true;
     if (level === "divisions") ok = await deleteDivision(id);
@@ -281,6 +285,7 @@ export default function ClassificationManager() {
 
   return (
     <div className="flex gap-5">
+      {confirmDialog}
       {/* Divisions sidebar (Library-style) */}
       <aside className="hidden w-56 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">

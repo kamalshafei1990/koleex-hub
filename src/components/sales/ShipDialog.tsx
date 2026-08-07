@@ -13,6 +13,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmWithReason from "@/components/kds/ConfirmWithReason";
+import { useState as useVoidState } from "react";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
@@ -168,9 +170,9 @@ export default function ShipDialog({
     }
   };
 
-  const voidShipment = async (id: string) => {
-    if (!confirm("Void this shipment? Stock will be restored and qty_shipped will roll back.")) return;
-    const reason = prompt("Reason (optional):") ?? null;
+  const [voidAsk, setVoidAsk] = useVoidState<string | null>(null);
+  const voidShipment = (id: string) => setVoidAsk(id);
+  const doVoidShipment = async (id: string, reason: string | null) => {
     const r = await fetch(`/api/sales/shipments/${id}/void`, {
       method: "POST",
       credentials: "include",
@@ -184,6 +186,7 @@ export default function ShipDialog({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <ConfirmWithReason open={voidAsk !== null} title="Void this shipment? Stock will be restored and qty_shipped will roll back." confirmLabel="Void" onCancel={() => setVoidAsk(null)} onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoidShipment(id, reason || null); }} />
       <div className="w-full max-w-4xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="min-w-0">

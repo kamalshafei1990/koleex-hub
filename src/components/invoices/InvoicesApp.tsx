@@ -14,6 +14,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { invoicesT } from "@/lib/translations/invoices";
@@ -401,11 +402,11 @@ function InvoiceDetailView({
     }
   };
 
-  const del = async () => {
-    if (!confirm(t("confirm.delete"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const del = () => askConfirm(t("confirm.delete"), async () => {
     await deleteInvoice(invoiceId);
     onBack();
-  };
+  }, { confirmLabel: "Delete" });
 
   if (loading || !state) {
     return (
@@ -485,6 +486,7 @@ function InvoiceDetailView({
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
+      {confirmDialog}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden print:hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
           <div className="flex items-center gap-3 pt-4 pb-3 flex-wrap">

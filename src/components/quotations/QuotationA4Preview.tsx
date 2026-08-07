@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-labels";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
@@ -8724,6 +8725,7 @@ function PricingSettingsCard({
   current: Quotation;
   setCurrent: Dispatch<SetStateAction<Quotation | null>>;
 }) {
+  const { askConfirm, confirmDialog } = useConfirm();
   const labelCss: React.CSSProperties = {
     fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
     textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
@@ -8762,49 +8764,45 @@ function PricingSettingsCard({
   /* Apply the GLOBAL price to every product row that has NO override. Rows
      with a custom override (it.sellMethod != null) are left exactly as-is. */
   const applyToAll = () => {
-    setCurrent((prev) => {
-      if (!prev) return prev;
-      const eligible = prev.items.filter((it) => isProductRow(it) && !isOverridden(it));
-      const willPrice = eligible.filter((it) => priceFor(it, method, value) !== undefined).length;
-      const overrides = prev.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
-      if (typeof window !== "undefined") {
-        const ok = window.confirm(
-          `Apply global ${method === "margin" ? `${value}% margin` : `${value} ${cur} fixed`} to ${willPrice} product${willPrice === 1 ? "" : "s"}?` +
-          (overrides ? `\n\n${overrides} product${overrides === 1 ? "" : "s"} with a custom override will be left unchanged.` : "") +
-          `\n\nThis overwrites the Unit Price on those rows.`,
-        );
-        if (!ok) return prev;
-      }
-      const items = prev.items.map((it) => {
-        if (!isProductRow(it) || isOverridden(it)) return it; // header or override → untouched
-        const p = priceFor(it, method, value);
-        return p === undefined ? it : { ...it, unitPrice: p };
-      });
-      return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
-    });
+    const eligible = current.items.filter((it) => isProductRow(it) && !isOverridden(it));
+    const willPrice = eligible.filter((it) => priceFor(it, method, value) !== undefined).length;
+    const overrides = current.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
+    askConfirm(
+      `Apply global ${method === "margin" ? `${value}% margin` : `${value} ${cur} fixed`} to ${willPrice} product${willPrice === 1 ? "" : "s"}?` +
+      (overrides ? ` ${overrides} product${overrides === 1 ? "" : "s"} with a custom override stay unchanged.` : "") +
+      ` This overwrites the Unit Price on those rows.`,
+      () => setCurrent((prev) => {
+        if (!prev) return prev;
+        const items = prev.items.map((it) => {
+          if (!isProductRow(it) || isOverridden(it)) return it; // header or override → untouched
+          const p = priceFor(it, method, value);
+          return p === undefined ? it : { ...it, unitPrice: p };
+        });
+        return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
+      }),
+      { confirmLabel: "Apply", tone: "neutral" },
+    );
   };
 
   /* Remove every per-row pricing override (sellMethod/sellValue only — no
      product data) and re-price all rows to the global default. */
   const clearOverrides = () => {
-    setCurrent((prev) => {
-      if (!prev) return prev;
-      const overrides = prev.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
-      if (typeof window !== "undefined") {
-        const ok = window.confirm(
-          `Clear ${overrides} product pricing override${overrides === 1 ? "" : "s"} and return every product to the global default?` +
-          `\n\nOnly pricing overrides are removed — no product data is deleted.`,
-        );
-        if (!ok) return prev;
-      }
-      const items = prev.items.map((it) => {
-        if (!isProductRow(it)) return it;
-        const cleared = { ...it, sellMethod: undefined, sellValue: undefined };
-        const p = priceFor(cleared, method, value);
-        return p === undefined ? cleared : { ...cleared, unitPrice: p };
-      });
-      return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
-    });
+    const overrides = current.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
+    askConfirm(
+      `Clear ${overrides} product pricing override${overrides === 1 ? "" : "s"} and return every product to the global default?` +
+      ` Only pricing overrides are removed — no product data is deleted.`,
+      () => setCurrent((prev) => {
+        if (!prev) return prev;
+        const items = prev.items.map((it) => {
+          if (!isProductRow(it)) return it;
+          const cleared = { ...it, sellMethod: undefined, sellValue: undefined };
+          const p = priceFor(cleared, method, value);
+          return p === undefined ? cleared : { ...cleared, unitPrice: p };
+        });
+        return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
+      }),
+      { confirmLabel: "Clear overrides" },
+    );
   };
 
   const overrideCount = current.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
@@ -8868,6 +8866,7 @@ function PricingSettingsCard({
           cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#0D0D0D",
         }}
       >Apply To All Products</button>
+      {confirmDialog}
 
       <button
         type="button"
@@ -8927,6 +8926,7 @@ function CostPricePanel({
   globalMethod?: "margin" | "fixed";
   globalValue?: number;
 }) {
+  const { askConfirm, confirmDialog } = useConfirm();
   const mode = item.costMode ?? "head";
   const head = Number(item.costHead) || 0;
   /* Calculated COST in RMB: head, head + Stand&Table (complete), or head
@@ -9092,12 +9092,12 @@ function CostPricePanel({
       });
       const j = await res.json().catch(() => null);
       if (res.ok && j?.status === "needs_confirm") {
-        const ok = window.confirm(
-          `This model already has a saved Head Cost of ${fmtN(Number(j.currentCost))} RMB.\nOverwrite it with ${fmtN(head)} RMB?`,
-        );
         setSaving(false);
-        if (ok) return saveCost(true);
-        setSaveMsg("Kept the existing cost.");
+        askConfirm(
+          `This model already has a saved Head Cost of ${fmtN(Number(j.currentCost))} RMB. Overwrite it with ${fmtN(head)} RMB?`,
+          () => { void saveCost(true); },
+          { confirmLabel: "Overwrite", onCancel: () => setSaveMsg("Kept the existing cost.") },
+        );
         return;
       }
       if (!res.ok) { setSaveMsg(j?.error || "Save failed."); setSaving(false); return; }
@@ -9462,6 +9462,7 @@ function CostPricePanel({
                   background: "transparent", color: "rgba(255,255,255,0.9)", opacity: saving ? 0.6 : 1,
                 }}
               >{saving ? "Saving…" : "Save Cost to Product Data"}</button>
+              {confirmDialog}
               {saveMsg && (
                 <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>{saveMsg}</span>
               )}

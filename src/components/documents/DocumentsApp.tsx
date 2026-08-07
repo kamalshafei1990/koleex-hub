@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import PageHeader from "@/components/ui/PageHeader";
 import QuotationA4Preview, {
   type Quotation,
@@ -296,22 +297,25 @@ function DocEditor({
     window.location.href = mailto;
   }, [current, doSave, status, kind]);
 
-  const handleDelete = useCallback(async () => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const handleDelete = useCallback(() => {
     if (!docId) {
       onBack();
       return;
     }
-    if (!window.confirm("Delete this saved document? This cannot be undone.")) return;
-    await removeDocument(docId);
-    onChanged();
-    onBack();
-  }, [docId, onBack, onChanged]);
+    askConfirm("Delete this saved document? This cannot be undone.", async () => {
+      await removeDocument(docId);
+      onChanged();
+      onBack();
+    }, { confirmLabel: "Delete" });
+  }, [askConfirm, docId, onBack, onChanged]);
 
   if (!current) return null;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
+      {confirmDialog}
       <style>{`
         .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
         @media print {
@@ -498,12 +502,12 @@ export default function DocumentsApp() {
     setEditing(full);
     setOpenKind(row.doc_kind);
   };
-  const deleteSaved = async (row: DocumentRow) => {
-    if (!window.confirm(`Delete ${row.doc_no || "this document"}? This cannot be undone.`)) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const deleteSaved = (row: DocumentRow) => askConfirm(`Delete ${row.doc_no || "this document"}? This cannot be undone.`, async () => {
     setDocs((prev) => prev.filter((d) => d.id !== row.id));
     await removeDocument(row.id);
     void refresh();
-  };
+  }, { confirmLabel: "Delete" });
   const backToHome = () => {
     setOpenKind(null);
     setEditing(null);
@@ -519,6 +523,7 @@ export default function DocumentsApp() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="px-4 md:px-6 pt-5 sm:pt-6">
+      {confirmDialog}
         <PageHeader
           title="Documents"
           subtitle="Koleex document formats — create, save, and manage your quotations, invoices, and packing lists"

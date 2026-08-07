@@ -15,6 +15,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmWithReason from "@/components/kds/ConfirmWithReason";
+import { useState as useVoidState } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import {
@@ -115,9 +117,9 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const voidShipment = async (id: string) => {
-    if (!confirm("Void this shipment? Stock will be restored and qty_shipped will roll back.")) return;
-    const reason = prompt("Reason (optional):") ?? null;
+  const [voidAsk, setVoidAsk] = useVoidState<string | null>(null);
+  const voidShipment = (id: string) => setVoidAsk(id);
+  const doVoidShipment = async (id: string, reason: string | null) => {
     const r = await fetch(`/api/sales/shipments/${id}/void`, {
       method: "POST",
       credentials: "include",
@@ -182,6 +184,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <ConfirmWithReason open={voidAsk !== null} title="Void this shipment? Stock will be restored and qty_shipped will roll back." confirmLabel="Void" onCancel={() => setVoidAsk(null)} onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoidShipment(id, reason || null); }} />
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

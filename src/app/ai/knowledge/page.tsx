@@ -13,6 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -200,13 +201,15 @@ export default function AiKnowledgePage() {
     await Promise.all([loadUnits(sel), loadSources()]);
   }, [sel, loadUnits, loadSources]);
 
-  const removeSource = useCallback(async () => {
+  const { askConfirm, confirmDialog } = useConfirm();
+  const removeSource = useCallback(() => {
     if (!sel) return;
-    if (!window.confirm(t("kq.confirmDel", "Delete this source and ALL its units?"))) return;
-    await fetch(`/api/ai/knowledge/sources/${sel}`, { method: "DELETE", credentials: "include" });
-    setSel(null); setUnits([]);
-    loadSources();
-  }, [sel, loadSources, t]);
+    askConfirm(t("kq.confirmDel", "Delete this source and ALL its units?"), async () => {
+      await fetch(`/api/ai/knowledge/sources/${sel}`, { method: "DELETE", credentials: "include" });
+      setSel(null); setUnits([]);
+      loadSources();
+    }, { confirmLabel: "Delete" });
+  }, [askConfirm, sel, loadSources, t]);
 
   if (allowed === false) {
     /* Owner rule: this bench must not even LOOK like a page to anyone
@@ -219,6 +222,7 @@ export default function AiKnowledgePage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={lang === "ar" ? "rtl" : "ltr"}>
+      {confirmDialog}
       <div className="w-full px-4 md:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
           <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")}

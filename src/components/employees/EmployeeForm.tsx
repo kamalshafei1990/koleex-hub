@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { fpAvatar } from "@/lib/cdn";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -1274,11 +1275,14 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
     }
   };
 
+  const { askConfirm, confirmDialog } = useConfirm();
   const handleBack = () => {
+    const go = () => router.push(isEdit && employeeId ? `/employees/${employeeId}` : "/employees");
     if (isDirty && !saved) {
-      if (!window.confirm(t("unsaved.confirm"))) return;
+      askConfirm(t("unsaved.confirm"), go, { confirmLabel: t("unsaved.leave", "Leave"), tone: "neutral" });
+      return;
     }
-    router.push(isEdit && employeeId ? `/employees/${employeeId}` : "/employees");
+    go();
   };
 
   /** Scroll a field into view and focus it. Targets [data-field]
@@ -1502,6 +1506,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       {SavedModal}
+      {confirmDialog}
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
         {/* ── Header ── */}

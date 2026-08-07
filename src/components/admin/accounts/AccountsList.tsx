@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -319,8 +320,11 @@ export default function AccountsList() {
     }
   }
 
-  async function actionDelete(a: AccountRow) {
-    if (!window.confirm(t("acc.action.confirmDelete"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  function actionDelete(a: AccountRow) {
+    askConfirm(t("acc.action.confirmDelete"), () => doActionDelete(a), { confirmLabel: "Delete" });
+  }
+  async function doActionDelete(a: AccountRow) {
     setWorking(true);
     const ok = await deleteAccount(a.id);
     setWorking(false);
@@ -340,6 +344,7 @@ export default function AccountsList() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {confirmDialog}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}

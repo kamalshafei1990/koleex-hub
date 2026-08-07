@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { docLabels } from "@/lib/doc-labels";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -1074,6 +1075,8 @@ export const PRINT_AND_DOC_STYLES = `
 
 export default function Quotations() {
   const { t } = useTranslation(docsT);
+  const { askConfirm, confirmDialog } = useConfirm();
+
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Quotation | null>(null);
@@ -2685,16 +2688,16 @@ export default function Quotations() {
             <>
               <button
                 type="button"
-                onClick={async () => {
-                  if (!window.confirm("Load the latest version? Your unsaved edits will be replaced.")) return;
+                onClick={() => askConfirm("Load the latest version? Your unsaved edits will be replaced.", async () => {
                   await loadLatest();
                   clearNotice();
-                }}
+                }, { confirmLabel: "Load latest", tone: "neutral" })}
                 className="px-3 py-1.5 text-xs font-bold rounded-lg"
                 style={{ border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF" }}
               >
                 Load Latest
               </button>
+              {confirmDialog}
               <button
                 type="button"
                 onClick={clearNotice}

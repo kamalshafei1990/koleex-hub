@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useId } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import {
   getFieldOptions,
   getRepeaterSchema,
@@ -55,6 +56,8 @@ interface Props {
 
 export default function FieldRenderer({ field, value, onChange, disabled }: Props) {
   const id = useId();
+  const { askConfirm, confirmDialog } = useConfirm();
+
   const labelEl = (
     <label
       htmlFor={id}
@@ -428,20 +431,13 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
                 ))}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (
-                      typeof window !== "undefined" &&
-                      !window.confirm("Remove this card? This can't be undone in the form — save discards it.")
-                    ) {
-                      return;
-                    }
-                    removeRow(idx);
-                  }}
+                  onClick={() => askConfirm("Remove this card? This can't be undone in the form — save discards it.", () => removeRow(idx), { confirmLabel: "Remove" })}
                   disabled={disabled}
                   className="text-[11px] text-red-500 hover:text-red-600 disabled:opacity-50"
                 >
                   Remove
                 </button>
+                {confirmDialog}
               </div>
             ))}
           </div>
@@ -485,6 +481,7 @@ function RepeaterRow({
   onRemove: () => void;
   disabled?: boolean;
 }) {
+  const { askConfirm, confirmDialog } = useConfirm();
   return (
     <div className="px-3 py-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${schema.length + 1}, minmax(0, 1fr))` }}>
       {schema.map((s) => (
@@ -498,18 +495,11 @@ function RepeaterRow({
       ))}
       <button
         type="button"
-        onClick={() => {
-          if (
-            typeof window !== "undefined" &&
-            !window.confirm("Remove this row? You'll lose its values for this product.")
-          ) {
-            return;
-          }
-          onRemove();
-        }}
+        onClick={() => askConfirm("Remove this row? You'll lose its values for this product.", () => onRemove(), { confirmLabel: "Remove" })}
         disabled={disabled}
         className="self-center justify-self-end text-[11px] text-red-500 hover:text-red-600 disabled:opacity-50"
       >
+        {confirmDialog}
         Remove
       </button>
     </div>

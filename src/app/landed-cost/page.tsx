@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -62,11 +63,13 @@ export default function LandedCostListPage() {
     return list;
   }, [simulations, search, statusFilter, sortBy]);
 
-  async function handleDelete(id: string) {
-    if (!confirm(t("list.deleteConfirm"))) return;
-    const ok = await deleteSimulation(id);
-    if (ok) setSimulations(prev => prev.filter(s => s.id !== id));
-    setMenuOpen(null);
+  const { askConfirm, confirmDialog } = useConfirm();
+  function handleDelete(id: string) {
+    askConfirm(t("list.deleteConfirm"), async () => {
+      const ok = await deleteSimulation(id);
+      if (ok) setSimulations(prev => prev.filter(s => s.id !== id));
+      setMenuOpen(null);
+    }, { confirmLabel: "Delete" });
   }
 
   async function handleDuplicate(id: string) {
@@ -91,6 +94,7 @@ export default function LandedCostListPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
+      {confirmDialog}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">

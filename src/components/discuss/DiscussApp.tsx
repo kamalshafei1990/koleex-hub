@@ -38,6 +38,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import BellOffIcon from "@/components/icons/ui/BellOffIcon";
@@ -371,6 +372,7 @@ const MemoMessageBubble = memo(MessageBubble);
 
 export default function DiscussApp() {
   const { t } = useTranslation(discussT);
+  const { askConfirm, confirmDialog } = useConfirm();
   const { account, loading: accountLoading } = useCurrentAccount();
   const accountId = account?.id ?? null;
   const accountUsername = account?.username ?? "me";
@@ -1912,20 +1914,21 @@ export default function DiscussApp() {
   }, [editingMessageId, editingDraft, handleCancelEdit]);
 
   const handleDelete = useCallback(
-    async (messageId: string) => {
-      if (!window.confirm(t("msg.deleteConfirm", "Delete this message?"))) return;
-      const ok = await deleteDiscussMessage(messageId);
-      if (ok) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? { ...m, deleted_at: new Date().toISOString(), body: null }
-              : m,
-          ),
-        );
-      }
+    (messageId: string) => {
+      askConfirm(t("msg.deleteConfirm", "Delete this message?"), async () => {
+        const ok = await deleteDiscussMessage(messageId);
+        if (ok) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId
+                ? { ...m, deleted_at: new Date().toISOString(), body: null }
+                : m,
+            ),
+          );
+        }
+      }, { confirmLabel: t("msg.deleteDo", "Delete") });
     },
-    [t],
+    [askConfirm, t],
   );
 
   const handlePin = useCallback(
@@ -2098,20 +2101,20 @@ export default function DiscussApp() {
   );
 
   const handleDeleteConversation = useCallback(
-    async (ch: DiscussChannelWithState) => {
-      if (
-        !window.confirm(
-          t("conv.deleteConfirm", "Delete this conversation? It will be removed from your list."),
-        )
-      )
-        return;
-      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
-      if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
-      await deleteConversation(ch.id);
-      void loadChannels(true);
-      showToast(t("conv.deleted", "Conversation deleted"));
+    (ch: DiscussChannelWithState) => {
+      askConfirm(
+        t("conv.deleteConfirm", "Delete this conversation? It will be removed from your list."),
+        async () => {
+          setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+          if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
+          await deleteConversation(ch.id);
+          void loadChannels(true);
+          showToast(t("conv.deleted", "Conversation deleted"));
+        },
+        { confirmLabel: t("conv.deleteDo", "Delete") },
+      );
     },
-    [loadChannels, showToast, t],
+    [askConfirm, loadChannels, showToast, t],
   );
 
   /* Close the conversation menu on outside-click / Escape / scroll. */
@@ -2240,6 +2243,7 @@ export default function DiscussApp() {
       className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
+      {confirmDialog}
       {/* ═══ Top bar ═══
           On mobile the bar shrinks to a WeChat-style "[back] [chat
           name]" header once the user opens a chat (mobileView !==

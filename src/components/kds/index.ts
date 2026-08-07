@@ -11,6 +11,7 @@ export { default as Modal } from "./Modal";
 export { default as FormModal } from "./FormModal";
 export { default as ConfirmDialog } from "./ConfirmDialog";
 export { useConfirm } from "./useConfirm";
+export { default as ConfirmWithReason } from "./ConfirmWithReason";
 export { default as Drawer } from "./Drawer";
 export { default as Toast } from "./Toast";
 export { default as Avatar } from "./Avatar";

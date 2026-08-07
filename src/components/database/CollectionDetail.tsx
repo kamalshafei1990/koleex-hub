@@ -6,6 +6,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -96,11 +97,11 @@ export default function CollectionDetail({ cid }: { cid: string }) {
     await fetch(`/api/visual-library/collections/${cid}/assets?link_id=${linkId}`, { method: "DELETE", credentials: "include" });
     loadAssets(); loadMeta();
   };
-  const del = async () => {
-    if (!confirm(t("vl.colDetail.deleteConfirm", "Delete this collection? Assets stay in the library."))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const del = () => askConfirm(t("vl.colDetail.deleteConfirm", "Delete this collection? Assets stay in the library."), async () => {
     await fetch(`/api/visual-library/collections/${cid}`, { method: "DELETE", credentials: "include" });
     router.push("/database/collections");
-  };
+  }, { confirmLabel: t("vl.colDetail.deleteDo", "Delete") });
 
   // Drag reorder
   const onDrop = async (toIdx: number) => {
@@ -127,6 +128,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
 
   return (
     <div className="space-y-5">
+      {confirmDialog}
       <Link href="/database/collections" className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"><ArrowLeftIcon size={12} /> {t("vl.colDetail.collections", "Collections")}</Link>
 
       {/* Hero */}
