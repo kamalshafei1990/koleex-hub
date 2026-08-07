@@ -19,7 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import Modal from "@/components/admin/form-sections/Modal";
+import Modal from "@/components/kds/FormModal";
 import { dialog } from "@/lib/ui-dialog";
 
 /* RLS-4: every read/write in this file goes through the gated Purchase API

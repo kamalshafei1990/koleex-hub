@@ -8,7 +8,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { Country, State, City } from "country-state-city";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { createContact } from "@/lib/contacts-admin";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 

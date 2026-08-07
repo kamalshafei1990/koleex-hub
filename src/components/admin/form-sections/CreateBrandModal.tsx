@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { uploadBrandLogo, createBrand } from "@/lib/products-admin";
 
 interface Props {

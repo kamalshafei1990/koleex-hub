@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { createCategory } from "@/lib/products-admin";
 import type { CategoryRow } from "@/types/supabase";
 

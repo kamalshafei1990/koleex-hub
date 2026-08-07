@@ -33,7 +33,7 @@ import Heading3Icon from "@/components/icons/ui/Heading3Icon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { uploadProductFile } from "@/lib/products-admin";
 
 interface Props {

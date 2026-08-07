@@ -34,7 +34,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Modal from "@/components/admin/form-sections/Modal";
+import Modal from "@/components/kds/FormModal";
 
 type ConfirmOpts = {
   title?: string;

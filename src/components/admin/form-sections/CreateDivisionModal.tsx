@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { createDivision } from "@/lib/products-admin";
 import type { DivisionRow } from "@/types/supabase";
 

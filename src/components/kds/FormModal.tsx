@@ -1,5 +1,12 @@
 "use client";
 
+/* KDS FormModal — PROMOTED from admin/form-sections/Modal on 2026-08-07.
+   The kit's SECOND modal tier: chromed form dialog (header bar + subtitle +
+   X close, Escape + body scroll-lock, scrollable body, pinned right-aligned
+   footer) for heavy create/edit forms. Visuals unchanged by the promotion —
+   this is a re-homing, not a redesign. The elected MD-4 Modal stays the
+   default for light dialogs. */
+
 import { useEffect, useRef } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 

@@ -4,7 +4,7 @@
    (@/components/kds, /ui or /common) — the convergence signal the
    catalog shows as a percentage. Do not hand-edit; rerun the crawl. */
 export interface UiModule { key: string; fileCount: number; kitFiles: number; components: string[] }
-export const UI_COMPONENT_TOTALS = { components: 841, files: 1030, modules: 111 };
+export const UI_COMPONENT_TOTALS = { components: 840, files: 1030, modules: 111 };
 export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "activity",
@@ -16,8 +16,8 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "admin",
-    "fileCount": 59,
-    "kitFiles": 12,
+    "fileCount": 58,
+    "kitFiles": 18,
     "components": [
       "AccessRightsTab",
       "AccessoryOptionsSection",
@@ -53,7 +53,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "MemberLogisticsPanel",
       "MemberPricingPanel",
       "MemberSupplierPanel",
-      "Modal",
       "ModelsSection",
       "MonthView",
       "NotesTab",
@@ -505,7 +504,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "kds",
-    "fileCount": 21,
+    "fileCount": 22,
     "kitFiles": 0,
     "components": [
       "Avatar",
@@ -692,7 +691,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "purchase",
     "fileCount": 17,
-    "kitFiles": 2,
+    "kitFiles": 3,
     "components": [
       "ApprovalsModule",
       "BillsModule",

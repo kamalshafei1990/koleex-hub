@@ -15,7 +15,7 @@ import {
   StatusPill, ProgressBar, Toggle, SearchInput, SectionHeader, Button,
   Checkbox, EmptyState, Modal, ConfirmDialog, Drawer, Toast, Avatar,
   Table, Th, Td, MenuList, MenuItem, FilterChip, Pagination, Spinner,
-  CollapsibleSection,
+  CollapsibleSection, FormModal,
 } from "@/components/kds";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
 
@@ -39,6 +39,7 @@ export default function KdsShowcase() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
+  const [formModalOpen, setFormModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -161,12 +162,22 @@ export default function KdsShowcase() {
 
         <Card name="Modal · ConfirmDialog · Drawer · Toast" usage="interactive — open the demos">
           <Button variant="secondary" onClick={() => setModalOpen(true)}>Modal</Button>
+          <Button variant="secondary" onClick={() => setFormModalOpen(true)}>FormModal</Button>
           <Button variant="secondary" onClick={() => setConfirmOpen(true)}>ConfirmDialog</Button>
           <Button variant="secondary" onClick={() => setDrawerOpen(true)}>Drawer</Button>
           <Button variant="secondary" onClick={() => { setToast("This is a KDS toast"); setTimeout(() => setToast(null), 2500); }}>Toast</Button>
         </Card>
       </div>
 
+      <FormModal
+        open={formModalOpen}
+        onClose={() => setFormModalOpen(false)}
+        title="KDS FormModal"
+        subtitle="Chromed form dialog — header, X, scrollable body, pinned footer."
+        footer={<Button variant="primary" onClick={() => setFormModalOpen(false)}>Save</Button>}
+      >
+        <p className="text-[13px] text-[var(--text-muted)]">The kit&apos;s second modal tier, promoted from the product editor 2026-08-07. Use it for heavy create/edit forms; MD-4 Modal stays the light default.</p>
+      </FormModal>
       <Modal open={modalOpen} title="KDS Modal" onClose={() => setModalOpen(false)} actions={<Button variant="primary" onClick={() => setModalOpen(false)}>Done</Button>}>
         <p className="text-[13px] text-[var(--text-muted)]">The canonical modal — dim + blur backdrop per the standing rule.</p>
       </Modal>

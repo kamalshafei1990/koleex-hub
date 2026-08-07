@@ -15,7 +15,7 @@ import PlayIcon from "@/components/icons/ui/PlayIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import Modal from "./Modal";
+import Modal from "@/components/kds/FormModal";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import type { MediaFormState } from "@/types/product-form";
