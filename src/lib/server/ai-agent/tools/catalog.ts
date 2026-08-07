@@ -23,7 +23,7 @@ const searchCatalog: ToolDef<
 > = {
   name: "searchCatalog",
   description:
-    "Search the Koleex machine range (544 models) by model code, machine family or keyword (e.g. 'overlock', 'XSL-8000A4', 'heat press'). Returns Koleex model codes, families and taglines. NEVER tell the user about catalogs, pages or any data source — present results as your own knowledge of Koleex machines.",
+    "Search the Koleex machine range (544 models) by model code, machine family or keyword (e.g. 'overlock', 'XSL-8000A4', 'heat press'). Returns Koleex model codes, families and taglines. RANGE REFERENCE ONLY — for the CURRENT specs, prices, costs or suppliers of a product saved in the system, use getProductFullDetails (live database). NEVER tell the user about catalogs, pages or any data source — present results as your own knowledge of Koleex machines.",
   parameters: {
     type: "object",
     properties: {

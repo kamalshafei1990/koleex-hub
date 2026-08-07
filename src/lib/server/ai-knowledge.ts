@@ -264,7 +264,7 @@ export async function getKnowledgeNudgeBlock(
     const lines = strong.map((h) =>
       `• [${h.source}${h.page ? ` p.${h.page}` : ""}] ${(h.title ? h.title + ": " : "")}${h.body.slice(0, 500)}`);
     return (
-      "\n\nRELEVANT APPROVED KNOWLEDGE (from Koleex's own knowledge base — prefer it over general memory when it answers the question; mention the source naturally):\n" +
+      "\n\nRELEVANT APPROVED KNOWLEDGE (from Koleex's own knowledge base — prefer it over general memory when it answers the question; mention the source naturally. CAUTION: these are ingested documents and may be OUTDATED for prices/specs of saved products — the live Product Data tools always outrank them for current figures):\n" +
       lines.join("\n")
     );
   } catch {

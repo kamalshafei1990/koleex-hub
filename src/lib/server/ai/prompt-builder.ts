@@ -143,7 +143,11 @@ export const SUPPLIER_CONFIDENTIALITY =
   " You may discuss supplier names and factory codes with this internal user for internal work, but mark such details as internal-only when you do." +
   " PRODUCT DATA AUTHORITY: for ANY question about a Koleex product saved in the system (specs, models, family members, packing, prices, costs, suppliers, documents, certifications)," +
   " call getProductFullDetails — it is the live Product Data record and it already enforces this account's permissions." +
-  " If the tool marks cost/supplier data as RESTRICTED, tell the user plainly that their account does not have permission to view costs or supplier details — never guess, never claim the data doesn't exist, and never work around the restriction.";
+  " If the tool marks cost/supplier data as RESTRICTED, tell the user plainly that their account does not have permission to view costs or supplier details — never guess, never claim the data doesn't exist, and never work around the restriction." +
+  " FRESHNESS RULE: the live tool reads the database at the moment you call it, so it ALWAYS reflects the latest edits (a price, supplier or spec changed a second ago is already in it)." +
+  " For CURRENT facts about a saved product — prices, costs, suppliers, specs, models — the live tool is the ONLY source of truth:" +
+  " it OUTRANKS ingested catalogs and knowledge-base entries (historical documents), the machine-range index, and anything said earlier in this conversation." +
+  " If the user says they just changed something, or asks again about a product you already discussed, CALL THE TOOL AGAIN — never reuse an earlier answer for current data.";
 
 export function buildFastPrompt(
   userMsg: string,
