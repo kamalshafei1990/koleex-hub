@@ -45,6 +45,7 @@ import {
 } from "./posting";
 import { logInventoryAudit } from "./audit";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { notifyLite, checkLowStockAndNotify } from "@/lib/server/notify-lite";
 import type { MovementType, StockMovement } from "./types";
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -427,6 +428,22 @@ export async function transitionTransfer(
     metadata: { from: cur.status, to: next },
   });
 
+  /* The requester hears about their transfer's fate (inventory_activity). */
+  if (next === "approved" || next === "cancelled") {
+    const row = data as TransferRow;
+    void notifyLite({
+      tenantId,
+      recipients: [row.requested_by],
+      senderId: actorId,
+      subject: `Transfer ${row.transfer_no || ""} ${next}`.trim(),
+      body: next === "approved" ? "Your stock transfer was approved." : "Your stock transfer was cancelled.",
+      link: "/inventory/transfers",
+      type: `transfer_${next}`,
+      metadata: { source: "inventory", transfer_id: transferId },
+      tag: `transfer:${transferId}`,
+    });
+  }
+
   return { ok: true, transfer: data as TransferRow };
 }
 
@@ -571,6 +588,22 @@ export async function shipTransfer(
     entity_id: transferId,
     metadata: { movement_ids: createdMovementIds },
   });
+
+  void notifyLite({
+    tenantId,
+    recipients: [transfer.requested_by],
+    senderId: actorId,
+    subject: `Transfer ${transfer.transfer_no || ""} shipped`.trim(),
+    body: "Your stock transfer left the source warehouse.",
+    link: "/inventory/transfers",
+    type: "transfer_shipped",
+    metadata: { source: "inventory", transfer_id: transferId },
+    tag: `transfer:${transferId}`,
+  });
+  /* Stock just LEFT the source warehouse — low-stock check per item. */
+  for (const it of items) {
+    void checkLowStockAndNotify(tenantId, it.inventory_item_id, transfer.source_warehouse_id, actorId);
+  }
 
   return { ok: true };
 }
@@ -719,6 +752,18 @@ export async function receiveTransfer(
     entity_type: "transfer" as never,
     entity_id: transferId,
     metadata: { movement_ids: createdInMovementIds },
+  });
+
+  void notifyLite({
+    tenantId,
+    recipients: [transfer.requested_by],
+    senderId: actorId,
+    subject: `Transfer ${transfer.transfer_no || ""} received`.trim(),
+    body: "Your stock transfer was received at the destination warehouse.",
+    link: "/inventory/transfers",
+    type: "transfer_received",
+    metadata: { source: "inventory", transfer_id: transferId },
+    tag: `transfer:${transferId}`,
   });
 
   return { ok: true };

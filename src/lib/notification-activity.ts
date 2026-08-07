@@ -33,9 +33,11 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
   if (type.includes("mention")) return "mentions";
   if (type.includes("approval")) return "approvals";
   if (
-    type.includes("login") || type.includes("device") ||
-    type.includes("password") || type.includes("security") || type.includes("2fa")
+    type.includes("login") || type.includes("device") || type.includes("new_ip") ||
+    type.includes("password") || type.includes("security") || type.includes("2fa") ||
+    type.includes("suspicious")
   ) return "security_alerts";
+  if (type.includes("comment")) return "comments_activity";
   if (type.startsWith("qa")) return "qa_reports";
   if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
   if (type.includes("stock")) return "low_stock";
@@ -55,7 +57,6 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
     type.startsWith("hr") || type.includes("leave") || type.includes("payroll") ||
     type.includes("appraisal") || type.includes("behavior") || type.includes("onboard")
   ) return "hr_activity";
-  if (type.includes("comment")) return "comments_activity";
   if (type.includes("assign") || type.includes("observer") || type.includes("watcher")) return "assignments";
   if (
     type.includes("reminder") || type.includes("overdue") || type.includes("due") ||

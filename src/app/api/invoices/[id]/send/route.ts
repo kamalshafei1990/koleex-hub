@@ -48,7 +48,7 @@ export async function POST(_req: Request, { params }: RouteCtx) {
         subject: `Invoice ${data.inv_no} issued`,
         body: `An invoice for ${data.currency} ${Number(data.total).toFixed(2)} has been issued${data.due_date ? ` and is due ${data.due_date}` : ""}.`,
         link: "/invoices",
-        metadata: { source: "invoices", invoice_id: data.id, inv_no: data.inv_no },
+        metadata: { source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no },
       });
     }
   }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { notifyLite } from "@/lib/server/notify-lite";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
@@ -232,7 +233,7 @@ export async function POST(req: Request) {
        This does NOT modify any data. */
     const { data: cur, error: curErr } = await supabaseServer
       .from("quotations")
-      .select("version, updated_by_name, updated_at, doc")
+      .select("version, updated_by_name, updated_at, doc, created_by, quote_no")
       .eq("id", body.id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle();
@@ -291,6 +292,21 @@ export async function POST(req: Request) {
       .select("*")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    /* Quotation activity is a REAL notification family: the quotation's
+       creator hears when someone ELSE saves changes to their quotation. */
+    if (data && cur.created_by && cur.created_by !== auth.account_id) {
+      void notifyLite({
+        tenantId: auth.tenant_id,
+        recipients: [cur.created_by as string],
+        senderId: auth.account_id,
+        subject: `Quotation ${body.quote_no || (cur as { quote_no?: string }).quote_no || ""} updated`.trim(),
+        body: `${auth.username} saved changes to your quotation.`,
+        link: "/quotations",
+        type: "quotation_updated",
+        metadata: { source: "quotations", quotation_id: body.id },
+        tag: `quotation:${body.id}`,
+      });
+    }
     // 0 rows updated → a concurrent writer changed the version between our
     // read and write. Re-report as a conflict (never a silent overwrite).
     if (!data) {

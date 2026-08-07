@@ -20,6 +20,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
+import { checkLowStockAndNotify } from "@/lib/server/notify-lite";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { buildMovementHistory } from "@/lib/inventory/queries";
 import {
@@ -236,6 +237,16 @@ export async function POST(req: Request) {
       );
     }
     return NextResponse.json({ error: r.error }, { status: 422 });
+  }
+  /* Posted movement that took stock OUT → low-stock alert check
+     (fire-and-forget; classifier bucket "low_stock"). */
+  if (input.direction === "out" || String(input.movement_type).includes("out")) {
+    void checkLowStockAndNotify(
+      auth.tenant_id,
+      inventoryItemId,
+      body.warehouse_id ?? null,
+      auth.account_id,
+    );
   }
   return NextResponse.json({ movement: r.movement, post: r.post });
 }
