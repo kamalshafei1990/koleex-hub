@@ -27,7 +27,7 @@ chunks came from browser cache; the file COUNT stays comparable).
 | ID | Sev | Finding | Status |
 |---|---|---|---|
 | SYS-1 | P2 | DevReload (localhost-only) ticked on every pointermove unthrottled → 11-24 junk API calls/visit, polluted all localhost measurements | ✅ fixed 2026-08-08 (3s throttle) |
-| SYS-2 | P1 | Duplicate same-screen API calls everywhere (bootstrap ×2-4, inbox/feed ×3, discuss/read ×5, assignees ×4, avatars ×8…) — request coalescing (client-cache cachedGet) exists but many call sites bypass it. On a ~1s/request network each dup is a full second of user time | ⬜ |
+| SYS-2 | P1 | Duplicate same-screen API calls everywhere (bootstrap ×2-4, inbox/feed ×3, discuss/read ×5, assignees ×4, avatars ×8…) — request coalescing (client-cache cachedGet) exists but many call sites bypass it. On a ~1s/request network each dup is a full second of user time | 🛠 pass 1 ✅ 2026-08-08: discuss.ts bootstrap → shared me-bootstrap; todos/assignees+todo-labels+me/work+taxonomy/all → cachedGet; avatars CHUNK 30→120. Measured: /home 18→14, /todo 21→14, /customers avatars ×8→×2. Remaining ×2s (bootstrap, visual-bindings, contacts) pattern-match module duplication → folded into SYS-4. discuss/read ×5 = invalidation churn → Discuss app session |
 | SYS-3 | P1 | /customers pulls 2.7 MB of route JS chunks (47 files) on first visit — heaviest screen measured | ⬜ |
 | SYS-4 | P2 | Same-route RSC prefetch fetched under many distinct `_rsc` hashes (workflows ×5, finance/accounting/queue ×6 on /home) — prefetch variant churn, wasted bytes | ⬜ |
 | SYS-5 | P2 | 28-58 images per screen (cached in this run) — cold-load behavior, sizing and placeholders to verify per wave | ⬜ |

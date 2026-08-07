@@ -26,9 +26,11 @@ async function load(): Promise<AppBadgeCounts> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const res = await fetch("/api/me/work", { credentials: "include" });
-      if (!res.ok) return cache;
-      const j = (await res.json()) as {
+      /* cachedGet (SYS-2): MyWorkStrip reads the same endpoint on /todo —
+         one shared request instead of two, on top of this module's own
+         inflight/TTL guard. */
+      const { cachedGet } = await import("@/lib/client-cache");
+      const j = (await cachedGet<unknown>("/api/me/work", 15_000)) as {
         todoCount?: number;
         tasksCount?: number;
         planningCount?: number;

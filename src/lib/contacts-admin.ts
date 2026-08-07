@@ -319,7 +319,10 @@ export async function fetchContactAvatars(
 ): Promise<Record<string, { logo_url: string | null; photo_url: string | null }>> {
   const out: Record<string, { logo_url: string | null; photo_url: string | null }> = {};
   const unique = [...new Set(ids.filter(Boolean))];
-  const CHUNK = 30;
+  /* 30 → 120: on /customers the 30-id batches turned one avatar hydration
+     into 8 sequential requests (SYS-2). 120 uuids ≈ 4.5 KB of query string —
+     comfortably inside URL limits — so a full list is 1-2 requests. */
+  const CHUNK = 120;
   for (let i = 0; i < unique.length; i += CHUNK) {
     const batch = unique.slice(i, i + CHUNK);
     try {

@@ -144,11 +144,16 @@ export async function fetchTaxonomyAll(): Promise<{
   const s0 = readSessionCache<SubcategoryRow[]>("kx:taxo:subcategories");
   if (d0 && c0 && s0) return { divisions: d0, categories: c0, subcategories: s0 };
 
-  const json = await jget<{
+  /* cachedGet adds IN-FLIGHT coalescing on top of the session cache: two
+     components mounting together both missed sessionStorage and fired
+     twin /api/taxonomy/all requests (SYS-2, measured ×2 on /product-data).
+     Now the second caller awaits the first one's promise. */
+  const { cachedGet } = await import("@/lib/client-cache");
+  const json = await cachedGet<{
     divisions?: DivisionRow[];
     categories?: CategoryRow[];
     subcategories?: SubcategoryRow[];
-  }>("/api/taxonomy/all", {});
+  }>("/api/taxonomy/all", 60_000);
   const divisions = json.divisions ?? [];
   const categories = json.categories ?? [];
   const subcategories = json.subcategories ?? [];

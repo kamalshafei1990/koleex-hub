@@ -716,14 +716,18 @@ if (typeof window !== "undefined") {
 }
 
 /** The signed-in account id, resolved once from the session bootstrap and
- *  cached — needed to pick the caller's `discuss:account:<id>` ping topic. */
+ *  cached — needed to pick the caller's `discuss:account:<id>` ping topic.
+ *  Reads through the SHARED me-bootstrap store (warm-start + coalesced):
+ *  this used to be its own raw /api/me/bootstrap fetch, which meant every
+ *  screen paid a duplicate bootstrap round-trip just for Discuss's ping
+ *  topic (SYS-2, measured ×2-4 per screen). */
 let cachedAccountId: string | null = null;
 let accountIdPromise: Promise<string | null> | null = null;
 async function getMyAccountId(): Promise<string | null> {
   if (cachedAccountId) return cachedAccountId;
   if (!accountIdPromise) {
-    accountIdPromise = fetch("/api/me/bootstrap", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
+    accountIdPromise = import("@/lib/me-bootstrap")
+      .then((m) => m.getMeBootstrap())
       .then((j) => {
         cachedAccountId = j?.auth?.account_id ?? null;
         return cachedAccountId;

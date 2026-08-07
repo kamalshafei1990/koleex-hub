@@ -42,9 +42,10 @@ export default function MyWorkStrip() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/me/work", { credentials: "include" });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
+        /* Coalesced (SYS-2): the sidebar badge loader hits the same URL at
+           the same moment — share one request via cachedGet. */
+        const { cachedGet } = await import("@/lib/client-cache");
+        const json = (await cachedGet<unknown>("/api/me/work", 15_000)) as {
           tasks: WorkTask[];
           tasksCount: number;
           planning: WorkShift[];

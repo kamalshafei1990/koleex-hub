@@ -518,13 +518,15 @@ export async function deleteTodoNote(noteId: string): Promise<boolean> {
 
 export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
   try {
-    const res = await fetch("/api/todo-labels", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as { labels: TodoLabelRow[] };
-      return json.labels;
-    }
-    if (res.status === 401 || res.status === 403) return [];
+    /* Coalesced (SYS-2): two components mount together on /todo and each
+       asked for labels; one shared request + 60s reuse covers both.
+       createTodoLabel() below invalidates after a write. */
+    const { cachedGet } = await import("@/lib/client-cache");
+    const json = await cachedGet<{ labels: TodoLabelRow[] }>("/api/todo-labels", 60_000);
+    return json.labels;
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) return [];
     console.error("[Todos] fetchTodoLabels API failed:", e);
   }
   const { data } = await supabase
@@ -547,6 +549,9 @@ export async function createTodoLabel(
     });
     if (res.ok) {
       const json = (await res.json()) as { label: TodoLabelRow | null };
+      /* Drop the coalesced list so the next fetch shows the new label. */
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/todo-labels");
       return json.label;
     }
     if (res.status === 401 || res.status === 403) return null;
@@ -573,11 +578,12 @@ export async function fetchAssignableEmployees(): Promise<TodoAssigneeInfo[]> {
      (P0 lockdown), so the anon client below returns nothing. The
      /api/todos/assignees route resolves the list server-side. */
   try {
-    const res = await fetch("/api/todos/assignees", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as { assignees?: TodoAssigneeInfo[] };
-      if (Array.isArray(json.assignees)) return json.assignees;
-    }
+    /* Coalesced (SYS-2): the picker, the filter bar and the report view each
+       asked for this list on mount (measured ×4 on /todo). One request,
+       60s reuse — the roster doesn't change mid-screen. */
+    const { cachedGet } = await import("@/lib/client-cache");
+    const json = await cachedGet<{ assignees?: TodoAssigneeInfo[] }>("/api/todos/assignees", 60_000);
+    if (Array.isArray(json.assignees)) return json.assignees;
   } catch {
     /* fall through to the legacy anon path */
   }
@@ -597,11 +603,11 @@ export async function fetchAssignableEmployees(): Promise<TodoAssigneeInfo[]> {
 export async function fetchDepartments(): Promise<string[]> {
   /* API-first for the same reason as fetchAssignableEmployees. */
   try {
-    const res = await fetch("/api/todos/assignees", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as { departments?: string[] };
-      if (Array.isArray(json.departments)) return json.departments;
-    }
+    /* Same coalesced read as fetchAssignableEmployees — identical URL, so
+       both helpers share one request when a screen needs both. */
+    const { cachedGet } = await import("@/lib/client-cache");
+    const json = await cachedGet<{ departments?: string[] }>("/api/todos/assignees", 60_000);
+    if (Array.isArray(json.departments)) return json.departments;
   } catch {
     /* fall through */
   }
