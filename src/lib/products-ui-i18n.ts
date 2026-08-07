@@ -718,6 +718,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "sup.addPriceNote": { en: "Add price note", zh: "添加价格备注", ar: "أضف ملاحظة للسعر" },
   "sup.noteDone": { en: "Done", zh: "完成", ar: "تم" },
   "sup.notePriceEdit": { en: "Edit price note", zh: "编辑价格备注", ar: "عدّل ملاحظة السعر" },
+  "pp.f.familyOfN": { en: "Family of {n} models", zh: "系列（{n} 个型号）", ar: "عائلة من {n} موديلات" },
+  "pp.f.standalone": { en: "Standalone product", zh: "独立产品", ar: "منتج مستقل" },
   "sup.importSpecs": { en: "Import from product specs", zh: "从产品规格导入", ar: "استيراد من مواصفات المنتج" },
   "sup.importSpecsClose": { en: "Close specs", zh: "收起规格", ar: "إغلاق المواصفات" },
   "sup.importSpecsHint": { en: "Click a line to add it to the note", zh: "点击一行即可加入备注", ar: "اضغط على سطر لإضافته إلى الملاحظة" },

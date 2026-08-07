@@ -207,6 +207,79 @@ interface Profile {
    threading it through ~90 <Field/> call sites would be pure noise. */
 let NOT_SET = "Not set";
 
+
+/* ── Row icons — ALWAYS from the Visual Library (Database app), never
+   hand-authored (owner standing rule). Monochrome CSS-mask so the SVG
+   inherits the label's ghost tone in both themes. iconForLabel() keyword-
+   matches the (translated) label so EVERY row in EVERY tab gets a glyph
+   automatically — new fields inherit one with zero wiring. */
+const VL_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/";
+
+function RowGlyph({ src, className = "h-3 w-3" }: { src: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 bg-current align-middle ${className}`}
+      style={{ maskImage: `url("${src}")`, maskRepeat: "no-repeat", maskPosition: "center", maskSize: "contain", WebkitMaskImage: `url("${src}")`, WebkitMaskRepeat: "no-repeat", WebkitMaskPosition: "center", WebkitMaskSize: "contain" }}
+    />
+  );
+}
+
+const VL_ICON_RULES: Array<[RegExp, string]> = [
+  [/visible|visibility/i, "general/security/eye.svg"],
+  [/featured/i, "pack/status/ranking-star.svg"],
+  [/sourcing status/i, "pack/status/memo-circle-check.svg"],
+  [/status|lifecycle/i, "general/status/info.svg"],
+  [/level/i, "pack/actions/layers.svg"],
+  [/division/i, "general/business/building.svg"],
+  [/subcategory code|category code|koleex code|^code|model code|barcode/i, "general/inventory/barcode.svg"],
+  [/subcategory/i, "pack/actions/layers.svg"],
+  [/category/i, "pack/files/folder-tree.svg"],
+  [/family/i, "general/inventory/boxes.svg"],
+  [/template/i, "general/database/settings.svg"],
+  [/supplier product code|reference/i, "pack/devices/barcode-read.svg"],
+  [/supplier/i, "general/manufacturing/factory.svg"],
+  [/url|slug|link/i, "pack/actions/link.svg"],
+  [/brand/i, "pack/documents/crown.svg"],
+  [/name|title/i, "pack/commerce/label.svg"],
+  [/tagline|description|excerpt|note/i, "general/documents/document.svg"],
+  [/cost/i, "pack/finance/dollar.svg"],
+  [/pricing mode/i, "pack/actions/settings-sliders.svg"],
+  [/price/i, "pack/finance/money-bill-wave.svg"],
+  [/margin|percent|tax|vat/i, "pack/misc/percentage.svg"],
+  [/moq|quantity|stock/i, "general/inventory/boxes.svg"],
+  [/lead|time/i, "general/time/clock.svg"],
+  [/payment/i, "pack/finance/money-bill-wave.svg"],
+  [/currency/i, "general/finance/coins.svg"],
+  [/incoterm/i, "pack/maps/passport.svg"],
+  [/sample/i, "pack/status/cube.svg"],
+  [/warranty|shield/i, "general/security/shield.svg"],
+  [/supply|warehouse|container/i, "pack/misc/container-storage.svg"],
+  [/sku/i, "pack/commerce/label.svg"],
+  [/weight/i, "pack/actions/scale.svg"],
+  [/cbm|volume/i, "pack/status/cube.svg"],
+  [/packing|carton|box/i, "general/inventory/box.svg"],
+  [/hs /i, "general/maps/globe.svg"],
+  [/origin|country/i, "pack/maps/flag.svg"],
+  [/voltage|power|watt|frequency|phase|electric|plug|motor/i, "pack/manufacturing/bolt.svg"],
+  [/colou?r/i, "pack/actions/palette.svg"],
+  [/dimension|size|length|width|height|diameter/i, "pack/manufacturing/ruler-combined.svg"],
+  [/speed|rpm/i, "pack/analytics/chart-line-up-down.svg"],
+  [/capacity/i, "pack/devices/battery-full.svg"],
+  [/certificat|cert |diploma|compliance/i, "pack/documents/diploma.svg"],
+  [/manual|datasheet|brochure|document|file/i, "general/documents/document.svg"],
+  [/photo|image|media|gallery|video/i, "pack/files/camera.svg"],
+  [/language|market/i, "pack/actions/language.svg"],
+  [/date|created|updated|quoted|valid/i, "general/time/calendar.svg"],
+  [/knowledge|related/i, "pack/actions/book-open-cover.svg"],
+  [/readiness/i, "pack/status/memo-circle-check.svg"],
+];
+
+function iconForLabel(label: string): string {
+  for (const [re, path] of VL_ICON_RULES) if (re.test(label)) return VL_BASE + path;
+  return VL_BASE + "general/status/info.svg";
+}
+
 function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   const empty =
     v === null || v === undefined || v === "" ||
@@ -328,15 +401,22 @@ function Row({ label, value, help, mono, badge }: {
   label: string; value: unknown; help?: string; mono?: boolean; badge?: string;
 }) {
   return (
-    <div className="py-3 first:pt-0 last:pb-0">
-      <div className="flex items-start justify-between gap-3 mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{label}</span>
-        {badge && (
-          <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">{badge}</span>
-        )}
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+      {/* Icon tile — the eye's anchor while scanning down the sheet.
+          Always a Visual Library glyph (owner rule). */}
+      <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+        <RowGlyph src={iconForLabel(label)} className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3 mb-0.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{label}</span>
+          {badge && (
+            <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">{badge}</span>
+          )}
+        </div>
+        <div><Val v={value} mono={mono} /></div>
+        {help && <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]/80 leading-relaxed">{help}</p>}
       </div>
-      <div className="mb-1"><Val v={value} mono={mono} /></div>
-      {help && <p className="text-[10.5px] text-[var(--text-ghost)]/80 leading-relaxed">{help}</p>}
     </div>
   );
 }
@@ -655,7 +735,18 @@ export default function ProductProfile() {
           <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} />
           <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} />
           <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
-          <Row label={t("pp.f.family", "Family")} value={s2("family")} />
+          {/* "Not set" reads as MISSING data, but a standalone product
+              legitimately has no family (owner). Real family → member
+              count; otherwise the free-text family; otherwise the honest
+              default value "Standalone product". */}
+          <Row
+            label={t("pp.f.family", "Family")}
+            value={
+              (data.models?.length ?? 0) > 1
+                ? t("pp.f.familyOfN", "Family of {n} models").replace("{n}", String(data.models.length))
+                : (s2("family") as string | null) || t("pp.f.standalone", "Standalone product")
+            }
+          />
           <Row
                 label={t("pp.f.level", "Level")}
                 /* Show the tier LABEL, not the stored key — the record must
@@ -807,28 +898,33 @@ export default function ProductProfile() {
                     fillable. */}
                 <div className="divide-y divide-[var(--border-subtle)]">
                   {fields.map((f) => (
-                    <div key={f.key} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-start justify-between gap-3 mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">
-                          {f.label || f.key}
-                          {f.required && <span className="text-rose-400 ms-1">*</span>}
-                        </span>
-                        <span className="flex items-center gap-1 shrink-0">
-                          {f.internalOnly
-                            ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]">INTERNAL</span>
-                            : f.publicVisible
-                            ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-400/90">PUBLIC</span>
-                            : null}
-                          {f.aiReadable && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">AI</span>}
-                        </span>
+                    <div key={f.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                      <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+                        <RowGlyph src={iconForLabel(f.label || f.key)} className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3 mb-0.5">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">
+                            {f.label || f.key}
+                            {f.required && <span className="text-rose-400 ms-1">*</span>}
+                          </span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            {f.internalOnly
+                              ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]">INTERNAL</span>
+                              : f.publicVisible
+                              ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-400/90">PUBLIC</span>
+                              : null}
+                            {f.aiReadable && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">AI</span>}
+                          </span>
+                        </div>
+                        <div>
+                          <Val v={specs[f.key]} />
+                          {f.unit && isFilled(f.key) ? <span className="text-[11px] text-[var(--text-ghost)] ms-1">{f.unit}</span> : null}
+                        </div>
+                        {f.description && (
+                          <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]/80 leading-relaxed">{f.description}</p>
+                        )}
                       </div>
-                      <div className="mb-1">
-                        <Val v={specs[f.key]} />
-                        {f.unit && isFilled(f.key) ? <span className="text-[11px] text-[var(--text-ghost)] ms-1">{f.unit}</span> : null}
-                      </div>
-                      {f.description && (
-                        <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">{f.description}</p>
-                      )}
                     </div>
                   ))}
                 </div>
