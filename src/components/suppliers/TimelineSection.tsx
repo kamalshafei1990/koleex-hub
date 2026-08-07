@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -218,9 +219,11 @@ export default function TimelineSection({
     } finally { setBusy(false); }
   };
 
-  const remove = async (e: Row) => {
-    const id = str(e, "id");
-    if (!confirm(t("ts.confirmRemove", "Remove this logged event?"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = (e: Row) => {
+    askConfirm(t("ts.confirmRemove", "Remove this logged event?"), () => doRemove(str(e, "id")), { confirmLabel: t("ts.removeDo", "Remove") });
+  };
+  const doRemove = async (id: string) => {
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/timeline/${id}`, { method: "DELETE", credentials: "include" });
@@ -241,6 +244,7 @@ export default function TimelineSection({
 
   return (
     <section className="space-y-5" {...kxInspectAttrs({ component: "SupplierTimelineSection", module: "Suppliers", section: "Records", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />

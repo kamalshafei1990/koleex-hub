@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -110,8 +111,11 @@ export default function NegotiationSection({
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   };
 
-  const remove = async (n: Row) => {
-    const id = str(n, "id"); if (!confirm(t("neg.confirmRemove", "Remove this negotiation round?"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = (n: Row) => {
+    askConfirm(t("neg.confirmRemove", "Remove this negotiation round?"), () => doRemove(str(n, "id")), { confirmLabel: t("neg.removeDo", "Remove") });
+  };
+  const doRemove = async (id: string) => {
     setBusyId(id); setListErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/negotiations/${id}`, { method: "DELETE", credentials: "include" });
@@ -122,6 +126,7 @@ export default function NegotiationSection({
 
   return (
     <section className="space-y-5" {...kxInspectAttrs({ component: "SupplierNegotiationSection", module: "Suppliers", section: "Intelligence", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("neg.title", "Negotiation Intelligence")}</h3></div>
         <div className="flex items-center gap-2">

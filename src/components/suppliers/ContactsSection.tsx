@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
@@ -229,9 +230,11 @@ export default function ContactsSection({
     }
   };
 
-  const archiveContact = async (c: Row) => {
-    const id = str(c, "id");
-    if (!confirm(`${t("cs.archiveConfirmPrefix", "Archive")} ${str(c, "full_name") || t("cs.thisContact", "this contact")}${t("cs.archiveConfirmSuffix", "? They can be re-added later.")}`)) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const archiveContact = (c: Row) => {
+    askConfirm(`${t("cs.archiveConfirmPrefix", "Archive")} ${str(c, "full_name") || t("cs.thisContact", "this contact")}${t("cs.archiveConfirmSuffix", "? They can be re-added later.")}`, () => doArchiveContact(str(c, "id")), { confirmLabel: t("cs.archiveDo", "Archive"), tone: "neutral" });
+  };
+  const doArchiveContact = async (id: string) => {
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/contacts/${id}`, {
@@ -291,9 +294,10 @@ export default function ContactsSection({
     }
   };
 
-  const removeQr = async (q: Row) => {
-    const id = str(q, "id");
-    if (!confirm(t("cs.removeQrConfirm", "Remove this QR code?"))) return;
+  const removeQr = (q: Row) => {
+    askConfirm(t("cs.removeQrConfirm", "Remove this QR code?"), () => doRemoveQr(str(q, "id")), { confirmLabel: t("cs.removeDo", "Remove") });
+  };
+  const doRemoveQr = async (id: string) => {
     setBusyId(id); setQrErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/qr/${id}`, {
@@ -316,6 +320,7 @@ export default function ContactsSection({
 
   return (
     <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierContactPersonsSection", module: "Suppliers", section: "Communication", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <UsersIcon className="h-4 w-4 text-[var(--text-secondary)]" />

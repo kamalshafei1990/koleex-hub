@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -129,8 +130,11 @@ export default function SourcingSection({
       await onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusyId(null); }
   };
-  const removeRole = async (link: Row) => {
-    const id = str(link, "id"); if (!confirm(t("srcg.confirmRemoveRole", "Remove this product sourcing role?"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const removeRole = (link: Row) => {
+    askConfirm(t("srcg.confirmRemoveRole", "Remove this product sourcing role?"), () => doRemoveRole(str(link, "id")), { confirmLabel: t("srcg.removeDo", "Remove") });
+  };
+  const doRemoveRole = async (id: string) => {
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/sourcing/links/${id}`, { method: "DELETE", credentials: "include" });
@@ -162,6 +166,7 @@ export default function SourcingSection({
 
   return (
     <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierSourcingSection", module: "Suppliers", section: "Production", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><NetworkIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("srcg.title", "Sourcing Intelligence")}</h3></div>
         <div className="flex items-center gap-2">

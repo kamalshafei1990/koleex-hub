@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -242,9 +243,11 @@ export default function MediaSection({
     } finally { setBusyId(null); }
   };
 
-  const remove = async (m: Row) => {
-    const id = str(m, "id");
-    if (!confirm(t("ms.removeAssetConfirm", "Remove this asset? It will be archived (recoverable)."))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const remove = (m: Row) => {
+    askConfirm(t("ms.removeAssetConfirm", "Remove this asset? It will be archived (recoverable)."), () => doRemove(str(m, "id")), { confirmLabel: t("ms.removeDo", "Remove"), tone: "neutral" });
+  };
+  const doRemove = async (id: string) => {
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/media/${id}`, { method: "DELETE", credentials: "include" });
@@ -269,6 +272,7 @@ export default function MediaSection({
 
   return (
     <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierDocumentsSection", module: "Suppliers", section: "Records", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LayersIcon className="h-4 w-4 text-[var(--text-secondary)]" />

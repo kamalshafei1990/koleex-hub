@@ -17,6 +17,7 @@
    searched, or summarised here — the endpoint enforces that server-side.
    --------------------------------------------------------------------------- */
 import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useRouter } from "next/navigation";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { useApiQuery } from "@/lib/query/useApiQuery";
@@ -101,9 +102,9 @@ export default function SuppliersServerList() {
     list.refetch(); summary.refetch();
   };
   const toggleArchive = (r: Row) => runRow(r.id, () => updateContact(r.id, { contact_type: "supplier", is_active: !r.is_active }));
+  const { askConfirm, confirmDialog } = useConfirm();
   const removeRow = (r: Row) => {
-    if (!window.confirm(`${t("sl.confirmDelete")} ${rowName(r)}?`)) return;
-    runRow(r.id, () => deleteContact(r.id));
+    askConfirm(`${t("sl.confirmDelete")} ${rowName(r)}?`, () => runRow(r.id, () => deleteContact(r.id)), { confirmLabel: t("sl.deleteDo", "Delete") });
   };
 
   const cellS: React.CSSProperties = { padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", fontSize: 13, textAlign: "start" };
@@ -132,6 +133,7 @@ export default function SuppliersServerList() {
 
   return (
     <div dir={rtl ? "rtl" : "ltr"} style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
+      {confirmDialog}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t("sl.title")}</h1>
         <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "var(--bg-surface-active)", color: "var(--text-secondary)" }}>{t("sl.preview")}</span>

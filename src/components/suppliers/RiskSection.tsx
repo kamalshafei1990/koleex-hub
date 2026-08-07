@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -172,8 +173,11 @@ export default function RiskSection({
       await onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusyId(null); }
   };
-  const removeItem = async (it: Row) => {
-    const id = str(it, "id"); if (!confirm(t("rs.confirmRemove", "Remove this risk item?"))) return;
+  const { askConfirm, confirmDialog } = useConfirm();
+  const removeItem = (it: Row) => {
+    askConfirm(t("rs.confirmRemove", "Remove this risk item?"), () => doRemoveItem(str(it, "id")), { confirmLabel: t("rs.removeDo", "Remove") });
+  };
+  const doRemoveItem = async (id: string) => {
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/risk/items/${id}`, { method: "DELETE", credentials: "include" });
@@ -233,6 +237,7 @@ export default function RiskSection({
   /* ── VIEW MODE ── */
   return (
     <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierRiskSection", module: "Suppliers", section: "Intelligence", recordId: supplierId })}>
+      {confirmDialog}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><ShieldExclamationIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("rs.title", "Risk Intelligence")}</h3></div>
         <div className="flex items-center gap-2">
