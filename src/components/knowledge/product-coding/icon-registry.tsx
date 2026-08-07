@@ -11,7 +11,7 @@
    component — semantic, not literal.
    --------------------------------------------------------------------------- */
 
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType } from "react";
 
 /* CANONICAL division icons — same component instances that
    /products and /product-data render. If those ever change, this
@@ -36,7 +36,10 @@ import Globe2Icon from "@/components/icons/ui/Globe2Icon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 
-type IconComponent = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
+/* Loosened from SVGProps: registry-first icons (FactoryIcon, BookOpenIcon…)
+   render a bound span, not a raw <svg>. The doc only ever passes size and
+   className, so that's the honest contract. */
+type IconComponent = ComponentType<{ size?: number; className?: string }>;
 
 /* ── Domain → key → component mapping ──────────────────────────────────── */
 
