@@ -1,14 +1,15 @@
 /* AUTO-GENERATED component inventory — regenerated 2026-08-07 by a
-   directory-aware crawl over src/components AND src/app (route pages,
-   layouts and in-route components included). Export patterns:
-   function/class/const + named exports, uppercase-only, helpers
-   filtered. Do not hand-edit — rerun the crawl instead. */
-export interface UiModule { key: string; fileCount: number; components: string[] }
+   directory-aware crawl over src/components AND src/app. kitFiles =
+   how many of the module's files import from the shared kit
+   (@/components/kds or @/components/ui) — the convergence signal the
+   catalog shows as a percentage. Do not hand-edit; rerun the crawl. */
+export interface UiModule { key: string; fileCount: number; kitFiles: number; components: string[] }
 export const UI_COMPONENT_TOTALS = { components: 842, files: 1031, modules: 111 };
 export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "activity",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "ActivityTracker"
     ]
@@ -16,6 +17,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "admin",
     "fileCount": 60,
+    "kitFiles": 8,
     "components": [
       "AccessRightsTab",
       "AccessoryOptionsSection",
@@ -90,6 +92,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "ai",
     "fileCount": 11,
+    "kitFiles": 0,
     "components": [
       "AutoTranslate",
       "EmojiButton",
@@ -107,6 +110,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "ai-orb",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "AIOrb"
     ]
@@ -114,6 +118,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "approval",
     "fileCount": 2,
+    "kitFiles": 1,
     "components": [
       "ApprovalBadge",
       "ApprovalReviewDrawer"
@@ -122,6 +127,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "attachments",
     "fileCount": 4,
+    "kitFiles": 2,
     "components": [
       "AttachmentDropzone",
       "AttachmentList",
@@ -132,6 +138,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "behavior",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "BehaviorPicker",
       "BehaviorSlider",
@@ -141,6 +148,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "commercial-policy",
     "fileCount": 8,
+    "kitFiles": 0,
     "components": [
       "Badge",
       "Callout",
@@ -164,6 +172,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "common",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "BoundIcon"
     ]
@@ -171,6 +180,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "contacts",
     "fileCount": 3,
+    "kitFiles": 1,
     "components": [
       "Contacts",
       "ImportSupplierFromCatalog",
@@ -180,6 +190,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "create",
     "fileCount": 6,
+    "kitFiles": 6,
     "components": [
       "CreateAsset",
       "CreateCustomer",
@@ -192,6 +203,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "customers",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "CustomersServerList"
     ]
@@ -199,6 +211,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "database",
     "fileCount": 27,
+    "kitFiles": 9,
     "components": [
       "AddToCollectionModal",
       "AssetDna",
@@ -232,6 +245,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "discuss",
     "fileCount": 8,
+    "kitFiles": 0,
     "components": [
       "CustomerChatModal",
       "CustomerContactCard",
@@ -247,6 +261,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "documents",
     "fileCount": 4,
+    "kitFiles": 1,
     "components": [
       "DocToolbar",
       "DocumentsApp",
@@ -257,6 +272,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "employees",
     "fileCount": 3,
+    "kitFiles": 1,
     "components": [
       "EmployeeBehaviorSection",
       "EmployeeForm",
@@ -266,6 +282,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "executive",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "ExecutiveDashboard"
     ]
@@ -273,6 +290,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "expenses",
     "fileCount": 3,
+    "kitFiles": 3,
     "components": [
       "ExpensesApp",
       "ExpensesHeader",
@@ -282,6 +300,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "finance",
     "fileCount": 36,
+    "kitFiles": 30,
     "components": [
       "AgingTable",
       "AnomalyChip",
@@ -362,6 +381,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "home",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "RoleHome"
     ]
@@ -369,6 +389,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "hr",
     "fileCount": 17,
+    "kitFiles": 4,
     "components": [
       "AppraisalsModule",
       "Attendance",
@@ -397,6 +418,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "icons",
     "fileCount": 315,
+    "kitFiles": 0,
     "components": [
       "BrandGlyph",
       "FileCode2Icon",
@@ -410,6 +432,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "inventory",
     "fileCount": 19,
+    "kitFiles": 18,
     "components": [
       "ActionCard",
       "AlertCard",
@@ -467,6 +490,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "invoices",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "EntityInvoicesStrip",
       "InvoicesApp"
@@ -475,6 +499,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "invoices-doc",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "Quotations"
     ]
@@ -482,6 +507,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "kds",
     "fileCount": 21,
+    "kitFiles": 0,
     "components": [
       "Avatar",
       "Button",
@@ -512,6 +538,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "knowledge",
     "fileCount": 13,
+    "kitFiles": 0,
     "components": [
       "AIParseFlow",
       "BreakdownCard",
@@ -533,6 +560,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "landed-cost",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "SimulationForm"
     ]
@@ -540,6 +568,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "layout",
     "fileCount": 15,
+    "kitFiles": 1,
     "components": [
       "AppLaunchLink",
       "AppLaunchSplash",
@@ -561,6 +590,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "markets",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "Markets"
     ]
@@ -568,6 +598,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "notes",
     "fileCount": 6,
+    "kitFiles": 1,
     "components": [
       "ConfirmDialog",
       "FoldersSidebar",
@@ -581,6 +612,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "operations",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "NotificationBell",
       "OperationsDashboard"
@@ -589,6 +621,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "payment",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "PaymentReviewDrawer",
       "ReconciliationBadge"
@@ -597,6 +630,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "perf",
     "fileCount": 3,
+    "kitFiles": 0,
     "components": [
       "PerfPanel",
       "PerfPanelGate",
@@ -606,6 +640,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "planning",
     "fileCount": 3,
+    "kitFiles": 1,
     "components": [
       "EntityPicker",
       "EntityPlanningStrip",
@@ -615,6 +650,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "price-calculator",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "PriceCalculator"
     ]
@@ -622,6 +658,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "product-preview",
     "fileCount": 2,
+    "kitFiles": 0,
     "components": [
       "ProductPreview",
       "VisualGlyph"
@@ -630,6 +667,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "product-templates",
     "fileCount": 4,
+    "kitFiles": 0,
     "components": [
       "FieldRenderer",
       "SectionRenderer",
@@ -640,6 +678,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "projects",
     "fileCount": 3,
+    "kitFiles": 2,
     "components": [
       "AttachmentsPanel",
       "ChecklistPanel",
@@ -654,6 +693,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "purchase",
     "fileCount": 17,
+    "kitFiles": 2,
     "components": [
       "ApprovalsModule",
       "BillsModule",
@@ -681,6 +721,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "pwa",
     "fileCount": 3,
+    "kitFiles": 0,
     "components": [
       "DevReload",
       "ServiceWorkerRegistrar",
@@ -690,6 +731,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "qa",
     "fileCount": 12,
+    "kitFiles": 0,
     "components": [
       "AnnotationEditor",
       "AttachmentStrip",
@@ -709,6 +751,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "quotations",
     "fileCount": 7,
+    "kitFiles": 1,
     "components": [
       "CustomerPickerModal",
       "ImageLightbox",
@@ -724,6 +767,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "reports",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "OperationalReports",
       "StatementReports"
@@ -732,6 +776,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "sales",
     "fileCount": 19,
+    "kitFiles": 5,
     "components": [
       "ActivitiesModule",
       "CommissionsModule",
@@ -757,6 +802,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "security",
     "fileCount": 17,
+    "kitFiles": 2,
     "components": [
       "DataTable",
       "DeepDiveTabs",
@@ -780,6 +826,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "settings",
     "fileCount": 12,
+    "kitFiles": 2,
     "components": [
       "AboutTab",
       "AdminTab",
@@ -802,6 +849,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "super-admin",
     "fileCount": 2,
+    "kitFiles": 0,
     "components": [
       "AlertPreferencesModal",
       "UserActivityDrawer"
@@ -810,6 +858,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "suppliers",
     "fileCount": 14,
+    "kitFiles": 2,
     "components": [
       "AddressAutocomplete",
       "CatalogsSection",
@@ -830,6 +879,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "todo",
     "fileCount": 3,
+    "kitFiles": 1,
     "components": [
       "MyWorkStrip",
       "ProductPicker",
@@ -839,6 +889,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "translator",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "TranslatorApp"
     ]
@@ -846,6 +897,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "ui",
     "fileCount": 28,
+    "kitFiles": 14,
     "components": [
       "AppHomeMenu",
       "AppLoadingSkeleton",
@@ -910,6 +962,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "website",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "WebsiteCMS"
     ]
@@ -917,6 +970,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "workflows",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "FinanceWorkflow",
       "InventoryWorkflow",
@@ -928,6 +982,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 accounts",
     "fileCount": 6,
+    "kitFiles": 1,
     "components": [
       "AccountDetailPage",
       "AccountsPage",
@@ -940,6 +995,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 ai",
     "fileCount": 4,
+    "kitFiles": 1,
     "components": [
       "AiKnowledgePage",
       "AiPage",
@@ -950,6 +1006,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 ai-face-lab",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "AiFaceLabPage"
     ]
@@ -957,6 +1014,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 ai-orb-lab",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "AiOrbLab"
     ]
@@ -964,6 +1022,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 brands",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "BrandsRedirect"
     ]
@@ -971,6 +1030,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 calendar",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "CalendarPage"
     ]
@@ -978,6 +1038,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 catalogs",
     "fileCount": 2,
+    "kitFiles": 1,
     "components": [
       "CatalogsPage",
       "Loading"
@@ -986,6 +1047,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 categories",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "CategoriesPage"
     ]
@@ -993,6 +1055,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 commercial-policy",
     "fileCount": 2,
+    "kitFiles": 0,
     "components": [
       "CommercialPolicyPage",
       "MarketProfilePage"
@@ -1001,6 +1064,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 contacts",
     "fileCount": 2,
+    "kitFiles": 1,
     "components": [
       "ContactsPage",
       "Loading"
@@ -1009,6 +1073,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 create",
     "fileCount": 6,
+    "kitFiles": 0,
     "components": [
       "Page"
     ]
@@ -1016,6 +1081,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 crm",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "CrmPage",
       "Loading"
@@ -1024,6 +1090,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 customers",
     "fileCount": 3,
+    "kitFiles": 2,
     "components": [
       "CustomerProfilePage",
       "CustomersPage",
@@ -1033,6 +1100,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 database",
     "fileCount": 11,
+    "kitFiles": 0,
     "components": [
       "ClassificationPage",
       "CollectionDetailPage",
@@ -1050,6 +1118,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 discuss",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "DiscussPage",
       "Loading"
@@ -1058,6 +1127,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 divisions",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "DivisionsPage"
     ]
@@ -1065,6 +1135,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 documents",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "DocumentsPage"
     ]
@@ -1072,6 +1143,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 employees",
     "fileCount": 5,
+    "kitFiles": 1,
     "components": [
       "AddEmployeePage",
       "EditEmployeePage",
@@ -1083,6 +1155,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 executive",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "Page"
     ]
@@ -1090,6 +1163,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 expenses",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "ExpensesAppPage"
     ]
@@ -1097,6 +1171,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 finance",
     "fileCount": 30,
+    "kitFiles": 0,
     "components": [
       "FinanceAccountingQueuePage",
       "FinanceBankAccountsPage",
@@ -1129,6 +1204,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 home",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "Page"
     ]
@@ -1136,6 +1212,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 hr",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "HRPage"
     ]
@@ -1143,6 +1220,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 inbox",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "InboxPage",
       "Loading"
@@ -1151,6 +1229,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 inventory",
     "fileCount": 14,
+    "kitFiles": 1,
     "components": [
       "InventoryBalancesPage",
       "InventoryItemsPage",
@@ -1166,6 +1245,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 invoices",
     "fileCount": 3,
+    "kitFiles": 1,
     "components": [
       "InvoicePrintPage",
       "InvoicesPage",
@@ -1175,6 +1255,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 issues",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "IssuesPage"
     ]
@@ -1182,6 +1263,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 kds-lab",
     "fileCount": 2,
+    "kitFiles": 1,
     "components": [
       "ElementElection",
       "KdsLab"
@@ -1190,6 +1272,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 knowledge",
     "fileCount": 82,
+    "kitFiles": 0,
     "components": [
       "AccessControlPage",
       "AgentCreditPage",
@@ -1276,6 +1359,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 landed-cost",
     "fileCount": 4,
+    "kitFiles": 0,
     "components": [
       "EditSimulationPage",
       "LandedCostListPage",
@@ -1286,6 +1370,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 login",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "LoginPage"
     ]
@@ -1293,6 +1378,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 management",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "ManagementPage"
     ]
@@ -1300,6 +1386,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 markets",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "MarketsPage"
     ]
@@ -1307,6 +1394,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 notes",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "NotesPage"
     ]
@@ -1314,6 +1402,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 operations",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "Page"
     ]
@@ -1321,6 +1410,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 orb-lab",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "OrbLab"
     ]
@@ -1328,6 +1418,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 planning",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "PlanningPage"
     ]
@@ -1335,6 +1426,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 price-calculator",
     "fileCount": 2,
+    "kitFiles": 1,
     "components": [
       "PriceCalculatorPage",
       "PricingSettingsPage"
@@ -1343,6 +1435,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 product-data",
     "fileCount": 9,
+    "kitFiles": 0,
     "components": [
       "DemoLockstitchPage",
       "EditProductDataPage",
@@ -1358,6 +1451,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 products",
     "fileCount": 10,
+    "kitFiles": 1,
     "components": [
       "EditProductPage",
       "LegacyProductView",
@@ -1374,6 +1468,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 projects",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "ProjectsPage"
     ]
@@ -1381,6 +1476,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 purchase",
     "fileCount": 16,
+    "kitFiles": 1,
     "components": [
       "Loading",
       "PurchaseLayout",
@@ -1391,6 +1487,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 qa",
     "fileCount": 3,
+    "kitFiles": 0,
     "components": [
       "MyIssuesPage",
       "QaRedirect",
@@ -1400,6 +1497,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 quotations",
     "fileCount": 5,
+    "kitFiles": 1,
     "components": [
       "Loading",
       "PreorderPage",
@@ -1411,6 +1509,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 reports",
     "fileCount": 2,
+    "kitFiles": 0,
     "components": [
       "Page"
     ]
@@ -1418,6 +1517,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 roles",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "RolesPage"
     ]
@@ -1425,6 +1525,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 root",
     "fileCount": 5,
+    "kitFiles": 1,
     "components": [
       "HomePage",
       "Loading",
@@ -1436,6 +1537,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 sales",
     "fileCount": 4,
+    "kitFiles": 1,
     "components": [
       "Loading",
       "SalesOrderDetailPage",
@@ -1446,6 +1548,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 settings",
     "fileCount": 3,
+    "kitFiles": 3,
     "components": [
       "Loading",
       "NotificationsSettingsPage",
@@ -1455,6 +1558,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 software-center",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "SoftwareCenterPage"
     ]
@@ -1462,6 +1566,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 subcategories",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "SubcategoriesPage"
     ]
@@ -1469,6 +1574,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 super-admin",
     "fileCount": 1,
+    "kitFiles": 1,
     "components": [
       "SuperAdminActivityPage"
     ]
@@ -1476,6 +1582,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 suppliers",
     "fileCount": 5,
+    "kitFiles": 2,
     "components": [
       "KoleexMainSuppliersPage",
       "Loading",
@@ -1487,6 +1594,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 todo",
     "fileCount": 2,
+    "kitFiles": 2,
     "components": [
       "TodoPage",
       "TodoReportPage"
@@ -1495,6 +1603,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 translator",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "TranslatorPage"
     ]
@@ -1502,6 +1611,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 website",
     "fileCount": 1,
+    "kitFiles": 0,
     "components": [
       "WebsitePage"
     ]
@@ -1509,6 +1619,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "routes \u00b7 workflows",
     "fileCount": 5,
+    "kitFiles": 0,
     "components": [
       "Page",
       "WorkflowsPage"

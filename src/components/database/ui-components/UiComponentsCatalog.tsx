@@ -38,6 +38,10 @@ const T: Translations = {
   "db.uiComp.cat.business":    { en: "Business Modules", zh: "业务模块", ar: "وحدات الأعمال" },
   "db.uiComp.cat.content":     { en: "Content & Knowledge", zh: "内容与知识", ar: "المحتوى والمعرفة" },
   "db.uiComp.cat.other":       { en: "Other", zh: "其他", ar: "أخرى" },
+  "db.uiComp.cat.internals":   { en: "Platform Internals", zh: "平台内部", ar: "البنية الداخلية للمنصة" },
+  "db.uiComp.cat.routes":      { en: "App Screens (routes)", zh: "应用页面（路由）", ar: "شاشات التطبيقات (المسارات)" },
+  "db.uiComp.onKit":           { en: "{p}% on kit", zh: "{p}% 使用套件", ar: "{p}% على العدة" },
+  "db.uiComp.kitHint":         { en: "Share of this module's files already built on the shared kit (KDS / core UI). The goal: bespoke counts shrink, this rises.", zh: "该模块已使用共享套件（KDS/核心UI）的文件占比。目标：自定义数量下降，此比例上升。", ar: "نسبة ملفات الوحدة المبنية على العدة المشتركة (KDS / UI الأساسية). الهدف: تقل المكوّنات الخاصة وترتفع النسبة." },
   "db.uiComp.footer":       {
     en: "Inventory generated from the source tree. Component names are the React identifiers used in code.",
     zh: "清单由源代码树生成。组件名称即代码中使用的 React 标识符。",
@@ -62,14 +66,22 @@ const LABELS: Record<string, string> = {
   knowledge: "Knowledge Base", "product-templates": "Product Templates",
   "product-preview": "Product Preview", notes: "Notes", discuss: "Discuss",
   website: "Website",
+  kds: "KDS · Design System Kit", common: "Shared Common", customers: "Customers",
+  documents: "Documents", todo: "To-do", behavior: "Employee Behavior",
+  activity: "Activity Monitor", "ai-orb": "AI Orb", perf: "Performance",
+  pwa: "PWA & Offline", security: "Security & Auth", "super-admin": "Super Admin",
+  translator: "Translator", "shared-root": "Shared Root",
 };
 
 /* Super-categories — an ordered grouping so the catalog reads top-down. */
 const CATEGORIES: { title: string; i18nKey: string; keys: string[] }[] = [
-  { title: "Foundations & Primitives", i18nKey: "db.uiComp.cat.foundations", keys: ["ui", "icons", "layout"] },
+  { title: "Foundations & Primitives", i18nKey: "db.uiComp.cat.foundations", keys: ["kds", "ui", "icons", "layout", "common", "shared-root"] },
   { title: "Workspace & System", i18nKey: "db.uiComp.cat.workspace", keys: ["home", "create", "settings", "admin", "ai", "qa", "database", "attachments", "approval", "workflows", "reports", "executive"] },
-  { title: "Business Modules", i18nKey: "db.uiComp.cat.business", keys: ["finance", "expenses", "inventory", "sales", "purchase", "invoices", "invoices-doc", "quotations", "hr", "employees", "crm", "contacts", "suppliers", "projects", "operations", "planning", "landed-cost", "price-calculator", "payment", "commercial-policy", "markets"] },
-  { title: "Content & Knowledge", i18nKey: "db.uiComp.cat.content", keys: ["knowledge", "product-templates", "product-preview", "notes", "discuss", "website"] },
+  { title: "Business Modules", i18nKey: "db.uiComp.cat.business", keys: ["finance", "expenses", "inventory", "sales", "purchase", "invoices", "invoices-doc", "quotations", "hr", "employees", "crm", "contacts", "suppliers", "projects", "operations", "planning", "landed-cost", "price-calculator", "payment", "commercial-policy", "markets", "customers", "documents", "todo", "behavior"] },
+  { title: "Content & Knowledge", i18nKey: "db.uiComp.cat.content", keys: ["knowledge", "product-templates", "product-preview", "notes", "discuss", "website", "translator"] },
+  /* Infrastructure surfaces — real code, but not "app UI" anyone should copy
+     styles from. Kept visible (nothing hidden), clearly fenced off. */
+  { title: "Platform Internals", i18nKey: "db.uiComp.cat.internals", keys: ["activity", "ai-orb", "perf", "pwa", "security", "super-admin"] },
 ];
 
 function labelFor(key: string): string {
@@ -156,7 +168,7 @@ function LivePrimitives() {
 }
 
 /* ── Module group (collapsible) ───────────────────────────────────────────── */
-function ModuleGroup({ k, components, q, forceOpen }: { k: string; components: string[]; q: string; forceOpen: boolean }) {
+function ModuleGroup({ k, components, q, forceOpen, fileCount, kitFiles, onKitLabel, kitHint }: { k: string; components: string[]; q: string; forceOpen: boolean; fileCount: number; kitFiles: number; onKitLabel: string; kitHint: string }) {
   const [open, setOpen] = useState(false);
   const filtered = q ? components.filter((c) => c.toLowerCase().includes(q)) : components;
   if (q && filtered.length === 0) return null;
@@ -170,6 +182,14 @@ function ModuleGroup({ k, components, q, forceOpen }: { k: string; components: s
       >
         <span className="text-[13.5px] font-semibold text-[var(--text-primary)]">{labelFor(k)}</span>
         <span className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10.5px] font-semibold tabular-nums text-[var(--text-dim)]">{filtered.length}</span>
+        {fileCount > 0 && !k.startsWith("routes") && k !== "kds" && k !== "ui" && (
+          <span
+            title={kitHint}
+            className={`rounded-full border px-2 py-0.5 text-[9.5px] font-semibold tabular-nums ${kitFiles / fileCount >= 0.5 ? "border-emerald-500/30 text-emerald-500" : "border-[var(--border-subtle)] text-[var(--text-ghost)]"}`}
+          >
+            {onKitLabel.replace("{p}", String(Math.round((100 * kitFiles) / fileCount)))}
+          </span>
+        )}
         <span className="ms-auto text-[12px] text-[var(--text-dim)]">{expanded ? "▾" : "▸"}</span>
       </button>
       {expanded && (
@@ -187,16 +207,21 @@ export default function UiComponentsCatalog() {
   const query = q.trim().toLowerCase();
 
   const byKey = useMemo(() => {
-    const m: Record<string, string[]> = {};
-    for (const mod of UI_COMPONENT_MODULES) m[mod.key] = mod.components;
+    const m: Record<string, { components: string[]; fileCount: number; kitFiles: number }> = {};
+    for (const mod of UI_COMPONENT_MODULES) m[mod.key] = { components: mod.components, fileCount: mod.fileCount, kitFiles: mod.kitFiles };
     return m;
   }, []);
 
-  // Keys not covered by an explicit category go into "Other".
+  // Route-page modules get their own section; anything still unknown → "Other".
   const categorized = useMemo(() => {
     const used = new Set(CATEGORIES.flatMap((c) => c.keys));
-    const others = UI_COMPONENT_MODULES.map((m) => m.key).filter((k) => !used.has(k));
-    return others.length ? [...CATEGORIES, { title: "Other", i18nKey: "db.uiComp.cat.other", keys: others }] : CATEGORIES;
+    const rest = UI_COMPONENT_MODULES.map((m) => m.key).filter((k) => !used.has(k));
+    const routes = rest.filter((k) => k.startsWith("routes"));
+    const others = rest.filter((k) => !k.startsWith("routes"));
+    const cats = [...CATEGORIES];
+    if (routes.length) cats.push({ title: "App Screens (routes)", i18nKey: "db.uiComp.cat.routes", keys: routes });
+    if (others.length) cats.push({ title: "Other", i18nKey: "db.uiComp.cat.other", keys: others });
+    return cats;
   }, []);
 
   const showPrimitives = !query || "buttons kpi card badge pill input select primitive".includes(query);
@@ -240,7 +265,7 @@ export default function UiComponentsCatalog() {
         const keys = cat.keys.filter((k) => byKey[k]);
         if (keys.length === 0) return null;
         // When searching, drop categories whose modules have no match.
-        const anyMatch = !query || keys.some((k) => byKey[k].some((c) => c.toLowerCase().includes(query)));
+        const anyMatch = !query || keys.some((k) => byKey[k].components.some((c) => c.toLowerCase().includes(query)));
         if (!anyMatch) return null;
         return (
           <section key={cat.title} className="space-y-2.5">
@@ -250,7 +275,17 @@ export default function UiComponentsCatalog() {
             </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {keys.map((k) => (
-                <ModuleGroup key={k} k={k} components={byKey[k]} q={query} forceOpen={!!query} />
+                <ModuleGroup
+                  key={k}
+                  k={k}
+                  components={byKey[k].components}
+                  fileCount={byKey[k].fileCount}
+                  kitFiles={byKey[k].kitFiles}
+                  q={query}
+                  forceOpen={!!query}
+                  onKitLabel={t("db.uiComp.onKit", "{p}% on kit")}
+                  kitHint={t("db.uiComp.kitHint", "Share of this module's files already built on the shared kit (KDS / core UI). The goal: bespoke counts shrink, this rises.")}
+                />
               ))}
             </div>
           </section>
