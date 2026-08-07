@@ -193,6 +193,17 @@ export async function DELETE(
     );
   }
 
+  /* Offboarding hygiene BEFORE the row goes: the person's PRIVATE
+     to-dos are personal workspace garbage once the account is gone
+     (nobody could ever see them again). Shared/team tasks stay —
+     their creator/assigner become NULL via the SET NULL FKs and the
+     To-do app shows them as a former member; assignment rows CASCADE. */
+  await supabaseServer
+    .from("koleex_todos")
+    .delete()
+    .eq("created_by_account_id", id)
+    .eq("is_private", true);
+
   // Same belt-and-braces — the existsInTenant() check above protects
   // the happy path, but the DELETE itself must also be tenant-scoped
   // so a race / crafted request can't wipe another tenant's account.
@@ -204,6 +215,20 @@ export async function DELETE(
   const { error } = await del;
   if (error) {
     console.error("[api/accounts/[id] DELETE]", error.message);
+    /* FK block (23503): tell the operator WHICH record family is holding
+       the account instead of a silent/raw failure — this exact silence is
+       how a "deleted" account once survived and kept showing in To-do. */
+    if (error.code === "23503") {
+      const table = /table "([^"]+)"/.exec(error.details ?? "")?.[1] ?? null;
+      return NextResponse.json(
+        {
+          error: table
+            ? `This account is still referenced by records in "${table}" (audit/approval trails). Those records must keep their author — suspend the account instead of deleting it, or clear those records first.`
+            : "This account is still referenced by audit/approval records in another module. Suspend it instead of deleting, or clear those records first.",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
