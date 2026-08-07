@@ -31,6 +31,7 @@ import { supabaseServer } from "../../supabase-server";
 import { sendPushToAccounts } from "../../web-push";
 import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
+import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
 const TODO_MODULE = "To-do";
 
@@ -80,12 +81,12 @@ function todayRangeISO(): { startOfToday: string; endOfToday: string; endOfWeek:
 }
 
 const listMyTodos: ToolDef<
-  { filter?: string; due?: string; limit?: number },
+  { filter?: string; due?: string; q?: string; limit?: number },
   Array<Record<string, unknown>>
 > = {
   name: "listMyTodos",
   description:
-    "List the current user's to-do tasks (from the To-do app), already scoped to what THEY are allowed to see. Use for questions like 'what are my tasks', 'what's due today', 'my open to-dos', 'overdue tasks'. Returns only this user's visible tasks — never anyone else's private work.",
+    "List the current user's to-do tasks (from the To-do app), already scoped to what THEY are allowed to see. Use for questions like 'what are my tasks', 'what's due today', 'my open to-dos', 'overdue tasks'. When resolving a SPECIFIC task by name (to complete/update/delete/reassign it), ALWAYS pass q with a couple of words from its title — the plain list is capped and a matching task can sit beyond the cap. Returns only this user's visible tasks — never anyone else's private work.",
   parameters: {
     type: "object",
     properties: {
@@ -100,6 +101,7 @@ const listMyTodos: ToolDef<
           "Optional due filter. Default 'any' — use 'any' for general questions like 'what tasks do I have', 'what's on my plate', or even 'what do I have today' (an active task with NO due date is still something the user has, so 'any' surfaces it). Only use 'today' when the user explicitly asks what is DUE today (it excludes undated tasks); 'overdue' for past-due; 'week' for the next 7 days.",
         enum: ["any", "overdue", "today", "week"],
       },
+      q: { type: "string", description: "Title search (case-insensitive contains). Use when looking for a specific task by name." },
       limit: { type: "integer", description: "Max rows. Default 20, cap 50." },
     },
     required: [],
@@ -112,8 +114,16 @@ const listMyTodos: ToolDef<
     const limit = Math.min(Math.max(Number(args.limit ?? 20) || 20, 1), 50);
     const filter = String(args.filter ?? "open");
     const due = String(args.due ?? "any");
+    const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
 
     let q = supabaseServer.from("koleex_todos").select(TODO_COLS).eq("tenant_id", tenantId);
+
+    /* Title resolution — without this, a specific task can sit past the
+       row cap and the model wrongly concludes it doesn't exist (observed
+       live 2026-08-08 right after a successful create). Escaped ilike. */
+    if (titleQuery) {
+      q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
+    }
 
     /* ── Port of the route's non-SA visibility scope ── */
     if (!ctx.isSuperAdmin) {
@@ -362,7 +372,10 @@ const createTodo: ToolDef<
       .from("koleex_todos")
       .insert({
         title: normalized.title,
-        metadata: {},
+        /* AI provenance lives in metadata: the `source` column has a CHECK
+           constraint (manual|crm|calendar) — 'koleex-ai' violates it and
+           silently failed every confirmed create until 2026-08-08. */
+        metadata: { created_via: "koleex-ai" },
         description: normalized.description,
         completed: false,
         completed_at: null,
@@ -376,7 +389,7 @@ const createTodo: ToolDef<
         recurrence_until: null,
         created_by_account_id: ctx.auth.account_id,
         assigned_by_account_id: ctx.auth.account_id,
-        source: "koleex-ai",
+        source: "manual",
         source_id: null,
         assigned_department: null,
         assign_to_all: false,
@@ -456,6 +469,7 @@ const completeTodo: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
     const done = args.done !== false;
 
     const [t, { data: assignee }] = await Promise.all([
@@ -620,6 +634,7 @@ const updateTodo: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
     if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
@@ -735,6 +750,7 @@ const reassignTodo: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
     if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
@@ -874,6 +890,7 @@ const deleteTodo: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
     if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };

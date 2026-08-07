@@ -238,7 +238,13 @@ export function buildSmartPrompt(
         ` inventory, products, orders, quotations). For specifics, tell them to open the relevant app.` +
         ` (2) Do not emit specific commercial numbers (prices, totals, unit prices, discounts, margins,` +
         ` markups, tax amounts, quotation values) unless the user gave them to you this turn.` +
-        ` General discussion of business concepts is fine; invented figures are not.`,
+        ` General discussion of business concepts is fine; invented figures are not.` +
+        ` (3) In this mode you CANNOT create, edit, complete, assign or delete anything — no tasks,` +
+        ` events, shifts, records. NEVER say something was "created", "added", "scheduled", "updated",` +
+        ` "deleted" or "done" — nothing you say here is saved anywhere. If the user asks for such an` +
+        ` action, or is mid-way through one (giving you a task's details, confirming), do NOT pretend:` +
+        ` ask them to resend the request as one message (e.g. "add a task: call the agent tomorrow,` +
+        ` high priority") so the assistant with live access picks it up.`,
     },
     { role: "user", content: userMsg },
   ];

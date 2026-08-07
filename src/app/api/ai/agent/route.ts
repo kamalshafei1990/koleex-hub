@@ -496,21 +496,26 @@ export async function POST(req: Request) {
             /(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)/i.test(normalizedContent) ||
             /احفظ|تذكّ?ر|لا تنسى?|أضف .*للمعرفة|سجّ?ل (هذه|هذا|ذلك)/.test(normalizedContent) ||
             /记住|保存|别忘|加入知识库/.test(normalizedContent);
-          /* WRITE-WITH-CONFIRM turn 2 ("yes" / "ايوه" / "确认") carries no
-             work nouns, so isWorkDataQuery misses it — and the tool-less
-             general lane would swallow the confirmation, letting the model
-             narrate success with NOTHING written (the fabricated-create
-             failure 5676a3d6 fixed inside the loop, reintroduced one layer
-             up). If the previous assistant turn asked for a confirmation
-             and this message is short, force the tool loop; a short "no /
-             cancel" lands there too, which is exactly where a cancel
-             should be handled. */
+          /* MID-FLOW replies must reach the tool loop. Two proven failure
+             shapes when they don't (both fabricated writes in the tool-less
+             general lane): (a) WRITE-WITH-CONFIRM turn 2 — "yes"/"ايوه"/
+             "确认" carries no work nouns; (b) the DETAIL turn — the agent
+             asked "what should the task say / when is it due?" and the
+             user's answer is pure content ("call the shipping agent, high
+             priority") with no work nouns either (observed live 2026-08-08:
+             fast lane replied "已添加" with zero rows written). Structural
+             rule, language-agnostic: if the last assistant turn asked for
+             confirmation OR ended with a question mark, a reasonably short
+             user reply is ANSWERING it — route it to orchestrate(), which
+             handles small talk fine anyway. */
           const lastAssistantTurn =
             [...history].reverse().find((m) => m.role === "assistant")?.content ?? "";
           const assistantAskedConfirm =
             /confirm|تأكيد|أكّ?د|أؤكد|确认|هل أنفذ/i.test(lastAssistantTurn);
-          const isConfirmTurn =
-            assistantAskedConfirm && normalizedContent.trim().length <= 120;
+          const assistantAskedQuestion = /[?؟？]\s*$/.test(lastAssistantTurn.trim());
+          const isMidFlowReply =
+            (assistantAskedConfirm || assistantAskedQuestion) &&
+            normalizedContent.trim().length <= 300;
           /* DeepSeek powers the fast lanes now (Groq fully removed).
              USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
@@ -532,7 +537,7 @@ export async function POST(req: Request) {
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
           const canFastPath =
-            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isConfirmTurn;
+            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";

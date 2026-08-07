@@ -318,8 +318,13 @@ export async function POST(req: Request) {
     [...historyForAgent].reverse().find((m) => m.role === "assistant")?.content ?? "";
   const assistantAskedConfirm =
     /confirm|تأكيد|أكّ?د|أؤكد|确认|هل أنفذ/i.test(lastAssistantTurn);
-  const isConfirmTurn = assistantAskedConfirm && lastUser.trim().length <= 120;
-  if (isWorkDataQuery(lastUser) || isConfirmTurn) {
+  /* Mid-flow structural rule (same as the agent route): a short reply to
+     an assistant QUESTION — confirm turn, detail turn, "which one?" turn —
+     must reach the tool loop, or the tool-less lanes fabricate the write. */
+  const assistantAskedQuestion = /[?؟？]\s*$/.test(lastAssistantTurn.trim());
+  const isMidFlowReply =
+    (assistantAskedConfirm || assistantAskedQuestion) && lastUser.trim().length <= 300;
+  if (isWorkDataQuery(lastUser) || isMidFlowReply) {
     /* Groups this surface's rows in ai_tool_calls (uuid column, no FK).
        account_id already identifies the person; this marks the lane. */
     const DISCUSS_AGENT_CONVERSATION_ID = "00000000-0000-0000-0000-00000000d15c";
@@ -395,7 +400,7 @@ export async function POST(req: Request) {
             );
             console.log(
               `[ai] lane=agent ep=chat provider=${agent.provider} intent=work` +
-                ` confirm_turn=${isConfirmTurn ? 1 : 0} fallback=0` +
+                ` midflow=${isMidFlowReply ? 1 : 0} fallback=0` +
                 ` in_bytes=${lastUser.length} hist=${historyForAgent.length}` +
                 ` ms=${Date.now() - t0} stream=1 reply_bytes=${finalReply.length}`,
             );
@@ -435,7 +440,7 @@ export async function POST(req: Request) {
     const reply = polish(agent.finalReply ?? "");
     console.log(
       `[ai] lane=agent ep=chat provider=${agent.provider} intent=work` +
-        ` confirm_turn=${isConfirmTurn ? 1 : 0} fallback=0` +
+        ` midflow=${isMidFlowReply ? 1 : 0} fallback=0` +
         ` in_bytes=${lastUser.length} hist=${historyForAgent.length}` +
         ` ms=${Date.now() - t0} stream=0 reply_bytes=${reply.length}`,
     );

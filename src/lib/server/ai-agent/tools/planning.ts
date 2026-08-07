@@ -14,6 +14,7 @@ import "server-only";
 
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
+import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
 const PLANNING_MODULE = "Planning";
 
@@ -29,17 +30,18 @@ function windowISO(days: number): { from: string; to: string } {
 }
 
 const listMyPlanning: ToolDef<
-  { days?: number; mine?: boolean; limit?: number },
+  { days?: number; mine?: boolean; q?: string; limit?: number },
   Array<Record<string, unknown>>
 > = {
   name: "listMyPlanning",
   description:
-    "List the current user's schedule / planning items (shifts, allocations) from the Planning app, scoped to what they can see. Use for 'my schedule', 'my shifts this week', 'what am I planned for', 'open shifts'. Defaults to the next 7 days.",
+    "List the current user's schedule / planning items (shifts, allocations) from the Planning app, scoped to what they can see. Use for 'my schedule', 'my shifts this week', 'what am I planned for', 'open shifts'. When resolving a SPECIFIC item by name (to change/cancel/delete it), pass q with words from its title. Defaults to the next 7 days.",
   parameters: {
     type: "object",
     properties: {
       days: { type: "integer", description: "How many days ahead from now to include. Default 7, cap 60." },
       mine: { type: "boolean", description: "If true, only items on the user's own resource (not open/unassigned shifts). Default false." },
+      q: { type: "string", description: "Title search (case-insensitive contains). Use when looking for a specific item by name." },
       limit: { type: "integer", description: "Max rows. Default 30, cap 60." },
     },
     required: [],
@@ -82,6 +84,11 @@ const listMyPlanning: ToolDef<
       q = q.or(orParts.join(","));
     }
 
+    const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
+    if (titleQuery) {
+      q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
+    }
+
     const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
     if (error) {
       console.error("[tool.listMyPlanning]", error);
@@ -119,7 +126,7 @@ const createPlanningItem: ToolDef<
       title: { type: "string", description: "Short title/label for the item." },
       start_at: { type: "string", description: "ISO start datetime (required)." },
       end_at: { type: "string", description: "ISO end datetime (required)." },
-      type: { type: "string", description: "shift | task | time_off | other. Default shift." },
+      type: { type: "string", description: "shift | meeting | other. Default shift.", enum: ["shift", "meeting", "other"] },
       notes: { type: "string", description: "Optional notes." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
     },
@@ -131,8 +138,20 @@ const createPlanningItem: ToolDef<
     const startAt = String(args.start_at ?? "").trim();
     const endAt = String(args.end_at ?? "").trim();
     if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    {
+      const s = Date.parse(startAt), e = Date.parse(endAt);
+      if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) {
+        return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
+      }
+    }
     const title = args.title ? String(args.title) : "";
-    const type = String(args.type ?? "shift");
+    /* planning_items_type_check allows shift|meeting|production|delivery|
+       maintenance|project_task|room_booking|other — anything else from the
+       model (it used to offer "task"/"time_off") collapses to "shift" so
+       the insert can never hit the CHECK constraint. */
+    const DB_TYPES = new Set(["shift", "meeting", "production", "delivery", "maintenance", "project_task", "room_booking", "other"]);
+    const rawType = String(args.type ?? "shift");
+    const type = DB_TYPES.has(rawType) ? rawType : "shift";
 
     // Attach to the caller's own resource so it's their planned time (not an
     // open shift). If they have none, it's created unassigned.
@@ -274,6 +293,7 @@ const updatePlanningItem: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
     if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
@@ -289,6 +309,15 @@ const updatePlanningItem: ToolDef<
     }
     if (Object.keys(changes).length === 0) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
+    }
+
+    /* planning_items CHECK (end_at > start_at): validate the EFFECTIVE
+       bounds (changed value or the row's current one) so a one-sided
+       reschedule can't produce an inverted window. */
+    const effStart = Date.parse((changes.start_at as string | undefined) ?? item.start_at ?? "");
+    const effEnd = Date.parse((changes.end_at as string | undefined) ?? item.end_at ?? "");
+    if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd <= effStart) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
     }
 
     const label = item.title || item.type || "planning item";
@@ -348,6 +377,7 @@ const deletePlanningItem: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
     if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };

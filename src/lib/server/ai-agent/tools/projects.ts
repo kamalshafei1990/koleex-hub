@@ -17,6 +17,7 @@ import "server-only";
 import { supabaseServer } from "../../supabase-server";
 import { recomputeProjectProgress } from "../../project-progress";
 import type { ToolDef, ToolResult } from "../types";
+import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
 const PROJECTS_MODULE = "Projects";
 
@@ -134,17 +135,18 @@ const listMyProjects: ToolDef<
 };
 
 const listProjectTasks: ToolDef<
-  { mine?: boolean; status?: string; limit?: number },
+  { mine?: boolean; status?: string; q?: string; limit?: number },
   Array<Record<string, unknown>>
 > = {
   name: "listProjectTasks",
   description:
-    "List project tasks visible to the current user (tasks they're assigned to, created, or that live in a project they manage/created). Use for 'my project tasks', 'what's assigned to me on projects', 'open tasks in my projects'. Set mine=true to restrict to tasks assigned to the user only.",
+    "List project tasks visible to the current user (tasks they're assigned to, created, or that live in a project they manage/created). Use for 'my project tasks', 'what's assigned to me on projects', 'open tasks in my projects'. Set mine=true to restrict to tasks assigned to the user only. When resolving a SPECIFIC task by name, pass q with words from its title — the plain list is capped.",
   parameters: {
     type: "object",
     properties: {
       mine: { type: "boolean", description: "If true, only tasks assigned to the current user. Default false (all visible)." },
-      status: { type: "string", description: "Optional task status filter (e.g. 'todo', 'in_progress', 'done')." },
+      status: { type: "string", description: "Optional task status filter — one of 'open', 'done', 'cancelled'." },
+      q: { type: "string", description: "Title search (case-insensitive contains). Use when looking for a specific task by name." },
       limit: { type: "integer", description: "Max rows. Default 20, cap 50." },
     },
     required: [],
@@ -177,6 +179,10 @@ const listProjectTasks: ToolDef<
     }
 
     if (args.status) q = q.eq("status", String(args.status));
+    const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
+    if (titleQuery) {
+      q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
+    }
 
     const { data, error } = await q
       .order("due_date", { ascending: true, nullsFirst: false })
@@ -336,6 +342,7 @@ const completeProjectTask: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
     const done = args.done !== false;
 
     const t = await loadVisibleTask(ctx, id);
@@ -359,9 +366,11 @@ const completeProjectTask: ToolDef<
       };
     }
 
+    /* project_tasks_status_check allows open|done|cancelled — reopen
+       means "open" (there is no todo/in_progress at the DB level). */
     const patch: Record<string, unknown> = done
       ? { status: "done", closed_at: new Date().toISOString(), progress_pct: 100 }
-      : { status: "todo", closed_at: null };
+      : { status: "open", closed_at: null };
     const { error } = await supabaseServer
       .from("project_tasks")
       .update(patch)
@@ -375,8 +384,8 @@ const completeProjectTask: ToolDef<
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { id: t.id, title, status: done ? "done" : "todo" },
-      message: done ? `Done — project task "${title}" is marked complete.` : `Reopened "${title}".`,
+      data: { id: t.id, title, status: done ? "done" : "open" },
+      message: done ? `Done — project task "${title}" is marked complete.` : `Reopened "${title}" (status: open).`,
       sources: ["project_tasks(update)"],
     };
   },
@@ -414,6 +423,7 @@ const updateProjectTask: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadVisibleTask(ctx, id);
     if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
@@ -481,6 +491,7 @@ const deleteProjectTask: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadVisibleTask(ctx, id);
     if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };

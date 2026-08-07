@@ -15,6 +15,7 @@ import "server-only";
 
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
+import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
 const CALENDAR_MODULE = "Calendar";
 
@@ -29,16 +30,17 @@ function windowISO(days: number): { from: string; to: string } {
 }
 
 const listMyCalendar: ToolDef<
-  { days?: number; limit?: number },
+  { days?: number; q?: string; limit?: number },
   Array<Record<string, unknown>>
 > = {
   name: "listMyCalendar",
   description:
-    "List the current user's own calendar events in an upcoming window (default next 7 days). Use for 'what's on my calendar', 'my meetings this week', 'am I free tomorrow'. Only ever returns the current user's own calendar.",
+    "List the current user's own calendar events in an upcoming window (default next 7 days). Use for 'what's on my calendar', 'my meetings this week', 'am I free tomorrow'. When resolving a SPECIFIC event by name (to reschedule or delete it), pass q with words from its title and raise days if it might be further out. Only ever returns the current user's own calendar.",
   parameters: {
     type: "object",
     properties: {
       days: { type: "integer", description: "How many days ahead from now to include. Default 7, cap 60." },
+      q: { type: "string", description: "Title search (case-insensitive contains). Use when looking for a specific event by name." },
       limit: { type: "integer", description: "Max rows. Default 30, cap 60." },
     },
     required: [],
@@ -60,6 +62,11 @@ const listMyCalendar: ToolDef<
       .eq("tenant_id", tenantId)
       .lt("start_at", to)
       .gte("end_at", from);
+
+    const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
+    if (titleQuery) {
+      q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
+    }
 
     const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
     if (error) {
@@ -114,6 +121,14 @@ const createCalendarEvent: ToolDef<
     const endAt = String(args.end_at ?? "").trim();
     if (!title) return { ok: false, permissionStatus: "denied", data: null, message: "What's the event called?" };
     if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    {
+      // DB CHECK is end_at >= start_at; equal start/end is a zero-length
+      // event the calendar accepts, so only inverted windows are blocked.
+      const s = Date.parse(startAt), e = Date.parse(endAt);
+      if (!Number.isNaN(s) && !Number.isNaN(e) && e < s) {
+        return { ok: false, permissionStatus: "denied", data: null, message: "The end time can't be before the start time." };
+      }
+    }
 
     const normalized = {
       title,
@@ -227,6 +242,7 @@ const updateCalendarEvent: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.event_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const ev = await loadEventRow(id, ctx.auth.tenant_id);
     if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
@@ -243,6 +259,12 @@ const updateCalendarEvent: ToolDef<
     if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
     if (Object.keys(changes).length === 0) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, times, description, all-day, or privacy)." };
+    }
+
+    const effStart = Date.parse((changes.start_at as string | undefined) ?? ev.start_at ?? "");
+    const effEnd = Date.parse((changes.end_at as string | undefined) ?? ev.end_at ?? "");
+    if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd < effStart) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "The end time can't be before the start time." };
     }
 
     const title = ev.title ?? "Event";
@@ -306,6 +328,7 @@ const deleteCalendarEvent: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.event_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
 
     const ev = await loadEventRow(id, ctx.auth.tenant_id);
     if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
