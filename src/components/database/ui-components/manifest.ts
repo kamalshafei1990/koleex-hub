@@ -1,8 +1,10 @@
 /* AUTO-GENERATED component inventory — regenerated 2026-08-07 by a
-   directory-aware crawl (export function/class/const + named exports,
-   uppercase-only, helpers filtered). Do not hand-edit. */
+   directory-aware crawl over src/components AND src/app (route pages,
+   layouts and in-route components included). Export patterns:
+   function/class/const + named exports, uppercase-only, helpers
+   filtered. Do not hand-edit — rerun the crawl instead. */
 export interface UiModule { key: string; fileCount: number; components: string[] }
-export const UI_COMPONENT_TOTALS = { components: 593, files: 750, modules: 54 };
+export const UI_COMPONENT_TOTALS = { components: 842, files: 1031, modules: 111 };
 export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "activity",
@@ -196,13 +198,14 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "database",
-    "fileCount": 25,
+    "fileCount": 27,
     "components": [
       "AddToCollectionModal",
       "AssetDna",
       "AssetQuality",
       "AssetRegistry",
       "AssetReview",
+      "BrandReadThrough",
       "BrandsManager",
       "ClassificationIconHub",
       "ClassificationManager",
@@ -213,6 +216,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "DatabaseHome",
       "IconBindingPicker",
       "KdsShowcase",
+      "PlatformShowcase",
       "ReviewBoard",
       "SemanticRelationships",
       "SpecIconHub",
@@ -919,6 +923,595 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "ProcurementWorkflow",
       "SalesWorkflow",
       "WorkflowsHub"
+    ]
+  },
+  {
+    "key": "routes \u00b7 accounts",
+    "fileCount": 6,
+    "components": [
+      "AccountDetailPage",
+      "AccountsPage",
+      "EditAccountPage",
+      "Loading",
+      "LoginSecurityPage",
+      "NewAccountPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 ai",
+    "fileCount": 4,
+    "components": [
+      "AiKnowledgePage",
+      "AiPage",
+      "Loading",
+      "OrbDemoPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 ai-face-lab",
+    "fileCount": 1,
+    "components": [
+      "AiFaceLabPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 ai-orb-lab",
+    "fileCount": 1,
+    "components": [
+      "AiOrbLab"
+    ]
+  },
+  {
+    "key": "routes \u00b7 brands",
+    "fileCount": 1,
+    "components": [
+      "BrandsRedirect"
+    ]
+  },
+  {
+    "key": "routes \u00b7 calendar",
+    "fileCount": 1,
+    "components": [
+      "CalendarPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 catalogs",
+    "fileCount": 2,
+    "components": [
+      "CatalogsPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 categories",
+    "fileCount": 1,
+    "components": [
+      "CategoriesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 commercial-policy",
+    "fileCount": 2,
+    "components": [
+      "CommercialPolicyPage",
+      "MarketProfilePage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 contacts",
+    "fileCount": 2,
+    "components": [
+      "ContactsPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 create",
+    "fileCount": 6,
+    "components": [
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 crm",
+    "fileCount": 2,
+    "components": [
+      "CrmPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 customers",
+    "fileCount": 3,
+    "components": [
+      "CustomerProfilePage",
+      "CustomersPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 database",
+    "fileCount": 11,
+    "components": [
+      "ClassificationPage",
+      "CollectionDetailPage",
+      "CollectionsPage",
+      "DatabaseBrandsPage",
+      "DatabaseLayout",
+      "DatabasePage",
+      "DatabaseSpecsAttributesPage",
+      "LegacyIssuesRedirect",
+      "ReviewBoardPage",
+      "UiComponentsPage",
+      "VisualLibraryPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 discuss",
+    "fileCount": 2,
+    "components": [
+      "DiscussPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 divisions",
+    "fileCount": 1,
+    "components": [
+      "DivisionsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 documents",
+    "fileCount": 1,
+    "components": [
+      "DocumentsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 employees",
+    "fileCount": 5,
+    "components": [
+      "AddEmployeePage",
+      "EditEmployeePage",
+      "EmployeeProfilePage",
+      "EmployeesLoading",
+      "EmployeesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 executive",
+    "fileCount": 1,
+    "components": [
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 expenses",
+    "fileCount": 1,
+    "components": [
+      "ExpensesAppPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 finance",
+    "fileCount": 30,
+    "components": [
+      "FinanceAccountingQueuePage",
+      "FinanceBankAccountsPage",
+      "FinanceBankImportsPage",
+      "FinanceCashFlowPage",
+      "FinanceCustomersPage",
+      "FinanceEquityPage",
+      "FinanceExpensesPage",
+      "FinanceGeneralLedgerPage",
+      "FinanceIntelligencePage",
+      "FinanceLoading",
+      "FinanceNotificationsPage",
+      "FinanceOrdersPage",
+      "FinanceOverviewPage",
+      "FinancePage",
+      "FinancePaymentsPage",
+      "FinanceProfitLossPage",
+      "FinanceReconciliationPage",
+      "FinanceReportsPage",
+      "FinanceSetupPage",
+      "FinanceStatementsPage",
+      "FinanceSuppliersPage",
+      "FinanceTreasuryForecastPage",
+      "FinanceTreasuryPlansPage",
+      "FinanceTrialBalancePage",
+      "Page",
+      "ReportPrintPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 home",
+    "fileCount": 1,
+    "components": [
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 hr",
+    "fileCount": 1,
+    "components": [
+      "HRPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 inbox",
+    "fileCount": 2,
+    "components": [
+      "InboxPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 inventory",
+    "fileCount": 14,
+    "components": [
+      "InventoryBalancesPage",
+      "InventoryItemsPage",
+      "InventoryLayout",
+      "InventoryMovementsPage",
+      "InventoryPage",
+      "InventorySearchPage",
+      "InventoryWarehousesPage",
+      "Loading",
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 invoices",
+    "fileCount": 3,
+    "components": [
+      "InvoicePrintPage",
+      "InvoicesPage",
+      "Loading"
+    ]
+  },
+  {
+    "key": "routes \u00b7 issues",
+    "fileCount": 1,
+    "components": [
+      "IssuesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 kds-lab",
+    "fileCount": 2,
+    "components": [
+      "ElementElection",
+      "KdsLab"
+    ]
+  },
+  {
+    "key": "routes \u00b7 knowledge",
+    "fileCount": 82,
+    "components": [
+      "AccessControlPage",
+      "AgentCreditPage",
+      "AgentOverviewPage",
+      "ApprovalCommissionPage",
+      "ApprovalCreditPage",
+      "ApprovalDiamondPage",
+      "ApprovalDiscountPage",
+      "ApprovalFlowPage",
+      "ApprovalFlowsPage",
+      "ApprovalLevelsPage",
+      "ApprovalOverviewPage",
+      "ApprovalSpecialPricePage",
+      "BusinessModelPage",
+      "CaseStudiesPage",
+      "ChannelStructurePage",
+      "CommercialFlowOverviewPage",
+      "CommercialPolicyLandingPage",
+      "CommercialPolicyLayout",
+      "CommercialScenariosPage",
+      "CommissionCalculationPage",
+      "CommissionCalculatorPage",
+      "CommissionExamplesPage",
+      "CommissionFaqPage",
+      "CommissionFlowPage",
+      "CommissionOverviewPage",
+      "CommissionPolicyPage",
+      "CommissionScenariosPage",
+      "CommissionVisualsPage",
+      "CompetitorsPage",
+      "CreditCalculatorPage",
+      "CreditCheckFlowPage",
+      "CreditDaysPage",
+      "CreditExamplesPage",
+      "CreditFaqPage",
+      "CreditFlowPage",
+      "CreditLimitsPage",
+      "CreditMatrixPage",
+      "CreditOverviewPage",
+      "CreditPolicyPage",
+      "CreditProfilesPage",
+      "CreditUpgradePage",
+      "CustomerLevelsPage",
+      "CustomerTypesPage",
+      "DecisionTreePage",
+      "DiscountApprovalPage",
+      "DiscountCalculatorPage",
+      "DiscountExamplesPage",
+      "DiscountFlowPage",
+      "DiscountMarginPage",
+      "DiscountOverviewPage",
+      "DiscountPage",
+      "DiscountTypesPage",
+      "FxRiskPage",
+      "IntroductionPage",
+      "KnowledgeLayout",
+      "KnowledgePage",
+      "LandedCostPage",
+      "MarginFlowPage",
+      "MarginStrategyPage",
+      "MarketBandsPage",
+      "OverduePolicyPage",
+      "PartnerSystemPage",
+      "PriceCalculatorPage",
+      "PriceFlowPage",
+      "PricingAlgorithmPage",
+      "PricingEngineDashboardPage",
+      "PricingFlowPage",
+      "PricingFormulaPage",
+      "PricingGovernancePage",
+      "PricingMathPage",
+      "PricingOverviewPage",
+      "ProductCodingSystemPage",
+      "ProductLevelsPage",
+      "ProfitAnalysisPage",
+      "QuickReferencePage",
+      "ScenarioLibraryPage",
+      "SettingsPage",
+      "SpecialPricingPage",
+      "SupplierDataGuidePage",
+      "SupplierOnboardingWorkflowPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 landed-cost",
+    "fileCount": 4,
+    "components": [
+      "EditSimulationPage",
+      "LandedCostListPage",
+      "NewSimulationPage",
+      "PrintReportPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 login",
+    "fileCount": 1,
+    "components": [
+      "LoginPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 management",
+    "fileCount": 1,
+    "components": [
+      "ManagementPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 markets",
+    "fileCount": 1,
+    "components": [
+      "MarketsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 notes",
+    "fileCount": 1,
+    "components": [
+      "NotesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 operations",
+    "fileCount": 1,
+    "components": [
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 orb-lab",
+    "fileCount": 1,
+    "components": [
+      "OrbLab"
+    ]
+  },
+  {
+    "key": "routes \u00b7 planning",
+    "fileCount": 1,
+    "components": [
+      "PlanningPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 price-calculator",
+    "fileCount": 2,
+    "components": [
+      "PriceCalculatorPage",
+      "PricingSettingsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 product-data",
+    "fileCount": 9,
+    "components": [
+      "DemoLockstitchPage",
+      "EditProductDataPage",
+      "NewProductDataPage",
+      "ProductDataDetailPage",
+      "ProductDataLoading",
+      "ProductDataPage",
+      "ProductDataSettingsPage",
+      "ProductPreviewPage",
+      "VisualMappingRedirect"
+    ]
+  },
+  {
+    "key": "routes \u00b7 products",
+    "fileCount": 10,
+    "components": [
+      "EditProductPage",
+      "LegacyProductView",
+      "Loading",
+      "NewProductPage",
+      "OgImage",
+      "ProductDetailPage",
+      "ProductSettingsPage",
+      "ProductsLoading",
+      "ProductsPage",
+      "PublicProductPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 projects",
+    "fileCount": 1,
+    "components": [
+      "ProjectsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 purchase",
+    "fileCount": 16,
+    "components": [
+      "Loading",
+      "PurchaseLayout",
+      "PurchasePageRoute",
+      "PurchaseRoute"
+    ]
+  },
+  {
+    "key": "routes \u00b7 qa",
+    "fileCount": 3,
+    "components": [
+      "MyIssuesPage",
+      "QaRedirect",
+      "ReporterIssuePage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 quotations",
+    "fileCount": 5,
+    "components": [
+      "Loading",
+      "PreorderPage",
+      "QuotationDetailPage",
+      "QuotationPrintPage",
+      "QuotationsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 reports",
+    "fileCount": 2,
+    "components": [
+      "Page"
+    ]
+  },
+  {
+    "key": "routes \u00b7 roles",
+    "fileCount": 1,
+    "components": [
+      "RolesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 root",
+    "fileCount": 5,
+    "components": [
+      "HomePage",
+      "Loading",
+      "NotFound",
+      "Providers",
+      "RootLayout"
+    ]
+  },
+  {
+    "key": "routes \u00b7 sales",
+    "fileCount": 4,
+    "components": [
+      "Loading",
+      "SalesOrderDetailPage",
+      "SalesOrdersPage",
+      "SalesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 settings",
+    "fileCount": 3,
+    "components": [
+      "Loading",
+      "NotificationsSettingsPage",
+      "SettingsPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 software-center",
+    "fileCount": 1,
+    "components": [
+      "SoftwareCenterPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 subcategories",
+    "fileCount": 1,
+    "components": [
+      "SubcategoriesPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 super-admin",
+    "fileCount": 1,
+    "components": [
+      "SuperAdminActivityPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 suppliers",
+    "fileCount": 5,
+    "components": [
+      "KoleexMainSuppliersPage",
+      "Loading",
+      "SourcingCommandCenterPage",
+      "SupplierDetailPage",
+      "SuppliersPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 todo",
+    "fileCount": 2,
+    "components": [
+      "TodoPage",
+      "TodoReportPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 translator",
+    "fileCount": 1,
+    "components": [
+      "TranslatorPage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 website",
+    "fileCount": 1,
+    "components": [
+      "WebsitePage"
+    ]
+  },
+  {
+    "key": "routes \u00b7 workflows",
+    "fileCount": 5,
+    "components": [
+      "Page",
+      "WorkflowsPage"
     ]
   }
 ];

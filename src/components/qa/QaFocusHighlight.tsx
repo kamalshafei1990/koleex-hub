@@ -44,7 +44,7 @@ export default function QaFocusHighlight() {
   const [capture, setCapture] = useState<CaptureState>("idle");
   const [captureMsg, setCaptureMsg] = useState<string | null>(null);
 
-  const skip = pathname.startsWith("/database/issues") || pathname.startsWith("/qa/report");
+  const skip = pathname.startsWith("/issues") || pathname.startsWith("/qa/report");
   const active = !skip && (!!issueId || !!focus);
 
   useEffect(() => {

@@ -60,18 +60,20 @@ export default function ClassificationIconHub() {
   };
   useEffect(() => { void load(); }, []);
 
+  /* No selection = show EVERYTHING (owner: "where's the rest?" — all four
+     tiers must be visible at a glance). Picking a parent narrows children. */
   const cats = useMemo(
-    () => (pickDivId ? categories.filter((c) => c.division_id === pickDivId) : []),
+    () => (pickDivId ? categories.filter((c) => c.division_id === pickDivId) : categories),
     [categories, pickDivId],
   );
   const subs = useMemo(
-    () => (pickCatId ? subcategories.filter((s) => s.category_id === pickCatId) : []),
+    () => (pickCatId ? subcategories.filter((s) => s.category_id === pickCatId) : subcategories),
     [subcategories, pickCatId],
   );
   /* 4th tier — machine kinds registered for the picked subcategory (strict
      match only; the picker's "show all" fallback would mislead here). */
   const kinds = useMemo(
-    () => (pickSubSlug ? MACHINE_KINDS.filter((k) => k.subcategory === pickSubSlug) : []),
+    () => (pickSubSlug ? MACHINE_KINDS.filter((k) => k.subcategory === pickSubSlug) : MACHINE_KINDS),
     [pickSubSlug],
   );
 
@@ -123,7 +125,7 @@ export default function ClassificationIconHub() {
 
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
           <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">
-            {t("vh.categories", "Categories")} · {cats.length}{pickDivId ? "" : ` (${t("vh.pickDivision", "pick a division")})`}
+            {t("vh.categories", "Categories")} · {cats.length}{pickDivId ? "" : ` — ${t("vh.allShown", "all shown; pick a parent to narrow")}`}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
             {cats.map((c) => (
@@ -136,7 +138,7 @@ export default function ClassificationIconHub() {
 
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
           <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">
-            {t("vh.subcategories", "Subcategories")} · {subs.length}{pickCatId ? "" : ` (${t("vh.pickCategory", "pick a category")})`}
+            {t("vh.subcategories", "Subcategories")} · {subs.length}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
             {subs.map((sc) => (
@@ -149,7 +151,7 @@ export default function ClassificationIconHub() {
 
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
           <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">
-            {t("vh.kinds", "Machine kinds")} · {kinds.length}{pickSubSlug ? "" : ` (${t("vh.pickSubcategory", "pick a subcategory")})`}
+            {t("vh.kinds", "Machine kinds")} · {kinds.length}
           </h3>
           <div className="space-y-0.5 max-h-[62vh] overflow-y-auto">
             {kinds.map((k) => (

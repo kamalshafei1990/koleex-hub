@@ -91,14 +91,6 @@ export default function DatabaseHome() {
             <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">{t("db.home.openSystem", "Open system →")}</span>
           </Link>
 
-          <Link href="/database/issues"
-            className="group flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><MegaphoneIcon size={20} /></span>
-            <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">{t("db.home.issueReports", "Issue Reports")}</div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">{t("db.home.issuesDesc", "Bugs, UI issues and suggestions reported from across the Hub — triage, track and resolve.")}</p>
-            <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">{t("db.home.openSystem", "Open system →")}</span>
-          </Link>
-
           <div className="flex flex-col items-start justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-5 text-[var(--text-dim)]">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)]"><LayersIcon size={20} /></span>
             <div className="mt-3.5 text-[13.5px] font-medium text-[var(--text-muted)]">{t("db.home.moreSystems", "More systems coming")}</div>

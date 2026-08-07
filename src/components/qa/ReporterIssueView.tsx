@@ -395,7 +395,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
             )}
             {issue.is_admin_view && (
               <Link
-                href={`/database/issues?issue=${issue.id}`}
+                href={`/issues?issue=${issue.id}`}
                 className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 {t("qa.reporter.adminPanel", "Admin panel")} ↗
@@ -408,7 +408,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       {issue.is_admin_view && (
         <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
           <span>{t("qa.reporter.adminNote", "You’re viewing the reporter experience as an admin.")}</span>
-          <Link href={`/database/issues?issue=${issue.id}`} className="font-semibold text-[var(--accent)] hover:underline">{t("qa.reporter.openConsole", "Open in QA Console →")}</Link>
+          <Link href={`/issues?issue=${issue.id}`} className="font-semibold text-[var(--accent)] hover:underline">{t("qa.reporter.openConsole", "Open in QA Console →")}</Link>
         </div>
       )}
 

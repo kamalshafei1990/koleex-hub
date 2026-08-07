@@ -58,7 +58,7 @@ function Glyph({ url, className = "h-4 w-4" }: { url: string; className?: string
 
 export default function SpecIconHub() {
   const [bindings, setBindings] = useState<BindingsMap>({});
-  const [editing, setEditing] = useState<{ key: string; label: string; domain: "spec" | "attribute" | "field" } | null>(null);
+  const [editing, setEditing] = useState<{ key: string; label: string; domain: string } | null>(null);
   const [openSchema, setOpenSchema] = useState<string | null>(null);
 
   useEffect(() => { void fetchIconBindings().then(setBindings); }, []);
@@ -77,7 +77,39 @@ export default function SpecIconHub() {
 
   const refresh = () => { invalidateIconBindings(); void fetchIconBindings().then(setBindings); };
 
-  const FieldRow = ({ k, label, domain, unit }: { k: string; label: string; domain: "spec" | "attribute" | "field"; unit?: string | null }) => {
+  /* FULL coverage, live from the registry itself: every bound meaning in the
+     record-field / section / app / activity domains appears here
+     automatically — bind a new meaning anywhere and this hub lists it with
+     no code change. LEGACY_FIELDS stays merged in so a not-yet-bound legacy
+     column is still offered for binding (AUTO badge). */
+  const humanize = (k: string) => k.replace(/[_.]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const dynamic = useMemo(() => {
+    const fields = new Map<string, { key: string; label: string; domain: string }>();
+    for (const f of LEGACY_FIELDS) fields.set(`field.${f.key}`, { key: f.key, label: f.label, domain: "field" });
+    const apps: { key: string; label: string; domain: string }[] = [];
+    const activities: { key: string; label: string; domain: string }[] = [];
+    for (const full of Object.keys(bindings)) {
+      const dot = full.indexOf(".");
+      if (dot < 1) continue;
+      const domain = full.slice(0, dot);
+      const key = full.slice(dot + 1);
+      if (domain === "field" || domain === "section") {
+        if (!fields.has(full)) fields.set(full, { key, label: humanize(key), domain });
+      } else if (domain === "app") {
+        apps.push({ key, label: humanize(key), domain });
+      } else if (domain === "activity") {
+        activities.push({ key, label: humanize(key), domain });
+      }
+    }
+    const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
+    return {
+      fields: Array.from(fields.values()).sort(byLabel),
+      apps: apps.sort(byLabel),
+      activities: activities.sort(byLabel),
+    };
+  }, [bindings]);
+
+  const FieldRow = ({ k, label, domain, unit }: { k: string; label: string; domain: string; unit?: string | null }) => {
     const url = bindings[`${domain}.${k}`];
     return (
       <button
@@ -115,9 +147,23 @@ export default function SpecIconHub() {
       </section>
 
       <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
-        <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">Legacy technical columns · {LEGACY_FIELDS.length}</h3>
+        <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">Record fields & sections · {dynamic.fields.length}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
-          {LEGACY_FIELDS.map((a) => <FieldRow key={a.key} k={a.key} label={a.label} domain="field" />)}
+          {dynamic.fields.map((a) => <FieldRow key={`${a.domain}.${a.key}`} k={a.key} label={a.label} domain={a.domain} />)}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+        <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">App icons · {dynamic.apps.length}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+          {dynamic.apps.map((a) => <FieldRow key={`app.${a.key}`} k={a.key} label={a.label} domain="app" />)}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+        <h3 className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">Notification activities · {dynamic.activities.length}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+          {dynamic.activities.map((a) => <FieldRow key={`activity.${a.key}`} k={a.key} label={a.label} domain="activity" />)}
         </div>
       </section>
 

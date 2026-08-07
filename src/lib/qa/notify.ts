@@ -13,7 +13,7 @@ import "server-only";
      sender_account_id     → the actor (used to suppress self-notifications)
      category              → 'task' (normal) | 'alert' (reopen / urgent)
      subject / body        → title / message
-     link                  → /database/issues?issue=<id>  (auto-selects the issue)
+     link                  → /issues?issue=<id>  (auto-selects the issue)
      metadata.qa_type      → fine-grained type (qa_issue_assigned, …) for the
                              future (digests, preferences, cross-module routing)
      tenant_id             → the issue's tenant (recipients are tenant accounts)
@@ -42,7 +42,7 @@ const ALERT_TYPES = new Set<QaNotificationType>(["qa_issue_reopened"]);
 
 /** Admin deep-link — the QA console reads ?issue= to auto-select the row. */
 export function issueLink(issueId: string): string {
-  return `/database/issues?issue=${issueId}`;
+  return `/issues?issue=${issueId}`;
 }
 
 /** Reporter-safe deep-link — the restricted, read-only issue view. */

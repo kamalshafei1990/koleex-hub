@@ -1013,7 +1013,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     <ul className="space-y-0.5">
                       {dups.map((d) => (
                         <li key={d.id} className="truncate">
-                          <a href={`/database/issues?issue=${d.id}`} target="_blank" rel="noreferrer" className="font-medium text-[var(--text-primary)] hover:underline">{d.title}</a>
+                          <a href={`/issues?issue=${d.id}`} target="_blank" rel="noreferrer" className="font-medium text-[var(--text-primary)] hover:underline">{d.title}</a>
                           <span className="ms-1 text-[var(--text-dim)]">· {d.status}</span>
                         </li>
                       ))}

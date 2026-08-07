@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   QaReportsApp — QA Workflow & Ticketing console (/database/issues, /qa).
+   QaReportsApp — QA Workflow & Ticketing console (/issues, /qa).
 
    Phase 3 turns the issue list into a lightweight engineering workflow:
    saved views + advanced filters, a priority/assignment/duplicate/reopen
@@ -182,7 +182,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   // URL-persistent filter / view state — read once on mount, replaced on
   // every change so refreshing or sharing the link reproduces the view.
   const router = useRouter();
-  const pageRoute = usePathname() ?? "/database/issues";
+  const pageRoute = usePathname() ?? "/issues";
   const initFromUrlRef = useRef(false);
 
   // Saved views translate to concrete query params.
@@ -315,7 +315,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     };
   }, [load]);
 
-  /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
+  /* Deep-link from a notification: /issues?issue=<id> auto-selects
      the row. useSearchParams is REACTIVE, so clicking another notification
      while already on this page (soft navigation, no remount) re-selects the
      new issue immediately. */

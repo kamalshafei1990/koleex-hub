@@ -390,7 +390,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           title: watcherEvt.title,
           body: watcherEvt.body,
           alert: watcherEvt.alert,
-          link: `/database/issues?issue=${id}`,
+          link: `/issues?issue=${id}`,
         });
       }
     }
