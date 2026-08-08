@@ -21,7 +21,7 @@ import {
   wizardDataFromProfile,
   type EmployeeWizardData,
 } from "@/lib/employees-admin";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 
 export default function EditEmployeePage() {
@@ -70,9 +70,7 @@ export default function EditEmployeePage() {
      field would read as "this employee has no value" rather than "loading". */
   if (!initial) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon size={22} className="animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

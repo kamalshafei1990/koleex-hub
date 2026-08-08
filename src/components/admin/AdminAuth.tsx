@@ -27,6 +27,7 @@
 import { useEffect, useState } from "react";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
@@ -270,9 +271,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* Hydration spinner — nothing heavy so we don't flash the form. */
   if (authed === null) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 text-white/40 animate-spin" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

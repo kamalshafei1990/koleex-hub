@@ -125,9 +125,16 @@ export default function UpdateWatcher() {
           the brand identity in BOTH themes (a dark floating capsule reads as
           a system toast on light backgrounds too). Copy unchanged. */}
       <div className="kx-sheet-in pointer-events-auto flex items-center gap-3.5 rounded-2xl border border-[#7FA9D6]/45 bg-[#0e1116] text-white pl-4 pr-3 py-3 shadow-[0_0_22px_rgba(86,127,178,0.35),0_18px_40px_-12px_rgba(0,0,0,0.6)] max-w-[min(92vw,28rem)]">
-        <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#567FB2] to-[#7FA9D6] text-[14px] font-bold text-[#06090e]">
-          K
-        </span>
+        {/* Owner call: the REAL hub script mark, not a letter. Served through
+            the image optimizer (128px variant, ~few KB) and SW-cached, so it
+            is instant after first sight. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny optimized brand asset */}
+        <img
+          src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fhub-script.png&w=128&q=75"
+          alt=""
+          aria-hidden
+          className="h-7 w-auto shrink-0"
+        />
         <div className="min-w-0">
           <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
           <div className="mt-1 text-[11.5px] leading-snug text-white/70">{t("u.sub")}</div>

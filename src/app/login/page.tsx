@@ -19,6 +19,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import KoleexLogo from "@/components/layout/KoleexLogo";
@@ -149,9 +150,7 @@ function LoginInner() {
 
   if (!hydrated) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 
@@ -312,9 +311,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
-        </div>
+        <BrandLoading className="min-h-screen" />
       }
     >
       <LoginInner />

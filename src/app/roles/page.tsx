@@ -23,6 +23,7 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
@@ -691,9 +692,7 @@ export default function RolesPage() {
 
   if (bootLoading && !boot) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
   if (boot && !isSA) {

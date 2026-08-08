@@ -9,7 +9,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
@@ -86,9 +86,7 @@ export default function LandedCostListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

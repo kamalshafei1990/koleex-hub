@@ -29,7 +29,7 @@ import AuthGate from "@/components/admin/AuthGate";
 import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
@@ -114,9 +114,7 @@ function SettingsContent() {
 
   if (!account) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

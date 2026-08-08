@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -244,9 +245,7 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon size={28} className="animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

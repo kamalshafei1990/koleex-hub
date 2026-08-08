@@ -31,6 +31,7 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
@@ -464,9 +465,7 @@ export default function InboxPage() {
 
   if (accountLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 

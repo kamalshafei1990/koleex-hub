@@ -28,6 +28,7 @@ import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -340,9 +341,7 @@ export default function CustomerProfilePage({
 
   if (loading || !contact) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon size={28} className="animate-spin text-[var(--text-dim)]" />
-      </div>
+      <BrandLoading className="min-h-screen" />
     );
   }
 
