@@ -429,9 +429,29 @@ function ddmmyyyyToISO(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
+/* Warm-start mirror (same pattern as Contacts kx_contacts_v1): the last
+   fetched SLIM list (items already stripped server-side) paints instantly
+   on the next open while the network refresh runs. `kx_` prefix → wiped on
+   sign-out by session-caches.ts. Refreshed on EVERY list fetch (mount,
+   post-delete, post-save) since they all come through here. */
+const QUOT_SNAP_KEY = "kx_quot_snap_v1";
+function readQuotSnap(): Quotation[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(QUOT_SNAP_KEY);
+    if (!raw) return null;
+    const list = JSON.parse(raw) as Quotation[];
+    return Array.isArray(list) ? list : null;
+  } catch { return null; }
+}
+
 async function loadQuotationsRemote(opts: { fresh?: boolean } = {}): Promise<Quotation[]> {
   const rows = await fetchDocList(QUOTATIONS_SYNC, opts);
-  return rows.map(fromRow);
+  const list = rows.map(fromRow);
+  try {
+    window.localStorage.setItem(QUOT_SNAP_KEY, JSON.stringify(list.slice(0, 200)));
+  } catch { /* quota — mirror is best-effort */ }
+  return list;
 }
 
 /** Upsert a single quotation. Returns the server echo (canonical
@@ -1079,10 +1099,13 @@ export default function Quotations() {
   const { askConfirm, confirmDialog } = useConfirm();
   const { showToast, toastElement } = useToast();
 
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  /* Warm-start: seed from the localStorage mirror so a returning user sees
+     the list on the FIRST paint; the mount fetch below replaces it. */
+  const [snap] = useState(readQuotSnap);
+  const [quotations, setQuotations] = useState<Quotation[]>(snap ?? []);
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Quotation | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(snap !== null);
   /* Save state for the Save Draft / Save Final buttons. "idle" is the
      resting state; "saving" while the POST is in flight; "saved" for a
      brief confirmation flash; "error" if the request failed. Without

@@ -1436,10 +1436,40 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
 /* ══════════════════════════════════════════════════════════════
    MAIN PAGE
    ══════════════════════════════════════════════════════════════ */
+
+/* Warm-start snapshot (same pattern as Contacts/CRM board): paint the last
+   known list instantly, refresh from the network in the background. The
+   `kx_` prefix means sign-out wipes it (session-caches.ts). saView lenses
+   filter in-memory, so the raw fetch result is safe to mirror. */
+const TODO_SNAP_KEY = "kx_todo_snap_v1";
+interface TodoSnap {
+  todos: TodoWithRelations[];
+  employees: TodoAssigneeInfo[];
+  departments: string[];
+  labels: TodoLabelRow[];
+}
+function readTodoSnap(): TodoSnap | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(TODO_SNAP_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as TodoSnap;
+    return Array.isArray(s?.todos) ? s : null;
+  } catch { return null; }
+}
+function persistTodoSnap(s: TodoSnap): void {
+  try {
+    /* Cap rows so the mirror can never brush the localStorage quota; the
+       warm paint only needs the first screens, the refresh brings the rest. */
+    window.localStorage.setItem(TODO_SNAP_KEY, JSON.stringify({ ...s, todos: s.todos.slice(0, 400) }));
+  } catch { /* quota — mirror is best-effort */ }
+}
+
 export default function TodoPage() {
   const { t } = useTranslation(todoT);
-  const [todos, setTodos] = useState<TodoWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [snap] = useState(readTodoSnap);
+  const [todos, setTodos] = useState<TodoWithRelations[]>(snap?.todos ?? []);
+  const [loading, setLoading] = useState(!snap);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed" | "approvals">("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -1466,10 +1496,10 @@ export default function TodoPage() {
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: TodoWithRelations | null }>({ open: false, task: null });
   const [deleting, setDeleting] = useState(false);
 
-  // Reference data
-  const [employees, setEmployees] = useState<TodoAssigneeInfo[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [labels, setLabels] = useState<TodoLabelRow[]>([]);
+  // Reference data (warm-started from the snapshot when present)
+  const [employees, setEmployees] = useState<TodoAssigneeInfo[]>(snap?.employees ?? []);
+  const [departments, setDepartments] = useState<string[]>(snap?.departments ?? []);
+  const [labels, setLabels] = useState<TodoLabelRow[]>(snap?.labels ?? []);
   const accountId = getCurrentAccountIdSync();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
   /* Super-admin audience lens: "own" (default — SA sees THEIR tasks like any
@@ -1504,6 +1534,7 @@ export default function TodoPage() {
     ]);
     setTodos(t); setEmployees(e); setDepartments(d); setLabels(l);
     setLoading(false);
+    persistTodoSnap({ todos: t, employees: e, departments: d, labels: l });
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);

@@ -9,9 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { fetchIconBindings } from "@/lib/visual-bindings";
-
-let SNAP: Record<string, string> = {};
+import { fetchIconBindings, getIconBindingSync } from "@/lib/visual-bindings";
 
 export default function BoundIcon({
   semanticKey, fallback, className = "h-6 w-6",
@@ -20,11 +18,19 @@ export default function BoundIcon({
   fallback: ReactNode;
   className?: string;
 }) {
-  const [url, setUrl] = useState<string | undefined>(() => SNAP[semanticKey]);
+  /* First render already resolves through the warm-started mirror — this
+     is what killed the visible fallback→registry icon swap the owner saw
+     on every page load ("two layers"). The effect below only refreshes
+     when the binding actually changed. */
+  const [url, setUrl] = useState<string | undefined>(() => getIconBindingSync(semanticKey));
   useEffect(() => {
     let alive = true;
     fetchIconBindings()
-      .then((m) => { SNAP = m; if (alive) setUrl(m[semanticKey]); })
+      .then((m) => {
+        if (!alive) return;
+        const next = m[semanticKey];
+        setUrl((prev) => (prev === next ? prev : next));
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, [semanticKey]);
