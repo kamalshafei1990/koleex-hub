@@ -55,13 +55,15 @@ function getGreetingKey(): string {
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
 const APP_DATA_PREFETCH: Record<string, string> = {
-  /* MUST be ?view=list — the catalogue fetches that exact URL, so the warm
-     entry is reused. The bare /api/products URL was the FULL 80-column
-     projection (706 rows, megabyte-scale): a different cache key the app
-     never reads, so every hover/open paid a wasted heavyweight download
-     that competed with the app's real fetch. */
-  products: "/api/products?view=list",
-  "product-data": "/api/products?view=list",
+  /* MUST match the catalogue's request BYTE FOR BYTE or the warm entry is a
+     different cache key and the download is pure waste. It has been wrong
+     twice now: first the bare /api/products (the full 80-column projection),
+     and then ?view=list after the grid moved to server paging — 72 KB
+     downloaded and never read on every hover, which at the owner's 3000
+     products becomes ~1.8 MB competing with the real page load. If
+     ProductList's serverParams change, change this with them. */
+  products: "/api/products?view=list&paged=1&pageSize=48",
+  "product-data": "/api/products?view=list&paged=1&pageSize=48",
   projects: "/api/projects",
   todo: "/api/todos",
   accounts: "/api/accounts",

@@ -187,7 +187,7 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, t, onAskDelete, fx, fxTitle,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -205,6 +205,13 @@ const ProductCard = memo(function ProductCard({
   /* Internal work signals (Product Data only) — readiness, gaps, cost,
      visibility, staleness. Undefined on the public /products card. */
   signal?: ProductSignal;
+  /* True while the signals payload (which CARRIES the supplier) is still in
+     flight. Without it the card asserts "No supplier linked" before it can
+     possibly know, then flips to the real supplier when the payload lands —
+     121 cards changing at once, ~1.5s after the grid appeared. That is the
+     glitch the owner saw on opening Product Data, and the worst part was not
+     the movement: it was showing him something false. */
+  signalsPending?: boolean;
   t: (key: string, fallback?: string) => string;
   onAskDelete: (e: React.MouseEvent, id: string, name: string) => void;
   /* Passed down rather than fetched per card: sixty cards calling the hook
@@ -499,6 +506,13 @@ const ProductCard = memo(function ProductCard({
                   <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">+{suppliers.length - 1}</span>
                 )}
               </SupplierRowShell>
+            ) : signalsPending ? (
+              /* Don't answer "who makes this?" before the answer has arrived.
+                 Same 24px slot, a quiet placeholder instead of a claim. */
+              <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden" aria-hidden>
+                <span className="h-6 w-6 shrink-0 rounded-md bg-[var(--bg-surface-subtle)] animate-pulse" />
+                <span className="h-2.5 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" />
+              </div>
             ) : (
               /* Keep the slot so cost stays on the same line across cards. */
               <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden">
@@ -674,6 +688,29 @@ export default function ProductList() {
      itself triggers, and it must never cause a render. */
   const autoRetriedRef = useRef(false);
 
+  /* ── Server-driven list ────────────────────────────────────────────────
+     The grid used to download the whole catalogue and filter it here. At the
+     121 products in the system that is 71 KB; the owner is entering 3000,
+     which is ~1.8 MB on a response path measured at 2100 ms per 128 KB — past
+     this component's own 30s abort. A page is ~28 KB no matter how big the
+     catalogue gets.
+
+     Search, filters and sort now execute in SQL (/api/products?paged=1) and
+     pages append as the user scrolls. */
+  const [total, setTotal] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  /* The in-flight guard is a ref so it is read synchronously by the observer
+     callback — state would be a render behind and let two pages start. */
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(1);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  /* Signals carry the supplier, so until they land a card cannot honestly say
+     whether a product has one. Starts false ONLY for the internal grid — the
+     public card never fetches signals and must not sit in a permanent
+     placeholder. */
+  const [signalsReady, setSignalsReady] = useState(false);
+
 
   /* Filter state — persisted to sessionStorage so the back-button
      from a product detail returns the user to the same filtered
@@ -751,6 +788,46 @@ export default function ProductList() {
      render the (expensive) filtered grid at a lower priority — it can
      even interrupt a stale filter pass when the next keystroke lands. */
   const deferredSearch = useDeferredValue(search);
+
+  /* The screen's filter state translated into the endpoint's allowlisted
+     params. `filterSupplier` is deliberately absent: supplier links live on
+     the model rows, not on products, so it stays a client-side refinement
+     over the loaded pages. Everything else the server can do, the server
+     does — that is the whole point.
+
+     The string identity of this object is what the load effect keys on, so a
+     changed filter starts a fresh page 1 and an unchanged one does not. */
+  const serverParams = useMemo(() => {
+    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "48" });
+    if (deferredSearch.trim()) p.set("q", deferredSearch.trim());
+    if (filterDiv) p.set("division", filterDiv);
+    if (filterCat) p.set("category", filterCat);
+    if (filterSub) p.set("subcategory", filterSub);
+    if (filterBrand) p.set("brand", filterBrand);
+    if (filterLevel) p.set("level", filterLevel);
+    /* Status/visible are INTERNAL work filters — the same guard the client
+       predicate uses, so a "Draft" filter chosen in /product-data can never
+       silently empty the public catalogue for the same operator. */
+    if (isInternal) {
+      if (filterStatus) p.set("status", filterStatus);
+      if (filterVisible === "visible") p.set("visible", "true");
+      if (filterVisible === "hidden") p.set("visible", "false");
+    }
+    if (filterFeatured === "yes") p.set("featured", "true");
+    if (filterFeatured === "no") p.set("featured", "false");
+    return p.toString();
+  }, [deferredSearch, filterDiv, filterCat, filterSub, filterBrand, filterLevel,
+      filterStatus, filterVisible, filterFeatured, isInternal]);
+
+  /* While a server search is running, the client must NOT re-apply its own
+     token match. The client haystack carries model codes and supplier names
+     that arrive with the SIGNALS payload — so before signals land it would
+     reject rows the server correctly matched by model code, and the result
+     would look like "search finds nothing for a second". */
+  const serverSearchActive = deferredSearch.trim().length > 0;
+  /* "No filter, no search" — the only state whose first page is safe to keep
+     as the warm-start snapshot. */
+  const isDefaultView = serverParams === new URLSearchParams({ view: "list", paged: "1", pageSize: "48" }).toString();
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
@@ -880,6 +957,9 @@ export default function ProductList() {
                 setModelNames(j.models.modelNames || {});
               }
               if (j?.mainImages) applyMainImages(j.mainImages);
+              /* The supplier answer has arrived — cards may now state it,
+                 including stating that there ISN'T one. */
+              setSignalsReady(true);
             })
             .catch(async () => {
               /* Signals are optional, but model codes and thumbnails are
@@ -898,27 +978,39 @@ export default function ProductList() {
             setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
                 applyMainImages(imgs);
               } catch { /* grid still renders without either */ }
+              /* Released on the fallback too — otherwise a signals outage
+                 would leave every card stuck in the placeholder forever,
+                 which is worse than saying "no supplier linked". */
+              if (!cancelled) setSignalsReady(true);
             });
         }
         let p: ProductRow[];
         try {
           /* ?view=list keeps the response to the ~15 columns this grid
-             actually uses — the full 80-column rows made this the page's
-             megabyte-scale blocking fetch. */
-          const res = await fetch("/api/products?view=list", { credentials: "include", signal: ctrl.signal });
+             actually uses; ?paged=1 keeps it to ONE page. Search and filters
+             ride along in serverParams and execute in SQL. */
+          const res = await fetch(`/api/products?${serverParams}`, { credentials: "include", signal: ctrl.signal });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const json = (await res.json()) as { products?: ProductRow[] };
-          p = json.products ?? [];
+          const json = (await res.json()) as { rows?: ProductRow[]; total?: number | null; hasMore?: boolean };
+          p = json.rows ?? [];
+          pageRef.current = 1;
+          setTotal(json.total ?? null);
+          setHasMore(Boolean(json.hasMore));
         } finally {
           clearTimeout(timeoutId);
         }
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
-        /* Persist for instant paint on the next cold load / PWA restart. */
-        try {
-          const json = JSON.stringify(p);
-          if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
-        } catch { /* quota / serialize guard */ }
+        /* Persist for instant paint on the next cold load / PWA restart —
+           but ONLY the unfiltered, unsearched first page. Caching a filtered
+           result would make the next cold open paint someone's leftover
+           "Draft + Garment Machinery" view as if it were the whole catalogue. */
+        if (isDefaultView) {
+          try {
+            const json = JSON.stringify(p);
+            if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+          } catch { /* quota / serialize guard */ }
+        }
         /* PAINT NOW — products are the page. Taxonomy pills, model counts,
            supplier chips and photos hydrate in below the moment their
            (slower) fetches land; they must never hold the whole grid
@@ -987,8 +1079,67 @@ export default function ProductList() {
       }
     })();
     return () => { cancelled = true; };
+    /* serverParams: a changed filter or search is a NEW page 1. The abort
+       controller above cancels the in-flight page, so fast typing cannot land
+       an older response after a newer one. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInternal, retryKey]);
+  }, [isInternal, retryKey, serverParams]);
+
+  /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
+     learn, and it is the one that behaves on a phone. The sentinel sits after
+     the grid; when it comes into view the next page appends.
+
+     rootMargin 600px so the fetch starts BEFORE the user reaches the bottom —
+     on this connection a page takes ~400ms from Tokyo and several seconds from
+     the owner's link, and the point is that he never watches it happen. */
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading || loadError) return;
+    let cancelled = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || cancelled) return;
+        /* Guard on a REF, not on the state updater. Putting the fetch inside
+           setLoadingMore(prev => …) made it a side effect inside a state
+           updater, and React invokes those twice in development — every page
+           was requested twice (verified: pages 2,2,3,3). The id-dedupe below
+           hid it in the result, which is exactly why it needed catching here
+           rather than trusting the output. */
+        if (loadingMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        const next = pageRef.current + 1;
+        void (async () => {
+          try {
+            const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = (await res.json()) as { rows?: ProductRow[]; hasMore?: boolean };
+            if (cancelled) return;
+            const rows = json.rows ?? [];
+            pageRef.current = next;
+            /* Append by id, never blindly: a product edited between two page
+               requests can shift across the offset boundary and arrive twice,
+               which would render duplicate cards with the same key. */
+            setProducts((prev) => {
+              const seen = new Set(prev.map((r) => r.id));
+              return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+            });
+            setHasMore(Boolean(json.hasMore));
+          } catch {
+            /* A failed page must not blank the grid — stop offering more and
+               leave what is on screen. The user can filter or reload. */
+            if (!cancelled) setHasMore(false);
+          } finally {
+            loadingMoreRef.current = false;
+            if (!cancelled) setLoadingMore(false);
+          }
+        })();
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => { cancelled = true; io.disconnect(); };
+  }, [hasMore, loading, loadError, serverParams]);
 
   /* Persist the filter snapshot to sessionStorage on every change.
      Back-button from a detail page returns to the same view. Stays
@@ -1350,7 +1501,14 @@ export default function ProductList() {
       }
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
-      if (tokens.length > 0) {
+      /* The SERVER already ran this query — across the products row, the
+         model codes, the SKUs, the supplier names and the taxonomy names in
+         three languages. Re-running the client token match on top of it would
+         only ever REMOVE rows, and it would remove the right ones: the client
+         haystack gets model codes and supplier names from the signals
+         payload, which lands after the grid, so for those first moments it
+         would reject every row the server matched by model code. */
+      if (!serverSearchActive && tokens.length > 0) {
         const entry = searchHaystack[p.id];
         const hay = entry?.hay || "";
         const sq = entry?.sq || "";
@@ -1363,7 +1521,7 @@ export default function ProductList() {
       }
       return true;
     });
-  }, [products, isInternal, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, productSuppliers, searchHaystack]);
+  }, [products, isInternal, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, serverSearchActive, productSuppliers, searchHaystack]);
 
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
@@ -1518,7 +1676,12 @@ export default function ProductList() {
         <BackToTop label={t("list.backToTop", "Back to top")} />
         <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
           <span>
-            {(isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}{" "}
+            {/* The server's exact count, not how many rows happen to be
+                loaded — with paging those are different numbers, and the one
+                the operator wants is "how big is the catalogue". Falls back
+                to the loaded count while the first page is still in flight
+                (warm-start paint) or if the endpoint returned no count. */}
+            {total ?? (isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}{" "}
             {t("list.countInCatalog")}
           </span>
           {/* The rate every "≈ $" on this page was computed with. Shown once,
@@ -2177,6 +2340,7 @@ export default function ProductList() {
                 imgUrl={mainImages[p.id]}
                 models={modelCounts[p.id] || 0}
                 suppliers={productSuppliers[p.id] || EMPTY_SUPPLIERS}
+                signalsPending={isInternal && !signalsReady}
                 lvl={levelColors[p.level || ""] || ""}
                 baseRoute={baseRoute}
                 isInternal={isInternal}
@@ -2437,6 +2601,29 @@ export default function ProductList() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Infinite scroll. The sentinel is 600px of lead time (see the
+            observer) so the next page is already on its way before the user
+            reaches the bottom — on the owner's link a page is seconds, and he
+            should never watch it arrive. Rendered only while more pages
+            exist, so the observer has nothing to fire on at the end. */}
+        {hasMore && !loading && !loadError && (
+          <div ref={sentinelRef} className="pt-8 pb-2" aria-hidden>
+            {loadingMore && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden animate-pulse">
+                    <div className="aspect-[4/3] bg-[var(--bg-surface-subtle)]" />
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 bg-[var(--bg-surface-subtle)] rounded w-3/4" />
+                      <div className="h-3 bg-[var(--bg-surface-subtle)] rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
