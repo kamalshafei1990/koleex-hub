@@ -43,7 +43,7 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 5 | W1 | Notes | /notes | 🔍 | ✅ | ✅ | 🔍 | ✅ | ✅ |
 | 6 | W1 | Mail (Inbox) | /inbox | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
 | 7 | W2 | Customers | /customers | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 8 | W2 | Quotations | /quotations | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 8 | W2 | Quotations | /quotations | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 9 | W2 | Products | /products | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 10 | W2 | Product Data | /product-data | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 11 | W2 | CRM | /crm | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
