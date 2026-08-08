@@ -377,6 +377,14 @@ export const PRODUCTS_UI_I18N: Translations = {
   "state.noProducts": { en: "No products yet", zh: "暂无产品", ar: "لا توجد منتجات بعد" },
   "state.noResults": { en: "No products match your filters", zh: "没有符合筛选条件的产品", ar: "لا توجد منتجات مطابقة لعوامل التصفية" },
   "state.loadFailedTitle": { en: "Couldn't load products", zh: "无法加载产品", ar: "تعذّر تحميل المنتجات" },
+  /* Shown INSTEAD of the failure panel when the warm-start cache already put
+     the catalogue on screen — the products are there, only the refresh
+     failed, so the message is about freshness rather than availability. */
+  "state.showingCached": {
+    en: "Showing your last loaded catalog — couldn't reach the server just now.",
+    zh: "显示上次加载的产品目录 — 暂时无法连接服务器。",
+    ar: "بنعرضلك آخر نسخة اتحمّلت — الاتصال بالسيرفر مانفعش دلوقتي.",
+  },
   "state.serverTimeout": { en: "The server took too long to respond. Please retry.", zh: "服务器响应超时，请重试。", ar: "استغرق الخادم وقتًا طويلًا للرد. يرجى إعادة المحاولة." },
 
   /* ── Wizard chrome: header, nav, breadcrumb, steps gate (P0 #5b) ── */

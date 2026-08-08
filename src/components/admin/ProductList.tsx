@@ -667,6 +667,12 @@ export default function ProductList() {
      empty state. retryKey re-runs the load effect. */
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  /* ONE automatic retry per mount before the dead-end error. The owner's link
+     chokes in episodes (documented 30-90s), so a single stalled trip is not
+     evidence the catalogue is unreachable — it is evidence we asked during a
+     choke. Ref, not state: it must survive the effect re-run that the retry
+     itself triggers, and it must never cause a render. */
+  const autoRetriedRef = useRef(false);
 
 
   /* Filter state — persisted to sessionStorage so the back-button
@@ -959,6 +965,16 @@ export default function ProductList() {
           /* 401 = expired session, not a server fault — surface a
              sign-in path instead of a Retry that can never succeed. */
           const authFailed = e instanceof Error && e.message.includes("HTTP 401");
+          /* A stalled or dropped trip gets ONE silent second chance before we
+             ever show a dead end. Not for 401 (retrying an expired session
+             can only fail) and not for a real HTTP error (the server
+             answered; asking again changes nothing). */
+          const worthRetrying = !authFailed && (aborted || !(e instanceof Error && /HTTP \d/.test(e.message)));
+          if (worthRetrying && !autoRetriedRef.current) {
+            autoRetriedRef.current = true;
+            window.setTimeout(() => { if (!cancelled) setRetryKey((k) => k + 1); }, 800);
+            return;
+          }
           setLoadError(
             authFailed
               ? "__auth__"
@@ -1947,6 +1963,24 @@ export default function ProductList() {
           </p>
         )}
 
+        {/* Refresh failed but the catalogue is on screen from the warm-start
+            cache. Say so quietly and offer another try — do NOT take the grid
+            away, which is what this component used to do. */}
+        {loadError && loadError !== "__auth__" && products.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5">
+            <span className="text-[12.5px] text-[var(--text-secondary)]">
+              {t("state.showingCached", "Showing your last loaded catalog — couldn't reach the server just now.")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="text-[12.5px] font-semibold text-[#7FA9D6] underline-offset-2 hover:underline"
+            >
+              {t("action.retry")}
+            </button>
+          </div>
+        )}
+
         {/* Product Grid / List */}
         {loadError === "__auth__" ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
@@ -1960,7 +1994,14 @@ export default function ProductList() {
               {t("action.signInAgain", "Sign in again")}
             </a>
           </div>
-        ) : loadError ? (
+        ) : loadError && products.length === 0 ? (
+          /* The full-panel error is ONLY for a screen with nothing on it. When
+             the warm-start cache has already painted the catalogue, a failed
+             REFRESH must not take it away — the owner watched 121 products get
+             replaced by "Couldn't load products" because this branch sat above
+             the grid and never looked at whether it had anything to show. That
+             case now falls through to the grid and reports itself in the strip
+             below, which is a statement about freshness, not availability. */
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-red-500/30 p-16 text-center">
             <ProductsIcon size={48} className="text-red-400/70 mx-auto mb-4" />
             <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.loadFailedTitle")}</p>
