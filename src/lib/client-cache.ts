@@ -56,12 +56,88 @@ const cache: Map<string, Entry> = g.__kxCachedGet ?? (g.__kxCachedGet = new Map(
 
 /** GET `url` as JSON, coalescing concurrent callers and reusing the body for
  *  `ttlMs`. Throws on a non-OK response so callers keep their error handling. */
+/* ── Shell batching ────────────────────────────────────────────────────────
+   Coalescing removed the DUPLICATES; this removes the ROUND TRIPS. Measured
+   on the owner's connection: one warm API call costs ~0.33 s, but the 14 the
+   catalogue screen opens at once took 6.95 s — concurrent streams on a lossy
+   cross-border link stall each other, so the count is what hurts, not the
+   server. These four endpoints are fetched by every screen and are all
+   returned by /api/shell, so the first caller pulls the batch and the rest
+   are served from this cache without ever touching the network.
+
+   Deliberately conservative: if the batch fails, or returns null for a key,
+   the caller falls through to its own endpoint exactly as before. The
+   individual routes stay the source of truth. */
+const SHELL_SECTION: Record<string, string> = {
+  "/api/me/permissions": "permissions",
+  "/api/me/work": "work",
+  "/api/fx/cny-usd": "fx",
+};
+/* SYS-4: Turbopack duplicates this module across chunks, so a plain
+   module-level promise becomes several independent ones and the "single"
+   flight fires once per copy — measured 2 /api/shell calls instead of 1.
+   Anchoring on globalThis makes every copy share one promise. */
+interface ShellState { inflight: Promise<Record<string, unknown> | null> | null }
+const sg = globalThis as typeof globalThis & { __kxShellBatch?: ShellState };
+const shellState: ShellState = sg.__kxShellBatch ?? (sg.__kxShellBatch = { inflight: null });
+
+/** The shared shell batch. Exported so non-cachedGet consumers (visual
+ *  bindings) join the SAME request instead of opening a second one. */
+export async function getShell(): Promise<Record<string, unknown> | null> {
+  return fetchShell();
+}
+
+async function fetchShell(): Promise<Record<string, unknown> | null> {
+  if (shellState.inflight) return shellState.inflight;
+  shellState.inflight = (async () => {
+    try {
+      const res = await fetch("/api/shell", { credentials: "include" });
+      if (!res.ok) return null;
+      const body = (await res.json()) as Record<string, unknown>;
+      /* Seed every section so the sibling callers never hit the network. */
+      const now = Date.now();
+      for (const [path, section] of Object.entries(SHELL_SECTION)) {
+        const value = body[section];
+        if (value != null && !cache.get(path)?.inflight) cache.set(path, { value, at: now });
+      }
+      return body;
+    } catch {
+      return null;
+    } finally {
+      shellState.inflight = null;
+    }
+  })();
+  return shellState.inflight;
+}
+
 export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
   const hit = cache.get(url);
 
   if (hit?.inflight) return hit.inflight as Promise<T>;
   if (hit && hit.at != null && Date.now() - hit.at < ttlMs) {
     return hit.value as T;
+  }
+
+  const section = SHELL_SECTION[url];
+  if (section) {
+    const batched = (async () => {
+      const body = await fetchShell();
+      const value = body?.[section];
+      if (value != null) return value as T;
+      /* Batch unavailable for this key — take the original path. */
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+      return (await res.json()) as T;
+    })();
+    cache.set(url, { inflight: batched });
+    try {
+      const value = await batched;
+      cache.set(url, { value, at: Date.now() });
+      return value;
+    } catch (e) {
+      cache.delete(url);
+      throw e;
+    }
   }
 
   const inflight = (async () => {

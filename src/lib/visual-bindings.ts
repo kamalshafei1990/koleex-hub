@@ -66,9 +66,19 @@ export async function fetchIconBindings(): Promise<BindingsMap> {
   }
   state.inflight = (async () => {
     try {
-      const res = await fetch("/api/visual-bindings", { credentials: "include" });
-      const json = (await res.json().catch(() => null)) as { bindings?: BindingsMap } | null;
-      const map = json?.bindings ?? {};
+      /* Ride the shell batch when it is already coming (every screen asks for
+         it), and fall back to the dedicated endpoint otherwise. One fewer
+         cross-border round trip on every single screen open — see
+         client-cache for why the request COUNT is what costs seconds. */
+      const { getShell } = await import("./client-cache");
+      const shell = await getShell();
+      let map: BindingsMap | null =
+        (shell?.bindings as { bindings?: BindingsMap } | null)?.bindings ?? null;
+      if (!map) {
+        const res = await fetch("/api/visual-bindings", { credentials: "include" });
+        const json = (await res.json().catch(() => null)) as { bindings?: BindingsMap } | null;
+        map = json?.bindings ?? {};
+      }
       state.cache = { at: Date.now(), map };
       persist(map);
       return map;
