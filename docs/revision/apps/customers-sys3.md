@@ -39,3 +39,21 @@ Two subtleties found on the way:
   it to the shared lazy lib is a W3 (Suppliers) item.
 - The launcher's contacts chunk-preloader now warms a light chunk instead of
   the elephant.
+
+## Full six-lens close-out (same day, session 5b)
+- **B1** 🔍 clean: 0 console.logs / 0 TODOs in the 11.6k-line component; the
+  /customers page wrapper is exemplary (trusted cohort flag, dynamic split so
+  only ONE implementation's chunk downloads, no double render).
+- **B2** ✅ fresh open = 14 network API calls, no real duplicates (long-session
+  re-measures show only polling cadence + interaction fetches).
+- **B3** ✅ SYS-3 (above).
+- **B4** ✅ verified live on a customer 360: SCHEDULED (Planning), PROJECT
+  TASKS and INVOICES strips query per-record with honest empty states +
+  "Open ↗" cross-app links; CRM Pipeline card on the overview; Account tab
+  present (SA).
+- **F1** ✅ overview dashboard + 360 (profile, tier/credit/KYC chips, tabs)
+  consistent with KDS.
+- **F2** ✅ 375px: list rows, filter stacks, stat cards, and the full 360
+  stack correctly. (Note: the in-tool touch emulator failed to tap rows —
+  DOM click navigates fine; real-device taps are plain clicks. Automation
+  artifact, not an app bug.)
