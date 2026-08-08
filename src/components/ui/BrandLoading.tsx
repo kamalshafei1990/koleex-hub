@@ -20,6 +20,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ensureLoadProgressPatch, snapshotLoadProgress, subscribeLoadProgress } from "@/lib/load-progress";
 
+/* Minimum requests before a percentage is worth showing (3 → 0/33/66/100).
+   Fewer than this and the bar runs indeterminate instead of pretending. */
+const MEANINGFUL_REQUESTS = 3;
+
 export default function BrandLoading({
   label = "Loading…",
   className = "min-h-[60vh]",
@@ -43,11 +47,19 @@ export default function BrandLoading({
     const update = () => {
       const now = snapshotLoadProgress();
       const started = now.started - base.started + baseInflight;
-      if (started <= 0) return;
       const settled = now.settled - base.settled;
+      /* A percentage only MEANS something when there are enough requests
+         for intermediate values to exist. Waiting on one request over a
+         high-latency link can only ever read 0% then 100% — which looks
+         broken and taught the owner to distrust the bar (his words: "it
+         starts at zero, stays a long time, then suddenly 100%"). Below
+         the threshold we show the moving indeterminate bar instead: the
+         honest statement is "working", not a number we can't compute.
+         Once it qualifies it stays qualified (no flicker back). */
+      if (started < MEANINGFUL_REQUESTS && maxRef.current === 0) return;
       /* Monotonic display: late-starting requests grow the denominator,
          but a bar that moves backwards reads as broken. */
-      const p = Math.max(maxRef.current, Math.min(100, Math.round((settled / started) * 100)));
+      const p = Math.max(maxRef.current, Math.min(100, Math.round((settled / Math.max(started, 1)) * 100)));
       maxRef.current = p;
       setPct(p);
     };
