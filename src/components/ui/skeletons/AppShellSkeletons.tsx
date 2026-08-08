@@ -13,19 +13,10 @@
    fills only the content area (header/sidebar stay).
    --------------------------------------------------------------------------- */
 
+import BrandLoading from "@/components/ui/BrandLoading";
+
 function Shell({ label }: { label: string }) {
-  return (
-    <div role="status" aria-busy="true" aria-live="polite" className="relative w-full min-h-[60vh]">
-      <span className="sr-only">{label}</span>
-      <div className="kx-brand-load" aria-hidden>
-        {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp, no sizing/optimization needed */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
-        {/* eslint-disable-next-line @next/next/no-img-element -- theme twin of the above */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
-        <div className="kx-brand-underline" />
-      </div>
-    </div>
-  );
+  return <BrandLoading label={label} />;
 }
 
 /** Directory / list & table apps: Customers, Suppliers, Contacts, Accounts,

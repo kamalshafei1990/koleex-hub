@@ -33,13 +33,7 @@ import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
 
-const CatalogSkeleton = () => (
-  <div className="flex flex-col gap-2 p-4 animate-pulse">
-    <div className="h-40 bg-gray-200 rounded" />
-    <div className="h-4 bg-gray-200 rounded w-3/4" />
-    <div className="h-4 bg-gray-200 rounded w-1/2" />
-  </div>
-);
+import BrandLoading from "@/components/ui/BrandLoading";
 
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
@@ -3414,9 +3408,7 @@ function CatalogsApp() {
 
         {/* Content */}
         {catalogsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-            {Array.from({ length: 10 }).map((_, i) => <CatalogSkeleton key={i} />)}
-          </div>
+          <BrandLoading className="min-h-[50vh]" />
         ) : catalogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-[var(--border-subtle)] rounded-2xl">
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-4">

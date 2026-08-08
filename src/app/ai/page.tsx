@@ -2,13 +2,13 @@
 
 import dynamic from "next/dynamic";
 import AdminAuth from "@/components/admin/AdminAuth";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 
 const KoleexAiApp = dynamic(() => import("@/components/ai/KoleexAiApp"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-      <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <BrandLoading className="min-h-screen" />
     </div>
   ),
 });

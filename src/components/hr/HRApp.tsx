@@ -24,7 +24,7 @@ import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import HrIcon from "@/components/icons/HrIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
@@ -156,9 +156,7 @@ export default function HRApp() {
       {/* ═══════════ CONTENT ═══════════ */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {empLoading ? (
-          <div className="flex-1 h-full flex items-center justify-center">
-            <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
-          </div>
+          <BrandLoading className="h-full min-h-[40vh]" />
         ) : (
           <div key={activeTab} className="kx-tab-in">
             <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />

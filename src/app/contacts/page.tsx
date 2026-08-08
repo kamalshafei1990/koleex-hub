@@ -10,15 +10,12 @@
    never touches. */
 
 import dynamic from "next/dynamic";
+import BrandLoading from "@/components/ui/BrandLoading";
 
 const Contacts = dynamic(() => import("@/components/contacts/Contacts"), {
   ssr: false,
   loading: () => (
-    <div className="p-6 space-y-3">
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className="h-16 rounded-xl bg-[var(--bg-surface)] animate-pulse" />
-      ))}
-    </div>
+    <BrandLoading className="min-h-[60vh]" />
   ),
 });
 

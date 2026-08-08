@@ -23,6 +23,7 @@ import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "@/components/quotations/QuotationPreviewSkeleton";
 import ProductPickerModal, { type PickResult } from "@/components/quotations/ProductPickerModal";
 import CustomerPickerModal, { type CustomerPickResult } from "@/components/quotations/CustomerPickerModal";
+import BrandLoading from "@/components/ui/BrandLoading";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   INVOICES_DOC_SYNC,
@@ -1753,8 +1754,8 @@ export default function Quotations() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <div className="text-gray-400 text-lg">Loading...</div>
+      <div className="min-h-screen bg-[var(--bg-primary)]">
+        <BrandLoading className="min-h-screen" />
       </div>
     );
   }
