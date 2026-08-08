@@ -29,12 +29,15 @@ function bootBuildId(): string {
   return process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "";
 }
 
+/* Copy calibrated twice by the owner (2026-08-08): the original two-line
+   explanation was "a lot of text", the bare "New version" was "too less".
+   Middle ground: full title + ONE short reassurance line. */
 const T = {
-  "u.available": { en: "New version", zh: "新版本", ar: "إصدار جديد" },
+  "u.available": { en: "New version available", zh: "新版本可用", ar: "إصدار جديد متاح" },
   "u.sub": {
-    en: "Update to load the latest improvements — takes a second and keeps you signed in.",
-    zh: "更新即可加载最新改进 — 只需一秒，且无需重新登录。",
-    ar: "حدّث لتحميل أحدث التحسينات — ثانية واحدة وبدون تسجيل خروج.",
+    en: "Takes a second — you stay signed in.",
+    zh: "只需一秒，无需重新登录。",
+    ar: "ثانية واحدة — وتفضل مسجّل الدخول.",
   },
   "u.refresh":  { en: "Update",      zh: "更新",       ar: "تحديث" },
   "u.updating": { en: "Updating…",   zh: "正在更新…",  ar: "جارٍ التحديث…" },
@@ -117,19 +120,17 @@ export default function UpdateWatcher() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-      <div className="kx-sheet-in pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2.5 py-2.5 shadow-2xl shadow-black/40 max-w-[min(92vw,26rem)]">
-        {/* Owner call 2026-08-08: ONE line only — the pill should whisper,
-            not explain. The subtitle copy stays in the T dict unused in case
-            he ever wants it back. */}
-        <div className="min-w-0 text-[13px] font-semibold leading-tight whitespace-nowrap">
-          {t("u.available")}
+      <div className="kx-sheet-in pointer-events-auto flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-5 pr-3 py-3 shadow-2xl shadow-black/40 max-w-[min(92vw,28rem)]">
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
+          <div className="mt-1 text-[11.5px] leading-snug opacity-75">{t("u.sub")}</div>
         </div>
         <button
           type="button"
           onClick={onUpdate}
           disabled={updating}
           aria-busy={updating}
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[12px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-60 disabled:pointer-events-none"
+          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[12.5px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-60 disabled:pointer-events-none"
         >
           {updating && (
             <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
