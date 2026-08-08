@@ -93,7 +93,7 @@ export default function UpdateWatcher() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2.5 py-2.5 shadow-2xl shadow-black/40 max-w-[min(92vw,26rem)]">
+      <div className="kx-sheet-in pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2.5 py-2.5 shadow-2xl shadow-black/40 max-w-[min(92vw,26rem)]">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold leading-tight">{t("u.available")}</div>
           <div className="mt-0.5 text-[11px] leading-snug opacity-70">{t("u.sub")}</div>

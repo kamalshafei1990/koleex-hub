@@ -870,19 +870,14 @@ export default function HomePage() {
           </linearGradient>
         </defs>
       </svg>
-      {/* Subtle staggered tile entrance — pure CSS, disabled for reduced-motion. */}
+      {/* Tile entrance: the launcher is CORE NAVIGATION (opened dozens of
+          times a day) — that frequency tier earns near-imperceptible motion
+          only. The old 500ms rise+stagger (last tile settled ~700ms) read
+          as load time; a 150ms opacity-only fade bridges the paint without
+          costing perceived speed. No movement, no stagger, on purpose. */}
       <style>{`
-        @keyframes kx-tile-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
-        .kx-grid > * { animation: kx-tile-in .5s cubic-bezier(.22,.61,.36,1) both; }
-        .kx-grid > *:nth-child(1){animation-delay:0s}
-        .kx-grid > *:nth-child(2){animation-delay:.025s}
-        .kx-grid > *:nth-child(3){animation-delay:.05s}
-        .kx-grid > *:nth-child(4){animation-delay:.075s}
-        .kx-grid > *:nth-child(5){animation-delay:.1s}
-        .kx-grid > *:nth-child(6){animation-delay:.125s}
-        .kx-grid > *:nth-child(7){animation-delay:.15s}
-        .kx-grid > *:nth-child(8){animation-delay:.175s}
-        .kx-grid > *:nth-child(n+9){animation-delay:.2s}
+        @keyframes kx-tile-in { from { opacity: 0; } to { opacity: 1; } }
+        .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
       <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">

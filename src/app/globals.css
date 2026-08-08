@@ -906,6 +906,38 @@ input[type="number"]:not(.kx-spinner) {
   to   { transform: translateY(0);     opacity: 1; }
 }
 
+/* Modal/dialog entrance — fade + settle from 0.975 (never scale(0): real
+   surfaces don't appear from nothing). For centered dialogs and compact
+   creation sheets; same curve family as kx-drop-in for cohesion. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-pop-in {
+    animation: kx-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+@keyframes kx-pop {
+  from { transform: scale(0.975); opacity: 0; }
+  to   { transform: scale(1);     opacity: 1; }
+}
+
+/* Side-panel entrance — slides from the inline-end edge (where the panel
+   is anchored), flipped under RTL so the spatial story stays true. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-slide-in-end {
+    animation: kx-slide-end 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [dir="rtl"] .kx-slide-in-end {
+    animation-name: kx-slide-end-rtl;
+  }
+}
+@keyframes kx-slide-end {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes kx-slide-end-rtl {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
 /* ── KDS-1 §2 — canonical interactive-card hover physics ──
    ONE implementation for the whole Hub: Hub Blue gradient ring
    (masked overlay, opacity-faded), steel glow, gentle lift. Apply
@@ -949,6 +981,19 @@ input[type="number"]:not(.kx-spinner) {
 }
 .kx-hover-card.kx-ring-white:hover {
   box-shadow: 0 0 16px rgba(255,255,255,.16), 0 10px 30px -12px rgba(0,0,0,.35);
+}
+
+/* Press feedback — the touch/click acknowledgment for every interactive
+   card and tile. Near-imperceptible on purpose (0.98, 100ms): these are
+   pressed tens of times a day. On touch screens this is the ONLY press
+   response (no hover there). Placed after the hover rules and doubled
+   for the tile variant so the pressed state wins while held; release
+   springs back on the base 0.18s ease-out (asymmetric: press snappier
+   than release). */
+.kx-hover-card:active,
+.kx-hover-card.kx-hover-tile:active {
+  transform: scale(0.98);
+  transition-duration: 0.1s;
 }
 
 /* Progressive-mount polish: sections fade in instead of popping. */
