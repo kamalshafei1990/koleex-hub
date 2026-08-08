@@ -157,7 +157,15 @@ export default function UpdateWatcher() {
           the same 1.5px band. A static border underneath would show through
           the dim part of the sweep as a second, competing edge. */}
       <div className="kx-update-capsule kx-sheet-in pointer-events-auto flex w-[min(94vw,28rem)] flex-col gap-3 rounded-2xl px-4 py-3 text-white max-[399px]:items-stretch min-[400px]:flex-row min-[400px]:items-center min-[400px]:gap-3.5 min-[400px]:pr-3">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        {/* Lockup pinned to the leading edge, message pushed to the trailing
+            edge. They used to sit side by side with a 12px gap and the title
+            read as jammed against the mark (owner, 2026-08-08: "not too close
+            from koleex hub logo" → then "make the logo in the left and the
+            text on right"). `flex-1` on the text block plus `text-end` opens
+            the whole leftover row width between them; the 20px gap is only
+            the floor for when the wide layout's sub-line eats that slack.
+            Logical properties throughout, so Arabic mirrors it correctly. */}
+        <div className="flex min-w-0 flex-1 items-center gap-5">
           {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
               mark alone. Capsule is always dark → for-dark variant, served
               through the image optimizer (256px, ~few KB) and SW-cached. */}
@@ -166,9 +174,9 @@ export default function UpdateWatcher() {
             src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark.webp&w=256&q=75"
             alt=""
             aria-hidden
-            className="h-[17px] w-auto shrink-0"
+            className="h-[17px] w-auto shrink-0 opacity-80"
           />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 text-end">
             <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
             <div className="mt-1 hidden text-[11.5px] leading-snug text-white/70 min-[400px]:block">{t("u.sub")}</div>
           </div>
