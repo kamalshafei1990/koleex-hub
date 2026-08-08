@@ -25,6 +25,7 @@ import { APP_REGISTRY } from "@/lib/navigation";
 import BoundIcon from "@/components/common/BoundIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { ensureLoadProgressPatch } from "@/lib/load-progress";
 
 const SHOW_AFTER_MS = 120;
 const SAFETY_MS = 15_000;
@@ -39,6 +40,11 @@ if (typeof window !== "undefined") {
     const img = new Image();
     img.src = `/brand/hub-logo/koleex-hub-logo-for-${v}.webp`;
   }
+  /* Install the request counter with the FIRST module of the shell, not
+     with the first loading surface: screens fire their data fetches the
+     moment they mount, and a patch that arrives one effect later misses
+     them — that was the "no percentage in most apps" bug. */
+  ensureLoadProgressPatch();
 }
 
 export default function AppLaunchSplash() {

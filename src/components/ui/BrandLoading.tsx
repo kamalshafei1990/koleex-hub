@@ -37,9 +37,15 @@ export default function BrandLoading({
   useEffect(() => {
     ensureLoadProgressPatch();
     const base = snapshotLoadProgress();
+    /* Requests already in flight when this gate appeared belong to the
+       thing the user is waiting for — count them into BOTH sides, so a
+       gate that mounts one tick after the screen fired its fetches still
+       shows an honest ratio instead of nothing (the "no percentage in
+       most apps" bug) or a fake instant-100%. */
+    const baseInflight = Math.max(0, base.started - base.settled);
     const update = () => {
       const now = snapshotLoadProgress();
-      const started = now.started - base.started;
+      const started = now.started - base.started + baseInflight;
       if (started <= 0) return;
       const settled = now.settled - base.settled;
       /* Monotonic display: late-starting requests grow the denominator,
@@ -64,6 +70,8 @@ export default function BrandLoading({
           <div className="kx-brand-underline" />
         ) : (
           <>
+            {/* P6 "comet head" (owner's corrected pick): gradient tail fills
+                with the REAL ratio; the glowing head pulses at the edge. */}
             <div className="kx-brand-progress">
               <i style={{ width: `${pct}%` }} />
             </div>

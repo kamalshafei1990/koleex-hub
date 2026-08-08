@@ -998,29 +998,50 @@ input[type="number"]:not(.kx-spinner) {
 }
 [data-theme="light"] .kx-brand-logo-dark { display: none; }
 [data-theme="dark"] .kx-brand-logo-light { display: none; }
-/* P1 (owner pick): the thin line FILLS with the real request-completion
-   ratio; the % under it reads out the same number. The indeterminate
-   sweep below stays for surfaces with no trackable requests. */
+/* P6 "comet head" (owner pick): the bar FILLS with the real
+   request-completion ratio — a soft gradient tail with a glowing head
+   pulsing at the progress edge; the % under it reads the same number.
+   The indeterminate sweep below stays for surfaces with no trackable
+   requests (never a fake crawling percentage). */
 .kx-brand-progress {
-  width: 150px;
-  height: 2.5px;
-  border-radius: 2px;
-  background: rgba(127, 169, 214, 0.15);
-  overflow: hidden;
+  position: relative;
+  width: 220px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
 }
 .kx-brand-progress i {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #567FB2, #BCD8F0);
-  box-shadow: 0 0 8px rgba(127, 169, 214, 0.5);
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, #7FA9D6);
   transition: width 0.25s ease-out;
 }
+.kx-brand-progress i::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #BCD8F0;
+  transform: translateY(-50%);
+  box-shadow: 0 0 12px 3px rgba(188, 216, 240, 0.55);
+  animation: kx-comet-pulse 1s ease-in-out infinite;
+}
+@keyframes kx-comet-pulse {
+  50% { box-shadow: 0 0 18px 5px rgba(188, 216, 240, 0.8); }
+}
+[dir="rtl"] .kx-brand-progress i { left: auto; right: 0; background: linear-gradient(270deg, transparent, #7FA9D6); }
+[dir="rtl"] .kx-brand-progress i::after { right: auto; left: -3px; }
 .kx-brand-pct {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-  margin-top: -8px;
+  margin-top: -6px;
 }
 
 .kx-brand-underline {
