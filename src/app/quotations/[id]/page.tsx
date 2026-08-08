@@ -245,7 +245,7 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
 
   if (loading) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

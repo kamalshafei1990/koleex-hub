@@ -24,12 +24,23 @@ import { ensureLoadProgressPatch, snapshotLoadProgress, subscribeLoadProgress } 
    Fewer than this and the bar runs indeterminate instead of pretending. */
 const MEANINGFUL_REQUESTS = 3;
 
+/* Height of the loading surface. Owner report: "the loading page is not
+   centred, it dances up and down because I can scroll while it's showing".
+   Cause: the gate was min-h-screen (100vh) sitting BELOW the app header, so
+   the page was taller than the viewport by the header height — the logo was
+   centred in the block, not on screen, and the whole thing scrolled. Fixed
+   height = visible area (dvh, so the iOS URL bar can't change it mid-scroll)
+   minus the header, and nothing can overflow. */
+const SURFACE = "h-[calc(100dvh-var(--kx-header-h,3.5rem))] overflow-hidden";
+
 export default function BrandLoading({
   label = "Loading…",
-  className = "min-h-[60vh]",
+  className = SURFACE,
 }: {
   label?: string;
-  /** Sizing/positioning of the surface the loader centers in. */
+  /** Sizing/positioning of the surface the loader centers in. Defaults to
+   *  exactly the visible content area — pass your own only for embedded
+   *  (non-full-page) gates. */
   className?: string;
 }) {
   const [pct, setPct] = useState<number | null>(null);

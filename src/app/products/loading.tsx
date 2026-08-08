@@ -5,5 +5,5 @@
 import BrandLoading from "@/components/ui/BrandLoading";
 
 export default function Loading() {
-  return <BrandLoading label="Loading…" className="min-h-screen" />;
+  return <BrandLoading label="Loading…" />;
 }

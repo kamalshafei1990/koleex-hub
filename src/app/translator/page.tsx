@@ -9,7 +9,7 @@ import BrandLoading from "@/components/ui/BrandLoading";
 const TranslatorApp = dynamic(() => import("@/components/translator/TranslatorApp"), {
   loading: () => (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     </div>
   ),
 });

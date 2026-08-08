@@ -1755,7 +1755,7 @@ export default function Quotations() {
   if (!loaded) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)]">
-        <BrandLoading className="min-h-screen" />
+        <BrandLoading />
       </div>
     );
   }

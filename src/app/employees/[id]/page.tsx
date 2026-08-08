@@ -481,7 +481,7 @@ export default function EmployeeProfilePage({
 
   if (loading || !profile) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

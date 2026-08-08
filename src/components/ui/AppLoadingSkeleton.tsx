@@ -8,5 +8,5 @@
 import BrandLoading from "@/components/ui/BrandLoading";
 
 export default function AppLoadingSkeleton({ label = "Loading…" }: { label?: string }) {
-  return <BrandLoading label={label} className="h-full min-h-[60vh]" />;
+  return <BrandLoading label={label} />;
 }

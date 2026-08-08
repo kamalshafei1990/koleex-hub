@@ -114,7 +114,7 @@ function SettingsContent() {
 
   if (!account) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

@@ -8,7 +8,7 @@ const KoleexAiApp = dynamic(() => import("@/components/ai/KoleexAiApp"), {
   ssr: false,
   loading: () => (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     </div>
   ),
 });

@@ -150,7 +150,7 @@ function LoginInner() {
 
   if (!hydrated) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 
@@ -311,7 +311,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <BrandLoading className="min-h-screen" />
+        <BrandLoading />
       }
     >
       <LoginInner />

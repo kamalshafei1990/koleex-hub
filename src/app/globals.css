@@ -906,6 +906,56 @@ input[type="number"]:not(.kx-spinner) {
   to   { transform: translateY(0);     opacity: 1; }
 }
 
+/* Update capsule — a slow Hub Blue glow travelling around the border.
+   Owner call: the surface is BLACK on every device, and the border breathes
+   instead of sitting static. Two layers so the glow can rotate without the
+   content inheriting the animation: a conic gradient ring under a solid
+   black fill. @property makes the angle animatable; browsers without it
+   fall back to the plain ring, which is why the border colour is set on the
+   element too. */
+@property --kx-cap-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.kx-update-capsule {
+  position: relative;
+  isolation: isolate;
+  background: #000;
+}
+.kx-update-capsule::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  z-index: -1;
+  background: conic-gradient(
+    from var(--kx-cap-angle),
+    rgba(86, 127, 178, 0.25) 0deg,
+    #7FA9D6 70deg,
+    #BCD8F0 120deg,
+    #567FB2 190deg,
+    rgba(86, 127, 178, 0.25) 300deg,
+    rgba(86, 127, 178, 0.25) 360deg
+  );
+  animation: kx-cap-spin 6s linear infinite;
+}
+.kx-update-capsule::after {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+  z-index: -2;
+  background: radial-gradient(closest-side, rgba(86, 127, 178, 0.30), transparent 75%);
+  animation: kx-cap-breathe 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes kx-cap-spin { to { --kx-cap-angle: 360deg; } }
+@keyframes kx-cap-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
 /* Modal/dialog entrance — fade + settle from 0.975 (never scale(0): real
    surfaces don't appear from nothing). For centered dialogs and compact
    creation sheets; same curve family as kx-drop-in for cohesion. */

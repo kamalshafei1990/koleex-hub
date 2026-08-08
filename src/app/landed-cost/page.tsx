@@ -86,7 +86,7 @@ export default function LandedCostListPage() {
 
   if (loading) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

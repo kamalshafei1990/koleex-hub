@@ -15,7 +15,7 @@ import BrandLoading from "@/components/ui/BrandLoading";
 const Contacts = dynamic(() => import("@/components/contacts/Contacts"), {
   ssr: false,
   loading: () => (
-    <BrandLoading className="min-h-[60vh]" />
+    <BrandLoading />
   ),
 });
 

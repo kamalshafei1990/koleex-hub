@@ -127,28 +127,31 @@ export default function UpdateWatcher() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-      {/* Owner pick 2026-08-08 (motion sample U5): always-dark capsule with a
-          Hub Blue ring + glow and the K monogram — the update moment carries
-          the brand identity in BOTH themes (a dark floating capsule reads as
-          a system toast on light backgrounds too). Copy unchanged. */}
-      {/* FIXED width, not max-width: the capsule can then never resize for
-          any reason — button state, language, longer copy. (Owner reported
-          it growing on press; the stable-width button fixed the measured
-          case, this makes the whole surface immune by construction.) */}
-      <div className="kx-sheet-in pointer-events-auto flex items-center gap-3.5 rounded-2xl border border-[#7FA9D6]/45 bg-[#0e1116] text-white pl-4 pr-3 py-3 shadow-[0_0_22px_rgba(86,127,178,0.35),0_18px_40px_-12px_rgba(0,0,0,0.6)] w-[min(92vw,28rem)]">
-        {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
-            mark alone. The capsule is always-dark → for-dark variant. Served
-            through the image optimizer (256px, ~few KB) and SW-cached. */}
-        {/* eslint-disable-next-line @next/next/no-img-element -- tiny optimized brand asset */}
-        <img
-          src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark.webp&w=256&q=75"
-          alt=""
-          aria-hidden
-          className="h-[17px] w-auto shrink-0"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
-          <div className="mt-1 text-[11.5px] leading-snug text-white/70">{t("u.sub")}</div>
+      {/* Always-BLACK capsule with a slowly travelling Hub Blue glow on the
+          border (owner call — both themes, both devices).
+
+          MOBILE LAYOUT (owner screenshot: the copy was wrapping one word per
+          line and the box grew tall): below 400px the capsule stacks — the
+          lockup and title on the first row, the button full width beneath —
+          and the reassurance line is dropped, because on a phone it costs
+          three lines to say something the title already implies. Width is
+          fixed (not max-w) so nothing can resize the surface. */}
+      <div className="kx-update-capsule kx-sheet-in pointer-events-auto flex w-[min(94vw,28rem)] flex-col gap-3 rounded-2xl border border-[#7FA9D6]/45 px-4 py-3 text-white max-[399px]:items-stretch min-[400px]:flex-row min-[400px]:items-center min-[400px]:gap-3.5 min-[400px]:pr-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
+              mark alone. Capsule is always dark → for-dark variant, served
+              through the image optimizer (256px, ~few KB) and SW-cached. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- tiny optimized brand asset */}
+          <img
+            src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark.webp&w=256&q=75"
+            alt=""
+            aria-hidden
+            className="h-[17px] w-auto shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
+            <div className="mt-1 hidden text-[11.5px] leading-snug text-white/70 min-[400px]:block">{t("u.sub")}</div>
+          </div>
         </div>
         {/* Stable width: both labels occupy the SAME grid cell, so the button
             is always as wide as the longer one and pressing Update can't
@@ -161,7 +164,7 @@ export default function UpdateWatcher() {
           disabled={updating}
           aria-busy={updating}
           aria-label={updating ? t("u.updating") : t("u.refresh")}
-          className="shrink-0 grid h-9 place-items-center px-4 rounded-full bg-white text-[#0b0b0b] text-[12.5px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7FA9D6] disabled:opacity-60 disabled:pointer-events-none"
+          className="grid h-9 w-full shrink-0 place-items-center rounded-full bg-white px-4 text-[12.5px] font-semibold text-[#0b0b0b] transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7FA9D6] disabled:opacity-60 disabled:pointer-events-none min-[400px]:w-auto"
         >
           <span className={`col-start-1 row-start-1 ${updating ? "invisible" : ""}`}>{t("u.refresh")}</span>
           <span className={`col-start-1 row-start-1 inline-flex items-center gap-1.5 ${updating ? "" : "invisible"}`}>

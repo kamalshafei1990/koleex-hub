@@ -78,7 +78,7 @@ export default function AppLaunchSplash() {
       className="fixed inset-x-0 bottom-0 z-[90] bg-[var(--bg-primary)]"
       style={{ top: "var(--kx-header-h, 3.5rem)" }}
     >
-      <BrandLoading className="h-full" />
+      <BrandLoading className="h-full overflow-hidden" />
     </div>
   );
 }

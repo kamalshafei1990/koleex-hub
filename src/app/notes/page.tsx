@@ -12,7 +12,7 @@ const NotesApp = dynamic(() => import("@/components/notes/NotesApp"), {
   ssr: false,
   loading: () => (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     </div>
   ),
 });

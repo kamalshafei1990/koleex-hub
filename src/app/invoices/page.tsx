@@ -12,7 +12,7 @@ const InvoicesDoc = dynamic(() => import("@/components/invoices-doc/InvoicesDoc"
   ssr: false,
   loading: () => (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     </div>
   ),
 });

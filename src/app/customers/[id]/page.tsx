@@ -341,7 +341,7 @@ export default function CustomerProfilePage({
 
   if (loading || !contact) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

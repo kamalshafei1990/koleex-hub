@@ -70,7 +70,7 @@ export default function EditEmployeePage() {
      field would read as "this employee has no value" rather than "loading". */
   if (!initial) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

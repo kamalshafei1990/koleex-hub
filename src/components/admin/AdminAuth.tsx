@@ -271,7 +271,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* Hydration spinner — nothing heavy so we don't flash the form. */
   if (authed === null) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading className="h-[100dvh] overflow-hidden" />
     );
   }
 

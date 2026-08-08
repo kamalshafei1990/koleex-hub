@@ -465,7 +465,7 @@ export default function InboxPage() {
 
   if (accountLoading) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
 

@@ -692,7 +692,7 @@ export default function RolesPage() {
 
   if (bootLoading && !boot) {
     return (
-      <BrandLoading className="min-h-screen" />
+      <BrandLoading />
     );
   }
   if (boot && !isSA) {
