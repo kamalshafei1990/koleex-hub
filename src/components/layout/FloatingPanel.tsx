@@ -18,15 +18,29 @@ import {
   useCallback,
   useMemo,
 } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { fpAvatar } from "@/lib/cdn";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
-import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
+import type { TtsHandle } from "@/components/ai/MicButton";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
-import MessageMarkdown from "@/components/ai/MessageMarkdown";
+/* These two are the panel's heavy tail and neither is on screen until the
+   panel is OPEN: MessageMarkdown pulls react-markdown (140 KB in the bundle
+   for 4 KB of source) and only renders inside an AI reply; MicButton pulls
+   the speech stack and only exists in the composer.
+
+   They were static imports, so they rode into every page's boot — the same
+   trap the notification bell was in. The FAB itself is untouched, so the dock
+   looks and behaves exactly as before; only what is behind it got later. */
+const MessageMarkdown = dynamic(() => import("@/components/ai/MessageMarkdown"), {
+  ssr: false, loading: () => null,
+});
+const MicButton = dynamic(() => import("@/components/ai/MicButton"), {
+  ssr: false, loading: () => null,
+});
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
@@ -452,7 +466,7 @@ export default function FloatingPanel() {
           setAiMessages(prev => [...prev, { role: "ai", text: replyText }]);
           if (viaVoice && json?.reply) {
             setAiSpeaking(true);
-            ttsHandleRef.current = speakText(json.reply, {
+            ttsHandleRef.current = (await import("@/components/ai/MicButton")).speakText(json.reply, {
               lang: uiLang,
               onEnd: () => {
                 ttsHandleRef.current = null;
@@ -546,7 +560,7 @@ export default function FloatingPanel() {
         const spokenText = finalReply || accumulated;
         if (viaVoice && spokenText) {
           setAiSpeaking(true);
-          ttsHandleRef.current = speakText(spokenText, {
+          ttsHandleRef.current = (await import("@/components/ai/MicButton")).speakText(spokenText, {
             lang: uiLang,
             onEnd: () => {
               ttsHandleRef.current = null;
