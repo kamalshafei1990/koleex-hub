@@ -597,7 +597,11 @@ export const fetchSubcategoryLogos = () => fetchTaxonomyLogos("subcategories");
    shaped { division|category|subcategory|kind : { slug: icon_url } }. A present
    entry wins over the built-in code/storage icon everywhere; absent = fallback. */
 export async function fetchClassificationIcons(): Promise<Record<string, Record<string, string>>> {
-  const json = await jget<{ icons?: Record<string, Record<string, string>> }>("/api/classification-icons", {});
+  /* Coalesced (SYS-2): several PD surfaces mount together and each asked
+     for the icon overrides (measured ×2 on /product-data). Icon edits go
+     through the Visual Library, which reloads — 60s reuse is safe. */
+  const { cachedGet } = await import("@/lib/client-cache");
+  const json = await cachedGet<{ icons?: Record<string, Record<string, string>> }>("/api/classification-icons", 60_000);
   return json.icons ?? {};
 }
 export const uploadDivisionLogo = (slug: string, file: File) => uploadTaxonomyLogo("divisions", slug, file);

@@ -44,8 +44,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 6 | W1 | Mail (Inbox) | /inbox | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
 | 7 | W2 | Customers | /customers | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 8 | W2 | Quotations | /quotations | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 9 | W2 | Products | /products | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 10 | W2 | Product Data | /product-data | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 9 | W2 | Products | /products | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 10 | W2 | Product Data | /product-data | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 11 | W2 | CRM | /crm | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 12 | W2 | Invoices | /invoices | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 13 | W3 | Suppliers | /suppliers | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
