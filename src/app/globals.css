@@ -920,41 +920,38 @@ input[type="number"]:not(.kx-spinner) {
 }
 .kx-update-capsule {
   position: relative;
-  isolation: isolate;
   background: #000;
+  /* Glow lives OUTSIDE the box, never over it (owner: "the borders only").
+     A box-shadow can't tint the surface the way a painted layer can. */
+  box-shadow: 0 0 18px -2px rgba(86, 127, 178, 0.35), 0 18px 40px -12px rgba(0, 0, 0, 0.6);
 }
+/* The travelling ring. MASKED to the border band only — the first attempt
+   used a negative z-index layer, but an element that owns a stacking context
+   paints its own background FIRST, so that layer washed the whole capsule
+   blue (owner screenshot). Same masked-ring technique as .kx-hover-card. */
 .kx-update-capsule::before {
   content: "";
   position: absolute;
-  inset: -1.5px;
+  inset: 0;
   border-radius: inherit;
-  z-index: -1;
+  padding: 1.5px;
   background: conic-gradient(
     from var(--kx-cap-angle),
-    rgba(86, 127, 178, 0.25) 0deg,
+    rgba(86, 127, 178, 0.22) 0deg,
     #7FA9D6 70deg,
     #BCD8F0 120deg,
     #567FB2 190deg,
-    rgba(86, 127, 178, 0.25) 300deg,
-    rgba(86, 127, 178, 0.25) 360deg
+    rgba(86, 127, 178, 0.22) 300deg,
+    rgba(86, 127, 178, 0.22) 360deg
   );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   animation: kx-cap-spin 6s linear infinite;
-}
-.kx-update-capsule::after {
-  content: "";
-  position: absolute;
-  inset: -14px;
-  border-radius: inherit;
-  z-index: -2;
-  background: radial-gradient(closest-side, rgba(86, 127, 178, 0.30), transparent 75%);
-  animation: kx-cap-breathe 3.2s ease-in-out infinite;
   pointer-events: none;
 }
 @keyframes kx-cap-spin { to { --kx-cap-angle: 360deg; } }
-@keyframes kx-cap-breathe {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
-}
 
 /* Modal/dialog entrance — fade + settle from 0.975 (never scale(0): real
    surfaces don't appear from nothing). For centered dialogs and compact

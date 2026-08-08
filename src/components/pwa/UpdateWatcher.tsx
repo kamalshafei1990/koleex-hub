@@ -153,7 +153,10 @@ export default function UpdateWatcher() {
           and the reassurance line is dropped, because on a phone it costs
           three lines to say something the title already implies. Width is
           fixed (not max-w) so nothing can resize the surface. */}
-      <div className="kx-update-capsule kx-sheet-in pointer-events-auto flex w-[min(94vw,28rem)] flex-col gap-3 rounded-2xl border border-[#7FA9D6]/45 px-4 py-3 text-white max-[399px]:items-stretch min-[400px]:flex-row min-[400px]:items-center min-[400px]:gap-3.5 min-[400px]:pr-3">
+      {/* No CSS border: .kx-update-capsule draws a masked, travelling ring in
+          the same 1.5px band. A static border underneath would show through
+          the dim part of the sweep as a second, competing edge. */}
+      <div className="kx-update-capsule kx-sheet-in pointer-events-auto flex w-[min(94vw,28rem)] flex-col gap-3 rounded-2xl px-4 py-3 text-white max-[399px]:items-stretch min-[400px]:flex-row min-[400px]:items-center min-[400px]:gap-3.5 min-[400px]:pr-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
               mark alone. Capsule is always dark → for-dark variant, served
