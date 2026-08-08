@@ -976,6 +976,53 @@ input[type="number"]:not(.kx-spinner) {
   100% { left: 105%; width: 30%; }
 }
 
+/* ── Loading language v2 (owner pick 2026-08-08: sample "B — logo breath") ──
+   Route/app loading = the KOLEEX hub lockup breathing over a clean surface,
+   with a light sweep along a thin underline. Replaces the bar+shimmer look
+   on page/splash loading; kx-loadbar/kx-shimmer stay for the pressed-tile
+   overlay and any future accent use. */
+.kx-brand-load {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.kx-brand-load img {
+  width: min(200px, 56vw);
+  height: auto;
+  opacity: 0.5;
+  animation: kx-brand-breath 1.5s ease-in-out infinite;
+}
+[data-theme="light"] .kx-brand-logo-dark { display: none; }
+[data-theme="dark"] .kx-brand-logo-light { display: none; }
+.kx-brand-underline {
+  width: 120px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(127, 169, 214, 0.14);
+  overflow: hidden;
+  position: relative;
+}
+.kx-brand-underline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, #7FA9D6, transparent);
+  animation: kx-brand-sweep 1.5s ease-in-out infinite;
+}
+@keyframes kx-brand-breath {
+  0%, 100% { opacity: 0.45; transform: scale(0.985); }
+  50%      { opacity: 1;    transform: scale(1); }
+}
+@keyframes kx-brand-sweep {
+  to { transform: translateX(100%); }
+}
+
 .kx-shimmer {
   position: relative;
   overflow: hidden;

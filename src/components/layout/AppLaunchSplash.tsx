@@ -73,35 +73,25 @@ export default function AppLaunchSplash() {
       className="fixed inset-x-0 bottom-0 z-[90] bg-[var(--bg-primary)]"
       style={{ top: "var(--kx-header-h, 3.5rem)" }}
     >
-      {/* Loading language (owner pick): Hub Blue sweep bar + shimmer blocks,
-          structure static. The bar is the single "working" signal, so the
-          old spinner well now shows the DESTINATION app's registry icon
-          (warm-started mirror → paints instantly) — you're visually inside
-          the app you tapped from the first frame. */}
-      <div className="kx-loadbar" />
-      <div className="mx-auto max-w-[1200px] px-4 md:px-8 pt-6 md:pt-10">
-        {/* App title row — appears instantly, so the tap "did something" */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-9 w-9 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)]">
-            <BoundIcon
-              semanticKey={`app.${appId}`}
-              className="h-[18px] w-[18px]"
-              fallback={<SpinnerIcon size={15} className="animate-spin text-[var(--text-dim)]" />}
-            />
-          </div>
-          <div className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">
-            {name}
-          </div>
-        </div>
-        {/* Generic app-shaped skeleton — blocks shimmer, lines stay still */}
-        <div className="space-y-3">
-          <div className="kx-shimmer h-10 w-full max-w-[560px] rounded-xl bg-[var(--bg-secondary)]" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="kx-shimmer h-24 rounded-2xl bg-[var(--bg-secondary)]" />
-            ))}
-          </div>
-          <div className="kx-shimmer h-64 rounded-2xl bg-[var(--bg-secondary)] mt-2" />
+      {/* Loading language v2 (owner pick, motion sample "B — logo breath"):
+          the KOLEEX hub lockup breathing + light-sweep underline — the same
+          brand moment every route loading.tsx shows, so splash → page is one
+          continuous surface. Destination app's name (and its registry icon,
+          instant via the warm mirror) sit under it so the tap still visibly
+          "did something" specific. */}
+      <div className="kx-brand-load">
+        {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp */}
+        <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- theme twin */}
+        <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
+        <div className="kx-brand-underline" />
+        <div className="flex items-center gap-2 text-[var(--text-dim)]">
+          <BoundIcon
+            semanticKey={`app.${appId}`}
+            className="h-[15px] w-[15px]"
+            fallback={<SpinnerIcon size={13} className="animate-spin" />}
+          />
+          <span className="text-[13px] font-medium tracking-tight">{name}</span>
         </div>
       </div>
     </div>
