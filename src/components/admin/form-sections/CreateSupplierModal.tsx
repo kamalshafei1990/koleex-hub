@@ -7,7 +7,16 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
-import { Country, State, City } from "country-state-city";
+/* SYS-3 pattern: deep Country import (Turbopack doesn't tree-shake the
+   package index — the full 8 MB city dataset would ride this chunk);
+   State/City stream in lazily when the modal's pickers mount. */
+import Country from "country-state-city/lib/country";
+import {
+  useStateCity,
+  getStatesOfCountrySync,
+  getCitiesOfStateSync,
+  getCitiesOfCountrySync,
+} from "@/lib/geo/state-city-lazy";
 import Modal from "@/components/kds/FormModal";
 import { createContact } from "@/lib/contacts-admin";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
@@ -160,10 +169,11 @@ function ProvincePicker({ countryCode, value, stateCode, onChange, label }: {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const geoReady = useStateCity();
   const states = useMemo(() => {
-    if (!countryCode) return [];
-    return State.getStatesOfCountry(countryCode);
-  }, [countryCode]);
+    if (!countryCode || !geoReady) return [];
+    return getStatesOfCountrySync(countryCode);
+  }, [countryCode, geoReady]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -241,11 +251,12 @@ function CityPicker({ countryCode, stateCode, value, onChange, label }: {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const geoReady = useStateCity();
   const cities = useMemo(() => {
-    if (!countryCode) return [];
-    if (stateCode) return City.getCitiesOfState(countryCode, stateCode);
-    return City.getCitiesOfCountry(countryCode) || [];
-  }, [countryCode, stateCode]);
+    if (!countryCode || !geoReady) return [];
+    if (stateCode) return getCitiesOfStateSync(countryCode, stateCode);
+    return getCitiesOfCountrySync(countryCode);
+  }, [countryCode, stateCode, geoReady]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

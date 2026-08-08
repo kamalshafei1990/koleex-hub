@@ -5175,7 +5175,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     document.addEventListener("visibilitychange", onVisible);
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void silentRefresh();
-    }, 20000);
+      /* 20s → 90s (revision W3): the 20s cadence re-downloaded the whole
+         slim list 3×/minute per open tab — measurable list traffic at our
+         ~1s/request network and a real cadence×users cost at the ~30-user
+         ceiling. Focus/visibility refetch above still gives instant
+         freshness the moment an operator returns to the tab. */
+    }, 90_000);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);

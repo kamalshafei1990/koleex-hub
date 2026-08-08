@@ -48,8 +48,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 10 | W2 | Product Data | /product-data | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 11 | W2 | CRM | /crm | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 12 | W2 | Invoices | /invoices | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 13 | W3 | Suppliers | /suppliers | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 14 | W3 | Contacts | /contacts | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 13 | W3 | Suppliers | /suppliers | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 14 | W3 | Contacts | /contacts | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 15 | W3 | Inventory | /inventory | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 16 | W3 | Purchases | /purchase | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 17 | W3 | Landed Cost | /landed-cost | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
