@@ -59,53 +59,84 @@ async function jsend(
   }
 }
 
-/* ─── Taxonomy in-flight + session cache (unchanged) ─────────────────── */
+/* ─── Taxonomy in-flight + warm-start cache ───────────────────────────────
+   localStorage, NOT sessionStorage. Measured on production 2026-08-08:
+   /api/taxonomy/all takes 1.5-4.5s while the handler that produces it runs in
+   1ms (x-kx-timing: auth=0 db=0 ser=1 memo=HIT) — the cost is Vercel's
+   dynamic-response path, and no server change touches it. A sessionStorage
+   cache dies with the tab, so every fresh tab and every PWA relaunch paid
+   those seconds again before the catalogue could draw a single filter.
+
+   localStorage survives that, and readTaxoStale() lets the screen paint from
+   the mirror while the refresh happens behind it — the same warm-start shape
+   visual-bindings already uses for the icon registry.
+
+   Sign-out clears it: the keys are `kx:taxo:*` and session-caches wipes every
+   `kx:` prefix from BOTH stores. */
 const TAXO_TTL_MS = 60_000;
 type Cached<T> = { data: T; expiresAt: number };
 const inflight = new Map<string, Promise<unknown>>();
 
-function readSessionCache<T>(key: string): T | null {
+function taxoStore(): Storage | null {
   if (typeof window === "undefined") return null;
+  try { return window.localStorage; } catch { return null; }
+}
+
+function readTaxoCache<T>(key: string): T | null {
+  const store = taxoStore();
+  if (!store) return null;
   try {
-    const raw = window.sessionStorage.getItem(key);
+    const raw = store.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Cached<T>;
-    if (parsed.expiresAt < Date.now()) {
-      window.sessionStorage.removeItem(key);
-      return null;
-    }
+    if (parsed.expiresAt < Date.now()) return null;
     return parsed.data;
   } catch { return null; }
 }
-function writeSessionCache<T>(key: string, data: T): void {
-  if (typeof window === "undefined") return;
+
+/** The mirrored value regardless of age. Used to paint immediately while a
+ *  refresh runs; never used to SKIP the refresh. */
+function readTaxoStale<T>(key: string): T | null {
+  const store = taxoStore();
+  if (!store) return null;
+  try {
+    const raw = store.getItem(key);
+    return raw ? (JSON.parse(raw) as Cached<T>).data : null;
+  } catch { return null; }
+}
+
+function writeTaxoCache<T>(key: string, data: T): void {
+  const store = taxoStore();
+  if (!store) return;
   try {
     const payload: Cached<T> = { data, expiresAt: Date.now() + TAXO_TTL_MS };
-    window.sessionStorage.setItem(key, JSON.stringify(payload));
+    store.setItem(key, JSON.stringify(payload));
   } catch { /* quota exceeded — fine */ }
 }
-function clearSessionKey(key: string): void {
-  if (typeof window === "undefined") return;
-  try { window.sessionStorage.removeItem(key); } catch { /* noop */ }
+
+function clearTaxoKey(key: string): void {
+  const store = taxoStore();
+  if (!store) return;
+  try { store.removeItem(key); } catch { /* noop */ }
 }
 
 /** Call this from every taxonomy mutation so the next read pulls fresh data. */
 export function invalidateTaxonomyCache(): void {
-  clearSessionKey("kx:taxo:divisions");
-  clearSessionKey("kx:taxo:categories");
-  clearSessionKey("kx:taxo:subcategories");
+  clearTaxoKey("kx:taxo:divisions");
+  clearTaxoKey("kx:taxo:categories");
+  clearTaxoKey("kx:taxo:subcategories");
   inflight.delete("divisions");
   inflight.delete("categories");
   inflight.delete("subcategories");
 }
 
 async function memoFetch<T>(key: string, loader: () => Promise<T>): Promise<T> {
-  const cached = readSessionCache<T>(`kx:taxo:${key}`);
+  const cached = readTaxoCache<T>(`kx:taxo:${key}`);
   if (cached !== null) return cached;
   const existing = inflight.get(key);
   if (existing) return existing as Promise<T>;
   const p = loader().then((data) => {
-    writeSessionCache(`kx:taxo:${key}`, data);
+    writeTaxoCache(`kx:taxo:${key}`, data);
     inflight.delete(key);
     return data;
   }).catch((err) => {
@@ -128,26 +159,30 @@ async function fetchTaxonomy<T>(kind: string): Promise<T[]> {
     subcategories together, and on the operators' connection a request
     costs ~1-2s of latency no matter how small it is — three requests for
     three tiny tables is the expensive part, not the data. This fills the
-    same session caches the individual fetchers read, so any later call
+    same warm-start caches the individual fetchers read, so any later call
     for one of them costs nothing.
+
+    WARM START: when the mirror exists but has aged past its TTL, the stale
+    copy is returned IMMEDIATELY and the refresh runs behind it. The
+    catalogue therefore draws its divisions and filters on the first frame
+    instead of after a 1.5-4.5s round trip, and picks up any change a moment
+    later. Only a genuinely cold client (first ever visit, or right after
+    sign-out) waits for the network.
 
     A failed request returns empty lists and writes NOTHING to the cache:
     caching an empty taxonomy would leave the grid unfiltered for the rest
     of the session. */
-export async function fetchTaxonomyAll(): Promise<{
+type TaxonomyAll = {
   divisions: DivisionRow[];
   categories: CategoryRow[];
   subcategories: SubcategoryRow[];
-}> {
-  const d0 = readSessionCache<DivisionRow[]>("kx:taxo:divisions");
-  const c0 = readSessionCache<CategoryRow[]>("kx:taxo:categories");
-  const s0 = readSessionCache<SubcategoryRow[]>("kx:taxo:subcategories");
-  if (d0 && c0 && s0) return { divisions: d0, categories: c0, subcategories: s0 };
+};
 
-  /* cachedGet adds IN-FLIGHT coalescing on top of the session cache: two
-     components mounting together both missed sessionStorage and fired
-     twin /api/taxonomy/all requests (SYS-2, measured ×2 on /product-data).
-     Now the second caller awaits the first one's promise. */
+async function refreshTaxonomyAll(): Promise<TaxonomyAll> {
+  /* cachedGet adds IN-FLIGHT coalescing on top of the warm-start cache: two
+     components mounting together both missed storage and fired twin
+     /api/taxonomy/all requests (SYS-2, measured ×2 on /product-data). Now the
+     second caller awaits the first one's promise. */
   const { cachedGet } = await import("@/lib/client-cache");
   const json = await cachedGet<{
     divisions?: DivisionRow[];
@@ -158,10 +193,32 @@ export async function fetchTaxonomyAll(): Promise<{
   const categories = json.categories ?? [];
   const subcategories = json.subcategories ?? [];
   if (divisions.length && categories.length) {
-    writeSessionCache("kx:taxo:divisions", divisions);
-    writeSessionCache("kx:taxo:categories", categories);
-    writeSessionCache("kx:taxo:subcategories", subcategories);
+    writeTaxoCache("kx:taxo:divisions", divisions);
+    writeTaxoCache("kx:taxo:categories", categories);
+    writeTaxoCache("kx:taxo:subcategories", subcategories);
   }
+  return { divisions, categories, subcategories };
+}
+
+export async function fetchTaxonomyAll(): Promise<TaxonomyAll> {
+  const d0 = readTaxoCache<DivisionRow[]>("kx:taxo:divisions");
+  const c0 = readTaxoCache<CategoryRow[]>("kx:taxo:categories");
+  const s0 = readTaxoCache<SubcategoryRow[]>("kx:taxo:subcategories");
+  if (d0 && c0 && s0) return { divisions: d0, categories: c0, subcategories: s0 };
+
+  /* Aged mirror → paint now, refresh behind. The refresh is deliberately not
+     awaited; it updates the mirror for the next read. Its failure is already
+     handled inside refreshTaxonomyAll (nothing is written), so the catch here
+     only stops an unhandled rejection. */
+  const dS = readTaxoStale<DivisionRow[]>("kx:taxo:divisions");
+  const cS = readTaxoStale<CategoryRow[]>("kx:taxo:categories");
+  const sS = readTaxoStale<SubcategoryRow[]>("kx:taxo:subcategories");
+  if (dS?.length && cS?.length && sS) {
+    void refreshTaxonomyAll().catch(() => {});
+    return { divisions: dS, categories: cS, subcategories: sS };
+  }
+
+  const { divisions, categories, subcategories } = await refreshTaxonomyAll();
   return { divisions, categories, subcategories };
 }
 
@@ -568,7 +625,7 @@ async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string
   });
 }
 function invalidateTaxonomyLogoCache(folder: string): void {
-  clearSessionKey(`kx:taxo:logos:${folder}`);
+  clearTaxoKey(`kx:taxo:logos:${folder}`);
   inflight.delete(`logos:${folder}`);
 }
 async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Promise<string | null> {
