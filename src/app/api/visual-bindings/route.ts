@@ -18,6 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { inlineAppIcons, invalidateAppIconInline } from "@/lib/server/app-icon-inline";
 
 const DOMAINS = ["classification", "field", "spec", "attribute", "app", "activity", "ui"];
 
@@ -31,9 +32,22 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const bindings: Record<string, string> = {};
+  const appBindings: Record<string, string> = {};
   for (const r of data ?? []) {
-    if (r.semantic_key && r.icon_url) bindings[r.semantic_key as string] = (r.icon_url as string).replace(/\s+/g, "");
+    if (!r.semantic_key || !r.icon_url) continue;
+    const key = r.semantic_key as string;
+    const url = (r.icon_url as string).replace(/\s+/g, "");
+    bindings[key] = url;
+    if (key.startsWith("app.")) appBindings[key] = url;
   }
+
+  /* App-tile icons ride INSIDE this payload as data: URIs instead of being 28
+     separate downloads — see lib/server/app-icon-inline for the measurement
+     (~21 KB total, and the owner could watch them arrive one by one). Any
+     icon that could not be read keeps its URL and simply loads as before. */
+  const inlined = await inlineAppIcons(appBindings);
+  Object.assign(bindings, inlined);
+
   return NextResponse.json(
     { bindings },
     { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
@@ -60,6 +74,7 @@ export async function PUT(req: Request) {
   if (!iconUrl) {
     const { error } = await supabaseServer.from("visual_icon_bindings").delete().eq("semantic_key", key);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    invalidateAppIconInline();
     return NextResponse.json({ ok: true, removed: true });
   }
 
@@ -101,5 +116,7 @@ export async function PUT(req: Request) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  /* An icon just changed — the inlined copies must not outlive it. */
+  invalidateAppIconInline();
   return NextResponse.json({ ok: true });
 }
