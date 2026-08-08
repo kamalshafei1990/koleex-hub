@@ -953,6 +953,13 @@ input[type="number"]:not(.kx-spinner) {
   pointer-events: none;
   z-index: 5;
 }
+/* Tile variant: the same sweep pinned to the bottom edge of a pressed
+   launcher/home tile (LaunchPendingOverlay). */
+.kx-loadbar.kx-loadbar-bottom {
+  top: auto;
+  bottom: 0;
+  height: 2.5px;
+}
 .kx-loadbar::after {
   content: "";
   position: absolute;

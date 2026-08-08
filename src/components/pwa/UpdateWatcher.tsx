@@ -56,7 +56,14 @@ export default function UpdateWatcher() {
         const { id } = (await r.json()) as { id?: string };
         if (!id || id === "dev") return;
         if (boot.current == null) { boot.current = id; return; }
-        if (id !== boot.current && alive) setStale(true);
+        if (id !== boot.current && alive) {
+          setStale(true);
+          /* Global flag read by AppLaunchLink: while stale, the next app
+             launch becomes a FULL navigation so the user rides onto the new
+             bundle mid-launch — no pill tap required. Kills the "nothing
+             changed" loop for long-lived tabs/desktop windows. */
+          (globalThis as typeof globalThis & { __kxStaleBuild?: boolean }).__kxStaleBuild = true;
+        }
       } catch {
         /* offline / transient — ignore */
       }
@@ -86,9 +93,26 @@ export default function UpdateWatcher() {
   const onUpdate = () => {
     if (updating) return;
     setUpdating(true);
-    /* Give the pressed/spinner state one frame to paint before the reload
-       tears the page down — otherwise the tap feels ignored. */
-    window.setTimeout(() => window.location.reload(), 180);
+    /* Belt-and-suspenders before the reload: nudge the service worker to
+       fetch its newest self and drop the hashed-chunk cache, so the reload
+       can only come back fresh. Every step is best-effort — worst case we
+       still do the plain reload we always did. (The 180ms floor keeps the
+       pressed/spinner state visible for a frame so the tap feels heard.) */
+    void (async () => {
+      const started = Date.now();
+      try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.update().catch(() => {})));
+        }
+        if (typeof caches !== "undefined") {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter((k) => k.startsWith("kx-static-")).map((k) => caches.delete(k)));
+        }
+      } catch { /* best-effort */ }
+      const wait = Math.max(0, 180 - (Date.now() - started));
+      window.setTimeout(() => window.location.reload(), wait);
+    })();
   };
 
   return (

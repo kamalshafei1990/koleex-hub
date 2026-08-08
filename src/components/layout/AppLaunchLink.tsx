@@ -37,18 +37,23 @@ import { prefetchTier, readNetworkContext, isPreloadAllowed } from "@/lib/app-pr
 import { preloadAppChunk, wasChunkWarmed } from "@/lib/app-chunk-preload";
 
 /* Renders INSIDE the <Link>: while the navigation this link started is still
-   in flight (RSC payload / chunk on a slow network), dim the tile and show a
-   small spinner so a tap ALWAYS visibly responds. 150 ms delay so instant
-   navigations never flash. */
+   in flight (RSC payload / chunk on a slow network), the tile itself speaks
+   the Hub loading language (owner call 2026-08-08 — he pointed at the old
+   floating corner spinner): a soft Hub Blue inner ring + a thin sweep bar
+   along the tile's bottom edge — the same bar that then appears on the
+   splash and the destination page, so press → splash → page reads as ONE
+   continuous thread. 150 ms delay so instant navigations never flash. */
 function LaunchPendingOverlay() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
     <span
       aria-hidden
-      className="absolute inset-0 z-10 flex items-center justify-end rounded-[inherit] bg-[var(--bg-primary)]/40 pe-3 opacity-0 [animation:kx-launch-pending_.15s_.15s_forwards]"
+      className="absolute inset-0 z-10 overflow-hidden rounded-[inherit] opacity-0 [animation:kx-launch-pending_.15s_.15s_forwards]"
     >
-      <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--text-dim)] border-t-transparent" />
+      <span className="absolute inset-0 rounded-[inherit] bg-[var(--bg-primary)]/30" />
+      <span className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-[#7FA9D6]/50 shadow-[inset_0_0_18px_rgba(86,127,178,0.28)]" />
+      <span className="kx-loadbar kx-loadbar-bottom" />
       <style>{`@keyframes kx-launch-pending { to { opacity: 1; } }`}</style>
     </span>
   );
@@ -128,6 +133,16 @@ export default function AppLaunchLink({
       try { trackAppOpen("", app.id); } catch { /* best-effort */ }
       try { onNavigate?.(); } catch { /* best-effort */ }
       if (modified) return;
+      /* A newer deploy is live (UpdateWatcher sets the flag): turn this
+         launch into a FULL document navigation so the user lands on the
+         fresh bundle as part of a navigation they were doing anyway —
+         updates apply themselves without the pill ever being tapped. */
+      const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
+      if (g.__kxStaleBuild) {
+        e.preventDefault();
+        window.location.assign(app.route);
+        return;
+      }
       // Duplicate-activation guard: ignore a second plain launch within 400 ms.
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       if (now - lastLaunchRef.current < 400) return;
