@@ -108,7 +108,20 @@ import { divisionNameLocalized, categoryNameLocalized } from "@/lib/geo/taxonomy
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
-import { Country, State, City } from "country-state-city";
+/* SYS-3: Country (96 KB) is the only slice cheap enough to import
+   statically — State/City drag the 8 MB world city dataset onto this
+   route's chunk, so they load lazily via state-city-lazy on first use.
+   DEEP import (lib/country, not the package index): Turbopack does NOT
+   tree-shake the index's re-exports, so `import { Country } from
+   "country-state-city"` still welded city.json (verified: 8.2 MB chunk
+   containing the city list) onto this route. */
+import Country from "country-state-city/lib/country";
+import {
+  useStateCity,
+  getStatesOfCountrySync,
+  getCitiesOfStateSync,
+  getCitiesOfCountrySync,
+} from "@/lib/geo/state-city-lazy";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
@@ -4638,10 +4651,11 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const geoReady = useStateCity();
   const states = useMemo(() => {
-    if (!countryCode) return [];
-    return State.getStatesOfCountry(countryCode);
-  }, [countryCode]);
+    if (!countryCode || !geoReady) return [];
+    return getStatesOfCountrySync(countryCode);
+  }, [countryCode, geoReady]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -4718,6 +4732,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const geoReady = useStateCity();
   const cities = useMemo(() => {
     if (!countryCode) return [];
     // China: use our clean, complete prefecture-level list (the geo library's
@@ -4726,9 +4741,10 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
       const list = chinaCitiesForState(stateCode);
       if (list.length) return list.map((c) => ({ name: c.en }));
     }
-    if (stateCode) return City.getCitiesOfState(countryCode, stateCode);
-    return City.getCitiesOfCountry(countryCode) || [];
-  }, [countryCode, stateCode]);
+    if (!geoReady) return [];
+    if (stateCode) return getCitiesOfStateSync(countryCode, stateCode);
+    return getCitiesOfCountrySync(countryCode);
+  }, [countryCode, stateCode, geoReady]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -5404,6 +5420,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      renderFormPanel) inside a modal, pre-filled with the extracted data. The
      PDF is filed against the new supplier after Save (handleSave success). */
   const [formModalOpen, setFormModalOpen] = useState(false);
+  /* Lazy State/City dataset (SYS-3): the hook is GATED on the form being
+     on screen — ungated it downloaded the 8 MB city chunk at list open,
+     defeating the split. Sits above the setupNeeded/loading early
+     returns, so the rules of hooks hold. */
+  const geoReady = useStateCity(view === "form" || formModalOpen);
   const pendingCatalogFileRef = useRef<File | null>(null);
   /* Duplicate-supplier guard: likely matches found at save time + a one-shot
      bypass when the operator confirms "create anyway". */
@@ -8642,7 +8663,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const showTab = (tab: CustomerTab) => !isCustomer || !form.entity_type || customerTab === tab;
 
     /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
-    const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
+    const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && geoReady && getStatesOfCountrySync(form.country_code).length > 0;
 
     /* City always shows once country is selected; province is optional */
     const showCity = !!form.country_code;

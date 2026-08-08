@@ -28,7 +28,7 @@ chunks came from browser cache; the file COUNT stays comparable).
 |---|---|---|---|
 | SYS-1 | P2 | DevReload (localhost-only) ticked on every pointermove unthrottled → 11-24 junk API calls/visit, polluted all localhost measurements | ✅ fixed 2026-08-08 (3s throttle) |
 | SYS-2 | P1 | Duplicate same-screen API calls everywhere (bootstrap ×2-4, inbox/feed ×3, discuss/read ×5, assignees ×4, avatars ×8…) — request coalescing (client-cache cachedGet) exists but many call sites bypass it. On a ~1s/request network each dup is a full second of user time | 🛠 pass 1 ✅ 2026-08-08: discuss.ts bootstrap → shared me-bootstrap; todos/assignees+todo-labels+me/work+taxonomy/all → cachedGet; avatars CHUNK 30→120. Measured: /home 18→14, /todo 21→14, /customers avatars ×8→×2. Remaining ×2s (bootstrap, visual-bindings, contacts) pattern-match module duplication → folded into SYS-4. discuss/read ×5 = invalidation churn → Discuss app session |
-| SYS-3 | P1 | /customers pulls 2.7 MB of route JS chunks (47 files) on first visit — heaviest screen measured | ⬜ |
+| SYS-3 | P1 | /customers pulls 2.7 MB of route JS chunks (47 files) on first visit — heaviest screen measured | ✅ 2026-08-08: country-state-city's 8.2 MB city dataset (2.26 MB gzip) was welded onto the route (Turbopack doesn't tree-shake index re-exports; needed a deep lib/country import + form-gated lazy State/City). Cold open now ~0.45 MB (−83%); dataset loads on demand at form open. Details: apps/customers-sys3.md |
 | SYS-4 | P2→P1 | ROOT CAUSE FOUND 2026-08-08: Turbopack DUPLICATES small modules across chunks (visual-bindings code present in 3 chunk files) → module-level singleton caches split into independent copies → parallel duplicate fetches (vb ×2 @15ms apart, proven by timestamps). FIX: anchor singletons on globalThis — applied to visual-bindings + client-cache; verified vb ×2→×1. me-bootstrap single-copy today (left untouched — auth-critical, own session if it ever duplicates). RSC `_rsc`-variant prefetch churn = Next prefetch TTL behavior, accepted for now | 🛠 core fixed |
 | SYS-5 | P2 | 28-58 images per screen (cached in this run) — cold-load behavior, sizing and placeholders to verify per wave | ⬜ |
 
@@ -42,7 +42,7 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 4 | W1 | Calendar | /calendar | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
 | 5 | W1 | Notes | /notes | 🔍 | ✅ | ✅ | 🔍 | ✅ | ✅ |
 | 6 | W1 | Mail (Inbox) | /inbox | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
-| 7 | W2 | Customers | /customers | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 7 | W2 | Customers | /customers | ⬜ | 🛠 | ✅ | ⬜ | ⬜ | ⬜ |
 | 8 | W2 | Quotations | /quotations | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 9 | W2 | Products | /products | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 10 | W2 | Product Data | /product-data | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
