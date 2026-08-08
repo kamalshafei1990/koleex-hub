@@ -139,20 +139,27 @@ export default function UpdateWatcher() {
           <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
           <div className="mt-1 text-[11.5px] leading-snug text-white/70">{t("u.sub")}</div>
         </div>
+        {/* Stable width: both labels occupy the SAME grid cell, so the button
+            is always as wide as the longer one and pressing Update can't
+            resize the capsule or re-wrap the text (owner report). Works in
+            every language — no hardcoded px width. The idle label keeps the
+            layout; only opacity swaps. */}
         <button
           type="button"
           onClick={onUpdate}
           disabled={updating}
           aria-busy={updating}
-          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0b0b0b] text-[12.5px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7FA9D6] disabled:opacity-60 disabled:pointer-events-none"
+          aria-label={updating ? t("u.updating") : t("u.refresh")}
+          className="shrink-0 grid h-9 place-items-center px-4 rounded-full bg-white text-[#0b0b0b] text-[12.5px] font-semibold transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7FA9D6] disabled:opacity-60 disabled:pointer-events-none"
         >
-          {updating && (
+          <span className={`col-start-1 row-start-1 ${updating ? "invisible" : ""}`}>{t("u.refresh")}</span>
+          <span className={`col-start-1 row-start-1 inline-flex items-center gap-1.5 ${updating ? "" : "invisible"}`}>
             <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
-          )}
-          {updating ? t("u.updating") : t("u.refresh")}
+            {t("u.updating")}
+          </span>
         </button>
       </div>
     </div>
