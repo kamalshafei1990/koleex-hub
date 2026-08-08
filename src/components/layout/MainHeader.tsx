@@ -14,10 +14,11 @@ import UserMenu from "./UserMenu";
 /* Lazy: the bell pulls the discuss + inbox + supabase data layer (~90KB gz).
    Deferring it takes that entire stack OFF the first-paint critical path on
    EVERY page; the icon slot is reserved so nothing shifts. */
-const NotificationBell = dynamic(() => import("./NotificationBell"), {
-  ssr: false,
-  loading: () => <div className="w-8 h-8 md:w-9 md:h-9" aria-hidden />,
-});
+/* The gate is the bell AT REST — icon + count, no data layer. It mounts the
+   real 1105-line panel on the first click. Loading the panel eagerly here (as
+   a plain dynamic import that renders immediately) put the inbox + discuss +
+   supabase chunks into every page's boot; see NotificationBellGate. */
+import NotificationBellGate from "./NotificationBellGate";
 import TenantPicker from "./TenantPicker";
 import ViewAsPicker from "./ViewAsPicker";
 import KoleexLogo from "./KoleexLogo";
@@ -285,7 +286,7 @@ export default function MainHeader() {
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}
-        <NotificationBell dk={dk} />
+        <NotificationBellGate dk={dk} />
 
         {/* Subtle spacer before account */}
         <div className="hidden md:block w-1" />

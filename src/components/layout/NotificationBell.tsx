@@ -204,7 +204,11 @@ function channelLabel(channel: DiscussChannelWithState, t: TFn): string {
   return t("notif.untitled");
 }
 
-export default function NotificationBell({ dk }: { dk: boolean }) {
+export default function NotificationBell({ dk, defaultOpen = false }: { dk: boolean; defaultOpen?: boolean }) {
+  /* defaultOpen: NotificationBellGate renders the resting bell without this
+     component's code and only mounts it when the user clicks. The click has
+     already happened by then, so the panel must come up open — otherwise the
+     first tap would look like it did nothing. */
   const router = useRouter();
   const { t } = useTranslation(hubT);
   const { account } = useCurrentAccount();
@@ -221,7 +225,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   const notifPrefsRef = useRef<Record<string, unknown> | undefined>(undefined);
   notifPrefsRef.current = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [inboxUnread, setInboxUnread] = useState(0);
   const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
   const [loadingInbox, setLoadingInbox] = useState(false);
