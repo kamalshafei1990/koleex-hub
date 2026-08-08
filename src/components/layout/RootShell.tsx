@@ -28,6 +28,7 @@ import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import DevReload from "@/components/pwa/DevReload";
 import UpdateWatcher from "@/components/pwa/UpdateWatcher";
+import PerfVitals from "@/components/perf/PerfVitals";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
@@ -246,6 +247,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           deploy looks like "nothing changed" until a manual hard reload.
           This was written but never mounted, so it had no effect. */}
       <UpdateWatcher />
+      {/* kx-perf bootstrap: cold-load TTFB/DOM/load beacons, warm nav timing,
+          long tasks. Written for Phase-2 observability but never mounted —
+          which is why perf_samples only ever held home.interactive_ms and
+          the network-vs-app split had no real-user numbers behind it. */}
+      <PerfVitals />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
     </QAInspectorProvider>

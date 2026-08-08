@@ -19,7 +19,14 @@
 /* v3: version bump forces every open window onto fresh code on activate (the
    `hadOld` navigate below) — used to roll the fleet onto the Discuss SSE
    delivery build promptly. */
-const STATIC_CACHE = "kx-static-v4";
+const STATIC_CACHE = "kx-static-v5";
+/* Optimized images (/_next/image) + stable brand assets (/brand/…). Their
+   URLs are effectively immutable — uploads land on timestamped paths, so a
+   replaced photo is a NEW url — which makes cache-first safe. This is the
+   China/iOS lever: Safari evicts the HTTP cache aggressively and every
+   re-fetch crosses the border (~1s+ each); the Cache API survives both. */
+const IMG_CACHE = "kx-img-v1";
+const IMG_CACHE_MAX = 500;
 
 self.addEventListener("install", () => {
   // Activate immediately so the first subscribe works without a reload.
@@ -60,23 +67,32 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
-  // ONLY the immutable, hashed build output. Everything else is untouched.
-  if (!url.pathname.startsWith("/_next/static/")) return;
   // DEV GUARD: dev-server chunk names are NOT content-hashed (stable names,
   // changing content), so cache-first would pin stale code across rebuilds —
   // the recurring "my change doesn't show" trap. Never cache on localhost.
   if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return;
 
+  // Immutable, hashed build output → cache-first in the static cache.
+  const isStatic = url.pathname.startsWith("/_next/static/");
+  // Optimized images (per-(url,w,q) entries; sources live on timestamped
+  // paths → replaced photo = new URL) + the brand lockups the loading
+  // language paints on every gate. Both effectively immutable.
+  const isImage =
+    url.pathname.startsWith("/_next/image") ||
+    url.pathname.startsWith("/brand/");
+  if (!isStatic && !isImage) return;
+
   event.respondWith(
     (async () => {
       try {
-        const cache = await caches.open(STATIC_CACHE);
+        const cache = await caches.open(isStatic ? STATIC_CACHE : IMG_CACHE);
         const hit = await cache.match(req);
         if (hit) return hit;
         const res = await fetch(req);
-        if (res && res.status === 200 && res.type === "basic") {
+        if (res && res.status === 200 && (res.type === "basic" || res.type === "default")) {
           try {
             await cache.put(req, res.clone());
+            if (!isStatic) trimImageCache(cache);
           } catch {
             /* quota — ignore */
           }
@@ -88,6 +104,19 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+
+/* Best-effort LRU-ish cap: Cache API keys come back in insertion order, so
+   dropping from the front removes the oldest entries. Fire-and-forget — a
+   trim failure can never affect the response already returned. */
+function trimImageCache(cache) {
+  cache
+    .keys()
+    .then((keys) => {
+      if (keys.length <= IMG_CACHE_MAX) return;
+      return Promise.all(keys.slice(0, keys.length - IMG_CACHE_MAX).map((k) => cache.delete(k)));
+    })
+    .catch(() => {});
+}
 
 self.addEventListener("push", (event) => {
   let payload = {};

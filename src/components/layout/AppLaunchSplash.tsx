@@ -28,6 +28,18 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const SHOW_AFTER_MS = 120;
 const SAFETY_MS = 15_000;
 
+/* Warm the loading-language lockups ONCE at boot. /public assets ship with
+   max-age=0 (revalidate every time — ~1s over the China link), so without
+   this the loader's own logo used to arrive AFTER the loading moment it was
+   supposed to fill. Combined with the SW image cache they're then instant
+   for the life of the install. */
+if (typeof window !== "undefined") {
+  for (const v of ["dark", "light"]) {
+    const img = new Image();
+    img.src = `/brand/hub-logo/koleex-hub-logo-for-${v}.webp`;
+  }
+}
+
 export default function AppLaunchSplash() {
   const pathname = usePathname();
   const { t } = useTranslation(hubT);

@@ -136,12 +136,21 @@ export default function AppLaunchLink({
       /* A newer deploy is live (UpdateWatcher sets the flag): turn this
          launch into a FULL document navigation so the user lands on the
          fresh bundle as part of a navigation they were doing anyway —
-         updates apply themselves without the pill ever being tapped. */
+         updates apply themselves without the pill ever being tapped.
+         THROTTLED to once per 10 minutes: on deploy-heavy days the owner
+         was paying a full page load on nearly every tile tap (each deploy
+         re-flags every open client) — one self-heal per window is enough;
+         the pill covers the rest. */
       const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
       if (g.__kxStaleBuild) {
-        e.preventDefault();
-        window.location.assign(app.route);
-        return;
+        let last = 0;
+        try { last = Number(window.localStorage.getItem("kx_stale_nav_at") || 0); } catch { /* ignore */ }
+        if (Date.now() - last > 600_000) {
+          try { window.localStorage.setItem("kx_stale_nav_at", String(Date.now())); } catch { /* ignore */ }
+          e.preventDefault();
+          window.location.assign(app.route);
+          return;
+        }
       }
       // Duplicate-activation guard: ignore a second plain launch within 400 ms.
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
