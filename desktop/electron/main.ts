@@ -53,6 +53,11 @@ let reconnectTimer: NodeJS.Timeout | null = null;
 let reconnectAttempts = 0;
 /* Guard against renderer-crash reload loops. */
 let crashReloads = 0;
+/* Where the user actually was. Recovery used to always reload APP_URL (the
+   Hub root), so any transient failure while opening an app dumped the user
+   back on Home — reported as "it kicks me out to Home, then I go in again".
+   Recover to the last good in-app URL instead, falling back to the root. */
+let lastGoodUrl: string | null = null;
 
 const getMainWindow = () => mainWindow;
 
@@ -147,11 +152,20 @@ async function createMainWindow(): Promise<void> {
   mainWindow.once("ready-to-show", reveal);
   mainWindow.webContents.once("did-finish-load", reveal);
 
-  // A successful load clears any pending reconnect/backoff + crash counters.
+  // A successful load clears any pending reconnect/backoff + crash counters,
+  // and records where the user is so recovery can put them back there.
   mainWindow.webContents.on("did-finish-load", () => {
     reconnectAttempts = 0;
     crashReloads = 0;
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    const url = mainWindow?.webContents.getURL();
+    if (url && url.startsWith(APP_URL)) lastGoodUrl = url;
+  });
+  // In-app moves are client-side, so did-finish-load doesn't fire for them —
+  // track the committed URL too, otherwise recovery would rewind to whatever
+  // page the window last hard-loaded.
+  mainWindow.webContents.on("did-navigate-in-page", (_e, url, isMainFrame) => {
+    if (isMainFrame && url.startsWith(APP_URL)) lastGoodUrl = url;
   });
 
   // Offline / unreachable production → show a friendly screen and auto-retry
@@ -174,7 +188,13 @@ async function createMainWindow(): Promise<void> {
 
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        /* Back to where the user WAS — the failing URL if we have it,
+           otherwise the last page that loaded cleanly. Only the very first
+           launch falls through to the Hub root. */
+        const back = (validatedURL && validatedURL.startsWith(APP_URL) ? validatedURL : lastGoodUrl) ?? APP_URL;
+        void mainWindow.loadURL(back);
+      }
     }, delayMs);
   });
 
@@ -184,7 +204,7 @@ async function createMainWindow(): Promise<void> {
     log("error", "renderer gone — recovering", details);
     if (crashReloads < 3 && mainWindow && !mainWindow.isDestroyed()) {
       crashReloads += 1;
-      void mainWindow.loadURL(APP_URL);
+      void mainWindow.loadURL(lastGoodUrl ?? APP_URL);
     }
   });
 

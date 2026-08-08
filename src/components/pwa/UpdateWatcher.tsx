@@ -61,11 +61,18 @@ export default function UpdateWatcher() {
         if (boot.current == null) { boot.current = id; return; }
         if (id !== boot.current && alive) {
           setStale(true);
-          /* Global flag read by AppLaunchLink: while stale, the next app
-             launch becomes a FULL navigation so the user rides onto the new
-             bundle mid-launch — no pill tap required. Kills the "nothing
-             changed" loop for long-lived tabs/desktop windows. */
-          (globalThis as typeof globalThis & { __kxStaleBuild?: boolean }).__kxStaleBuild = true;
+          /* Read by AppLaunchLink: while stale, the next app launch becomes a
+             FULL navigation so the user rides onto the new bundle mid-launch —
+             no pill tap required. The ID matters as much as the flag: healing
+             is done ONCE PER BUILD (see AppLaunchLink), because a stale tab's
+             chunk URLs are already 404 and a soft navigation would bounce the
+             user back to Home. */
+          const g = globalThis as typeof globalThis & {
+            __kxStaleBuild?: boolean;
+            __kxStaleBuildId?: string;
+          };
+          g.__kxStaleBuild = true;
+          g.__kxStaleBuildId = id;
         }
       } catch {
         /* offline / transient — ignore */

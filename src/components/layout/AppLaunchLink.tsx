@@ -133,20 +133,29 @@ export default function AppLaunchLink({
       try { trackAppOpen("", app.id); } catch { /* best-effort */ }
       try { onNavigate?.(); } catch { /* best-effort */ }
       if (modified) return;
-      /* A newer deploy is live (UpdateWatcher sets the flag): turn this
-         launch into a FULL document navigation so the user lands on the
-         fresh bundle as part of a navigation they were doing anyway —
-         updates apply themselves without the pill ever being tapped.
-         THROTTLED to once per 10 minutes: on deploy-heavy days the owner
-         was paying a full page load on nearly every tile tap (each deploy
-         re-flags every open client) — one self-heal per window is enough;
-         the pill covers the rest. */
-      const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
+      /* A newer deploy is live (UpdateWatcher raised the flag): turn this
+         launch into a FULL document navigation so the user rides onto the
+         fresh bundle as part of a navigation they were making anyway.
+
+         ONCE PER BUILD, not on a time window. A stale tab's chunk URLs are
+         already gone from the server, so a soft navigation 404s and the App
+         Router recovers by reloading the CURRENT url — which is still "/"
+         because the URL only changes once a navigation commits. That is
+         exactly the "I open an app, it waits, then throws me back to Home
+         and I have to go in again" the owner reported; the previous 10-minute
+         throttle made it MORE likely by letting stale taps take the soft
+         path. Keying on the build id gives every client exactly one full
+         load per deploy — the moment it is needed, and never again. */
+      const g = globalThis as typeof globalThis & {
+        __kxStaleBuild?: boolean;
+        __kxStaleBuildId?: string;
+      };
       if (g.__kxStaleBuild) {
-        let last = 0;
-        try { last = Number(window.localStorage.getItem("kx_stale_nav_at") || 0); } catch { /* ignore */ }
-        if (Date.now() - last > 600_000) {
-          try { window.localStorage.setItem("kx_stale_nav_at", String(Date.now())); } catch { /* ignore */ }
+        const target = g.__kxStaleBuildId ?? "unknown";
+        let healed = "";
+        try { healed = window.localStorage.getItem("kx_healed_build") ?? ""; } catch { /* ignore */ }
+        if (healed !== target) {
+          try { window.localStorage.setItem("kx_healed_build", target); } catch { /* ignore */ }
           e.preventDefault();
           window.location.assign(app.route);
           return;
