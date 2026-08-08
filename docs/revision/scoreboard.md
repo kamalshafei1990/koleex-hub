@@ -36,8 +36,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 
 | # | Wave | App | Route | B1 | B2 | B3 | B4 | F1 | F2 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | W1 | Home | / + /home | 🛠 | ✅ | 🛠 | 🔍 | ✅ | ✅ |
-| 2 | W1 | Discuss | /discuss | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1 | W1 | Home | / + /home | ✅ | ✅ | ✅ | 🔍 | ✅ | ✅ |
+| 2 | W1 | Discuss | /discuss | ⬜ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 3 | W1 | To-do | /todo | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | W1 | Calendar | /calendar | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 5 | W1 | Notes | /notes | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -78,6 +78,19 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 40 | W7 | Download Center | /software-center | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 41 | W7 | Management | /management | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | — | — | Marketing / Marketing Cards / Events / Dashboard | — | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ (registry `active:false`) |
+
+## Session-2 measurements (post SYS-2/SYS-4, 2026-08-08)
+
+| Screen | API calls (was) | Duplicates now |
+|---|---|---|
+| /home | **14** (18) | none — heartbeat/badge polling cadence only |
+| /todo | **14** (21) | todos ×2 (app's own double-load — To-do session item) |
+| /discuss | **15** (19) | none of the old ones — myChannels ×5→×1, bootstrap ×3→×1, visual-bindings ×2→×1; channelMessages ×4 = the open thread's live-refresh loop (owner-settled reliability design, keep) |
+| /customers | 19 over 35s | avatars ×8→×2; remaining ×2s were module-dup (fixed via globalThis anchors) — re-measure in the Customers session |
+
+`/` launcher B1 verdict: **clean** — memoized cards, intent/idle prefetch tiers,
+visibility-aware timers, mobile resilience already in place from prior perf
+waves. No changes made; don't re-tune it without new evidence.
 
 ## Severity scale
 - **P0** broken / wrong data shown / crash
