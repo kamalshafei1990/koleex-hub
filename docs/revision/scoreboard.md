@@ -106,3 +106,35 @@ background revalidation (initiator "other"). Count only
 
 ## Per-app reports
 Filed as `docs/revision/apps/<app>.md` as each app completes.
+
+## Owner complaint response — perceived speed (2026-08-08, `e65de7b7`)
+
+Owner: "home/launcher still too slow, I saw the OLD icons then suddenly change
+to new icons (two layers), entering any app still takes very long."
+
+Root causes + structural fixes:
+1. **Icon two-layer flash** — the bindings map lived only in memory, so every
+   full page load painted inline fallback SVGs first and swapped to registry
+   icons one network round-trip (~1s on owner's network) later.
+   Fix: `visual-bindings.ts` mirrors the map in localStorage (`kx_vb_v1`),
+   seeds it SYNCHRONOUSLY at module init, and `BoundIcon` resolves through new
+   `getIconBindingSync()` in its useState initializer → registry icons on the
+   FIRST paint, zero swap. Stale-while-revalidate: background refresh updates
+   quietly, `setUrl` only fires when the URL actually changed.
+2. **App-entry wait** — screens that fetch-on-mount show skeleton for ~1s/req
+   on owner's network. Warm-start snapshots extended to the two biggest
+   remaining daily apps: `/todo` (`kx_todo_snap_v1`: todos+employees+
+   departments+labels, capped 400 rows, persisted after every loadAll) and
+   Quotations (`kx_quot_snap_v1`: slim list ≤200 rows, persisted inside
+   loadQuotationsRemote so mount/delete/save all refresh it). Both paint the
+   last known list instantly and refresh in background — same pattern as
+   Contacts `kx_contacts_v1` / CRM board.
+   All keys use the `kx_` prefix → wiped on sign-out by session-caches.ts.
+
+Verified on local prod server (`next start -p 3001`, owner session): /todo and
+/quotations paint full lists on first frame after reload (no skeleton); /home
+renders 53 mask-image bound icons; console clean.
+
+**Warm-start coverage now:** Home (cachedGet) · Discuss (store) · Contacts ·
+CRM board · To-do · Quotations · visual-bindings (all icons everywhere).
+Remaining apps pick the pattern up as their revision session lands (W3+).
