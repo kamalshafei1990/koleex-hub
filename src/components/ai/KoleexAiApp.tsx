@@ -1579,28 +1579,44 @@ export default function KoleexAiApp() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
+    /* Only visualViewport reports the KEYBOARD. innerHeight does not shrink
+       when iOS raises it, so ignoring every height change (the old rule)
+       meant the composer stayed underneath the keyboard — the owner's "I
+       write a message and I can't send it". The distinction that matters:
+       url/toolbar chrome slides by ~60-90 px, a keyboard takes 250 px+.
+       Track the big changes, ignore the small ones, and the pane neither
+       shakes nor hides the send button. */
+    const KEYBOARD_MIN_DELTA = 120;
+    const vv = window.visualViewport;
+    const viewportH = () => (vv ? vv.height : window.innerHeight);
+    let applied = viewportH();
+
     const apply = () => {
       if (isMobile()) {
         // 56 px = height of the Hub top chrome above the AI app shell.
-        setStageHeight(`${window.innerHeight - 56}px`);
+        applied = viewportH();
+        setStageHeight(`${Math.max(240, applied - 56)}px`);
       } else {
         setStageHeight("calc(100dvh - 3.5rem)");
       }
     };
     apply();
+
     let lastWidth = window.innerWidth;
     const onResize = () => {
-      // Ignore pure-height changes on mobile (browser chrome show/hide);
-      // only react when the viewport width actually changes.
-      if (isMobile() && window.innerWidth === lastWidth) return;
-      lastWidth = window.innerWidth;
-      apply();
+      if (!isMobile()) { apply(); return; }
+      if (window.innerWidth !== lastWidth) { lastWidth = window.innerWidth; apply(); return; }
+      /* Same width → either chrome sliding (ignore) or the keyboard (follow). */
+      if (Math.abs(viewportH() - applied) >= KEYBOARD_MIN_DELTA) apply();
     };
+
     window.addEventListener("orientationchange", apply);
     window.addEventListener("resize", onResize);
+    vv?.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("orientationchange", apply);
       window.removeEventListener("resize", onResize);
+      vv?.removeEventListener("resize", onResize);
     };
   }, []);
 
