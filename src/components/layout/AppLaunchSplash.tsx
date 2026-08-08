@@ -46,16 +46,27 @@ if (typeof window !== "undefined") {
 export default function AppLaunchSplash() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  /* fullPage = this launch is a real document load. The browser keeps the OLD
+     page painted until the new one commits, so we must cover the header too
+     and show INSTANTLY — otherwise the user watches the page he just left
+     (on Home that reads as "it threw me back to Home"). */
+  const [fullPage, setFullPage] = useState(false);
   const showTimerRef = useRef<number | null>(null);
   const safetyRef = useRef<number | null>(null);
 
   useEffect(() => {
     const onLaunch = (e: Event) => {
-      const { appId, route } = (e as CustomEvent<{ appId: string; route: string }>).detail ?? {};
+      const { appId, route, fullPage: full } =
+        (e as CustomEvent<{ appId: string; route: string; fullPage?: boolean }>).detail ?? {};
       if (!appId || !route) return;
       if (route.split(/[?#]/)[0] === window.location.pathname) return;
       if (showTimerRef.current) window.clearTimeout(showTimerRef.current);
-      showTimerRef.current = window.setTimeout(() => setVisible(true), SHOW_AFTER_MS);
+      if (full) {
+        setFullPage(true);
+        setVisible(true);
+      } else {
+        showTimerRef.current = window.setTimeout(() => setVisible(true), SHOW_AFTER_MS);
+      }
       if (safetyRef.current) window.clearTimeout(safetyRef.current);
       safetyRef.current = window.setTimeout(() => setVisible(false), SAFETY_MS);
     };
@@ -75,8 +86,8 @@ export default function AppLaunchSplash() {
   return (
     <div
       aria-hidden
-      className="fixed inset-x-0 bottom-0 z-[90] bg-[var(--bg-primary)]"
-      style={{ top: "var(--kx-header-h, 3.5rem)" }}
+      className={`fixed inset-x-0 bottom-0 bg-[var(--bg-primary)] ${fullPage ? "z-[999]" : "z-[90]"}`}
+      style={{ top: fullPage ? 0 : "var(--kx-header-h, 3.5rem)" }}
     >
       <BrandLoading className="h-full overflow-hidden" />
     </div>

@@ -157,6 +157,16 @@ export default function AppLaunchLink({
         if (healed !== target) {
           try { window.localStorage.setItem("kx_healed_build", target); } catch { /* ignore */ }
           e.preventDefault();
+          /* Cover the ENTIRE viewport before the load starts. A browser keeps
+             the old document painted until the new one commits, so without
+             this the user stares at the page he just left — on Home that
+             reads as "it threw me back to Home" (owner's repeated report).
+             fullPage tells the splash to cover the header too, immediately. */
+          try {
+            window.dispatchEvent(new CustomEvent("kx:app-launch", {
+              detail: { appId: app.id, route: app.route, fullPage: true },
+            }));
+          } catch { /* best-effort */ }
           window.location.assign(app.route);
           return;
         }

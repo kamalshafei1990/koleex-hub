@@ -79,6 +79,22 @@ export default function UpdateWatcher() {
       }
     };
     void check();
+    /* HEAL WHILE HIDDEN. The user must never watch a full page load: the
+       browser keeps the OLD page on screen until the new document commits,
+       so a reload triggered mid-tap looks like "it threw me back to Home,
+       showed loading, then went into the app" (owner, repeatedly). When the
+       tab goes away we reload right then — the work happens off-screen and
+       he comes back to a fresh bundle, so his next tap is a soft, instant
+       navigation with nothing to heal. */
+    const onHide = () => {
+      if (document.visibilityState !== "hidden") return;
+      const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
+      if (!g.__kxStaleBuild) return;
+      /* Never interrupt unsaved work — the same guard the exit prompts use. */
+      if (document.querySelector("[data-kx-unsaved='1']")) return;
+      window.location.reload();
+    };
+    document.addEventListener("visibilitychange", onHide);
     const onVis = () => { if (document.visibilityState === "visible") void check(); };
     document.addEventListener("visibilitychange", onVis);
     /* Also on window focus — visibilitychange misses focus switches between
@@ -92,6 +108,7 @@ export default function UpdateWatcher() {
     }, 60 * 1000);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onHide);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
       window.clearInterval(iv);

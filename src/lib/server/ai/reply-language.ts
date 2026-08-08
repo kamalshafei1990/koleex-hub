@@ -36,8 +36,21 @@ export type LanguageDirective = ReplyLang | "clear" | null;
    reply in Arabic" in English. The verb is required so that merely mentioning
    a language ("translate this to Arabic", "how do you say hello in Chinese")
    never silently changes the reply language. */
+/* "use" was here and it is far too generic — "do the Chinese users use this
+   app?" set the reply language to Chinese permanently. A directive verb has
+   to be about REPLYING. */
 const SPEAK =
-  /(reply|replies|respond|answer|answering|write|speak|talk|use)/i;
+  /(reply|replies|respond|answer|answering|write|speak|talk)/i;
+
+/* A complaint is not an instruction. "Did I ask you to speak in Chinese? Why
+   do you answer me in Chinese" contains a verb AND a language name, so the
+   old detector re-locked Chinese on the very message objecting to it — the
+   loop the owner hit (the model apologised while the stored lock stayed).
+   These read as "I do NOT want that language". */
+const OBJECTION =
+  /(why (are|do|did|you)|did i (ask|tell)|didn'?t ask|i never|stop|don'?t|do not|no need)/i;
+const OBJECTION_AR = /(ليه|لماذا|مش عايز|ما طلبت|مطلبتش|انا مطلبت|بطل|توقف)/;
+const OBJECTION_ZH = /(为什么|我没有|别|不要|停止)/;
 const ALWAYS = /(always|from now on|going forward|every time|all the time)/i;
 
 const NAMES: Record<ReplyLang, RegExp> = {
@@ -49,7 +62,8 @@ const NAMES: Record<ReplyLang, RegExp> = {
 /* Arabic and Chinese rarely use the English verb, so each gets its own
    imperative forms. "رد بالعربي", "اتكلم عربي", "请用中文回答". */
 const SPEAK_AR = /(رد|ردّ|جاوب|جاوبني|اجب|أجب|اكتب|تكلم|اتكلم|كلمني|استخدم)/;
-const SPEAK_ZH = /(回答|回复|说|讲|用|写)/;
+/* 用 ("use") dropped for the same reason as the English "use". */
+const SPEAK_ZH = /(回答|回复|说|讲|写)/;
 const ALWAYS_AR = /(دايما|دائما|دائمًا|دايماً|من الآن|من الان|من دلوقتي|كل مرة|على طول)/;
 const ALWAYS_ZH = /(总是|以后|一直|每次|始终)/;
 
@@ -67,6 +81,14 @@ export function detectLanguageDirective(raw: string): LanguageDirective {
   const hasVerb = SPEAK.test(msg) || SPEAK_AR.test(msg) || SPEAK_ZH.test(msg);
   if (!hasVerb) return null;
 
+  /* Complaint, not instruction — and specifically a complaint ABOUT a
+     language, so it must CLEAR the lock rather than set it. Checked before
+     everything else: this exact sentence shape ("why are you answering me in
+     Chinese") used to re-arm the language it was objecting to. */
+  if (OBJECTION.test(msg) || OBJECTION_AR.test(msg) || OBJECTION_ZH.test(msg)) {
+    return "clear";
+  }
+
   /* "stop replying in Arabic", "go back to normal", "auto" */
   if (
     /(stop|no longer|don'?t)\s+\w*\s*(reply|respond|answer|writing|speaking)/i.test(msg) ||
@@ -79,6 +101,27 @@ export function detectLanguageDirective(raw: string): LanguageDirective {
      ambiguous ("translate my Arabic into English") — do nothing. */
   const named = (Object.keys(NAMES) as ReplyLang[]).filter((k) => NAMES[k].test(msg));
   if (named.length !== 1) return null;
+
+  /* PROXIMITY. The verb and the language name have to belong to the same
+     clause. Without this, any sentence that merely contains both anywhere
+     ("our Chinese suppliers never answer emails") flipped every future reply
+     to that language. 30 characters covers "reply in Chinese", "always答复中文",
+     "رد بالعربي" and nothing longer-range. */
+  const nameAt = msg.search(NAMES[named[0]]);
+  const enAt = msg.search(SPEAK);
+  const arAt = msg.search(SPEAK_AR);
+  const zhAt = msg.search(SPEAK_ZH);
+  /* Latin and Arabic directives put the language AFTER the verb ("reply in
+     Chinese", "رد بالعربي"). Requiring that order is what separates a real
+     instruction from a sentence that merely mentions both — "our Chinese
+     suppliers never answer emails" has the name first and must not count.
+     Chinese grammar is the exception ("请用中文回答" — name before verb), so
+     that script is matched in either direction inside a tight window. */
+  const ok =
+    (enAt >= 0 && nameAt > enAt && nameAt - enAt <= 30) ||
+    (arAt >= 0 && nameAt > arAt && nameAt - arAt <= 30) ||
+    (zhAt >= 0 && Math.abs(zhAt - nameAt) <= 12);
+  if (!ok) return null;
 
   /* A bare "reply in Arabic" is a one-off; "ALWAYS reply in Arabic" is a
      standing order. Both set the preference — a user who says "reply in
