@@ -17,19 +17,16 @@
    full data gates) — small in-place placeholders stay quiet text/spinners.
    CSS-only animation, theme-aware webp pair, reduced-motion-safe. */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ensureLoadProgressPatch, snapshotLoadProgress, subscribeLoadProgress } from "@/lib/load-progress";
 
 export default function BrandLoading({
   label = "Loading…",
   className = "min-h-[60vh]",
-  footer,
 }: {
   label?: string;
   /** Sizing/positioning of the surface the loader centers in. */
   className?: string;
-  /** Optional row under the progress line (e.g. the splash's app name). */
-  footer?: ReactNode;
 }) {
   const [pct, setPct] = useState<number | null>(null);
   const maxRef = useRef(0);
@@ -74,7 +71,6 @@ export default function BrandLoading({
           <i style={pct === null ? undefined : { width: `${pct}%` }} />
         </div>
         {pct !== null && <div className="kx-brand-pct">{pct}%</div>}
-        {footer}
       </div>
     </div>
   );

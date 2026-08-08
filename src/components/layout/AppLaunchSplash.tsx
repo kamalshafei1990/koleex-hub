@@ -5,26 +5,22 @@
 
    When the user taps an app tile and the route hasn't arrived within 120 ms
    (typical on high-latency links: mainland China → Vercel), this takes over
-   the content area INSTANTLY with the destination app's shell: its name, an
-   app-shaped skeleton and a spinner. The user is visually "inside" the app
-   from the moment they tap — no dead screen, no double-tap confusion.
+   the content area INSTANTLY with the Hub's one loading moment, so the tap
+   always visibly does something — no dead screen, no double-tap confusion.
 
    · Listens for `kx:app-launch` (dispatched by AppLaunchLink on every plain
      same-tab launch).
    · 120 ms grace so genuinely instant swaps (prefetched payload) never flash.
    · Hides on pathname change (the real page + its loading.tsx take over,
-     visually seamless — both are bg-primary shells) or a 15 s safety.
+     visually seamless — both render the same BrandLoading) or a 15 s safety.
    · Sits below the main header (var(--kx-header-h)) so the chrome stays put.
+   · Owner call 2026-08-08: the splash shows ONLY the brand moment — no app
+     name, no spinner. Same picture as every other gate.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useTranslation } from "@/lib/i18n";
-import { hubT } from "@/lib/translations/hub";
-import { APP_REGISTRY } from "@/lib/navigation";
-import BoundIcon from "@/components/common/BoundIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { ensureLoadProgressPatch } from "@/lib/load-progress";
 
 const SHOW_AFTER_MS = 120;
@@ -49,25 +45,19 @@ if (typeof window !== "undefined") {
 
 export default function AppLaunchSplash() {
   const pathname = usePathname();
-  const { t } = useTranslation(hubT);
-  const [appId, setAppId] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
   const showTimerRef = useRef<number | null>(null);
   const safetyRef = useRef<number | null>(null);
-  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const onLaunch = (e: Event) => {
-      const { appId: id, route } = (e as CustomEvent<{ appId: string; route: string }>).detail ?? {};
-      if (!id || !route) return;
+      const { appId, route } = (e as CustomEvent<{ appId: string; route: string }>).detail ?? {};
+      if (!appId || !route) return;
       if (route.split(/[?#]/)[0] === window.location.pathname) return;
-      setAppId(id);
       if (showTimerRef.current) window.clearTimeout(showTimerRef.current);
       showTimerRef.current = window.setTimeout(() => setVisible(true), SHOW_AFTER_MS);
       if (safetyRef.current) window.clearTimeout(safetyRef.current);
-      safetyRef.current = window.setTimeout(() => {
-        setVisible(false);
-        setAppId(null);
-      }, SAFETY_MS);
+      safetyRef.current = window.setTimeout(() => setVisible(false), SAFETY_MS);
     };
     window.addEventListener("kx:app-launch", onLaunch);
     return () => window.removeEventListener("kx:app-launch", onLaunch);
@@ -78,13 +68,9 @@ export default function AppLaunchSplash() {
     if (showTimerRef.current) window.clearTimeout(showTimerRef.current);
     if (safetyRef.current) window.clearTimeout(safetyRef.current);
     setVisible(false);
-    setAppId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  if (!visible || !appId) return null;
-  const app = APP_REGISTRY.find((a) => a.id === appId);
-  const name = app?.tKey ? t(app.tKey) : "";
+  if (!visible) return null;
 
   return (
     <div
@@ -92,23 +78,7 @@ export default function AppLaunchSplash() {
       className="fixed inset-x-0 bottom-0 z-[90] bg-[var(--bg-primary)]"
       style={{ top: "var(--kx-header-h, 3.5rem)" }}
     >
-      {/* Loading language v2: the SAME BrandLoading every gate shows (logo
-          breath + P1 real-percentage line), plus the destination app's name
-          and registry icon (instant via the warm mirror) so the tap still
-          visibly "did something" specific. */}
-      <BrandLoading
-        className="h-full"
-        footer={
-          <div className="flex items-center gap-2 text-[var(--text-dim)]">
-            <BoundIcon
-              semanticKey={`app.${appId}`}
-              className="h-[15px] w-[15px]"
-              fallback={<SpinnerIcon size={13} className="animate-spin" />}
-            />
-            <span className="text-[13px] font-medium tracking-tight">{name}</span>
-          </div>
-        }
-      />
+      <BrandLoading className="h-full" />
     </div>
   );
 }
