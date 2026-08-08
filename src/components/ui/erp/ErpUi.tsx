@@ -245,6 +245,16 @@ export function ErpQuickAction({
       </span>
     </>
   );
-  if (href) return <Link href={href} className={cls}>{inner}</Link>;
+  /* prefetch={false}, and it matters more than it looks. These quick actions
+     sit on Home pointing into /finance/*, and an App Router <Link> prefetches
+     its route's CLIENT CHUNKS on viewport — so simply rendering the Home
+     dashboard was downloading the Finance/Accounting bundle. Traced from the
+     route manifests: chunk 1730w9botx4rr.js (200 KB) belongs to /finance/*
+     and was arriving on a cold /home.
+
+     A secondary shortcut does not get to pull a whole app's code before
+     anyone has expressed interest in it. The chunk still warms on hover via
+     the launch path, and the click itself is unchanged. */
+  if (href) return <Link href={href} prefetch={false} className={cls}>{inner}</Link>;
   return <button type="button" onClick={onClick} className={`${cls} w-full`}>{inner}</button>;
 }

@@ -103,7 +103,12 @@ export default function RoleHome() {
             Create
           </button>
           {/* "Data Entry" — answer to "how do I put data in manually". */}
+          {/* prefetch={false}: an App Router Link warms its route's client
+              chunks on viewport, and this one points into /finance — see the
+              note on ErpQuickAction. Home must not download the Finance
+              bundle just for showing a shortcut to it. */}
           <Link
+            prefetch={false}
             href="/finance/data-entry"
             className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             title="Where to put finance data manually"
@@ -125,6 +130,7 @@ export default function RoleHome() {
     >
       {showSetupBanner && (
         <Link
+          prefetch={false}
           href="/finance/setup"
           className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-200"
         >
