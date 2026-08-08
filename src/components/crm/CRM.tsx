@@ -221,6 +221,13 @@ export default function CRM() {
   // every fetch below. Without it, this page would fetch wide-open and
   // leak Koleex's opportunities to a customer-tenant account.
   const scopeCtx = useScopeContext();
+  /* scopeCtx rides a ref so `reload` keeps ONE identity: it starts null
+     and resolves a beat later, and with [scopeCtx] in reload's deps that
+     re-ran the whole board load (opportunities ×2 measured 1ms apart on
+     open — the API path ignores ctx anyway; the server scopes by session,
+     ctx only feeds the legacy fallback). Same fix as /todo. */
+  const scopeCtxRef = useRef(scopeCtx);
+  scopeCtxRef.current = scopeCtx;
 
   /* First-mount flag so board timing is only recorded for the cold load,
      and so post-mutation reloads can run "soft" (keep the board visible
@@ -266,8 +273,8 @@ export default function CRM() {
       const t0 =
         typeof performance !== "undefined" ? performance.now() : 0;
       const [s, o] = await Promise.all([
-        fetchStages(scopeCtx),
-        fetchOpportunities({ ctx: scopeCtx, view: "board" }),
+        fetchStages(scopeCtxRef.current),
+        fetchOpportunities({ ctx: scopeCtxRef.current, view: "board" }),
       ]);
       setStages(s);
       setOpps(o);
@@ -292,7 +299,7 @@ export default function CRM() {
         }
       }
     },
-    [scopeCtx],
+    [],
   );
 
   useEffect(() => {

@@ -46,8 +46,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 8 | W2 | Quotations | /quotations | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 9 | W2 | Products | /products | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 10 | W2 | Product Data | /product-data | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 11 | W2 | CRM | /crm | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 12 | W2 | Invoices | /invoices | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 11 | W2 | CRM | /crm | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 12 | W2 | Invoices | /invoices | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 13 | W3 | Suppliers | /suppliers | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 14 | W3 | Contacts | /contacts | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 15 | W3 | Inventory | /inventory | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
