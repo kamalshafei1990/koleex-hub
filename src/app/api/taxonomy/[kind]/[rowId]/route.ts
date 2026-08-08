@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
+import { invalidateTaxonomyAll } from "@/lib/server/taxonomy-cache";
 
 const TAXONOMY_KINDS = ["divisions", "categories", "subcategories"] as const;
 type Kind = (typeof TAXONOMY_KINDS)[number];
@@ -43,6 +44,9 @@ export async function PATCH(
     console.error(`[api/taxonomy ${g.kind} PATCH]`, error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  /* Drop the ?kind=all memo so the editor doesn't read back their own row
+     unchanged for the next minute. */
+  invalidateTaxonomyAll();
   return NextResponse.json({ ok: true });
 }
 
@@ -57,5 +61,6 @@ export async function DELETE(
     console.error(`[api/taxonomy ${g.kind} DELETE]`, error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  invalidateTaxonomyAll();
   return NextResponse.json({ ok: true });
 }

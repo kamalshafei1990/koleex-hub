@@ -16,6 +16,12 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import {
+  readTaxonomyAll,
+  readTaxonomyAllStale,
+  writeTaxonomyAll,
+  invalidateTaxonomyAll,
+} from "@/lib/server/taxonomy-cache";
 
 const TAXONOMY_KINDS = ["divisions", "categories", "subcategories"] as const;
 type Kind = (typeof TAXONOMY_KINDS)[number];
@@ -30,6 +36,7 @@ const COUNT_COLUMN: Record<Kind, string> = {
 function asKind(raw: string): Kind | null {
   return (TAXONOMY_KINDS as readonly string[]).includes(raw) ? (raw as Kind) : null;
 }
+
 
 export async function GET(
   req: Request,
@@ -46,16 +53,28 @@ export async function GET(
      part. Same rows, same order, same permission (taxonomy is public
      catalogue structure to any authenticated user). */
   if (rawKind === "all") {
-    const [d, c, s] = await Promise.all(
-      TAXONOMY_KINDS.map((k) => supabaseServer.from(k).select("*").order("order")),
-    );
-    const failed = [d, c, s].find((r) => r.error);
-    if (failed?.error) {
-      console.error("[api/taxonomy all GET]", failed.error.message);
-      return NextResponse.json({ error: failed.error.message }, { status: 500 });
+    /* Warm instance → straight from memory. See lib/server/taxonomy-cache for
+       the production measurement that motivated this (3513 ms for a payload
+       Postgres builds in 1.9 ms). Auth was already enforced above. */
+    let payload = readTaxonomyAll();
+    if (!payload) {
+      const [d, c, s] = await Promise.all(
+        TAXONOMY_KINDS.map((k) => supabaseServer.from(k).select("*").order("order")),
+      );
+      const failed = [d, c, s].find((r) => r.error);
+      if (failed?.error) {
+        console.error("[api/taxonomy all GET]", failed.error.message);
+        /* One transient PostgREST error must not blank every catalogue screen
+           at once — serve the last known payload if we have one. */
+        payload = readTaxonomyAllStale();
+        if (!payload) return NextResponse.json({ error: failed.error.message }, { status: 500 });
+      } else {
+        payload = { divisions: d.data ?? [], categories: c.data ?? [], subcategories: s.data ?? [] };
+        writeTaxonomyAll(payload);
+      }
     }
     return NextResponse.json(
-      { divisions: d.data ?? [], categories: c.data ?? [], subcategories: s.data ?? [] },
+      payload,
       { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
     );
   }
@@ -105,5 +124,6 @@ export async function POST(
     console.error(`[api/taxonomy ${kind} POST]`, error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  invalidateTaxonomyAll();
   return NextResponse.json({ row: data });
 }

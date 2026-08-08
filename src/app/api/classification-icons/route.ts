@@ -21,9 +21,33 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 type Level = "division" | "category" | "subcategory" | "kind";
 const LEVELS: Level[] = ["division", "category", "subcategory", "kind"];
 
+type IconMap = Record<Level, Record<string, string>>;
+
+/* Same finding as /api/taxonomy?kind=all, same treatment: measured on
+   production this route costs ~660 ms to return ~56 KB that is IDENTICAL for
+   every authenticated user, and the query behind it is sub-millisecond. A
+   warm instance therefore answers from memory.
+
+   Better than the taxonomy case: writes come through the PUT below, in this
+   same module, so the memo is dropped the moment an icon changes — an editor
+   sees their own write immediately instead of waiting out a TTL. The TTL is
+   only the backstop for writes made by a DIFFERENT instance.
+
+   Auth is still enforced per request, above the cache. */
+const gi = globalThis as typeof globalThis & { __kxClassIcons?: { at: number; icons: IconMap } | null };
+const ICONS_TTL_MS = 60_000;
+
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+
+  const memo = gi.__kxClassIcons;
+  if (memo && Date.now() - memo.at < ICONS_TTL_MS) {
+    return NextResponse.json(
+      { icons: memo.icons },
+      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+    );
+  }
 
   /* CL-registry unification (owner 2026-08-07): classification icons now
      LIVE in visual_icon_bindings (semantic_key classification.level.slug) —
@@ -38,7 +62,7 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const icons: Record<Level, Record<string, string>> = {
+  const icons: IconMap = {
     division: {}, category: {}, subcategory: {}, kind: {},
   };
   for (const raw of data ?? []) {
@@ -52,6 +76,7 @@ export async function GET() {
       icons[lvl][row.slug as string] = (row.icon_url as string).replace(/\s+/g, "");
     }
   }
+  gi.__kxClassIcons = { at: Date.now(), icons };
   return NextResponse.json(
     { icons },
     /* Icon overrides change rarely (Database-app edits) — let the browser
@@ -96,6 +121,7 @@ export async function PUT(req: Request) {
       console.error("[api/classification-icons PUT clear]", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    gi.__kxClassIcons = null;
     return NextResponse.json({ ok: true, cleared: true });
   }
 
@@ -124,5 +150,8 @@ export async function PUT(req: Request) {
     if (error.code === "23505") return NextResponse.json({ error: "This icon already carries another meaning." }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  /* This instance must not keep serving the pre-write map to the very person
+     who just changed it. */
+  gi.__kxClassIcons = null;
   return NextResponse.json({ ok: true });
 }
