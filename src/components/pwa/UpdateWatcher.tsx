@@ -140,7 +140,11 @@ export default function UpdateWatcher() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
+    /* --kx-actionbar-h is published by MobileActionBar while it is on screen
+       (0 when there is none, and on desktop where it is display:none), so the
+       capsule clears the mobile tab bar instead of covering it — it was
+       hiding Home / Create / Ops / Finance completely. */
+    <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+var(--kx-actionbar-h,0px)+12px)] pointer-events-none">
       {/* Always-BLACK capsule with a slowly travelling Hub Blue glow on the
           border (owner call — both themes, both devices).
 
