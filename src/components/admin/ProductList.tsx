@@ -798,7 +798,7 @@ export default function ProductList() {
      The string identity of this object is what the load effect keys on, so a
      changed filter starts a fresh page 1 and an unchanged one does not. */
   const serverParams = useMemo(() => {
-    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "48" });
+    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
     if (deferredSearch.trim()) p.set("q", deferredSearch.trim());
     if (filterDiv) p.set("division", filterDiv);
     if (filterCat) p.set("category", filterCat);
@@ -827,7 +827,7 @@ export default function ProductList() {
   const serverSearchActive = deferredSearch.trim().length > 0;
   /* "No filter, no search" — the only state whose first page is safe to keep
      as the warm-start snapshot. */
-  const isDefaultView = serverParams === new URLSearchParams({ view: "list", paged: "1", pageSize: "48" }).toString();
+  const isDefaultView = serverParams === new URLSearchParams({ view: "list", paged: "1", pageSize: "150" }).toString();
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
