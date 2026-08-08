@@ -91,6 +91,17 @@ const CATALOG_SECTION: Record<string, string> = {
 const cg = globalThis as typeof globalThis & { __kxCatalogBatch?: ShellState };
 const catalogState: ShellState = cg.__kxCatalogBatch ?? (cg.__kxCatalogBatch = { inflight: null });
 
+/* Home asks for three more on mount — and RoleHome already requests them
+   together in one Promise.all, so they collapse into one trip cleanly. Kept
+   out of the shell batch because no other screen reads them. */
+const HOME_SECTION: Record<string, string> = {
+  "/api/me/preferences": "preferences",
+  "/api/workflows/status": "workflows",
+  "/api/finance/setup/status": "financeSetup",
+};
+const hg = globalThis as typeof globalThis & { __kxHomeBatch?: ShellState };
+const homeState: ShellState = hg.__kxHomeBatch ?? (hg.__kxHomeBatch = { inflight: null });
+
 /** The shared shell batch. Exported so non-cachedGet consumers (visual
  *  bindings) join the SAME request instead of opening a second one. */
 export async function getShell(): Promise<Record<string, unknown> | null> {
@@ -127,6 +138,23 @@ async function fetchShell(): Promise<Record<string, unknown> | null> {
   return fetchBatch(shellState, "/api/shell", SHELL_SECTION);
 }
 
+/* Every batch, in one table. A new one is a single entry here plus its route —
+   there is no other place that has to learn about it, and a URL that appears
+   in no table keeps fetching its own endpoint exactly as before. */
+const BATCHES = [
+  { url: "/api/shell",        state: shellState,   map: SHELL_SECTION },
+  { url: "/api/catalog-refs", state: catalogState, map: CATALOG_SECTION },
+  { url: "/api/home-refs",    state: homeState,    map: HOME_SECTION },
+] as const;
+
+function pickBatch(url: string) {
+  for (const b of BATCHES) {
+    const section = b.map[url];
+    if (section) return { section, state: b.state, url: b.url, map: b.map };
+  }
+  return null;
+}
+
 export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
   const hit = cache.get(url);
 
@@ -136,10 +164,7 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
   }
 
   /* Which batch, if any, already carries this payload? */
-  const batch =
-    SHELL_SECTION[url] ? { section: SHELL_SECTION[url], state: shellState, url: "/api/shell", map: SHELL_SECTION }
-    : CATALOG_SECTION[url] ? { section: CATALOG_SECTION[url], state: catalogState, url: "/api/catalog-refs", map: CATALOG_SECTION }
-    : null;
+  const batch = pickBatch(url);
   if (batch) {
     const batched = (async () => {
       const body = await fetchBatch(batch.state, batch.url, batch.map);

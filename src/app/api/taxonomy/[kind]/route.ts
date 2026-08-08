@@ -42,6 +42,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ kind: string }> },
 ) {
+  const reqStart = Date.now();
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const rawKind = (await params).kind;
@@ -56,7 +57,10 @@ export async function GET(
     /* Warm instance → straight from memory. See lib/server/taxonomy-cache for
        the production measurement that motivated this (3513 ms for a payload
        Postgres builds in 1.9 ms). Auth was already enforced above. */
+    const t0 = Date.now();
+    const tAuth = t0 - reqStart;
     let payload = readTaxonomyAll();
+    const hit = payload != null;
     if (!payload) {
       const [d, c, s] = await Promise.all(
         TAXONOMY_KINDS.map((k) => supabaseServer.from(k).select("*").order("order")),
@@ -73,10 +77,21 @@ export async function GET(
         writeTaxonomyAll(payload);
       }
     }
-    return NextResponse.json(
-      payload,
-      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
-    );
+    /* Server-Timing so the split is visible from the browser instead of
+       inferred. Four sequential requests to this route still took 2.1-4.2s
+       AFTER the memo landed, which rules the Supabase fetch out as the cost —
+       these numbers say where it actually goes. `db` is 0 on a memo hit. */
+    const tDb = Date.now() - t0;
+    const body = JSON.stringify(payload);
+    const tSer = Date.now() - t0 - tDb;
+    return new NextResponse(body, {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, max-age=60, stale-while-revalidate=600",
+        "Server-Timing":
+          `auth;dur=${tAuth}, db;dur=${tDb}, ser;dur=${tSer}, memo;desc=${hit ? "HIT" : "MISS"}, bytes;dur=${body.length}`,
+      },
+    });
   }
 
   const kind = asKind(rawKind);
