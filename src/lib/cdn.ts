@@ -63,11 +63,25 @@ const snapQuality = (q: number) => (q >= 78 ? 78 : 75); // mirrors images.qualit
 
 export function cdnImage(url: string | null | undefined, opts: CdnImageOptions = {}): string {
   if (!url) return "";
-  if (!url.includes(SUPABASE_OBJECT_PATH)) return url;
+
+  /* NORMALISE THE RENDER FORM FIRST. Plenty of stored URLs already point at
+     Supabase's own transform endpoint (/storage/v1/render/image/public/…),
+     written before first-party images shipped. Those failed the object-path
+     test below and were returned UNTOUCHED, so the browser fetched them
+     straight from supabase.co — off-origin, unreachable-ish from mainland
+     China, and (with an empty query) at FULL size. Measured on /product-data
+     at 375px: 139 of 244 images took that path, 0 went through the optimizer.
+     Converting back to the object path lets them ride the first-party
+     pipeline like everything else. */
+  let src = url;
+  if (src.includes(SUPABASE_RENDER_PATH)) {
+    src = src.split("?")[0].replace(SUPABASE_RENDER_PATH, SUPABASE_OBJECT_PATH);
+  }
+  if (!src.includes(SUPABASE_OBJECT_PATH)) return url;
   /* SVGs can't ride either transform pipeline: the Next optimizer rejects
      them (dangerouslyAllowSVG is deliberately OFF — see STORAGE_SECURITY_MODEL)
      and the Supabase render endpoint doesn't rasterize them. Pass through. */
-  if (/\.svg(\?|$)/i.test(url)) return url;
+  if (/\.svg(\?|$)/i.test(src)) return url;
 
   if (FIRST_PARTY_IMAGES) {
     const w = snapWidth(opts.width ?? 1200);
@@ -75,10 +89,10 @@ export function cdnImage(url: string | null | undefined, opts: CdnImageOptions =
     /* height/resize hints are intentionally dropped in this mode: the Next
        optimizer always preserves aspect ratio (contain semantics), which is
        what every IMG preset asked for anyway. */
-    return `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=${q}`;
+    return `/_next/image?url=${encodeURIComponent(src)}&w=${w}&q=${q}`;
   }
 
-  const transformed = url.replace(SUPABASE_OBJECT_PATH, SUPABASE_RENDER_PATH);
+  const transformed = src.replace(SUPABASE_OBJECT_PATH, SUPABASE_RENDER_PATH);
   const params = new URLSearchParams();
   if (opts.width) params.set("width", String(opts.width));
   if (opts.height) params.set("height", String(opts.height));
@@ -107,13 +121,28 @@ export function fpAvatar<T extends string | null | undefined>(url: T): string | 
   return url ? cdnImage(url, { width: 160, quality: 75, resize: "contain" }) : url;
 }
 
+/* ── Phone-sized presets ───────────────────────────────────────────────────
+   Measured on production at 375px / DPR 2 (/product-data): 122 of 140 images
+   arrived with MORE THAN TWICE the pixels the slot could use — a 256px file
+   in a 32px avatar (4x), a 640px file in a 129px card (2.5x). Desktop slots
+   genuinely need the big variants, phones do not, and on the China link those
+   wasted pixels are the "photos take very long to load" complaint.
+
+   The narrow-viewport widths below still clear retina: 96 covers a 32px slot
+   at 3x, 384 covers a 164px card at 2.3x. SAFE FOR HYDRATION: thumb/card are
+   only used inside lists that render AFTER a client-side fetch, so there is
+   no server-rendered markup for the branch to disagree with. */
+const narrowViewport = () => typeof window !== "undefined" && window.innerWidth < 640;
+
 export const IMG = {
   /** Row thumbnail — list cells, brand logos. Bumped from 96 → 160
    *  because the products app routinely shows these inside ≥120px
    *  containers and 96 was rendering too tight to be recognisable. */
-  thumb: (url: string | null | undefined) => cdnImage(url, { width: 160, quality: 75, resize: "contain" }),
+  thumb: (url: string | null | undefined) =>
+    cdnImage(url, { width: narrowViewport() ? 96 : 160, quality: 75, resize: "contain" }),
   /** Card grid thumbnail — products list, related products. */
-  card: (url: string | null | undefined) => cdnImage(url, { width: 480, quality: 75, resize: "contain" }),
+  card: (url: string | null | undefined) =>
+    cdnImage(url, { width: narrowViewport() ? 384 : 480, quality: 75, resize: "contain" }),
   /** Detail page gallery slot — main image carousel cells. The hero
    *  on `aspect-[5/4]` actually paints at ~960px wide on a 1440px
    *  viewport (~480px on mobile), so 1200×q78 covers retina displays
