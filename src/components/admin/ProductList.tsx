@@ -723,6 +723,11 @@ export default function ProductList() {
      lands, a card cannot honestly say a product "needs a name" or has
      "0 models" — it simply does not know yet. */
   const [modelsReady, setModelsReady] = useState(false);
+  const modelsFromPageRef = useRef<{
+    counts: Record<string, number>;
+    primaryModelNames: Record<string, string>;
+    modelNames: Record<string, string[]>;
+  } | null>(null);
 
 
   /* Filter state — persisted to sessionStorage so the back-button
@@ -875,6 +880,19 @@ export default function ProductList() {
       /* Warm-start the photo map too — without this, a revisit painted the
          cards instantly but every image slot sat EMPTY until the media
          round-trip finished, which read as "photos take forever". */
+      /* Seed the model maps BEFORE the first paint, for the same reason the
+         product rows are seeded: a card without its code/chips/count is a
+         different height, and filling them in afterwards moves the grid. */
+      const rawModels = typeof window !== "undefined"
+        ? window.localStorage.getItem(`kx_products_models_v1:${currentScopeKey()}`)
+        : null;
+      if (rawModels) {
+        const m = JSON.parse(rawModels) as { counts?: Record<string, number>; primaryModelNames?: Record<string, string>; modelNames?: Record<string, string[]> };
+        if (m?.counts) setModelCounts(m.counts);
+        if (m?.primaryModelNames) setPrimaryModelNames(m.primaryModelNames);
+        if (m?.modelNames) setModelNames(m.modelNames);
+        if (m?.primaryModelNames) setModelsReady(true);
+      }
       const rawImgs = typeof window !== "undefined"
         ? window.localStorage.getItem(`kx_products_imgs_v1:${currentScopeKey()}`)
         : null;
@@ -1015,6 +1033,7 @@ export default function ProductList() {
              arrive later and refine suppliers/readiness — they just no longer
              change the card's size or correct its text. */
           if (json.models) {
+            modelsFromPageRef.current = json.models;
             setModelCounts(json.models.counts);
             setPrimaryModelNames(json.models.primaryModelNames);
             setModelNames(json.models.modelNames);
@@ -1036,6 +1055,16 @@ export default function ProductList() {
           try {
             const json = JSON.stringify(p);
             if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+            /* The model maps go WITH the list. Without them the warm paint
+               renders cards that have no code, no chips and no count — 208px
+               — and they grow to 311px the moment the network answers. That
+               is the open-glitch again, just sourced from cache instead of
+               from a late request (measured on production: page height
+               10676 -> 11574 at 1.4s). */
+            if (modelsFromPageRef.current) {
+              const mj = JSON.stringify(modelsFromPageRef.current);
+              if (mj.length < 600_000) window.localStorage.setItem(`kx_products_models_v1:${currentScopeKey()}`, mj);
+            }
           } catch { /* quota / serialize guard */ }
         }
         /* PAINT NOW — products are the page. Taxonomy pills, model counts,
