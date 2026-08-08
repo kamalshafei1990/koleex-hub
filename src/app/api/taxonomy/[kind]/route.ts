@@ -77,10 +77,14 @@ export async function GET(
         writeTaxonomyAll(payload);
       }
     }
-    /* Server-Timing so the split is visible from the browser instead of
-       inferred. Four sequential requests to this route still took 2.1-4.2s
-       AFTER the memo landed, which rules the Supabase fetch out as the cost —
-       these numbers say where it actually goes. `db` is 0 on a memo hit. */
+    /* Timing so the split is visible from the browser instead of inferred.
+       Five sequential requests to this route still took 1.5-3.5s AFTER the
+       memo landed, and a memo hit does no Supabase work at all — so the
+       fetch cannot be where the time goes. These numbers say where it does.
+
+       x-kx-timing, NOT Server-Timing: Vercel strips the standard header
+       before it reaches the browser (verified on f52cc1e1 — the response
+       arrived with every other header intact and that one missing). */
     const tDb = Date.now() - t0;
     const body = JSON.stringify(payload);
     const tSer = Date.now() - t0 - tDb;
@@ -88,8 +92,8 @@ export async function GET(
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=60, stale-while-revalidate=600",
-        "Server-Timing":
-          `auth;dur=${tAuth}, db;dur=${tDb}, ser;dur=${tSer}, memo;desc=${hit ? "HIT" : "MISS"}, bytes;dur=${body.length}`,
+        "x-kx-timing":
+          `auth=${tAuth} db=${tDb} ser=${tSer} memo=${hit ? "HIT" : "MISS"} bytes=${body.length} handler=${Date.now() - reqStart}`,
       },
     });
   }
