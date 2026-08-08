@@ -996,8 +996,14 @@ input[type="number"]:not(.kx-spinner) {
   opacity: 0.5;
   animation: kx-brand-breath 1.5s ease-in-out infinite;
 }
+/* data-theme is stamped by CLIENT code only — the first paint after a full
+   reload has NO attribute, and two attribute-scoped hide rules meant BOTH
+   lockups rendered stacked in that window (owner caught it mid-update).
+   Default = dark variant (the app's base theme); light swaps in only when
+   the attribute says so. */
+.kx-brand-logo-light { display: none; }
 [data-theme="light"] .kx-brand-logo-dark { display: none; }
-[data-theme="dark"] .kx-brand-logo-light { display: none; }
+[data-theme="light"] .kx-brand-logo-light { display: block; }
 /* P6 "comet head" (owner pick): the bar FILLS with the real
    request-completion ratio — a soft gradient tail with a glowing head
    pulsing at the progress edge; the % under it reads the same number.
