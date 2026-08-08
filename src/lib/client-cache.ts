@@ -81,22 +81,35 @@ interface ShellState { inflight: Promise<Record<string, unknown> | null> | null 
 const sg = globalThis as typeof globalThis & { __kxShellBatch?: ShellState };
 const shellState: ShellState = sg.__kxShellBatch ?? (sg.__kxShellBatch = { inflight: null });
 
+/* The catalogue screens need two more reference payloads that the rest of
+   the Hub never reads — kept in their OWN batch so Home doesn't pay for a
+   128 KB taxonomy it will never show. */
+const CATALOG_SECTION: Record<string, string> = {
+  "/api/taxonomy/all": "taxonomy",
+  "/api/classification-icons": "icons",
+};
+const cg = globalThis as typeof globalThis & { __kxCatalogBatch?: ShellState };
+const catalogState: ShellState = cg.__kxCatalogBatch ?? (cg.__kxCatalogBatch = { inflight: null });
+
 /** The shared shell batch. Exported so non-cachedGet consumers (visual
  *  bindings) join the SAME request instead of opening a second one. */
 export async function getShell(): Promise<Record<string, unknown> | null> {
   return fetchShell();
 }
 
-async function fetchShell(): Promise<Record<string, unknown> | null> {
-  if (shellState.inflight) return shellState.inflight;
-  shellState.inflight = (async () => {
+async function fetchBatch(
+  state: ShellState,
+  url: string,
+  sections: Record<string, string>,
+): Promise<Record<string, unknown> | null> {
+  if (state.inflight) return state.inflight;
+  state.inflight = (async () => {
     try {
-      const res = await fetch("/api/shell", { credentials: "include" });
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
       const body = (await res.json()) as Record<string, unknown>;
-      /* Seed every section so the sibling callers never hit the network. */
       const now = Date.now();
-      for (const [path, section] of Object.entries(SHELL_SECTION)) {
+      for (const [path, section] of Object.entries(sections)) {
         const value = body[section];
         if (value != null && !cache.get(path)?.inflight) cache.set(path, { value, at: now });
       }
@@ -104,10 +117,14 @@ async function fetchShell(): Promise<Record<string, unknown> | null> {
     } catch {
       return null;
     } finally {
-      shellState.inflight = null;
+      state.inflight = null;
     }
   })();
-  return shellState.inflight;
+  return state.inflight;
+}
+
+async function fetchShell(): Promise<Record<string, unknown> | null> {
+  return fetchBatch(shellState, "/api/shell", SHELL_SECTION);
 }
 
 export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
@@ -118,11 +135,15 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
     return hit.value as T;
   }
 
-  const section = SHELL_SECTION[url];
-  if (section) {
+  /* Which batch, if any, already carries this payload? */
+  const batch =
+    SHELL_SECTION[url] ? { section: SHELL_SECTION[url], state: shellState, url: "/api/shell", map: SHELL_SECTION }
+    : CATALOG_SECTION[url] ? { section: CATALOG_SECTION[url], state: catalogState, url: "/api/catalog-refs", map: CATALOG_SECTION }
+    : null;
+  if (batch) {
     const batched = (async () => {
-      const body = await fetchShell();
-      const value = body?.[section];
+      const body = await fetchBatch(batch.state, batch.url, batch.map);
+      const value = body?.[batch.section];
       if (value != null) return value as T;
       /* Batch unavailable for this key — take the original path. */
       const res = await fetch(url, { credentials: "include" });
