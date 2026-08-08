@@ -55,13 +55,15 @@ export async function fetchAccounts(
   // "Accounts" module permission. Legacy direct-Supabase path below
   // stays as a fallback for code still calling this without a session.
   try {
-    const res = await fetch("/api/accounts", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as { accounts: AccountRow[] };
-      return json.accounts;
-    }
-    if (res.status === 401 || res.status === 403) return [];
+    /* Coalesced (SYS-2): CalendarApp + EventModal (and any other screen
+       resolving account names) share one request per 60s window. Every
+       mutation in this lib calls invalidateAccountsList() after a write. */
+    const { cachedGet } = await import("@/lib/client-cache");
+    const json = await cachedGet<{ accounts: AccountRow[] }>("/api/accounts", 60_000);
+    return json.accounts;
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) return [];
     console.error("[Accounts] API failed:", e);
   }
 
@@ -260,6 +262,15 @@ export async function fetchAccountWithLinks(
   return { ...account, person, company, role, preset, employee, overrides };
 }
 
+/* Drop the coalesced /api/accounts list after any write so the next
+   fetchAccounts() reads fresh (SYS-2 companion to the cachedGet above). */
+async function invalidateAccountsList(): Promise<void> {
+  try {
+    const { invalidateCachedGet } = await import("@/lib/client-cache");
+    invalidateCachedGet("/api/accounts");
+  } catch { /* cache module unavailable — nothing to drop */ }
+}
+
 export async function createAccount(
   input: Omit<AccountInsert, "password_hash" | "force_password_change" | "preferences"> & {
     temporary_password?: string;
@@ -275,6 +286,7 @@ export async function createAccount(
     });
     if (res.ok) {
       const json = (await res.json()) as { account: AccountRow | null };
+      void invalidateAccountsList();
       return json.account;
     }
     if (res.status === 401 || res.status === 403) return null;
@@ -322,7 +334,7 @@ export async function updateAccount(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    if (res.ok) return true;
+    if (res.ok) { void invalidateAccountsList(); return true; }
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
     console.error("[Accounts] updateAccount API failed:", e);
@@ -346,7 +358,7 @@ export async function setAccountStatus(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) return true;
+    if (res.ok) { void invalidateAccountsList(); return true; }
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
     console.error("[Accounts] setAccountStatus API failed:", e);
@@ -419,7 +431,7 @@ export async function deleteAccount(id: string): Promise<boolean> {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) return true;
+    if (res.ok) { void invalidateAccountsList(); return true; }
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
     console.error("[Accounts] deleteAccount API failed:", e);

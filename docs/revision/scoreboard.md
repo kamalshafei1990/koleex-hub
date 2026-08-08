@@ -39,9 +39,9 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 1 | W1 | Home | / + /home | ✅ | ✅ | ✅ | 🔍 | ✅ | ✅ |
 | 2 | W1 | Discuss | /discuss | ⬜ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 3 | W1 | To-do | /todo | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
-| 4 | W1 | Calendar | /calendar | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 5 | W1 | Notes | /notes | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 6 | W1 | Mail (Inbox) | /inbox | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 4 | W1 | Calendar | /calendar | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
+| 5 | W1 | Notes | /notes | 🔍 | ✅ | ✅ | 🔍 | ✅ | ✅ |
+| 6 | W1 | Mail (Inbox) | /inbox | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
 | 7 | W2 | Customers | /customers | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 8 | W2 | Quotations | /quotations | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 9 | W2 | Products | /products | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -91,6 +91,13 @@ chunks came from browser cache; the file COUNT stays comparable).
 `/` launcher B1 verdict: **clean** — memoized cards, intent/idle prefetch tiers,
 visibility-aware timers, mobile resilience already in place from prior perf
 waves. No changes made; don't re-tune it without new evidence.
+
+### Measurement doctrine (updated session 4)
+An API URL appearing twice is NOT automatically a duplicate: HTTP
+stale-while-revalidate produces a `deliveryType:"cache"` hit (~1ms) plus a
+background revalidation (initiator "other"). Count only
+`deliveryType!=="cache"` entries; discriminate remaining repeats by timestamp
+(parallel = real dup, spaced = polling cadence).
 
 ## Severity scale
 - **P0** broken / wrong data shown / crash
