@@ -38,7 +38,7 @@ chunks came from browser cache; the file COUNT stays comparable).
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | W1 | Home | / + /home | ✅ | ✅ | ✅ | 🔍 | ✅ | ✅ |
 | 2 | W1 | Discuss | /discuss | ⬜ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 3 | W1 | To-do | /todo | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 3 | W1 | To-do | /todo | 🔍 | ✅ | 🔍 | 🔍 | ✅ | ✅ |
 | 4 | W1 | Calendar | /calendar | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 5 | W1 | Notes | /notes | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 6 | W1 | Mail (Inbox) | /inbox | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

@@ -1487,16 +1487,24 @@ export default function TodoPage() {
     loadScopeContext(accountId).then(setScopeCtx);
   }, [accountId]);
 
+  /* scopeCtx rides a ref so loadAll keeps ONE identity for the whole
+     mount. It used to depend on scopeCtx, which starts null and resolves
+     a beat later — that re-ran this effect and re-fetched the ENTIRE
+     list a second time on every open (the API path ignores ctx anyway;
+     the server does the scoping — ctx only feeds the legacy fallback),
+     and it also made the realtime effect below resubscribe. */
+  const scopeCtxRef = useRef(scopeCtx);
+  scopeCtxRef.current = scopeCtx;
   const loadAll = useCallback(async () => {
     const [t, e, d, l] = await Promise.all([
-      fetchTodos(scopeCtx),
+      fetchTodos(scopeCtxRef.current),
       fetchAssignableEmployees(),
       fetchDepartments(),
       fetchTodoLabels(),
     ]);
     setTodos(t); setEmployees(e); setDepartments(d); setLabels(l);
     setLoading(false);
-  }, [scopeCtx]);
+  }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
