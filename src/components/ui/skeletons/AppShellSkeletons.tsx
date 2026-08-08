@@ -13,13 +13,18 @@
    on every app (a directory list ≠ a board ≠ an editor ≠ a chat).
    --------------------------------------------------------------------------- */
 
-const PULSE = "animate-pulse motion-reduce:animate-none";
+/* Loading language (owner pick 2026-08-08): Hub Blue sweep bar on top +
+   shimmer over the big blocks, structure static — replaces the old
+   whole-shell opacity pulse (blinking reads as "slow"; a light pass over
+   visible structure reads as "almost ready"). Small `bar` lines stay
+   still on purpose: two moving accents is the whole motion budget. */
 const bar = "rounded bg-[var(--bg-surface-active)]";
-const block = "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]";
+const block = "kx-shimmer rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]";
 
 function Shell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div role="status" aria-busy="true" aria-live="polite" className={`w-full min-h-[60vh] p-4 sm:p-6 ${PULSE}`}>
+    <div role="status" aria-busy="true" aria-live="polite" className="relative w-full min-h-[60vh] p-4 sm:p-6">
+      <div className="kx-loadbar" aria-hidden />
       <span className="sr-only">{label}</span>
       {children}
     </div>

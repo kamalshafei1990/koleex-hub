@@ -938,6 +938,53 @@ input[type="number"]:not(.kx-spinner) {
   to   { transform: translateX(0); }
 }
 
+/* ── Loading language (owner pick 2026-08-08: "bar + shimmer") ──
+   ONE loading vocabulary for the whole Hub: an indeterminate Hub Blue
+   sweep bar hugging the top of the loading surface + a light band
+   sweeping across the big skeleton blocks. Structure stays visible and
+   static (that's what makes it read "almost ready"); only these two
+   accents move. Both are transform/opacity-free of layout work; the
+   app-wide reduced-motion neutralizer freezes them. */
+.kx-loadbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+.kx-loadbar::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -40%; width: 38%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #567FB2, #7FA9D6, #BCD8F0);
+  box-shadow: 0 0 12px rgba(127, 169, 214, 0.5);
+  animation: kx-loadbar-sweep 1.05s cubic-bezier(0.4, 0.1, 0.4, 0.9) infinite;
+}
+@keyframes kx-loadbar-sweep {
+  0%   { left: -40%; width: 38%; }
+  55%  { width: 52%; }
+  100% { left: 105%; width: 30%; }
+}
+
+.kx-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.kx-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 30%, rgba(188, 216, 240, 0.08) 50%, transparent 70%);
+  animation: kx-shimmer-sweep 1.3s ease-in-out infinite;
+}
+@keyframes kx-shimmer-sweep {
+  to { transform: translateX(100%); }
+}
+
 /* ── KDS-1 §2 — canonical interactive-card hover physics ──
    ONE implementation for the whole Hub: Hub Blue gradient ring
    (masked overlay, opacity-faded), steel glow, gentle lift. Apply
