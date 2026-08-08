@@ -1065,6 +1065,11 @@ export default function KoleexAiApp() {
             (e instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(raw)) ||
             /networkerror|net::err|the operation was aborted/i.test(raw);
           setError(humanizeError(isNetwork ? "NetworkError" : raw));
+          /* Owner report: "I write a message and can't send it" — a dropped
+             stream lost the text as well as the answer, so the only recovery
+             was retyping. On this link a drop is routine, so put the message
+             back in the composer: one tap resends instead of rewriting. */
+          if (isNetwork) setInput((cur) => (cur.trim() ? cur : text));
         }
       } finally {
         abortRef.current = null;
