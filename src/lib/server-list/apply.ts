@@ -24,14 +24,26 @@ function escForOr(q: string): string {
   return q.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-export function applyServerList<B>(builder: B, req: ServerListRequest, cfg: ServerListConfig): B {
+/** Extra, caller-built or-terms to widen the free-text match beyond this
+ *  table's own columns — e.g. `id.in.(…)` for products whose MODEL matched, or
+ *  `division_slug.in.(…)` for a taxonomy name match. The caller resolves those
+ *  ids/slugs itself with its own small queries; this only ORs the terms in.
+ *  Every term is caller-constructed from database values, never from raw user
+ *  input, so it carries the same trust as the allowlisted columns. */
+export function applyServerList<B>(
+  builder: B,
+  req: ServerListRequest,
+  cfg: ServerListConfig,
+  extraOr: string[] = [],
+): B {
   let b = builder as unknown as Chainable;
 
-  // Free-text search across ONLY the approved columns (OR of ilike).
-  if (req.q && cfg.searchColumns.length > 0) {
+  // Free-text search across ONLY the approved columns (OR of ilike), plus any
+  // caller-resolved cross-table terms.
+  if (req.q && (cfg.searchColumns.length > 0 || extraOr.length > 0)) {
     const v = escForOr(req.q);
-    const orExpr = cfg.searchColumns.map((c) => `${c}.ilike."%${v}%"`).join(",");
-    b = b.or(orExpr);
+    const terms = cfg.searchColumns.map((c) => `${c}.ilike."%${v}%"`).concat(extraOr);
+    b = b.or(terms.join(","));
   }
 
   // Approved equality filters.

@@ -29,16 +29,13 @@ function bootBuildId(): string {
   return process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "";
 }
 
-/* Copy calibrated twice by the owner (2026-08-08): the original two-line
-   explanation was "a lot of text", the bare "New version" was "too less".
-   Middle ground: full title + ONE short reassurance line. */
+/* Copy calibrated three times by the owner: the original two-line explanation
+   was "a lot of text", the bare "New version" was "too less", and the
+   title-plus-reassurance middle ground was still "text in two lines". Final:
+   the title alone, on one line. The sub-line and its dictionary entry are
+   DELETED rather than hidden — nothing renders it any more. */
 const T = {
   "u.available": { en: "New version available", zh: "新版本可用", ar: "إصدار جديد متاح" },
-  "u.sub": {
-    en: "Takes a second — you stay signed in.",
-    zh: "只需一秒，无需重新登录。",
-    ar: "ثانية واحدة — وتفضل مسجّل الدخول.",
-  },
   "u.refresh":  { en: "Update",      zh: "更新",       ar: "تحديث" },
   "u.updating": { en: "Updating…",   zh: "正在更新…",  ar: "جارٍ التحديث…" },
 };
@@ -176,9 +173,14 @@ export default function UpdateWatcher() {
             aria-hidden
             className="h-[17px] w-auto shrink-0 opacity-80"
           />
-          <div className="min-w-0 flex-1 text-end">
-            <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
-            <div className="mt-1 hidden text-[11.5px] leading-snug text-white/70 min-[400px]:block">{t("u.sub")}</div>
+          {/* ONE line of text. The reassurance sub-line is gone (owner,
+              2026-08-09: "I don't want the text in two lines, I don't mean
+              the title") — it was the second line, and inside a 448px
+              capsule shared with the lockup and the button it also wrapped,
+              so it cost two lines to say something the title implies.
+              `truncate` keeps that true in every language. */}
+          <div className="min-w-0 flex-1 truncate text-end text-[13.5px] font-semibold leading-tight">
+            {t("u.available")}
           </div>
         </div>
         {/* Stable width: both labels occupy the SAME grid cell, so the button

@@ -30,6 +30,7 @@ import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, req
 import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
 import { PRODUCTS_LIST_CONFIG } from "@/lib/server-list/products-config";
+import { resolveProductSearchReach } from "@/lib/server/product-search-reach";
 
 export async function GET(req: Request) {
   const _t = stageTimer("products.list");
@@ -61,6 +62,13 @@ export async function GET(req: Request) {
      columns. */
   if (url.searchParams.get("paged") === "1") {
     const listReq = parseListParams(url.searchParams, PRODUCTS_LIST_CONFIG);
+    /* Give the server search the browser search's reach — model codes, SKUs,
+       supplier names, the models' Chinese names, and taxonomy names in all
+       three languages. Without this, moving the list to the server would have
+       silently broken searching by model code or supplier. */
+    const reach = listReq.q
+      ? await resolveProductSearchReach(listReq.q, auth.tenant_id)
+      : { terms: [] as string[], capped: false };
     let pq = supabaseServer
       .from("products")
       /* exact count drives the pager; at catalogue scale (thousands, not
@@ -68,7 +76,7 @@ export async function GET(req: Request) {
       .select(cols, { count: "exact" })
       .eq("tenant_id", auth.tenant_id);
     if (!canSeeSecrets) pq = pq.eq("status", "active");
-    pq = applyServerList(pq, listReq, PRODUCTS_LIST_CONFIG);
+    pq = applyServerList(pq, listReq, PRODUCTS_LIST_CONFIG, reach.terms);
 
     const { data, error: pagedError, count } = await pq;
     _t.mark("db");
