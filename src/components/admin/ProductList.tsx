@@ -1085,6 +1085,69 @@ export default function ProductList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInternal, retryKey, serverParams]);
 
+  /* Finish a SMALL catalogue in the background instead of waiting for scroll.
+     Paging by 48 broke something the grid depends on: it groups by category,
+     so with only the newest 48 rows loaded, whole categories are simply absent
+     from the page. The owner opened Product Data, could not find Fabric
+     Preparation, and reasonably concluded its 54 products had been deleted.
+     Nothing was — they were on page 2 and 3.
+
+     So: the first page still paints immediately (that is the part that has to
+     be fast), and if the whole catalogue is small enough to hold, the rest
+     streams in behind it and every category is complete a moment later. The
+     scroll path below stays for the catalogue this was built for — at the
+     owner's 3000 products the threshold stops applying and pages arrive on
+     demand, which is the only thing that works at that size. */
+  const AUTO_COMPLETE_MAX = 600;
+
+  /* ONE implementation of "fetch the next page", shared by the background
+     completion above and the scroll observer below, so they cannot disagree
+     about the page counter or race each other into the same request.
+     Resolves to whether more pages remain. */
+  const loadNextPage = useCallback(async (): Promise<boolean> => {
+    if (loadingMoreRef.current) return false;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const next = pageRef.current + 1;
+    try {
+      const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as { rows?: ProductRow[]; hasMore?: boolean };
+      const rows = json.rows ?? [];
+      pageRef.current = next;
+      /* Append by id, never blindly: a product edited between two page
+         requests can shift across the offset boundary and arrive twice, which
+         would render duplicate cards with the same key. */
+      setProducts((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(Boolean(json.hasMore));
+      return Boolean(json.hasMore);
+    } catch {
+      /* A failed page must not blank the grid — stop offering more and leave
+         what is on screen. The user can filter or reload. */
+      setHasMore(false);
+      return false;
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [serverParams]);
+
+  useEffect(() => {
+    if (loading || loadError || !hasMore) return;
+    if (total == null || total > AUTO_COMPLETE_MAX) return;
+    let cancelled = false;
+    void (async () => {
+      /* One page at a time, so a slow link is not hit with ten parallel
+         requests — the whole point of this work was fewer of them at once. */
+      let more = true;
+      while (!cancelled && more) more = await loadNextPage();
+    })();
+    return () => { cancelled = true; };
+  }, [loading, loadError, hasMore, total, loadNextPage]);
+
   /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
      learn, and it is the one that behaves on a phone. The sentinel sits after
      the grid; when it comes into view the next page appends.
@@ -1099,47 +1162,19 @@ export default function ProductList() {
     const io = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting || cancelled) return;
-        /* Guard on a REF, not on the state updater. Putting the fetch inside
-           setLoadingMore(prev => …) made it a side effect inside a state
-           updater, and React invokes those twice in development — every page
-           was requested twice (verified: pages 2,2,3,3). The id-dedupe below
-           hid it in the result, which is exactly why it needed catching here
-           rather than trusting the output. */
-        if (loadingMoreRef.current) return;
-        loadingMoreRef.current = true;
-        setLoadingMore(true);
-        const next = pageRef.current + 1;
-        void (async () => {
-          try {
-            const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = (await res.json()) as { rows?: ProductRow[]; hasMore?: boolean };
-            if (cancelled) return;
-            const rows = json.rows ?? [];
-            pageRef.current = next;
-            /* Append by id, never blindly: a product edited between two page
-               requests can shift across the offset boundary and arrive twice,
-               which would render duplicate cards with the same key. */
-            setProducts((prev) => {
-              const seen = new Set(prev.map((r) => r.id));
-              return [...prev, ...rows.filter((r) => !seen.has(r.id))];
-            });
-            setHasMore(Boolean(json.hasMore));
-          } catch {
-            /* A failed page must not blank the grid — stop offering more and
-               leave what is on screen. The user can filter or reload. */
-            if (!cancelled) setHasMore(false);
-          } finally {
-            loadingMoreRef.current = false;
-            if (!cancelled) setLoadingMore(false);
-          }
-        })();
+        /* The in-flight guard lives inside loadNextPage, on a REF. It used to
+           be the state updater — a side effect inside setLoadingMore(prev=>…),
+           which React invokes twice in development, so every page was
+           requested twice (verified: pages 2,2,3,3). The id-dedupe hid it in
+           the result, which is exactly why it had to be caught here rather
+           than by trusting the output. */
+        void loadNextPage();
       },
       { rootMargin: "600px" },
     );
     io.observe(el);
     return () => { cancelled = true; io.disconnect(); };
-  }, [hasMore, loading, loadError, serverParams]);
+  }, [hasMore, loading, loadError, loadNextPage]);
 
   /* Persist the filter snapshot to sessionStorage on every change.
      Back-button from a detail page returns to the same view. Stays
