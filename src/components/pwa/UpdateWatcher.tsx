@@ -124,7 +124,11 @@ export default function UpdateWatcher() {
           Hub Blue ring + glow and the K monogram — the update moment carries
           the brand identity in BOTH themes (a dark floating capsule reads as
           a system toast on light backgrounds too). Copy unchanged. */}
-      <div className="kx-sheet-in pointer-events-auto flex items-center gap-3.5 rounded-2xl border border-[#7FA9D6]/45 bg-[#0e1116] text-white pl-4 pr-3 py-3 shadow-[0_0_22px_rgba(86,127,178,0.35),0_18px_40px_-12px_rgba(0,0,0,0.6)] max-w-[min(92vw,28rem)]">
+      {/* FIXED width, not max-width: the capsule can then never resize for
+          any reason — button state, language, longer copy. (Owner reported
+          it growing on press; the stable-width button fixed the measured
+          case, this makes the whole surface immune by construction.) */}
+      <div className="kx-sheet-in pointer-events-auto flex items-center gap-3.5 rounded-2xl border border-[#7FA9D6]/45 bg-[#0e1116] text-white pl-4 pr-3 py-3 shadow-[0_0_22px_rgba(86,127,178,0.35),0_18px_40px_-12px_rgba(0,0,0,0.6)] w-[min(92vw,28rem)]">
         {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
             mark alone. The capsule is always-dark → for-dark variant. Served
             through the image optimizer (256px, ~few KB) and SW-cached. */}
@@ -135,7 +139,7 @@ export default function UpdateWatcher() {
           aria-hidden
           className="h-[17px] w-auto shrink-0"
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
           <div className="mt-1 text-[11.5px] leading-snug text-white/70">{t("u.sub")}</div>
         </div>
