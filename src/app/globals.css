@@ -1050,22 +1050,29 @@ input[type="number"]:not(.kx-spinner) {
   margin-top: -6px;
 }
 
-.kx-brand-underline {
-  width: 120px;
-  height: 2px;
-  border-radius: 2px;
-  background: rgba(127, 169, 214, 0.14);
+/* Indeterminate mode — SAME comet bar, sliding, no number. Used when the
+   gate is waiting on something the request counter can't measure (a code
+   chunk, an RSC payload already in flight). Owner report: the old separate
+   thin sweep read as "a different, older loading style in some apps";
+   one visual language, honest about whether a number exists. */
+.kx-brand-progress.is-indeterminate {
   overflow: hidden;
-  position: relative;
 }
-.kx-brand-underline::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 2px;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, #7FA9D6, transparent);
-  animation: kx-brand-sweep 1.5s ease-in-out infinite;
+.kx-brand-progress.is-indeterminate i {
+  width: 34%;
+  transition: none;
+  animation: kx-comet-slide 1.15s cubic-bezier(0.4, 0.1, 0.4, 0.9) infinite;
+}
+@keyframes kx-comet-slide {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+[dir="rtl"] .kx-brand-progress.is-indeterminate i {
+  animation-name: kx-comet-slide-rtl;
+}
+@keyframes kx-comet-slide-rtl {
+  0%   { transform: translateX(110%); }
+  100% { transform: translateX(-320%); }
 }
 @keyframes kx-brand-breath {
   0%, 100% { opacity: 0.45; transform: scale(0.985); }

@@ -73,17 +73,22 @@ function isTracked(input: RequestInfo | URL, init?: RequestInit): boolean {
       typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const u = new URL(url, window.location.origin);
     if (u.origin !== window.location.origin) return false;
+    const method = (
+      init?.method ??
+      (typeof input === "object" && input !== null && "method" in input ? (input as Request).method : "GET")
+    ).toUpperCase();
+    if (method !== "GET") return false;
+    /* Route navigation payloads: the App Router fetches these for every
+       in-app move, so a gate that is waiting purely on navigation still
+       has something honest to count. */
+    if (u.searchParams.has("_rsc")) return true;
     if (!u.pathname.startsWith("/api/")) return false;
     if (u.pathname.startsWith("/api/ai")) return false;
     if (u.pathname.startsWith("/api/translator")) return false;
     if (u.pathname.startsWith("/api/perf")) return false;
     if (u.pathname.startsWith("/api/discuss/stream")) return false;
     if (headerAccept(input, init).includes("text/event-stream")) return false;
-    const method = (
-      init?.method ??
-      (typeof input === "object" && input !== null && "method" in input ? (input as Request).method : "GET")
-    ).toUpperCase();
-    return method === "GET";
+    return true;
   } catch {
     return false;
   }

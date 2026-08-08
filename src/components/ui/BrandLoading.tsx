@@ -66,18 +66,14 @@ export default function BrandLoading({
         <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
         {/* eslint-disable-next-line @next/next/no-img-element -- theme twin of the above */}
         <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
-        {pct === null ? (
-          <div className="kx-brand-underline" />
-        ) : (
-          <>
-            {/* P6 "comet head" (owner's corrected pick): gradient tail fills
-                with the REAL ratio; the glowing head pulses at the edge. */}
-            <div className="kx-brand-progress">
-              <i style={{ width: `${pct}%` }} />
-            </div>
-            <div className="kx-brand-pct">{pct}%</div>
-          </>
-        )}
+        {/* P6 "comet head" — ONE bar in every gate. With trackable requests
+            it fills to the REAL ratio and shows the number; otherwise the
+            same bar slides indeterminately (chunk/RSC waits can't be
+            counted honestly, so no number is invented). */}
+        <div className={`kx-brand-progress${pct === null ? " is-indeterminate" : ""}`}>
+          <i style={pct === null ? undefined : { width: `${pct}%` }} />
+        </div>
+        {pct !== null && <div className="kx-brand-pct">{pct}%</div>}
         {footer}
       </div>
     </div>
