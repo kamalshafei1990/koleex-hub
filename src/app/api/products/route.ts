@@ -90,7 +90,59 @@ export async function GET(req: Request) {
        objects and the grid needs no second code path. The cast is only
        because `select()` takes a runtime string, which erases the row type. */
     const rows = (data ?? []) as unknown as Record<string, unknown>[];
-    const body = buildListResponse(rows, listReq, count ?? null);
+
+    /* MODEL CODES TRAVEL WITH THE PAGE. They used to arrive later, in the
+       signals payload, and the card is built around them — the heading is the
+       model code, the family chips are the member codes, and the count says
+       "N models". So every card first painted with the descriptive name, an
+       amber "Needs name" and "0 models", then rebuilt ~1 s later at a
+       different height: measured on production, the card body went 208px ->
+       311px after it was already on screen. The owner called it a glitch, and
+       the worse half was that the first version was WRONG.
+
+       One extra query, scoped to the ids ON THIS PAGE (150 max), so it costs
+       the same whether the catalogue holds 121 products or 3000. */
+    const ids = rows.map((r) => r.id).filter(Boolean) as string[];
+    let models: {
+      counts: Record<string, number>;
+      primaryModelNames: Record<string, string>;
+      modelNames: Record<string, string[]>;
+    } | undefined;
+    if (ids.length) {
+      const { data: mRows, error: mErr } = await supabaseServer
+        .from("product_models")
+        .select('product_id, primary_model, model_name, visible, status, "order"')
+        .in("product_id", ids)
+        .order("order", { ascending: true });
+      if (mErr) console.error("[api/products paged models]", mErr.message);
+      const counts: Record<string, number> = {};
+      const names: Record<string, string[]> = {};
+      const primary: Record<string, string> = {};
+      /* THESE RULES MUST MATCH /api/products/signals EXACTLY. Both feed the
+         same card, so any difference shows up as the card visibly correcting
+         itself a second after it painted — the first version of this used
+         model_name alone and the heading flipped XPRS-Y -> XPRS-160S. */
+      for (const raw of (mRows ?? []) as {
+        product_id: string | null; primary_model: string | null; model_name: string | null;
+        visible: boolean | null; status: string | null;
+      }[]) {
+        if (!raw.product_id) continue;
+        counts[raw.product_id] = (counts[raw.product_id] ?? 0) + 1;
+        const label = raw.primary_model?.trim() || raw.model_name;
+        if (!label) continue;
+        primary[raw.product_id] ??= label;
+        /* The roster advertises SELLABLE members only — a member leaves it
+           when someone hid or discontinued it. */
+        if (raw.visible !== false && raw.status !== "discontinued") {
+          const list = (names[raw.product_id] ??= []);
+          if (!list.includes(label)) list.push(label);
+        }
+      }
+      models = { counts, primaryModelNames: primary, modelNames: names };
+    }
+    _t.mark("models");
+
+    const body = { ...buildListResponse(rows, listReq, count ?? null), models };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
     return NextResponse.json(body, {
       headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header },

@@ -187,7 +187,7 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -212,6 +212,10 @@ const ProductCard = memo(function ProductCard({
      glitch the owner saw on opening Product Data, and the worst part was not
      the movement: it was showing him something false. */
   signalsPending?: boolean;
+  /* True until the page response (which now carries the model codes) has
+     landed. Distinct from signalsPending: models decide the card's SHAPE,
+     signals only decorate it. */
+  modelsPending?: boolean;
   t: (key: string, fallback?: string) => string;
   onAskDelete: (e: React.MouseEvent, id: string, name: string) => void;
   /* Passed down rather than fetched per card: sixty cards calling the hook
@@ -336,8 +340,13 @@ const ProductCard = memo(function ProductCard({
                 {p.product_name}
               </h3>
               {isInternal && (
+                /* The slot keeps its height either way, so the card does not
+                   move when the answer arrives. Only the CLAIM waits: "Needs
+                   name" is a judgement about missing data, and before the
+                   model codes land we do not know whether the name is missing
+                   — every card said it, then took it back. */
                 <p className="mt-0.5 text-[10px] font-medium text-amber-400/80 min-h-[34px] max-sm:min-h-0">
-                  {t("list.needsName", "Needs name")}
+                  {modelsPending ? "" : t("list.needsName", "Needs name")}
                 </p>
               )}
             </>
@@ -710,6 +719,10 @@ export default function ProductList() {
      public card never fetches signals and must not sit in a permanent
      placeholder. */
   const [signalsReady, setSignalsReady] = useState(false);
+  /* Model codes now come with the page itself. Until that first response
+     lands, a card cannot honestly say a product "needs a name" or has
+     "0 models" — it simply does not know yet. */
+  const [modelsReady, setModelsReady] = useState(false);
 
 
   /* Filter state — persisted to sessionStorage so the back-button
@@ -991,8 +1004,22 @@ export default function ProductList() {
              ride along in serverParams and execute in SQL. */
           const res = await fetch(`/api/products?${serverParams}`, { credentials: "include", signal: ctrl.signal });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const json = (await res.json()) as { rows?: ProductRow[]; total?: number | null; hasMore?: boolean };
+          const json = (await res.json()) as {
+            rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
+            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+          };
           p = json.rows ?? [];
+          /* Model codes ride WITH the page now, so the card paints its final
+             shape on the first frame instead of rebuilding when signals land
+             (measured: card body 208px -> 311px after paint). Signals still
+             arrive later and refine suppliers/readiness — they just no longer
+             change the card's size or correct its text. */
+          if (json.models) {
+            setModelCounts(json.models.counts);
+            setPrimaryModelNames(json.models.primaryModelNames);
+            setModelNames(json.models.modelNames);
+            setModelsReady(true);
+          }
           pageRef.current = 1;
           setTotal(json.total ?? null);
           setHasMore(Boolean(json.hasMore));
@@ -1112,8 +1139,17 @@ export default function ProductList() {
     try {
       const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as { rows?: ProductRow[]; hasMore?: boolean };
+      const json = (await res.json()) as {
+        rows?: ProductRow[]; hasMore?: boolean;
+        models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+      };
       const rows = json.rows ?? [];
+      /* Merge, never replace: these maps already hold every earlier page. */
+      if (json.models) {
+        setModelCounts((prev) => ({ ...prev, ...json.models!.counts }));
+        setPrimaryModelNames((prev) => ({ ...prev, ...json.models!.primaryModelNames }));
+        setModelNames((prev) => ({ ...prev, ...json.models!.modelNames }));
+      }
       pageRef.current = next;
       /* Append by id, never blindly: a product edited between two page
          requests can shift across the offset boundary and arrive twice, which
@@ -2376,6 +2412,7 @@ export default function ProductList() {
                 models={modelCounts[p.id] || 0}
                 suppliers={productSuppliers[p.id] || EMPTY_SUPPLIERS}
                 signalsPending={isInternal && !signalsReady}
+                modelsPending={isInternal && !modelsReady}
                 lvl={levelColors[p.level || ""] || ""}
                 baseRoute={baseRoute}
                 isInternal={isInternal}
