@@ -31,17 +31,18 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   icons: {
-    /* ?v=2 busts browser/OS favicon caches after the hub-lockup icon
+    /* ?v=3 busts browser/OS favicon caches after the hub-lockup icon
        refresh — without it Safari/Chrome kept serving the pre-logo-v2
        icons for tabs, Add-to-Home-Screen and Add-to-Dock. Bump the
-       version whenever the icon artwork changes. */
+       version whenever the icon artwork changes. v3 = 2026-08-08 icon
+       (KOLEEX centred + AI-face gradient). */
     icon: [
-      { url: "/favicon.ico?v=2", sizes: "any" },
-      { url: "/icon.png?v=2", type: "image/png", sizes: "32x32" },
-      { url: "/icon-192.png?v=2", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png?v=2", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico?v=3", sizes: "any" },
+      { url: "/icon.png?v=3", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png?v=3", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png?v=3", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/apple-icon.png?v=2",
+    apple: "/apple-icon.png?v=3",
   },
 };
 
