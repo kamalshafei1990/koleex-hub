@@ -23,6 +23,7 @@ import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { APP_REGISTRY } from "@/lib/navigation";
 import BoundIcon from "@/components/common/BoundIcon";
+import BrandLoading from "@/components/ui/BrandLoading";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const SHOW_AFTER_MS = 120;
@@ -85,27 +86,23 @@ export default function AppLaunchSplash() {
       className="fixed inset-x-0 bottom-0 z-[90] bg-[var(--bg-primary)]"
       style={{ top: "var(--kx-header-h, 3.5rem)" }}
     >
-      {/* Loading language v2 (owner pick, motion sample "B — logo breath"):
-          the KOLEEX hub lockup breathing + light-sweep underline — the same
-          brand moment every route loading.tsx shows, so splash → page is one
-          continuous surface. Destination app's name (and its registry icon,
-          instant via the warm mirror) sit under it so the tap still visibly
-          "did something" specific. */}
-      <div className="kx-brand-load">
-        {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
-        {/* eslint-disable-next-line @next/next/no-img-element -- theme twin */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
-        <div className="kx-brand-underline" />
-        <div className="flex items-center gap-2 text-[var(--text-dim)]">
-          <BoundIcon
-            semanticKey={`app.${appId}`}
-            className="h-[15px] w-[15px]"
-            fallback={<SpinnerIcon size={13} className="animate-spin" />}
-          />
-          <span className="text-[13px] font-medium tracking-tight">{name}</span>
-        </div>
-      </div>
+      {/* Loading language v2: the SAME BrandLoading every gate shows (logo
+          breath + P1 real-percentage line), plus the destination app's name
+          and registry icon (instant via the warm mirror) so the tap still
+          visibly "did something" specific. */}
+      <BrandLoading
+        className="h-full"
+        footer={
+          <div className="flex items-center gap-2 text-[var(--text-dim)]">
+            <BoundIcon
+              semanticKey={`app.${appId}`}
+              className="h-[15px] w-[15px]"
+              fallback={<SpinnerIcon size={13} className="animate-spin" />}
+            />
+            <span className="text-[13px] font-medium tracking-tight">{name}</span>
+          </div>
+        }
+      />
     </div>
   );
 }

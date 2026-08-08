@@ -998,6 +998,31 @@ input[type="number"]:not(.kx-spinner) {
 }
 [data-theme="light"] .kx-brand-logo-dark { display: none; }
 [data-theme="dark"] .kx-brand-logo-light { display: none; }
+/* P1 (owner pick): the thin line FILLS with the real request-completion
+   ratio; the % under it reads out the same number. The indeterminate
+   sweep below stays for surfaces with no trackable requests. */
+.kx-brand-progress {
+  width: 150px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: rgba(127, 169, 214, 0.15);
+  overflow: hidden;
+}
+.kx-brand-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #567FB2, #BCD8F0);
+  box-shadow: 0 0 8px rgba(127, 169, 214, 0.5);
+  transition: width 0.25s ease-out;
+}
+.kx-brand-pct {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  margin-top: -8px;
+}
+
 .kx-brand-underline {
   width: 120px;
   height: 2px;
