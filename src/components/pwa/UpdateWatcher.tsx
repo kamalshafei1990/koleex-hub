@@ -30,7 +30,7 @@ function bootBuildId(): string {
 }
 
 const T = {
-  "u.available": { en: "A new version is available", zh: "有新版本可用", ar: "يتوفر إصدار جديد" },
+  "u.available": { en: "New version", zh: "新版本", ar: "إصدار جديد" },
   "u.sub": {
     en: "Update to load the latest improvements — takes a second and keeps you signed in.",
     zh: "更新即可加载最新改进 — 只需一秒，且无需重新登录。",
@@ -94,9 +94,11 @@ export default function UpdateWatcher() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
       <div className="kx-sheet-in pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] pl-4 pr-2.5 py-2.5 shadow-2xl shadow-black/40 max-w-[min(92vw,26rem)]">
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold leading-tight">{t("u.available")}</div>
-          <div className="mt-0.5 text-[11px] leading-snug opacity-70">{t("u.sub")}</div>
+        {/* Owner call 2026-08-08: ONE line only — the pill should whisper,
+            not explain. The subtitle copy stays in the T dict unused in case
+            he ever wants it back. */}
+        <div className="min-w-0 text-[13px] font-semibold leading-tight whitespace-nowrap">
+          {t("u.available")}
         </div>
         <button
           type="button"
