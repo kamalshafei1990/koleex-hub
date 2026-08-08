@@ -823,11 +823,13 @@ export default function ProductList() {
       try {
         /* Products are the CRITICAL fetch — if this fails we must surface a
            real error + Retry, never a misleading "No products yet" state.
-           A 12s abort prevents an indefinite skeleton on a stalled network.
-           Filters/meta below stay tolerant (a missing filter list shouldn't
-           block the catalogue from rendering). */
+           The abort guards against an INDEFINITE stall — 30s, not 12s: the
+           office link has documented 30–90s choke episodes, and a 12s trip
+           was converting an eventually-successful load into "Couldn't load
+           products" (owner screenshot 2026-08-08). Filters/meta below stay
+           tolerant (a missing filter list shouldn't block the catalogue). */
         const ctrl = new AbortController();
-        const timeoutId = setTimeout(() => ctrl.abort(), 12_000);
+        const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
         /* The meta fetches don't depend on the products response — start
            them immediately so they load alongside it instead of queueing
            behind the largest request on the page. */

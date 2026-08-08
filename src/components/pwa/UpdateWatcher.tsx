@@ -125,15 +125,15 @@ export default function UpdateWatcher() {
           the brand identity in BOTH themes (a dark floating capsule reads as
           a system toast on light backgrounds too). Copy unchanged. */}
       <div className="kx-sheet-in pointer-events-auto flex items-center gap-3.5 rounded-2xl border border-[#7FA9D6]/45 bg-[#0e1116] text-white pl-4 pr-3 py-3 shadow-[0_0_22px_rgba(86,127,178,0.35),0_18px_40px_-12px_rgba(0,0,0,0.6)] max-w-[min(92vw,28rem)]">
-        {/* Owner call: the REAL hub script mark, not a letter. Served through
-            the image optimizer (128px variant, ~few KB) and SW-cached, so it
-            is instant after first sight. */}
+        {/* Owner call round 2: the FULL "KOLEEX hub" lockup, not the script
+            mark alone. The capsule is always-dark → for-dark variant. Served
+            through the image optimizer (256px, ~few KB) and SW-cached. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- tiny optimized brand asset */}
         <img
-          src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fhub-script.png&w=128&q=75"
+          src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark.webp&w=256&q=75"
           alt=""
           aria-hidden
-          className="h-7 w-auto shrink-0"
+          className="h-[17px] w-auto shrink-0"
         />
         <div className="min-w-0">
           <div className="text-[13.5px] font-semibold leading-tight">{t("u.available")}</div>
