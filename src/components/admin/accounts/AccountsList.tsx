@@ -78,6 +78,22 @@ export default function AccountsList() {
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [loading, setLoading] = useState(true);
+  /* Pending applications, for the badge on the Requests button. Its own tiny
+     fetch rather than part of the accounts payload: a non-reviewer gets a 403
+     here and simply sees no badge, which is the correct outcome. */
+  const [pendingRequests, setPendingRequests] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/membership-requests?status=pending", { credentials: "include" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { counts?: Record<string, number> };
+        if (alive) setPendingRequests(json.counts?.pending ?? 0);
+      } catch { /* the badge is a nicety, never a blocker */ }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"" | UserType>("");
@@ -361,6 +377,22 @@ export default function AccountsList() {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* The way IN to the review queue. It existed only as a link
+                inside a mail notification, so anyone who cleared the mail had
+                no route to it at all. The count is the point: a reviewer
+                should see there is work waiting without opening anything. */}
+            <Link
+              href="/accounts/requests"
+              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              title="Become Koleex Member — applications waiting for review"
+            >
+              Requests
+              {pendingRequests > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500/20 text-amber-400 text-[11px] font-bold tabular-nums flex items-center justify-center">
+                  {pendingRequests}
+                </span>
+              )}
+            </Link>
             <Link
               href="/accounts/login-security"
               className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
