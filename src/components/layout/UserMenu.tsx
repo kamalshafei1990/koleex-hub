@@ -16,14 +16,14 @@
          · Avatar initials derived from email or user_metadata.username
          · "Sign Out" calls auth-client.signOut() (which also writes the
            audit log entry + revokes the account_sessions row) then
-           redirects to "/login".
-         · "Sign In" → "/login?next=<current path>"
+           redirects to the root, where AdminAuth renders the form.
+         · "Sign In" → "/" (AdminAuth renders the sign-in form there)
 
    Theme aware: uses the same dk/light branches as MainHeader.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { clearSessionScopedCaches } from "@/lib/session-caches";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
@@ -86,7 +86,6 @@ function subLineFor(identity: Identity): string {
 
 export default function UserMenu({ dk }: { dk: boolean }) {
   const router = useRouter();
-  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [identity, setIdentity] = useState<Identity>(() =>
@@ -203,15 +202,11 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
   const handleSignIn = useCallback(() => {
     setOpen(false);
-    if (identity.mode === "supabase") {
-      const next = encodeURIComponent(pathname || "/");
-      router.push(`/login?next=${next}`);
-    } else {
-      /* Legacy: the root is now gated by AdminAuth, so a plain reload
-         brings up the username + password form. */
-      window.location.href = "/";
-    }
-  }, [identity, pathname, router]);
+    /* Both modes land on the root: AdminAuth renders the username + password
+       form there when there is no session, and it is the only sign-in screen
+       the Hub has. */
+    window.location.href = "/";
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     setOpen(false);
@@ -228,7 +223,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       const { signOut: supabaseSignOut } = await import("@/lib/auth-client");
       await supabaseSignOut();
       setIdentity({ mode: "supabase", signedIn: false });
-      router.replace("/login");
+      router.replace("/");
       return;
     }
     /* Legacy — clear the client-side session flags, drop the stored

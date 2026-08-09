@@ -3,7 +3,7 @@
 /* ---------------------------------------------------------------------------
    RootShell — client-side wrapper used by the root layout.
 
-   · `/login` and `/auth/*` bypass authentication entirely.
+   · `/auth/*` bypasses authentication entirely.
    · Every other route is wrapped in AuthGate + MainHeader + Sidebar.
    · The sidebar provider gives shared state to both Sidebar and MainHeader.
    --------------------------------------------------------------------------- */
@@ -110,7 +110,7 @@ function ScrollToTopOnRouteChange() {
    pages and the Hub chrome (header, sidebar, panels) must NOT be
    present in the captured output. */
 const BYPASS_SUFFIXES = ["/print"];
-const BYPASS_PREFIXES = ["/login", "/auth"];
+const BYPASS_PREFIXES = ["/auth"];
 
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;

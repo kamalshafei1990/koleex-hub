@@ -2329,7 +2329,8 @@ export default function ProductList() {
             <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.sessionExpiredTitle", "Session expired")}</p>
             <p className="text-[var(--text-muted)] text-[13px] mt-1">{t("state.sessionExpiredHint", "Please sign in again to load the catalog.")}</p>
             <a
-              href="/login"
+              /* The root renders the sign-in form when the session is gone. */
+              href="/"
               className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               {t("action.signInAgain", "Sign in again")}

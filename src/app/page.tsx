@@ -1152,7 +1152,11 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
               element election and matched nothing in the system. */}
           {isAuth ? (
             <a
-              href="/login"
+              /* The root IS the sign-in screen: AdminAuth renders the username
+                 + password form in place when there is no session. This used to
+                 point at /login, a second form that asked for an EMAIL and
+                 belonged to an auth system that is switched off. */
+              href="/"
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Sign in again

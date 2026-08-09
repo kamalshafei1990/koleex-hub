@@ -70,7 +70,9 @@ export default function ActivityTracker() {
           // Admin force-logout: the presence row was revoked → sign out.
           if (json.revoked) {
             stopped = true;
-            window.location.href = "/login?revoked=1";
+            /* The root shows the sign-in form. `?revoked=1` went with the
+               deleted /login page — nothing ever read it. */
+            window.location.href = "/";
           }
         }
       } catch {

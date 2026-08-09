@@ -5,7 +5,7 @@
    auth mechanism based on NEXT_PUBLIC_USE_SUPABASE_AUTH.
 
      - flag OFF (default): renders the legacy <AdminAuth> password gate.
-     - flag ON: checks for a live Supabase session, redirects to /login?next=…
+     - flag ON: checks for a live Supabase session, redirects to the root
        if there's none, and renders children once authenticated.
 
    Drop-in replacement for <AdminAuth>: same props, same behavior, zero
@@ -90,8 +90,10 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
         // API call would 401 — and we're leaving immediately.
         try { localStorage.removeItem(AUTHED_HINT_KEY); } catch { /* ignore */ }
         setState("redirecting");
-        const next = encodeURIComponent(pathname || "/");
-        router.replace(`/login?next=${next}`);
+        /* AdminAuth at the root IS the sign-in screen. The dedicated /login
+           page this used to target was deleted: it asked for an EMAIL and
+           belonged to an auth system that has never been switched on. */
+        router.replace("/");
       }
     })();
 
@@ -103,8 +105,7 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (!session) {
           try { localStorage.removeItem(AUTHED_HINT_KEY); } catch { /* ignore */ }
-          const next = encodeURIComponent(pathname || "/");
-          router.replace(`/login?next=${next}`);
+          router.replace("/");
         } else {
           try { localStorage.setItem(AUTHED_HINT_KEY, "1"); } catch { /* ignore */ }
         }
