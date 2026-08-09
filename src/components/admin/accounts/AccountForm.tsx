@@ -44,7 +44,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import {
   createAccount, updateAccount,
-  fetchCompanies, fetchRoles, fetchPeople, fetchAccessPresetByRoleId,
+  fetchCompanies, fetchRoles, fetchPeople,
   fetchEmployeesWithPerson, linkEmployeeToAccount,
   fetchCustomerContacts,
   fetchHiddenModulesForAccount, saveHiddenModulesForAccount,
@@ -54,7 +54,6 @@ import {
   type EmployeeWithPerson, type ContactLite,
 } from "@/lib/accounts-admin";
 import { useScopeContext } from "@/lib/use-scope";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
 import type {
@@ -237,28 +236,25 @@ export default function AccountForm({ mode, account }: Props) {
   useEffect(() => {
     if (!form.role_id) {
       setRoleGrantedModules([]);
-      return;
-    }
-    (async () => {
-      const { data } = await supabaseAdmin
-        .from("koleex_permissions")
-        .select("module_name, can_view")
-        .eq("role_id", form.role_id)
-        .eq("can_view", true)
-        .order("module_name", { ascending: true });
-      setRoleGrantedModules(
-        ((data ?? []) as { module_name: string }[]).map((r) => r.module_name),
-      );
-    })();
-  }, [form.role_id]);
-
-  /* ── Whenever role changes, refresh the preset summary ── */
-  useEffect(() => {
-    if (!form.role_id) {
       setPreset(null);
       return;
     }
-    fetchAccessPresetByRoleId(form.role_id).then(setPreset);
+    /* One call answers both questions about the role — its preset and the
+       modules it grants. The query that used to sit here read
+       koleex_permissions from the BROWSER; that table is service-role-only, so
+       it returned nothing and the "this role grants" list was always empty. */
+    (async () => {
+      const res = await fetch(`/api/roles/${form.role_id}/access-preset`, {
+        credentials: "include",
+      });
+      if (!res.ok) { setRoleGrantedModules([]); setPreset(null); return; }
+      const json = (await res.json()) as {
+        preset: AccessPresetRow | null;
+        grantedModules?: string[];
+      };
+      setRoleGrantedModules(json.grantedModules ?? []);
+      setPreset(json.preset);
+    })();
   }, [form.role_id]);
 
   const isCustomer = form.user_type === "customer";

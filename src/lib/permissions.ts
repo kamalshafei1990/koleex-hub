@@ -24,7 +24,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentAccount } from "./identity";
-import { supabaseAdmin } from "./supabase-admin";
 import type { OrgPermissionRow, DataScope } from "@/types/supabase";
 import { isOpenAccessModule } from "./permission-modules";
 import { cachedGet } from "./client-cache";
@@ -79,8 +78,8 @@ export function usePermissions(): PermissionState {
 
       // Parallel fetch: permissions for role + department assignments for person
       const [permsResult, deptResult] = await Promise.all([
-        account.role_id ? fetchRolePermissions(account.role_id) : Promise.resolve([]),
-        account.person_id ? fetchPersonDepartments(account.person_id) : Promise.resolve([]),
+        account.role_id ? fetchRolePermissions() : Promise.resolve([]),
+        account.person_id ? fetchPersonDepartments() : Promise.resolve([]),
       ]);
 
       if (cancelled) return;
@@ -165,7 +164,10 @@ const PERMISSIONS_TTL_MS = 15_000;
    DATA FETCHERS
    ═══════════════════════════════════════════════════ */
 
-async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]> {
+/* No arguments: the endpoint answers for the SESSION, not for whatever
+   role id the browser believes it has. Passing one in was the shape the
+   deleted anon-key query needed. */
+async function fetchRolePermissions(): Promise<OrgPermissionRow[]> {
   // API-first: /api/me/permissions returns the caller's perms + depts
   // via service_role. The anon-key path is blocked by RLS now.
   //
@@ -180,18 +182,17 @@ async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]>
     );
     return json.permissions;
   } catch (e) {
+    /* No fallback. The old one queried koleex_permissions with the anon key —
+       RLS blocks it, so it could only ever return [] after logging a second
+       error. Worse, "no permissions" is the most permissive-looking empty
+       value in some call sites; a failure must not be able to produce it by
+       accident from a path nobody expected to run. */
     console.error("[permissions] /api/me/permissions failed:", e);
+    return [];
   }
-  // Legacy fallback
-  const { data, error } = await supabaseAdmin
-    .from("koleex_permissions")
-    .select("*")
-    .eq("role_id", roleId);
-  if (error || !data) return [];
-  return data as OrgPermissionRow[];
 }
 
-async function fetchPersonDepartments(personId: string): Promise<string[]> {
+async function fetchPersonDepartments(): Promise<string[]> {
   // API-first: included in the SAME /api/me/permissions response the role
   // fetch above reads — hence the shared coalescing cache rather than a
   // second identical round-trip.
@@ -202,14 +203,8 @@ async function fetchPersonDepartments(personId: string): Promise<string[]> {
     return json.departments;
   } catch (e) {
     console.error("[permissions] /api/me/permissions failed:", e);
+    return [];
   }
-  // Legacy fallback
-  const { data, error } = await supabaseAdmin
-    .from("koleex_assignments")
-    .select("department_id")
-    .eq("person_id", personId);
-  if (error || !data) return [];
-  return [...new Set((data as { department_id: string }[]).map((a) => a.department_id))];
 }
 
 /* ═══════════════════════════════════════════════════

@@ -16,7 +16,6 @@ import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import MarketsIcon from "@/components/icons/MarketsIcon";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 
@@ -188,16 +187,16 @@ export default function Markets() {
     setLoadingCustomers(true);
     setCustomers([]);
     try {
-      const { data, error } = await supabaseAdmin
-        .from("customers")
-        .select("*")
-        .or(
-          `market_id.eq.${market.name.toLowerCase().replace(/\s+/g, "-")},country.ilike.%${market.name}%`
-        )
-        .limit(100);
-
-      if (!error && data && data.length > 0) {
-        setCustomers(data as CustomerRow[]);
+      /* The or-filter runs on the server now. It used to run here, against
+         `customers` — a table the browser cannot read — so every market
+         showed an empty customer list. */
+      const res = await fetch(
+        `/api/customers?market=${encodeURIComponent(market.name)}`,
+        { credentials: "include" },
+      );
+      if (res.ok) {
+        const json = (await res.json()) as { customers?: CustomerRow[] };
+        setCustomers(json.customers ?? []);
       } else {
         setCustomers([]);
       }

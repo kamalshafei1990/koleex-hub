@@ -171,3 +171,85 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
+
+/* PATCH — set the HIDDEN-MODULE set for this account in one call.
+   Body: { hidden: string[] }
+
+   The Accounts UI has a simple "which apps can this person not see" switch,
+   and it used to implement that in the BROWSER: read the overrides, diff them,
+   upsert the additions, delete the removals — four anon-key statements against
+   `account_permission_overrides`, a table with RLS on and NO policy, so it
+   could not read or write a single row. The switch did nothing.
+
+   It is a DIFF, deliberately, not the full replace POST does: an account may
+   carry overrides that have nothing to do with visibility (can_create,
+   can_edit, data_scope), and replacing the set would silently drop them. */
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id: accountId } = await params;
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Accounts", "edit");
+  if (deny) return deny;
+  const guard = await guardAccountInTenant(accountId, auth.tenant_id);
+  if (guard) return guard;
+
+  const body = (await req.json().catch(() => null)) as { hidden?: unknown } | null;
+  if (!Array.isArray(body?.hidden) || body.hidden.some((m) => typeof m !== "string")) {
+    return NextResponse.json({ error: "hidden must be an array of module keys" }, { status: 400 });
+  }
+  const hidden = [...new Set(body.hidden as string[])].filter(Boolean);
+
+  const { data: current, error: readErr } = await supabaseServer
+    .from("account_permission_overrides")
+    .select("module_key, can_view")
+    .eq("account_id", accountId);
+  if (readErr) {
+    console.error("[api/accounts/permission-overrides PATCH read]", readErr.message);
+    return NextResponse.json({ error: readErr.message }, { status: 500 });
+  }
+  const existingHidden = ((current ?? []) as { module_key: string; can_view: boolean | null }[])
+    .filter((r) => r.can_view === false)
+    .map((r) => r.module_key);
+
+  const toAdd = hidden.filter((m) => !existingHidden.includes(m));
+  const toRemove = existingHidden.filter((m) => !hidden.includes(m));
+
+  if (toAdd.length > 0) {
+    const { error } = await supabaseServer
+      .from("account_permission_overrides")
+      .upsert(
+        toAdd.map((m) => ({
+          account_id: accountId,
+          module_key: m,
+          access_level: "none",
+          can_view: false,
+          can_create: false,
+          can_edit: false,
+          can_delete: false,
+          data_scope: "own",
+        })),
+        { onConflict: "account_id,module_key" },
+      );
+    if (error) {
+      console.error("[api/accounts/permission-overrides PATCH add]", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  if (toRemove.length > 0) {
+    const { error } = await supabaseServer
+      .from("account_permission_overrides")
+      .delete()
+      .eq("account_id", accountId)
+      .in("module_key", toRemove);
+    if (error) {
+      console.error("[api/accounts/permission-overrides PATCH remove]", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, hidden, added: toAdd.length, removed: toRemove.length });
+}

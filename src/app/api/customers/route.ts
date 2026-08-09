@@ -25,11 +25,41 @@ interface PostBody {
   status?: string | null;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Customers");
   if (deny) return deny;
+
+  /* ?market=<name> — the Markets app's per-market customer list. It used to
+     run this exact or-filter from the BROWSER against `customers`, a table the
+     browser cannot read, so every market showed an empty customer list. It
+     needs the full row (the panel renders more than the picker's columns), so
+     this branch selects * while the default list keeps its slim projection. */
+  const market = new URL(req.url).searchParams.get("market")?.trim();
+  const marketId = new URL(req.url).searchParams.get("marketId")?.trim();
+  if (market || marketId) {
+    /* Escape the PostgREST or-grammar's delimiters before interpolating a
+       user-supplied name into the expression. */
+    const safe = (v: string) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    /* `market_id` is a UUID column. The browser version compared it to a
+        SLUG built from the market's display name — "china" — so Postgres
+        raised `invalid input syntax for type uuid` and the whole or-filter
+        failed. The name matches on `country`; the id, when the caller has a
+        real one, matches on market_id. */
+    const terms: string[] = [];
+    if (marketId && /^[0-9a-f-]{36}$/i.test(marketId)) terms.push(`market_id.eq.${marketId}`);
+    if (market) terms.push(`country.ilike."%${safe(market)}%"`);
+    let q = supabaseServer.from("customers").select("*").eq("tenant_id", auth.tenant_id);
+    q = terms.length > 1 ? q.or(terms.join(",")) : q.or(terms[0]);
+    const { data, error } = await q.limit(100);
+    if (error) {
+      console.error("[api/customers market]", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ customers: data ?? [] });
+  }
+
   const { data, error } = await supabaseServer.from("customers")
     .select("id, name, company_name, country, email, phone, customer_type, status, currency_code, payment_terms")
     .eq("tenant_id", auth.tenant_id).order("name", { ascending: true });

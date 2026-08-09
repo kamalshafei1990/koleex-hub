@@ -20,7 +20,6 @@
      require them to set a proper password that Supabase Auth handles.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
 import type { ScopeContext } from "./scope";
 import type {
@@ -30,26 +29,25 @@ import type {
   EmployeeRow, EmployeeInsert, EmployeeUpdate,
   RoleRow,
   AccessPresetRow,
-  AccountPermissionOverrideRow, AccountPermissionOverrideInsert,
   AccountPreferences,
 } from "@/types/supabase";
-import type { AccessLevel } from "@/lib/access-control";
 import { logEvent } from "./account-security";
 
-const ACCOUNTS = "accounts";
-const COMPANIES = "companies";
-const ROLES = "roles";
-const PEOPLE = "people";
-const EMPLOYEES = "koleex_employees"; // renamed to avoid collision with legacy `employees` table
-const ACCESS_PRESETS = "access_presets";
-const PERMISSION_OVERRIDES = "account_permission_overrides";
+/* No table-name constants any more, and no Supabase client: every read and
+   write in this file goes through an API route. accounts, people, companies,
+   koleex_employees, roles, access_presets and account_permission_overrides
+   are ALL service-role-only, so the browser queries that used to sit under
+   each API call could not touch a row — they only ever logged a second error
+   after the first. Four of them were not fallbacks at all but the ONLY path,
+   which is why hiding an app from an account, linking a new login to an
+   employee, showing a role's access preset and saving the Private HR tab
+   silently did nothing. */
 
 /* ============================================================================
    Accounts
    ============================================================================ */
 
 export async function fetchAccounts(
-  ctx?: ScopeContext | null,
 ): Promise<AccountRow[]> {
   // API-first: goes through /api/accounts which requires auth + the
   // "Accounts" module permission. Legacy direct-Supabase path below
@@ -67,20 +65,7 @@ export async function fetchAccounts(
     console.error("[Accounts] API failed:", e);
   }
 
-  let q = supabase
-    .from(ACCOUNTS)
-    .select("*")
-    .order("created_at", { ascending: false });
-  // Multi-tenancy: scope to current tenant. Customer-tenant admins see
-  // only their own users. SA viewing via the tenant picker sees the
-  // tenant they picked.
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Accounts] Fetch:", error.message);
-    return [];
-  }
-  return (data as AccountRow[]) || [];
+  return [];
 }
 
 export async function fetchAccountById(id: string): Promise<AccountRow | null> {
@@ -143,80 +128,14 @@ export async function fetchAccountForHeader(
       };
       return json.account;
     }
-    if (res.status === 401) return null;
+    if (res.status !== 401) {
+      console.error("[Accounts] fetchAccountForHeader:", res.status);
+    }
+    return null;
   } catch (e) {
-    console.error("[Accounts] fetchAccountForHeader API failed:", e);
-  }
-
-  const { data, error } = await supabase
-    .from(ACCOUNTS)
-    .select(
-      `
-        id,
-        username,
-        user_type,
-        avatar_url,
-        person_id,
-        company_id,
-        role_id,
-        person:people(id, full_name, name_alt, avatar_url),
-        role:roles(id, name)
-      `,
-    )
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[Accounts] Fetch header:", error.message);
+    console.error("[Accounts] fetchAccountForHeader failed:", e);
     return null;
   }
-  if (!data) return null;
-
-  // Supabase's embedded-resource syntax can return either an object or an
-  // array depending on FK cardinality — normalise both to a single row.
-  const row = data as Record<string, unknown>;
-  const personRaw = row.person;
-  const roleRaw = row.role;
-  const person = Array.isArray(personRaw)
-    ? (personRaw[0] as PersonRow | undefined) ?? null
-    : ((personRaw as PersonRow | null) ?? null);
-  const role = Array.isArray(roleRaw)
-    ? (roleRaw[0] as RoleRow | undefined) ?? null
-    : ((roleRaw as RoleRow | null) ?? null);
-
-  return {
-    id: row.id as string,
-    auth_user_id: null,
-    username: row.username as string,
-    login_email: "",
-    password_hash: null,
-    password_algo: "legacy",
-    password_changed_at: null,
-    password_rehash_required: false,
-    force_password_change: false,
-    two_factor_enabled: false,
-    last_login_at: null,
-    user_type: row.user_type as AccountRow["user_type"],
-    status: "active" as AccountRow["status"],
-    role_id: (row.role_id as string | null) ?? null,
-    person_id: (row.person_id as string | null) ?? null,
-    company_id: (row.company_id as string | null) ?? null,
-    contact_id: (row.contact_id as string | null) ?? null,
-    tenant_id: (row.tenant_id as string) ?? "",
-    is_super_admin: (row.is_super_admin as boolean) ?? false,
-    avatar_url: (row.avatar_url as string | null) ?? null,
-    internal_notes: null,
-    preferences: {},
-    created_at: "",
-    updated_at: "",
-    created_by: null,
-    person,
-    company: null,
-    role,
-    preset: null,
-    employee: null,
-    overrides: [],
-  };
 }
 
 /**
@@ -227,10 +146,12 @@ export async function fetchAccountForHeader(
 export async function fetchAccountWithLinks(
   id: string,
 ): Promise<AccountWithLinks | null> {
-  // API-first: /api/accounts/[id] returns the enriched object in one
-  // round-trip via service_role. The individual fetchPersonById /
-  // fetchCompanyById / fetchRoleById / fetchEmployeeByAccountId calls
-  // still use anon-key reads which are blocked by RLS now.
+  /* /api/accounts/[id] returns the enriched object — person, company, role,
+     preset, employee and overrides — in ONE round trip via service_role. The
+     per-link browser helpers this replaced (fetchPersonById, fetchCompanyById,
+     fetchRoleById, fetchEmployeeByAccountId) each read a service-role-only
+     table with the anon key, so they returned null and the enriched object was
+     assembled out of five nulls. They are deleted. */
   try {
     const res = await fetch("/api/accounts/" + id, { credentials: "include" });
     if (res.ok) {
@@ -239,27 +160,14 @@ export async function fetchAccountWithLinks(
       };
       return json.account;
     }
-    if (res.status === 401 || res.status === 403 || res.status === 404) return null;
+    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+      console.error("[Accounts] fetchAccountWithLinks:", res.status);
+    }
+    return null;
   } catch (e) {
-    console.error("[Accounts] fetchAccountWithLinks API failed:", e);
+    console.error("[Accounts] fetchAccountWithLinks failed:", e);
+    return null;
   }
-
-  const account = await fetchAccountById(id);
-  if (!account) return null;
-
-  const [person, company, role, employee, overrides] = await Promise.all([
-    account.person_id ? fetchPersonById(account.person_id) : Promise.resolve(null),
-    account.company_id ? fetchCompanyById(account.company_id) : Promise.resolve(null),
-    account.role_id ? fetchRoleById(account.role_id) : Promise.resolve(null),
-    fetchEmployeeByAccountId(account.id),
-    fetchPermissionOverrides(account.id),
-  ]);
-
-  const preset = account.role_id
-    ? await fetchAccessPresetByRoleId(account.role_id)
-    : null;
-
-  return { ...account, person, company, role, preset, employee, overrides };
 }
 
 /* Drop the coalesced /api/accounts list after any write so the next
@@ -289,38 +197,17 @@ export async function createAccount(
       void invalidateAccountsList();
       return json.account;
     }
-    if (res.status === 401 || res.status === 403) return null;
+    if (res.status !== 401 && res.status !== 403) {
+      console.error("[Accounts] createAccount:", res.status);
+    }
+    return null;
   } catch (e) {
-    console.error("[Accounts] createAccount API failed:", e);
-  }
-
-  const { temporary_password, preferences, ...rest } = input;
-  // S1b: this client fallback NEVER hashes (Argon2 is server-only). The real
-  // creation path is POST /api/accounts above, which hashes server-side. If we
-  // ever reach this fallback (API unreachable) the row is created WITHOUT a
-  // password (sign-in disabled) and an admin sets one via the password endpoint.
-  void temporary_password; // intentionally not stored here
-  const payload: Record<string, unknown> = {
-    ...rest,
-    password_hash: null,
-    /* Default OFF — the admin's chosen password is the real one.
-       Callers that DO want a forced reset can pass
-       force_password_change: true explicitly via `rest`. */
-    force_password_change: false,
-    preferences: preferences ?? {},
-  };
-
-  const { data, error } = await supabase
-    .from(ACCOUNTS)
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("[Accounts] Create:", error.message);
+    /* The removed fallback inserted the row from the browser WITHOUT a
+       password hash — Argon2 is server-only — so an account created down that
+       path could never sign in. Failing here is the honest outcome. */
+    console.error("[Accounts] createAccount failed:", e);
     return null;
   }
-  return data as AccountRow;
 }
 
 export async function updateAccount(
@@ -339,12 +226,7 @@ export async function updateAccount(
   } catch (e) {
     console.error("[Accounts] updateAccount API failed:", e);
   }
-  const { error } = await supabase.from(ACCOUNTS).update(updates).eq("id", id);
-  if (error) {
-    console.error("[Accounts] Update:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 export async function setAccountStatus(
@@ -409,20 +291,7 @@ export async function setForcePasswordChange(
   } catch (e) {
     console.error("[Accounts] setForcePasswordChange API failed:", e);
   }
-  const { error } = await supabase
-    .from(ACCOUNTS)
-    .update({ force_password_change: force })
-    .eq("id", id);
-  if (error) {
-    console.error("[Accounts] Set force password change:", error.message);
-    return false;
-  }
-  void logEvent(
-    id,
-    force ? "force_reset_enabled" : "force_reset_cleared",
-    {},
-  );
-  return true;
+  return false;
 }
 
 export async function deleteAccount(id: string): Promise<boolean> {
@@ -436,12 +305,7 @@ export async function deleteAccount(id: string): Promise<boolean> {
   } catch (e) {
     console.error("[Accounts] deleteAccount API failed:", e);
   }
-  const { error } = await supabase.from(ACCOUNTS).delete().eq("id", id);
-  if (error) {
-    console.error("[Accounts] Delete:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 /**
@@ -495,37 +359,51 @@ export async function updateAccountAvatar(
   } catch (e) {
     console.error("[Accounts] updateAccountAvatar API failed:", e);
   }
-  const { error } = await supabase
-    .from(ACCOUNTS)
-    .update({ avatar_url: avatarUrl })
-    .eq("id", id);
-  if (error) {
-    console.error("[Accounts] Update avatar:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 export async function isUsernameAvailable(
   username: string,
   excludeId?: string,
 ): Promise<boolean> {
-  let q = supabase.from(ACCOUNTS).select("id").eq("username", username);
-  if (excludeId) q = q.neq("id", excludeId);
-  const { data, error } = await q;
-  if (error) return true;
-  return !data || data.length === 0;
+  /* Fails CLOSED. The browser check this replaces returned TRUE on error, and
+     `accounts` is service-role-only, so it errored every time and told the
+     form that every name was free. */
+  try {
+    const qs = new URLSearchParams({ username: username });
+    if (excludeId) qs.set("excludeId", excludeId);
+    const res = await fetch(`/api/accounts/availability?${qs.toString()}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { username?: boolean };
+    return json.username === true;
+  } catch (e) {
+    console.error("[Accounts] isUsernameAvailable failed:", e);
+    return false;
+  }
 }
 
 export async function isLoginEmailAvailable(
   loginEmail: string,
   excludeId?: string,
 ): Promise<boolean> {
-  let q = supabase.from(ACCOUNTS).select("id").eq("login_email", loginEmail);
-  if (excludeId) q = q.neq("id", excludeId);
-  const { data, error } = await q;
-  if (error) return true;
-  return !data || data.length === 0;
+  /* Fails CLOSED. The browser check this replaces returned TRUE on error, and
+     `accounts` is service-role-only, so it errored every time and told the
+     form that every name was free. */
+  try {
+    const qs = new URLSearchParams({ loginEmail: loginEmail });
+    if (excludeId) qs.set("excludeId", excludeId);
+    const res = await fetch(`/api/accounts/availability?${qs.toString()}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { loginEmail?: boolean };
+    return json.loginEmail === true;
+  } catch (e) {
+    console.error("[Accounts] isLoginEmailAvailable failed:", e);
+    return false;
+  }
 }
 
 /* ============================================================================
@@ -533,7 +411,6 @@ export async function isLoginEmailAvailable(
    ============================================================================ */
 
 export async function fetchPeople(
-  ctx?: ScopeContext | null,
 ): Promise<PersonRow[]> {
   try {
     const res = await fetch("/api/people", { credentials: "include" });
@@ -546,27 +423,7 @@ export async function fetchPeople(
     console.error("[People] API failed:", e);
   }
 
-  let q = supabase
-    .from(PEOPLE)
-    .select("*")
-    .order("full_name", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[People] Fetch:", error.message);
-    return [];
-  }
-  return (data as PersonRow[]) || [];
-}
-
-export async function fetchPersonById(id: string): Promise<PersonRow | null> {
-  const { data, error } = await supabase
-    .from(PEOPLE)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return null;
-  return (data as PersonRow) || null;
+  return [];
 }
 
 /**
@@ -590,19 +447,32 @@ export interface ContactLite {
 export async function fetchCustomerContacts(
   options: { anyType?: boolean } = {},
 ): Promise<ContactLite[]> {
-  let q = supabase
-    .from("contacts")
-    .select("id, full_name, company_name, contact_type, customer_type, country")
-    .order("full_name", { ascending: true });
-  if (!options.anyType) {
-    q = q.in("contact_type", ["customer", "supplier"]);
-  }
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Contacts] Fetch for picker:", error.message);
+  /* `contacts` is service-role-only, so the browser query this replaces
+     returned nothing and the picker was always empty. */
+  const types = options.anyType ? [""] : ["customer", "supplier"];
+  try {
+    const lists = await Promise.all(
+      types.map(async (t) => {
+        const res = await fetch(`/api/contacts${t ? `?type=${encodeURIComponent(t)}` : ""}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return [] as ContactLite[];
+        const json = (await res.json()) as { contacts?: Record<string, unknown>[] };
+        return (json.contacts ?? []).map((c) => ({
+          id: String(c.id),
+          full_name: (c.full_name as string) ?? (c.display_name as string) ?? "",
+          company_name: (c.company_name as string) ?? null,
+          contact_type: (c.contact_type as string) ?? null,
+          customer_type: (c.customer_type as string) ?? null,
+          country: (c.country as string) ?? null,
+        })) as ContactLite[];
+      }),
+    );
+    return lists.flat().sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""));
+  } catch (e) {
+    console.error("[Contacts] Fetch for picker failed:", e);
     return [];
   }
-  return (data as ContactLite[]) ?? [];
 }
 
 export async function createPerson(input: PersonInsert): Promise<PersonRow | null> {
@@ -621,16 +491,7 @@ export async function createPerson(input: PersonInsert): Promise<PersonRow | nul
   } catch (e) {
     console.error("[People] createPerson API failed:", e);
   }
-  const { data, error } = await supabase
-    .from(PEOPLE)
-    .insert(input)
-    .select()
-    .single();
-  if (error) {
-    console.error("[People] Create:", error.message);
-    return null;
-  }
-  return data as PersonRow;
+  return null;
 }
 
 export async function updatePerson(
@@ -649,12 +510,7 @@ export async function updatePerson(
   } catch (e) {
     console.error("[People] updatePerson API failed:", e);
   }
-  const { error } = await supabase.from(PEOPLE).update(updates).eq("id", id);
-  if (error) {
-    console.error("[People] Update:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 /* ============================================================================
@@ -662,7 +518,6 @@ export async function updatePerson(
    ============================================================================ */
 
 export async function fetchCompanies(
-  ctx?: ScopeContext | null,
 ): Promise<CompanyRow[]> {
   try {
     const res = await fetch("/api/companies", { credentials: "include" });
@@ -675,27 +530,7 @@ export async function fetchCompanies(
     console.error("[Companies] API failed:", e);
   }
 
-  let q = supabase
-    .from(COMPANIES)
-    .select("*")
-    .order("name", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Companies] Fetch:", error.message);
-    return [];
-  }
-  return (data as CompanyRow[]) || [];
-}
-
-export async function fetchCompanyById(id: string): Promise<CompanyRow | null> {
-  const { data, error } = await supabase
-    .from(COMPANIES)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return null;
-  return (data as CompanyRow) || null;
+  return [];
 }
 
 export async function createCompany(
@@ -714,18 +549,9 @@ export async function createCompany(
     }
     if (res.status === 401 || res.status === 403) return null;
   } catch (e) {
-    console.error("[Companies] createCompany API failed:", e);
+    console.error("[Companies] createCompany failed:", e);
   }
-  const { data, error } = await supabase
-    .from(COMPANIES)
-    .insert(input)
-    .select()
-    .single();
-  if (error) {
-    console.error("[Companies] Create:", error.message);
-    return null;
-  }
-  return data as CompanyRow;
+  return null;
 }
 
 export async function updateCompany(
@@ -742,14 +568,9 @@ export async function updateCompany(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[Companies] updateCompany API failed:", e);
+    console.error("[Companies] updateCompany failed:", e);
   }
-  const { error } = await supabase.from(COMPANIES).update(updates).eq("id", id);
-  if (error) {
-    console.error("[Companies] Update:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 /* ============================================================================
@@ -798,49 +619,7 @@ export async function fetchEmployeesWithPerson(
     console.error("[Employees] API failed:", e);
   }
 
-  // Legacy fallback — direct anon-key query.
-  let q = supabase
-    .from(EMPLOYEES)
-    .select(
-      `id, person_id, account_id, employee_number, department, position, work_email,
-       person:people(full_name, name_alt, email, job_title)`,
-    )
-    .order("employee_number", { ascending: true, nullsFirst: false });
-  // Multi-tenancy: limit the Employee picker to the current tenant so a
-  // customer-tenant admin can't accidentally link their new account to
-  // a Koleex employee.
-  if (options.ctx?.tenant_id) q = q.eq("tenant_id", options.ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Employees] Fetch for picker:", error.message);
-    return [];
-  }
-
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
-  const mapped: EmployeeWithPerson[] = rows
-    .map((r) => {
-      const personRaw = r.person;
-      const person = Array.isArray(personRaw)
-        ? (personRaw[0] as Record<string, unknown> | undefined)
-        : (personRaw as Record<string, unknown> | null);
-      if (!r.person_id || !person) return null;
-      return {
-        employee_id: r.id as string,
-        person_id: r.person_id as string,
-        account_id: (r.account_id as string | null) ?? null,
-        employee_number: (r.employee_number as string | null) ?? null,
-        department: (r.department as string | null) ?? null,
-        position: (r.position as string | null) ?? null,
-        full_name: (person.full_name as string) || "Unnamed employee",
-        email: (person.email as string | null) ?? null,
-        job_title: (person.job_title as string | null) ?? null,
-        work_email: (r.work_email as string | null) ?? null,
-      };
-    })
-    .filter((x): x is EmployeeWithPerson => x !== null);
-
-  if (options.includeAlreadyLinked) return mapped;
-  return mapped.filter((e) => e.account_id === null);
+  return [];
 }
 
 /* ============================================================================
@@ -868,16 +647,24 @@ export async function fetchEmployeesWithPerson(
 export async function fetchHiddenModulesForAccount(
   accountId: string,
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .select("module_key, can_view")
-    .eq("account_id", accountId)
-    .eq("can_view", false);
-  if (error) {
-    console.error("[Accounts] fetchHiddenModules:", error.message);
+  try {
+    const res = await fetch(`/api/accounts/${accountId}/permission-overrides`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+        console.error("[Accounts] fetchHiddenModules:", res.status);
+      }
+      return [];
+    }
+    const json = (await res.json()) as {
+      overrides?: { module_key: string; can_view: boolean | null }[];
+    };
+    return (json.overrides ?? []).filter((o) => o.can_view === false).map((o) => o.module_key);
+  } catch (e) {
+    console.error("[Accounts] fetchHiddenModules failed:", e);
     return [];
   }
-  return ((data ?? []) as { module_key: string }[]).map((r) => r.module_key);
 }
 
 /** Write the hidden-module set for an account. Diffs against what's
@@ -888,37 +675,22 @@ export async function saveHiddenModulesForAccount(
   accountId: string,
   hidden: string[],
 ): Promise<{ ok: boolean; error: string | null }> {
-  const existing = await fetchHiddenModulesForAccount(accountId);
-  const toAdd = hidden.filter((m) => !existing.includes(m));
-  const toRemove = existing.filter((m) => !hidden.includes(m));
-
-  if (toAdd.length > 0) {
-    const rows = toAdd.map((m) => ({
-      account_id: accountId,
-      module_key: m,
-      access_level: "none",
-      can_view: false,
-      can_create: false,
-      can_edit: false,
-      can_delete: false,
-      data_scope: "own",
-    }));
-    const { error: insErr } = await supabase
-      .from(PERMISSION_OVERRIDES)
-      .upsert(rows, { onConflict: "account_id,module_key" });
-    if (insErr) return { ok: false, error: insErr.message };
+  /* One call. The diff (which overrides to add, which to drop) happens on the
+     server, where it can also see the overrides that are NOT about visibility
+     and leave them alone. */
+  try {
+    const res = await fetch(`/api/accounts/${accountId}/permission-overrides`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden }),
+    });
+    if (res.ok) return { ok: true, error: null };
+    const err = (await res.json().catch(() => null)) as { error?: string } | null;
+    return { ok: false, error: err?.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
   }
-
-  if (toRemove.length > 0) {
-    const { error: delErr } = await supabase
-      .from(PERMISSION_OVERRIDES)
-      .delete()
-      .eq("account_id", accountId)
-      .in("module_key", toRemove);
-    if (delErr) return { ok: false, error: delErr.message };
-  }
-
-  return { ok: true, error: null };
 }
 
 /** Write-through: stamp the new account_id on the employee row. Called
@@ -928,25 +700,17 @@ export async function linkEmployeeToAccount(
   employeeId: string,
   accountId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from(EMPLOYEES)
-    .update({ account_id: accountId })
-    .eq("id", employeeId);
-  if (error) {
-    console.error("[Employees] Link to account:", error.message);
+  try {
+    const res = await fetch(`/api/employees/${employeeId}/link-account`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account_id: accountId }),
+    });
+    if (!res.ok) console.error("[Employees] Link to account:", res.status);
+  } catch (e) {
+    console.error("[Employees] Link to account failed:", e);
   }
-}
-
-export async function fetchEmployeeByAccountId(
-  accountId: string,
-): Promise<EmployeeRow | null> {
-  const { data, error } = await supabase
-    .from(EMPLOYEES)
-    .select("*")
-    .eq("account_id", accountId)
-    .maybeSingle();
-  if (error) return null;
-  return (data as EmployeeRow) || null;
 }
 
 export async function createEmployee(
@@ -965,18 +729,9 @@ export async function createEmployee(
     }
     if (res.status === 401 || res.status === 403) return null;
   } catch (e) {
-    console.error("[Employees] createEmployee API failed:", e);
+    console.error("[Employees] createEmployee failed:", e);
   }
-  const { data, error } = await supabase
-    .from(EMPLOYEES)
-    .insert(input)
-    .select()
-    .single();
-  if (error) {
-    console.error("[Employees] Create:", error.message);
-    return null;
-  }
-  return data as EmployeeRow;
+  return null;
 }
 
 /**
@@ -998,58 +753,43 @@ export async function updateEmployee(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[Employees] updateEmployee API failed:", e);
+    console.error("[Employees] updateEmployee failed:", e);
   }
-  const { error } = await supabase.from(EMPLOYEES).update(updates).eq("id", id);
-  if (error) {
-    console.error("[Employees] Update:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 /**
- * Upsert a Koleex employee by account_id. Creates a new HR record if one
- * doesn't exist yet, otherwise updates in place. Used by the Private HR tab
- * when an internal account has no linked employee record.
+ * Find-or-create the HR record for an account and apply `updates`, in ONE
+ * server call. Used by the Private HR tab when an internal account has no
+ * linked employee record.
+ *
+ * It used to look the row up by account_id in the browser, then update or
+ * insert — three statements against koleex_employees, a service-role-only
+ * table, so none of them touched a row and the tab could not save.
  */
 export async function upsertEmployeeByAccountId(
   accountId: string,
   personId: string | null,
   updates: EmployeeUpdate,
 ): Promise<EmployeeRow | null> {
-  const existing = await fetchEmployeeByAccountId(accountId);
-  if (existing) {
-    const ok = await updateEmployee(existing.id, updates);
-    if (!ok) return null;
-    return { ...existing, ...updates } as EmployeeRow;
+  try {
+    const res = await fetch(`/api/accounts/${accountId}/employee`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ person_id: personId, updates }),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      console.error("[Employees] upsertByAccountId:", err?.error ?? res.status);
+      return null;
+    }
+    const json = (await res.json()) as { employee: EmployeeRow | null };
+    return json.employee;
+  } catch (e) {
+    console.error("[Employees] upsertByAccountId failed:", e);
+    return null;
   }
-  // Create a minimal HR record.
-  const created = await createEmployee({
-    account_id: accountId,
-    person_id: personId,
-    employee_number: null,
-    department: null,
-    position: null,
-    hire_date: null,
-    employment_status: "active",
-    manager_id: null,
-    work_email: null,
-    work_phone: null,
-    notes: null,
-    emergency_contact_name: null,
-    emergency_contact_phone: null,
-    emergency_contact_relationship: null,
-    birth_date: null,
-    marital_status: null,
-    nationality: null,
-    identification_id: null,
-    passport_number: null,
-    visa_number: null,
-    visa_expiry_date: null,
-    ...updates,
-  } as EmployeeInsert);
-  return created;
 }
 
 /* ============================================================================
@@ -1065,48 +805,28 @@ export async function fetchRoles(): Promise<RoleRow[]> {
     }
     if (res.status === 401 || res.status === 403) return [];
   } catch (e) {
-    console.error("[Roles] Fetch API failed:", e);
+    console.error("[Roles] Fetch failed:", e);
   }
-  const { data, error } = await supabase
-    .from(ROLES)
-    .select("*")
-    .order("display_order", { ascending: true });
-  if (error) {
-    console.error("[Roles] Fetch:", error.message);
-    return [];
-  }
-  return (data as RoleRow[]) || [];
-}
-
-export async function fetchRoleById(id: string): Promise<RoleRow | null> {
-  const { data, error } = await supabase
-    .from(ROLES)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return null;
-  return (data as RoleRow) || null;
-}
-
-export async function fetchAccessPresets(): Promise<AccessPresetRow[]> {
-  const { data, error } = await supabase.from(ACCESS_PRESETS).select("*");
-  if (error) {
-    console.error("[AccessPresets] Fetch:", error.message);
-    return [];
-  }
-  return (data as AccessPresetRow[]) || [];
+  return [];
 }
 
 export async function fetchAccessPresetByRoleId(
   roleId: string,
 ): Promise<AccessPresetRow | null> {
-  const { data, error } = await supabase
-    .from(ACCESS_PRESETS)
-    .select("*")
-    .eq("role_id", roleId)
-    .maybeSingle();
-  if (error) return null;
-  return (data as AccessPresetRow) || null;
+  try {
+    const res = await fetch(`/api/roles/${roleId}/access-preset`, { credentials: "include" });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+        console.error("[AccessPresets] fetch:", res.status);
+      }
+      return null;
+    }
+    const json = (await res.json()) as { preset: AccessPresetRow | null };
+    return json.preset;
+  } catch (e) {
+    console.error("[AccessPresets] fetch failed:", e);
+    return null;
+  }
 }
 
 /* ============================================================================
@@ -1149,17 +869,9 @@ async function updateAccountPreferencesNow(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[Accounts] updateAccountPreferences API failed:", e);
+    console.error("[Accounts] updateAccountPreferences failed:", e);
   }
-  const { error } = await supabase
-    .from(ACCOUNTS)
-    .update({ preferences })
-    .eq("id", id);
-  if (error) {
-    console.error("[Accounts] Update preferences:", error.message);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 /* ============================================================================
@@ -1169,115 +881,6 @@ async function updateAccountPreferencesNow(
    on top of the role's access_preset. Absence of a row for a given module
    means "use the preset default".
    ============================================================================ */
-
-export async function fetchPermissionOverrides(
-  accountId: string,
-): Promise<AccountPermissionOverrideRow[]> {
-  const { data, error } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .select("*")
-    .eq("account_id", accountId);
-  if (error) {
-    console.error("[PermissionOverrides] Fetch:", error.message);
-    return [];
-  }
-  return (data as AccountPermissionOverrideRow[]) || [];
-}
-
-/**
- * Upsert a single permission override. Creates a row if one doesn't exist
- * for (account_id, module_key), otherwise updates the access_level.
- */
-export async function upsertPermissionOverride(
-  accountId: string,
-  moduleKey: string,
-  accessLevel: AccessLevel,
-  granular?: { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean; data_scope: string },
-): Promise<boolean> {
-  const payload: AccountPermissionOverrideInsert = {
-    account_id: accountId,
-    module_key: moduleKey,
-    access_level: accessLevel,
-    can_view: granular?.can_view ?? (accessLevel !== "none"),
-    can_create: granular?.can_create ?? (accessLevel !== "none"),
-    can_edit: granular?.can_edit ?? (accessLevel === "manager" || accessLevel === "admin"),
-    can_delete: granular?.can_delete ?? (accessLevel === "admin"),
-    data_scope: (granular?.data_scope as "own" | "department" | "all") ?? "own",
-  };
-  try {
-    const res = await fetch(
-      "/api/accounts/" + accountId + "/permission-overrides",
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    if (res.ok) {
-      // Invalidate the client-side /api/me/bootstrap cache so the
-      // sidebar / PermissionGate pick up the new override on the next
-      // render instead of waiting for the 10s TTL to expire.
-      try {
-        const { invalidateMeBootstrap } = await import("./me-bootstrap");
-        invalidateMeBootstrap();
-      } catch { /* bootstrap module not loaded yet — next fetch will be fresh */ }
-      return true;
-    }
-    if (res.status === 401 || res.status === 403) return false;
-  } catch (e) {
-    console.error("[PermissionOverrides] upsert API failed:", e);
-  }
-  const { error } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .upsert(payload, { onConflict: "account_id,module_key" });
-  if (error) {
-    console.error("[PermissionOverrides] Upsert:", error.message);
-    return false;
-  }
-  return true;
-}
-
-/**
- * Delete an override row — used when a user resets a module back to its
- * preset default ("no override").
- */
-export async function deletePermissionOverride(
-  accountId: string,
-  moduleKey: string,
-): Promise<boolean> {
-  try {
-    const res = await fetch(
-      "/api/accounts/" + accountId + "/permission-overrides",
-      {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ module_key: moduleKey }),
-      },
-    );
-    if (res.ok) {
-      try {
-        const { invalidateMeBootstrap } = await import("./me-bootstrap");
-        invalidateMeBootstrap();
-      } catch { /* ignore */ }
-      return true;
-    }
-    if (res.status === 401 || res.status === 403) return false;
-  } catch (e) {
-    console.error("[PermissionOverrides] delete API failed:", e);
-  }
-  const { error } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .delete()
-    .eq("account_id", accountId)
-    .eq("module_key", moduleKey);
-  if (error) {
-    console.error("[PermissionOverrides] Delete:", error.message);
-    return false;
-  }
-  return true;
-}
 
 /**
  * Replace the full set of overrides for an account with a new set. Deletes
@@ -1339,26 +942,13 @@ export async function replacePermissionOverrides(
     }
     if (res.status === 401 || res.status === 403) return false;
   } catch (e) {
-    console.error("[PermissionOverrides] replace API failed:", e);
+    console.error("[PermissionOverrides] replace failed:", e);
   }
-
-  const { error: delErr } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .delete()
-    .eq("account_id", accountId);
-  if (delErr) {
-    console.error("[PermissionOverrides] Replace/delete:", delErr.message);
-    return false;
-  }
-  if (nextOverrides.length === 0) return true;
-  const { error: insErr } = await supabase
-    .from(PERMISSION_OVERRIDES)
-    .insert(payload);
-  if (insErr) {
-    console.error("[PermissionOverrides] Replace/insert:", insErr.message);
-    return false;
-  }
-  return true;
+  /* No browser fallback for a PERMISSION write. The removed one deleted every
+     override for the account and then re-inserted — from the browser, with the
+     anon key. If the delete had succeeded and the insert failed, the account
+     would silently lose all its overrides. */
+  return false;
 }
 
 /* ============================================================================
@@ -1369,48 +959,6 @@ export async function replacePermissionOverrides(
    Password hashing is now Argon2id and happens exclusively server-side
    (src/lib/server/password.ts via the API routes) — this client-importable
    module must never produce a password hash. */
-
-/**
- * Look up an account row by username. Used by the legacy login form so we
- * can validate username+password against the accounts table without going
- * through Supabase Auth. Case-insensitive match — usernames are always
- * lowercased on insert, but we ilike-match defensively.
- */
-export async function fetchAccountByUsername(
-  username: string,
-): Promise<AccountRow | null> {
-  const trimmed = username.trim();
-  if (!trimmed) return null;
-  const { data, error } = await supabase
-    .from(ACCOUNTS)
-    .select("*")
-    .ilike("username", trimmed)
-    .maybeSingle();
-  if (error) {
-    console.error("[Accounts] Lookup by username:", error.message);
-    return null;
-  }
-  return (data as AccountRow) || null;
-}
-
-/** Lookup an account by login_email. Used by the legacy /login flow
- *  where users identify themselves by email rather than username. */
-export async function fetchAccountByLoginEmail(
-  loginEmail: string,
-): Promise<AccountRow | null> {
-  const trimmed = loginEmail.trim();
-  if (!trimmed) return null;
-  const { data, error } = await supabase
-    .from(ACCOUNTS)
-    .select("*")
-    .ilike("login_email", trimmed)
-    .maybeSingle();
-  if (error) {
-    console.error("[Accounts] Lookup by email:", error.message);
-    return null;
-  }
-  return (data as AccountRow) || null;
-}
 
 /**
  * Legacy login: verify a username + plaintext password against the accounts
