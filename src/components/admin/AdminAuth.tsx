@@ -571,7 +571,7 @@ function SignInPanel({
       <div>
         <label className={labelBase}>{t("username")}</label>
         <div className="relative">
-          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+          <UserIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
             type="text"
             autoComplete="username"
@@ -579,7 +579,7 @@ function SignInPanel({
             value={username}
             onChange={(e) => onUsernameChange(e.target.value)}
             placeholder="jane.cooper"
-            className={`${inputBase} pl-9`}
+            className={`${inputBase} ps-9`}
           />
         </div>
       </div>
@@ -704,14 +704,14 @@ function JoinPanel({
             return (
               <Current
                 size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+                className="absolute start-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
               />
             );
           })()}
           <select
             value={state.relationship}
             onChange={(e) => setters.setRelationship(e.target.value)}
-            className={`${selectBase} pl-9`}
+            className={`${selectBase.replace('ps-3', '')} ps-9`}
           >
             {RELATIONSHIPS.map((r) => (
               <option key={r.value} value={r.value} className="bg-[#121212]">
@@ -732,7 +732,7 @@ function JoinPanel({
       <div>
         <label className={labelBase}>{t("join.name")}</label>
         <div className="relative">
-          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+          <UserIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
             type="text"
             required
@@ -740,7 +740,7 @@ function JoinPanel({
             value={state.name}
             onChange={(e) => setters.setName(e.target.value)}
             placeholder="Jane Cooper"
-            className={`${inputBase} pl-9`}
+            className={`${inputBase} ps-9`}
           />
         </div>
       </div>
@@ -750,7 +750,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>{t("join.email")}</label>
           <div className="relative">
-            <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <EnvelopeIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="email"
               required
@@ -758,21 +758,21 @@ function JoinPanel({
               value={state.email}
               onChange={(e) => setters.setEmail(e.target.value)}
               placeholder="jane@company.com"
-              className={`${inputBase} pl-9`}
+              className={`${inputBase} ps-9`}
             />
           </div>
         </div>
         <div>
           <label className={labelBase}>{t("join.phone")}</label>
           <div className="relative">
-            <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <PhoneIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="tel"
               autoComplete="tel"
               value={state.phone}
               onChange={(e) => setters.setPhone(e.target.value)}
               placeholder="+1 555 123 4567"
-              className={`${inputBase} pl-9`}
+              className={`${inputBase} ps-9`}
             />
           </div>
         </div>
@@ -783,28 +783,28 @@ function JoinPanel({
         <div>
           <label className={labelBase}>{t("join.company")}</label>
           <div className="relative">
-            <Building2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <Building2Icon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="text"
               autoComplete="organization"
               value={state.company}
               onChange={(e) => setters.setCompany(e.target.value)}
               placeholder="Acme Inc."
-              className={`${inputBase} pl-9`}
+              className={`${inputBase} ps-9`}
             />
           </div>
         </div>
         <div>
           <label className={labelBase}>{t("join.jobTitle")}</label>
           <div className="relative">
-            <BriefcaseIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <BriefcaseIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="text"
               autoComplete="organization-title"
               value={state.jobTitle}
               onChange={(e) => setters.setJobTitle(e.target.value)}
               placeholder="Procurement Manager"
-              className={`${inputBase} pl-9`}
+              className={`${inputBase} ps-9`}
             />
           </div>
         </div>
@@ -815,11 +815,11 @@ function JoinPanel({
         <div>
           <label className={labelBase}>{t("join.country")}</label>
           <div className="relative">
-            <GlobeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <GlobeIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
             <select
               value={state.country}
               onChange={(e) => setters.setCountry(e.target.value)}
-              className={`${selectBase} pl-9`}
+              className={`${selectBase.replace('ps-3', '')} ps-9`}
             >
               <option value="" className="bg-[#121212]">
                 {t("join.selectCountry")}
@@ -839,13 +839,13 @@ function JoinPanel({
           <div>
             <label className={labelBase}>{t("join.customerCode")}</label>
             <div className="relative">
-              <Building2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+              <Building2Icon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
               <input
                 type="text"
                 value={state.customerCode}
                 onChange={(e) => setters.setCustomerCode(e.target.value)}
                 placeholder="KX-1042"
-                className={`${inputBase} pl-9`}
+                className={`${inputBase} ps-9`}
               />
             </div>
           </div>
@@ -858,11 +858,11 @@ function JoinPanel({
       <div>
         <label className={labelBase}>{t("join.heardFrom")}</label>
         <div className="relative">
-          <Link2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+          <Link2Icon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
           <select
             value={state.heardFrom}
             onChange={(e) => setters.setHeardFrom(e.target.value)}
-            className={`${selectBase} pl-9`}
+            className={`${selectBase.replace('ps-3', '')} ps-9`}
           >
             {HEARD_FROM_OPTIONS.map((o) => (
               <option key={o.value} value={o.value} className="bg-[#121212]">
@@ -881,12 +881,12 @@ function JoinPanel({
       <div>
         <label className={labelBase}>{t(`join.q.${state.relationship}`)}</label>
         <div className="relative">
-          <MessageSquareIcon className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
+          <MessageSquareIcon className="absolute start-3 top-3 h-3.5 w-3.5 text-white/30" />
           <textarea
             value={state.message}
             onChange={(e) => setters.setMessage(e.target.value)}
             placeholder={t(`join.qh.${state.relationship}`)}
-            className={`${textareaBase} pl-9`}
+            className={`${textareaBase} ps-9`}
           />
         </div>
       </div>
