@@ -31,13 +31,23 @@ const CATEGORIES: Record<string, string> = {
   forgot_username: "Forgot username",
   account_locked: "Account is locked",
   account_disabled: "Account no longer works",
+  password_expired: "Forced password change fails",
   no_account: "No account yet",
   code_not_received: "Cannot receive the code",
+  contact_changed: "Phone or email changed",
   no_app_access: "Needs access to an app",
+  error_message: "Getting an error message",
+  hub_not_loading: "Hub will not load",
+  suspicious_activity: "SUSPECTED ACCOUNT MISUSE",
   other: "Something else",
 };
 
-const MAX = { name: 120, email: 160, phone: 32, message: 2000 } as const;
+/* A suspected break-in is not a password reset. It gets its own subject line
+   so it is not read as one more routine request. */
+const URGENT = new Set(["suspicious_activity"]);
+
+const MAX = { name: 120, email: 160, phone: 32, message: 2000, username: 120, company: 120 } as const;
+const LANGS = new Set(["en", "zh", "ar"]);
 
 /* Three requests per IP per hour. In-memory on purpose: this is a speed bump
    against a flood, not an auth boundary, and a per-instance counter is enough
@@ -98,6 +108,13 @@ export async function POST(req: Request) {
   const phone_code = clean(body.phone_code, 8);
   const country_code = clean(body.country_code, 4);
   const message = clean(body.message, MAX.message);
+  const username = clean(body.username, MAX.username);
+  const company = clean(body.company, MAX.company);
+  /* Captured, not asked: the form already knows which language the person is
+     reading, so an administrator can reply in one they understand. */
+  const reportedLanguage = LANGS.has(clean(body.reported_language, 4))
+    ? clean(body.reported_language, 4)
+    : null;
 
   if (!category) return NextResponse.json({ error: "Please choose a problem." }, { status: 400 });
   if (!full_name) return NextResponse.json({ error: "Your name is required." }, { status: 400 });
@@ -127,7 +144,9 @@ export async function POST(req: Request) {
     .insert({
       ref, category, message: message || null,
       full_name, email,
+      username: username || null, company: company || null,
       phone_code: phone_code || null, phone, country_code: country_code || null,
+      reported_language: reportedLanguage,
       user_agent: userAgent,
     })
     .select("id, ref")
@@ -144,11 +163,15 @@ export async function POST(req: Request) {
     console.error("[api/support/sign-in-help] no admin recipients — request", ref, "is only in the table");
   } else {
     const label = CATEGORIES[category];
+    const urgent = URGENT.has(category);
     const lines = [
       `Problem     ${label}`,
+      username ? `Username    ${username}` : null,
       `Name        ${full_name}`,
+      company ? `Company     ${company}` : null,
       `Email       ${email}`,
       `Phone       ${phone_code ? phone_code + " " : ""}${phone}`,
+      reportedLanguage ? `Language    ${reportedLanguage}` : null,
       message ? `Message     ${message}` : null,
       "",
       `Reference   ${ref}`,
@@ -159,7 +182,9 @@ export async function POST(req: Request) {
         recipient_account_id: rid,
         sender_account_id: null,
         category: "alert",
-        subject: `Sign-in help · ${full_name}`,
+        subject: urgent
+          ? `⚠ Suspected account misuse · ${full_name}`
+          : `Sign-in help · ${full_name}`,
         body: lines.join("\n"),
         link: "/accounts",
         metadata: {
@@ -168,6 +193,10 @@ export async function POST(req: Request) {
           ref,
           problem: category,
           problem_label: label,
+          urgent,
+          username: username || null,
+          company: company || null,
+          language: reportedLanguage,
           full_name, email,
           phone: `${phone_code ? phone_code + " " : ""}${phone}`,
           country_code: country_code || null,

@@ -32,11 +32,25 @@ const PROBLEMS = [
   "forgot_username",
   "account_locked",
   "account_disabled",
+  "password_expired",
   "no_account",
   "code_not_received",
+  "contact_changed",
   "no_app_access",
+  "error_message",
+  "hub_not_loading",
+  "suspicious_activity",
   "other",
 ] as const;
+
+/* The reasons where an administrator's first question is "which account?".
+   Asking for the username on "I don't have an account yet" would be absurd,
+   so the field appears only where it can be answered. */
+const ASKS_USERNAME = new Set([
+  "forgot_password", "account_locked", "account_disabled",
+  "password_expired", "code_not_received", "contact_changed",
+  "no_app_access", "suspicious_activity",
+]);
 
 const DIALS = COUNTRIES.filter((c) => "dial" in c) as ReadonlyArray<{
   code: string; name: string; dial: string;
@@ -57,6 +71,8 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
   const rtl = lang === "ar";
   const [problem, setProblem] = useState<string>("forgot_password");
   const [message, setMessage] = useState("");
+  const [usernameGuess, setUsernameGuess] = useState("");
+  const [company, setCompany] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   /* Default the dial code to Egypt — head office — rather than leaving it
@@ -74,6 +90,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
     if (!open) return;
     setProblem("forgot_password"); setMessage(""); setFullName("");
     setEmail(""); setCountry("EG"); setPhone("");
+    setUsernameGuess(""); setCompany("");
     setError(null); setSentRef(null); setBusy(false);
     const t = setTimeout(() => firstFieldRef.current?.focus(), 60);
     return () => clearTimeout(t);
@@ -107,6 +124,9 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
         body: JSON.stringify({
           category: problem,
           message: message.trim(),
+          username: usernameGuess.trim(),
+          company: company.trim(),
+          reported_language: lang,
           full_name: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
@@ -181,31 +201,32 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
         ) : (
           <form onSubmit={submit} className="px-5 py-5 space-y-5">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2.5">
+              <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
                 {t("help.problem")}
-              </p>
-              <div className="space-y-1.5">
+              </label>
+              {/* A dropdown, not thirteen radio rows: the list grew past the
+                  point where scanning it beats picking from it, and on a phone
+                  the rows pushed the name and phone fields off the screen
+                  entirely. */}
+              <select
+                value={problem}
+                onChange={(e) => setProblem(e.target.value)}
+                className="w-full h-11 rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
+              >
                 {PROBLEMS.map((id) => (
-                  <label
-                    key={id}
-                    className={`flex items-center gap-3 h-11 px-3 rounded-xl border cursor-pointer transition-colors ${
-                      problem === id
-                        ? "bg-white/[0.07] border-white/25"
-                        : "bg-white/[0.02] border-white/[0.07] hover:border-white/15"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="problem"
-                      value={id}
-                      checked={problem === id}
-                      onChange={() => setProblem(id)}
-                      className="accent-white h-[15px] w-[15px]"
-                    />
-                    <span className="text-[13.5px] text-white/85">{t(`help.p.${id}`)}</span>
-                  </label>
+                  <option key={id} value={id} className="bg-[#121212]">
+                    {t(`help.p.${id}`)}
+                  </option>
                 ))}
-              </div>
+              </select>
+              {problem === "suspicious_activity" && (
+                /* Say it back to them. Someone reporting a possible break-in
+                   needs to know it was not filed as a password reset. */
+                <p className="mt-2 text-[11.5px] text-[#F59E0B] flex items-center gap-1.5">
+                  <ExclamationIcon className="h-3.5 w-3.5 shrink-0" />
+                  {t("help.urgent")}
+                </p>
+              )}
             </div>
 
             <div>
@@ -227,6 +248,22 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
             </div>
 
             <div className="space-y-3">
+              {ASKS_USERNAME.has(problem) && (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
+                    {t("help.username")}
+                  </label>
+                  <input
+                    value={usernameGuess}
+                    onChange={(e) => setUsernameGuess(e.target.value)}
+                    maxLength={120}
+                    autoComplete="username"
+                    className={field}
+                    placeholder="jane.cooper"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
                   {t("help.name")}
@@ -254,6 +291,20 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                   autoComplete="email"
                   className={field}
                   placeholder="you@company.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
+                  {t("help.company")}
+                </label>
+                <input
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  maxLength={120}
+                  autoComplete="organization"
+                  className={field}
+                  placeholder="Koleex · Production"
                 />
               </div>
 
