@@ -39,6 +39,13 @@ import { countriesFor, countryName, flagOf } from "@/lib/countries-dial";
 import { shrinkImage } from "@/lib/shrink-image";
 import { useTranslation } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
+import { signInJoinT } from "@/lib/translations/signin-join";
+
+/* Merged once at module scope, not per render. The gate half is already
+   resident — it ships in the boot chunk — so this costs nothing beyond the
+   join copy that arrives with this file, and a missing key is impossible
+   because the form can still read anything the gate can. */
+const joinDict = { ...signInT, ...signInJoinT };
 import { inputBase, selectBase, textareaBase, labelBase } from "./field-styles";
 
 /* BrandGlyph carries the simple-icons dataset — lazy even here, so the logos
@@ -158,7 +165,7 @@ export default function JoinPanel({
   onSubmit,
   onGoSignIn,
 }: JoinPanelProps) {
-  const { t, lang } = useTranslation(signInT);
+  const { t, lang } = useTranslation(joinDict);
   const [docErr, setDocErr] = useState<string | null>(null);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
