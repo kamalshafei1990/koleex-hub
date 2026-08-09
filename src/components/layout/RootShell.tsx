@@ -221,7 +221,27 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             .shell-content-offset { padding-inline-start: ${desktopPad}px !important; }
           }
         `}</style>
-        <div id="main-scroll-container" className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out">
+        {/* scrollbar-gutter: stable — the fix for the horizontal flash on app
+            open (owner: "the product card was a little to the right side then
+            back to normal position, so so quick, like a flash").
+
+            This element is the Hub's scroller and it SURVIVES navigation. On
+            the way into an app the outgoing screen unmounts and the loading
+            surface is short, so the scrollbar disappears for a frame or two;
+            the container widens, and every centred `mx-auto max-w-[1500px]`
+            page drifts right by half the scrollbar. The grid then paints, the
+            scrollbar returns, and it all snaps back. Reserving the gutter
+            permanently means the width never changes, so there is nothing to
+            snap back from.
+
+            Invisible on macOS overlay scrollbars (gutter is 0 there) and
+            costs a fixed ~15px on platforms that show a classic scrollbar —
+            which they were already spending, just not consistently. */}
+        <div
+          id="main-scroll-container"
+          style={{ scrollbarGutter: "stable" }}
+          className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out"
+        >
           <ScrollToTopOnRouteChange />
           {children}
         </div>
