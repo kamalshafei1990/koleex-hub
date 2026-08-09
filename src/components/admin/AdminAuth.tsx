@@ -61,6 +61,10 @@ const JoinPanel = dynamic(() => import("@/components/admin/signin/JoinPanel"), {
   loading: () => <div className="h-[420px]" aria-hidden />,
 });
 const SignInHelpDialog = dynamic(() => import("./SignInHelpDialog"), { ssr: false });
+/* Canvas + a draw loop must never sit in the boot chunk, and must never mount
+   for somebody who is already signed in. ssr:false because it measures the
+   element before it can paint. */
+const WavyBackground = dynamic(() => import("@/components/admin/signin/WavyBackground"), { ssr: false });
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
 
@@ -441,26 +445,12 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
            without turning the layout round leaves a screen that is technically
            Arabic and still reads wrong. */
         dir={lang === "ar" ? "rtl" : "ltr"}
-        className="h-[100dvh] bg-[#0A0A0A] flex justify-center overflow-y-auto overflow-x-hidden p-4 py-10 relative"
-        style={{
-          backgroundImage:
-            "radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.05), transparent 60%)",
-        }}
+        className="h-[100dvh] bg-[#05070C] flex justify-center overflow-y-auto overflow-x-hidden p-4 py-10 relative"
       >
-        {/* Subtle grid backdrop */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
-            backgroundSize: "64px 64px",
-            maskImage:
-              "radial-gradient(ellipse 60% 50% at 50% 40%, black 30%, transparent 80%)",
-            WebkitMaskImage:
-              "radial-gradient(ellipse 60% 50% at 50% 40%, black 30%, transparent 80%)",
-          }}
-        />
+        {/* The ground. Replaces the radial wash and the 64px grid — three
+            backgrounds stacked would have been noise, and the waves already
+            carry the depth those two were there to provide. */}
+        <WavyBackground />
 
         <div
           /* Same curve and length as the height and the indicator — the card
@@ -494,7 +484,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           </div>
 
           {/* Card */}
-          <div className="bg-[#121212] rounded-2xl border border-white/[0.06] shadow-2xl overflow-hidden backdrop-blur">
+          {/* Glass, not a solid panel. With a moving ground behind it an opaque card
+                just hides the thing you chose — the waves have to reach through. */}
+            <div className="rounded-2xl border border-white/[0.10] shadow-2xl overflow-hidden bg-[#0B0E14]/60 backdrop-blur-2xl backdrop-saturate-150 [box-shadow:0_1px_0_rgba(255,255,255,.12)_inset,0_40px_80px_-30px_rgba(0,0,0,.9)]">
             {/* Tab bar.
 
                 flex, NOT grid-cols-2. Two equal halves gave "Sign In" — seven
