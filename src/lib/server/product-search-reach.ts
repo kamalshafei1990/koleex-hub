@@ -19,6 +19,11 @@ import "server-only";
    lookups resolve the query to a set of product ids and taxonomy slugs, and
    the main list query ORs those in beside its own columns.
 
+   Still true after the `products.search_text` migration. That generated column
+   flattens the PRODUCTS ROW — including the `tags` and `alternate_names`
+   arrays, which ilike could never reach — but model codes, SKUs, supplier
+   names and taxonomy names live in OTHER tables, so they still come from here.
+
    Cost: two indexed lookups over small tables (168 models, 451 taxonomy rows),
    and they run in parallel with each other. Measured in-function database time
    for three taxonomy tables was 56 ms, so this is not where the time goes.
@@ -54,52 +59,66 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
   const terms: string[] = [];
   let capped = false;
 
-  const [models, modelsI18n, divisions, categories, subcategories] = await Promise.all([
-    /* Model code (model_name), Koleex SKU, model slug, supplier name. */
+  const [models, divisions, categories, subcategories, suppliers] = await Promise.all([
+    /* Model code, primary model, Koleex SKU, slug AND the models' Chinese /
+       other-language names — all of it in ONE indexed column that the database
+       maintains (migration `product_models_search_text_generated_column`).
+
+       This replaced two queries and a live defect. name_i18n is jsonb, and the
+       previous `.filter("name_i18n::text", "ilike", …)` was not applying the
+       cast: every search logged `operator does not exist: jsonb ~~* unknown`
+       and silently returned nothing, so 45 models with Chinese names — 14 of
+       them matching 蒸汽 — could not be found in Chinese at all. Casting once
+       at write time puts it somewhere PostgREST never has to parse. */
     supabaseServer
       .from("product_models")
       .select("product_id")
-      .or(
-        [
-          `model_name.ilike.${like}`,
-          `sku.ilike.${like}`,
-          `slug.ilike.${like}`,
-          `supplier.ilike.${like}`,
-        ].join(","),
-      )
-      .limit(MAX_IDS + 1),
-    /* The models' Chinese / other-language names, in a query of their OWN.
-       name_i18n is jsonb, Postgres has no `jsonb ILIKE text`, and PostgREST's
-       logic-tree parser rejects a `::text` cast INSIDE an or() — put one there
-       and the whole or-expression fails to parse, so the lookup returns
-       nothing and the search quietly loses model codes and supplier names
-       rather than erroring. That happened here twice before this split: a real
-       SKU returned 0 hits while the row plainly existed. A cast is legal on a
-       standalone filter, so this term gets its own request. */
-    supabaseServer
-      .from("product_models")
-      .select("product_id")
-      .filter("name_i18n::text", "ilike", like)
+      .ilike("search_text", like)
       .limit(MAX_IDS + 1),
     supabaseServer.from("divisions").select("slug").or(taxonomyOr(like)),
     supabaseServer.from("categories").select("slug").or(taxonomyOr(like)),
     supabaseServer.from("subcategories").select("slug").or(taxonomyOr(like)),
+    /* THE SUPPLIER, from where the supplier actually is.
+       `product_models.supplier` is a legacy text column and it is NULL on all
+       168 rows — so the supplier term above has never matched anything, and
+       searching the catalogue by supplier name silently returned zero. The
+       real link is product_suppliers.supplier_id -> contacts. Verified: the
+       supplier linked to all 121 products returned 0 hits before this. */
+    supabaseServer
+      .from("contacts")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("contact_type", "supplier")
+      .or([`display_name.ilike.${like}`, `company_name.ilike.${like}`, `legal_name.ilike.${like}`].join(","))
+      .limit(MAX_IDS),
   ]);
+
+  /* One dependent hop, and only when a supplier name actually matched — a
+     search for "ironing" pays nothing for it. */
+  const supplierIds = ((suppliers.data ?? []) as { id: string }[]).map((r) => r.id);
+  const supplierLinks = supplierIds.length
+    ? await supabaseServer
+        .from("product_suppliers")
+        .select("product_id")
+        .in("supplier_id", supplierIds)
+        .limit(MAX_IDS + 1)
+    : null;
 
   /* A failed lookup must be LOUD. Silently returning no terms degrades the
      search back to products-only columns, which looks like "the search just
      doesn't find model codes" — the exact failure this module exists to
      prevent, and the one the jsonb cast above already caused once. */
   for (const [name, res] of [
-    ["product_models", models], ["product_models.name_i18n", modelsI18n],
+    ["product_models", models],
     ["divisions", divisions], ["categories", categories], ["subcategories", subcategories],
+    ["contacts(supplier)", suppliers], ["product_suppliers", supplierLinks],
   ] as const) {
-    if (res.error) console.error(`[product-search] ${name} lookup failed:`, res.error.message);
+    if (res?.error) console.error(`[product-search] ${name} lookup failed:`, res.error.message);
   }
 
   const modelRows = [
     ...((models.data ?? []) as { product_id: string | null }[]),
-    ...((modelsI18n.data ?? []) as { product_id: string | null }[]),
+    ...((supplierLinks?.data ?? []) as { product_id: string | null }[]),
   ];
   const modelIds = Array.from(
     new Set(modelRows.map((r) => r.product_id).filter(Boolean) as string[]),
@@ -119,12 +138,11 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
   slugTerm(categories.data as { slug: string | null }[] | null, "category_slug");
   slugTerm(subcategories.data as { slug: string | null }[] | null, "subcategory_slug");
 
-  /* tenantId is not used to filter the lookups: product_models and the
-     taxonomy are not tenant-scoped, and the MAIN query is already scoped to
-     the caller's tenant — so a model id from elsewhere simply matches nothing.
-     Kept in the signature so a future tenant-scoped models table has an
-     obvious place to use it. */
-  void tenantId;
+  /* product_models and the taxonomy are not tenant-scoped, and the MAIN query
+     is already scoped to the caller's tenant, so a model id from elsewhere
+     simply matches nothing. The CONTACTS lookup above is scoped explicitly —
+     contacts are tenant data, and resolving a supplier name across tenants
+     would leak the existence of another tenant's supplier through a hit count. */
 
   return { terms, capped };
 }

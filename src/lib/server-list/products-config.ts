@@ -40,14 +40,21 @@ export const PRODUCTS_LIST_CONFIG: ServerListConfig = {
   /* Newest first — the working order in Product Data, and what the unpaged
      route has always returned. */
   defaultSort: { field: "created", dir: "desc" },
-  /* TEXT columns only. `tags` and `alternate_names` are text[] and ilike does
-     not apply to an array, so including them here would silently produce an
-     invalid PostgREST or-expression and break every search. Array search needs
-     the containment operators and a separate pass — see
-     [products text[] trap] in lib/product-array-columns. Until then the
-     Chinese/alternate names stay searchable through the client-side haystack
-     on the page the user already has. */
-  searchColumns: ["product_name", "slug", "brand", "excerpt", "description"],
+  /* ONE column, because the database now maintains one.
+     `search_text` is a GENERATED STORED column holding
+     product_name + slug + brand + excerpt + description + alternate_names +
+     tags, lowercased, with a GIN trigram index
+     (migration `products_search_text_generated_column`).
+
+     It replaced five ilike terms, and it closes a real gap: `tags` and
+     `alternate_names` are text[], ilike cannot apply to an array, so they were
+     unsearchable — invisible while no row carried an alternate name, and a
+     broken Chinese search the day the real catalogue is entered. Postgres, not
+     application code, keeps the column in step with every insert and update,
+     so a new searchable field is a migration and not a code path that can be
+     forgotten. Verified identical to the old five-column OR on the live
+     catalogue: `ironing` matched 38 both ways. */
+  searchColumns: ["search_text"],
   filters: {
     division: { column: "division_slug" },
     category: { column: "category_slug" },

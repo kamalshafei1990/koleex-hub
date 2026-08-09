@@ -78,7 +78,14 @@ for (const route of WRITE_ROUTES) {
   const src = read(route);
   /* Split the file at each exported handler; the body of handler N is the
      text up to handler N+1. Gate helpers defined at module level (gate(),
-     gatePD(), gateProductData()) count when the body calls them. */
+     gatePD(), gateProductData()) count when the body calls them.
+
+     The gate pattern is `requireAuth(` and NOT `requireAuth()`. It was written
+     as the latter, back when the helper took no argument; the helper later
+     started taking the request, and from that day this validator reported all
+     16 write handlers as ungated — on every run, so the noise became normal
+     and a real regression here would have been invisible. A guard that always
+     fails protects nothing. */
   const matches = [...src.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\b/g)];
   for (let i = 0; i < matches.length; i++) {
     const method = matches[i][1];
@@ -87,15 +94,15 @@ for (const route of WRITE_ROUTES) {
     const bodyEnd = i + 1 < matches.length ? (matches[i + 1].index ?? src.length) : src.length;
     const body = src.slice(bodyStart, bodyEnd);
     const gated =
-      (/requireAuth\(\)/.test(body) &&
-        (/hasProductDataAccess\(/.test(body) || /requireModuleAccess\(/.test(body))) ||
+      (/requireAuth\(/.test(body) &&
+        (/hasProductDataAccess\(/.test(body) || /requireProductDataAction\(/.test(body) || /requireModuleAccess\(/.test(body) || /requireModuleAction\(/.test(body))) ||
       /await gate(PD|ProductData)?\(/.test(body); // delegated to a module-level gate
     check(`${route} ${method} is auth+PD gated`, gated);
     if (/await gate(PD|ProductData)?\(/.test(body)) {
       check(
         `${route} module gate calls requireAuth + PD check`,
-        /requireAuth\(\)/.test(src) &&
-          (/hasProductDataAccess\(/.test(src) || /requireModuleAccess\(/.test(src)),
+        /requireAuth\(/.test(src) &&
+          (/hasProductDataAccess\(/.test(src) || /requireProductDataAction\(/.test(src) || /requireModuleAccess\(/.test(src) || /requireModuleAction\(/.test(src)),
       );
     }
   }
@@ -110,10 +117,15 @@ for (const f of ["src/app/api/taxonomy/[kind]/route.ts", "src/app/api/taxonomy/[
 
 /* ── 5. list-view supplier gating ────────────────────────────────────── */
 const listView = read("src/app/api/products/list-view/route.ts");
-check("list-view selects supplier column only when canSeeSecrets",
-  /canSeeSecrets\s*\?\s*`product_id, supplier/.test(listView));
-check("list-view populates suppliers only behind canSeeSecrets",
-  /canSeeSecrets && row\.supplier/.test(listView));
+/* `canSeeCosts` is `canSeeSecrets && hasProductCostAccess` — STRICTER than
+   what this check was written to demand. The route tightened and the check did
+   not follow, so it reported the supplier names as ungated while they were in
+   fact gated twice over. Accept either, and fail loudly if neither appears. */
+const SUPPLIER_GATE = /(canSeeSecrets|canSeeCosts)/;
+check("list-view selects supplier column only behind the supplier gate",
+  new RegExp(`${SUPPLIER_GATE.source}\\s*\\?\\s*\`product_id, supplier`).test(listView));
+check("list-view populates suppliers only behind the supplier gate",
+  new RegExp(`${SUPPLIER_GATE.source} && row\\.supplier`).test(listView));
 
 /* ── 6. search escapes ilike wildcards ───────────────────────────────── */
 const search = read("src/app/api/products/search/route.ts");
