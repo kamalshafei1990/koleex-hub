@@ -103,6 +103,7 @@ type NotifFilter =
   | "discuss_messages"
   | "security_alerts"
   | "comments_activity"
+  | "membership_requests"
   | "other";
 
 const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: string }> = [
@@ -115,6 +116,7 @@ const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: str
   { key: "calendar_events", settingsKey: "act.calendar" },
   { key: "projects_planning", settingsKey: "act.projects" },
   { key: "quotation_activity", settingsKey: "act.quotation" },
+  { key: "membership_requests", settingsKey: "act.membership" },
   { key: "low_stock", settingsKey: "act.lowStock" },
   { key: "inventory_activity", settingsKey: "act.inventory" },
   { key: "finance_activity", settingsKey: "act.finance" },

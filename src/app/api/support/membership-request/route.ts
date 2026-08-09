@@ -20,6 +20,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { adminRecipients } from "@/lib/server/admin-recipients";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 
 /* Ids match RELATIONSHIPS in AdminAuth — changing one without the other
    silently files every request as "Other". */
@@ -311,8 +312,34 @@ export async function POST(req: Request) {
         },
       })),
     );
-    if (mailErr) console.error("[api/support/membership-request] fan-out", mailErr.message);
-    else await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
+    if (mailErr) {
+      console.error("[api/support/membership-request] fan-out", mailErr.message);
+    } else {
+      await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
+      /* The bell has always shown these — the row is an inbox_message with
+         category "membership_request" and the bell styles that case. What was
+         missing is the PUSH, so a reviewer who was not looking at the tab
+         learned about an application whenever they next happened to open it.
+
+         `kind` is what both the push gate and the chime classify on:
+         "membership_request" buckets into the membership_requests activity,
+         so Settings → Notifications can mute it and Settings → Sounds can
+         give it its own tone. Fire-and-forget — a push failure must never
+         fail the application it is announcing. */
+      void sendPushToAccounts(
+        recipients,
+        {
+          title: `New membership request · ${full_name}`,
+          body: [RELATIONSHIPS[relationship], company].filter(Boolean).join(" · "),
+          url: "/accounts/requests",
+          tag: `membership-${ref}`,
+          kind: "membership_request",
+        },
+        { actorAccountId: null },
+      ).catch((e) =>
+        console.error("[api/support/membership-request] push", e instanceof Error ? e.message : e),
+      );
+    }
   }
 
   recordSend(ip);

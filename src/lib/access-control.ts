@@ -253,6 +253,7 @@ export interface NotificationPrefs {
   inventory_activity?: boolean;
   finance_activity?: boolean;
   hr_activity?: boolean;
+  membership_requests?: boolean;
   discuss_messages?: boolean;
   security_alerts?: boolean;
   comments_activity?: boolean;
@@ -373,6 +374,7 @@ export const DEFAULT_PREFERENCES: Required<
     assignments: true,
     tasks_due: true,
     quotation_activity: true,
+    membership_requests: true,
     low_stock: true,
     qa_reports: true,
     price_fx: true,
@@ -435,6 +437,7 @@ export function withDefaults(
       assignments: p.notifications?.assignments ?? DEFAULT_PREFERENCES.notifications.assignments,
       tasks_due: p.notifications?.tasks_due ?? DEFAULT_PREFERENCES.notifications.tasks_due,
       quotation_activity: p.notifications?.quotation_activity ?? DEFAULT_PREFERENCES.notifications.quotation_activity,
+      membership_requests: p.notifications?.membership_requests ?? DEFAULT_PREFERENCES.notifications.membership_requests,
       low_stock: p.notifications?.low_stock ?? DEFAULT_PREFERENCES.notifications.low_stock,
       qa_reports: p.notifications?.qa_reports ?? DEFAULT_PREFERENCES.notifications.qa_reports,
       price_fx: p.notifications?.price_fx ?? DEFAULT_PREFERENCES.notifications.price_fx,

@@ -163,6 +163,7 @@ export const settingsT: Translations = {
   "act.tasksDue":         { en: "Task reminders", zh: "任务提醒", ar: "تذكيرات المهام" },
   "act.tasksDue.hint":    { en: "Upcoming and overdue tasks.", zh: "即将到期和逾期的任务。", ar: "المهام القادمة والمتأخرة." },
   "act.quotation":        { en: "Quotation activity", zh: "报价动态", ar: "نشاط عروض الأسعار" },
+  "act.membership":       { en: "Membership requests", zh: "入驻申请", ar: "طلبات العضوية" },
   "act.quotation.hint":   { en: "Quote views, edits, and status changes.", zh: "报价的查看、编辑和状态变更。", ar: "مشاهدات العروض وتعديلاتها وتغيّر حالتها." },
   "act.lowStock":         { en: "Low stock", zh: "低库存", ar: "انخفاض المخزون" },
   "act.lowStock.hint":    { en: "Inventory dropping below its reorder point.", zh: "库存低于补货点。", ar: "انخفاض المخزون دون نقطة إعادة الطلب." },

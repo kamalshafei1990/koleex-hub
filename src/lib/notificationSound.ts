@@ -96,6 +96,7 @@ export const SOUND_ACTIVITIES = [
   "quotation_activity", "low_stock", "inventory_activity",
   "finance_activity", "qa_reports", "price_fx",
   "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
+  "membership_requests",
 ] as const;
 export type SoundActivity = (typeof SOUND_ACTIVITIES)[number];
 

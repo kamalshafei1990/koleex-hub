@@ -21,6 +21,7 @@ export const NOTIFICATION_ACTIVITIES = [
   "quotation_activity", "low_stock", "inventory_activity",
   "finance_activity", "qa_reports", "price_fx",
   "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
+  "membership_requests",
 ] as const;
 export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 
@@ -37,6 +38,9 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
     type.includes("password") || type.includes("security") || type.includes("2fa") ||
     type.includes("suspicious")
   ) return "security_alerts";
+  /* Before the generic word matches: "membership_request" would otherwise
+     fall through to null and the activity would be a dead switch. */
+  if (type.includes("membership")) return "membership_requests";
   if (type.includes("comment")) return "comments_activity";
   if (type.startsWith("qa")) return "qa_reports";
   if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";

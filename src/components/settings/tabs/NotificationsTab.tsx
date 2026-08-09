@@ -34,6 +34,7 @@ const ACTIVITIES: { key: ActivityKey; tKey: string }[] = [
   { key: "calendar_events", tKey: "act.calendar" },
   { key: "projects_planning", tKey: "act.projects" },
   { key: "quotation_activity", tKey: "act.quotation" },
+  { key: "membership_requests", tKey: "act.membership" },
   { key: "low_stock", tKey: "act.lowStock" },
   { key: "inventory_activity", tKey: "act.inventory" },
   { key: "finance_activity", tKey: "act.finance" },

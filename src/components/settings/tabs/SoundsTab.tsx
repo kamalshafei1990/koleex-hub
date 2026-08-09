@@ -79,6 +79,7 @@ const ACTIVITY_KEYS: Record<SoundActivity, string> = {
   calendar_events: "act.calendar",
   projects_planning: "act.projects",
   quotation_activity: "act.quotation",
+  membership_requests: "act.membership",
   low_stock: "act.lowStock",
   inventory_activity: "act.inventory",
   finance_activity: "act.finance",
