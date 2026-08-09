@@ -43,6 +43,45 @@ import Link2Icon from "@/components/icons/ui/Link2Icon";
 import { setCurrentAccountId } from "@/lib/identity";
 import { COUNTRIES } from "@/types/product-form";
 import SignInHelpDialog from "./SignInHelpDialog";
+import { useTranslation, type Lang } from "@/lib/i18n";
+import { signInT } from "@/lib/translations/signin";
+
+/* The header's language switcher does not exist yet on this screen — it is
+   part of the shell you only reach AFTER signing in. So the sign-in screen
+   carries its own, writing to the same `koleex-lang` key and firing the same
+   `langchange` event, which means the choice someone makes at the door is
+   still theirs once they are inside. */
+const SIGNIN_LANGS: { code: Lang; short: string }[] = [
+  { code: "en", short: "EN" },
+  { code: "zh", short: "中文" },
+  { code: "ar", short: "عربي" },
+];
+
+function LangSwitch({ lang }: { lang: Lang }) {
+  const pick = (next: Lang) => {
+    try { localStorage.setItem("koleex-lang", next); } catch { /* storage blocked */ }
+    window.dispatchEvent(new CustomEvent("langchange", { detail: next }));
+  };
+  return (
+    <div className="flex items-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.07] p-1">
+      {SIGNIN_LANGS.map((l) => (
+        <button
+          key={l.code}
+          type="button"
+          onClick={() => pick(l.code)}
+          aria-pressed={lang === l.code}
+          className={`h-7 px-3 rounded-lg text-[11.5px] font-semibold transition-colors ${
+            lang === l.code
+              ? "bg-white/90 text-black"
+              : "text-white/50 hover:text-white/85 hover:bg-white/[0.06]"
+          }`}
+        >
+          {l.short}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
@@ -101,6 +140,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* `authed === null` = still hydrating; render a spinner so we don't
      flash the form before we know the session state. */
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const { t, lang } = useTranslation(signInT);
   /* "Having trouble?" — mounted only while the gate is showing, so the dialog
      never ships with the authenticated shell. */
   const [helpOpen, setHelpOpen] = useState(false);
@@ -286,6 +326,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
     return (
       <div
+        /* Arabic reads right-to-left, so the whole gate flips — labels,
+           helper text, the icon beside each field. Translating the words
+           without turning the layout round leaves a screen that is technically
+           Arabic and still reads wrong. */
+        dir={lang === "ar" ? "rtl" : "ltr"}
         className="h-[100dvh] bg-[#0A0A0A] flex justify-center overflow-y-auto overflow-x-hidden p-4 py-10 relative"
         style={{
           backgroundImage:
@@ -306,6 +351,13 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               "radial-gradient(ellipse 60% 50% at 50% 40%, black 30%, transparent 80%)",
           }}
         />
+
+        {/* Pinned to the top corner so it is the first thing a person who
+            cannot read the form will look for, and it never pushes the card
+            off centre. */}
+        <div className={`absolute top-4 ${lang === "ar" ? "left-4" : "right-4"} z-10`}>
+          <LangSwitch lang={lang} />
+        </div>
 
         <div
           className={`relative w-full my-auto transition-[max-width] duration-300 ${
@@ -329,7 +381,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />
               <span className="text-[10px] uppercase tracking-[0.24em] text-white/45 font-semibold">
-                Shaping the Future
+                {t("tagline")}
               </span>
               <span className="h-px w-6 bg-white/15" aria-hidden />
             </div>
@@ -353,7 +405,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 aria-pressed={tab === "signin"}
               >
                 <SignInIcon className="h-3.5 w-3.5" />
-                Sign In
+                {t("tab.signIn")}
                 {tab === "signin" && (
                   <span
                     aria-hidden
@@ -375,7 +427,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 aria-pressed={tab === "join"}
               >
                 <UserPlusIcon className="h-3.5 w-3.5" />
-                Be a Koleex Member
+                {t("tab.join")}
                 {tab === "join" && (
                   <span
                     aria-hidden
@@ -392,17 +444,17 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               <div className="mb-5">
                 <h2 className="text-[17px] font-bold text-white tracking-tight leading-none">
                   {tab === "signin"
-                    ? "Welcome back"
+                    ? t("welcome")
                     : joinDone
-                      ? "Request received"
-                      : "Join the Koleex network"}
+                      ? t("join.doneTitle")
+                      : t("join.title")}
                 </h2>
                 <p className="text-[12px] text-white/50 mt-1.5">
                   {tab === "signin"
-                    ? "Sign in to your Koleex Hub account."
+                    ? t("welcomeSub")
                     : joinDone
-                      ? "A Super Admin will review your request shortly."
-                      : "Tell us a bit about you — we'll reach out with an invitation."}
+                      ? t("join.doneSub")
+                      : t("join.sub")}
                 </p>
               </div>
 
@@ -466,7 +518,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           </div>
 
           <p className="text-[11px] text-white/30 text-center mt-5 tracking-wide">
-            Koleex International Group · Authorized Access Only
+            {t("footer")}
           </p>
         </div>
 
@@ -503,10 +555,11 @@ function SignInPanel({
   onSubmit,
   onNeedHelp,
 }: SignInPanelProps) {
+  const { t } = useTranslation(signInT);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className={labelBase}>Username</label>
+        <label className={labelBase}>{t("username")}</label>
         <div className="relative">
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
@@ -522,7 +575,7 @@ function SignInPanel({
       </div>
 
       <div>
-        <label className={labelBase}>Password</label>
+        <label className={labelBase}>{t("password")}</label>
         <input
           type="password"
           autoComplete="current-password"
@@ -546,22 +599,28 @@ function SignInPanel({
       >
         {busy ? (
           <>
-            <SpinnerIcon className="h-4 w-4 animate-spin" /> Signing in…
+            <SpinnerIcon className="h-4 w-4 animate-spin" /> {t("signingIn")}
           </>
         ) : (
           <>
-            <SignInIcon className="h-4 w-4" /> Sign In
+            <SignInIcon className="h-4 w-4" /> {t("signIn")}
           </>
         )}
       </button>
 
       <p className="text-[11px] text-white/35 text-center pt-1">
+        {/* Reads as a control, not a sentence: it lifts to the Hub Blue
+            accent, the underline sharpens and it takes a faint pill on hover,
+            so it is obvious before you click that something will happen. */}
         <button
           type="button"
           onClick={onNeedHelp}
-          className="underline decoration-white/20 underline-offset-4 hover:text-white/70 hover:decoration-white/40 transition-colors"
+          className="inline-flex items-center rounded-lg px-2 py-1 -mx-2 text-white/45 underline decoration-white/15 underline-offset-4
+                     hover:text-[#8FB6E0] hover:decoration-[#8FB6E0]/60 hover:bg-white/[0.05]
+                     focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#567FB2]/60
+                     transition-colors"
         >
-          Having trouble? Contact your Koleex administrator.
+          {t("help.link")}
         </button>
       </p>
     </form>
@@ -611,13 +670,14 @@ function JoinPanel({
   error,
   onSubmit,
 }: JoinPanelProps) {
+  const { t } = useTranslation(signInT);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {/* Relationship — pill buttons. First thing the admin wants to
           know, so we ask it first and use a visual control so visitors
           don't miss it. */}
       <div>
-        <label className={labelBase}>Your relationship with Koleex</label>
+        <label className={labelBase}>{t("join.relationship")}</label>
         <div className="flex flex-wrap gap-1.5">
           {RELATIONSHIPS.map((r) => {
             const active = state.relationship === r.value;
@@ -644,7 +704,7 @@ function JoinPanel({
 
       {/* Name — always full width, required */}
       <div>
-        <label className={labelBase}>Full Name *</label>
+        <label className={labelBase}>{t("join.name")}</label>
         <div className="relative">
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
@@ -661,7 +721,7 @@ function JoinPanel({
       {/* Email + Phone row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <div>
-          <label className={labelBase}>Work Email *</label>
+          <label className={labelBase}>{t("join.email")}</label>
           <div className="relative">
             <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
@@ -675,7 +735,7 @@ function JoinPanel({
           </div>
         </div>
         <div>
-          <label className={labelBase}>Phone</label>
+          <label className={labelBase}>{t("join.phone")}</label>
           <div className="relative">
             <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
@@ -693,7 +753,7 @@ function JoinPanel({
       {/* Company + Job title row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <div>
-          <label className={labelBase}>Company</label>
+          <label className={labelBase}>{t("join.company")}</label>
           <div className="relative">
             <Building2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
@@ -707,7 +767,7 @@ function JoinPanel({
           </div>
         </div>
         <div>
-          <label className={labelBase}>Job Title</label>
+          <label className={labelBase}>{t("join.jobTitle")}</label>
           <div className="relative">
             <BriefcaseIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
@@ -725,7 +785,7 @@ function JoinPanel({
       {/* Country + City row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <div>
-          <label className={labelBase}>Country</label>
+          <label className={labelBase}>{t("join.country")}</label>
           <div className="relative">
             <GlobeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
             <select
@@ -734,7 +794,7 @@ function JoinPanel({
               className={`${selectBase} pl-9`}
             >
               <option value="" className="bg-[#121212]">
-                Select country
+                {t("join.selectCountry")}
               </option>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code} className="bg-[#121212]">
@@ -745,7 +805,7 @@ function JoinPanel({
           </div>
         </div>
         <div>
-          <label className={labelBase}>City</label>
+          <label className={labelBase}>{t("join.city")}</label>
           <div className="relative">
             <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
@@ -762,7 +822,7 @@ function JoinPanel({
 
       {/* How did you hear — native select keeps it compact */}
       <div>
-        <label className={labelBase}>How did you hear about us?</label>
+        <label className={labelBase}>{t("join.heardFrom")}</label>
         <div className="relative">
           <Link2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
           <select
@@ -781,7 +841,7 @@ function JoinPanel({
 
       {/* Purpose */}
       <div>
-        <label className={labelBase}>Purpose of access</label>
+        <label className={labelBase}>{t("join.purpose")}</label>
         <div className="relative">
           <MessageSquareIcon className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
           <textarea
@@ -811,7 +871,7 @@ function JoinPanel({
           </>
         ) : (
           <>
-            <UserPlusIcon className="h-4 w-4" /> Request Access
+            <UserPlusIcon className="h-4 w-4" /> {t("join.submit")}
           </>
         )}
       </button>
@@ -832,6 +892,7 @@ interface JoinSuccessPanelProps {
 }
 
 function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
+  const { t } = useTranslation(signInT);
   const firstName = name.split(" ")[0] || "there";
   return (
     <div className="py-4 flex flex-col items-center text-center">
@@ -850,7 +911,7 @@ function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
         onClick={onReset}
         className="mt-5 text-[12px] font-medium text-white/60 hover:text-white transition-colors underline underline-offset-4 decoration-white/20 hover:decoration-white/60"
       >
-        Submit another request
+        {t("join.another")}
       </button>
     </div>
   );

@@ -22,11 +22,18 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
+/* Must stay in step with PROBLEMS in SignInHelpDialog and with the
+   support_requests_category_check constraint — three places, one list. The
+   labels are English on purpose: they are read by administrators in the Mail
+   app, whatever language the requester filled the form in. */
 const CATEGORIES: Record<string, string> = {
   forgot_password: "Forgot password",
+  forgot_username: "Forgot username",
   account_locked: "Account is locked",
+  account_disabled: "Account no longer works",
   no_account: "No account yet",
   code_not_received: "Cannot receive the code",
+  no_app_access: "Needs access to an app",
   other: "Something else",
 };
 

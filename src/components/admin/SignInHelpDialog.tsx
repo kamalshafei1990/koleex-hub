@@ -15,25 +15,46 @@
 
 import { useEffect, useRef, useState } from "react";
 import { COUNTRIES } from "@/types/product-form";
+import { useTranslation } from "@/lib/i18n";
+import { signInT } from "@/lib/translations/signin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 
+/* Ordered by how often an administrator is actually asked. A forgotten
+   USERNAME sits second because the Hub signs in by username, not email, so it
+   is at least as common as a forgotten password — and there was no way to say
+   it before. "I need an app I can't see" is a permissions request rather than
+   a sign-in fault, but it is the other thing people are stuck on at this
+   screen, so it belongs here rather than nowhere. */
 const PROBLEMS = [
-  { id: "forgot_password", label: "I forgot my password" },
-  { id: "account_locked", label: "My account is locked" },
-  { id: "no_account", label: "I don't have an account yet" },
-  { id: "code_not_received", label: "I can't receive my code" },
-  { id: "other", label: "Something else" },
+  "forgot_password",
+  "forgot_username",
+  "account_locked",
+  "account_disabled",
+  "no_account",
+  "code_not_received",
+  "no_app_access",
+  "other",
 ] as const;
 
 const DIALS = COUNTRIES.filter((c) => "dial" in c) as ReadonlyArray<{
   code: string; name: string; dial: string;
 }>;
 
+/** 🇪🇬 from "EG" — the two letters shifted into Unicode's regional-indicator
+ *  block. No flag assets, no lookup table, works for every country code. */
+function flagOf(code: string): string {
+  return code
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
 interface Props { open: boolean; onClose: () => void }
 
 export default function SignInHelpDialog({ open, onClose }: Props) {
+  const { t, lang } = useTranslation(signInT);
+  const rtl = lang === "ar";
   const [problem, setProblem] = useState<string>("forgot_password");
   const [message, setMessage] = useState("");
   const [fullName, setFullName] = useState("");
@@ -96,12 +117,12 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
       const json = (await res.json().catch(() => null)) as
         | { ok?: boolean; ref?: string; error?: string } | null;
       if (!res.ok || !json?.ok) {
-        setError(json?.error ?? "Could not send the request. Please try again.");
+        setError(json?.error ?? t("err.generic"));
         return;
       }
       setSentRef(json.ref ?? "");
     } catch {
-      setError("Network problem. Please try again.");
+      setError(t("err.network"));
     } finally {
       setBusy(false);
     }
@@ -116,6 +137,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      dir={rtl ? "rtl" : "ltr"}
       role="dialog"
       aria-modal="true"
       aria-label="Request sign-in help"
@@ -123,7 +145,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
       <div className="w-full max-w-[440px] max-h-[90dvh] overflow-y-auto bg-[#121212] rounded-2xl border border-white/[0.08] shadow-2xl">
         <div className="flex items-center justify-between px-5 h-14 border-b border-white/[0.06]">
           <h2 className="text-[15px] font-semibold text-white">
-            {sentRef ? "Request sent" : "Request help"}
+            {sentRef ? t("help.sentTitle") : t("help.title")}
           </h2>
           <button
             type="button"
@@ -139,12 +161,12 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
           <div className="px-6 py-8 text-center">
             <CheckCircleIcon className="h-10 w-10 text-[#10B981] mx-auto mb-4" />
             <p className="text-[15px] text-white font-semibold">
-              We have your request
+              {t("help.sentHead")}
             </p>
             <p className="text-[13px] text-white/50 mt-2 leading-relaxed">
-              A Koleex administrator will contact you on the details you gave.
+              {t("help.sentBody")}
             </p>
-            <p className="text-[12px] text-white/40 mt-5">Your reference</p>
+            <p className="text-[12px] text-white/40 mt-5">{t("help.reference")}</p>
             <p className="text-[16px] text-white font-semibold tabular-nums tracking-wide mt-1">
               {sentRef}
             </p>
@@ -153,21 +175,21 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
               onClick={onClose}
               className="mt-7 w-full h-11 rounded-xl bg-white/90 text-black text-[14px] font-semibold hover:bg-white transition-colors"
             >
-              Close
+              {t("help.close")}
             </button>
           </div>
         ) : (
           <form onSubmit={submit} className="px-5 py-5 space-y-5">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2.5">
-                What is the problem?
+                {t("help.problem")}
               </p>
               <div className="space-y-1.5">
-                {PROBLEMS.map((p) => (
+                {PROBLEMS.map((id) => (
                   <label
-                    key={p.id}
+                    key={id}
                     className={`flex items-center gap-3 h-11 px-3 rounded-xl border cursor-pointer transition-colors ${
-                      problem === p.id
+                      problem === id
                         ? "bg-white/[0.07] border-white/25"
                         : "bg-white/[0.02] border-white/[0.07] hover:border-white/15"
                     }`}
@@ -175,12 +197,12 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                     <input
                       type="radio"
                       name="problem"
-                      value={p.id}
-                      checked={problem === p.id}
-                      onChange={() => setProblem(p.id)}
+                      value={id}
+                      checked={problem === id}
+                      onChange={() => setProblem(id)}
                       className="accent-white h-[15px] w-[15px]"
                     />
-                    <span className="text-[13.5px] text-white/85">{p.label}</span>
+                    <span className="text-[13.5px] text-white/85">{t(`help.p.${id}`)}</span>
                   </label>
                 ))}
               </div>
@@ -188,7 +210,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
 
             <div>
               <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
-                {problem === "other" ? "Describe the problem" : "Anything else? (optional)"}
+                {problem === "other" ? t("help.describe") : t("help.optional")}
               </label>
               <textarea
                 value={message}
@@ -197,8 +219,8 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                 maxLength={2000}
                 placeholder={
                   problem === "other"
-                    ? "Tell us what happened…"
-                    : "Add any detail that would help…"
+                    ? t("help.ph.describe")
+                    : t("help.ph.detail")
                 }
                 className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2.5 text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/25 transition-colors resize-none"
               />
@@ -207,7 +229,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
-                  Full name
+                  {t("help.name")}
                 </label>
                 <input
                   ref={firstFieldRef}
@@ -222,7 +244,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
 
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
-                  Email
+                  {t("help.email")}
                 </label>
                 <input
                   type="email"
@@ -237,7 +259,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
 
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
-                  Phone
+                  {t("help.phone")}
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -248,7 +270,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                   >
                     {DIALS.map((c) => (
                       <option key={c.code} value={c.code} className="bg-[#121212]">
-                        {c.dial} · {c.code}
+                        {flagOf(c.code)}  {c.dial}
                       </option>
                     ))}
                   </select>
@@ -279,14 +301,14 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
               className="w-full h-11 rounded-xl bg-white/90 text-black text-[14px] font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {busy ? (
-                <><SpinnerIcon size={16} className="animate-spin" /> Sending…</>
+                <><SpinnerIcon size={16} className="animate-spin" /> {t("help.sending")}</>
               ) : (
-                "Send request"
+                t("help.send")
               )}
             </button>
 
             <p className="text-[11px] text-white/30 text-center leading-relaxed">
-              Your details go to the Koleex administrators only.
+              {t("help.privacy")}
             </p>
           </form>
         )}
