@@ -581,6 +581,31 @@ select option[selected] {
   [data-knowledge-print-hide] {
     display: none !important;
   }
+
+  /* ── Membership-request receipt ──────────────────────────────────────
+     Same isolation trick for the "Save as PDF" button on the sign-in
+     screen's success panel. window.print() and a print-only subtree cost
+     ZERO bytes — a PDF library would have been 200-300 KB on the one
+     screen we spent today getting OUT of everybody's boot chunk.
+
+     Printed on white with black text on purpose: the Hub is a dark
+     product, and a dark PDF is a page a printer floods with toner and a
+     reader cannot photocopy. */
+  body:has([data-kx-receipt]) * {
+    visibility: hidden !important;
+  }
+  body:has([data-kx-receipt]) [data-kx-receipt],
+  body:has([data-kx-receipt]) [data-kx-receipt] * {
+    visibility: visible !important;
+  }
+  [data-kx-receipt] {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

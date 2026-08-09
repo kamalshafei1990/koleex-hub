@@ -143,5 +143,15 @@ export const signInT: Translations = {
   /* Same wording as the help dialog's confirmation — one Hub, one phrase for
      "we have it". */
   "join.thanks":    { en: "Request sent", zh: "申请已发送", ar: "الطلب اتبعت" },
+  "join.copy":      { en: "Copy", zh: "复制", ar: "نسخ" },
+  "join.copied":    { en: "Copied", zh: "已复制", ar: "اتنسخ" },
+  "join.savePdf":   { en: "Save as PDF", zh: "保存为 PDF", ar: "احفظه PDF" },
+  /* Printed sheet only — never on screen. */
+  "join.receiptTitle":  { en: "Membership request", zh: "入驻申请", ar: "طلب عضوية" },
+  "join.receiptName":   { en: "Applicant", zh: "申请人", ar: "مقدّم الطلب" },
+  "join.receiptDate":   { en: "Submitted", zh: "提交日期", ar: "تاريخ الإرسال" },
+  "join.receiptNote":   { en: "Keep this sheet. Quote the reference above if you contact Koleex about this application.",
+                          zh: "请保留此页。如就本申请与 Koleex 联系，请提供上方编号。",
+                          ar: "احتفظ بالورقة دي. قول الرقم اللي فوق لو اتواصلت مع Koleex بخصوص الطلب ده." },
   "join.reference": { en: "Your reference", zh: "您的编号", ar: "رقمك المرجعي" },
 };

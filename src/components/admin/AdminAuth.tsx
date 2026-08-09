@@ -46,7 +46,8 @@ import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import TruckIcon from "@/components/icons/ui/TruckIcon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
-import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SelectChevron from "@/components/admin/SelectChevron";
 import { inputBase, labelBase } from "@/components/admin/signin/field-styles";
@@ -844,8 +845,19 @@ interface JoinSuccessPanelProps {
   onReset: () => void;
 }
 
+function Line({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: "flex", gap: 16, padding: "5px 0", fontSize: 12.5 }}>
+      <span style={{ width: 130, color: "#777" }}>{k}</span>
+      <span style={{ fontWeight: 600 }}>{v}</span>
+    </div>
+  );
+}
+
 function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
   const { t } = useTranslation(signInT);
+  const [copied, setCopied] = useState(false);
+  const refRef = useRef<HTMLSpanElement>(null);
   void onReset; /* see below — the "send another" affordance was removed */
   return (
     <div className="py-4 flex flex-col items-center text-center">
@@ -871,14 +883,97 @@ function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
       {reference ? (
         <>
           <p className="text-[11px] text-white/40 mt-5">{t("join.reference")}</p>
-          <p className="text-[15px] text-white font-semibold tabular-nums tracking-wide mt-1">
-            {reference}
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <span ref={refRef} className="text-[15px] text-white font-semibold tabular-nums tracking-wide">
+              {reference}
+            </span>
+            {/* A reference is only useful if it survives the walk to the email
+                client. Asking somebody to retype MR-2026-0021 by hand is how
+                it arrives wrong. */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(reference);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1600);
+                } catch {
+                  /* The Clipboard API rejects on an insecure origin, on older
+                     Safari, and whenever the permission is denied. Doing
+                     nothing would mean somebody presses Copy and gets no
+                     answer at all, so select the reference instead — they can
+                     still copy it with the keyboard, and the selection is the
+                     feedback that the press registered. */
+                  const el = refRef.current;
+                  if (!el) return;
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  const sel = window.getSelection();
+                  sel?.removeAllRanges();
+                  sel?.addRange(range);
+                }
+              }}
+              className="h-7 px-2.5 rounded-lg border border-white/[0.10] bg-white/[0.04] text-[11px] font-semibold text-white/60 inline-flex items-center gap-1.5 hover:text-white hover:border-white/25 transition-colors"
+            >
+              {copied ? <CheckCircleIcon className="h-3 w-3 text-emerald-300" /> : <CopyIcon className="h-3 w-3" />}
+              {t(copied ? "join.copied" : "join.copy")}
+            </button>
+          </div>
+
+          {/* window.print(), not a PDF library. A library would have been
+              200-300 KB on the exact screen we spent today getting out of
+              everybody's boot chunk; the browser already has a PDF writer and
+              the receipt below is a print-only subtree costing nothing. */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="mt-4 h-9 px-3.5 rounded-lg border border-white/[0.10] bg-white/[0.04] text-[12px] font-semibold text-white/70 inline-flex items-center gap-2 hover:text-white hover:border-white/25 transition-colors"
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            {t("join.savePdf")}
+          </button>
         </>
       ) : null}
 
       {/* "Submit another request" was here. It invited the same person to file
           a duplicate, which is work for a Super Admin and no help to anyone. */}
+
+      {/* ── The printed sheet ──────────────────────────────────────────────
+          Never visible on screen; the @media print rule in globals.css hides
+          everything else and reveals this. White with black text on purpose:
+          the Hub is a dark product, and a dark PDF is a page a printer floods
+          with toner and nobody can photocopy. */}
+      {reference ? (
+        <div data-kx-receipt className="hidden text-start" aria-hidden>
+          <div style={{ padding: "48px 56px", fontFamily: "inherit" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/hub-logo/koleex-hub-logo-for-light.webp"
+              alt="Koleex Hub"
+              style={{ height: 30, width: "auto" }}
+            />
+            <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#666" }}>
+              {t("join.receiptTitle")}
+            </p>
+            <p style={{ marginTop: 6, fontSize: 30, fontWeight: 700, letterSpacing: "0.02em" }}>
+              {reference}
+            </p>
+            <div style={{ marginTop: 28, borderTop: "1px solid #ddd", paddingTop: 18 }}>
+              <Line k={t("join.receiptName")} v={name} />
+              <Line k={t("join.receiptDate")} v={new Date().toLocaleDateString()} />
+            </div>
+            <p style={{ marginTop: 22, fontSize: 12, lineHeight: 1.7, color: "#333", maxWidth: 460 }}>
+              {t("join.doneSub").replace("{name}", name)}
+            </p>
+            <p style={{ marginTop: 10, fontSize: 12, lineHeight: 1.7, color: "#666", maxWidth: 460 }}>
+              {t("join.receiptNote")}
+            </p>
+            <p style={{ marginTop: 40, fontSize: 10, color: "#999", borderTop: "1px solid #eee", paddingTop: 12 }}>
+              {t("footer")}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
