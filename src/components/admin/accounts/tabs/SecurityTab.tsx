@@ -144,7 +144,7 @@ export default function SecurityTab({ account }: Props) {
 
   async function handleRevokeKey(id: string) {
     setBusy(true);
-    const ok = await revokeApiKey(id);
+    const ok = await revokeApiKey(id, account.id);
     setBusy(false);
     if (!ok) {
       setError(t("acc.err.apiKeyRevokeFailed"));
@@ -156,7 +156,7 @@ export default function SecurityTab({ account }: Props) {
 
   async function handleDeleteKey(id: string) {
     setBusy(true);
-    const ok = await deleteApiKey(id);
+    const ok = await deleteApiKey(id, account.id);
     setBusy(false);
     if (!ok) {
       setError(t("acc.err.apiKeyDeleteFailed"));
@@ -205,7 +205,7 @@ export default function SecurityTab({ account }: Props) {
 
   async function handleRevokeSession(id: string) {
     setBusy(true);
-    const ok = await revokeSession(id);
+    const ok = await revokeSession(id, account.id);
     setBusy(false);
     if (!ok) {
       setError(t("acc.err.sessionRevokeFailed"));

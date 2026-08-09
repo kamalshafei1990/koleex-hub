@@ -12,20 +12,14 @@
    Supabase Auth lands (see SUPABASE_AUTH_SETUP.md) RLS will take over.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type {
   ApiKeyRow,
-  ApiKeyInsert,
   AccountSessionRow,
-  AccountSessionInsert,
   LoginHistoryRow,
   LoginEventType,
   DeviceType,
 } from "@/types/supabase";
 
-const API_KEYS = "account_api_keys";
-const SESSIONS = "account_sessions";
-const LOGIN_HISTORY = "account_login_history";
 
 /* ============================================================================
    Web Crypto helpers (browser + Node 18+ both expose globalThis.crypto)
@@ -94,17 +88,40 @@ export function parseUserAgent(ua: string | null | undefined): {
    API keys
    ============================================================================ */
 
-export async function fetchApiKeys(accountId: string): Promise<ApiKeyRow[]> {
-  const { data, error } = await supabase
-    .from(API_KEYS)
-    .select("*")
-    .eq("account_id", accountId)
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[Security] fetchApiKeys:", error.message);
-    return [];
+/* Every database operation here goes through /api/accounts/[id]/security.
+   account_api_keys, account_sessions and account_login_history have RLS on
+   with ZERO policies, so the browser queries these replace could not read or
+   write a single row: the Security tab showed nothing, creating a key returned
+   nothing, revoking did nothing, and the audit trail — logEvent, called from
+   the account flows — was silently never written. */
+async function sec<T>(accountId: string, path: string, init?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(`/api/accounts/${accountId}/security${path}`, {
+      credentials: "include",
+      ...init,
+    });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+        console.error("[Security]", path, res.status);
+      }
+      return null;
+    }
+    return (await res.json()) as T;
+  } catch (e) {
+    console.error("[Security]", path, "failed:", e);
+    return null;
   }
-  return (data as ApiKeyRow[]) || [];
+}
+const post = (accountId: string, body: Record<string, unknown>) =>
+  sec<Record<string, unknown>>(accountId, "", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export async function fetchApiKeys(accountId: string): Promise<ApiKeyRow[]> {
+  const j = await sec<{ keys: ApiKeyRow[] }>(accountId, "?part=keys");
+  return j?.keys ?? [];
 }
 
 /**
@@ -120,70 +137,33 @@ export async function createApiKey(
     expiresAt?: string | null;
   },
 ): Promise<{ token: string; row: ApiKeyRow } | null> {
+  /* The token is generated HERE and only its hash crosses the wire — the
+     plaintext key is shown to the admin once and is never stored anywhere. */
   const token = generateApiKeyToken();
   const hash = await sha256Hex(token);
   const prefix = keyPrefix(token);
 
-  const insert: ApiKeyInsert = {
-    account_id: accountId,
+  const j = await post(accountId, {
+    action: "createKey",
     name: opts.name.trim(),
     key_prefix: prefix,
     key_hash: hash,
     scopes: opts.scopes || [],
     expires_at: opts.expiresAt || null,
-    last_used_at: null,
-    revoked_at: null,
-  };
-
-  const { data, error } = await supabase
-    .from(API_KEYS)
-    .insert(insert)
-    .select("*")
-    .maybeSingle();
-  if (error || !data) {
-    console.error("[Security] createApiKey:", error?.message);
-    return null;
-  }
-
-  // Audit log (best-effort — don't block on it).
-  void logEvent(accountId, "api_key_created", { key_prefix: prefix });
-
-  return { token, row: data as ApiKeyRow };
+  });
+  const row = (j as { key?: ApiKeyRow } | null)?.key;
+  if (!row) return null;
+  return { token, row };
 }
 
-export async function revokeApiKey(id: string): Promise<boolean> {
-  // Fetch the row first so we can include it in the audit log.
-  const { data: existing } = await supabase
-    .from(API_KEYS)
-    .select("account_id, key_prefix")
-    .eq("id", id)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from(API_KEYS)
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Security] revokeApiKey:", error.message);
-    return false;
-  }
-
-  if (existing) {
-    const row = existing as { account_id: string; key_prefix: string };
-    void logEvent(row.account_id, "api_key_revoked", {
-      key_prefix: row.key_prefix,
-    });
-  }
-  return true;
+export async function revokeApiKey(id: string, accountId: string): Promise<boolean> {
+  const j = await post(accountId, { action: "revokeKey", id });
+  return j != null;
 }
 
-export async function deleteApiKey(id: string): Promise<boolean> {
-  const { error } = await supabase.from(API_KEYS).delete().eq("id", id);
-  if (error) {
-    console.error("[Security] deleteApiKey:", error.message);
-    return false;
-  }
-  return true;
+export async function deleteApiKey(id: string, accountId: string): Promise<boolean> {
+  const j = await post(accountId, { action: "deleteKey", id });
+  return j != null;
 }
 
 /* ============================================================================
@@ -193,17 +173,8 @@ export async function deleteApiKey(id: string): Promise<boolean> {
 export async function fetchSessions(
   accountId: string,
 ): Promise<AccountSessionRow[]> {
-  const { data, error } = await supabase
-    .from(SESSIONS)
-    .select("*")
-    .eq("account_id", accountId)
-    .is("revoked_at", null)
-    .order("last_active_at", { ascending: false });
-  if (error) {
-    console.error("[Security] fetchSessions:", error.message);
-    return [];
-  }
-  return (data as AccountSessionRow[]) || [];
+  const j = await sec<{ sessions: AccountSessionRow[] }>(accountId, "?part=sessions");
+  return j?.sessions ?? [];
 }
 
 /**
@@ -221,66 +192,30 @@ export async function createSession(
 ): Promise<AccountSessionRow | null> {
   const hash = await sha256Hex(rawToken);
   const ua = parseUserAgent(meta.user_agent);
-
-  const insert: AccountSessionInsert = {
-    account_id: accountId,
+  const j = await post(accountId, {
+    action: "createSession",
     session_token_hash: hash,
     device_name: ua.device_name,
     device_type: ua.device_type,
     os: ua.os,
     browser: ua.browser,
+    user_agent: meta.user_agent ?? null,
     ip_address: meta.ip_address || null,
     expires_at: meta.expires_at || null,
-    revoked_at: null,
-  };
-
-  const { data, error } = await supabase
-    .from(SESSIONS)
-    .insert(insert)
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    console.error("[Security] createSession:", error.message);
-    return null;
-  }
-  return (data as AccountSessionRow) || null;
+  });
+  return ((j as { session?: AccountSessionRow } | null)?.session) ?? null;
 }
 
-export async function touchSession(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(SESSIONS)
-    .update({ last_active_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Security] touchSession:", error.message);
-    return false;
-  }
-  return true;
+export async function touchSession(id: string, accountId: string): Promise<boolean> {
+  const j = await post(accountId, { action: "touchSession", id });
+  return j != null;
 }
 
-export async function revokeSession(id: string): Promise<boolean> {
-  const { data: existing } = await supabase
-    .from(SESSIONS)
-    .select("account_id, device_name")
-    .eq("id", id)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from(SESSIONS)
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Security] revokeSession:", error.message);
-    return false;
-  }
-
-  if (existing) {
-    const row = existing as { account_id: string; device_name: string | null };
-    void logEvent(row.account_id, "session_revoked", {
-      device_name: row.device_name,
-    });
-  }
-  return true;
+export async function revokeSession(id: string, accountId: string): Promise<boolean> {
+  /* The route writes the session_revoked audit row itself, from the session —
+     an audit entry whose author the client can choose is not an audit entry. */
+  const j = await post(accountId, { action: "revokeSession", id });
+  return j != null;
 }
 
 /* ============================================================================
@@ -291,17 +226,10 @@ export async function fetchLoginHistory(
   accountId: string,
   limit = 50,
 ): Promise<LoginHistoryRow[]> {
-  const { data, error } = await supabase
-    .from(LOGIN_HISTORY)
-    .select("*")
-    .eq("account_id", accountId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error("[Security] fetchLoginHistory:", error.message);
-    return [];
-  }
-  return (data as LoginHistoryRow[]) || [];
+  const j = await sec<{ history: LoginHistoryRow[] }>(
+    accountId, `?part=history&limit=${limit}`,
+  );
+  return j?.history ?? [];
 }
 
 /** Append-only audit event. Safe to call in the background. */
@@ -309,20 +237,6 @@ export async function logEvent(
   accountId: string,
   eventType: LoginEventType,
   metadata: Record<string, unknown> = {},
-  opts: { ip_address?: string | null; user_agent?: string | null } = {},
 ): Promise<void> {
-  const row = {
-    account_id: accountId,
-    event_type: eventType,
-    ip_address: opts.ip_address || null,
-    user_agent:
-      opts.user_agent ||
-      (typeof navigator !== "undefined" ? navigator.userAgent : null),
-    metadata,
-  };
-  const { error } = await supabase.from(LOGIN_HISTORY).insert(row);
-  if (error) {
-    // Non-fatal — just log to the console so we don't break the UI flow.
-    console.warn("[Security] logEvent failed:", error.message);
-  }
+  await post(accountId, { action: "logEvent", event_type: eventType, metadata });
 }

@@ -205,7 +205,7 @@ export async function signOut(): Promise<void> {
         .is("revoked_at", null)
         .limit(1);
       const id = (rows as { id: string }[] | null)?.[0]?.id;
-      if (id) await revokeSession(id);
+      if (id) await revokeSession(id, uid);
     } catch {
       // Non-fatal — best-effort cleanup.
     }
