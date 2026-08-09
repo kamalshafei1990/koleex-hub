@@ -9,12 +9,37 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 
-/** The role names are an explicit allow-list, not a wildcard. A `%admin%`
- *  match also catches "Customer Admin", which is a CUSTOMER-side role — these
- *  requests carry a person's name, email and phone, and a customer's own admin
- *  has no business receiving one. `user_type = internal` is the second guard
- *  on the same idea. */
+/** An explicit allow-list, not a wildcard. A `%admin%` match also catches
+ *  "Customer Admin", which is a CUSTOMER-side role — these requests carry a
+ *  person's name, email and phone, and a customer's own admin has no business
+ *  receiving one. `user_type = internal` is the second guard on the same idea. */
 const INTERNAL_ADMIN_ROLES = ["Admin", "Super Admin"];
+
+/** Is this account allowed to READ membership requests?
+ *
+ *  Deliberately the same predicate as the fan-out below: if a request lands in
+ *  your mail you can open it, and if it does not, you cannot. Two different
+ *  answers to "who reviews these" is how somebody ends up notified about an
+ *  application they are then refused permission to read. */
+export async function isReviewer(accountId: string): Promise<boolean> {
+  const { data, error } = await supabaseServer
+    .from("accounts")
+    .select("is_super_admin, reviews_membership_requests, user_type, status, roles:role_id ( name )")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const a = data as {
+    is_super_admin: boolean | null;
+    reviews_membership_requests: boolean | null;
+    user_type: string | null;
+    status: string | null;
+    roles: { name: string | null } | { name: string | null }[] | null;
+  };
+  if (a.user_type !== "internal" || a.status !== "active") return false;
+  if (a.is_super_admin || a.reviews_membership_requests) return true;
+  const role = Array.isArray(a.roles) ? a.roles[0] : a.roles;
+  return INTERNAL_ADMIN_ROLES.includes(role?.name ?? "");
+}
 
 /** Every active internal Super Admin, every active internal account holding an
  *  internal admin role, and anyone a Super Admin has nominated by hand.

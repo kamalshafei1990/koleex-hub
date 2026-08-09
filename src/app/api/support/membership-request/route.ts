@@ -282,7 +282,9 @@ export async function POST(req: Request) {
         category: "membership_request",
         subject: `Account request · ${full_name}`,
         body: lines.join("\n"),
-        link: "/inbox",
+        /* Straight to the queue, not a generic inbox. The old DB trigger
+           linked at /admin/requests/<id>, which does not exist. */
+        link: "/accounts/requests",
         metadata: {
           type: "membership_request",
           membership_request_id: row.id,
