@@ -20,7 +20,7 @@ export const signInT: Translations = {
 
   /* ── Tabs ── */
   "tab.signIn":     { en: "Sign In", zh: "登录", ar: "تسجيل الدخول" },
-  "tab.join":       { en: "Request an Account", zh: "申请账户", ar: "اطلب حساب" },
+  "tab.join":       { en: "Become Koleex Member", zh: "成为 Koleex 会员", ar: "كن عضوًا في Koleex" },
 
   /* ── Sign-in panel ── */
   "welcome":        { en: "Welcome back", zh: "欢迎回来", ar: "أهلاً بعودتك" },
@@ -98,6 +98,16 @@ export const signInT: Translations = {
                       zh: "超级管理员将尽快审核您的请求。",
                       ar: "مسؤول رئيسي هيراجع طلبك قريب." },
   "join.relationship": { en: "Your relationship with Koleex", zh: "您与 Koleex 的关系", ar: "علاقتك بـ Koleex" },
+  "rel.new_prospect":      { en: "New to Koleex", zh: "初次接触", ar: "جديد على Koleex" },
+  "rel.new_prospect.d":    { en: "First time here", zh: "第一次了解我们", ar: "أول مرة" },
+  "rel.existing_customer": { en: "Customer", zh: "客户", ar: "عميل" },
+  "rel.existing_customer.d": { en: "We already work together", zh: "我们已有合作", ar: "بنشتغل مع بعض" },
+  "rel.supplier":          { en: "Supplier", zh: "供应商", ar: "مورّد" },
+  "rel.supplier.d":        { en: "I supply Koleex", zh: "我为 Koleex 供货", ar: "بورّد لـ Koleex" },
+  "rel.partner":           { en: "Partner", zh: "合作伙伴", ar: "شريك" },
+  "rel.partner.d":         { en: "Agent or distributor", zh: "代理或经销商", ar: "وكيل أو موزّع" },
+  "rel.other":             { en: "Other", zh: "其他", ar: "غير ذلك" },
+  "rel.other.d":           { en: "Something else", zh: "其他情况", ar: "حاجة تانية" },
   "join.name":      { en: "Full Name *", zh: "姓名 *", ar: "الاسم بالكامل *" },
   "join.email":     { en: "Work Email *", zh: "工作邮箱 *", ar: "بريد العمل *" },
   "join.phone":     { en: "Phone", zh: "电话", ar: "التليفون" },

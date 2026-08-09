@@ -39,6 +39,11 @@ import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
+import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
 import { setCurrentAccountId } from "@/lib/identity";
 import { COUNTRIES } from "@/types/product-form";
 import SignInHelpDialog from "./SignInHelpDialog";
@@ -100,12 +105,17 @@ type Tab = "signin" | "join";
 /* Relationship-to-Koleex options. The value is what we store; the label
    is what the visitor sees. Kept as a tuple so we can reuse it in the
    detail pane later. */
-const RELATIONSHIPS: Array<{ value: string; label: string }> = [
-  { value: "new_prospect", label: "New to Koleex" },
-  { value: "existing_customer", label: "Existing Customer" },
-  { value: "supplier", label: "Supplier" },
-  { value: "partner", label: "Partner" },
-  { value: "other", label: "Other" },
+/* Every icon comes from the Koleex library — src/components/icons/ui.
+   Nothing on this screen is hand-drawn or borrowed from a third-party set. */
+const RELATIONSHIPS: Array<{
+  value: string;
+  Icon: React.ComponentType<{ size?: number | string; className?: string }>;
+}> = [
+  { value: "new_prospect", Icon: SparklesIcon },
+  { value: "existing_customer", Icon: UserCheckIcon },
+  { value: "supplier", Icon: TruckIcon },
+  { value: "partner", Icon: HandshakeIcon },
+  { value: "other", Icon: HelpCircleIcon },
 ];
 
 const HEARD_FROM_OPTIONS: Array<{ value: string; label: string }> = [
@@ -664,22 +674,46 @@ function JoinPanel({
           don't miss it. */}
       <div>
         <label className={labelBase}>{t("join.relationship")}</label>
-        <div className="flex flex-wrap gap-1.5">
-          {RELATIONSHIPS.map((r) => {
+        {/* A two-column grid of cards, not five pills in a wrap. The pills
+            broke 2-then-3 at every width, which read as an accident rather
+            than a set, and a bare word gave no clue what picking it changes —
+            this choice reshapes the rest of the form. The last card spans both
+            columns so the grid never ends ragged. */}
+        <div className="grid grid-cols-2 gap-2">
+          {RELATIONSHIPS.map((r, i) => {
             const active = state.relationship === r.value;
+            const last = i === RELATIONSHIPS.length - 1;
             return (
               <button
                 key={r.value}
                 type="button"
                 onClick={() => setters.setRelationship(r.value)}
-                className={`h-8 px-3 rounded-full text-[11px] font-semibold transition-all border ${
-                  active
-                    ? "bg-white text-black border-white"
-                    : "bg-white/[0.04] text-white/70 border-white/[0.1] hover:bg-white/[0.07] hover:text-white"
-                }`}
                 aria-pressed={active}
+                /* Icon ABOVE the label, not beside it. Side by side, a 143px
+                   card left 75px for the text and "New to Koleex" was cut to
+                   "New to Ko…" — measured. Stacked, the label gets the whole
+                   card width. */
+                className={`${last ? "col-span-2" : ""} flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border text-center transition-colors ${
+                  active
+                    ? "bg-white/[0.09] border-white/30"
+                    : "bg-white/[0.02] border-white/[0.07] hover:border-white/20 hover:bg-white/[0.05]"
+                }`}
               >
-                {r.label}
+                <span
+                  className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
+                    active ? "bg-white text-black" : "bg-white/[0.06] text-white/50"
+                  }`}
+                >
+                  <r.Icon size={15} />
+                </span>
+                <span className="w-full min-w-0">
+                  <span className={`block text-[12px] font-semibold leading-tight ${active ? "text-white" : "text-white/75"}`}>
+                    {t(`rel.${r.value}`)}
+                  </span>
+                  <span className="block text-[10px] text-white/35 leading-tight mt-0.5">
+                    {t(`rel.${r.value}.d`)}
+                  </span>
+                </span>
               </button>
             );
           })}

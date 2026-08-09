@@ -20,6 +20,7 @@ import { signInT } from "@/lib/translations/signin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 
 /* Ordered by how often an administrator is actually asked. A forgotten
    USERNAME sits second because the Hub signs in by username, not email, so it
@@ -171,9 +172,12 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="h-8 w-8 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors text-[18px] leading-none"
+            /* CrossIcon, not the × character: a text glyph is not an icon,
+               it renders at a different weight in every font and it was the
+               one thing on this screen not coming from the icon library. */
+            className="h-8 w-8 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors inline-flex items-center justify-center"
           >
-            ×
+            <CrossIcon size={13} />
           </button>
         </div>
 
