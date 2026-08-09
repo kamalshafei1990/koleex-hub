@@ -24,7 +24,7 @@
    field in the inbox detail pane.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -87,6 +87,19 @@ function LangSwitch({ lang }: { lang: Lang }) {
     </div>
   );
 }
+
+/* useLayoutEffect on the server is a no-op and warns; fall back to useEffect.
+   It has to be the layout variant in the browser: both the tab indicator and
+   the card height are measured from the DOM, and measuring after paint would
+   show one frame of the wrong geometry every single switch. */
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/* One easing and one duration for everything the tab switch moves — card
+   width, card height, indicator. Three transitions of different lengths read
+   as three separate events rather than one. Matches .kx-tab-in in globals.css,
+   which is the Hub's existing tab-entrance curve. */
+const SWITCH_MOTION =
+  "motion-safe:transition-[height,transform,width] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]";
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
@@ -155,6 +168,60 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
      never ships with the authenticated shell. */
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("signin");
+
+  /* ── Tab switch motion ──────────────────────────────────────────────
+     Switching tabs used to change three things at once with no motion at
+     all: the card jumped from 372px tall to 980px, the card widened, and
+     the white rule under the active tab teleported across. Each of the
+     three is measured rather than guessed, because none of them is a
+     value we can know in CSS — the join form's height depends on which
+     relationship is picked, and the label widths change with language. */
+  const stripRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [ink, setInk] = useState<{ x: number; w: number } | null>(null);
+  const [bodyH, setBodyH] = useState<number | null>(null);
+
+  /* The indicator. One bar that slides, not one per tab that blinks.
+     The maths is in PHYSICAL pixels on purpose: getBoundingClientRect and
+     translateX are both physical, and the bar is pinned with `left-0`, so
+     this is already correct in Arabic. Rewriting it to `start-0` would
+     apply the RTL flip a second time and send the bar off the card. */
+  useIsoLayoutEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const sync = () => {
+      const label = strip.querySelector<HTMLElement>('[data-tab-active="true"] > span');
+      if (!label) return;
+      const s = strip.getBoundingClientRect();
+      const l = label.getBoundingClientRect();
+      setInk({ x: Math.round(l.left - s.left) - 8, w: Math.round(l.width) + 16 });
+    };
+    sync();
+    /* Re-measure on width changes; the deps cover tab and language. Font
+       swap moves the label too, so re-run once the webfont has landed. */
+    const ro = new ResizeObserver(sync);
+    ro.observe(strip);
+    document.fonts?.ready.then(sync).catch(() => {});
+    return () => ro.disconnect();
+    /* `authed` is a dependency because the gate does not exist while the
+       session is still being checked: the first run finds a null ref, bails,
+       and without this it would never run again once the card mounts. */
+  }, [tab, lang, authed]);
+
+  /* The height. An explicit pixel height on the clipping wrapper is the
+     only way to transition it — `height: auto` is not interpolable. The
+     observer means this also covers the join form growing and shrinking
+     when the relationship changes, which jumped just as hard. */
+  useIsoLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const sync = () => setBodyH(el.offsetHeight);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+    /* Same reason as the indicator: mounted only after `authed` resolves. */
+  }, [authed]);
 
   /* Sign-in form state */
   const [username, setUsername] = useState("");
@@ -351,7 +418,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         />
 
         <div
-          className={`relative w-full my-auto transition-[max-width] duration-300 ${
+          /* Same curve and length as the height and the indicator — the card
+             widening on a different easing read as a second, later event. */
+          className={`relative w-full my-auto motion-safe:transition-[max-width] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
             isWide ? "max-w-[560px]" : "max-w-md"
           }`}
         >
@@ -404,7 +473,10 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 The underline lives on a span around the label, not on the
                 cell: at 1280 the join cell is 275px wide and a cell-width rule
                 drew 243px of white under a 169px label. */}
-            <div className="flex border-b border-white/[0.06] bg-white/[0.02]">
+            <div
+              ref={stripRef}
+              className="relative flex border-b border-white/[0.06] bg-white/[0.02]"
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -417,16 +489,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     : "text-white/40 hover:text-white/70"
                 }`}
                 aria-pressed={tab === "signin"}
+                data-tab-active={tab === "signin"}
               >
-                <span className="relative flex h-full items-center gap-2">
+                <span className="flex h-full items-center gap-2">
                   <SignInIcon className="h-3.5 w-3.5 shrink-0" />
                   {t("tab.signIn")}
-                  {tab === "signin" && (
-                    <span
-                      aria-hidden
-                      className="absolute bottom-0 -inset-x-2 h-[2px] rounded-full bg-white"
-                    />
-                  )}
                 </span>
               </button>
               <button
@@ -441,22 +508,46 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     : "text-white/40 hover:text-white/70"
                 }`}
                 aria-pressed={tab === "join"}
+                data-tab-active={tab === "join"}
               >
-                <span className="relative flex h-full items-center gap-2">
+                <span className="flex h-full items-center gap-2">
                   <UserPlusIcon className="h-3.5 w-3.5 shrink-0" />
                   {t("tab.join")}
-                  {tab === "join" && (
-                    <span
-                      aria-hidden
-                      className="absolute bottom-0 -inset-x-2 h-[2px] rounded-full bg-white"
-                    />
-                  )}
                 </span>
               </button>
+
+              {/* The one indicator. Rendered only once measured, so it never
+                  appears at the wrong tab for a frame. */}
+              {ink && (
+                <span
+                  aria-hidden
+                  className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${SWITCH_MOTION}`}
+                  style={{ transform: `translateX(${ink.x}px)`, width: ink.w }}
+                />
+              )}
             </div>
 
-            {/* Card body */}
-            <div className="px-6 py-6 md:px-7 md:py-7">
+            {/* Card body.
+
+                THREE nested wrappers, and each one earns its place. The outer
+                carries the animated pixel height and clips. The middle is what
+                gets measured — it has to be unconstrained, or the observer
+                would read back the height we just imposed and the card would
+                never grow again, and it must NOT carry the key, or remounting
+                would detach the very node the ResizeObserver is watching. The
+                inner is keyed on the panel, so React remounts it and
+                .kx-tab-in — the Hub's existing tab-entrance curve, the same one
+                Product Data uses — replays on every switch instead of the
+                content simply being swapped under your eyes. */}
+            <div
+              className={`overflow-hidden ${SWITCH_MOTION}`}
+              style={bodyH != null ? { height: bodyH } : undefined}
+            >
+              <div ref={bodyRef}>
+                <div
+                  key={tab === "signin" ? "signin" : joinDone ? "done" : "join"}
+                  className="kx-tab-in px-6 py-6 md:px-7 md:py-7"
+                >
               {/* Tab-contextual heading. Gives the form a human-readable
                   title without the clunky outer "Koleex Hub" label. */}
               <div className="mb-5">
@@ -532,6 +623,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   onSubmit={handleJoin}
                 />
               )}
+                </div>
+              </div>
             </div>
           </div>
 
