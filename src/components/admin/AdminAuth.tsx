@@ -381,29 +381,53 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
           {/* Card */}
           <div className="bg-[#121212] rounded-2xl border border-white/[0.06] shadow-2xl overflow-hidden backdrop-blur">
-            {/* Tab bar */}
-            <div className="grid grid-cols-2 border-b border-white/[0.06] bg-white/[0.02]">
+            {/* Tab bar.
+
+                flex, NOT grid-cols-2. Two equal halves gave "Sign In" — seven
+                characters — the same 171px as a label three times its length,
+                and measured at 375px "Become Koleex Member" plus its icon came
+                to 169px inside that 171px: one pixel of air on each side.
+                Sizing each tab to its own content puts the slack where the
+                long label needs it, and it keeps working when the label
+                changes length in Chinese and Arabic, which fixed fractions
+                would not.
+
+                flex-auto, not flex-1: flex-1 is basis-0, which is the equal
+                halves all over again. flex-auto sizes each tab to its content
+                and then splits the LEFTOVER evenly, so both labels end up with
+                identical breathing room at every width — 27px each at 375,
+                53px each at 1280.
+
+                The padding tightens below 360px: at 320 the two tabs came to
+                297px inside a 286px strip and the row overflowed.
+
+                The underline lives on a span around the label, not on the
+                cell: at 1280 the join cell is 275px wide and a cell-width rule
+                drew 243px of white under a 169px label. */}
+            <div className="flex border-b border-white/[0.06] bg-white/[0.02]">
               <button
                 type="button"
                 onClick={() => {
                   setTab("signin");
                   setJoinError(null);
                 }}
-                className={`relative h-12 text-[12px] font-semibold tracking-wide transition-colors flex items-center justify-center gap-2 ${
+                className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
                   tab === "signin"
                     ? "text-white"
                     : "text-white/40 hover:text-white/70"
                 }`}
                 aria-pressed={tab === "signin"}
               >
-                <SignInIcon className="h-3.5 w-3.5" />
-                {t("tab.signIn")}
-                {tab === "signin" && (
-                  <span
-                    aria-hidden
-                    className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full bg-white"
-                  />
-                )}
+                <span className="relative flex h-full items-center gap-2">
+                  <SignInIcon className="h-3.5 w-3.5 shrink-0" />
+                  {t("tab.signIn")}
+                  {tab === "signin" && (
+                    <span
+                      aria-hidden
+                      className="absolute bottom-0 -inset-x-2 h-[2px] rounded-full bg-white"
+                    />
+                  )}
+                </span>
               </button>
               <button
                 type="button"
@@ -411,21 +435,23 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   setTab("join");
                   setSignInError(null);
                 }}
-                className={`relative h-12 text-[12px] font-semibold tracking-wide transition-colors flex items-center justify-center gap-2 ${
+                className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
                   tab === "join"
                     ? "text-white"
                     : "text-white/40 hover:text-white/70"
                 }`}
                 aria-pressed={tab === "join"}
               >
-                <UserPlusIcon className="h-3.5 w-3.5" />
-                {t("tab.join")}
-                {tab === "join" && (
-                  <span
-                    aria-hidden
-                    className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full bg-white"
-                  />
-                )}
+                <span className="relative flex h-full items-center gap-2">
+                  <UserPlusIcon className="h-3.5 w-3.5 shrink-0" />
+                  {t("tab.join")}
+                  {tab === "join" && (
+                    <span
+                      aria-hidden
+                      className="absolute bottom-0 -inset-x-2 h-[2px] rounded-full bg-white"
+                    />
+                  )}
+                </span>
               </button>
             </div>
 
