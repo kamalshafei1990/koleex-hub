@@ -352,13 +352,6 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           }}
         />
 
-        {/* Pinned to the top corner so it is the first thing a person who
-            cannot read the form will look for, and it never pushes the card
-            off centre. */}
-        <div className={`absolute top-4 ${lang === "ar" ? "left-4" : "right-4"} z-10`}>
-          <LangSwitch lang={lang} />
-        </div>
-
         <div
           className={`relative w-full my-auto transition-[max-width] duration-300 ${
             isWide ? "max-w-[560px]" : "max-w-md"
@@ -384,6 +377,14 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 {t("tagline")}
               </span>
               <span className="h-px w-6 bg-white/15" aria-hidden />
+            </div>
+
+            {/* Inside the column with the logo and the card, not floating in a
+                screen corner: at 375px the corner chip sat alone in empty
+                black, disconnected from the thing it changes. Here it reads as
+                part of the sign-in block. */}
+            <div className="mt-5">
+              <LangSwitch lang={lang} />
             </div>
           </div>
 

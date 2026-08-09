@@ -208,10 +208,14 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                   point where scanning it beats picking from it, and on a phone
                   the rows pushed the name and phone fields off the screen
                   entirely. */}
+              {/* truncate: a <select> does NOT shorten its own selected text —
+                  measured at 375px, the longest option ran 61px past the box and
+                  disappeared under the chevron. The labels were shortened too;
+                  this is the guard for whatever gets added later. */}
               <select
                 value={problem}
                 onChange={(e) => setProblem(e.target.value)}
-                className="w-full h-11 rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
+                className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
               >
                 {PROBLEMS.map((id) => (
                   <option key={id} value={id} className="bg-[#121212]">
@@ -308,23 +312,38 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                 />
               </div>
 
+              {/* The country gets its own full-width row so the NAME fits
+                  beside the flag and the code. Squeezed into 124px next to the
+                  number it could only ever show "+20", which tells someone
+                  scrolling a 29-item list nothing. */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
+                  {t("help.country")}
+                </label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  aria-label="Country"
+                  className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
+                >
+                  {DIALS.map((c) => (
+                    <option key={c.code} value={c.code} className="bg-[#121212]">
+                      {flagOf(c.code)}  {c.name}  ·  {c.dial}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
                   {t("help.phone")}
                 </label>
                 <div className="flex gap-2">
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    aria-label="Country code"
-                    className="h-11 w-[124px] shrink-0 rounded-xl bg-white/[0.04] border border-white/10 px-2 text-[13px] text-white outline-none focus:border-white/25 transition-colors"
-                  >
-                    {DIALS.map((c) => (
-                      <option key={c.code} value={c.code} className="bg-[#121212]">
-                        {flagOf(c.code)}  {c.dial}
-                      </option>
-                    ))}
-                  </select>
+                  {/* The dial code is shown, not re-picked — it follows the
+                      country above. */}
+                  <span className="h-11 shrink-0 inline-flex items-center rounded-xl bg-white/[0.06] border border-white/10 px-3 text-[14px] text-white/70 tabular-nums">
+                    {dial}
+                  </span>
                   <input
                     type="tel"
                     inputMode="tel"
@@ -332,7 +351,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                     onChange={(e) => setPhone(e.target.value)}
                     maxLength={32}
                     autoComplete="tel"
-                    className={field}
+                    className="flex-1 min-w-0 h-11 rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/25 transition-colors"
                     placeholder="100 123 4567"
                   />
                 </div>
