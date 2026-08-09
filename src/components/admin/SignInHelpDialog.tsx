@@ -215,7 +215,11 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
               <select
                 value={problem}
                 onChange={(e) => setProblem(e.target.value)}
-                className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
+                /* ps-3 pe-9, not px-3: the browser draws the chevron inside
+                   the inline-END padding, so 12px reserved nothing and long
+                   text ran underneath it. Logical properties because that edge
+                   is the RIGHT in English and the LEFT in Arabic. */
+                className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 ps-3 pe-9 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
               >
                 {PROBLEMS.map((id) => (
                   <option key={id} value={id} className="bg-[#121212]">
@@ -324,7 +328,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   aria-label="Country"
-                  className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 px-3 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
+                  className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 ps-3 pe-9 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
                 >
                   {DIALS.map((c) => (
                     <option key={c.code} value={c.code} className="bg-[#121212]">

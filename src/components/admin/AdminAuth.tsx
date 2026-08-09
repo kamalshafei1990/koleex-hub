@@ -379,13 +379,6 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               <span className="h-px w-6 bg-white/15" aria-hidden />
             </div>
 
-            {/* Inside the column with the logo and the card, not floating in a
-                screen corner: at 375px the corner chip sat alone in empty
-                black, disconnected from the thing it changes. Here it reads as
-                part of the sign-in block. */}
-            <div className="mt-5">
-              <LangSwitch lang={lang} />
-            </div>
           </div>
 
           {/* Card */}
@@ -518,7 +511,15 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
             </div>
           </div>
 
-          <p className="text-[11px] text-white/30 text-center mt-5 tracking-wide">
+          {/* Under the card, below the sign-in button: a person who cannot
+              read the form scans it top to bottom first, and this is where
+              they end up. Above the logo it competed with the wordmark for the
+              first thing you look at. */}
+          <div className="mt-5 flex justify-center">
+            <LangSwitch lang={lang} />
+          </div>
+
+          <p className="text-[11px] text-white/30 text-center mt-4 tracking-wide">
             {t("footer")}
           </p>
         </div>
