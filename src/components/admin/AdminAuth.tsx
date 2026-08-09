@@ -44,6 +44,7 @@ import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import TruckIcon from "@/components/icons/ui/TruckIcon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { setCurrentAccountId } from "@/lib/identity";
 import { COUNTRIES } from "@/types/product-form";
 import SignInHelpDialog from "./SignInHelpDialog";
@@ -132,8 +133,21 @@ const HEARD_FROM_OPTIONS: Array<{ value: string; label: string }> = [
    the form renders correctly even before the app's theme CSS has loaded. ── */
 const inputBase =
   "w-full h-11 px-3.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-colors";
+/* `appearance-none` removes the browser's own chevron — and nothing was drawn
+   in its place, so every dropdown on the join form looked like a plain text
+   box with no hint you could open it. Room is reserved at the inline end
+   (logical, so Arabic flips) and SelectChevron paints the arrow. */
 const selectBase =
-  "w-full h-11 px-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer";
+  "w-full h-11 ps-3 pe-9 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer truncate";
+
+function SelectChevron() {
+  return (
+    <AngleDownIcon
+      size={12}
+      className="absolute end-3 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none"
+    />
+  );
+}
 const textareaBase =
   "w-full min-h-[86px] px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-colors resize-none";
 const labelBase =
@@ -674,50 +688,42 @@ function JoinPanel({
           don't miss it. */}
       <div>
         <label className={labelBase}>{t("join.relationship")}</label>
-        {/* A two-column grid of cards, not five pills in a wrap. The pills
-            broke 2-then-3 at every width, which read as an accident rather
-            than a set, and a bare word gave no clue what picking it changes —
-            this choice reshapes the rest of the form. The last card spans both
-            columns so the grid never ends ragged. */}
-        <div className="grid grid-cols-2 gap-2">
-          {RELATIONSHIPS.map((r, i) => {
-            const active = state.relationship === r.value;
-            const last = i === RELATIONSHIPS.length - 1;
+        {/* A dropdown, like the reason picker on the help dialog — the same
+            screen should not ask two questions two different ways.
+
+            It replaced a grid of five cards. Those were the loudest thing on a
+            screen whose whole job is to be quiet: 300px of boxes-inside-boxes,
+            centred text against a left-aligned form, and a 2+2+1 grid where
+            the least important option got the widest card. One 44px row says
+            the same thing, and the helper line under it carries the meaning
+            the card subtitles were there for. */}
+        <div className="relative">
+          {(() => {
+            const Current = (RELATIONSHIPS.find((r) => r.value === state.relationship)
+              ?? RELATIONSHIPS[0]).Icon;
             return (
-              <button
-                key={r.value}
-                type="button"
-                onClick={() => setters.setRelationship(r.value)}
-                aria-pressed={active}
-                /* Icon ABOVE the label, not beside it. Side by side, a 143px
-                   card left 75px for the text and "New to Koleex" was cut to
-                   "New to Ko…" — measured. Stacked, the label gets the whole
-                   card width. */
-                className={`${last ? "col-span-2" : ""} flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border text-center transition-colors ${
-                  active
-                    ? "bg-white/[0.09] border-white/30"
-                    : "bg-white/[0.02] border-white/[0.07] hover:border-white/20 hover:bg-white/[0.05]"
-                }`}
-              >
-                <span
-                  className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
-                    active ? "bg-white text-black" : "bg-white/[0.06] text-white/50"
-                  }`}
-                >
-                  <r.Icon size={15} />
-                </span>
-                <span className="w-full min-w-0">
-                  <span className={`block text-[12px] font-semibold leading-tight ${active ? "text-white" : "text-white/75"}`}>
-                    {t(`rel.${r.value}`)}
-                  </span>
-                  <span className="block text-[10px] text-white/35 leading-tight mt-0.5">
-                    {t(`rel.${r.value}.d`)}
-                  </span>
-                </span>
-              </button>
+              <Current
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+              />
             );
-          })}
+          })()}
+          <select
+            value={state.relationship}
+            onChange={(e) => setters.setRelationship(e.target.value)}
+            className={`${selectBase} pl-9`}
+          >
+            {RELATIONSHIPS.map((r) => (
+              <option key={r.value} value={r.value} className="bg-[#121212]">
+                {t(`rel.${r.value}`)}
+              </option>
+            ))}
+          </select>
+          <SelectChevron />
         </div>
+        <p className="mt-1.5 text-[11px] text-white/35">
+          {t(`rel.${state.relationship}.d`)}
+        </p>
       </div>
 
       <div className="h-px bg-white/[0.05]" aria-hidden />
@@ -824,6 +830,7 @@ function JoinPanel({
                 </option>
               ))}
             </select>
+            <SelectChevron />
           </div>
         </div>
         {/* Only an existing customer has a code. Everyone else was being asked
@@ -863,6 +870,7 @@ function JoinPanel({
               </option>
             ))}
           </select>
+          <SelectChevron />
         </div>
       </div>
       ) : null}
