@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, formatDate, linkBtnCls, sectionTitleCls } from "../shared";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
@@ -31,13 +30,13 @@ export default function QuotationsModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("quotations")
-        .select("id,quote_no,status,customer_name,total,created_at,valid_until")
-        .order("created_at", { ascending: false })
-        .limit(20);
+      /* Read through /api/sales/overview: this table is service-role-only, so
+         the browser query that used to be here returned nothing and the panel
+         was always empty. */
+      const res = await fetch("/api/sales/overview?module=quotations", { credentials: "include" });
+      const json = res.ok ? ((await res.json()) as { rows?: Quote[] }) : { rows: [] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Quote[]);
+      setRows(json.rows ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };

@@ -92,24 +92,24 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
     })();
   }, []);
 
-  /* The tenant LIST is the only thing here that still needs Supabase, and it
-     is only readable when the picker is actually open — switching tenant is
-     something the owner does rarely, while this component mounts on every
-     page. Loading it on mount kept the 184 KB client in the boot for exactly
-     the account that opens the Hub most. Fetched once, on first open. */
+  /* The tenant LIST is fetched once, on first open — switching tenant is rare
+     while this component mounts on every page. It now comes from /api/tenants
+     (SA-gated) instead of a browser query, so the header imports no Supabase
+     client at all. */
   const [tenantsLoaded, setTenantsLoaded] = useState(false);
   useEffect(() => {
     if (!open || tenantsLoaded || !isSuperAdmin) return;
     setTenantsLoaded(true);
     (async () => {
-      const { supabaseAdmin } = await import("@/lib/supabase-admin");
-      const { data: t } = await supabaseAdmin
-        .from("tenants")
-        .select("id, slug, name, is_host")
-        .eq("active", true)
-        .order("is_host", { ascending: false })
-        .order("name", { ascending: true });
-      setTenants((t as TenantRow[]) ?? []);
+      try {
+        const res = await fetch("/api/tenants", { credentials: "include" });
+        if (!res.ok) { setTenants([]); return; }
+        const json = (await res.json()) as { tenants?: TenantRow[] };
+        setTenants(json.tenants ?? []);
+      } catch (e) {
+        console.error("[TenantPicker] load tenants:", e);
+        setTenants([]);
+      }
     })();
   }, [open, tenantsLoaded, isSuperAdmin]);
 

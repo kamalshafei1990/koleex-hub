@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, linkBtnCls, sectionTitleCls, formatDate } from "../shared";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
@@ -31,14 +30,13 @@ export default function ActivitiesModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("crm_activities")
-        .select("id,title,type,due_date,is_done,opportunity_id")
-        .eq("is_done", false)
-        .order("due_date", { ascending: true })
-        .limit(30);
+      /* Read through /api/sales/overview: this table is service-role-only, so
+         the browser query that used to be here returned nothing and the panel
+         was always empty. */
+      const res = await fetch("/api/sales/overview?module=activities", { credentials: "include" });
+      const json = res.ok ? ((await res.json()) as { rows?: Activity[] }) : { rows: [] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Activity[]);
+      setRows(json.rows ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -46,7 +44,12 @@ export default function ActivitiesModule({ t }: SalesModuleProps) {
 
   const markDone = async (id: string) => {
     setRows((prev) => prev.filter((r) => r.id !== id));
-    await supabase.from("crm_activities").update({ is_done: true, completed_at: new Date().toISOString() }).eq("id", id);
+    await fetch("/api/sales/overview", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "completeActivity", id }),
+    });
   };
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;

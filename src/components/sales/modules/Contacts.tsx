@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, linkBtnCls, sectionTitleCls } from "../shared";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -33,14 +32,13 @@ export default function ContactsModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("contacts")
-        .select("id,display_name,full_name,first_name,last_name,company_name,position,job_title,email,phone,mobile,country,city,contact_type,vip_status,strategic_account")
-        .eq("is_active", true)
-        .order("updated_at", { ascending: false, nullsFirst: false })
-        .limit(50);
+      /* Read through /api/sales/overview: this table is service-role-only, so
+         the browser query that used to be here returned nothing and the panel
+         was always empty. */
+      const res = await fetch("/api/sales/overview?module=contacts", { credentials: "include" });
+      const json = res.ok ? ((await res.json()) as { rows?: Contact[] }) : { rows: [] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Contact[]);
+      setRows(json.rows ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };

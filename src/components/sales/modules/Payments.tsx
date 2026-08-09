@@ -7,7 +7,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, formatDate, linkBtnCls, sectionTitleCls } from "../shared";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
@@ -38,20 +37,21 @@ export default function PaymentsModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("invoice_payments")
-        .select("id,invoice_id,amount,currency,method,reference,received_at,created_at")
-        .order("received_at", { ascending: false, nullsFirst: false })
-        .limit(50);
-      const list = (r.data ?? []) as Payment[];
-      const invIds = list.map((p) => p.invoice_id).filter((x): x is string => !!x);
-
-      const [iR, cR] = await Promise.all([
-        invIds.length
-          ? supabase.from("invoices").select("id,inv_no,customer_id").in("id", invIds)
-          : Promise.resolve({ data: [] as { id: string; inv_no: string | null; customer_id: string | null }[] }),
-        supabase.from("customers").select("id,name,company_name"),
-      ]);
+      /* One request: the route resolves the payments, their invoices and the
+         customers behind them. All three tables are service-role-only, so the
+         three browser queries this replaces returned nothing and the panel was
+         always empty. */
+      const res = await fetch("/api/sales/overview?module=payments", { credentials: "include" });
+      const json = res.ok
+        ? ((await res.json()) as {
+            rows?: Payment[];
+            invoices?: { id: string; inv_no: string | null; customer_id: string | null }[];
+            customers?: { id: string; name: string | null; company_name: string | null }[];
+          })
+        : {};
+      const list = json.rows ?? [];
+      const iR = { data: json.invoices ?? [] };
+      const cR = { data: json.customers ?? [] };
       if (cancelled) return;
 
       setRows(list);

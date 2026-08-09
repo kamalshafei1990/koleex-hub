@@ -8,7 +8,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, linkBtnCls, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -41,12 +40,13 @@ export default function ForecastModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("crm_opportunities")
-        .select("id,name,expected_revenue,probability,expected_close_date,won_at,lost_at")
-        .is("lost_at", null);
+      /* Read through /api/sales/overview: this table is service-role-only, so
+         the browser query that used to be here returned nothing and the panel
+         was always empty. */
+      const res = await fetch("/api/sales/overview?module=forecast", { credentials: "include" });
+      const json = res.ok ? ((await res.json()) as { rows?: Opp[] }) : { rows: [] };
       if (cancelled) return;
-      setOpps((r.data ?? []) as Opp[]);
+      setOpps(json.rows ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
