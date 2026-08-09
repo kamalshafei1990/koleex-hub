@@ -186,6 +186,28 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
   );
 }
 
+/* Read the model maps SYNCHRONOUSLY, for the first render.
+   `products` already initialises from the TanStack cache, so on a soft
+   navigation the very first frame paints 121 cards — and the model maps used
+   to be seeded one effect later. That asymmetry WAS the open glitch: cards
+   painted at 208px without their code/chips/count and jumped to 311px a
+   moment after. Both halves have to be warm at the same instant. */
+type ModelMaps = {
+  counts: Record<string, number>;
+  primaryModelNames: Record<string, string>;
+  modelNames: Record<string, string[]>;
+};
+function readModelCache(scopeKey: string): ModelMaps | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`kx_products_models_v1:${scopeKey}`);
+    if (!raw) return null;
+    const m = JSON.parse(raw) as Partial<ModelMaps>;
+    if (!m?.primaryModelNames) return null;
+    return { counts: m.counts ?? {}, primaryModelNames: m.primaryModelNames, modelNames: m.modelNames ?? {} };
+  } catch { return null; }
+}
+
 const ProductCard = memo(function ProductCard({
   p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
 }: {
@@ -658,7 +680,7 @@ export default function ProductList() {
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
+  const [modelCounts, setModelCounts] = useState<Record<string, number>>(() => readModelCache(currentScopeKey())?.counts ?? {});
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
   /* Translated product names from signals — 中文/عربي names join the search
      haystack so operators can search in whichever language the name was
@@ -667,11 +689,11 @@ export default function ProductList() {
   const [supplierAlt, setSupplierAlt] = useState<Record<string, string>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
   const [supplierLogos, setSupplierLogos] = useState<Record<string, string>>({});
-  const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
+  const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>(() => readModelCache(currentScopeKey())?.primaryModelNames ?? {});
   /* Full model roster per product — feeds the family chips on the card and
      lets search find a member code that is NOT the primary (the "XF-600
      lives inside XF-450" problem). */
-  const [modelNames, setModelNames] = useState<Record<string, string[]>>({});
+  const [modelNames, setModelNames] = useState<Record<string, string[]>>(() => readModelCache(currentScopeKey())?.modelNames ?? {});
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
@@ -722,7 +744,7 @@ export default function ProductList() {
   /* Model codes now come with the page itself. Until that first response
      lands, a card cannot honestly say a product "needs a name" or has
      "0 models" — it simply does not know yet. */
-  const [modelsReady, setModelsReady] = useState(false);
+  const [modelsReady, setModelsReady] = useState(() => readModelCache(currentScopeKey()) != null);
   const modelsFromPageRef = useRef<{
     counts: Record<string, number>;
     primaryModelNames: Record<string, string>;
@@ -880,19 +902,6 @@ export default function ProductList() {
       /* Warm-start the photo map too — without this, a revisit painted the
          cards instantly but every image slot sat EMPTY until the media
          round-trip finished, which read as "photos take forever". */
-      /* Seed the model maps BEFORE the first paint, for the same reason the
-         product rows are seeded: a card without its code/chips/count is a
-         different height, and filling them in afterwards moves the grid. */
-      const rawModels = typeof window !== "undefined"
-        ? window.localStorage.getItem(`kx_products_models_v1:${currentScopeKey()}`)
-        : null;
-      if (rawModels) {
-        const m = JSON.parse(rawModels) as { counts?: Record<string, number>; primaryModelNames?: Record<string, string>; modelNames?: Record<string, string[]> };
-        if (m?.counts) setModelCounts(m.counts);
-        if (m?.primaryModelNames) setPrimaryModelNames(m.primaryModelNames);
-        if (m?.modelNames) setModelNames(m.modelNames);
-        if (m?.primaryModelNames) setModelsReady(true);
-      }
       const rawImgs = typeof window !== "undefined"
         ? window.localStorage.getItem(`kx_products_imgs_v1:${currentScopeKey()}`)
         : null;
