@@ -973,6 +973,9 @@ export async function replacePermissionOverrides(
 export async function verifyAccountLogin(
   username: string,
   password: string,
+  /* Ticked "this is a shared computer". The server drops maxAge from the
+     session cookie so the browser forgets it on close. */
+  sharedDevice = false,
 ): Promise<
   | { ok: true; account: AccountRow }
   | { ok: false; reason: "wrong_password" | "disabled" | "network" }
@@ -997,7 +1000,7 @@ export async function verifyAccountLogin(
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, shared_device: sharedDevice }),
         signal: ctrl.signal,
       });
     } finally {

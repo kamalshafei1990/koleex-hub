@@ -35,6 +35,18 @@ export const signInT: Translations = {
                       zh: "遇到问题？联系您的 Koleex 管理员。",
                       ar: "فيه مشكلة؟ تواصل مع مسؤول Koleex." },
 
+  /* NOT "remember me". The Hub already remembers you — the session cookie
+     runs 30 days — so a "remember me" box would either do nothing or force us
+     to shorten the default for everyone who does not tick it. The control that
+     is actually missing is the opposite one, for the office machine that four
+     people share. */
+  "signIn.shared":     { en: "This is a shared computer",
+                         zh: "这是公用电脑",
+                         ar: "الجهاز ده مشترك" },
+  "signIn.sharedHint": { en: "Sign out automatically when the browser closes",
+                         zh: "关闭浏览器后自动退出登录",
+                         ar: "الخروج تلقائيًا لما المتصفح يتقفل" },
+
   /* ── Help dialog ── */
   "help.title":     { en: "Request help", zh: "请求帮助", ar: "طلب مساعدة" },
   "help.problem":   { en: "What is the problem?", zh: "遇到什么问题？", ar: "إيه المشكلة؟" },

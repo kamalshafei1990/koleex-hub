@@ -110,6 +110,9 @@ const SWITCH_MOTION =
    explicit Sign Out. */
 export const LEGACY_SESSION_KEY = "koleex-admin";
 export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
+/* Survives sign-out — LEGACY_SESSION_USER_KEY does not. Who you are is worth
+   remembering across a deliberate sign-out; that you were signed in is not. */
+export const LAST_USER_KEY = "koleex-last-user";
 
 
 interface Props {
@@ -236,6 +239,19 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   const [password, setPassword] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [sharedDevice, setSharedDevice] = useState(false);
+
+  /* The username was already being saved on every sign-in and never read
+     back, so the field started empty every time. It is a separate key from
+     the session hint on purpose: signing out should forget that you are
+     signed in, not who you are. Ticking "shared computer" clears it, because
+     the next person at that desk should not be shown a colleague's username. */
+  useEffect(() => {
+    try {
+      const last = window.localStorage.getItem(LAST_USER_KEY);
+      if (last) setUsername(last);
+    } catch { /* storage blocked */ }
+  }, []);
 
   /* Membership request form state */
   const [joinName, setJoinName] = useState("");
@@ -286,7 +302,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     /* Lazy: accounts-admin pulls the supabase client — only needed at the
        moment of a sign-in attempt, never for the authed shell. */
     const { verifyAccountLogin } = await import("@/lib/accounts-admin");
-    const result = await verifyAccountLogin(username, password);
+    const result = await verifyAccountLogin(username, password, sharedDevice);
     setSignInBusy(false);
 
     if (!result.ok) {
@@ -310,6 +326,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         LEGACY_SESSION_USER_KEY,
         result.account.username,
       );
+      if (sharedDevice) window.localStorage.removeItem(LAST_USER_KEY);
+      else window.localStorage.setItem(LAST_USER_KEY, result.account.username);
     } catch {
       /* ignore — auth still works in-memory for this tab */
     }
@@ -609,6 +627,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               {tab === "signin" ? (
                 <SignInPanel
                   onNeedHelp={() => setHelpOpen(true)}
+                  sharedDevice={sharedDevice}
+                  onSharedDeviceChange={setSharedDevice}
                   username={username}
                   password={password}
                   busy={signInBusy}
@@ -717,6 +737,8 @@ interface SignInPanelProps {
   /** Opens the help dialog. Someone who cannot sign in has no other way to
       reach an administrator from this screen. */
   onNeedHelp: () => void;
+  sharedDevice: boolean;
+  onSharedDeviceChange: (v: boolean) => void;
 }
 
 function SignInPanel({
@@ -728,6 +750,8 @@ function SignInPanel({
   onPasswordChange,
   onSubmit,
   onNeedHelp,
+  sharedDevice,
+  onSharedDeviceChange,
 }: SignInPanelProps) {
   const { t } = useTranslation(signInT);
   return (
@@ -765,6 +789,27 @@ function SignInPanel({
           <span>{error}</span>
         </div>
       )}
+
+      {/* The inverse of the "remember me" box other sites carry. The Hub
+          already remembers you for 30 days, so a "remember me" would either
+          do nothing or force the default shorter for everyone who did not
+          tick it. What was missing is a way to say the opposite. */}
+      <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+        <input
+          type="checkbox"
+          checked={sharedDevice}
+          onChange={(e) => onSharedDeviceChange(e.target.checked)}
+          className="mt-0.5 h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] accent-white cursor-pointer shrink-0"
+        />
+        <span className="min-w-0">
+          <span className="block text-[12px] text-white/60 group-hover:text-white/80 transition-colors">
+            {t("signIn.shared")}
+          </span>
+          <span className="block text-[11px] text-white/30 leading-relaxed">
+            {t("signIn.sharedHint")}
+          </span>
+        </span>
+      </label>
 
       <button
         type="submit"

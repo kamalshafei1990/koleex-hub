@@ -274,7 +274,18 @@ function verifySignature(accountId: string, signature: string): boolean {
  *              POST requests (good baseline CSRF protection)
  *   path: '/'  available to every route
  */
-export async function setSessionCookie(accountId: string): Promise<void> {
+/** Write the session cookie.
+ *
+ *  `sharedDevice` omits maxAge, which makes it a SESSION cookie: the browser
+ *  drops it when it closes. The Hub's default is 30 days and should stay that
+ *  way — nobody in Koleex should be signing in daily — but the Hub also shows
+ *  B2B prices, and it gets opened on office machines that several people use.
+ *  A 30-day cookie on a shared computer is a door left open, and the only
+ *  person who knows the machine is shared is the person sitting at it. */
+export async function setSessionCookie(
+  accountId: string,
+  opts: { sharedDevice?: boolean } = {},
+): Promise<void> {
   if (!UUID_RE.test(accountId)) {
     throw new Error("[session] accountId must be a UUID");
   }
@@ -286,7 +297,7 @@ export async function setSessionCookie(accountId: string): Promise<void> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: COOKIE_MAX_AGE,
+    ...(opts.sharedDevice ? {} : { maxAge: COOKIE_MAX_AGE }),
   });
 }
 

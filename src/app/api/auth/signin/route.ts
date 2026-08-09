@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   // "service unreachable" error even when the real cause was a 500
   // we could have described precisely.
   try {
-    let body: { email?: string; username?: string; password?: string };
+    let body: { email?: string; username?: string; password?: string; shared_device?: boolean };
     try {
       body = await req.json();
     } catch {
@@ -173,7 +173,10 @@ export async function POST(req: Request) {
     }
 
     // Success — mint the session cookie. (Unchanged.)
-    await setSessionCookie(account.id);
+    /* Ticked "this is a shared computer": the cookie gets no maxAge, so the
+       browser drops it on close. Read from the body rather than inferred —
+       only the person at the keyboard knows whose machine it is. */
+    await setSessionCookie(account.id, { sharedDevice: body.shared_device === true });
 
     /* Side-effects — AFTER the response.
        These were awaited inline and formed a ~10-round-trip tail (rehash,
