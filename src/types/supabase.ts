@@ -856,6 +856,8 @@ export interface AccountRow {
   /** Per-account Super Admin override. Effective SA = account-level OR
    *  role-level. Grants all-tenant + personal-data-bypass privileges. */
   is_super_admin: boolean;
+  /* Super-Admin-granted: this account receives new membership requests. */
+  reviews_membership_requests: boolean;
 
   // Profile
   avatar_url: string | null;

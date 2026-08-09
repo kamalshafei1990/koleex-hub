@@ -16,19 +16,30 @@ import { supabaseServer } from "@/lib/server/supabase-server";
  *  on the same idea. */
 const INTERNAL_ADMIN_ROLES = ["Admin", "Super Admin"];
 
-/** Every active internal Super Admin, plus every active internal account
- *  holding an internal admin role. Deduped — one person holding both must not
- *  get two copies of the same request. */
+/** Every active internal Super Admin, every active internal account holding an
+ *  internal admin role, and anyone a Super Admin has nominated by hand.
+ *
+ *  The nomination exists because the rota should not be a function of the org
+ *  chart. Whoever actually reads these — a customer-service lead, one person
+ *  in procurement — can be added without granting them the Admin role and
+ *  everything else that comes with it. It is additive: nobody who qualifies by
+ *  role stops receiving them.
+ *
+ *  Deduped: someone who is a Super Admin AND nominated must not get two
+ *  copies of the same request. */
 export async function adminRecipients(tag: string): Promise<string[]> {
   const ids = new Set<string>();
 
+  /* Super Admin by flag, or nominated by one. `user_type = internal` is not
+     optional on either: a request carries a person's name, email and phone,
+     and no customer-side account may ever be nominated into that. */
   const { data: sa, error: saErr } = await supabaseServer
     .from("accounts")
     .select("id")
-    .eq("is_super_admin", true)
+    .or("is_super_admin.eq.true,reviews_membership_requests.eq.true")
     .eq("user_type", "internal")
     .eq("status", "active");
-  if (saErr) console.error(`[${tag}] super admins`, saErr.message);
+  if (saErr) console.error(`[${tag}] super admins and nominees`, saErr.message);
   for (const r of (sa ?? []) as { id: string }[]) ids.add(r.id);
 
   const { data: roles, error: rErr } = await supabaseServer

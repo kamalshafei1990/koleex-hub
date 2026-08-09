@@ -141,11 +141,52 @@ export async function PATCH(
   }
 
   const patch = (await req.json()) as Record<string, unknown>;
-  // Never let the client write these through a general update.
-  delete patch.id;
-  delete patch.tenant_id;
-  delete patch.password_hash; // use the dedicated reset endpoint
-  delete patch.created_at;
+
+  /* An ALLOW-list, not a deny-list.
+
+     This used to delete four keys and write everything else straight through,
+     which meant `is_super_admin` was writable by anyone holding Accounts:edit
+     — including on their own row. One PATCH and an Admin was a Super Admin.
+     A deny-list also silently re-opens every time a column is added, which is
+     exactly what would have happened with the reviewer flag below. */
+  const EDITABLE = new Set([
+    "username", "login_email", "status", "role_id", "person_id", "company_id",
+    "contact_id", "internal_notes", "preferences", "avatar_url", "user_type",
+    "force_password_change", "two_factor_enabled",
+  ]);
+  /* Granting a rank, or the right to read other people's membership requests,
+     is a Super Admin's call and nobody else's. */
+  const SUPER_ADMIN_ONLY = new Set(["is_super_admin", "reviews_membership_requests"]);
+
+  /* The account form posts the WHOLE object on every save, including
+     is_super_admin, so a plain "you may not send this key" would 403 an Admin
+     for editing somebody's phone number. What is forbidden is CHANGING the
+     value — sending back what is already stored is a no-op and is dropped. */
+  const guarded = [...SUPER_ADMIN_ONLY].filter((k) => k in patch);
+  if (guarded.length > 0 && !auth.is_super_admin) {
+    const { data: current } = await supabaseServer
+      .from("accounts")
+      .select(guarded.join(", "))
+      .eq("id", id)
+      .maybeSingle();
+    const now = (current ?? {}) as Record<string, unknown>;
+    const changing = guarded.filter((k) => Boolean(patch[k]) !== Boolean(now[k]));
+    if (changing.length > 0) {
+      return NextResponse.json(
+        { error: `Only a Super Admin can change: ${changing.join(", ")}` },
+        { status: 403 },
+      );
+    }
+  }
+
+  for (const key of Object.keys(patch)) {
+    if (EDITABLE.has(key)) continue;
+    if (SUPER_ADMIN_ONLY.has(key) && auth.is_super_admin) continue;
+    delete patch[key];
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
 
   // Guard: inline base64 avatars go to Storage, never into the column.
   try {

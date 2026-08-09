@@ -64,6 +64,21 @@ export async function POST(req: Request) {
   };
   const { temporary_password, preferences, ...rest } = body;
 
+  /* PATCH refuses to raise these; create has to refuse as well, or the way
+     around the lock is simply to make a NEW Super Admin instead of promoting
+     yourself. Sending them false is fine — that is what the form does. */
+  if (!auth.is_super_admin) {
+    const raised = ["is_super_admin", "reviews_membership_requests"].filter(
+      (k) => Boolean((rest as Record<string, unknown>)[k]),
+    );
+    if (raised.length > 0) {
+      return NextResponse.json(
+        { error: `Only a Super Admin can set: ${raised.join(", ")}` },
+        { status: 403 },
+      );
+    }
+  }
+
   // Reject empty-string passwords up-front. Previously hashTempPassword("")
   // produced "tmp$" — a deterministic "empty password" hash that any
   // attacker who knew the scheme could sign in against. If the admin

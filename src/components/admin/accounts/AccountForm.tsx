@@ -110,6 +110,8 @@ interface FormState {
    *  and all personal data. Separate from the role-level is_super_admin
    *  so the CEO can promote a specific person without inventing a new role. */
   is_super_admin: boolean;
+  /* Super-Admin-granted: receives new membership requests in Koleex Mail. */
+  reviews_membership_requests: boolean;
 
   internal_notes: string;
 }
@@ -133,6 +135,7 @@ function initialState(a?: AccountRow): FormState {
     contact_id: a?.contact_id ?? "",
     employee_id: "",  // resolved from the employee fetch below once an employee matches person_id
     is_super_admin: a?.is_super_admin ?? false,
+    reviews_membership_requests: a?.reviews_membership_requests ?? false,
 
     internal_notes: a?.internal_notes ?? "",
   };
@@ -373,6 +376,7 @@ export default function AccountForm({ mode, account }: Props) {
       company_id: form.company_id || null,
       contact_id: form.contact_id || null,
       is_super_admin: form.is_super_admin,
+      reviews_membership_requests: form.reviews_membership_requests,
       internal_notes: form.internal_notes.trim() || null,
     };
 
@@ -1138,6 +1142,41 @@ export default function AccountForm({ mode, account }: Props) {
                   </div>
                 </div>
               </label>
+
+              {/* Who reads the "Become Koleex Member" requests.
+
+                  Separate from Super Admin on purpose: the person who actually
+                  triages applications is often not the person who should be
+                  able to read every record in the company. Additive — Super
+                  Admins and internal Admins receive them regardless; this adds
+                  anyone else. Only a Super Admin may set it, enforced in
+                  /api/accounts on both create and update, not just hidden. */}
+              {scope?.is_super_admin && (
+                <label className={`mt-3 flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${
+                  form.reviews_membership_requests
+                    ? "border-emerald-500/30 bg-emerald-500/[0.08]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={form.reviews_membership_requests}
+                    onChange={(e) => set("reviews_membership_requests", e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className={`text-[13px] font-semibold ${
+                      form.reviews_membership_requests ? "text-emerald-300" : "text-[var(--text-primary)]"
+                    }`}>
+                      Review Koleex membership requests
+                    </div>
+                    <div className={`text-[11px] mt-1 leading-relaxed ${
+                      form.reviews_membership_requests ? "text-emerald-300/90" : "text-[var(--text-dim)]"
+                    }`}>
+                      Every new &ldquo;Become Koleex Member&rdquo; request lands in this account&rsquo;s Koleex Mail, with the applicant&rsquo;s company, phone, country and their contact at Koleex. Grants no other access. Super Admins and internal Admins already receive them.
+                    </div>
+                  </div>
+                </label>
+              )}
             </section>
           )}
 

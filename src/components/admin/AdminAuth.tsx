@@ -14,14 +14,15 @@
    only re-prompts after an explicit Sign Out (handled by UserMenu which
    clears the same keys plus the current-account id).
 
-   Membership requests POST to `membership_requests` via createMembershipRequest.
-   Extra fields (phone, relationship, country, city, job title, heard_from)
-   ride along inside the row's `metadata` JSONB blob so we can grow the
-   form without column migrations. A DB trigger fans out an inbox
-   notification to every active Super Admin on insert, and our trigger
-   update in supabase/migrations/update_trigger_merge_metadata.sql merges
-   the row metadata into the notification metadata so reviewers see every
-   field in the inbox detail pane.
+   Membership requests POST to /api/support/membership-request. Fields beyond
+   the four first-class columns ride inside the row's `metadata` JSONB, so the
+   form can grow without a migration every time.
+
+   The route owns the fan-out to Koleex Mail. A DB trigger used to do it too,
+   which meant every request was announced twice — and the trigger's copy was
+   the worse one: it matched role names with ILIKE '%super admin%' so it missed
+   Admins entirely, it dropped every field except the message, and it linked to
+   /admin/requests/<id>, a page that does not exist. Dropped 2026-08-10.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
