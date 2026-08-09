@@ -162,13 +162,58 @@ console.log("\nC. Coverage");
     : bad("unbudgeted app routes", `${unbudgeted.join(", ")} — run \`npm run budgets\` to read their measured size, then add a line to ROUTE_BUDGETS (measured + ~12%)`);
 }
 
-/* ── D. The warm-start rule, as a guard ────────────────────────────────────
+/* ── D. Boot document weight — the number the user actually waits for ──────
+   Section B reads what a route DECLARES in its client-reference manifest, and
+   that is not the same list the browser downloads: the /home document ships
+   script tags that appear in no manifest at all.
+
+   The honest ruler is the script list in the SERVER-RENDERED HTML. Do not
+   measure this with performance.getEntriesByType("resource") — that counts the
+   chunks the App Router prefetches for NEIGHBOURING routes as if they were
+   boot, and document.outerHTML accumulates tags from every client-side
+   navigation the tab has made. A full day went into hunting a 184 KB
+   @supabase chunk that both rulers showed in the boot and that the document
+   never requested; it is prefetch for Settings/Todo/Calendar, which is
+   deliberate warm-up.
+
+   The prerendered .html on disk is the same document Next serves, so this
+   needs no server, no session and no browser. */
+const BOOT_DOC_MAX_FILES = 22;
+const BOOT_DOC_MAX_KB = 1750;   // measured 2026-08-09: worst is hr at 19 / 1569
+const BOOT_DOC_HOME_MAX_KB = 1160;  // measured: home 15 files / 1055 KB
+console.log("\nD. Boot document (script tags in the server HTML)");
+{
+  const appDir = path.join(NEXT, "server/app");
+  const docs = fs.readdirSync(appDir).filter((f) => f.endsWith(".html"));
+  const measure = (file: string) => {
+    const html = fs.readFileSync(path.join(appDir, file), "utf8");
+    const files = [...new Set([...html.matchAll(/static\/chunks\/([\w.~%-]+\.js)/g)].map((m) => m[1]))];
+    const bytes = files.reduce((n, f) => n + sizeOf(`static/chunks/${f}`), 0);
+    return { route: file.replace(/\.html$/, ""), files: files.length, kb: kb(bytes) };
+  };
+  const rows = docs.map(measure).sort((a, b) => b.kb - a.kb);
+  const worst = rows[0];
+  console.log(`  ${rows.length} prerendered documents, heaviest: ${worst.route} ${worst.files} files / ${worst.kb} KB`);
+  const over = rows.filter((r) => r.files > BOOT_DOC_MAX_FILES || r.kb > BOOT_DOC_MAX_KB);
+  over.length === 0
+    ? ok("every boot document within budget", `≤ ${BOOT_DOC_MAX_FILES} files / ${BOOT_DOC_MAX_KB} KB`)
+    : bad("boot documents over budget", over.map((r) => `${r.route} ${r.files}/${r.kb}KB`).join(", "));
+  /* Home is the entry every single user pays, every session — it gets its own
+     tighter line so it cannot drift up under cover of the global ceiling. */
+  const home = rows.find((r) => r.route === "home");
+  if (!home) bad("home document", "no prerendered home.html — did the route move?");
+  else home.kb <= BOOT_DOC_HOME_MAX_KB
+    ? ok("home boot document", `${home.files} files / ${home.kb} KB ≤ ${BOOT_DOC_HOME_MAX_KB} KB`)
+    : bad("home boot document", `${home.files} files / ${home.kb} KB > ${BOOT_DOC_HOME_MAX_KB} KB — every session pays this`);
+}
+
+/* ── E. The warm-start rule, as a guard ────────────────────────────────────
    This one is here because I broke it three times in one component in one
    day. Anything read from a client cache must be read in the useState
    INITIALISER — `products` initialises synchronously from the query cache, so
    a value seeded one effect later lays the screen out twice. That is what the
    owner saw as "the card jumps a little to the right then back". */
-console.log("\nD. Warm-start seeding (no double layout)");
+console.log("\nE. Warm-start seeding (no double layout)");
 {
   const pl = fs.readFileSync(path.join(ROOT, "src/components/admin/ProductList.tsx"), "utf8");
   const seeded = (name: string) => new RegExp(`useState[^\\n]*\\(\\s*\\(\\)\\s*=>\\s*${name}\\(`).test(pl);
