@@ -82,10 +82,45 @@ const FLOOR_MAX_KB = 520;   // measured 2026-08-09: 6 files / 445 KB
    first run; measured beats guessed, always. */
 const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "home": { chunks: 10, kbytes: 560 },
-  "product-data": { chunks: 12, kbytes: 795 },
-  "products": { chunks: 12, kbytes: 790 },
-  "purchase": { chunks: 11, kbytes: 550 },
+  "accounts": { chunks: 12, kbytes: 880 },
+  "ai": { chunks: 10, kbytes: 508 },
+  "calendar": { chunks: 12, kbytes: 824 },
+  "catalogs": { chunks: 15, kbytes: 1124 },
+  "commercial-policy": { chunks: 11, kbytes: 665 },
+  "contacts": { chunks: 10, kbytes: 508 },
+  "crm": { chunks: 10, kbytes: 514 },
+  "customers": { chunks: 10, kbytes: 515 },
+  "database": { chunks: 11, kbytes: 549 },
+  "discuss": { chunks: 10, kbytes: 508 },
+  "documents": { chunks: 10, kbytes: 514 },
+  "employees": { chunks: 12, kbytes: 851 },
+  "expenses": { chunks: 13, kbytes: 722 },
+  "finance": { chunks: 14, kbytes: 999 },
+  "hr": { chunks: 14, kbytes: 1136 },
+  "inbox": { chunks: 12, kbytes: 839 },
   "inventory": { chunks: 13, kbytes: 675 },
+  "invoices": { chunks: 10, kbytes: 514 },
+  "issues": { chunks: 12, kbytes: 712 },
+  "knowledge": { chunks: 11, kbytes: 520 },
+  "landed-cost": { chunks: 11, kbytes: 577 },
+  "management": { chunks: 12, kbytes: 983 },
+  "markets": { chunks: 11, kbytes: 772 },
+  "notes": { chunks: 10, kbytes: 513 },
+  "planning": { chunks: 10, kbytes: 514 },
+  "price-calculator": { chunks: 12, kbytes: 803 },
+  "product-data": { chunks: 12, kbytes: 796 },
+  "products": { chunks: 12, kbytes: 791 },
+  "projects": { chunks: 10, kbytes: 514 },
+  "purchase": { chunks: 11, kbytes: 549 },
+  "quotations": { chunks: 13, kbytes: 880 },
+  "roles": { chunks: 12, kbytes: 816 },
+  "sales": { chunks: 12, kbytes: 810 },
+  "settings": { chunks: 14, kbytes: 1071 },
+  "software-center": { chunks: 10, kbytes: 551 },
+  "suppliers": { chunks: 10, kbytes: 515 },
+  "todo": { chunks: 12, kbytes: 964 },
+  "translator": { chunks: 11, kbytes: 595 },
+  "website": { chunks: 10, kbytes: 531 },
 };
 console.log("\nB. Route entry weight");
 for (const [route, budget] of Object.entries(ROUTE_BUDGETS)) {
@@ -116,11 +151,15 @@ console.log("\nC. Coverage");
   const active = [...new Set(routes)].filter((r) =>
     fs.existsSync(path.join(NEXT, "server/app", r, "page_client-reference-manifest.js")));
   const unbudgeted = active.filter((r) => !(r in ROUTE_BUDGETS));
-  /* Not every app needs a budget line — only the ones the owner opens daily.
-     This prints them so the list is a DECISION, never an oversight. */
+  /* EVERY built app route must carry a budget. This is the part that answers
+     the owner's actual worry — a NEW app cannot ship unwatched, because the
+     build stops until someone measures it and writes the number down. Adding
+     the line is thirty seconds; discovering the regression six months later
+     costs what this whole session cost. */
   console.log(`  ${active.length} built app routes, ${Object.keys(ROUTE_BUDGETS).length} budgeted`);
-  if (unbudgeted.length) console.log(`  (unbudgeted: ${unbudgeted.slice(0, 12).join(", ")}${unbudgeted.length > 12 ? " …" : ""})`);
-  ok("registry readable");
+  unbudgeted.length === 0
+    ? ok("every app route has a budget", `${active.length} routes`)
+    : bad("unbudgeted app routes", `${unbudgeted.join(", ")} — run \`npm run budgets\` to read their measured size, then add a line to ROUTE_BUDGETS (measured + ~12%)`);
 }
 
 /* ── D. The warm-start rule, as a guard ────────────────────────────────────
