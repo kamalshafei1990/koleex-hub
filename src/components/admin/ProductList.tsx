@@ -197,6 +197,25 @@ type ModelMaps = {
   primaryModelNames: Record<string, string>;
   modelNames: Record<string, string[]>;
 };
+/* The taxonomy decides the grid's SHAPE. With categories present the grid
+   renders as category sections; without them it renders flat. Seeding it one
+   effect after the first paint therefore means the cards are laid out twice,
+   in two different containers — which is the horizontal "card jumps a little
+   to the right then back" the owner sees, and it happens ONLY here because
+   only this grid sections itself. Same lazy-initialiser rule as products and
+   the model maps: read it before the first render or not at all. */
+type MetaMaps = { divisions: DivisionRow[]; categories: CategoryRow[]; subcategories: SubcategoryRow[] };
+function readMetaCache(scopeKey: string): MetaMaps | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`kx_products_meta_v1:${scopeKey}`);
+    if (!raw) return null;
+    const m = JSON.parse(raw) as Partial<MetaMaps>;
+    if (!Array.isArray(m?.divisions) || !Array.isArray(m?.categories) || !Array.isArray(m?.subcategories)) return null;
+    return { divisions: m.divisions, categories: m.categories, subcategories: m.subcategories };
+  } catch { return null; }
+}
+
 function readModelCache(scopeKey: string): ModelMaps | null {
   if (typeof window === "undefined") return null;
   try {
@@ -665,13 +684,13 @@ export default function ProductList() {
   const [products, setProducts] = useState<ProductRow[]>(
     () => queryClient.getQueryData<ProductRow[]>(productsQK) ?? [],
   );
-  const [divisions, setDivisions] = useState<DivisionRow[]>([]);
+  const [divisions, setDivisions] = useState<DivisionRow[]>(() => readMetaCache(currentScopeKey())?.divisions ?? []);
   /* True once taxonomy is known (warm cache or network) — until then the
      divisions bar renders as a same-height skeleton so its arrival never
      pushes the grid down. */
-  const [metaReady, setMetaReady] = useState(false);
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
+  const [metaReady, setMetaReady] = useState(() => readMetaCache(currentScopeKey()) != null);
+  const [categories, setCategories] = useState<CategoryRow[]>(() => readMetaCache(currentScopeKey())?.categories ?? []);
+  const [subcategories, setSubcategories] = useState<SubcategoryRow[]>(() => readMetaCache(currentScopeKey())?.subcategories ?? []);
   // Classification-icon hub overrides (level → slug → url). Lets the icons set
   // in the Database app surface as section markers in the catalogue.
   /* WARM START. The real icons live in the Classification Icon Hub and arrive
@@ -934,24 +953,16 @@ export default function ProductList() {
         const cachedImgs = JSON.parse(rawImgs) as Record<string, string>;
         if (cachedImgs && typeof cachedImgs === "object") setMainImages(cachedImgs);
       }
-      /* Warm-start the taxonomy too. Without it the warm paint had NO
-         division filter (slug→id map missing) and NO category order, so
-         the grid painted unfiltered + unsorted, then visibly re-shuffled
-         and grew a divisions bar when the meta fetch landed ~700ms later.
-         With it, the first paint IS the final layout. */
-      const rawMeta = typeof window !== "undefined"
-        ? window.localStorage.getItem(`kx_products_meta_v1:${currentScopeKey()}`)
-        : null;
-      if (rawMeta) {
-        const m = JSON.parse(rawMeta) as { divisions?: DivisionRow[]; categories?: CategoryRow[]; subcategories?: SubcategoryRow[] };
-        if (m && Array.isArray(m.divisions) && Array.isArray(m.categories) && Array.isArray(m.subcategories)) {
-          setDivisions(m.divisions);
-          setCategories(m.categories);
-          setSubcategories(m.subcategories);
-          setMetaReady(true);
-          if (!isInternal && !initialFilters.div && m.divisions.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
-            setFilterDiv(FLAGSHIP_DIVISION_SLUG);
-          }
+      /* The taxonomy is seeded in the useState initialisers above, BEFORE the
+         first render — it decides whether the grid renders sectioned or flat,
+         so reading it here (one paint later) laid the cards out twice. What
+         remains effect-only is the flagship default, which is a filter
+         choice, not layout. */
+      {
+        const meta = readMetaCache(currentScopeKey());
+        if (meta && !isInternal && !initialFilters.div
+            && meta.divisions.some((x) => x.slug === FLAGSHIP_DIVISION_SLUG)) {
+          setFilterDiv(FLAGSHIP_DIVISION_SLUG);
         }
       }
     } catch { /* corrupt/absent cache → normal load path */ }
