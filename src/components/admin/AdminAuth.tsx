@@ -65,6 +65,28 @@ const SignInHelpDialog = dynamic(() => import("./SignInHelpDialog"), { ssr: fals
    for somebody who is already signed in. ssr:false because it measures the
    element before it can paint. */
 const WavyBackground = dynamic(() => import("@/components/admin/signin/WavyBackground"), { ssr: false });
+const MagicRings = dynamic(() => import("@/components/admin/signin/MagicRings"), { ssr: false });
+
+/* TEMPORARY — while the owner compares the two grounds. `?bg=rings` picks the
+   WebGL rings, anything else keeps the waves. Whichever he chooses, the loser
+   and this switch both get deleted; a permanent toggle for a decision that
+   gets made once is how dead code starts. */
+function useGroundChoice(): "waves" | "rings" {
+  const [g, setG] = useState<"waves" | "rings">("waves");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("bg");
+    if (q === "rings" || q === "waves") {
+      setG(q);
+      try { window.localStorage.setItem("kx-signin-bg", q); } catch { /* blocked */ }
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem("kx-signin-bg");
+      if (saved === "rings") setG("rings");
+    } catch { /* blocked */ }
+  }, []);
+  return g;
+}
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
 
@@ -160,6 +182,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
      never ships with the authenticated shell. */
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("signin");
+  const ground = useGroundChoice();
 
   /* ── Tab switch motion ──────────────────────────────────────────────
      Switching tabs used to change three things at once with no motion at
@@ -450,7 +473,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         {/* The ground. Replaces the radial wash and the 64px grid — three
             backgrounds stacked would have been noise, and the waves already
             carry the depth those two were there to provide. */}
-        <WavyBackground />
+        {ground === "rings" ? <MagicRings /> : <WavyBackground />}
 
         <div
           /* Same curve and length as the height and the indicator — the card
