@@ -5089,7 +5089,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
        type-scoped endpoint returns only what this app renders. */
     const data = filterType
       ? await fetchContactsByType(filterType, scopeCtx)
-      : await fetchContacts(scopeCtx);
+      : await fetchContacts();
     if (data.length === 0 && !(await setupProbe)) {
       setSetupNeeded(true); setLoading(false); return;
     }

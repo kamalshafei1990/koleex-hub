@@ -25,7 +25,8 @@
    one module can't blow up the whole profile page.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
+/* NO DATABASE ACCESS. The activity buckets and the commercial-customer
+   lookup both run server-side now; see fetchCustomerActivity. */
 
 /* ═══════════════════════════════════════════════════
    TIER NORMALISATION
@@ -133,44 +134,34 @@ export interface LinkedCommercialCustomer {
 export async function findLinkedCommercialCustomer(
   contact: CustomerContactRow,
 ): Promise<LinkedCommercialCustomer | null> {
-  const SELECT = "id, name, customer_code, preferred_pricing_tier, assigned_salesperson, " +
-    "currency_code, payment_terms, last_contact_date, next_followup_date, status, is_active";
-
-  const tryQuery = async (col: string, val: string) => {
-    try {
-      const { data } = await supabase
-        .from("customers")
-        .select(SELECT)
-        .eq(col, val)
-        .limit(1)
-        .maybeSingle();
-      return (data as LinkedCommercialCustomer | null) || null;
-    } catch {
+  /* Three sequential browser queries against `customers` — a table the
+     browser cannot read — became one tenant-scoped server lookup that tries
+     email, then company name, then display name. */
+  const id = (contact.id as string | undefined) ?? "";
+  if (!id) return null;
+  const qs = new URLSearchParams({ resolve: "1" });
+  const email = contact.email as string | undefined;
+  const companyName = contact.company_name as string | undefined;
+  const displayName = contact.display_name as string | undefined;
+  if (email) qs.set("email", email);
+  if (companyName) qs.set("company_name", companyName);
+  if (displayName) qs.set("display_name", displayName);
+  try {
+    const res = await fetch(`/api/customers/${id}/activity?${qs.toString()}`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403) {
+        console.error("[customers-admin] findLinkedCommercialCustomer:", res.status);
+      }
       return null;
     }
-  };
-
-  /* Try strongest signal first. `customer_code` isn't on contacts
-     today, so start with email and names. */
-  const email = contact.email as string | undefined;
-  if (email) {
-    const hit = await tryQuery("email", email);
-    if (hit) return hit;
+    const json = (await res.json()) as { customer: LinkedCommercialCustomer | null };
+    return json.customer;
+  } catch (e) {
+    console.error("[customers-admin] findLinkedCommercialCustomer failed:", e);
+    return null;
   }
-
-  const companyName = contact.company_name as string | undefined;
-  if (companyName) {
-    const hit = await tryQuery("company_name", companyName);
-    if (hit) return hit;
-  }
-
-  const displayName = contact.display_name as string | undefined;
-  if (displayName) {
-    const hit = await tryQuery("name", displayName);
-    if (hit) return hit;
-  }
-
-  return null;
 }
 
 /**
@@ -241,151 +232,42 @@ export interface CustomerActivity {
 }
 
 const EMPTY_BUCKET: ActivityBucket = { count: 0, recent: [] };
-const RECENT_LIMIT = 5;
 
-async function safeBucket<T>(
-  run: () => Promise<{ rows: T[]; count: number | null }>,
-  map: (r: T) => ActivityItem,
-): Promise<ActivityBucket> {
-  try {
-    const { rows, count } = await run();
-    return { count: count ?? rows.length, recent: rows.map(map) };
-  } catch (e) {
-    console.warn("[customers-admin activity bucket]", e);
-    return EMPTY_BUCKET;
-  }
-}
-
-/** Cross-app activity snapshot for one customer (contact). Buckets:
+/** Cross-app activity snapshot for one customer (contact) — ONE request.
  *    · CRM opportunities   (crm_opportunities.contact_id)
  *    · Quotations          (quotations.customer_id)
  *    · Invoices            (invoices.customer_id)
  *    · Projects            (projects.customer_id)
- *    · Open tasks          (project_tasks on those projects) */
+ *    · Open tasks          (project_tasks on those projects)
+ *
+ *  These five queries used to run here, in the browser, with the anon key.
+ *  All five tables have RLS on with no anon policy, and the wrapper swallowed
+ *  each failure and returned an empty bucket — so the panel showed zeros and
+ *  never said why. /api/customers/[id]/activity runs them server-side, in one
+ *  round trip, and logs any bucket that fails. */
 export async function fetchCustomerActivity(contactId: string): Promise<CustomerActivity> {
-  if (!contactId) {
-    return {
-      opportunities: EMPTY_BUCKET,
-      quotations: EMPTY_BUCKET,
-      invoices: EMPTY_BUCKET,
-      projects: EMPTY_BUCKET,
-      tasks: EMPTY_BUCKET,
-    };
+  const blank: CustomerActivity = {
+    opportunities: EMPTY_BUCKET,
+    quotations: EMPTY_BUCKET,
+    invoices: EMPTY_BUCKET,
+    projects: EMPTY_BUCKET,
+    tasks: EMPTY_BUCKET,
+  };
+  if (!contactId) return blank;
+  try {
+    const res = await fetch(`/api/customers/${contactId}/activity`, { credentials: "include" });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+        console.error("[CustomerActivity]", res.status);
+      }
+      return blank;
+    }
+    const json = (await res.json()) as { activity: CustomerActivity };
+    return json.activity ?? blank;
+  } catch (e) {
+    console.error("[CustomerActivity] failed:", e);
+    return blank;
   }
-
-  const [opportunities, quotations, invoices, projects] = await Promise.all([
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("crm_opportunities")
-          .select("id, name, stage_id, value, currency, expected_close_date, created_at", { count: "exact" })
-          .eq("contact_id", contactId)
-          .order("created_at", { ascending: false })
-          .limit(RECENT_LIMIT);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.name as string) || "Opportunity",
-        subtitle: r.expected_close_date ? `Close ${r.expected_close_date}` : null,
-        amount: (r.value as number) ?? null,
-        currency: (r.currency as string) ?? null,
-        status: null,
-        createdAt: (r.created_at as string) ?? null,
-        href: "/crm",
-      }),
-    ),
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("quotations")
-          .select("id, quote_no, status, total, currency, issue_date, created_at", { count: "exact" })
-          .eq("customer_id", contactId)
-          .order("created_at", { ascending: false })
-          .limit(RECENT_LIMIT);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.quote_no as string) || "Quotation",
-        subtitle: (r.issue_date as string) || null,
-        status: (r.status as string) || null,
-        amount: (r.total as number) ?? null,
-        currency: (r.currency as string) ?? null,
-        createdAt: (r.created_at as string) ?? null,
-        href: `/quotations/${r.id}`,
-      }),
-    ),
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("invoices")
-          .select("id, inv_no, status, total, currency, issue_date, amount_paid, balance, created_at", { count: "exact" })
-          .eq("customer_id", contactId)
-          .order("created_at", { ascending: false })
-          .limit(RECENT_LIMIT);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.inv_no as string) || "Invoice",
-        subtitle: (r.issue_date as string) || null,
-        status: (r.status as string) || null,
-        amount: (r.total as number) ?? null,
-        currency: (r.currency as string) ?? null,
-        createdAt: (r.created_at as string) ?? null,
-        href: `/invoices/${r.id}`,
-      }),
-    ),
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("projects")
-          .select("id, name, code, status, planned_end, created_at", { count: "exact" })
-          .eq("customer_id", contactId)
-          .order("created_at", { ascending: false })
-          .limit(RECENT_LIMIT);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.name as string) || "Project",
-        subtitle: (r.code as string) || null,
-        status: (r.status as string) || null,
-        createdAt: (r.created_at as string) ?? null,
-        href: `/projects/${r.id}`,
-      }),
-    ),
-  ]);
-
-  /* Open tasks across this customer's projects. Piggyback on the
-     projects bucket we just fetched so we don't hit Supabase a
-     second time for IDs. */
-  const projectIds = projects.recent.map((r) => r.id);
-  const tasks = projectIds.length === 0
-    ? EMPTY_BUCKET
-    : await safeBucket<Record<string, unknown>>(
-        async () => {
-          const { data, count } = await supabase
-            .from("project_tasks")
-            .select("id, title, status, priority, due_date, project_id, created_at", { count: "exact" })
-            .in("project_id", projectIds)
-            .neq("status", "done")
-            .order("created_at", { ascending: false })
-            .limit(RECENT_LIMIT);
-          return { rows: (data || []) as Record<string, unknown>[], count };
-        },
-        (r) => ({
-          id: String(r.id),
-          title: (r.title as string) || "Task",
-          subtitle: r.due_date ? `Due ${r.due_date}` : null,
-          status: (r.status as string) || null,
-          createdAt: (r.created_at as string) ?? null,
-          href: `/projects/${r.project_id}`,
-        }),
-      );
-
-  return { opportunities, quotations, invoices, projects, tasks };
 }
 
 /* ═══════════════════════════════════════════════════

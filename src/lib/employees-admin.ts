@@ -15,26 +15,20 @@
      - koleex_roles         — For role assignment
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
-import { cachedGet, invalidateCachedGet } from "./client-cache";
-import {
-  generateTemporaryPassword,
-  suggestUsername,
-} from "./accounts-admin";
+/* NO DATABASE ACCESS. Every read and write here goes through an API route;
+   the Supabase client, the table-name constants and the local helpers that
+   only the removed queries used are gone with it. See fetchEmployeeActivity
+   for what that fixed. */
+
+import { cachedGet } from "./client-cache";
+import { generateTemporaryPassword } from "./accounts-admin";
 import type {
   PersonRow,
   EmployeeRow,
-  AccountRow,
-  AssignmentRow,
   DepartmentRow,
   PositionRow,
   EmployeeWithLinks,
 } from "@/types/supabase";
-
-/* ── Table names ── */
-const DEPARTMENTS = "koleex_departments";
-const POSITIONS = "koleex_positions";
-const HISTORY = "koleex_position_history";
 
 /* ── Employee list item (joined data) ── */
 export interface EmployeeListItem {
@@ -473,262 +467,39 @@ function empty(): EmployeeActivity {
   };
 }
 
-/* Generic wrapper — runs a fetcher, swallows errors so one broken
-   module can't take down the whole profile page. */
-async function safeBucket<T>(
-  fetcher: () => Promise<{ rows: T[]; count: number | null }>,
-  map: (r: T) => ActivityItem,
-): Promise<ActivityBucket> {
-  try {
-    const { rows, count } = await fetcher();
-    return {
-      count: count ?? rows.length,
-      recent: rows.map(map),
-    };
-  } catch (e) {
-    console.warn("[EmployeeActivity bucket]", e);
-    return EMPTY_BUCKET;
-  }
-}
+/** Cross-module activity snapshot for one employee — ONE request.
 
-/** Fetch a cross-module activity snapshot for one employee. All
- *  buckets are queried in parallel; a failure in any single bucket
- *  returns an empty one rather than rejecting. */
+    This used to fan out NINE queries from the browser with the anon key. All
+    nine tables have RLS on with no anon policy, so all nine returned nothing,
+    and the wrapper here swallowed each failure and reported an empty bucket —
+    so the panel showed zeros, silently, while the tenant held 15 quotations,
+    2 projects and 24 notes. Two of the queries were broken regardless:
+    `todos` is not a table (it is `koleex_todos`, with assignees in a junction,
+    not an array column) and the calendar was filtered on `starts_at`, which
+    does not exist either. /api/employees/[id]/activity does the whole thing
+    server-side, in one round trip, and logs any bucket that fails. */
 export async function fetchEmployeeActivity(
   employeeId: string,
   accountId: string | null,
 ): Promise<EmployeeActivity> {
   if (!employeeId) return empty();
-
-  const limit = 5;
-
-  /* HR bucket — keyed on employee_id, independent of account. */
-  const leavePromise = safeBucket<Record<string, unknown>>(
-    async () => {
-      const { data, count } = await supabase
-        .from("hr_leave_requests")
-        .select("id, leave_type_id, status, start_date, end_date, days, created_at", { count: "exact" })
-        .eq("employee_id", employeeId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      return { rows: (data || []) as Record<string, unknown>[], count };
-    },
-    (r) => ({
-      id: String(r.id),
-      title: `${r.days ?? "?"} day${Number(r.days) === 1 ? "" : "s"} leave`,
-      subtitle: `${r.start_date ?? ""} → ${r.end_date ?? ""}`,
-      status: (r.status as string) || null,
-      createdAt: (r.created_at as string) || null,
-      href: "/hr",
-    }),
-  );
-
-  /* Everything else is keyed on account_id. If the employee has no
-     account yet, short-circuit with empty buckets + a flag so the
-     UI can prompt. */
-  if (!accountId) {
-    const leave = await leavePromise;
-    return { ...empty(), leaveRequests: leave, missingAccount: true };
+  try {
+    const qs = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
+    const res = await fetch(`/api/employees/${employeeId}/activity${qs}`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+        console.error("[EmployeeActivity]", res.status);
+      }
+      return empty();
+    }
+    const json = (await res.json()) as { activity: EmployeeActivity };
+    return json.activity ?? empty();
+  } catch (e) {
+    console.error("[EmployeeActivity] failed:", e);
+    return empty();
   }
-
-  const [
-    crm,
-    quotations,
-    invoices,
-    projectsManaged,
-    tasksAssigned,
-    todosAssigned,
-    calendarEvents,
-    notes,
-    leave,
-  ] = await Promise.all([
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("crm_opportunities")
-          .select("id, name, stage_id, value, currency, expected_close_date, created_at", { count: "exact" })
-          .eq("owner_account_id", accountId)
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.name as string) || "Opportunity",
-        subtitle: r.expected_close_date ? `Close ${r.expected_close_date}` : null,
-        amount: r.value as number | null,
-        currency: (r.currency as string) || null,
-        status: null,
-        createdAt: (r.created_at as string) || null,
-        href: "/crm",
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("quotations")
-          .select("id, quote_no, status, total, currency, issue_date, created_at", { count: "exact" })
-          .eq("created_by", accountId)
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.quote_no as string) || "Quotation",
-        subtitle: (r.issue_date as string) || null,
-        status: (r.status as string) || null,
-        amount: r.total as number | null,
-        currency: (r.currency as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: `/quotations/${r.id}`,
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("invoices")
-          .select("id, invoice_no, status, total, currency, issue_date, created_at", { count: "exact" })
-          .eq("created_by_account_id", accountId)
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.invoice_no as string) || "Invoice",
-        subtitle: (r.issue_date as string) || null,
-        status: (r.status as string) || null,
-        amount: r.total as number | null,
-        currency: (r.currency as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: `/invoices/${r.id}`,
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("projects")
-          .select("id, name, code, status, planned_end, created_at", { count: "exact" })
-          .eq("manager_account_id", accountId)
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.name as string) || "Project",
-        subtitle: (r.code as string) || null,
-        status: (r.status as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: `/projects/${r.id}`,
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("project_tasks")
-          .select("id, title, status, priority, due_date, project_id, created_at", { count: "exact" })
-          .eq("assignee_account_id", accountId)
-          .neq("status", "done")
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.title as string) || "Task",
-        subtitle: r.due_date ? `Due ${r.due_date}` : null,
-        status: (r.status as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: `/projects/${r.project_id}`,
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        /* Todos use a Postgres array column for assignees. The `cs`
-           (contains) filter checks membership without pulling all
-           rows to the client. */
-        const { data, count } = await supabase
-          .from("todos")
-          .select("id, title, status, priority, due_date, created_at", { count: "exact" })
-          .contains("assignee_account_ids", [accountId])
-          .neq("status", "done")
-          .order("created_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.title as string) || "Todo",
-        subtitle: r.due_date ? `Due ${r.due_date}` : null,
-        status: (r.status as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: `/todo`,
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("koleex_calendar_events")
-          .select("id, title, starts_at, ends_at, event_type, created_at", { count: "exact" })
-          .eq("account_id", accountId)
-          .gte("starts_at", new Date(Date.now() - 90 * 86400_000).toISOString())
-          .order("starts_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.title as string) || "Event",
-        subtitle: (r.starts_at as string) || null,
-        status: (r.event_type as string) || null,
-        createdAt: (r.created_at as string) || null,
-        href: "/calendar",
-      }),
-    ),
-
-    safeBucket<Record<string, unknown>>(
-      async () => {
-        const { data, count } = await supabase
-          .from("notes")
-          .select("id, title, updated_at, created_at", { count: "exact" })
-          .eq("account_id", accountId)
-          .order("updated_at", { ascending: false })
-          .limit(limit);
-        return { rows: (data || []) as Record<string, unknown>[], count };
-      },
-      (r) => ({
-        id: String(r.id),
-        title: (r.title as string) || "Untitled note",
-        subtitle: null,
-        status: null,
-        createdAt: (r.updated_at as string) || (r.created_at as string) || null,
-        href: "/notes",
-      }),
-    ),
-
-    leavePromise,
-  ]);
-
-  return {
-    crmOpportunities: crm,
-    quotations,
-    invoices,
-    projectsManaged,
-    tasksAssigned,
-    todosAssigned,
-    leaveRequests: leave,
-    calendarEvents,
-    notes,
-    missingAccount: false,
-  };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -855,49 +626,53 @@ export async function deleteEmployee(
    INLINE DEPARTMENT / POSITION CREATION
    ═══════════════════════════════════════════════════ */
 
+/* Both of these insert through /api/management/*, which is Super-Admin gated
+   and — the part that matters — stamps `tenant_id`. The browser inserts they
+   replace did not set it, so anything created from these two buttons landed
+   with a null tenant and belonged to nobody. */
 export async function createDepartment(name: string): Promise<DepartmentRow | null> {
-  const { data, error } = await supabase
-    .from(DEPARTMENTS)
-    .insert({
-      name,
-      description: null,
-      icon: "building2",
-      icon_type: "icon",
-      icon_value: null,
-      parent_id: null,
-      sort_order: 0,
-      is_active: true,
-    })
-    .select()
-    .single();
-
-  if (error) { console.error("[Department] Create:", error.message); return null; }
-  return data as DepartmentRow;
+  try {
+    const res = await fetch("/api/management/departments", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, icon: "building2", sort_order: 0 }),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      console.error("[Department] Create:", err?.error ?? res.status);
+      return null;
+    }
+    const json = (await res.json()) as { department: DepartmentRow | null };
+    return json.department;
+  } catch (e) {
+    console.error("[Department] Create failed:", e);
+    return null;
+  }
 }
 
 export async function createPosition(
   title: string,
   departmentId: string,
 ): Promise<PositionRow | null> {
-  const { data, error } = await supabase
-    .from(POSITIONS)
-    .insert({
-      title,
-      department_id: departmentId,
-      reports_to_position_id: null,
-      level: 4,
-      description: null,
-      role_id: null,
-      responsibilities: null,
-      requirements: null,
-      is_active: true,
-      sort_order: 0,
-    })
-    .select()
-    .single();
-
-  if (error) { console.error("[Position] Create:", error.message); return null; }
-  return data as PositionRow;
+  try {
+    const res = await fetch("/api/management/positions", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, department_id: departmentId, level: 4, sort_order: 0 }),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      console.error("[Position] Create:", err?.error ?? res.status);
+      return null;
+    }
+    const json = (await res.json()) as { position: PositionRow | null };
+    return json.position;
+  } catch (e) {
+    console.error("[Position] Create failed:", e);
+    return null;
+  }
 }
 
 /* ═══════════════════════════════════════════════════

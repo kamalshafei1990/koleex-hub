@@ -72,6 +72,20 @@ export async function GET(req: Request) {
   if (deny) { _t.done({ status: 403 }); return deny; }
   _t.mark("auth");
 
+  /* ── ?probe=1 — "is the contacts table reachable at all?" ────────────────
+     The directory shows a "table is not set up" screen when it has nothing to
+     display, and it used to decide that in the BROWSER by selecting one row
+     from `contacts`. That table is service-role-only, so the browser probe
+     always failed and always answered "not set up" — meaning a legitimately
+     empty directory (a tenant with no suppliers yet) showed a setup error
+     instead of "no contacts". Asked here, the answer is true. */
+  if (url.searchParams.get("probe") === "1") {
+    const { error } = await supabaseServer.from("contacts").select("contact_type").limit(1);
+    if (error) console.error("[api/contacts probe]", error.message);
+    _t.done({ status: 200, probe: 1 });
+    return NextResponse.json({ ok: !error });
+  }
+
   /* ── Wave 2A.1: global summary aggregate (?summary=1) ───────────────────
      Permission-safe tenant-wide counts so the paged UI can show CORRECT
      global statistics without fetching the full dataset. Uses head-only exact

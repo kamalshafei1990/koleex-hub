@@ -1,8 +1,14 @@
 /* ---------------------------------------------------------------------------
-   Contacts Admin — Supabase CRUD for the contacts module.
+   Contacts Admin — the browser's client for /api/contacts.
+
+   NO DATABASE ACCESS HERE. The `contacts` table is service-role-only, so the
+   legacy fallbacks that sat under each API call — insert, update, delete and a
+   full list — could never have returned a row; they existed only to log a
+   second error after the first one. The setup probe was the exception, and it
+   was worse than useless: it always failed, so an empty directory told the
+   user the table was not set up.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type { ScopeContext } from "./scope";
 
 /* ── Types ── */
@@ -255,31 +261,34 @@ export interface ContactRow {
 
 /* ── Setup Check ── */
 
+/** Is the contacts table reachable? Only the "table is not set up" screen
+ *  depends on this. It used to select a row from `contacts` in the BROWSER —
+ *  a table that is service-role-only, so the probe always failed and the
+ *  directory told the user it was not set up whenever it was merely empty. */
 export async function checkContactsSetup(): Promise<boolean> {
-  const { error } = await supabase.from("contacts").select("contact_type").limit(1);
-  return !error;
+  try {
+    const res = await fetch("/api/contacts?probe=1", { credentials: "include" });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { ok?: boolean };
+    return json.ok === true;
+  } catch {
+    /* Offline or a blocked request is not "the table does not exist" — say
+       yes, so a network blip never shows a setup error over real data. */
+    return true;
+  }
 }
 
 /* ── CRUD ── */
 
 /**
- * Fetch all contacts visible to the current user.
+ * Every contact visible to the current user.
  *
- * Now goes through the server-side /api/contacts route instead of
- * talking to Supabase directly from the browser. The route enforces
- * auth (session cookie), module permission (Customers), and tenant
- * filter on the server using the service-role client. After RLS is
- * enabled with deny-by-default, direct browser queries to the contacts
- * table return nothing — only the API layer can read it.
- *
- * Falls back to the legacy direct-Supabase path when the API returns
- * a network error AND no ctx is provided, so integrations calling this
- * function without a session (e.g. server-side migrations) still work
- * during the transition. Normal app usage always hits the API.
+ * The route enforces auth (session cookie), module permission and the tenant
+ * filter with the service-role client. There is no ScopeContext parameter any
+ * more: the server reads the session, and a scope the browser assembled for
+ * itself was never consulted.
  */
-export async function fetchContacts(
-  ctx?: ScopeContext | null,
-): Promise<ContactRow[]> {
+export async function fetchContacts(): Promise<ContactRow[]> {
   try {
     const res = await fetch("/api/contacts", { credentials: "include" });
     if (res.ok) {
@@ -288,25 +297,14 @@ export async function fetchContacts(
     }
     // 401/403 — user not signed in or no module access. Return empty
     // rather than leaking the legacy direct path.
-    if (res.status === 401 || res.status === 403) return [];
-    console.error("[Contacts] API error:", res.status);
+    if (res.status !== 401 && res.status !== 403) {
+      console.error("[Contacts] API error:", res.status);
+    }
+    return [];
   } catch (e) {
     console.error("[Contacts] API fetch failed:", e);
-  }
-
-  // Legacy fallback — remove after RLS is enabled and we've verified
-  // the API path works everywhere in production.
-  let q = supabase
-    .from("contacts")
-    .select("*")
-    .order("first_name", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Contacts] Fetch fallback:", error.message);
     return [];
   }
-  return (data as ContactRow[]) || [];
 }
 
 /**
@@ -386,14 +384,9 @@ export async function createContact(obj: Record<string, unknown>): Promise<{ dat
     const err = await res.json().catch(() => ({ error: "Failed" }));
     return { data: null, error: (err as { error?: string }).error ?? "Failed" };
   } catch (e) {
-    console.error("[Contacts] createContact API failed:", e);
+    console.error("[Contacts] createContact failed:", e);
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
   }
-  const { data, error } = await supabase.from("contacts").insert(obj).select().single();
-  if (error) {
-    console.error("[Contacts] Create:", error.message);
-    return { data: null, error: error.message };
-  }
-  return { data: data as ContactRow, error: null };
 }
 
 export async function updateContact(id: string, obj: Record<string, unknown>): Promise<{ ok: boolean; error: string | null }> {
@@ -411,14 +404,9 @@ export async function updateContact(id: string, obj: Record<string, unknown>): P
     const err = await res.json().catch(() => ({ error: "Failed" }));
     return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
   } catch (e) {
-    console.error("[Contacts] updateContact API failed:", e);
+    console.error("[Contacts] updateContact failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
   }
-  const { error } = await supabase.from("contacts").update(obj).eq("id", id);
-  if (error) {
-    console.error("[Contacts] Update:", error.message);
-    return { ok: false, error: error.message };
-  }
-  return { ok: true, error: null };
 }
 
 export async function deleteContact(id: string): Promise<{ ok: boolean; error: string | null }> {
@@ -434,12 +422,7 @@ export async function deleteContact(id: string): Promise<{ ok: boolean; error: s
     const err = await res.json().catch(() => ({ error: "Failed" }));
     return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
   } catch (e) {
-    console.error("[Contacts] deleteContact API failed:", e);
+    console.error("[Contacts] deleteContact failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
   }
-  const { error } = await supabase.from("contacts").delete().eq("id", id);
-  if (error) {
-    console.error("[Contacts] Delete:", error.message);
-    return { ok: false, error: error.message };
-  }
-  return { ok: true, error: null };
 }
