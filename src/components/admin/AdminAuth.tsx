@@ -599,7 +599,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   {tab === "signin"
                     ? t("welcome")
                     : joinDone
-                      ? t("join.doneTitle")
+                      ? t("join.doneTitle").replace("{name}", joinName.trim().split(" ")[0] || "")
+                          .replace(/[،,]\s*$/, "")
                       : t("join.title")}
                 </h2>
                 <p className="text-[12px] text-white/50 mt-1.5">
@@ -846,17 +847,15 @@ interface JoinSuccessPanelProps {
 function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
   const { t } = useTranslation(signInT);
   void onReset; /* see below — the "send another" affordance was removed */
-  const firstName = name.split(" ")[0] || "there";
   return (
     <div className="py-4 flex flex-col items-center text-center">
       <div className="h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-4">
         <CheckCircleIcon className="h-6 w-6 text-emerald-300" />
       </div>
-      {/* "Thank you", the owner's word, and translated — it was hard-coded
-          English on a screen that reads in three languages, and the
-          exclamation mark was the least professional thing on it. */}
+      {/* States what happened; the thank-you moved up to the card heading
+          where it is said by name. Same phrase the help dialog uses. */}
       <h3 className="text-[15px] font-semibold text-white">
-        {t("join.thanks").replace("{name}", firstName)}
+        {t("join.thanks")}
       </h3>
       {/* Deliberately NOT a second "someone will review this within N days" —
           the card heading directly above says exactly that, translated. This

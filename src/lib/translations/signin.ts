@@ -111,7 +111,10 @@ export const signInT: Translations = {
   "join.sub":       { en: "Tell us about you and we'll be in touch.",
                       zh: "介绍一下您自己，我们会与您联系。",
                       ar: "عرّفنا بنفسك وهنتواصل معاك." },
-  "join.doneTitle": { en: "Request received", zh: "已收到请求", ar: "الطلب اتستلم" },
+  /* The thank-you is the CARD heading now and the confirmation is on the
+     panel — the owner's call, and it reads better: you are thanked first, by
+     name, and the green tick states the fact. */
+  "join.doneTitle": { en: "Thank you, {name}", zh: "谢谢您，{name}", ar: "شكرًا، {name}" },
   /* Friendlier without going soft. The old line was "A Koleex administrator
      will review your request and reply within 1–3 working days" — accurate,
      and written like a government form: an anonymous office holder, a passive
@@ -137,6 +140,8 @@ export const signInT: Translations = {
   "join.doneKeepRef": { en: "Keep this reference — quote it if you contact us about your application.",
                         zh: "请保存此编号，如就申请与我们联系时请提供。",
                         ar: "احتفظ بالرقم ده — قوله لو اتواصلت معانا بخصوص طلبك." },
-  "join.thanks":    { en: "Thank you, {name}.", zh: "谢谢您，{name}。", ar: "شكرًا، {name}." },
+  /* Same wording as the help dialog's confirmation — one Hub, one phrase for
+     "we have it". */
+  "join.thanks":    { en: "Request sent", zh: "申请已发送", ar: "الطلب اتبعت" },
   "join.reference": { en: "Your reference", zh: "您的编号", ar: "رقمك المرجعي" },
 };
