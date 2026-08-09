@@ -132,6 +132,10 @@ const RELATIONSHIPS: Array<{
   { value: "other", Icon: HelpCircleIcon },
 ];
 
+/* Kept in step with PARTNER_TYPES in the membership-request route — the route
+   allow-lists them, so adding one here alone files it as "distributor". */
+const PARTNER_TYPES = ["distributor", "agent", "service", "other"] as const;
+
 const HEARD_FROM_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "Select an option" },
   { value: "linkedin", label: "LinkedIn" },
@@ -240,6 +244,14 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* Customer code replaces City: the admin needs to identify the account, not
      the town — and Country already says where they are. */
   const [joinCustomerCode, setJoinCustomerCode] = useState("");
+  /* Asked only of the relationship that needs them. Every one of these had to
+     pass the same test: if it were blank, would the reviewer have to write
+     back before deciding? */
+  const [joinKoleexContact, setJoinKoleexContact] = useState("");
+  const [joinPartnerType, setJoinPartnerType] = useState("distributor");
+  const [joinTerritory, setJoinTerritory] = useState("");
+  const [joinSupplies, setJoinSupplies] = useState("");
+  const [joinWebsite, setJoinWebsite] = useState("");
   const [joinRef, setJoinRef] = useState("");
   const [joinHeardFrom, setJoinHeardFrom] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
@@ -313,6 +325,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setJoinCompany("");
     setJoinJobTitle("");
     setJoinCountry("");
+    setJoinKoleexContact("");
+    setJoinPartnerType("distributor");
+    setJoinTerritory("");
+    setJoinSupplies("");
+    setJoinWebsite("");
     setJoinHeardFrom("");
     setJoinMessage("");
   }
@@ -355,6 +372,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           job_title: joinJobTitle.trim(),
           heard_from: joinHeardFrom,
           customer_code: joinCustomerCode.trim(),
+          koleex_contact: joinKoleexContact.trim(),
+          partner_type: joinPartnerType,
+          territory: joinTerritory.trim(),
+          supplies: joinSupplies.trim(),
+          website: joinWebsite.trim(),
           message: joinMessage.trim(),
           language: lang,
         }),
@@ -597,6 +619,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     jobTitle: joinJobTitle,
                     country: joinCountry,
                     customerCode: joinCustomerCode,
+                    koleexContact: joinKoleexContact,
+                    partnerType: joinPartnerType,
+                    territory: joinTerritory,
+                    supplies: joinSupplies,
+                    website: joinWebsite,
                     heardFrom: joinHeardFrom,
                     message: joinMessage,
                   }}
@@ -617,10 +644,19 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     setJobTitle: setJoinJobTitle,
                     setCountry: setJoinCountry,
                     setCustomerCode: setJoinCustomerCode,
+                    setKoleexContact: setJoinKoleexContact,
+                    setPartnerType: setJoinPartnerType,
+                    setTerritory: setJoinTerritory,
+                    setSupplies: setJoinSupplies,
+                    setWebsite: setJoinWebsite,
                     setHeardFrom: setJoinHeardFrom,
                     setMessage: setJoinMessage,
                   }}
                   onSubmit={handleJoin}
+                  onGoSignIn={() => {
+                    setTab("signin");
+                    setJoinError(null);
+                  }}
                 />
               )}
                 </div>
@@ -757,6 +793,11 @@ interface JoinState {
   jobTitle: string;
   country: string;
   customerCode: string;
+  koleexContact: string;
+  partnerType: string;
+  territory: string;
+  supplies: string;
+  website: string;
   heardFrom: string;
   message: string;
 }
@@ -770,6 +811,11 @@ interface JoinSetters {
   setJobTitle: (v: string) => void;
   setCountry: (v: string) => void;
   setCustomerCode: (v: string) => void;
+  setKoleexContact: (v: string) => void;
+  setPartnerType: (v: string) => void;
+  setTerritory: (v: string) => void;
+  setSupplies: (v: string) => void;
+  setWebsite: (v: string) => void;
   setHeardFrom: (v: string) => void;
   setMessage: (v: string) => void;
 }
@@ -780,6 +826,9 @@ interface JoinPanelProps {
   busy: boolean;
   error: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  /* Someone who already has an account is told to sign in instead — the link
+     has to actually take them there, not just say so. */
+  onGoSignIn: () => void;
 }
 
 function JoinPanel({
@@ -788,6 +837,7 @@ function JoinPanel({
   busy,
   error,
   onSubmit,
+  onGoSignIn,
 }: JoinPanelProps) {
   const { t, lang } = useTranslation(signInT);
   return (
@@ -832,6 +882,25 @@ function JoinPanel({
         </div>
         <p className="mt-1.5 text-[11px] text-white/35">
           {t(`rel.${state.relationship}.d`)}
+        </p>
+      </div>
+
+      {/* Two people should not be filling this in, and both used to have no
+          idea where else to go. A Koleex employee picking any option here
+          creates a request HR was always going to handle; and someone who
+          already has an account is far safer asking for extra users from
+          inside a signed-in session, where the company is already proven. */}
+      <div className="rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-2.5 space-y-1.5">
+        <p className="text-[11px] text-white/40 leading-relaxed">{t("join.employeeNote")}</p>
+        <p className="text-[11px] text-white/40 leading-relaxed">
+          {t("join.moreUsersNote")}{" "}
+          <button
+            type="button"
+            onClick={onGoSignIn}
+            className="text-white/70 underline underline-offset-2 hover:text-white transition-colors"
+          >
+            {t("join.signInHere")}
+          </button>
         </p>
       </div>
 
@@ -963,6 +1032,101 @@ function JoinPanel({
           </div>
         ) : null}
       </div>
+
+
+      {/* ── The one question each relationship turns on ──────────────────
+          Every field here had to answer: if it were blank, would the
+          reviewer have to write back before deciding? Anything that failed
+          is not on the form. The most valuable of them is the Koleex
+          contact — one internal message to a named colleague settles an
+          application faster than reading any document. */}
+      {state.relationship === "existing_customer" ||
+      state.relationship === "partner" ||
+      state.relationship === "supplier" ? (
+        <div>
+          <label className={labelBase}>{t("join.koleexContact")}</label>
+          <div className="relative">
+            <UserCheckIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <input
+              type="text"
+              value={state.koleexContact}
+              onChange={(e) => setters.setKoleexContact(e.target.value)}
+              placeholder="Mohamed Adel"
+              className={`${inputBase} ps-9`}
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-white/35">{t("join.koleexContactHint")}</p>
+        </div>
+      ) : null}
+
+      {state.relationship === "partner" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div>
+            <label className={labelBase}>{t("join.partnerType")}</label>
+            <div className="relative">
+              <HandshakeIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+              <select
+                value={state.partnerType}
+                onChange={(e) => setters.setPartnerType(e.target.value)}
+                className={`${selectBase.replace('ps-3', '')} ps-9`}
+              >
+                {PARTNER_TYPES.map((v) => (
+                  <option key={v} value={v} className="bg-[#121212]">
+                    {t(`ptype.${v}`)}
+                  </option>
+                ))}
+              </select>
+              <SelectChevron />
+            </div>
+          </div>
+          <div>
+            <label className={labelBase}>{t("join.territory")}</label>
+            <div className="relative">
+              <GlobeIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+              <input
+                type="text"
+                value={state.territory}
+                onChange={(e) => setters.setTerritory(e.target.value)}
+                placeholder="Upper Egypt"
+                className={`${inputBase} ps-9`}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {state.relationship === "supplier" ? (
+        <div>
+          <label className={labelBase}>{t("join.supplies")}</label>
+          <div className="relative">
+            <TruckIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <input
+              type="text"
+              value={state.supplies}
+              onChange={(e) => setters.setSupplies(e.target.value)}
+              placeholder="Spare parts"
+              className={`${inputBase} ps-9`}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {state.relationship === "new_prospect" ? (
+        <div>
+          <label className={labelBase}>{t("join.website")}</label>
+          <div className="relative">
+            <Link2Icon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <input
+              type="text"
+              inputMode="url"
+              value={state.website}
+              onChange={(e) => setters.setWebsite(e.target.value)}
+              placeholder="company.com"
+              className={`${inputBase} ps-9`}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* How did you hear — only asked of someone who has just found us. An
           existing customer or supplier already knows who we are. */}

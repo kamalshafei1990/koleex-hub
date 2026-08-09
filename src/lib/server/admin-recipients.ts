@@ -1,0 +1,53 @@
+import "server-only";
+
+/* Who inside Koleex receives a request that came from outside it.
+
+   This lived inside the sign-in-help route until the membership form needed
+   the same answer. Two copies of "who is an admin" is how the two lists drift
+   apart, and the failure is silent: a request simply never reaches somebody.
+   One implementation, imported by both. */
+
+import { supabaseServer } from "@/lib/server/supabase-server";
+
+/** The role names are an explicit allow-list, not a wildcard. A `%admin%`
+ *  match also catches "Customer Admin", which is a CUSTOMER-side role — these
+ *  requests carry a person's name, email and phone, and a customer's own admin
+ *  has no business receiving one. `user_type = internal` is the second guard
+ *  on the same idea. */
+const INTERNAL_ADMIN_ROLES = ["Admin", "Super Admin"];
+
+/** Every active internal Super Admin, plus every active internal account
+ *  holding an internal admin role. Deduped — one person holding both must not
+ *  get two copies of the same request. */
+export async function adminRecipients(tag: string): Promise<string[]> {
+  const ids = new Set<string>();
+
+  const { data: sa, error: saErr } = await supabaseServer
+    .from("accounts")
+    .select("id")
+    .eq("is_super_admin", true)
+    .eq("user_type", "internal")
+    .eq("status", "active");
+  if (saErr) console.error(`[${tag}] super admins`, saErr.message);
+  for (const r of (sa ?? []) as { id: string }[]) ids.add(r.id);
+
+  const { data: roles, error: rErr } = await supabaseServer
+    .from("roles")
+    .select("id")
+    .in("name", INTERNAL_ADMIN_ROLES);
+  if (rErr) console.error(`[${tag}] roles`, rErr.message);
+  const roleIds = ((roles ?? []) as { id: string }[]).map((r) => r.id);
+
+  if (roleIds.length > 0) {
+    const { data: admins, error: aErr } = await supabaseServer
+      .from("accounts")
+      .select("id")
+      .in("role_id", roleIds)
+      .eq("user_type", "internal")
+      .eq("status", "active");
+    if (aErr) console.error(`[${tag}] admin accounts`, aErr.message);
+    for (const r of (admins ?? []) as { id: string }[]) ids.add(r.id);
+  }
+
+  return [...ids];
+}

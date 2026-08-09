@@ -20,6 +20,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { adminRecipients } from "@/lib/server/admin-recipients";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 /* Must stay in step with PROBLEMS in SignInHelpDialog and with the
@@ -158,7 +159,7 @@ export async function POST(req: Request) {
   }
 
   /* ── Fan out to Super Admins and Admin-role accounts ──────────────────── */
-  const recipients = await adminRecipients();
+  const recipients = await adminRecipients("api/support/sign-in-help");
   if (recipients.length === 0) {
     console.error("[api/support/sign-in-help] no admin recipients — request", ref, "is only in the table");
   } else {
@@ -214,48 +215,4 @@ export async function POST(req: Request) {
 
   recordSend(ip);
   return NextResponse.json({ ok: true, ref });
-}
-
-/** Every active INTERNAL Super Admin, plus every active internal account
- *  holding an internal admin role. Deduped — one person holding both must not
- *  get two copies.
- *
- *  The role names are an explicit allow-list, not a wildcard. A `%admin%`
- *  match also catches "Customer Admin", which is a CUSTOMER-side role: a
- *  sign-in help request carries a name, an email and a phone number, and a
- *  customer's admin has no business receiving one. `user_type = internal` is
- *  the second guard on the same idea. */
-const INTERNAL_ADMIN_ROLES = ["Admin", "Super Admin"];
-
-async function adminRecipients(): Promise<string[]> {
-  const ids = new Set<string>();
-
-  const { data: sa, error: saErr } = await supabaseServer
-    .from("accounts")
-    .select("id")
-    .eq("is_super_admin", true)
-    .eq("user_type", "internal")
-    .eq("status", "active");
-  if (saErr) console.error("[api/support/sign-in-help] super admins", saErr.message);
-  for (const r of (sa ?? []) as { id: string }[]) ids.add(r.id);
-
-  const { data: roles, error: rErr } = await supabaseServer
-    .from("roles")
-    .select("id")
-    .in("name", INTERNAL_ADMIN_ROLES);
-  if (rErr) console.error("[api/support/sign-in-help] roles", rErr.message);
-  const roleIds = ((roles ?? []) as { id: string }[]).map((r) => r.id);
-
-  if (roleIds.length > 0) {
-    const { data: admins, error: aErr } = await supabaseServer
-      .from("accounts")
-      .select("id")
-      .in("role_id", roleIds)
-      .eq("user_type", "internal")
-      .eq("status", "active");
-    if (aErr) console.error("[api/support/sign-in-help] admin accounts", aErr.message);
-    for (const r of (admins ?? []) as { id: string }[]) ids.add(r.id);
-  }
-
-  return [...ids];
 }

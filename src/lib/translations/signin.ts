@@ -94,9 +94,11 @@ export const signInT: Translations = {
                       zh: "介绍一下您自己，我们会与您联系。",
                       ar: "عرّفنا بنفسك وهنتواصل معاك." },
   "join.doneTitle": { en: "Request received", zh: "已收到请求", ar: "الطلب اتستلم" },
-  "join.doneSub":   { en: "A Super Admin will review your request shortly.",
-                      zh: "超级管理员将尽快审核您的请求。",
-                      ar: "مسؤول رئيسي هيراجع طلبك قريب." },
+  /* "administrator", not "Super Admin": Admins review these too now, and the
+     applicant should not be told to expect a specific rank. */
+  "join.doneSub":   { en: "A Koleex administrator will review your request and reply within 1–3 working days.",
+                      zh: "Koleex 管理员将审核您的请求，并在 1–3 个工作日内答复。",
+                      ar: "مسؤول من Koleex هيراجع طلبك والرد هيوصلك خلال ١–٣ أيام عمل." },
   "join.relationship": { en: "Your relationship with Koleex", zh: "您与 Koleex 的关系", ar: "علاقتك بـ Koleex" },
   "rel.new_prospect":      { en: "New to Koleex", zh: "初次接触", ar: "جديد على Koleex" },
   "rel.new_prospect.d":    { en: "First time here", zh: "第一次了解我们", ar: "أول مرة" },
@@ -123,6 +125,63 @@ export const signInT: Translations = {
   "join.privacy":   { en: "Your details go to the Koleex administrators only.",
                       zh: "您的信息仅发送给 Koleex 管理员。",
                       ar: "بياناتك بتروح لمسؤولي Koleex بس." },
+
+  /* ── What this form actually is ──────────────────────────────────────
+     The Hub is not a public product. Every account is issued by Koleex
+     after a human reads the request, so the form has to say so before
+     someone fills it in: it is an application, it takes 1–3 working days,
+     and it can be refused. Saying it here is what stops the follow-up
+     "why haven't I got my password yet" three hours later. */
+  "join.reviewNote": {
+    en: "Koleex Hub is a private system. Every request is reviewed by a Koleex administrator and answered within 1–3 working days.",
+    zh: "Koleex Hub 为内部专用系统。所有申请均由 Koleex 管理员人工审核，1–3 个工作日内答复。",
+    ar: "‏Koleex Hub نظام خاص. كل طلب بيراجعه مسؤول من Koleex والرد بيوصل خلال ١–٣ أيام عمل.",
+  },
+  /* Two audiences who should NOT be filling this in — the one path that
+     says "no proof needed" is the one an attacker picks first, and a
+     request for extra seats is far safer made from inside a session that
+     has already proved who the company is. */
+  "join.employeeNote": {
+    en: "Koleex employee? Your account is created by HR — ask your manager.",
+    zh: "Koleex 员工？账号由人力资源部创建，请联系您的主管。",
+    ar: "موظف في Koleex؟ حسابك بيتعمل عن طريق HR — كلّم مديرك.",
+  },
+  "join.moreUsersNote": {
+    en: "Already have an account and need more users for your team? Sign in and request them from inside.",
+    zh: "已有账号，需要为团队增加用户？请登录后在系统内申请。",
+    ar: "عندك حساب ومحتاج مستخدمين لفريقك؟ ادخل بحسابك واطلبهم من جوه.",
+  },
+  "join.signInHere": { en: "Sign in", zh: "去登录", ar: "سجّل الدخول" },
+
+  /* ── The question that decides fastest ───────────────────────────────
+     One internal message to a named colleague beats any document review,
+     so this is asked of everyone who claims an existing relationship. */
+  "join.koleexContact": {
+    en: "Your contact at Koleex",
+    zh: "您在 Koleex 的联系人",
+    ar: "جهة اتصالك في Koleex",
+  },
+  "join.koleexContactHint": {
+    en: "The person you deal with — the fastest way for us to confirm you",
+    zh: "与您对接的同事 — 这是我们最快的核实方式",
+    ar: "الشخص اللي بتتعامل معاه — أسرع طريقة نتأكد بيها منك",
+  },
+
+  /* ── Partner ── */
+  "join.partnerType":  { en: "Type of partnership", zh: "合作类型", ar: "نوع الشراكة" },
+  "ptype.distributor": { en: "Distributor", zh: "经销商", ar: "موزّع" },
+  "ptype.agent":       { en: "Agent", zh: "代理商", ar: "وكيل" },
+  "ptype.service":     { en: "Service partner", zh: "服务伙伴", ar: "شريك خدمات" },
+  "ptype.other":       { en: "Other", zh: "其他", ar: "غير ذلك" },
+  "join.territory":    { en: "Market or territory", zh: "市场或区域", ar: "السوق أو المنطقة" },
+
+  /* ── Supplier ── */
+  "join.supplies":     { en: "What do you supply?", zh: "您供应什么？", ar: "بتورّد إيه؟" },
+  "join.supplierCode": { en: "Supplier code (if you have one)", zh: "供应商编号（如有）", ar: "كود المورّد (لو عندك)" },
+
+  /* ── Prospect ── */
+  "join.website":      { en: "Company website", zh: "公司网站", ar: "موقع الشركة" },
+
   "join.customerCode": { en: "Customer code or account name",
                       zh: "客户编号或账户名称",
                       ar: "كود العميل أو اسم الحساب" },

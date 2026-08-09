@@ -19,6 +19,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { adminRecipients } from "@/lib/server/admin-recipients";
 
 /* Ids match RELATIONSHIPS in AdminAuth — changing one without the other
    silently files every request as "Other". */
@@ -30,9 +31,14 @@ const RELATIONSHIPS: Record<string, string> = {
   other: "Other",
 };
 
+/* Kept in step with PARTNER_TYPES in AdminAuth — anything outside the list is
+   filed as "other" rather than trusted. */
+const PARTNER_TYPES = new Set(["distributor", "agent", "service", "other"]);
+
 const MAX = {
   name: 120, email: 160, phone: 32, company: 160,
   jobTitle: 120, message: 2000, code: 60,
+  contact: 120, territory: 120, supplies: 200, website: 200,
 } as const;
 
 const WINDOW_MS = 60 * 60 * 1000;
@@ -81,6 +87,12 @@ export async function POST(req: Request) {
   const job_title = clean(body.job_title, MAX.jobTitle);
   const heard_from = clean(body.heard_from, 60);
   const customer_code = clean(body.customer_code, MAX.code);
+  const koleex_contact = clean(body.koleex_contact, MAX.contact);
+  const partner_type_raw = clean(body.partner_type, 20);
+  const partner_type = PARTNER_TYPES.has(partner_type_raw) ? partner_type_raw : "other";
+  const territory = clean(body.territory, MAX.territory);
+  const supplies = clean(body.supplies, MAX.supplies);
+  const website = clean(body.website, MAX.website);
   const message = clean(body.message, MAX.message);
   const language = ["en", "zh", "ar"].includes(clean(body.language, 4))
     ? clean(body.language, 4) : null;
@@ -109,6 +121,13 @@ export async function POST(req: Request) {
     job_title: job_title || null,
     heard_from: heard_from || null,
     customer_code: customer_code || null,
+    koleex_contact: koleex_contact || null,
+    /* Only meaningful for the relationship that asked the question — storing
+       "distributor" against a supplier request would mislead the reviewer. */
+    partner_type: relationship === "partner" ? partner_type : null,
+    territory: relationship === "partner" ? territory || null : null,
+    supplies: relationship === "supplier" ? supplies || null : null,
+    website: relationship === "new_prospect" ? website || null : null,
     language,
   };
   for (const k of Object.keys(metadata)) if (metadata[k] == null) delete metadata[k];
@@ -130,16 +149,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not send the request." }, { status: 500 });
   }
 
-  /* Super Admins only. A membership request is a decision about who gets into
-     the Hub at all, which is not an Admin's call. */
-  const { data: sa, error: saErr } = await supabaseServer
-    .from("accounts").select("id")
-    .eq("is_super_admin", true).eq("user_type", "internal").eq("status", "active");
-  if (saErr) console.error("[api/support/membership-request] super admins", saErr.message);
-  const recipients = ((sa ?? []) as { id: string }[]).map((r) => r.id);
+  /* Super Admins AND Admins — the owner's call, 2026-08-10. Widening the
+     rota does not widen what an Admin can do: approval provisions nothing by
+     itself, and whoever reviews still creates the account by hand through
+     /api/accounts, which gates on the Accounts:create permission. */
+  const recipients = await adminRecipients("api/support/membership-request");
 
   if (recipients.length === 0) {
-    console.error("[api/support/membership-request] no Super Admin — request", ref, "is only in the table");
+    console.error("[api/support/membership-request] no reviewer — request", ref, "is only in the table");
   } else {
     const lines = [
       `Relationship  ${RELATIONSHIPS[relationship]}`,
@@ -147,6 +164,11 @@ export async function POST(req: Request) {
       company ? `Company       ${company}` : null,
       job_title ? `Job title     ${job_title}` : null,
       customer_code ? `Customer code ${customer_code}` : null,
+      koleex_contact ? `Koleex contact ${koleex_contact}` : null,
+      relationship === "partner" ? `Partnership   ${partner_type}` : null,
+      relationship === "partner" && territory ? `Territory     ${territory}` : null,
+      relationship === "supplier" && supplies ? `Supplies      ${supplies}` : null,
+      relationship === "new_prospect" && website ? `Website       ${website}` : null,
       `Email         ${email}`,
       phone ? `Phone         ${phone_code ? phone_code + " " : ""}${phone}` : null,
       country_code ? `Country       ${country_code}` : null,
