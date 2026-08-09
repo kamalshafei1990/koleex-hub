@@ -464,28 +464,25 @@ const ProductCard = memo(function ProductCard({
             ~900px about half a second after it had painted. That jump is the
             "quick glitch" the owner kept seeing.
 
-            So the strip's space is held from the first frame: same rows, same
-            heights, quiet placeholders instead of numbers we do not have yet.
-            Nothing here states a value — an empty readiness track and blank
-            lines, never a "0" or a "No cost" that we would have to take back
-            (that mistake is already logged twice on this card). */}
+            So the strip's space is held from the first frame — but held
+            INVISIBLY. The first version drew pulsing grey boxes, which put
+            726 shimmering placeholders on screen at once (6 per card x 121)
+            and the owner rightly called that a flash too: it traded a layout
+            jump for a light show. Reserving space costs nothing visually if
+            you draw nothing. The content simply appears in place.
+
+            Nothing here states a value either — never a "0" or a "No cost"
+            that we would have to take back (already logged twice on this
+            card). */}
         {isInternal && !signal && signalsPending && (
           <div className="mt-3 space-y-2 max-sm:mt-2 max-sm:space-y-1.5 flex flex-col flex-1" aria-hidden>
             <div className="flex items-center gap-2">
               <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)]" />
-              <span className="h-3 w-7 rounded bg-[var(--bg-surface-subtle)] animate-pulse" />
+              <span className="h-3 w-7" />
             </div>
-            <div className="flex flex-wrap gap-1">
-              <span className="h-[18px] w-16 rounded-md bg-[var(--bg-surface-subtle)] animate-pulse" />
-              <span className="h-[18px] w-14 rounded-md bg-[var(--bg-surface-subtle)] animate-pulse" />
-            </div>
-            <div className="flex items-center gap-2 min-w-0 h-7 max-sm:hidden">
-              <span className="h-6 w-6 shrink-0 rounded-md bg-[var(--bg-surface-subtle)] animate-pulse" />
-              <span className="h-2.5 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" />
-            </div>
-            <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
-              <span className="h-5 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" />
-            </div>
+            <div className="flex flex-wrap gap-1"><span className="h-[18px] w-16" /></div>
+            <div className="flex items-center gap-2 min-w-0 h-7 max-sm:hidden" />
+            <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1"><span className="h-5 w-20" /></div>
           </div>
         )}
 
@@ -571,10 +568,7 @@ const ProductCard = memo(function ProductCard({
             ) : signalsPending ? (
               /* Don't answer "who makes this?" before the answer has arrived.
                  Same 24px slot, a quiet placeholder instead of a claim. */
-              <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden" aria-hidden>
-                <span className="h-6 w-6 shrink-0 rounded-md bg-[var(--bg-surface-subtle)] animate-pulse" />
-                <span className="h-2.5 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" />
-              </div>
+              <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden" aria-hidden />
             ) : (
               /* Keep the slot so cost stays on the same line across cards. */
               <div className="flex items-center gap-2 min-w-0 h-6 max-sm:hidden">
