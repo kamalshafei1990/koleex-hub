@@ -65,28 +65,6 @@ const SignInHelpDialog = dynamic(() => import("./SignInHelpDialog"), { ssr: fals
    for somebody who is already signed in. ssr:false because it measures the
    element before it can paint. */
 const WavyBackground = dynamic(() => import("@/components/admin/signin/WavyBackground"), { ssr: false });
-const MagicRings = dynamic(() => import("@/components/admin/signin/MagicRings"), { ssr: false });
-
-/* TEMPORARY — while the owner compares the two grounds. `?bg=rings` picks the
-   WebGL rings, anything else keeps the waves. Whichever he chooses, the loser
-   and this switch both get deleted; a permanent toggle for a decision that
-   gets made once is how dead code starts. */
-function useGroundChoice(): "waves" | "rings" {
-  const [g, setG] = useState<"waves" | "rings">("waves");
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("bg");
-    if (q === "rings" || q === "waves") {
-      setG(q);
-      try { window.localStorage.setItem("kx-signin-bg", q); } catch { /* blocked */ }
-      return;
-    }
-    try {
-      const saved = window.localStorage.getItem("kx-signin-bg");
-      if (saved === "rings") setG("rings");
-    } catch { /* blocked */ }
-  }, []);
-  return g;
-}
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
 
@@ -182,7 +160,6 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
      never ships with the authenticated shell. */
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("signin");
-  const ground = useGroundChoice();
 
   /* ── Tab switch motion ──────────────────────────────────────────────
      Switching tabs used to change three things at once with no motion at
@@ -473,7 +450,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         {/* The ground. Replaces the radial wash and the 64px grid — three
             backgrounds stacked would have been noise, and the waves already
             carry the depth those two were there to provide. */}
-        {ground === "rings" ? <MagicRings /> : <WavyBackground />}
+        <WavyBackground />
 
         <div
           /* Same curve and length as the height and the indicator — the card
@@ -709,14 +686,19 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Under the card, below the sign-in button: a person who cannot
-              read the form scans it top to bottom first, and this is where
-              they end up. Above the logo it competed with the wordmark for the
-              first thing you look at. */}
-          <div className="mt-5 flex justify-center">
-            <LangSwitch lang={lang} />
+            {/* Inside the card, not floating under it. It belongs to the form
+                it changes, and a control sitting alone on the background read
+                as a stray piece of the page.
+
+                Outside the height-animated body on purpose: in there it would
+                slide every time the tab changes, and a language switch that
+                moves when you switch tabs looks broken. */}
+            <div className="px-6 md:px-7 pb-5 pt-1 flex justify-center border-t border-white/[0.06]">
+              <div className="pt-4">
+                <LangSwitch lang={lang} />
+              </div>
+            </div>
           </div>
 
           <p className="text-[11px] text-white/30 text-center mt-4 tracking-wide">
