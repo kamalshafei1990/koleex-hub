@@ -121,11 +121,22 @@ export const signInT: Translations = {
      actually happens, and saying every request is read explains WHY it takes
      days — which turns the wait from a delay into a reassurance. No
      exclamation mark and no promise we cannot keep. */
-  "join.doneSub":   { en: "Every request is read by someone on our team. You'll hear back within 1–3 working days.",
-                      zh: "每一份申请都由我们的团队亲自查阅，我们会在 1–3 个工作日内回复您。",
-                      ar: "كل طلب بيقراه حد من فريقنا. هيوصلك رد خلال ١–٣ أيام عمل." },
+  /* The owner's own wording, cleaned and de-duplicated. He asked for:
+     thank you · received · reviewed by the Koleex team · 1-3 working days ·
+     we'll come back with the result.
+
+     Two of those already exist elsewhere on the same panel, two lines apart.
+     "Received" is the heading directly above this. "Thank you" is the line
+     directly below, WITH the person's name in it — warmer than a generic one,
+     so that is the copy that keeps it. What is left here is the part nothing
+     else says: where the request is now, who has it, how long, and that an
+     answer is coming either way. */
+  "join.doneSub":   { en: "Your request is with the Koleex team. They'll review it and come back to you with the result within 1–3 working days.",
+                      zh: "您的申请已转交 Koleex 团队。我们会进行审核，并在 1–3 个工作日内向您反馈结果。",
+                      ar: "طلبك بقى مع فريق Koleex. هيراجعوه ويرجعولك بالنتيجة خلال ١–٣ أيام عمل." },
   "join.doneKeepRef": { en: "Keep this reference — quote it if you contact us about your application.",
                         zh: "请保存此编号，如就申请与我们联系时请提供。",
                         ar: "احتفظ بالرقم ده — قوله لو اتواصلت معانا بخصوص طلبك." },
+  "join.thanks":    { en: "Thank you, {name}.", zh: "谢谢您，{name}。", ar: "شكرًا، {name}." },
   "join.reference": { en: "Your reference", zh: "您的编号", ar: "رقمك المرجعي" },
 };

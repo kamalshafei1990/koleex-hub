@@ -852,8 +852,11 @@ function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
       <div className="h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-4">
         <CheckCircleIcon className="h-6 w-6 text-emerald-300" />
       </div>
+      {/* "Thank you", the owner's word, and translated — it was hard-coded
+          English on a screen that reads in three languages, and the
+          exclamation mark was the least professional thing on it. */}
       <h3 className="text-[15px] font-semibold text-white">
-        Thanks, {firstName}!
+        {t("join.thanks").replace("{name}", firstName)}
       </h3>
       {/* Deliberately NOT a second "someone will review this within N days" —
           the card heading directly above says exactly that, translated. This
