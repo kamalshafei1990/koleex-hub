@@ -733,7 +733,18 @@ input[type="number"]:not(.kx-spinner) {
      pane and under the app header. `backwards` still prevents the opening
      flash; once the 0.32s is up the element returns to its natural styles,
      which are visually identical to the final keyframe. */
-  animation: kx-tab-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  /* Timing comes from two custom properties so a screen can retime the
+     entrance on itself without forking the class. The defaults ARE the
+     original values, so every existing caller — Product Data and the rest —
+     is byte-for-byte unchanged. The sign-in gate sets them to match its own
+     slower switch curve.
+
+     A variable rather than a Tailwind override because globals.css is
+     unlayered: its `animation` shorthand beats any utility on the element no
+     matter the specificity, so the override silently did nothing. A custom
+     property set on the element wins that fight without an !important. */
+  animation: kx-tab-in var(--kx-tab-in-dur, 0.32s)
+             var(--kx-tab-in-ease, cubic-bezier(0.22, 1, 0.36, 1)) backwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .kx-tab-in { animation: none; }

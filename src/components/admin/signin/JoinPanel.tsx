@@ -46,7 +46,7 @@ import { signInJoinT } from "@/lib/translations/signin-join";
    join copy that arrives with this file, and a missing key is impossible
    because the form can still read anything the gate can. */
 const joinDict = { ...signInT, ...signInJoinT };
-import { inputBase, selectBase, textareaBase, labelBase } from "./field-styles";
+import { inputBase, selectBase, textareaBase, labelBase, primaryButton } from "./field-styles";
 
 /* BrandGlyph carries the simple-icons dataset — lazy even here, so the logos
    arrive with the chips rather than with the form. */
@@ -649,7 +649,7 @@ export default function JoinPanel({
       <button
         type="submit"
         disabled={busy || !state.name || !state.email}
-        className="w-full h-11 rounded-xl bg-white text-black text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-60"
+        className={primaryButton}
       >
         {busy ? (
           <>

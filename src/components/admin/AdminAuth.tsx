@@ -124,8 +124,20 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
    width, card height, indicator. Three transitions of different lengths read
    as three separate events rather than one. Matches .kx-tab-in in globals.css,
    which is the Hub's existing tab-entrance curve. */
+/* ONE curve and ONE length for everything that moves on a tab switch — the
+   card height, the card width, the underline and the content entrance — so the
+   switch reads as a single movement instead of four things that happen to
+   start at the same time.
+
+   This was 300ms on cubic-bezier(0.22, 1, 0.36, 1), easeOutQuint. That curve
+   leaves the start line at almost full speed, so a 700px height change flew
+   open and then crawled the last few pixels — the abrupt part sits at the very
+   beginning, which is where the eye is. Replaced with the standard in-out: it
+   builds up, holds, and settles long and soft at both ends. 440ms rather than
+   300 because the taller the travel the longer it needs in order not to look
+   rushed, and the Join form is more than twice the height of Sign In. */
 const SWITCH_MOTION =
-  "motion-safe:transition-[height,transform,width] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "motion-safe:transition-[height,transform,width] motion-safe:duration-[440ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)]";
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
@@ -445,22 +457,40 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
            without turning the layout round leaves a screen that is technically
            Arabic and still reads wrong. */
         dir={lang === "ar" ? "rtl" : "ltr"}
-        className="h-[100dvh] bg-[#05070C] flex justify-center overflow-y-auto overflow-x-hidden p-4 py-10 relative"
+        /* THE FRAME DOES NOT SCROLL — overflow-hidden. The scrolling moved to
+           an inner element, below.
+
+           This element used to be the scroller, with the waves absolutely
+           positioned inside it. An absolutely positioned child of a scroll
+           container is laid against the container's PADDING BOX — the entire
+           scrollable height, not the visible window — so on the Join tab the
+           ground stretched to fifteen hundred pixels and slid away up the
+           screen as you scrolled. inset-0 now resolves to exactly the
+           viewport, so the waves stay centred and still however far down the
+           form you are. */
+        className="h-[100dvh] bg-[#05070C] relative overflow-hidden"
       >
         {/* The ground. Replaces the radial wash and the 64px grid — three
             backgrounds stacked would have been noise, and the waves already
             carry the depth those two were there to provide. */}
         <WavyBackground />
 
-        <div
-          /* Same curve and length as the height and the indicator — the card
-             widening on a different easing read as a second, later event. */
-          className={`relative w-full my-auto motion-safe:transition-[max-width] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isWide ? "max-w-[560px]" : "max-w-md"
-          }`}
-        >
-          {/* Brand header — tight, centered, a single statement. */}
-          <div className="flex flex-col items-center mb-6">
+        <div className="relative h-full flex flex-col items-center px-4">
+
+        {/* BRAND HEADER — PINNED. It sits outside the scroller entirely, so
+            it does not move when the tab changes and does not move when the
+            Join form is scrolled. It is the fixed point of the screen.
+
+            It used to live inside a column centred with my-auto. Centring is
+            computed from the column's own height, so the moment the card grew
+            for the Join form the midpoint moved and the logo slid up with it.
+
+            The offset is the one that centres the SIGN-IN state exactly:
+            (100dvh − 665px) / 2, where 665px is that column measured. Floored
+            at 40px so short screens keep some air, capped at 200px so a tall
+            monitor does not park everything halfway down the glass. It depends
+            only on the viewport — never on the content. */}
+        <div className="shrink-0 flex flex-col items-center pt-[clamp(40px,calc((100dvh-665px)/2),200px)] pb-6">
             {/* Hub logo v2 — login screen is always dark, so the for-dark
                 composite (untouched KOLEEX wordmark + gradient hub script). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -480,230 +510,255 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               </span>
               <span className="h-px w-6 bg-white/15" aria-hidden />
             </div>
-
           </div>
 
-          {/* Card */}
-          {/* Glass, not a solid panel. With a moving ground behind it an opaque card
-                just hides the thing you chose — the waves have to reach through. */}
-            <div className="rounded-2xl border border-white/[0.10] shadow-2xl overflow-hidden bg-[#0B0E14]/60 backdrop-blur-2xl backdrop-saturate-150 [box-shadow:0_1px_0_rgba(255,255,255,.12)_inset,0_40px_80px_-30px_rgba(0,0,0,.9)]">
-            {/* Tab bar.
+          {/* THE ONLY THING THAT SCROLLS.
 
-                flex, NOT grid-cols-2. Two equal halves gave "Sign In" — seven
-                characters — the same 171px as a label three times its length,
-                and measured at 375px "Become Koleex Member" plus its icon came
-                to 169px inside that 171px: one pixel of air on each side.
-                Sizing each tab to its own content puts the slack where the
-                long label needs it, and it keeps working when the label
-                changes length in Chinese and Arabic, which fixed fractions
-                would not.
+              min-h-0 is load-bearing: a flex child refuses to shrink below its
+              own content, so without it this box grows to the height of the
+              Join form and no scrollbar ever appears.
 
-                flex-auto, not flex-1: flex-1 is basis-0, which is the equal
-                halves all over again. flex-auto sizes each tab to its content
-                and then splits the LEFTOVER evenly, so both labels end up with
-                identical breathing room at every width — 27px each at 375,
-                53px each at 1280.
-
-                The padding tightens below 360px: at 320 the two tabs came to
-                297px inside a 286px strip and the row overflowed.
-
-                The underline lives on a span around the label, not on the
-                cell: at 1280 the join cell is 275px wide and a cell-width rule
-                drew 243px of white under a 169px label. */}
+              scrollbar-gutter reserves the track on BOTH edges, so the card
+              stays optically centred and the screen does not jump sideways the
+              moment the form gets long enough to overflow. */}
+          <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges] flex justify-center">
             <div
-              ref={stripRef}
-              className="relative flex border-b border-white/[0.06] bg-white/[0.02]"
+              /* Same curve and length as the height and the underline — the
+                 card widening on a different easing read as a second, later
+                 event. */
+              className={`relative w-full self-start pb-10 motion-safe:transition-[max-width] motion-safe:duration-[440ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                isWide ? "max-w-[560px]" : "max-w-md"
+              }`}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("signin");
-                  setJoinError(null);
-                }}
-                className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
-                  tab === "signin"
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
-                }`}
-                aria-pressed={tab === "signin"}
-                data-tab-active={tab === "signin"}
+
+            {/* Card */}
+            {/* Glass, not a solid panel. With a moving ground behind it an opaque card
+                  just hides the thing you chose — the waves have to reach through. */}
+              <div className="rounded-2xl border border-white/[0.10] shadow-2xl overflow-hidden bg-[#0B0E14]/60 backdrop-blur-2xl backdrop-saturate-150 [box-shadow:0_1px_0_rgba(255,255,255,.12)_inset,0_40px_80px_-30px_rgba(0,0,0,.9)]">
+              {/* Tab bar.
+
+                  flex, NOT grid-cols-2. Two equal halves gave "Sign In" — seven
+                  characters — the same 171px as a label three times its length,
+                  and measured at 375px "Become Koleex Member" plus its icon came
+                  to 169px inside that 171px: one pixel of air on each side.
+                  Sizing each tab to its own content puts the slack where the
+                  long label needs it, and it keeps working when the label
+                  changes length in Chinese and Arabic, which fixed fractions
+                  would not.
+
+                  flex-auto, not flex-1: flex-1 is basis-0, which is the equal
+                  halves all over again. flex-auto sizes each tab to its content
+                  and then splits the LEFTOVER evenly, so both labels end up with
+                  identical breathing room at every width — 27px each at 375,
+                  53px each at 1280.
+
+                  The padding tightens below 360px: at 320 the two tabs came to
+                  297px inside a 286px strip and the row overflowed.
+
+                  The underline lives on a span around the label, not on the
+                  cell: at 1280 the join cell is 275px wide and a cell-width rule
+                  drew 243px of white under a 169px label. */}
+              <div
+                ref={stripRef}
+                className="relative flex border-b border-white/[0.06] bg-white/[0.02]"
               >
-                <span className="flex h-full items-center gap-2">
-                  <SignInIcon className="h-3.5 w-3.5 shrink-0" />
-                  {t("tab.signIn")}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("join");
-                  setSignInError(null);
-                }}
-                className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
-                  tab === "join"
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
-                }`}
-                aria-pressed={tab === "join"}
-                data-tab-active={tab === "join"}
-              >
-                <span className="flex h-full items-center gap-2">
-                  <UserPlusIcon className="h-3.5 w-3.5 shrink-0" />
-                  {t("tab.join")}
-                </span>
-              </button>
-
-              {/* The one indicator. Rendered only once measured, so it never
-                  appears at the wrong tab for a frame. */}
-              {ink && (
-                <span
-                  aria-hidden
-                  className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${SWITCH_MOTION}`}
-                  style={{ transform: `translateX(${ink.x}px)`, width: ink.w }}
-                />
-              )}
-            </div>
-
-            {/* Card body.
-
-                THREE nested wrappers, and each one earns its place. The outer
-                carries the animated pixel height and clips. The middle is what
-                gets measured — it has to be unconstrained, or the observer
-                would read back the height we just imposed and the card would
-                never grow again, and it must NOT carry the key, or remounting
-                would detach the very node the ResizeObserver is watching. The
-                inner is keyed on the panel, so React remounts it and
-                .kx-tab-in — the Hub's existing tab-entrance curve, the same one
-                Product Data uses — replays on every switch instead of the
-                content simply being swapped under your eyes. */}
-            <div
-              className={`overflow-hidden ${SWITCH_MOTION}`}
-              style={bodyH != null ? { height: bodyH } : undefined}
-            >
-              <div ref={bodyRef}>
-                <div
-                  key={tab === "signin" ? "signin" : joinDone ? "done" : "join"}
-                  className="kx-tab-in px-6 py-6 md:px-7 md:py-7"
-                >
-              {/* Tab-contextual heading. Gives the form a human-readable
-                  title without the clunky outer "Koleex Hub" label. */}
-              <div className="mb-5">
-                <h2 className="text-[17px] font-bold text-white tracking-tight leading-none">
-                  {tab === "signin"
-                    ? t("welcome")
-                    : joinDone
-                      ? t("join.doneTitle").replace("{name}", joinName.trim().split(" ")[0] || "")
-                          .replace(/[،,]\s*$/, "")
-                      : t("join.title")}
-                </h2>
-                <p className="text-[12px] text-white/50 mt-1.5">
-                  {tab === "signin"
-                    ? t("welcomeSub")
-                    : joinDone
-                      ? t("join.doneSub")
-                      : t("join.sub")}
-                </p>
-              </div>
-
-              {tab === "signin" ? (
-                <SignInPanel
-                  onNeedHelp={() => setHelpOpen(true)}
-                  sharedDevice={sharedDevice}
-                  onSharedDeviceChange={setSharedDevice}
-                  username={username}
-                  password={password}
-                  busy={signInBusy}
-                  error={signInError}
-                  onUsernameChange={(v) => {
-                    setUsername(v);
-                    setSignInError(null);
-                  }}
-                  onPasswordChange={(v) => {
-                    setPassword(v);
-                    setSignInError(null);
-                  }}
-                  onSubmit={handleSignIn}
-                />
-              ) : joinDone ? (
-                <JoinSuccessPanel name={joinName} reference={joinRef} onReset={resetJoinForm} />
-              ) : (
-                <JoinPanel
-                  state={{
-                    name: joinName,
-                    email: joinEmail,
-                    phone: joinPhone,
-                    relationship: joinRelationship,
-                    company: joinCompany,
-                    jobTitle: joinJobTitle,
-                    country: joinCountry,
-                    customerCode: joinCustomerCode,
-                    koleexContact: joinKoleexContact,
-                    partnerType: joinPartnerType,
-                    territory: joinTerritory,
-                    supplies: joinSupplies,
-                    website: joinWebsite,
-                    docs: joinDocs,
-                    contactVia: joinContactVia,
-                    contactHandle: joinContactHandle,
-                    heardFrom: joinHeardFrom,
-                    message: joinMessage,
-                  }}
-                  busy={joinBusy}
-                  error={joinError}
-                  setters={{
-                    setName: (v) => {
-                      setJoinName(v);
-                      setJoinError(null);
-                    },
-                    setEmail: (v) => {
-                      setJoinEmail(v);
-                      setJoinError(null);
-                    },
-                    setPhone: setJoinPhone,
-                    setRelationship: setJoinRelationship,
-                    setCompany: setJoinCompany,
-                    setJobTitle: setJoinJobTitle,
-                    setCountry: setJoinCountry,
-                    setCustomerCode: setJoinCustomerCode,
-                    setKoleexContact: setJoinKoleexContact,
-                    setPartnerType: setJoinPartnerType,
-                    setTerritory: setJoinTerritory,
-                    setSupplies: setJoinSupplies,
-                    setWebsite: setJoinWebsite,
-                    setDocs: setJoinDocs,
-                    setContactVia: setJoinContactVia,
-                    setContactHandle: setJoinContactHandle,
-                    setHeardFrom: setJoinHeardFrom,
-                    setMessage: setJoinMessage,
-                  }}
-                  onSubmit={handleJoin}
-                  onGoSignIn={() => {
+                <button
+                  type="button"
+                  onClick={() => {
                     setTab("signin");
                     setJoinError(null);
                   }}
-                />
-              )}
+                  className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
+                    tab === "signin"
+                      ? "text-white"
+                      : "text-white/40 hover:text-white/70"
+                  }`}
+                  aria-pressed={tab === "signin"}
+                  data-tab-active={tab === "signin"}
+                >
+                  <span className="flex h-full items-center gap-2">
+                    <SignInIcon className="h-3.5 w-3.5 shrink-0" />
+                    {t("tab.signIn")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("join");
+                    setSignInError(null);
+                  }}
+                  className={`relative h-12 flex-auto px-3 min-[360px]:px-4 sm:px-5 text-[12px] font-semibold tracking-wide whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
+                    tab === "join"
+                      ? "text-white"
+                      : "text-white/40 hover:text-white/70"
+                  }`}
+                  aria-pressed={tab === "join"}
+                  data-tab-active={tab === "join"}
+                >
+                  <span className="flex h-full items-center gap-2">
+                    <UserPlusIcon className="h-3.5 w-3.5 shrink-0" />
+                    {t("tab.join")}
+                  </span>
+                </button>
+
+                {/* The one indicator. Rendered only once measured, so it never
+                    appears at the wrong tab for a frame. */}
+                {ink && (
+                  <span
+                    aria-hidden
+                    className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${SWITCH_MOTION}`}
+                    style={{ transform: `translateX(${ink.x}px)`, width: ink.w }}
+                  />
+                )}
+              </div>
+
+              {/* Card body.
+
+                  THREE nested wrappers, and each one earns its place. The outer
+                  carries the animated pixel height and clips. The middle is what
+                  gets measured — it has to be unconstrained, or the observer
+                  would read back the height we just imposed and the card would
+                  never grow again, and it must NOT carry the key, or remounting
+                  would detach the very node the ResizeObserver is watching. The
+                  inner is keyed on the panel, so React remounts it and
+                  .kx-tab-in — the Hub's existing tab-entrance curve, the same one
+                  Product Data uses — replays on every switch instead of the
+                  content simply being swapped under your eyes. */}
+              <div
+                className={`overflow-hidden ${SWITCH_MOTION}`}
+                style={bodyH != null ? { height: bodyH } : undefined}
+              >
+                <div ref={bodyRef}>
+                  <div
+                    key={tab === "signin" ? "signin" : joinDone ? "done" : "join"}
+                    /* kx-tab-in is the Hub-wide tab entrance and Product Data uses
+                       the same class, so it is RETIMED HERE through the two
+                       custom properties the class now reads, rather than being
+                       changed in globals.css. This screen gets the softer curve;
+                       every other tab in the Hub keeps the snappy one. */
+                    className="kx-tab-in [--kx-tab-in-dur:0.44s] [--kx-tab-in-ease:cubic-bezier(0.4,0,0.2,1)] px-6 py-6 md:px-7 md:py-7"
+                  >
+                {/* Tab-contextual heading. Gives the form a human-readable
+                    title without the clunky outer "Koleex Hub" label. */}
+                <div className="mb-5">
+                  <h2 className="text-[17px] font-bold text-white tracking-tight leading-none">
+                    {tab === "signin"
+                      ? t("welcome")
+                      : joinDone
+                        ? t("join.doneTitle").replace("{name}", joinName.trim().split(" ")[0] || "")
+                            .replace(/[،,]\s*$/, "")
+                        : t("join.title")}
+                  </h2>
+                  <p className="text-[12px] text-white/50 mt-1.5">
+                    {tab === "signin"
+                      ? t("welcomeSub")
+                      : joinDone
+                        ? t("join.doneSub")
+                        : t("join.sub")}
+                  </p>
+                </div>
+
+                {tab === "signin" ? (
+                  <SignInPanel
+                    onNeedHelp={() => setHelpOpen(true)}
+                    sharedDevice={sharedDevice}
+                    onSharedDeviceChange={setSharedDevice}
+                    username={username}
+                    password={password}
+                    busy={signInBusy}
+                    error={signInError}
+                    onUsernameChange={(v) => {
+                      setUsername(v);
+                      setSignInError(null);
+                    }}
+                    onPasswordChange={(v) => {
+                      setPassword(v);
+                      setSignInError(null);
+                    }}
+                    onSubmit={handleSignIn}
+                  />
+                ) : joinDone ? (
+                  <JoinSuccessPanel name={joinName} reference={joinRef} onReset={resetJoinForm} />
+                ) : (
+                  <JoinPanel
+                    state={{
+                      name: joinName,
+                      email: joinEmail,
+                      phone: joinPhone,
+                      relationship: joinRelationship,
+                      company: joinCompany,
+                      jobTitle: joinJobTitle,
+                      country: joinCountry,
+                      customerCode: joinCustomerCode,
+                      koleexContact: joinKoleexContact,
+                      partnerType: joinPartnerType,
+                      territory: joinTerritory,
+                      supplies: joinSupplies,
+                      website: joinWebsite,
+                      docs: joinDocs,
+                      contactVia: joinContactVia,
+                      contactHandle: joinContactHandle,
+                      heardFrom: joinHeardFrom,
+                      message: joinMessage,
+                    }}
+                    busy={joinBusy}
+                    error={joinError}
+                    setters={{
+                      setName: (v) => {
+                        setJoinName(v);
+                        setJoinError(null);
+                      },
+                      setEmail: (v) => {
+                        setJoinEmail(v);
+                        setJoinError(null);
+                      },
+                      setPhone: setJoinPhone,
+                      setRelationship: setJoinRelationship,
+                      setCompany: setJoinCompany,
+                      setJobTitle: setJoinJobTitle,
+                      setCountry: setJoinCountry,
+                      setCustomerCode: setJoinCustomerCode,
+                      setKoleexContact: setJoinKoleexContact,
+                      setPartnerType: setJoinPartnerType,
+                      setTerritory: setJoinTerritory,
+                      setSupplies: setJoinSupplies,
+                      setWebsite: setJoinWebsite,
+                      setDocs: setJoinDocs,
+                      setContactVia: setJoinContactVia,
+                      setContactHandle: setJoinContactHandle,
+                      setHeardFrom: setJoinHeardFrom,
+                      setMessage: setJoinMessage,
+                    }}
+                    onSubmit={handleJoin}
+                    onGoSignIn={() => {
+                      setTab("signin");
+                      setJoinError(null);
+                    }}
+                  />
+                )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Inside the card, not floating under it. It belongs to the form
+                  it changes, and a control sitting alone on the background read
+                  as a stray piece of the page.
+
+                  Outside the height-animated body on purpose: in there it would
+                  slide every time the tab changes, and a language switch that
+                  moves when you switch tabs looks broken. */}
+              <div className="px-6 md:px-7 pb-5 pt-1 flex justify-center border-t border-white/[0.06]">
+                <div className="pt-4">
+                  <LangSwitch lang={lang} />
                 </div>
               </div>
             </div>
 
-            {/* Inside the card, not floating under it. It belongs to the form
-                it changes, and a control sitting alone on the background read
-                as a stray piece of the page.
-
-                Outside the height-animated body on purpose: in there it would
-                slide every time the tab changes, and a language switch that
-                moves when you switch tabs looks broken. */}
-            <div className="px-6 md:px-7 pb-5 pt-1 flex justify-center border-t border-white/[0.06]">
-              <div className="pt-4">
-                <LangSwitch lang={lang} />
-              </div>
-            </div>
+            <p className="text-[11px] text-white/30 text-center mt-4 tracking-wide">
+              {t("footer")}
+            </p>
           </div>
-
-          <p className="text-[11px] text-white/30 text-center mt-4 tracking-wide">
-            {t("footer")}
-          </p>
+          </div>
         </div>
 
         <SignInHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
