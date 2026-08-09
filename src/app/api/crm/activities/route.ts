@@ -14,7 +14,39 @@ export async function GET(req: Request) {
   const deny = await requireModuleAccess(auth, "CRM");
   if (deny) return deny;
 
-  const opportunityId = new URL(req.url).searchParams.get("opportunityId");
+  const url = new URL(req.url);
+
+  /* ?feed=1 — every activity in the tenant, each carrying its parent
+     opportunity's name, company and stage so the row renders without a second
+     round trip. The browser built this by reading crm_activities and then
+     crm_opportunities directly; both are service-role-only, so the CRM
+     activity feed was permanently empty. */
+  if (url.searchParams.get("feed") === "1") {
+    let aq = supabaseServer.from("crm_activities").select("*").order("due_at", { ascending: true });
+    if (auth.tenant_id) aq = aq.eq("tenant_id", auth.tenant_id);
+    const { data: acts, error: aErr } = await aq;
+    if (aErr) {
+      console.error("[api/crm/activities feed]", aErr.message);
+      return NextResponse.json({ error: "Failed to load feed" }, { status: 500 });
+    }
+    const rows = (acts ?? []) as { opportunity_id: string }[];
+    if (rows.length === 0) return NextResponse.json({ activities: [] });
+
+    const oppIds = [...new Set(rows.map((r) => r.opportunity_id).filter(Boolean))];
+    const { data: opps, error: oErr } = await supabaseServer
+      .from("crm_opportunities")
+      .select("id, name, company_name, stage_id")
+      .in("id", oppIds);
+    if (oErr) console.error("[api/crm/activities feed opps]", oErr.message);
+    const byId = new Map(
+      ((opps ?? []) as { id: string }[]).map((o) => [o.id, o]),
+    );
+    return NextResponse.json({
+      activities: rows.map((r) => ({ ...r, opportunity: byId.get(r.opportunity_id) ?? null })),
+    });
+  }
+
+  const opportunityId = url.searchParams.get("opportunityId");
   if (!opportunityId) {
     return NextResponse.json(
       { error: "opportunityId is required" },

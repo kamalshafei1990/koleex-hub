@@ -273,7 +273,7 @@ export default function CRM() {
       const t0 =
         typeof performance !== "undefined" ? performance.now() : 0;
       const [s, o] = await Promise.all([
-        fetchStages(scopeCtxRef.current),
+        fetchStages(),
         fetchOpportunities({ ctx: scopeCtxRef.current, view: "board" }),
       ]);
       setStages(s);

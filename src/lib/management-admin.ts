@@ -18,10 +18,20 @@
      • Assignments always reference existing people
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin } from "./supabase-admin";
 import { invalidateCachedGet } from "./client-cache";
 import { uploadToStorage } from "./storage-client";
 
+
+/* Every call goes through an API route; nothing here touches the database. */
+const J = { "Content-Type": "application/json" };
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { credentials: "include", ...init });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `HTTP ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
 const BUCKET = "media";
 
 /* ═══════════════════════════════════════════════════
@@ -199,73 +209,50 @@ export function detectCircularHierarchy(
    ═══════════════════════════════════════════════════ */
 
 export async function fetchDepartments(): Promise<DepartmentRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from("koleex_departments")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("[Management] fetchDepartments:", error.message);
+  try {
+    const j = await api<{ departments: DepartmentRow[] }>("/api/management/departments");
+    return j.departments ?? [];
+  } catch (e) {
+    console.error("[Management] fetchDepartments:", e);
     return [];
   }
-  return (data as DepartmentRow[]) || [];
 }
 
 export async function createDepartment(
   obj: Partial<DepartmentRow>,
 ): Promise<{ data: DepartmentRow | null; error: string | null }> {
-  /* Defensively default is_active to true. The employees picker
-     filters on is_active=true — if a caller forgets the flag and
-     the DB default ever drifts, the new department would be
-     invisible in Add Employee. Set it here once. */
-  const payload = {
-    is_active: obj.is_active ?? true,
-    ...obj,
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabaseAdmin
-    .from("koleex_departments")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  /* The employees wizard reuses the department list for a minute; a new
-     department must not wait that long to become pickable. */
-  invalidateCachedGet("/api/management/departments");
-  return { data: data as DepartmentRow, error: null };
+  try {
+    const j = await api<{ department: DepartmentRow | null }>("/api/management/departments", {
+      method: "POST", headers: J, body: JSON.stringify(obj),
+    });
+    invalidateCachedGet("/api/management/departments");
+    return { data: j.department, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function updateDepartment(
   id: string,
   obj: Partial<DepartmentRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
-  /* Never let a partial update silently clear is_active. If the
-     caller didn't send it, leave it alone. */
-  const payload: Record<string, unknown> = { ...obj, updated_at: new Date().toISOString() };
-  if (obj.is_active === undefined) delete payload.is_active;
-  const { error } = await supabaseAdmin
-    .from("koleex_departments")
-    .update(payload)
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  invalidateCachedGet("/api/management/departments");
-  return { ok: true, error: null };
+  try {
+    await api("/api/management/departments", {
+      method: "PATCH", headers: J, body: JSON.stringify({ ...obj, id }),
+    });
+    invalidateCachedGet("/api/management/departments");
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function deleteDepartment(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin
-    .from("koleex_departments")
-    .delete()
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  invalidateCachedGet("/api/management/departments");
-  return { ok: true, error: null };
+  /* Always the SAFE delete: the route reparents children and handles the
+     department's positions in one operation. */
+  return safeDeleteDepartment(id, "cascade");
 }
 
 /** Safe delete: reassigns child departments to parent, handles positions. */
@@ -274,36 +261,16 @@ export async function safeDeleteDepartment(
   positionStrategy: "cascade" | "reassign",
   reassignToDeptId?: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  // Get department's parent so we can reparent children
-  const { data: dept } = await supabaseAdmin
-    .from("koleex_departments")
-    .select("parent_id")
-    .eq("id", id)
-    .single();
-
-  // Reparent child departments to this dept's parent
-  await supabaseAdmin
-    .from("koleex_departments")
-    .update({ parent_id: dept?.parent_id || null, updated_at: new Date().toISOString() })
-    .eq("parent_id", id);
-
-  if (positionStrategy === "reassign" && reassignToDeptId) {
-    // Move positions to another department
-    await supabaseAdmin
-      .from("koleex_positions")
-      .update({ department_id: reassignToDeptId, updated_at: new Date().toISOString() })
-      .eq("department_id", id);
-    await supabaseAdmin
-      .from("koleex_assignments")
-      .update({ department_id: reassignToDeptId, updated_at: new Date().toISOString() })
-      .eq("department_id", id);
-  } else {
-    // Cascade delete: remove assignments then positions
-    await supabaseAdmin.from("koleex_assignments").delete().eq("department_id", id);
-    await supabaseAdmin.from("koleex_positions").delete().eq("department_id", id);
+  try {
+    await api("/api/management/departments", {
+      method: "DELETE", headers: J,
+      body: JSON.stringify({ id, positionStrategy, reassignToDeptId }),
+    });
+    invalidateCachedGet("/api/management/departments");
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
   }
-
-  return deleteDepartment(id);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -313,127 +280,75 @@ export async function safeDeleteDepartment(
 export async function fetchPositions(
   departmentId?: string,
 ): Promise<PositionRow[]> {
-  let query = supabaseAdmin
-    .from("koleex_positions")
-    .select("*")
-    .order("level", { ascending: true })
-    .order("sort_order", { ascending: true })
-    .order("title", { ascending: true });
-
-  if (departmentId) query = query.eq("department_id", departmentId);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[Management] fetchPositions:", error.message);
+  try {
+    const qs = departmentId ? `?department_id=${encodeURIComponent(departmentId)}` : "";
+    const j = await api<{ positions: PositionRow[] }>(`/api/management/positions${qs}`);
+    return j.positions ?? [];
+  } catch (e) {
+    console.error("[Management] fetchPositions:", e);
     return [];
   }
-  return (data as PositionRow[]) || [];
 }
 
 export async function createPosition(
   obj: Partial<PositionRow>,
 ): Promise<{ data: PositionRow | null; error: string | null }> {
-  /* Default is_active=true for the same reason as departments —
-     the Add Employee picker filters on it. */
-  const payload = {
-    is_active: obj.is_active ?? true,
-    ...obj,
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabaseAdmin
-    .from("koleex_positions")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  return { data: data as PositionRow, error: null };
+  try {
+    const j = await api<{ position: PositionRow | null }>("/api/management/positions", {
+      method: "POST", headers: J, body: JSON.stringify(obj),
+    });
+    return { data: j.position, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function updatePosition(
   id: string,
   obj: Partial<PositionRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const payload: Record<string, unknown> = { ...obj, updated_at: new Date().toISOString() };
-  if (obj.is_active === undefined) delete payload.is_active;
-  const { error } = await supabaseAdmin
-    .from("koleex_positions")
-    .update(payload)
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  try {
+    await api("/api/management/positions", {
+      method: "PATCH", headers: J, body: JSON.stringify({ ...obj, id }),
+    });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function deletePosition(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin
-    .from("koleex_positions")
-    .delete()
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  return safeDeletePosition(id);
 }
 
 /** Safe delete: reassigns subordinates to this position's parent, removes assignments. */
 export async function safeDeletePosition(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { data: pos } = await supabaseAdmin
-    .from("koleex_positions")
-    .select("reports_to_position_id")
-    .eq("id", id)
-    .single();
-
-  // Reassign direct reports to this position's parent
-  await supabaseAdmin
-    .from("koleex_positions")
-    .update({
-      reports_to_position_id: pos?.reports_to_position_id || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("reports_to_position_id", id);
-
-  // Remove assignments
-  await supabaseAdmin.from("koleex_assignments").delete().eq("position_id", id);
-
-  return deletePosition(id);
+  try {
+    await api("/api/management/positions", {
+      method: "DELETE", headers: J, body: JSON.stringify({ id }),
+    });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /** Duplicate a position (copies title, level, description, JD — not assignments). */
 export async function duplicatePosition(
   sourceId: string,
 ): Promise<{ data: PositionRow | null; error: string | null }> {
-  const { data: src, error: fetchErr } = await supabaseAdmin
-    .from("koleex_positions")
-    .select("*")
-    .eq("id", sourceId)
-    .single();
-
-  if (fetchErr || !src) return { data: null, error: fetchErr?.message || "Position not found" };
-
-  const { data, error } = await supabaseAdmin
-    .from("koleex_positions")
-    .insert({
-      title: `${src.title} (Copy)`,
-      department_id: src.department_id,
-      reports_to_position_id: src.reports_to_position_id,
-      level: src.level,
-      description: src.description,
-      role_id: src.role_id,
-      responsibilities: src.responsibilities,
-      requirements: src.requirements,
-      is_active: true,
-      sort_order: (src.sort_order || 0) + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  return { data: data as PositionRow, error: null };
+  try {
+    const j = await api<{ position: PositionRow | null }>("/api/management/positions", {
+      method: "PUT", headers: J, body: JSON.stringify({ duplicate: sourceId }),
+    });
+    return { data: j.position, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /** Move a position in the hierarchy (drag & drop). */
@@ -442,19 +357,14 @@ export async function movePosition(
   newReportsToId: string | null,
   newDepartmentId?: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const updates: Record<string, unknown> = {
-    reports_to_position_id: newReportsToId,
-    updated_at: new Date().toISOString(),
-  };
-  if (newDepartmentId) updates.department_id = newDepartmentId;
-
-  const { error } = await supabaseAdmin
-    .from("koleex_positions")
-    .update(updates)
-    .eq("id", positionId);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  const body: Record<string, unknown> = { id: positionId, reports_to_position_id: newReportsToId };
+  if (newDepartmentId) body.department_id = newDepartmentId;
+  try {
+    await api("/api/management/positions", { method: "PATCH", headers: J, body: JSON.stringify(body) });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -464,59 +374,52 @@ export async function movePosition(
 export async function fetchAssignments(
   departmentId?: string,
 ): Promise<AssignmentRow[]> {
-  let query = supabaseAdmin
-    .from("koleex_assignments")
-    .select("*")
-    .eq("is_active", true)
-    .order("is_primary", { ascending: false })
-    .order("created_at", { ascending: true });
-
-  if (departmentId) query = query.eq("department_id", departmentId);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[Management] fetchAssignments:", error.message);
+  try {
+    const qs = departmentId ? `?department_id=${encodeURIComponent(departmentId)}` : "";
+    const j = await api<{ assignments: AssignmentRow[] }>(`/api/management/assignments${qs}`);
+    return j.assignments ?? [];
+  } catch (e) {
+    console.error("[Management] fetchAssignments:", e);
     return [];
   }
-  return (data as AssignmentRow[]) || [];
 }
 
 export async function createAssignment(
   obj: Partial<AssignmentRow>,
 ): Promise<{ data: AssignmentRow | null; error: string | null }> {
-  const { data, error } = await supabaseAdmin
-    .from("koleex_assignments")
-    .insert({ ...obj, updated_at: new Date().toISOString() })
-    .select()
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  return { data: data as AssignmentRow, error: null };
+  try {
+    const j = await api<{ assignment: AssignmentRow | null }>("/api/management/assignments", {
+      method: "POST", headers: J, body: JSON.stringify(obj),
+    });
+    return { data: j.assignment, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function updateAssignment(
   id: string,
   obj: Partial<AssignmentRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin
-    .from("koleex_assignments")
-    .update({ ...obj, updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  try {
+    await api("/api/management/assignments", {
+      method: "PATCH", headers: J, body: JSON.stringify({ ...obj, id }),
+    });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 export async function deleteAssignment(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin
-    .from("koleex_assignments")
-    .delete()
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  try {
+    await api("/api/management/assignments", { method: "DELETE", headers: J, body: JSON.stringify({ id }) });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -530,20 +433,14 @@ export async function fetchRoles(): Promise<RoleRow[]> {
       const json = (await res.json()) as { roles: RoleRow[] };
       return json.roles;
     }
-    if (res.status === 401 || res.status === 403) return [];
+    if (res.status !== 401 && res.status !== 403) {
+      console.error("[Management] fetchRoles:", res.status);
+    }
+    return [];
   } catch (e) {
-    console.error("[Management] fetchRoles API failed:", e);
-  }
-  const { data, error } = await supabaseAdmin
-    .from("koleex_roles")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("[Management] fetchRoles:", error.message);
+    console.error("[Management] fetchRoles failed:", e);
     return [];
   }
-  return (data as RoleRow[]) || [];
 }
 
 export async function createRole(
@@ -661,18 +558,14 @@ export async function fetchPermissions(roleId: string): Promise<PermissionRow[]>
       const json = (await res.json()) as { permissions: PermissionRow[] };
       return json.permissions;
     }
-    if (res.status === 401 || res.status === 403) return [];
+    if (res.status !== 401 && res.status !== 403) {
+      console.error("[Management] fetchPermissions:", res.status);
+    }
+    return [];
   } catch (e) {
-    console.error("[Management] fetchPermissions API failed:", e);
+    console.error("[Management] fetchPermissions failed:", e);
+    return [];
   }
-  const { data, error } = await supabaseAdmin
-    .from("koleex_permissions")
-    .select("*")
-    .eq("role_id", roleId)
-    .order("module_name", { ascending: true });
-
-  if (error) return [];
-  return (data as PermissionRow[]) || [];
 }
 
 export async function upsertPermissions(
@@ -719,22 +612,26 @@ export async function upsertPermissions(
    ═══════════════════════════════════════════════════ */
 
 export async function fetchPositionHistory(positionId: string): Promise<PositionHistoryRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from("koleex_position_history")
-    .select("*")
-    .eq("position_id", positionId)
-    .order("created_at", { ascending: false });
-
-  if (error) return [];
-  return (data as PositionHistoryRow[]) || [];
+  try {
+    const j = await api<{ history: PositionHistoryRow[] }>(
+      `/api/management/activity?position_id=${encodeURIComponent(positionId)}`,
+    );
+    return j.history ?? [];
+  } catch (e) {
+    console.error("[Management] fetchPositionHistory:", e);
+    return [];
+  }
 }
 
 export async function addPositionHistory(
   obj: Partial<PositionHistoryRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin.from("koleex_position_history").insert(obj);
-  if (error) return { ok: false, error: error.message };
-  return { ok: true, error: null };
+  try {
+    await api("/api/management/activity", { method: "POST", headers: J, body: JSON.stringify(obj) });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -746,38 +643,17 @@ export async function transferEmployee(
   newPositionId: string,
   newDepartmentId: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { data: current, error: fetchErr } = await supabaseAdmin
-    .from("koleex_assignments")
-    .select("*")
-    .eq("id", assignmentId)
-    .single();
-
-  if (fetchErr || !current) return { ok: false, error: fetchErr?.message || "Assignment not found" };
-
-  const oldPositionId = current.position_id as string;
-  const contactId = current.person_id as string;
-  const oldDepartmentId = current.department_id as string;
-
-  const { error: updateErr } = await supabaseAdmin
-    .from("koleex_assignments")
-    .update({ position_id: newPositionId, department_id: newDepartmentId, updated_at: new Date().toISOString() })
-    .eq("id", assignmentId);
-
-  if (updateErr) return { ok: false, error: updateErr.message };
-
-  // Audit entries
-  await supabaseAdmin.from("koleex_position_history").insert({
-    position_id: oldPositionId, person_id: contactId, department_id: oldDepartmentId,
-    action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
-    notes: "Transferred out",
-  });
-  await supabaseAdmin.from("koleex_position_history").insert({
-    position_id: newPositionId, person_id: contactId, department_id: newDepartmentId,
-    action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
-    notes: "Transferred in",
-  });
-
-  return { ok: true, error: null };
+  /* The move AND both audit rows land as one server operation. Split across
+     the browser, a failure between them left a transfer with half a trail. */
+  try {
+    await api("/api/management/assignments", {
+      method: "PUT", headers: J,
+      body: JSON.stringify({ transfer: { assignmentId, newPositionId, newDepartmentId } }),
+    });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -785,20 +661,20 @@ export async function transferEmployee(
    ═══════════════════════════════════════════════════ */
 
 export async function fetchPeopleForLinking(): Promise<PersonRef[]> {
-  const { data, error } = await supabaseAdmin
-    .from("people")
-    .select("id, first_name, last_name, display_name, full_name, email, avatar_url, phone")
-    .order("full_name", { ascending: true });
-
-  if (error) return [];
-
-  return (data || []).map((c: Record<string, unknown>) => ({
-    id: c.id as string,
-    name: (c.display_name as string) || (c.full_name as string) || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed",
-    email: (c.email as string) || null,
-    avatar: (c.avatar_url as string) || null,
-    phone: (c.phone as string) || null,
-  }));
+  try {
+    const j = await api<{ people: Record<string, unknown>[] }>("/api/people");
+    return (j.people ?? []).map((c) => ({
+      id: c.id as string,
+      name: (c.display_name as string) || (c.full_name as string)
+        || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed",
+      email: (c.email as string) || null,
+      avatar: (c.avatar_url as string) || null,
+      phone: (c.phone as string) || null,
+    }));
+  } catch (e) {
+    console.error("[Management] fetchPeopleForLinking:", e);
+    return [];
+  }
 }
 
 export async function createInlinePerson(input: {
@@ -808,32 +684,32 @@ export async function createInlinePerson(input: {
   phone?: string;
 }): Promise<{ data: PersonRef | null; error: string | null }> {
   const display = [input.first_name, input.last_name].filter(Boolean).join(" ");
-
-  const { data, error } = await supabaseAdmin
-    .from("people")
-    .insert({
-      first_name: input.first_name,
-      last_name: input.last_name || null,
-      full_name: display,
-      display_name: display,
-      email: input.email || null,
-      phone: input.phone || null,
-    })
-    .select("id, first_name, last_name, display_name, email, avatar_url, phone")
-    .single();
-
-  if (error) return { data: null, error: error.message };
-
-  return {
-    data: {
-      id: data.id,
-      name: data.display_name || display,
-      email: data.email,
-      avatar: data.avatar_url || null,
-      phone: data.phone,
-    },
-    error: null,
-  };
+  try {
+    const j = await api<{ person: Record<string, unknown> }>("/api/people", {
+      method: "POST", headers: J,
+      body: JSON.stringify({
+        first_name: input.first_name,
+        last_name: input.last_name || null,
+        full_name: display,
+        display_name: display,
+        email: input.email || null,
+        phone: input.phone || null,
+      }),
+    });
+    const d = j.person ?? {};
+    return {
+      data: {
+        id: d.id as string,
+        name: (d.display_name as string) || display,
+        email: (d.email as string) ?? null,
+        avatar: (d.avatar_url as string) ?? null,
+        phone: (d.phone as string) ?? null,
+      },
+      error: null,
+    };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Failed" };
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1028,14 +904,13 @@ export async function fetchEmployeeProfile(personId: string): Promise<EmployeePr
    ═══════════════════════════════════════════════════ */
 
 export async function fetchRecentActivity(limit = 50): Promise<PositionHistoryRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from("koleex_position_history")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) return [];
-  return (data as PositionHistoryRow[]) || [];
+  try {
+    const j = await api<{ history: PositionHistoryRow[] }>(`/api/management/activity?limit=${limit}`);
+    return j.history ?? [];
+  } catch (e) {
+    console.error("[Management] fetchRecentActivity:", e);
+    return [];
+  }
 }
 
 /* ═══════════════════════════════════════════════════

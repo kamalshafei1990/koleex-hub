@@ -17,7 +17,6 @@
    show the failure message.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type { ScopeContext } from "./scope";
 import type {
   CrmActivityInsert,
@@ -33,22 +32,6 @@ import type {
   CrmStageUpdate,
 } from "@/types/supabase";
 
-const STAGES = "crm_stages";
-const OPPS = "crm_opportunities";
-const ACTS = "crm_activities";
-
-/** Fallback returned when the table doesn't exist yet. We sniff for
- *  the typical PostgREST messages so the UI degrades to "empty
- *  pipeline" rather than throwing. */
-function isMissingTable(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("does not exist") ||
-    m.includes("not found") ||
-    m.includes("schema cache") ||
-    m.includes("404")
-  );
-}
 
 /* ════════════════════════════════════════════════════════════════════════
    Contact picker search (Phase 4 Wave 2B.2)
@@ -117,34 +100,21 @@ export async function searchCrmContacts(
  *  session (server-side migrations, tests) still works during the
  *  transition. Will be removed once RLS deny-by-default is enabled
  *  across all tables. */
-export async function fetchStages(
-  ctx?: ScopeContext | null,
-): Promise<CrmStageRow[]> {
+export async function fetchStages(): Promise<CrmStageRow[]> {
   try {
     const res = await fetch("/api/crm/stages", { credentials: "include" });
     if (res.ok) {
       const json = (await res.json()) as { stages: CrmStageRow[] };
       return json.stages;
     }
-    if (res.status === 401 || res.status === 403) return [];
-  } catch (e) {
-    console.error("[CRM] fetchStages API failed:", e);
-  }
-
-  // Legacy fallback — direct anon-key query.
-  let q = supabase
-    .from(STAGES)
-    .select("*")
-    .order("sequence", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[CRM] Fetch stages:", error.message);
+    if (res.status !== 401 && res.status !== 403) {
+      console.error("[CRM] fetchStages:", res.status);
     }
     return [];
+  } catch (e) {
+    console.error("[CRM] fetchStages failed:", e);
+    return [];
   }
-  return (data as CrmStageRow[]) ?? [];
 }
 
 export async function createStage(
@@ -163,18 +133,10 @@ export async function createStage(
     }
     if (res.status === 401 || res.status === 403) return null;
   } catch (e) {
-    console.error("[CRM] createStage API failed:", e);
-  }
-  const { data, error } = await supabase
-    .from(STAGES)
-    .insert(input)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[CRM] Create stage:", error.message);
+    console.error("[CRM] createStage failed:", e);
     return null;
   }
-  return data as CrmStageRow;
+  return null;
 }
 
 export async function updateStage(
@@ -191,14 +153,10 @@ export async function updateStage(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] updateStage API failed:", e);
-  }
-  const { error } = await supabase.from(STAGES).update(patch).eq("id", id);
-  if (error) {
-    console.error("[CRM] Update stage:", error.message);
+    console.error("[CRM] updateStage failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 export async function deleteStage(id: string): Promise<boolean> {
@@ -210,19 +168,11 @@ export async function deleteStage(id: string): Promise<boolean> {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] deleteStage API failed:", e);
-  }
-  const { error } = await supabase.from(STAGES).delete().eq("id", id);
-  if (error) {
-    console.error("[CRM] Delete stage:", error.message);
+    console.error("[CRM] deleteStage failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
-
-/* ════════════════════════════════════════════════════════════════════════
-   Opportunities
-   ════════════════════════════════════════════════════════════════════════ */
 
 interface FetchOpportunitiesOptions {
   /** When true, archived rows are included. Defaults to false so the
@@ -274,13 +224,13 @@ export async function fetchOpportunities(
     contactId = null,
     search = null,
     limit = 500,
-    ctx = null,
     view = null,
   } = options;
 
-  // API-first: the /api/crm/opportunities route returns the same enriched
-  // shape as this legacy path, scoped to the caller's tenant by the session
-  // cookie. Falls back to direct anon-key query below on network error.
+  /* The route returns the enriched shape, scoped to the caller's tenant from
+     the session cookie. `options.ctx` is accepted for call-site compatibility
+     and deliberately ignored — a scope the browser assembled for itself was
+     never what decided the answer. */
   try {
     const params = new URLSearchParams();
     if (includeArchived) params.set("includeArchived", "1");
@@ -303,172 +253,10 @@ export async function fetchOpportunities(
     }
     if (res.status === 401 || res.status === 403) return [];
   } catch (e) {
-    console.error("[CRM] fetchOpportunities API failed:", e);
-  }
-
-  // Legacy fallback.
-  let q = supabase
-    .from(OPPS)
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(limit);
-
-  // Multi-tenancy: auto-filter to the viewer's tenant when ctx is provided.
-  // Prevents a customer-tenant account from ever seeing Koleex deals and
-  // vice versa. Super Admin views a specific tenant via the top-bar picker
-  // (ctx.tenant_id is set to whichever tenant they're currently browsing).
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-
-  if (!includeArchived) q = q.is("archived_at", null);
-  if (ownerAccountId) q = q.eq("owner_account_id", ownerAccountId);
-  if (stageId) q = q.eq("stage_id", stageId);
-  if (contactId) q = q.eq("contact_id", contactId);
-  if (search && search.trim().length > 0) {
-    const s = `%${search.trim()}%`;
-    q = q.or(
-      `name.ilike.${s},company_name.ilike.${s},contact_name.ilike.${s},email.ilike.${s}`,
-    );
-  }
-
-  const { data, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[CRM] Fetch opportunities:", error.message);
-    }
+    console.error("[CRM] fetchOpportunities failed:", e);
     return [];
   }
-  const rows = (data as CrmOpportunityRow[]) ?? [];
-  if (rows.length === 0) return [];
-
-  /* Collect FK ids in one pass so the follow-up fetches stay batched. */
-  const stageIds = new Set<string>();
-  const contactIds = new Set<string>();
-  const ownerIds = new Set<string>();
-  for (const r of rows) {
-    if (r.stage_id) stageIds.add(r.stage_id);
-    if (r.contact_id) contactIds.add(r.contact_id);
-    if (r.owner_account_id) ownerIds.add(r.owner_account_id);
-  }
-
-  /* Stages — usually a handful, fetch all and key by id. */
-  const stagesById = new Map<string, CrmStageRow>();
-  if (stageIds.size > 0) {
-    const { data: stages } = await supabase
-      .from(STAGES)
-      .select("*")
-      .in("id", Array.from(stageIds));
-    for (const s of (stages as CrmStageRow[]) ?? []) {
-      stagesById.set(s.id, s);
-    }
-  }
-
-  /* Contacts — display columns + country (used by Map view). */
-  const contactsById = new Map<
-    string,
-    {
-      id: string;
-      display_name: string;
-      company: string | null;
-      country: string | null;
-      country_code: string | null;
-    }
-  >();
-  if (contactIds.size > 0) {
-    const { data: contacts } = await supabase
-      .from("contacts")
-      .select("id, display_name, company, country, country_code")
-      .in("id", Array.from(contactIds));
-    for (const c of (contacts as Array<{
-      id: string;
-      display_name: string | null;
-      company: string | null;
-      country: string | null;
-      country_code: string | null;
-    }>) ?? []) {
-      contactsById.set(c.id, {
-        id: c.id,
-        display_name: c.display_name ?? "Untitled",
-        company: c.company ?? null,
-        country: c.country ?? null,
-        country_code: c.country_code ?? null,
-      });
-    }
-  }
-
-  /* Owners — account + person join for the avatar + display name. */
-  const ownersById = new Map<
-    string,
-    {
-      id: string;
-      username: string;
-      full_name: string | null;
-      avatar_url: string | null;
-    }
-  >();
-  if (ownerIds.size > 0) {
-    const { data: owners } = await supabase
-      .from("accounts")
-      .select(
-        "id, username, avatar_url, person:people ( full_name, avatar_url )",
-      )
-      .in("id", Array.from(ownerIds));
-    type OwnerRow = {
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person:
-        | { full_name: string | null; avatar_url: string | null }
-        | Array<{ full_name: string | null; avatar_url: string | null }>
-        | null;
-    };
-    for (const o of (owners as OwnerRow[]) ?? []) {
-      const person = Array.isArray(o.person) ? o.person[0] ?? null : o.person;
-      ownersById.set(o.id, {
-        id: o.id,
-        username: o.username,
-        full_name: person?.full_name ?? null,
-        avatar_url: o.avatar_url ?? person?.avatar_url ?? null,
-      });
-    }
-  }
-
-  /* Activities — batch fetch all activities for these opportunities, then
-     bucket per opportunity. The card needs the next pending activity, the
-     overdue count and the pending count. */
-  const oppIds = rows.map((r) => r.id);
-  const activitiesByOpp = new Map<string, CrmActivityRow[]>();
-  if (oppIds.length > 0) {
-    const { data: acts } = await supabase
-      .from(ACTS)
-      .select("*")
-      .in("opportunity_id", oppIds)
-      .is("done_at", null)
-      .order("due_at", { ascending: true });
-    for (const a of (acts as CrmActivityRow[]) ?? []) {
-      const list = activitiesByOpp.get(a.opportunity_id) ?? [];
-      list.push(a);
-      activitiesByOpp.set(a.opportunity_id, list);
-    }
-  }
-
-  const now = Date.now();
-  return rows.map((r) => {
-    const acts = activitiesByOpp.get(r.id) ?? [];
-    const overdue = acts.filter(
-      (a) => a.due_at && new Date(a.due_at).getTime() < now,
-    ).length;
-    return {
-      ...r,
-      stage: r.stage_id ? stagesById.get(r.stage_id) ?? null : null,
-      contact: r.contact_id ? contactsById.get(r.contact_id) ?? null : null,
-      owner: r.owner_account_id
-        ? ownersById.get(r.owner_account_id) ?? null
-        : null,
-      next_activity: acts[0] ?? null,
-      activities_overdue: overdue,
-      activities_pending: acts.length,
-    };
-  });
+  return [];
 }
 
 /** Single opportunity with the same enrichment as fetchOpportunities. */
@@ -488,73 +276,14 @@ export async function fetchOpportunity(
       };
       if (json.opportunity) return json.opportunity;
     }
-    if (res.status === 401 || res.status === 403 || res.status === 404) {
-      return null;
+    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+      console.error("[CRM] fetchOpportunity:", res.status);
     }
-  } catch {
-    /* fall through to the legacy list scan */
+    return null;
+  } catch (e) {
+    console.error("[CRM] fetchOpportunity failed:", e);
+    return null;
   }
-  const list = await fetchOpportunities({ includeArchived: true });
-  return list.find((o) => o.id === id) ?? null;
-}
-
-/* ────────────────────────────────────────────────────────────────────
-   Lifecycle sync: CRM → Contacts
-   --------------------------------------------------------------------
-   When a deal closes Won, reflect that on the linked customer record
-   so the Customers app doesn't drift out of sync with reality. We:
-     · promote `contact_type` from "company" (prospect) → "customer",
-       idempotent for already-flagged customers
-     · stamp `last_order_date` = today so the customer profile shows
-       recency without another query
-   Suppliers and employees are never promoted — those paths are
-   deliberate. Failures are logged but never thrown: this one-way
-   sync must not block the primary CRM write.
-   ──────────────────────────────────────────────────────────────────── */
-
-async function reflectWinOnContact(
-  contactId: string | null | undefined,
-): Promise<void> {
-  if (!contactId) return;
-  const { data: contact, error: cErr } = await supabase
-    .from("contacts")
-    .select("id, contact_type")
-    .eq("id", contactId)
-    .single();
-  if (cErr || !contact) return;
-  if (
-    contact.contact_type === "employee" ||
-    contact.contact_type === "supplier"
-  ) {
-    return;
-  }
-  const patch: Record<string, unknown> = {
-    last_order_date: new Date().toISOString().slice(0, 10),
-  };
-  if (contact.contact_type !== "customer") {
-    patch.contact_type = "customer";
-  }
-  const { error: uErr } = await supabase
-    .from("contacts")
-    .update(patch)
-    .eq("id", contactId);
-  if (uErr) {
-    console.error("[CRM→Contacts] Lifecycle sync:", uErr.message);
-  }
-}
-
-/** True when the given stage id is flagged `is_won`. Used by the
- *  opportunity mutation helpers to decide whether to fan out a
- *  lifecycle sync. */
-async function isWonStageId(stageId: string | null | undefined): Promise<boolean> {
-  if (!stageId) return false;
-  const { data, error } = await supabase
-    .from(STAGES)
-    .select("is_won")
-    .eq("id", stageId)
-    .single();
-  if (error) return false;
-  return Boolean(data?.is_won);
 }
 
 export async function createOpportunity(
@@ -580,22 +309,9 @@ export async function createOpportunity(
     const err = await res.json().catch(() => ({ error: "Failed" }));
     return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
   } catch (e) {
-    console.error("[CRM] createOpportunity API failed:", e);
+    console.error("[CRM] createOpportunity failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
   }
-  const { data, error } = await supabase
-    .from(OPPS)
-    .insert(input)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[CRM] Create opportunity:", error.message);
-    return { ok: false, error: error.message };
-  }
-  const opp = data as CrmOpportunityRow;
-  if (await isWonStageId(opp.stage_id)) {
-    await reflectWinOnContact(opp.contact_id);
-  }
-  return { ok: true, opportunity: opp };
 }
 
 export async function updateOpportunity(
@@ -612,22 +328,10 @@ export async function updateOpportunity(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] updateOpportunity API failed:", e);
-  }
-  const { error } = await supabase.from(OPPS).update(patch).eq("id", id);
-  if (error) {
-    console.error("[CRM] Update opportunity:", error.message);
+    console.error("[CRM] updateOpportunity failed:", e);
     return false;
   }
-  if (patch.stage_id && (await isWonStageId(patch.stage_id))) {
-    const { data: opp } = await supabase
-      .from(OPPS)
-      .select("contact_id")
-      .eq("id", id)
-      .single();
-    await reflectWinOnContact(opp?.contact_id);
-  }
-  return true;
+  return false;
 }
 
 /** Move an opportunity to a new stage. Updates `won_at` / `lost_at`
@@ -654,32 +358,10 @@ export async function moveOpportunityToStage(input: {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] moveOpportunityToStage API failed:", e);
-  }
-  const patch: CrmOpportunityUpdate = {
-    stage_id: input.stageId,
-  };
-  if (input.isWonStage) {
-    patch.won_at = new Date().toISOString();
-    patch.probability = 100;
-  }
-  const { error } = await supabase
-    .from(OPPS)
-    .update(patch)
-    .eq("id", input.opportunityId);
-  if (error) {
-    console.error("[CRM] Move opportunity:", error.message);
+    console.error("[CRM] moveOpportunityToStage failed:", e);
     return false;
   }
-  if (input.isWonStage) {
-    const { data: opp } = await supabase
-      .from(OPPS)
-      .select("contact_id")
-      .eq("id", input.opportunityId)
-      .single();
-    await reflectWinOnContact(opp?.contact_id);
-  }
-  return true;
+  return false;
 }
 
 /** Mark an opportunity as lost. Stamps `lost_at`, captures the reason,
@@ -699,23 +381,10 @@ export async function markOpportunityLost(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] markOpportunityLost API failed:", e);
-  }
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from(OPPS)
-    .update({
-      lost_reason: reason,
-      lost_at: now,
-      probability: 0,
-      archived_at: now,
-    })
-    .eq("id", id);
-  if (error) {
-    console.error("[CRM] Mark lost:", error.message);
+    console.error("[CRM] markOpportunityLost failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 export async function archiveOpportunity(id: string): Promise<boolean> {
@@ -727,17 +396,10 @@ export async function archiveOpportunity(id: string): Promise<boolean> {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] archiveOpportunity API failed:", e);
-  }
-  const { error } = await supabase
-    .from(OPPS)
-    .update({ archived_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[CRM] Archive opportunity:", error.message);
+    console.error("[CRM] archiveOpportunity failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 export async function unarchiveOpportunity(id: string): Promise<boolean> {
@@ -749,17 +411,10 @@ export async function unarchiveOpportunity(id: string): Promise<boolean> {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] unarchiveOpportunity API failed:", e);
-  }
-  const { error } = await supabase
-    .from(OPPS)
-    .update({ archived_at: null })
-    .eq("id", id);
-  if (error) {
-    console.error("[CRM] Unarchive opportunity:", error.message);
+    console.error("[CRM] unarchiveOpportunity failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 export async function deleteOpportunity(id: string): Promise<boolean> {
@@ -771,14 +426,10 @@ export async function deleteOpportunity(id: string): Promise<boolean> {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] deleteOpportunity API failed:", e);
-  }
-  const { error } = await supabase.from(OPPS).delete().eq("id", id);
-  if (error) {
-    console.error("[CRM] Delete opportunity:", error.message);
+    console.error("[CRM] deleteOpportunity failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -788,18 +439,23 @@ export async function deleteOpportunity(id: string): Promise<boolean> {
 export async function fetchActivities(
   opportunityId: string,
 ): Promise<CrmActivityRow[]> {
-  const { data, error } = await supabase
-    .from(ACTS)
-    .select("*")
-    .eq("opportunity_id", opportunityId)
-    .order("created_at", { ascending: false });
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[CRM] Fetch activities:", error.message);
+  try {
+    const res = await fetch(
+      `/api/crm/activities?opportunityId=${encodeURIComponent(opportunityId)}`,
+      { credentials: "include" },
+    );
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403) {
+        console.error("[CRM] fetchActivities:", res.status);
+      }
+      return [];
     }
+    const json = (await res.json()) as { activities: CrmActivityRow[] };
+    return json.activities ?? [];
+  } catch (e) {
+    console.error("[CRM] fetchActivities failed:", e);
     return [];
   }
-  return (data as CrmActivityRow[]) ?? [];
 }
 
 export async function createActivity(
@@ -818,18 +474,10 @@ export async function createActivity(
     }
     if (res.status === 401 || res.status === 403) return null;
   } catch (e) {
-    console.error("[CRM] createActivity API failed:", e);
-  }
-  const { data, error } = await supabase
-    .from(ACTS)
-    .insert(input)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[CRM] Create activity:", error.message);
+    console.error("[CRM] createActivity failed:", e);
     return null;
   }
-  return data as CrmActivityRow;
+  return null;
 }
 
 export async function updateActivity(
@@ -846,14 +494,10 @@ export async function updateActivity(
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] updateActivity API failed:", e);
-  }
-  const { error } = await supabase.from(ACTS).update(patch).eq("id", id);
-  if (error) {
-    console.error("[CRM] Update activity:", error.message);
+    console.error("[CRM] updateActivity failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 export async function completeActivity(id: string): Promise<boolean> {
@@ -873,14 +517,10 @@ export async function deleteActivity(id: string): Promise<boolean> {
     if (res.ok) return true;
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
-    console.error("[CRM] deleteActivity API failed:", e);
-  }
-  const { error } = await supabase.from(ACTS).delete().eq("id", id);
-  if (error) {
-    console.error("[CRM] Delete activity:", error.message);
+    console.error("[CRM] deleteActivity failed:", e);
     return false;
   }
-  return true;
+  return false;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -1030,12 +670,29 @@ export async function generateLeads(
     };
   });
 
-  const { error } = await supabase.from(OPPS).insert(rows);
-  if (error) {
-    console.error("[CRM] Generate leads:", error.message);
-    return { ok: false, error: error.message };
+  /* Posted one by one through the same gated route a real deal goes through,
+     rather than a bulk insert from the browser: the demo rows then get the
+     tenant, the creator and every server-side default that a hand-made
+     opportunity gets, instead of whatever the browser happened to send. */
+  let created = 0;
+  for (const row of rows) {
+    try {
+      const res = await fetch("/api/crm/opportunities", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      if (res.ok) created += 1;
+      else if (created === 0) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        return { ok: false, error: err?.error ?? `HTTP ${res.status}` };
+      }
+    } catch (e) {
+      if (created === 0) return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+    }
   }
-  return { ok: true, created: rows.length };
+  return { ok: true, created };
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -1054,42 +711,24 @@ export interface ActivityFeedRow extends CrmActivityRow {
   } | null;
 }
 
-export async function fetchActivityFeed(
-  ctx?: ScopeContext | null,
-): Promise<ActivityFeedRow[]> {
-  let q = supabase
-    .from(ACTS)
-    .select("*")
-    .order("due_at", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data: acts, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[CRM] Fetch activity feed:", error.message);
+export async function fetchActivityFeed(): Promise<ActivityFeedRow[]> {
+  /* The route joins each activity to its opportunity, so the row renders
+     without a second round trip. Tenant scope comes from the session — the
+     `ctx` this used to take was assembled in the browser. */
+  try {
+    const res = await fetch("/api/crm/activities?feed=1", { credentials: "include" });
+    if (!res.ok) {
+      if (res.status !== 401 && res.status !== 403) {
+        console.error("[CRM] fetchActivityFeed:", res.status);
+      }
+      return [];
     }
+    const json = (await res.json()) as { activities: ActivityFeedRow[] };
+    return json.activities ?? [];
+  } catch (e) {
+    console.error("[CRM] fetchActivityFeed failed:", e);
     return [];
   }
-  const rows = (acts as CrmActivityRow[]) ?? [];
-  if (rows.length === 0) return [];
-
-  const oppIds = Array.from(new Set(rows.map((r) => r.opportunity_id)));
-  const { data: opps } = await supabase
-    .from(OPPS)
-    .select("id, name, company_name, stage_id")
-    .in("id", oppIds);
-  const byId = new Map(
-    ((opps as Array<{
-      id: string;
-      name: string;
-      company_name: string | null;
-      stage_id: string | null;
-    }>) ?? []).map((o) => [o.id, o]),
-  );
-
-  return rows.map((r) => ({
-    ...r,
-    opportunity: byId.get(r.opportunity_id) ?? null,
-  }));
 }
 
 /* ════════════════════════════════════════════════════════════════════════
