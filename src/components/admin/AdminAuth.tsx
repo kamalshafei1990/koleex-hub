@@ -42,6 +42,7 @@ import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
 import { setCurrentAccountId } from "@/lib/identity";
 import { COUNTRIES } from "@/types/product-form";
+import SignInHelpDialog from "./SignInHelpDialog";
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
@@ -100,6 +101,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* `authed === null` = still hydrating; render a spinner so we don't
      flash the form before we know the session state. */
   const [authed, setAuthed] = useState<boolean | null>(null);
+  /* "Having trouble?" — mounted only while the gate is showing, so the dialog
+     never ships with the authenticated shell. */
+  const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("signin");
 
   /* Sign-in form state */
@@ -325,7 +329,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />
               <span className="text-[10px] uppercase tracking-[0.24em] text-white/45 font-semibold">
-                Enterprise Operations
+                Shaping the Future
               </span>
               <span className="h-px w-6 bg-white/15" aria-hidden />
             </div>
@@ -404,6 +408,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
               {tab === "signin" ? (
                 <SignInPanel
+                  onNeedHelp={() => setHelpOpen(true)}
                   username={username}
                   password={password}
                   busy={signInBusy}
@@ -461,9 +466,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           </div>
 
           <p className="text-[11px] text-white/30 text-center mt-5 tracking-wide">
-            Koleex Group · Secure Hub
+            Koleex International Group · Authorized Access Only
           </p>
         </div>
+
+        <SignInHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       </div>
     );
   }
@@ -481,6 +488,9 @@ interface SignInPanelProps {
   onUsernameChange: (v: string) => void;
   onPasswordChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  /** Opens the help dialog. Someone who cannot sign in has no other way to
+      reach an administrator from this screen. */
+  onNeedHelp: () => void;
 }
 
 function SignInPanel({
@@ -491,6 +501,7 @@ function SignInPanel({
   onUsernameChange,
   onPasswordChange,
   onSubmit,
+  onNeedHelp,
 }: SignInPanelProps) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -545,7 +556,13 @@ function SignInPanel({
       </button>
 
       <p className="text-[11px] text-white/35 text-center pt-1">
-        Having trouble? Contact your administrator.
+        <button
+          type="button"
+          onClick={onNeedHelp}
+          className="underline decoration-white/20 underline-offset-4 hover:text-white/70 hover:decoration-white/40 transition-colors"
+        >
+          Having trouble? Contact your Koleex administrator.
+        </button>
       </p>
     </form>
   );
