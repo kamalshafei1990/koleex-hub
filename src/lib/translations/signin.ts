@@ -14,7 +14,12 @@ import type { Translations } from "@/lib/i18n";
 export const signInT: Translations = {
 
   /* ── Brand ── */
-  "tagline":        { en: "Shaping the Future", zh: "塑造未来", ar: "نصنع المستقبل" },
+  /* The HUB's slogan, owner's pick 2026-08-10. "Shaping the Future" is the
+     GROUP's line and stays on the website and print — two slogans on one
+     screen is one too many, and this screen is the Hub. */
+  "tagline":        { en: "Work Smarter. Together.",
+                      zh: "智慧工作 · 携手同行",
+                      ar: "نعمل بذكاء. معًا." },
   "footer":         { en: "Koleex International Group · Authorized Access Only",
                       zh: "Koleex International Group · 仅限授权访问",
                       ar: "Koleex International Group · الدخول للمصرّح لهم فقط" },

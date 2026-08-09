@@ -264,7 +264,11 @@ export const settingsT: Translations = {
   "admin.footer":         { en: "View-as and workspace switching live in the top bar. These controls are only visible to Super Admins.", zh: "“以身份查看”和工作区切换在顶栏中。这些控件仅超级管理员可见。", ar: "«العرض كـ» وتبديل مساحة العمل في الشريط العلوي. هذه الأدوات مرئية للمشرفين الخارقين فقط." },
 
   /* ── About ── */
-  "about.slogan":         { en: "Shaping the Future", zh: "Shaping the Future", ar: "Shaping the Future" },
+  /* Sits directly under "Koleex Hub" in About, so it is the Hub's slogan, not
+     the group's — and it was the same English string in all three languages. */
+  "about.slogan":         { en: "Work Smarter. Together.",
+                            zh: "智慧工作 · 携手同行",
+                            ar: "نعمل بذكاء. معًا." },
   "about.version":        { en: "Version", zh: "版本", ar: "الإصدار" },
   "about.desktop":        { en: "Desktop app", zh: "桌面应用", ar: "تطبيق سطح المكتب" },
   "about.device":         { en: "This device", zh: "本设备", ar: "هذا الجهاز" },
