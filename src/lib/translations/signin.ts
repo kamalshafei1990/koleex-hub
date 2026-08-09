@@ -20,7 +20,7 @@ export const signInT: Translations = {
 
   /* ── Tabs ── */
   "tab.signIn":     { en: "Sign In", zh: "登录", ar: "تسجيل الدخول" },
-  "tab.join":       { en: "Be a Koleex Member", zh: "成为 Koleex 会员", ar: "انضم إلى Koleex" },
+  "tab.join":       { en: "Request an Account", zh: "申请账户", ar: "اطلب حساب" },
 
   /* ── Sign-in panel ── */
   "welcome":        { en: "Welcome back", zh: "欢迎回来", ar: "أهلاً بعودتك" },
@@ -89,10 +89,10 @@ export const signInT: Translations = {
   "help.close":     { en: "Close", zh: "关闭", ar: "إغلاق" },
 
   /* ── Join panel ── */
-  "join.title":     { en: "Join the Koleex network", zh: "加入 Koleex 网络", ar: "انضم لشبكة Koleex" },
-  "join.sub":       { en: "Tell us a bit about you — we'll reach out with an invitation.",
-                      zh: "简单介绍一下您自己，我们会向您发出邀请。",
-                      ar: "عرّفنا بنفسك — وهنتواصل معاك بدعوة." },
+  "join.title":     { en: "New here?", zh: "第一次来？", ar: "أول مرة معانا؟" },
+  "join.sub":       { en: "Tell us about you and we'll be in touch.",
+                      zh: "介绍一下您自己，我们会与您联系。",
+                      ar: "عرّفنا بنفسك وهنتواصل معاك." },
   "join.doneTitle": { en: "Request received", zh: "已收到请求", ar: "الطلب اتستلم" },
   "join.doneSub":   { en: "A Super Admin will review your request shortly.",
                       zh: "超级管理员将尽快审核您的请求。",
@@ -109,7 +109,32 @@ export const signInT: Translations = {
   "join.heardFrom": { en: "How did you hear about us?", zh: "您如何得知我们？", ar: "عرفت عننا إزاي؟" },
   "join.purpose":   { en: "Purpose of access", zh: "申请用途", ar: "الغرض من الدخول" },
   "join.submit":    { en: "Request Access", zh: "申请访问", ar: "اطلب الدخول" },
-  "join.another":   { en: "Submit another request", zh: "再提交一个请求", ar: "إرسال طلب تاني" },
+  "join.reference": { en: "Your reference", zh: "您的编号", ar: "رقمك المرجعي" },
+  "join.privacy":   { en: "Your details go to the Koleex administrators only.",
+                      zh: "您的信息仅发送给 Koleex 管理员。",
+                      ar: "بياناتك بتروح لمسؤولي Koleex بس." },
+  "join.customerCode": { en: "Customer code or account name",
+                      zh: "客户编号或账户名称",
+                      ar: "كود العميل أو اسم الحساب" },
+  /* The last question changes with who is asking — a brand-new contact cannot
+     answer "which parts of the Hub do you need" because they have never seen
+     it. */
+  "join.q.new_prospect":     { en: "What are you looking for?",
+                      zh: "您在寻找什么？", ar: "بتدوّر على إيه؟" },
+  "join.q.existing_customer":{ en: "What do you need access to?",
+                      zh: "您需要访问什么？", ar: "محتاج توصل لإيه؟" },
+  "join.q.supplier": { en: "What do you supply?", zh: "您供应什么产品？", ar: "بتورّد إيه؟" },
+  "join.q.partner":  { en: "What kind of partnership?", zh: "哪种合作方式？", ar: "شراكة من أي نوع؟" },
+  "join.q.other":    { en: "How can we help?", zh: "我们能帮您什么？", ar: "نقدر نساعدك إزاي؟" },
+  "join.qh.new_prospect":     { en: "Tell us about your business and what you need…",
+                      zh: "介绍您的业务和需求…", ar: "قولنا عن شغلك ومحتاج إيه…" },
+  "join.qh.existing_customer":{ en: "Orders, quotations, invoices…",
+                      zh: "订单、报价、发票…", ar: "أوردرات، عروض أسعار، فواتير…" },
+  "join.qh.supplier": { en: "Machines, spare parts, materials…",
+                      zh: "机器、备件、材料…", ar: "ماكينات، قطع غيار، خامات…" },
+  "join.qh.partner":  { en: "Distribution, agency, technical…",
+                      zh: "分销、代理、技术…", ar: "توزيع، وكالة، فني…" },
+  "join.qh.other":    { en: "Tell us what you need…", zh: "告诉我们您的需求…", ar: "قولنا محتاج إيه…" },
 
   /* ── Errors ── */
   "err.network":    { en: "Network problem. Please try again.",

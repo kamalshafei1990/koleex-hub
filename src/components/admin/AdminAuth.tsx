@@ -36,7 +36,6 @@ import UserIcon from "@/components/icons/ui/UserIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
-import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
@@ -89,12 +88,6 @@ function LangSwitch({ lang }: { lang: Lang }) {
 export const LEGACY_SESSION_KEY = "koleex-admin";
 export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
 
-/* Fallback storage for membership requests. The primary path is the
-   Supabase `membership_requests` table (which fires a trigger to notify
-   every Super Admin). If that insert fails — usually because the
-   migration hasn't been applied yet — we stash here so the visitor still
-   sees a success state and the admin can recover the request later. */
-const MEMBERSHIP_REQUEST_KEY = "koleex-membership-requests";
 
 interface Props {
   title: string;
@@ -160,7 +153,10 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   const [joinCompany, setJoinCompany] = useState("");
   const [joinJobTitle, setJoinJobTitle] = useState("");
   const [joinCountry, setJoinCountry] = useState("");
-  const [joinCity, setJoinCity] = useState("");
+  /* Customer code replaces City: the admin needs to identify the account, not
+     the town — and Country already says where they are. */
+  const [joinCustomerCode, setJoinCustomerCode] = useState("");
+  const [joinRef, setJoinRef] = useState("");
   const [joinHeardFrom, setJoinHeardFrom] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [joinBusy, setJoinBusy] = useState(false);
@@ -224,6 +220,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
 
   function resetJoinForm() {
     setJoinDone(false);
+    setJoinRef("");
+    setJoinCustomerCode("");
     setJoinName("");
     setJoinEmail("");
     setJoinPhone("");
@@ -231,7 +229,6 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setJoinCompany("");
     setJoinJobTitle("");
     setJoinCountry("");
-    setJoinCity("");
     setJoinHeardFrom("");
     setJoinMessage("");
   }
@@ -251,61 +248,48 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
       return;
     }
 
-    /* Look up the human-readable country name so admins don't have to
-       decode country codes in the inbox. */
-    const countryRow = COUNTRIES.find((c) => c.code === joinCountry);
-
     setJoinBusy(true);
 
-    /* Primary path: insert into `membership_requests`. The DB trigger
-       fans out a notification to every active Super Admin. */
-    const { createMembershipRequest } = await import("@/lib/inbox");
-    const result = await createMembershipRequest({
-      full_name: name,
-      email,
-      company: joinCompany.trim() || null,
-      message: joinMessage.trim() || null,
-      source: "login_gate",
-      extras: {
-        phone: joinPhone.trim() || null,
-        relationship: joinRelationship || null,
-        job_title: joinJobTitle.trim() || null,
-        country: joinCountry || null,
-        country_name: countryRow?.name ?? null,
-        city: joinCity.trim() || null,
-        heard_from: joinHeardFrom || null,
-      },
-    });
-
-    if (!result.ok) {
-      /* Fallback stash so the visitor isn't blocked before the
-         migration is applied. */
-      try {
-        const raw = window.localStorage.getItem(MEMBERSHIP_REQUEST_KEY);
-        const existing = raw ? (JSON.parse(raw) as unknown[]) : [];
-        existing.push({
+    /* Through the server. The old path inserted into `membership_requests`
+       from the browser; that table is service_role-only, so every submit since
+       the RLS lockdown was rejected — and the failure branch stashed the
+       request in the visitor's OWN localStorage and showed the success panel
+       anyway. People were told a Super Admin would review a request nobody
+       ever received. */
+    const dialRow = COUNTRIES.find(
+      (c) => c.code === joinCountry,
+    ) as { code: string; dial?: string } | undefined;
+    try {
+      const res = await fetch("/api/support/membership-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          relationship: joinRelationship,
           full_name: name,
           email,
-          phone: joinPhone.trim() || null,
-          relationship: joinRelationship || null,
-          company: joinCompany.trim() || null,
-          job_title: joinJobTitle.trim() || null,
-          country: joinCountry || null,
-          country_name: countryRow?.name ?? null,
-          city: joinCity.trim() || null,
-          heard_from: joinHeardFrom || null,
-          message: joinMessage.trim() || null,
-          created_at: new Date().toISOString(),
-          error: result.error,
-        });
-        window.localStorage.setItem(
-          MEMBERSHIP_REQUEST_KEY,
-          JSON.stringify(existing),
-        );
-      } catch {
-        /* Even if localStorage blows up, still show the success state —
-           the visitor filled out a form and we don't want them stuck. */
+          phone: joinPhone.trim(),
+          phone_code: dialRow?.dial ?? "",
+          country_code: joinCountry || "",
+          company: joinCompany.trim(),
+          job_title: joinJobTitle.trim(),
+          heard_from: joinHeardFrom,
+          customer_code: joinCustomerCode.trim(),
+          message: joinMessage.trim(),
+          language: lang,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; ref?: string; error?: string } | null;
+      if (!res.ok || !json?.ok) {
+        setJoinBusy(false);
+        setJoinError(json?.error ?? "Could not send the request. Please try again.");
+        return;
       }
+      setJoinRef(json.ref ?? "");
+    } catch {
+      setJoinBusy(false);
+      setJoinError("Network problem. Please try again.");
+      return;
     }
 
     setJoinBusy(false);
@@ -470,7 +454,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   onSubmit={handleSignIn}
                 />
               ) : joinDone ? (
-                <JoinSuccessPanel name={joinName} onReset={resetJoinForm} />
+                <JoinSuccessPanel name={joinName} reference={joinRef} onReset={resetJoinForm} />
               ) : (
                 <JoinPanel
                   state={{
@@ -481,7 +465,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     company: joinCompany,
                     jobTitle: joinJobTitle,
                     country: joinCountry,
-                    city: joinCity,
+                    customerCode: joinCustomerCode,
                     heardFrom: joinHeardFrom,
                     message: joinMessage,
                   }}
@@ -501,7 +485,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     setCompany: setJoinCompany,
                     setJobTitle: setJoinJobTitle,
                     setCountry: setJoinCountry,
-                    setCity: setJoinCity,
+                    setCustomerCode: setJoinCustomerCode,
                     setHeardFrom: setJoinHeardFrom,
                     setMessage: setJoinMessage,
                   }}
@@ -639,7 +623,7 @@ interface JoinState {
   company: string;
   jobTitle: string;
   country: string;
-  city: string;
+  customerCode: string;
   heardFrom: string;
   message: string;
 }
@@ -652,7 +636,7 @@ interface JoinSetters {
   setCompany: (v: string) => void;
   setJobTitle: (v: string) => void;
   setCountry: (v: string) => void;
-  setCity: (v: string) => void;
+  setCustomerCode: (v: string) => void;
   setHeardFrom: (v: string) => void;
   setMessage: (v: string) => void;
 }
@@ -711,6 +695,7 @@ function JoinPanel({
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
             type="text"
+            required
             autoComplete="name"
             value={state.name}
             onChange={(e) => setters.setName(e.target.value)}
@@ -728,6 +713,7 @@ function JoinPanel({
             <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="email"
+              required
               autoComplete="email"
               value={state.email}
               onChange={(e) => setters.setEmail(e.target.value)}
@@ -806,23 +792,28 @@ function JoinPanel({
             </select>
           </div>
         </div>
-        <div>
-          <label className={labelBase}>{t("join.city")}</label>
-          <div className="relative">
-            <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-            <input
-              type="text"
-              autoComplete="address-level2"
-              value={state.city}
-              onChange={(e) => setters.setCity(e.target.value)}
-              placeholder="Dubai"
-              className={`${inputBase} pl-9`}
-            />
+        {/* Only an existing customer has a code. Everyone else was being asked
+            for a city the admin was never going to use. */}
+        {state.relationship === "existing_customer" ? (
+          <div>
+            <label className={labelBase}>{t("join.customerCode")}</label>
+            <div className="relative">
+              <Building2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+              <input
+                type="text"
+                value={state.customerCode}
+                onChange={(e) => setters.setCustomerCode(e.target.value)}
+                placeholder="KX-1042"
+                className={`${inputBase} pl-9`}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
-      {/* How did you hear — native select keeps it compact */}
+      {/* How did you hear — only asked of someone who has just found us. An
+          existing customer or supplier already knows who we are. */}
+      {(state.relationship === "new_prospect" || state.relationship === "other") ? (
       <div>
         <label className={labelBase}>{t("join.heardFrom")}</label>
         <div className="relative">
@@ -840,16 +831,19 @@ function JoinPanel({
           </select>
         </div>
       </div>
+      ) : null}
 
-      {/* Purpose */}
+      {/* The last question follows the relationship. "Which parts of the Hub
+          would you like access to" is unanswerable for someone who has never
+          seen the Hub — which is exactly who ticks "New to Koleex". */}
       <div>
-        <label className={labelBase}>{t("join.purpose")}</label>
+        <label className={labelBase}>{t(`join.q.${state.relationship}`)}</label>
         <div className="relative">
           <MessageSquareIcon className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
           <textarea
             value={state.message}
             onChange={(e) => setters.setMessage(e.target.value)}
-            placeholder="Which parts of the Koleex Hub would you like access to, and why?"
+            placeholder={t(`join.qh.${state.relationship}`)}
             className={`${textareaBase} pl-9`}
           />
         </div>
@@ -878,9 +872,8 @@ function JoinPanel({
         )}
       </button>
 
-      <p className="text-[11px] text-white/35 text-center pt-1">
-        Fields marked * are required. Everything else helps us route your
-        request faster.
+      <p className="text-[11px] text-white/30 text-center pt-1">
+        {t("join.privacy")}
       </p>
     </form>
   );
@@ -890,11 +883,13 @@ function JoinPanel({
 
 interface JoinSuccessPanelProps {
   name: string;
+  reference: string;
   onReset: () => void;
 }
 
-function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
+function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
   const { t } = useTranslation(signInT);
+  void onReset; /* see below — the "send another" affordance was removed */
   const firstName = name.split(" ")[0] || "there";
   return (
     <div className="py-4 flex flex-col items-center text-center">
@@ -908,13 +903,20 @@ function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
         Your request has been received. A Koleex Super Admin will review it
         and reach out shortly with next steps.
       </p>
-      <button
-        type="button"
-        onClick={onReset}
-        className="mt-5 text-[12px] font-medium text-white/60 hover:text-white transition-colors underline underline-offset-4 decoration-white/20 hover:decoration-white/60"
-      >
-        {t("join.another")}
-      </button>
+      {/* A reference the person can quote when someone calls them back. The
+          panel used to say "a Super Admin will review your request" and hand
+          over nothing at all. */}
+      {reference ? (
+        <>
+          <p className="text-[11px] text-white/40 mt-5">{t("join.reference")}</p>
+          <p className="text-[15px] text-white font-semibold tabular-nums tracking-wide mt-1">
+            {reference}
+          </p>
+        </>
+      ) : null}
+
+      {/* "Submit another request" was here. It invited the same person to file
+          a duplicate, which is work for a Super Admin and no help to anyone. */}
     </div>
   );
 }
