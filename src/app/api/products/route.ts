@@ -78,6 +78,30 @@ export async function GET(req: Request) {
     if (!canSeeSecrets) pq = pq.eq("status", "active");
     pq = applyServerList(pq, listReq, PRODUCTS_LIST_CONFIG, reach.terms);
 
+    /* TRUE GROUP COUNTS, FIRST PAGE ONLY.
+       The grid groups by category and subcategory, and it used to count each
+       heading from the rows it happened to have LOADED. At 121 products that
+       is invisible; past the auto-complete cap it becomes the exact failure the
+       owner already hit once — whole categories missing and the rest showing
+       counts far below the truth, which reads as "my products were deleted".
+
+       Counted over the SAME match set as the page (same search, same filters,
+       no window), fetching two slug columns and nothing else. Those bytes never
+       leave the datacenter; the browser receives only the aggregated numbers, a
+       few hundred bytes. Page 1 only — the numbers do not change as you scroll,
+       and re-counting per page would pay for the whole match set every page. */
+    const GROUP_SCAN_MAX = 50_000;
+    const buildGroupCountsQuery = () => {
+      if (listReq.page !== 1) return null;
+      let gq = supabaseServer
+        .from("products")
+        .select("category_slug, subcategory_slug")
+        .eq("tenant_id", auth.tenant_id);
+      if (!canSeeSecrets) gq = gq.eq("status", "active");
+      return applyServerList(gq, listReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
+        .range(0, GROUP_SCAN_MAX - 1);
+    };
+
     const { data, error: pagedError, count } = await pq;
     _t.mark("db");
     if (pagedError) {
@@ -103,17 +127,34 @@ export async function GET(req: Request) {
        One extra query, scoped to the ids ON THIS PAGE (150 max), so it costs
        the same whether the catalogue holds 121 products or 3000. */
     const ids = rows.map((r) => r.id).filter(Boolean) as string[];
+
+    /* The models query and the group-count query are independent — one needs
+       the page's ids, the other the request's filters — so they go out
+       together. Run in sequence they added their two latencies to every first
+       page; in parallel the page pays the slower one once.
+
+       `.then(r => r)` is not decoration. A PostgREST builder is a THENABLE,
+       not a promise: it issues no request until something calls `.then` on it,
+       so merely holding two builders and awaiting them later still runs them
+       one after the other. Measured before this line: db 282 / models 207 /
+       groups 168. Touching `.then` here is what actually starts them both. */
+    const modelsPromise = ids.length
+      ? supabaseServer
+          .from("product_models")
+          .select('product_id, primary_model, model_name, visible, status, "order"')
+          .in("product_id", ids)
+          .order("order", { ascending: true })
+          .then((r) => r)
+      : null;
+    const groupsPromise = buildGroupCountsQuery()?.then((r) => r) ?? null;
+
     let models: {
       counts: Record<string, number>;
       primaryModelNames: Record<string, string>;
       modelNames: Record<string, string[]>;
     } | undefined;
-    if (ids.length) {
-      const { data: mRows, error: mErr } = await supabaseServer
-        .from("product_models")
-        .select('product_id, primary_model, model_name, visible, status, "order"')
-        .in("product_id", ids)
-        .order("order", { ascending: true });
+    if (modelsPromise) {
+      const { data: mRows, error: mErr } = await modelsPromise;
       if (mErr) console.error("[api/products paged models]", mErr.message);
       const counts: Record<string, number> = {};
       const names: Record<string, string[]> = {};
@@ -142,7 +183,34 @@ export async function GET(req: Request) {
     }
     _t.mark("models");
 
-    const body = { ...buildListResponse(rows, listReq, count ?? null), models };
+    let groupCounts:
+      | { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean }
+      | undefined;
+    if (groupsPromise) {
+      const { data: gRows, error: gErr } = await groupsPromise;
+      /* A failed count must not fail the page — the grid falls back to
+         counting what it loaded, which is what it did before this existed. */
+      if (gErr) console.error("[api/products paged groupCounts]", gErr.message);
+      else {
+        const categories: Record<string, number> = {};
+        const subcategories: Record<string, number> = {};
+        for (const g of (gRows ?? []) as { category_slug: string | null; subcategory_slug: string | null }[]) {
+          const c = g.category_slug || "_uncategorized";
+          const s = g.subcategory_slug || "_uncategorized";
+          categories[c] = (categories[c] ?? 0) + 1;
+          /* Keyed by cat/sub: the same subcategory slug can legitimately sit
+             under two categories, and a flat key would merge their counts. */
+          const k = `${c}/${s}`;
+          subcategories[k] = (subcategories[k] ?? 0) + 1;
+        }
+        const capped = (gRows?.length ?? 0) >= GROUP_SCAN_MAX;
+        if (capped) console.warn("[api/products paged groupCounts] scan capped at", GROUP_SCAN_MAX);
+        groupCounts = { categories, subcategories, capped };
+      }
+    }
+    _t.mark("groups");
+
+    const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
     return NextResponse.json(body, {
       headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header },

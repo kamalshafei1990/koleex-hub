@@ -30,11 +30,17 @@ function escForOr(q: string): string {
  *  ids/slugs itself with its own small queries; this only ORs the terms in.
  *  Every term is caller-constructed from database values, never from raw user
  *  input, so it carries the same trust as the allowlisted columns. */
+/** `window: false` applies the SAME search + filters but no ordering and no
+ *  offset window. That is what a group-count query needs: identical match set,
+ *  every row, and no sort to pay for. Ordering is skipped rather than kept
+ *  because a count does not care about order, and sorting the whole match set
+ *  is the one part that gets expensive as the catalogue grows. */
 export function applyServerList<B>(
   builder: B,
   req: ServerListRequest,
   cfg: ServerListConfig,
   extraOr: string[] = [],
+  opts: { window?: boolean } = {},
 ): B {
   let b = builder as unknown as Chainable;
 
@@ -51,6 +57,8 @@ export function applyServerList<B>(
     const col = cfg.filters[key]?.column;
     if (col) b = b.eq(col, val);
   }
+
+  if (opts.window === false) return b as unknown as B;
 
   // Deterministic ordering + unique tie-breaker so offset pages never
   // duplicate or skip rows under stable data. nullsFirst:false → NULLS LAST.

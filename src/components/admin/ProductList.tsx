@@ -773,6 +773,12 @@ export default function ProductList() {
      Search, filters and sort now execute in SQL (/api/products?paged=1) and
      pages append as the user scrolls. */
   const [total, setTotal] = useState<number | null>(null);
+  /* Per-heading truth, counted in SQL over the whole match set — see where it
+     is set. null means "server did not send it", and every consumer falls back
+     to counting loaded rows, which is exactly the old behaviour. */
+  const [groupCounts, setGroupCounts] = useState<
+    { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean } | null
+  >(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   /* The in-flight guard is a ref so it is read synchronously by the observer
@@ -1070,6 +1076,7 @@ export default function ProductList() {
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
             models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+            groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean };
           };
           p = json.rows ?? [];
           /* Model codes ride WITH the page now, so the card paints its final
@@ -1086,6 +1093,12 @@ export default function ProductList() {
           }
           pageRef.current = 1;
           setTotal(json.total ?? null);
+          /* TRUE counts per heading, from SQL over the whole match set. Without
+             them the grid counts the rows it happens to have loaded, so once
+             the catalogue passes the auto-complete cap every category heading
+             under-reports and the ones further down the sort do not appear at
+             all — the "my products were deleted" failure, again. */
+          setGroupCounts(json.groupCounts ?? null);
           setHasMore(Boolean(json.hasMore));
         } finally {
           clearTimeout(timeoutId);
@@ -1691,6 +1704,10 @@ export default function ProductList() {
     slug: string;
     name: string;
     total: number;
+    /* How many of `total` are actually on screen. Equal to total until the
+       catalogue outgrows one page — then the heading says so out loud instead
+       of quietly showing a short category. */
+    loaded: number;
     subSections: { slug: string; name: string; products: ProductRow[] }[];
   };
 
@@ -1712,21 +1729,37 @@ export default function ProductList() {
     const catRank = new Map(categories.map((c, i) => [c.slug, i]));
     const subRank = new Map(subcategories.map((x, i) => [x.slug, i]));
     const rank = (m: Map<string, number>, k: string) => m.get(k) ?? Number.MAX_SAFE_INTEGER;
-    const catSlugs = Object.keys(catBuckets).sort((a, b) => rank(catRank, a) - rank(catRank, b));
+    /* The group SET comes from the server when it sent one, not from the rows
+       that happen to be loaded. Same numbers as before while everything fits
+       on one page — and above that, a category no longer disappears just
+       because the sort put it on page four. Search/filter narrow both sides
+       identically, because the count query runs the same match set. */
+    /* Only when the client predicate cannot remove rows the server counted,
+       otherwise the heading would over-report — worse than under-reporting.
+       Two narrowings live only in the browser: the supplier filter (it reads
+       the signals map, which the server has no part in) and the active-only
+       catalogue rule on /products, which the server applies for unprivileged
+       callers but not for staff who are allowed to see drafts. In both cases
+       the grid falls back to counting what it loaded, exactly as before. */
+    const serverCats = isInternal && !filterSupplier ? groupCounts?.categories ?? null : null;
+    const catSlugs = [...new Set([...Object.keys(catBuckets), ...Object.keys(serverCats ?? {})])]
+      .sort((a, b) => rank(catRank, a) - rank(catRank, b));
     return catSlugs.map(catSlug => {
       const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? t("list.uncategorized", "Uncategorized") : catSlug);
-      const subSlugs = Object.keys(catBuckets[catSlug]).sort((a, b) => rank(subRank, a) - rank(subRank, b));
+      const buckets = catBuckets[catSlug] ?? {};
+      const subSlugs = Object.keys(buckets).sort((a, b) => rank(subRank, a) - rank(subRank, b));
       const subSections = subSlugs.map(subSlug => ({
         slug: subSlug,
         name: subMap[subSlug] || (subSlug === "_uncategorized" ? t("list.other", "Other") : subSlug),
-        products: catBuckets[catSlug][subSlug],
+        products: buckets[subSlug],
       }));
-      const total = subSections.reduce((a, s) => a + s.products.length, 0);
+      const loaded = subSections.reduce((a, s) => a + s.products.length, 0);
+      const total = serverCats?.[catSlug] ?? loaded;
       // Capitalise first letter of category name even if input is title cased lower in our map
       const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
-      return { slug: catSlug, name: displayName, total, subSections };
+      return { slug: catSlug, name: displayName, total, loaded, subSections };
     });
-  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode]);
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier]);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
@@ -2454,12 +2487,31 @@ export default function ProductList() {
                       {cat.name}
                     </h2>
                   </div>
+                  {/* When the catalogue outgrows one page the heading says
+                      "12 of 214" rather than showing 12 and letting the number
+                      imply the category shrank. The count itself is SQL over
+                      the whole match set, not a tally of what is on screen. */}
                   <span className="shrink-0 text-[11px] font-medium text-[var(--text-ghost)] tabular-nums whitespace-nowrap">
-                    {cat.total} {cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}
+                    {cat.loaded < cat.total
+                      ? `${cat.loaded} ${t("list.ofWord", "of")} ${cat.total} ${cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}`
+                      : `${cat.total} ${cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}`}
                   </span>
                 </div>
                 <div className="mt-3 h-px bg-[var(--border-subtle)]" />
               </div>
+
+              {/* A category the server counted but this page has not reached
+                  yet. It gets one quiet line instead of an empty grid — the
+                  point is that the category is visibly THERE, with its real
+                  number, so a catalogue too big for one page never reads as
+                  "these products are gone". No animation: this is reserved
+                  space, not a loading state that will swap under the reader. */}
+              {cat.subSections.length === 0 && (
+                <p className="py-6 text-[12px] text-[var(--text-ghost)] tabular-nums">
+                  {cat.total} {cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}
+                  {" · "}{t("list.scrollToLoad", "scroll to load")}
+                </p>
+              )}
 
               {/* Sub-sections within the category */}
               <div className="space-y-10">

@@ -1206,6 +1206,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "list.other": { en: "Other", zh: "其他", ar: "أخرى" },
   "list.productOne": { en: "product", zh: "件产品", ar: "منتج" },
   "list.productMany": { en: "products", zh: "件产品", ar: "منتجات" },
+  /* Used by the category heading once the catalogue outgrows one page:
+     "12 of 214 products", and the placeholder for a category the current
+     page has not reached yet. */
+  "list.ofWord": { en: "of", zh: "共", ar: "من" },
+  "list.scrollToLoad": { en: "scroll to load", zh: "滚动加载", ar: "مرِّر للتحميل" },
   "cls.selectDivision": { en: "Select Division", zh: "选择事业部", ar: "اختر القسم" },
   "cls.selectCategoryIn": { en: "Select Category in", zh: "选择类别 —", ar: "اختر الفئة ضمن" },
   "cls.selectSubcategoryIn": { en: "Select Subcategory in", zh: "选择子类别 —", ar: "اختر الفئة الفرعية ضمن" },
