@@ -215,64 +215,60 @@ export async function loadScopeContext(
 async function loadScopeContextUncached(
   accountId: string,
 ): Promise<ScopeContext> {
-  // Parallel: account+role and employee
-  const [accRes, empRes] = await Promise.all([
-    (await sb())
-      .from("accounts")
-      .select(
-        "role_id, tenant_id, is_super_admin, roles:role_id(is_super_admin, can_view_private)",
-      )
-      .eq("id", accountId)
-      .maybeSingle(),
-    (await sb())
-      .from("koleex_employees")
-      .select("department")
-      .eq("account_id", accountId)
-      .maybeSingle(),
-  ]);
+  /* THE SERVER ALREADY RESOLVED THIS. requireAuth() builds a full
+     ScopeContext per request — account, role, super-admin, can_view_private
+     and the koleex_employees department — and /api/me/bootstrap returns it as
+     `auth`, which every screen already fetches inside the /api/shell batch.
 
-  const accData = (accRes.data ?? null) as {
-    role_id: string | null;
-    tenant_id: string;
-    is_super_admin: boolean;
-    roles?:
-      | { is_super_admin: boolean; can_view_private: boolean }
-      | { is_super_admin: boolean; can_view_private: boolean }[]
-      | null;
-  } | null;
+     Reading `accounts` and `koleex_employees` from the BROWSER to rebuild the
+     same object cost, on every single page in the Hub:
+       · @supabase/supabase-js — 184 KB, the largest chunk in the boot after
+         the framework itself, pulled in only for these two reads
+       · two direct cross-border database round trips
+     Both are gone; the numbers come from a payload already in flight.
 
-  // Supabase returns embedded role as either an object or single-element array
-  const roleRaw = accData?.roles;
-  const role = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw ?? null;
-
-  // Effective SA = account-level OR role-level flag. Lets the CEO promote
-  // a specific account without inventing a new role.
-  const effectiveSA =
-    (accData?.is_super_admin ?? false) || (role?.is_super_admin ?? false);
-
-  // Super Admin tenant override: when SA has used the top-bar TenantPicker
-  // to switch to another tenant, respect that choice. The override lives
-  // in localStorage (koleex.sa.active_tenant_id) and only applies to SA
-  // users — regular accounts are always locked to their own tenant_id.
-  let effectiveTenantId = accData?.tenant_id ?? "";
-  if (effectiveSA && typeof window !== "undefined") {
-    try {
-      const override = window.localStorage.getItem(
-        "koleex.sa.active_tenant_id",
-      );
-      if (override) effectiveTenantId = override;
-    } catch {
-      // localStorage unavailable — fall back to the account's tenant
+     The SA tenant override stays client-side below on purpose: it lives in
+     localStorage and is a per-device choice the server has no business
+     knowing about. */
+  const { getMeBootstrap } = await import("./me-bootstrap");
+  const boot = await getMeBootstrap().catch(() => null);
+  const fromAuth = boot?.auth && boot.auth.account_id === accountId ? boot.auth : null;
+  if (fromAuth) {
+    let effectiveTenantId = fromAuth.tenant_id ?? "";
+    if (fromAuth.is_super_admin && typeof window !== "undefined") {
+      try {
+        const override = window.localStorage.getItem("koleex.sa.active_tenant_id");
+        if (override) effectiveTenantId = override;
+      } catch { /* localStorage unavailable — keep the account's tenant */ }
     }
+    return {
+      account_id: fromAuth.account_id,
+      tenant_id: effectiveTenantId,
+      role_id: fromAuth.role_id ?? null,
+      department: fromAuth.department ?? null,
+      is_super_admin: fromAuth.is_super_admin ?? false,
+      can_view_private: fromAuth.can_view_private ?? false,
+    };
   }
 
+  /* NO DATABASE FALLBACK. Rebuilding this from the browser meant reading
+     `accounts` and `koleex_employees` with the public key to decide what the
+     user may see — permissions resolved on the client, from the client. The
+     server already resolves them per request; if that answer is not
+     available, the honest result is the most restrictive one, not a guess
+     assembled here.
+
+     It also kept @supabase/supabase-js (184 KB) in the boot of every page:
+     the import never ran once bootstrap was working, but the chunk was
+     reachable from the shell graph and downloaded anyway. Deleting the path
+     is what actually removes it. */
   return {
     account_id: accountId,
-    tenant_id: effectiveTenantId,
-    role_id: accData?.role_id ?? null,
-    department: empRes.data?.department ?? null,
-    is_super_admin: effectiveSA,
-    can_view_private: role?.can_view_private ?? false,
+    tenant_id: "",
+    role_id: null,
+    department: null,
+    is_super_admin: false,
+    can_view_private: false,
   };
 }
 

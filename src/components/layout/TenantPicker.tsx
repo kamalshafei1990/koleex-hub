@@ -69,34 +69,40 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
     const accountId = getCurrentAccountIdSync();
     if (!accountId) return;
     (async () => {
-      /* Lazy: keeps @supabase/supabase-js out of the header's first-load JS. */
-      const { supabaseAdmin } = await import("@/lib/supabase-admin");
-      // Check if viewer is SA (role or account level)
-      const { data: acc } = await supabaseAdmin
-        .from("accounts")
-        .select(
-          "tenant_id, is_super_admin, roles:role_id(is_super_admin)",
-        )
-        .eq("id", accountId)
-        .maybeSingle();
-      const accData = acc as {
-        tenant_id: string;
-        is_super_admin: boolean;
-        roles?:
-          | { is_super_admin: boolean }
-          | { is_super_admin: boolean }[]
-          | null;
-      } | null;
-      const roleRaw = accData?.roles;
-      const role = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw ?? null;
-      const sa =
-        (accData?.is_super_admin ?? false) || (role?.is_super_admin ?? false);
+      /* "Am I a Super Admin, and which tenant am I?" — the server answers
+         this on every request and /api/me/bootstrap already carries it as
+         `auth`, inside the /api/shell batch every screen fetches anyway.
+
+         Asking Supabase directly from the header was the LAST thing dragging
+         @supabase/supabase-js (184 KB) into the boot of every page in the
+         Hub, plus a cross-border round trip, to learn a boolean we were
+         already holding. The lazy import was not wrong — it just could not
+         help, because this effect runs on mount on every page. */
+      const { getMeBootstrap } = await import("@/lib/me-bootstrap");
+      const boot = await getMeBootstrap().catch(() => null);
+      const sa = boot?.auth?.is_super_admin ?? false;
       setIsSuperAdmin(sa);
-      setAccountTenantId(accData?.tenant_id ?? null);
+      setAccountTenantId(boot?.auth?.tenant_id ?? null);
 
       if (!sa) return; // Non-SA users don't see the picker
 
-      // Load tenant list
+      // Apply current override or fall back to account tenant
+      const override = readTenantOverride();
+      setActiveTenantId(override ?? boot?.auth?.tenant_id ?? null);
+    })();
+  }, []);
+
+  /* The tenant LIST is the only thing here that still needs Supabase, and it
+     is only readable when the picker is actually open — switching tenant is
+     something the owner does rarely, while this component mounts on every
+     page. Loading it on mount kept the 184 KB client in the boot for exactly
+     the account that opens the Hub most. Fetched once, on first open. */
+  const [tenantsLoaded, setTenantsLoaded] = useState(false);
+  useEffect(() => {
+    if (!open || tenantsLoaded || !isSuperAdmin) return;
+    setTenantsLoaded(true);
+    (async () => {
+      const { supabaseAdmin } = await import("@/lib/supabase-admin");
       const { data: t } = await supabaseAdmin
         .from("tenants")
         .select("id, slug, name, is_host")
@@ -104,12 +110,8 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
         .order("is_host", { ascending: false })
         .order("name", { ascending: true });
       setTenants((t as TenantRow[]) ?? []);
-
-      // Apply current override or fall back to account tenant
-      const override = readTenantOverride();
-      setActiveTenantId(override ?? accData?.tenant_id ?? null);
     })();
-  }, []);
+  }, [open, tenantsLoaded, isSuperAdmin]);
 
   /* ── Close on outside click ── */
   useEffect(() => {
