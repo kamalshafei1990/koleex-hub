@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -92,6 +93,15 @@ function LangSwitch({ lang }: { lang: Lang }) {
   );
 }
 
+/* BrandGlyph carries the simple-icons dataset, and this file is the auth gate
+   — it is loaded on EVERY route. A static import put those bytes in the shared
+   chunk and pushed eleven routes over their budget at once. Lazily loaded, the
+   logos are fetched only when somebody actually opens the join form. */
+const BrandGlyph = dynamic(() => import("@/components/icons/brands/BrandGlyph"), {
+  ssr: false,
+  loading: () => <span className="inline-block h-[15px] w-[15px] shrink-0" />,
+});
+
 /* useLayoutEffect on the server is a no-op and warns; fall back to useEffect.
    It has to be the layout variant in the browser: both the tab indicator and
    the card height are measured from the DOM, and measuring after paint would
@@ -143,15 +153,37 @@ const RELATIONSHIPS: Array<{
    allow-lists them, so adding one here alone files it as "distributor". */
 const PARTNER_TYPES = ["distributor", "agent", "service", "other"] as const;
 
-const HEARD_FROM_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "", label: "Select an option" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "google", label: "Google Search" },
-  { value: "referral", label: "Referral from a colleague" },
-  { value: "event", label: "Event / Conference" },
-  { value: "website", label: "Koleex website" },
-  { value: "other", label: "Other" },
+/* Was six hard-coded English strings on a screen that reads in three
+   languages, and short enough that "Other" collected most of the answers.
+   Labels now come from the dictionary like everything else. */
+const HEARD_FROM_OPTIONS = [
+  "", "linkedin", "google", "referral", "existing_customer", "sales_rep",
+  "partner", "exhibition", "event", "website", "marketplace", "wechat",
+  "social", "press", "email", "other",
+] as const;
+
+/* How to reach them. A work email is the field we insist on and often the
+   worst way to actually reach somebody — a supplier in Shenzhen answers
+   WeChat in minutes and email in days. `brand` picks the real logo out of
+   BrandGlyph; the rest fall back to a library icon. */
+const CONTACT_CHANNELS: Array<{
+  value: string;
+  brand?: string;
+  Icon?: React.ComponentType<{ size?: number | string; className?: string }>;
+}> = [
+  { value: "email", Icon: EnvelopeIcon },
+  { value: "whatsapp", brand: "whatsapp" },
+  { value: "wechat", brand: "wechat" },
+  { value: "telegram", brand: "telegram" },
+  { value: "messenger", brand: "messenger" },
+  { value: "sms", Icon: MessageSquareIcon },
+  { value: "phone", Icon: PhoneIcon },
+  { value: "other", Icon: HelpCircleIcon },
 ];
+/* Channels whose handle IS a phone number — prefilled from the number they
+   already typed, because asking twice for the same digits is how a form
+   loses somebody at the last field. */
+const PHONE_CHANNELS = new Set(["whatsapp", "sms", "phone"]);
 
 /* ── Shared input / label styling. Hard-coded colors (not CSS variables) so
    the form renders correctly even before the app's theme CSS has loaded. ── */
@@ -275,6 +307,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* Proof documents live on the parent, not the panel, so switching
      relationship mid-form does not silently drop a file already attached. */
   const [joinDocs, setJoinDocs] = useState<File[]>([]);
+  const [joinContactVia, setJoinContactVia] = useState("email");
+  const [joinContactHandle, setJoinContactHandle] = useState("");
   const [joinRef, setJoinRef] = useState("");
   const [joinHeardFrom, setJoinHeardFrom] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
@@ -356,6 +390,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setJoinSupplies("");
     setJoinWebsite("");
     setJoinDocs([]);
+    setJoinContactVia("email");
+    setJoinContactHandle("");
     setJoinHeardFrom("");
     setJoinMessage("");
   }
@@ -404,6 +440,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
       territory: joinTerritory.trim(),
       supplies: joinSupplies.trim(),
       website: joinWebsite.trim(),
+      contact_via: joinContactVia,
+      contact_handle: joinContactHandle.trim(),
       message: joinMessage.trim(),
       language: lang,
     };
@@ -662,6 +700,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     supplies: joinSupplies,
                     website: joinWebsite,
                     docs: joinDocs,
+                    contactVia: joinContactVia,
+                    contactHandle: joinContactHandle,
                     heardFrom: joinHeardFrom,
                     message: joinMessage,
                   }}
@@ -688,6 +728,8 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     setSupplies: setJoinSupplies,
                     setWebsite: setJoinWebsite,
                     setDocs: setJoinDocs,
+                    setContactVia: setJoinContactVia,
+                    setContactHandle: setJoinContactHandle,
                     setHeardFrom: setJoinHeardFrom,
                     setMessage: setJoinMessage,
                   }}
@@ -863,6 +905,8 @@ interface JoinState {
   supplies: string;
   website: string;
   docs: File[];
+  contactVia: string;
+  contactHandle: string;
   heardFrom: string;
   message: string;
 }
@@ -882,6 +926,8 @@ interface JoinSetters {
   setSupplies: (v: string) => void;
   setWebsite: (v: string) => void;
   setDocs: (v: File[]) => void;
+  setContactVia: (v: string) => void;
+  setContactHandle: (v: string) => void;
   setHeardFrom: (v: string) => void;
   setMessage: (v: string) => void;
 }
@@ -949,25 +995,6 @@ function JoinPanel({
         </div>
         <p className="mt-1.5 text-[11px] text-white/35">
           {t(`rel.${state.relationship}.d`)}
-        </p>
-      </div>
-
-      {/* Two people should not be filling this in, and both used to have no
-          idea where else to go. A Koleex employee picking any option here
-          creates a request HR was always going to handle; and someone who
-          already has an account is far safer asking for extra users from
-          inside a signed-in session, where the company is already proven. */}
-      <div className="rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-2.5 space-y-1.5">
-        <p className="text-[11px] text-white/40 leading-relaxed">{t("join.employeeNote")}</p>
-        <p className="text-[11px] text-white/40 leading-relaxed">
-          {t("join.moreUsersNote")}{" "}
-          <button
-            type="button"
-            onClick={onGoSignIn}
-            className="text-white/70 underline underline-offset-2 hover:text-white transition-colors"
-          >
-            {t("join.signInHere")}
-          </button>
         </p>
       </div>
 
@@ -1278,6 +1305,87 @@ function JoinPanel({
         <p className="mt-1.5 text-[11px] text-white/30 leading-relaxed">{t("join.docsPrivate")}</p>
       </div>
 
+
+      {/* ── How to reach them ─────────────────────────────────────────────
+          Chips rather than a dropdown, because the logos ARE the label: you
+          recognise the WeChat glyph faster than you read the word, and this
+          is the one question on the form where the answer is a brand. Real
+          marks from BrandGlyph — the Hub's own component, backed by Simple
+          Icons — never hand-drawn. Two columns on a phone, four from sm. */}
+      <div>
+        <label className={labelBase}>{t("join.contactVia")}</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {CONTACT_CHANNELS.map((c) => {
+            const on = state.contactVia === c.value;
+            return (
+              <button
+                key={c.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setters.setContactVia(c.value);
+                  /* Prefill the digits they already typed rather than asking
+                     for the same number twice. */
+                  setters.setContactHandle(
+                    PHONE_CHANNELS.has(c.value) ? state.phone.trim() : "",
+                  );
+                }}
+                className={`h-11 px-2 rounded-lg border text-[12px] font-medium flex items-center justify-center gap-1.5 min-w-0 transition-colors ${
+                  on
+                    ? "border-white/30 bg-white/[0.09] text-white"
+                    : "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white/85 hover:border-white/20"
+                }`}
+              >
+                {c.brand ? (
+                  <BrandGlyph name={c.brand} size={15} className="shrink-0" />
+                ) : c.Icon ? (
+                  <c.Icon size={14} className="h-3.5 w-3.5 shrink-0" />
+                ) : null}
+                <span className="truncate">{t(`cv.${c.value}`)}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {state.contactVia === "email" ? (
+          <p className="mt-1.5 text-[11px] text-white/35">{t("cv.emailNote")}</p>
+        ) : (
+          <div className="mt-2.5">
+            <div className="relative">
+              {(() => {
+                const c = CONTACT_CHANNELS.find((x) => x.value === state.contactVia);
+                return c?.brand ? (
+                  <span className="absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <BrandGlyph name={c.brand} size={14} />
+                  </span>
+                ) : (
+                  <MessageSquareIcon className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+                );
+              })()}
+              <input
+                type={PHONE_CHANNELS.has(state.contactVia) ? "tel" : "text"}
+                inputMode={PHONE_CHANNELS.has(state.contactVia) ? "tel" : "text"}
+                value={state.contactHandle}
+                onChange={(e) => setters.setContactHandle(e.target.value)}
+                placeholder={t(`cv.h.${state.contactVia}`)}
+                aria-label={t(`cv.h.${state.contactVia}`)}
+                className={`${inputBase} ps-9`}
+              />
+            </div>
+            {PHONE_CHANNELS.has(state.contactVia) && state.phone.trim() &&
+             state.contactHandle.trim() !== state.phone.trim() && (
+              <button
+                type="button"
+                onClick={() => setters.setContactHandle(state.phone.trim())}
+                className="mt-1.5 text-[11px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
+              >
+                {t("cv.sameAsPhone")}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* How did you hear — only asked of someone who has just found us. An
           existing customer or supplier already knows who we are. */}
       {(state.relationship === "new_prospect" || state.relationship === "other") ? (
@@ -1290,9 +1398,9 @@ function JoinPanel({
             onChange={(e) => setters.setHeardFrom(e.target.value)}
             className={`${selectBase.replace('ps-3', '')} ps-9`}
           >
-            {HEARD_FROM_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value} className="bg-[#121212]">
-                {o.label}
+            {HEARD_FROM_OPTIONS.map((v) => (
+              <option key={v || "none"} value={v} className="bg-[#121212]">
+                {t(`hf.${v}`)}
               </option>
             ))}
           </select>

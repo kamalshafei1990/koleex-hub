@@ -27,6 +27,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import UserPlus2Icon from "@/components/icons/ui/UserPlusIcon";
+import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { flagOf, countryName, COUNTRY_DIALS } from "@/lib/countries-dial";
 
 type Status = "pending" | "approved" | "rejected";
@@ -62,6 +63,13 @@ const PARTNER_LABEL: Record<string, string> = {
 };
 const LANG_LABEL: Record<string, string> = {
   en: "English", zh: "中文", ar: "العربية",
+};
+const CHANNEL_LABEL: Record<string, string> = {
+  email: "Email", whatsapp: "WhatsApp", wechat: "WeChat", telegram: "Telegram",
+  messenger: "Messenger", sms: "SMS", phone: "Phone call", other: "Other",
+};
+const CHANNEL_BRAND: Record<string, string> = {
+  whatsapp: "whatsapp", wechat: "wechat", telegram: "telegram", messenger: "messenger",
 };
 
 const STATUS_STYLE: Record<Status, string> = {
@@ -333,6 +341,8 @@ function Detail({
   const free = FREE_MAIL.has(domainOf(row.email));
   const partner = String(m.partner_type ?? "");
   const lang = String(m.language ?? "");
+  const channel = String(m.contact_via ?? "");
+  const handle = String(m.contact_handle ?? "");
   const decisions = (m.decisions ?? []) as Array<{ status: string; note: string | null; at: string }>;
 
   return (
@@ -378,6 +388,22 @@ function Detail({
         <Field k="Email" v={row.email} note={free ? "personal address" : undefined} />
         <Field k="Phone" v={String(m.phone ?? "")} />
         <Field k="Language" v={LANG_LABEL[lang] ?? lang} />
+        {/* What they ASKED for, which is often not email — a supplier in
+            Shenzhen answers WeChat in minutes and email in days. */}
+        {channel && (
+          <div className="min-w-0">
+            <dt className={labelCls}>Prefers</dt>
+            <dd className="text-[12.5px] break-words flex items-center gap-1.5">
+              {CHANNEL_BRAND[channel] && (
+                <BrandGlyph name={CHANNEL_BRAND[channel]} size={14} className="shrink-0" />
+              )}
+              <span>
+                {CHANNEL_LABEL[channel] ?? channel}
+                {handle ? ` · ${handle}` : ""}
+              </span>
+            </dd>
+          </div>
+        )}
       </Group>
 
       <Group title="Who they are">

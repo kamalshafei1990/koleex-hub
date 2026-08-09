@@ -35,10 +35,16 @@ const RELATIONSHIPS: Record<string, string> = {
    filed as "other" rather than trusted. */
 const PARTNER_TYPES = new Set(["distributor", "agent", "service", "other"]);
 
+/* Kept in step with CONTACT_CHANNELS in AdminAuth. Anything outside the list
+   is filed as "email", which is the one channel we always have. */
+const CONTACT_CHANNELS = new Set([
+  "email", "whatsapp", "wechat", "telegram", "messenger", "sms", "phone", "other",
+]);
+
 const MAX = {
   name: 120, email: 160, phone: 32, company: 160,
   jobTitle: 120, message: 2000, code: 60,
-  contact: 120, territory: 120, supplies: 200, website: 200,
+  contact: 120, territory: 120, supplies: 200, website: 200, handle: 160,
 } as const;
 
 /* Proof documents. The bucket is private, has no anon policy, and is read
@@ -138,6 +144,9 @@ export async function POST(req: Request) {
   const territory = clean(body.territory, MAX.territory);
   const supplies = clean(body.supplies, MAX.supplies);
   const website = clean(body.website, MAX.website);
+  const contact_via_raw = clean(body.contact_via, 20);
+  const contact_via = CONTACT_CHANNELS.has(contact_via_raw) ? contact_via_raw : "email";
+  const contact_handle = clean(body.contact_handle, MAX.handle);
   const message = clean(body.message, MAX.message);
   const language = ["en", "zh", "ar"].includes(clean(body.language, 4))
     ? clean(body.language, 4) : null;
@@ -212,6 +221,10 @@ export async function POST(req: Request) {
     territory: relationship === "partner" ? territory || null : null,
     supplies: relationship === "supplier" ? supplies || null : null,
     website: relationship === "new_prospect" ? website || null : null,
+    contact_via,
+    /* Only stored when it means something — a handle against "email" would be
+       a second address nobody asked for and nobody would use. */
+    contact_handle: contact_via !== "email" ? contact_handle || null : null,
     documents: documents.length > 0 ? documents : null,
     language,
   };
@@ -267,6 +280,9 @@ export async function POST(req: Request) {
       country_code ? `Country       ${country_code}` : null,
       heard_from ? `Heard from    ${heard_from}` : null,
       language ? `Language      ${language}` : null,
+      contact_via !== "email"
+        ? `Prefers       ${contact_via}${contact_handle ? ` · ${contact_handle}` : ""}`
+        : "Prefers       email",
       documents.length > 0
         ? `Documents     ${documents.map((d) => d.name).join(", ")}`
         : "Documents     none attached",

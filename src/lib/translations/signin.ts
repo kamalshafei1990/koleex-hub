@@ -153,17 +153,6 @@ export const signInT: Translations = {
      says "no proof needed" is the one an attacker picks first, and a
      request for extra seats is far safer made from inside a session that
      has already proved who the company is. */
-  "join.employeeNote": {
-    en: "Koleex employee? Your account is created by HR — ask your manager.",
-    zh: "Koleex 员工？账号由人力资源部创建，请联系您的主管。",
-    ar: "موظف في Koleex؟ حسابك بيتعمل عن طريق HR — كلّم مديرك.",
-  },
-  "join.moreUsersNote": {
-    en: "Already have an account and need more users for your team? Sign in and request them from inside.",
-    zh: "已有账号，需要为团队增加用户？请登录后在系统内申请。",
-    ar: "عندك حساب ومحتاج مستخدمين لفريقك؟ ادخل بحسابك واطلبهم من جوه.",
-  },
-  "join.signInHere": { en: "Sign in", zh: "去登录", ar: "سجّل الدخول" },
 
   /* ── The question that decides fastest ───────────────────────────────
      One internal message to a named colleague beats any document review,
@@ -194,6 +183,59 @@ export const signInT: Translations = {
   /* ── Prospect ── */
   "join.website":      { en: "Company website", zh: "公司网站", ar: "موقع الشركة" },
 
+
+  /* ── How to reach them ───────────────────────────────────────────────
+     A work email is the one field we insist on, but it is often the worst
+     way to actually reach somebody: a supplier in Shenzhen answers WeChat in
+     minutes and email in days, and half of Egypt runs on WhatsApp. Asking
+     removes a round of "we emailed you twice" from every application. */
+  "join.contactVia":  { en: "How would you like us to contact you?",
+                        zh: "您希望我们通过哪种方式联系您？",
+                        ar: "تحب نتواصل معاك إزاي؟" },
+  "cv.email":     { en: "Email",     zh: "邮箱",       ar: "الإيميل" },
+  "cv.whatsapp":  { en: "WhatsApp",  zh: "WhatsApp",  ar: "واتساب" },
+  "cv.wechat":    { en: "WeChat",    zh: "微信",       ar: "ويشات" },
+  "cv.telegram":  { en: "Telegram",  zh: "Telegram",  ar: "تليجرام" },
+  "cv.messenger": { en: "Messenger", zh: "Messenger", ar: "ماسنجر" },
+  "cv.sms":       { en: "SMS",       zh: "短信",       ar: "رسالة نصية" },
+  "cv.phone":     { en: "Phone call", zh: "电话",      ar: "مكالمة" },
+  "cv.other":     { en: "Other",     zh: "其他",       ar: "طريقة تانية" },
+  /* The handle field is named after the channel — "contact details" would
+     leave someone guessing whether we want a number or a username. */
+  "cv.h.whatsapp":  { en: "WhatsApp number",  zh: "WhatsApp 号码", ar: "رقم الواتساب" },
+  "cv.h.wechat":    { en: "WeChat ID",        zh: "微信号",        ar: "معرّف الويشات" },
+  "cv.h.telegram":  { en: "Telegram username or number", zh: "Telegram 用户名或号码", ar: "يوزر تليجرام أو الرقم" },
+  "cv.h.messenger": { en: "Messenger profile", zh: "Messenger 主页", ar: "حساب الماسنجر" },
+  "cv.h.sms":       { en: "Mobile number",     zh: "手机号码",      ar: "رقم الموبايل" },
+  "cv.h.phone":     { en: "Number to call",    zh: "联系电话",      ar: "الرقم اللي نكلّمه" },
+  "cv.h.other":     { en: "How should we reach you?", zh: "请说明联系方式", ar: "نوصلك إزاي؟" },
+  "cv.sameAsPhone": { en: "Same as the phone number above",
+                      zh: "与上方电话号码相同",
+                      ar: "نفس رقم التليفون فوق" },
+  "cv.emailNote":   { en: "We already have your work email above.",
+                      zh: "我们已获取上方的工作邮箱。",
+                      ar: "بريد العمل فوق كفاية." },
+
+  /* ── How they found us ───────────────────────────────────────────────
+     Was six English strings hard-coded in the component, on a screen that
+     reads in three languages. Now translated, and long enough to be worth
+     answering — "Other" was collecting most of the traffic. */
+  "hf.":                { en: "Select an option", zh: "请选择", ar: "اختر" },
+  "hf.linkedin":        { en: "LinkedIn", zh: "领英 LinkedIn", ar: "لينكدإن" },
+  "hf.google":          { en: "Google or another search engine", zh: "谷歌或其他搜索引擎", ar: "جوجل أو محرك بحث تاني" },
+  "hf.referral":        { en: "A colleague recommended you", zh: "同事推荐", ar: "زميل رشّحكم" },
+  "hf.existing_customer": { en: "A Koleex customer recommended you", zh: "Koleex 客户推荐", ar: "عميل عند Koleex رشّحكم" },
+  "hf.sales_rep":       { en: "A Koleex sales representative", zh: "Koleex 销售代表", ar: "مندوب مبيعات من Koleex" },
+  "hf.partner":         { en: "A Koleex partner or distributor", zh: "Koleex 合作伙伴或经销商", ar: "شريك أو موزّع لـ Koleex" },
+  "hf.exhibition":      { en: "Trade show or exhibition", zh: "展会", ar: "معرض تجاري" },
+  "hf.event":           { en: "Event or conference", zh: "活动或会议", ar: "فعالية أو مؤتمر" },
+  "hf.website":         { en: "Koleex website", zh: "Koleex 官网", ar: "موقع Koleex" },
+  "hf.marketplace":     { en: "Alibaba or another B2B marketplace", zh: "阿里巴巴或其他 B2B 平台", ar: "علي بابا أو منصة B2B تانية" },
+  "hf.wechat":          { en: "WeChat", zh: "微信", ar: "ويشات" },
+  "hf.social":          { en: "Instagram, Facebook or YouTube", zh: "Instagram、Facebook 或 YouTube", ar: "إنستجرام أو فيسبوك أو يوتيوب" },
+  "hf.press":           { en: "Industry press or magazine", zh: "行业媒体或杂志", ar: "مجلة أو صحافة متخصصة" },
+  "hf.email":           { en: "An email from Koleex", zh: "Koleex 的邮件", ar: "إيميل من Koleex" },
+  "hf.other":           { en: "Somewhere else", zh: "其他途径", ar: "حتة تانية" },
 
   /* ── Proof ───────────────────────────────────────────────────────────
      The owner's rule: a company license from EVERY applicant, whoever they
@@ -242,7 +284,11 @@ export const signInT: Translations = {
                       zh: "您在寻找什么？", ar: "بتدوّر على إيه؟" },
   "join.q.existing_customer":{ en: "What do you need access to?",
                       zh: "您需要访问什么？", ar: "محتاج توصل لإيه؟" },
-  "join.q.supplier": { en: "What do you supply?", zh: "您供应什么产品？", ar: "بتورّد إيه؟" },
+  /* NOT "What do you supply?" — the one-line field above already asks that,
+     and a supplier was answering the same question twice on one form. */
+  "join.q.supplier": { en: "Anything else we should know?",
+                       zh: "还有什么需要我们了解的吗？",
+                       ar: "في حاجة تانية المفروض نعرفها؟" },
   "join.q.partner":  { en: "What kind of partnership?", zh: "哪种合作方式？", ar: "شراكة من أي نوع؟" },
   "join.q.other":    { en: "How can we help?", zh: "我们能帮您什么？", ar: "نقدر نساعدك إزاي؟" },
   "join.qh.new_prospect":     { en: "Tell us about your business and what you need…",
