@@ -4,6 +4,55 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
+/* GET /api/calendar/events/[id]
+   One event by id. Same boundary as PATCH and DELETE: the caller's tenant is
+   applied in the query, so a cross-tenant id is a 404 rather than a leak of
+   its existence, and only the owner or a Super Admin may read it — Calendar is
+   a Type C (Personal) module, where a role's Scope=All has deliberately NO
+   effect.
+
+   This exists so the browser stops reading the table directly. CalendarApp
+   needs the base event of a recurring series when you edit one occurrence, and
+   that was the last read in the Calendar going straight from the browser to
+   the database — a cross-border round trip on the owner's link, to fetch one
+   row the server could have handed over in the same region. */
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Calendar");
+  if (deny) return deny;
+
+  /* The events list mixes in VIRTUAL entries whose id is prefixed — a to-do
+     shown on the calendar arrives as `todo:<uuid>`. Those are not rows in this
+     table, and handing one to Postgres raises `invalid input syntax for type
+     uuid` and a 500. A malformed id is a not-found, not a server fault. */
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { data, error } = await (() => {
+    let q = supabaseServer.from("koleex_calendar_events").select("*").eq("id", id);
+    if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+    return q.maybeSingle();
+  })();
+
+  if (error) {
+    console.error("[api/calendar/events GET one]", error.message);
+    return NextResponse.json({ error: "Failed to load" }, { status: 500 });
+  }
+  if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const row = data as { account_id: string };
+  if (row.account_id !== auth.account_id && !auth.is_super_admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return NextResponse.json({ event: data });
+}
+
 /* PATCH /api/calendar/events/[id]
    Update a single event. Caller must own the calendar (account_id = me)
    or be Super Admin. The event's tenant is enforced server-side — a

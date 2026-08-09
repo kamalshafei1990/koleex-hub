@@ -201,11 +201,13 @@ export default function CalendarApp() {
       activeAccountId,
       visibleRange.from,
       visibleRange.to,
-      scopeCtx,
     );
     setEvents(rows);
     setLoadingEvents(false);
-  }, [activeAccountId, visibleRange, scopeCtx]);
+    /* scopeCtx is deliberately NOT a dependency any more: the route reads the
+       session and decides scope itself, so a change in the browser's copy of
+       the context cannot change what this fetch is allowed to return. */
+  }, [activeAccountId, visibleRange]);
 
   useEffect(() => {
     loadEvents();
