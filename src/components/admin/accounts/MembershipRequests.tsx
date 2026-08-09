@@ -444,7 +444,7 @@ function Detail({
 
       {/* ── Body: facts on the left, prose on the right ── */}
       <div className="grid xl:grid-cols-2">
-        <div className="px-4 sm:px-5 py-4 space-y-5 xl:border-e border-[var(--border-subtle)] min-w-0">
+        <div className="px-4 sm:px-5 xl:border-e border-[var(--border-subtle)] min-w-0">
           <Block title="Contact">
             <Row k="Email" v={row.email} note={free ? "personal address" : undefined} />
             <Row k="Phone" v={String(m.phone ?? "")} />
@@ -472,7 +472,7 @@ function Detail({
           </Block>
         </div>
 
-        <div className="px-4 sm:px-5 py-4 space-y-5 border-t xl:border-t-0 border-[var(--border-subtle)] min-w-0">
+        <div className="px-4 sm:px-5 border-t xl:border-t-0 border-[var(--border-subtle)] min-w-0">
           <Block title="Proof documents">
             {docs.length === 0 ? (
               <p className="flex items-start gap-2 text-[12px] text-amber-400">
@@ -604,8 +604,8 @@ function Detail({
    before: both were the same 10px uppercase grey. */
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0">
-      <h3 className={`${sectionCls} mb-2`}>{title}</h3>
+    <section className="min-w-0 py-4 border-t border-[var(--border-subtle)] first:border-t-0">
+      <h3 className={`${sectionCls} mb-1`}>{title}</h3>
       {children}
     </section>
   );
@@ -620,7 +620,7 @@ function Row({
 }: { k: string; v: string; note?: string; brand?: string }) {
   if (!v) return null;
   return (
-    <div className="flex gap-3 py-[3px] min-w-0">
+    <div className="flex gap-3 py-2 min-w-0 border-b border-[var(--border-faint)] last:border-b-0">
       <span className="w-[104px] sm:w-[124px] shrink-0 text-[11.5px] text-[var(--text-faint)]">
         {k}
       </span>
