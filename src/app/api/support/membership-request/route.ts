@@ -41,6 +41,30 @@ const MAX = {
   contact: 120, territory: 120, supplies: 200, website: 200,
 } as const;
 
+/* Proof documents. The bucket is private, has no anon policy, and is read
+   only through short-lived signed URLs minted for a reviewer.
+
+   The type is decided by the first bytes of the file, never by its name or by
+   the Content-Type the browser volunteered — both are attacker-controlled on a
+   public endpoint. Storage enforces the same list a second time via the
+   bucket's allowed_mime_types. */
+const DOCS_BUCKET = "membership-docs";
+const MAX_DOCS = 2;
+const MAX_DOC_BYTES = 4 * 1024 * 1024;
+
+const MAGIC: Array<{ ext: string; mime: string; test: (b: Uint8Array) => boolean }> = [
+  { ext: "jpg",  mime: "image/jpeg",       test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  { ext: "png",  mime: "image/png",        test: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
+  { ext: "pdf",  mime: "application/pdf",  test: (b) => b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46 },
+  { ext: "webp", mime: "image/webp",       test: (b) =>
+      b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 },
+];
+
+function sniff(bytes: Uint8Array): { ext: string; mime: string } | null {
+  return MAGIC.find((m) => m.test(bytes)) ?? null;
+}
+
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 3;
 type Hits = { count: number; resetAt: number };
@@ -73,7 +97,28 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  /* Multipart when documents are attached, JSON when they are not. Keeping
+     both means the form is one request either way: no upload endpoint that
+     can leave orphan files behind if the visitor closes the tab before
+     submitting, and one rate-limit bucket rather than two. */
+  const contentType = req.headers.get("content-type") ?? "";
+  let body: Record<string, unknown> = {};
+  let files: File[] = [];
+  if (contentType.includes("multipart/form-data")) {
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      return NextResponse.json({ error: "Could not read the form." }, { status: 400 });
+    }
+    for (const [k, v] of form.entries()) {
+      if (typeof v === "string") body[k] = v;
+      else if (k === "documents") files.push(v);
+    }
+    if (files.length > MAX_DOCS) files = files.slice(0, MAX_DOCS);
+  } else {
+    body = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  }
 
   const relationship = typeof body.relationship === "string" && body.relationship in RELATIONSHIPS
     ? body.relationship
@@ -109,6 +154,45 @@ export async function POST(req: Request) {
   }
   const ref = refData;
 
+  /* Uploaded under the reference, after it exists and before the row does.
+     A file that fails validation must not leave behind a request that reads
+     as complete — the applicant is told to fix it and nothing is stored. */
+  const documents: Array<{ path: string; name: string; mime: string; bytes: number }> = [];
+  for (const [i, file] of files.entries()) {
+    if (file.size === 0) continue;
+    if (file.size > MAX_DOC_BYTES) {
+      return NextResponse.json(
+        { error: `"${file.name}" is larger than 4 MB. Please attach a smaller file.` },
+        { status: 413 },
+      );
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const kind = sniff(bytes.subarray(0, 16));
+    if (!kind) {
+      return NextResponse.json(
+        { error: `"${file.name}" is not a PDF or an image. Please attach a PDF, JPG or PNG.` },
+        { status: 415 },
+      );
+    }
+    /* Our own name, not theirs: the original is kept as a label in metadata,
+       but the path is built from the reference and the sniffed extension, so
+       nothing a visitor types ever becomes part of a storage key. */
+    const path = `${ref}/${i + 1}.${kind.ext}`;
+    const { error: upErr } = await supabaseServer.storage
+      .from(DOCS_BUCKET)
+      .upload(path, bytes, { contentType: kind.mime, upsert: true });
+    if (upErr) {
+      console.error("[api/support/membership-request] upload", upErr.message);
+      return NextResponse.json({ error: "Could not upload the document." }, { status: 500 });
+    }
+    documents.push({
+      path,
+      name: file.name.slice(0, 120),
+      mime: kind.mime,
+      bytes: file.size,
+    });
+  }
+
   /* Everything beyond the four first-class columns lives in metadata — the
      shape differs by relationship, and a column per question would be a
      migration every time the form is edited. */
@@ -128,6 +212,7 @@ export async function POST(req: Request) {
     territory: relationship === "partner" ? territory || null : null,
     supplies: relationship === "supplier" ? supplies || null : null,
     website: relationship === "new_prospect" ? website || null : null,
+    documents: documents.length > 0 ? documents : null,
     language,
   };
   for (const k of Object.keys(metadata)) if (metadata[k] == null) delete metadata[k];
@@ -146,6 +231,14 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("[api/support/membership-request] insert", error.message);
+    if (documents.length > 0) {
+      /* Best effort: the row is what makes a document findable, so files
+         without one are unreachable rubbish sitting in a private bucket. */
+      await supabaseServer.storage
+        .from(DOCS_BUCKET)
+        .remove(documents.map((d) => d.path))
+        .catch(() => {});
+    }
     return NextResponse.json({ error: "Could not send the request." }, { status: 500 });
   }
 
@@ -174,6 +267,9 @@ export async function POST(req: Request) {
       country_code ? `Country       ${country_code}` : null,
       heard_from ? `Heard from    ${heard_from}` : null,
       language ? `Language      ${language}` : null,
+      documents.length > 0
+        ? `Documents     ${documents.map((d) => d.name).join(", ")}`
+        : "Documents     none attached",
       message ? `\nMessage\n${message}` : null,
       "",
       `Reference     ${ref}`,

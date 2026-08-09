@@ -182,6 +182,44 @@ export const signInT: Translations = {
   /* ── Prospect ── */
   "join.website":      { en: "Company website", zh: "公司网站", ar: "موقع الشركة" },
 
+
+  /* ── Proof ───────────────────────────────────────────────────────────
+     The owner's rule: a company license from EVERY applicant, whoever they
+     say they are. The second document differs by relationship and is what
+     lets a reviewer decide without a follow-up email. */
+  "join.docs":       { en: "Proof documents", zh: "证明文件", ar: "مستندات الإثبات" },
+  "join.docsAdd":    { en: "Attach files", zh: "上传文件", ar: "أرفق ملفات" },
+  "join.docsHint":   { en: "PDF, JPG or PNG · up to 2 files · 4 MB each",
+                       zh: "PDF、JPG 或 PNG · 最多 2 个文件 · 每个 4 MB",
+                       ar: "PDF أو JPG أو PNG · ملفين على الأكثر · ٤ ميجا للملف" },
+  "join.docsNeed":   { en: "Company license or commercial registration — required",
+                       zh: "营业执照或商业登记证 — 必填",
+                       ar: "السجل التجاري أو رخصة الشركة — مطلوب" },
+  /* Named per relationship, because "supporting document" tells nobody what
+     to go and find. */
+  "docs.existing_customer": { en: "Plus your last Koleex invoice, if you have it — it helps us find your account faster",
+                              zh: "如有，请附上最近一张 Koleex 发票 — 便于我们更快找到您的账户",
+                              ar: "ومعاه آخر فاتورة من Koleex لو عندك — بتساعدنا نلاقي حسابك أسرع" },
+  "docs.partner":           { en: "Plus your signed agreement with Koleex",
+                              zh: "以及您与 Koleex 签署的协议",
+                              ar: "ومعاه الاتفاقية الموقّعة مع Koleex" },
+  "docs.supplier":          { en: "Plus your latest contract or purchase order with Koleex",
+                              zh: "以及最近与 Koleex 的合同或采购订单",
+                              ar: "ومعاه آخر عقد أو أمر شراء مع Koleex" },
+  "docs.new_prospect":      { en: "The license is all we need at this stage",
+                              zh: "现阶段仅需营业执照",
+                              ar: "السجل التجاري كفاية في المرحلة دي" },
+  "docs.other":             { en: "Plus anything that helps us understand your request",
+                              zh: "以及任何有助于我们了解您需求的材料",
+                              ar: "ومعاه أي حاجة تساعدنا نفهم طلبك" },
+  "join.docsTooBig":  { en: "That file is over 4 MB. Please attach a smaller one.",
+                        zh: "该文件超过 4 MB，请上传较小的文件。",
+                        ar: "الملف ده أكبر من ٤ ميجا. ارفع ملف أصغر من فضلك." },
+  "join.docsRemove":  { en: "Remove", zh: "移除", ar: "شيل" },
+  "join.docsPrivate": { en: "Documents are stored privately and seen only by the Koleex administrators reviewing your request.",
+                        zh: "文件私密存储，仅供审核您申请的 Koleex 管理员查看。",
+                        ar: "المستندات بتتخزن بشكل خاص ومحدش بيشوفها غير مسؤولي Koleex اللي بيراجعوا طلبك." },
+
   "join.customerCode": { en: "Customer code or account name",
                       zh: "客户编号或账户名称",
                       ar: "كود العميل أو اسم الحساب" },

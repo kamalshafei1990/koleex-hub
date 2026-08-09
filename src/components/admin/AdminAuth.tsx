@@ -45,9 +45,12 @@ import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import TruckIcon from "@/components/icons/ui/TruckIcon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SelectChevron from "@/components/admin/SelectChevron";
 import { setCurrentAccountId } from "@/lib/identity";
 import { countriesFor, countryName, dialOf, flagOf } from "@/lib/countries-dial";
+import { shrinkImage } from "@/lib/shrink-image";
 import SignInHelpDialog from "./SignInHelpDialog";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
@@ -253,6 +256,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   const [joinTerritory, setJoinTerritory] = useState("");
   const [joinSupplies, setJoinSupplies] = useState("");
   const [joinWebsite, setJoinWebsite] = useState("");
+  /* Proof documents live on the parent, not the panel, so switching
+     relationship mid-form does not silently drop a file already attached. */
+  const [joinDocs, setJoinDocs] = useState<File[]>([]);
   const [joinRef, setJoinRef] = useState("");
   const [joinHeardFrom, setJoinHeardFrom] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
@@ -331,6 +337,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setJoinTerritory("");
     setJoinSupplies("");
     setJoinWebsite("");
+    setJoinDocs([]);
     setJoinHeardFrom("");
     setJoinMessage("");
   }
@@ -358,29 +365,38 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
        request in the visitor's OWN localStorage and showed the success panel
        anyway. People were told a Super Admin would review a request nobody
        ever received. */
+    /* One request whether or not there are documents. FormData rather than
+       two round-trips: an upload endpoint that runs first would leave orphan
+       files behind every time somebody attaches a license and then closes the
+       tab, and it would need its own rate limit. Content-Type is deliberately
+       NOT set — the browser has to add the multipart boundary itself. */
+    const fields: Record<string, string> = {
+      relationship: joinRelationship,
+      full_name: name,
+      email,
+      phone: joinPhone.trim(),
+      phone_code: dialOf(joinCountry),
+      country_code: joinCountry || "",
+      company: joinCompany.trim(),
+      job_title: joinJobTitle.trim(),
+      heard_from: joinHeardFrom,
+      customer_code: joinCustomerCode.trim(),
+      koleex_contact: joinKoleexContact.trim(),
+      partner_type: joinPartnerType,
+      territory: joinTerritory.trim(),
+      supplies: joinSupplies.trim(),
+      website: joinWebsite.trim(),
+      message: joinMessage.trim(),
+      language: lang,
+    };
+    const payload = new FormData();
+    for (const [k, v] of Object.entries(fields)) payload.append(k, v);
+    for (const f of joinDocs) payload.append("documents", f, f.name);
+
     try {
       const res = await fetch("/api/support/membership-request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          relationship: joinRelationship,
-          full_name: name,
-          email,
-          phone: joinPhone.trim(),
-          phone_code: dialOf(joinCountry),
-          country_code: joinCountry || "",
-          company: joinCompany.trim(),
-          job_title: joinJobTitle.trim(),
-          heard_from: joinHeardFrom,
-          customer_code: joinCustomerCode.trim(),
-          koleex_contact: joinKoleexContact.trim(),
-          partner_type: joinPartnerType,
-          territory: joinTerritory.trim(),
-          supplies: joinSupplies.trim(),
-          website: joinWebsite.trim(),
-          message: joinMessage.trim(),
-          language: lang,
-        }),
+        body: payload,
       });
       const json = (await res.json().catch(() => null)) as
         | { ok?: boolean; ref?: string; error?: string } | null;
@@ -625,6 +641,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     territory: joinTerritory,
                     supplies: joinSupplies,
                     website: joinWebsite,
+                    docs: joinDocs,
                     heardFrom: joinHeardFrom,
                     message: joinMessage,
                   }}
@@ -650,6 +667,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                     setTerritory: setJoinTerritory,
                     setSupplies: setJoinSupplies,
                     setWebsite: setJoinWebsite,
+                    setDocs: setJoinDocs,
                     setHeardFrom: setJoinHeardFrom,
                     setMessage: setJoinMessage,
                   }}
@@ -799,6 +817,7 @@ interface JoinState {
   territory: string;
   supplies: string;
   website: string;
+  docs: File[];
   heardFrom: string;
   message: string;
 }
@@ -817,6 +836,7 @@ interface JoinSetters {
   setTerritory: (v: string) => void;
   setSupplies: (v: string) => void;
   setWebsite: (v: string) => void;
+  setDocs: (v: File[]) => void;
   setHeardFrom: (v: string) => void;
   setMessage: (v: string) => void;
 }
@@ -841,6 +861,7 @@ function JoinPanel({
   onGoSignIn,
 }: JoinPanelProps) {
   const { t, lang } = useTranslation(signInT);
+  const [docErr, setDocErr] = useState<string | null>(null);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {/* Relationship — pill buttons. First thing the admin wants to
@@ -1128,6 +1149,89 @@ function JoinPanel({
           </div>
         </div>
       ) : null}
+
+
+      {/* ── Proof ─────────────────────────────────────────────────────────
+          The owner's rule: a company license from EVERY applicant, whoever
+          they say they are. An invoice or a contract proves a transaction
+          happened, not that this person works there — the license is what
+          establishes the company, and the second document is what tells the
+          reviewer WHICH company record to attach it to.
+
+          The hint is named per relationship on purpose. "Supporting document"
+          tells nobody what to go and find. */}
+      <div>
+        <label className={labelBase}>{t("join.docs")}</label>
+        <p className="text-[11px] text-white/45 leading-relaxed mb-2">
+          {t("join.docsNeed")}
+          <br />
+          <span className="text-white/35">{t(`docs.${state.relationship}`)}</span>
+        </p>
+
+        {state.docs.length > 0 && (
+          <ul className="mb-2 space-y-1.5">
+            {state.docs.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center gap-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2"
+              >
+                <PaperclipIcon className="h-3.5 w-3.5 text-white/35 shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-[12px] text-white/75">{f.name}</span>
+                <span className="text-[11px] text-white/35 tabular-nums shrink-0">
+                  {Math.max(1, Math.round(f.size / 1024))} KB
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setters.setDocs(state.docs.filter((_, j) => j !== i))}
+                  className="text-white/40 hover:text-white transition-colors shrink-0"
+                  aria-label={t("join.docsRemove")}
+                >
+                  <CrossIcon className="h-3 w-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {state.docs.length < 2 && (
+          <label className="flex items-center justify-center gap-2 h-11 rounded-lg border border-dashed border-white/[0.14] bg-white/[0.02] text-[12px] text-white/55 cursor-pointer hover:border-white/25 hover:text-white/80 transition-colors">
+            <PaperclipIcon className="h-3.5 w-3.5" />
+            {t("join.docsAdd")}
+            <input
+              type="file"
+              className="sr-only"
+              multiple
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={async (e) => {
+                const picked = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                if (picked.length === 0) return;
+                setDocErr(null);
+                /* A license photographed on a phone is 4-6 MB and the ceiling
+                   is 4. Shrink it rather than telling someone their own
+                   document is "too large" and leaving them to work out why. */
+                const room = 2 - state.docs.length;
+                const next: File[] = [];
+                for (const f of picked.slice(0, room)) {
+                  const small = await shrinkImage(f, 4 * 1024 * 1024);
+                  if (small.size > 4 * 1024 * 1024) {
+                    setDocErr(t("join.docsTooBig"));
+                    continue;
+                  }
+                  next.push(small);
+                }
+                if (next.length > 0) setters.setDocs([...state.docs, ...next]);
+              }}
+            />
+          </label>
+        )}
+        {docErr ? (
+          <p className="mt-1.5 text-[11px] text-red-300">{docErr}</p>
+        ) : (
+          <p className="mt-1.5 text-[11px] text-white/30">{t("join.docsHint")}</p>
+        )}
+        <p className="mt-1.5 text-[11px] text-white/30 leading-relaxed">{t("join.docsPrivate")}</p>
+      </div>
 
       {/* How did you hear — only asked of someone who has just found us. An
           existing customer or supplier already knows who we are. */}
