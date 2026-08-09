@@ -68,6 +68,14 @@ const CHANNEL_LABEL: Record<string, string> = {
   email: "Email", whatsapp: "WhatsApp", wechat: "WeChat", telegram: "Telegram",
   messenger: "Messenger", sms: "SMS", phone: "Phone call", other: "Other",
 };
+const HEARD_LABEL: Record<string, string> = {
+  linkedin: "LinkedIn", google: "Google or search", referral: "A colleague recommended us",
+  existing_customer: "A Koleex customer recommended us", sales_rep: "A Koleex sales rep",
+  partner: "A Koleex partner", exhibition: "Trade show", event: "Event or conference",
+  website: "Koleex website", marketplace: "Alibaba / B2B marketplace", wechat: "WeChat",
+  social: "Instagram / Facebook / YouTube", press: "Industry press", email: "Email from Koleex",
+  other: "Somewhere else",
+};
 const CHANNEL_BRAND: Record<string, string> = {
   whatsapp: "whatsapp", wechat: "wechat", telegram: "telegram", messenger: "messenger",
 };
@@ -110,8 +118,11 @@ function countryLabel(code: string) {
   return row ? `${flagOf(code)}  ${countryName(row, "en")}` : code;
 }
 
-const labelCls =
-  "text-[10px] font-semibold uppercase tracking-[0.09em] text-[var(--text-faint)]";
+/* THREE weights, deliberately different, because the first version gave the
+   section heading and the field label the same one and the card read as an
+   undifferentiated wall of grey capitals. */
+const sectionCls =
+  "text-[10.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-dim)]";
 const cardCls =
   "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]";
 
@@ -325,6 +336,23 @@ function StatusPill({ status }: { status: Status }) {
   );
 }
 
+/* ── Detail ────────────────────────────────────────────────────────────────
+   Rebuilt because the first version had no hierarchy: `Group` titles and
+   `Field` labels used the SAME class, so "HOW TO REACH THEM" and "EMAIL" were
+   typographically identical and the eye had nothing to climb. Eleven fields
+   stacked as label-above-value in a three-column grid also left a third of
+   every row empty and read as a spreadsheet.
+
+   Now: a header band that anchors on a monogram, facts as tight
+   label-then-value rows in a two-column body, and the things a reviewer reads
+   rather than scans — message, documents, history — in their own column. */
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
 function Detail({
   row, busy, note, onNote, onBack, onDecide,
 }: {
@@ -343,34 +371,66 @@ function Detail({
   const lang = String(m.language ?? "");
   const channel = String(m.contact_via ?? "");
   const handle = String(m.contact_handle ?? "");
+  const heard = String(m.heard_from ?? "");
   const decisions = (m.decisions ?? []) as Array<{ status: string; note: string | null; at: string }>;
 
   return (
     <div className={`${cardCls} overflow-hidden`}>
-      {/* Identity block — the four things a reviewer reads first. */}
-      <div className="px-4 sm:px-5 py-4 border-b border-[var(--border-subtle)]">
+
+      {/* ── Header band ── */}
+      <div className="px-4 sm:px-5 py-4 bg-[var(--bg-surface-subtle)] border-b border-[var(--border-subtle)]">
         <div className="flex items-start gap-3 min-w-0">
           <button
             type="button"
             onClick={onBack}
-            className="lg:hidden h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)]"
+            className="lg:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)]"
             aria-label="Back to the list"
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </button>
+
+          {/* A monogram, not an avatar: an applicant has no account and so no
+              photo, and a grey circle would be a placeholder for nothing. */}
+          <div
+            aria-hidden
+            className="hidden sm:flex h-11 w-11 shrink-0 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] items-center justify-center text-[13px] font-bold text-[var(--text-dim)]"
+          >
+            {initialsOf(row.full_name)}
+          </div>
+
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-[16px] font-bold tracking-tight break-words">{row.full_name}</h2>
+              <h2 className="text-[17px] font-bold tracking-tight break-words">{row.full_name}</h2>
               <StatusPill status={row.status} />
+              {String(m.relationship_label ?? "") && (
+                <span className="shrink-0 text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)]">
+                  {String(m.relationship_label)}
+                </span>
+              )}
             </div>
-            <p className="text-[12.5px] text-[var(--text-dim)] mt-0.5 break-words">
-              {[String(m.job_title ?? ""), row.company].filter(Boolean).join(" · ") || "—"}
-            </p>
-            <p className="text-[11px] text-[var(--text-faint)] mt-1.5 tabular-nums">
-              {row.ref ?? "—"} · {fmtDate(row.created_at)}
-              {row.status !== "pending" && row.reviewed_by_name
-                ? ` · ${STATUS_LABEL[row.status].toLowerCase()} by ${row.reviewed_by_name}`
-                : ""}
+            {(String(m.job_title ?? "") || row.company) && (
+              <p className="text-[12.5px] text-[var(--text-dim)] mt-1 break-words">
+                {[String(m.job_title ?? ""), row.company].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {/* No em-dash placeholder for a missing reference — an old row
+                simply shows its date. */}
+            <p className="text-[11px] text-[var(--text-faint)] mt-1.5 flex items-center gap-1.5 flex-wrap">
+              {row.ref && <span className="tabular-nums font-semibold">{row.ref}</span>}
+              {row.ref && <span aria-hidden>·</span>}
+              <span>{fmtDate(row.created_at)}</span>
+              {country && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{countryLabel(country)}</span>
+                </>
+              )}
+              {row.status !== "pending" && row.reviewed_by_name && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{STATUS_LABEL[row.status].toLowerCase()} by {row.reviewed_by_name}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -382,99 +442,107 @@ function Detail({
         )}
       </div>
 
-      {/* Grouped, because a flat list of eleven fields all at the same weight
-          is the reason this was hard to read. */}
-      <Group title="How to reach them">
-        <Field k="Email" v={row.email} note={free ? "personal address" : undefined} />
-        <Field k="Phone" v={String(m.phone ?? "")} />
-        <Field k="Language" v={LANG_LABEL[lang] ?? lang} />
-        {/* What they ASKED for, which is often not email — a supplier in
-            Shenzhen answers WeChat in minutes and email in days. */}
-        {channel && (
-          <div className="min-w-0">
-            <dt className={labelCls}>Prefers</dt>
-            <dd className="text-[12.5px] break-words flex items-center gap-1.5">
-              {CHANNEL_BRAND[channel] && (
-                <BrandGlyph name={CHANNEL_BRAND[channel]} size={14} className="shrink-0" />
-              )}
-              <span>
-                {CHANNEL_LABEL[channel] ?? channel}
-                {handle ? ` · ${handle}` : ""}
-              </span>
-            </dd>
-          </div>
-        )}
-      </Group>
+      {/* ── Body: facts on the left, prose on the right ── */}
+      <div className="grid xl:grid-cols-2">
+        <div className="px-4 sm:px-5 py-4 space-y-5 xl:border-e border-[var(--border-subtle)] min-w-0">
+          <Block title="Contact">
+            <Row k="Email" v={row.email} note={free ? "personal address" : undefined} />
+            <Row k="Phone" v={String(m.phone ?? "")} />
+            {channel && (
+              <Row
+                k="Prefers"
+                v={`${CHANNEL_LABEL[channel] ?? channel}${handle ? ` · ${handle}` : ""}`}
+                brand={CHANNEL_BRAND[channel]}
+              />
+            )}
+            <Row k="Language" v={LANG_LABEL[lang] ?? lang} />
+          </Block>
 
-      <Group title="Who they are">
-        <Field k="Relationship" v={String(m.relationship_label ?? "")} />
-        <Field k="Country" v={countryLabel(country)} note={country && !KNOWN_COUNTRY.has(country) ? "unrecognised code" : undefined} />
-        <Field k="Company" v={row.company ?? ""} />
-        <Field k="Website" v={String(m.website ?? "")} />
-        <Field k="Customer code" v={String(m.customer_code ?? "")} />
-        <Field k="Contact at Koleex" v={String(m.koleex_contact ?? "")} />
-        <Field k="Partnership" v={PARTNER_LABEL[partner] ?? partner} />
-        <Field k="Territory" v={String(m.territory ?? "")} />
-        <Field k="Supplies" v={String(m.supplies ?? "")} />
-        <Field k="Heard about us" v={String(m.heard_from ?? "")} />
-      </Group>
+          <Block title="Business">
+            <Row k="Company" v={row.company ?? ""} />
+            <Row k="Country" v={countryLabel(country)}
+                 note={country && !KNOWN_COUNTRY.has(country) ? "unrecognised code" : undefined} />
+            <Row k="Website" v={String(m.website ?? "")} />
+            <Row k="Customer code" v={String(m.customer_code ?? "")} />
+            <Row k="Contact at Koleex" v={String(m.koleex_contact ?? "")} />
+            <Row k="Partnership" v={PARTNER_LABEL[partner] ?? partner} />
+            <Row k="Territory" v={String(m.territory ?? "")} />
+            <Row k="Supplies" v={String(m.supplies ?? "")} />
+            <Row k="Heard about us" v={HEARD_LABEL[heard] ?? heard} />
+          </Block>
+        </div>
 
-      {row.message && (
-        <Group title="Their message" cols={1}>
-          <p className="text-[12.5px] leading-relaxed whitespace-pre-wrap break-words">
-            {row.message}
-          </p>
-        </Group>
-      )}
+        <div className="px-4 sm:px-5 py-4 space-y-5 border-t xl:border-t-0 border-[var(--border-subtle)] min-w-0">
+          <Block title="Proof documents">
+            {docs.length === 0 ? (
+              <p className="flex items-start gap-2 text-[12px] text-amber-400">
+                <ExclamationIcon className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>None attached — a company license is required.</span>
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {docs.map((d) => (
+                  <li key={d.path} className="min-w-0">
+                    {/* Signed for five minutes, minted server-side. There is
+                        no public URL to this bucket. */}
+                    <a
+                      href={`/api/membership-requests/${row.id}/document?path=${encodeURIComponent(d.path)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 max-w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] hover:border-[var(--text-faint)] transition-colors"
+                    >
+                      <PaperclipIcon className="h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
+                      <span className="truncate">{d.name}</span>
+                      <span className="text-[var(--text-faint)] tabular-nums shrink-0">
+                        {Math.max(1, Math.round(d.bytes / 1024))} KB
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Block>
 
-      <Group title="Proof documents" cols={1}>
-        {docs.length === 0 ? (
-          <p className="text-[12px] text-amber-400">
-            None attached — a company license is required.
-          </p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {docs.map((d) => (
-              <li key={d.path} className="min-w-0">
-                {/* Signed for five minutes, minted server-side. There is no
-                    public URL to this bucket. */}
-                <a
-                  href={`/api/membership-requests/${row.id}/document?path=${encodeURIComponent(d.path)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 max-w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] hover:border-[var(--text-faint)] transition-colors"
-                >
-                  <PaperclipIcon className="h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
-                  <span className="truncate">{d.name}</span>
-                  <span className="text-[var(--text-faint)] tabular-nums shrink-0">
-                    {Math.max(1, Math.round(d.bytes / 1024))} KB
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Group>
+          {row.message && (
+            <Block title="Their message">
+              <p className="text-[12.5px] leading-relaxed whitespace-pre-wrap break-words text-[var(--text-secondary)]">
+                {row.message}
+              </p>
+            </Block>
+          )}
 
-      {decisions.length > 0 && (
-        <Group title="History" cols={1}>
-          <ul className="space-y-1.5">
-            {decisions.map((d, i) => (
-              <li key={i} className="text-[12px] text-[var(--text-dim)] break-words">
-                <span className="text-[var(--text-primary)] font-semibold">
-                  {STATUS_LABEL[(d.status as Status)] ?? d.status}
-                </span>
-                {" · "}{fmtDate(d.at)}
-                {d.note ? ` · ${d.note}` : ""}
-              </li>
-            ))}
-          </ul>
-        </Group>
-      )}
+          {decisions.length > 0 && (
+            <Block title="History">
+              <ul className="space-y-2">
+                {decisions.map((d, i) => (
+                  <li key={i} className="text-[12px] break-words flex gap-2">
+                    <span
+                      className={`shrink-0 mt-1.5 h-1.5 w-1.5 rounded-full ${
+                        d.status === "approved" ? "bg-emerald-400"
+                        : d.status === "rejected" ? "bg-red-400" : "bg-amber-400"
+                      }`}
+                      aria-hidden
+                    />
+                    <span className="min-w-0">
+                      <span className="font-semibold">
+                        {STATUS_LABEL[d.status as Status] ?? d.status}
+                      </span>
+                      <span className="text-[var(--text-faint)]"> · {fmtDate(d.at)}</span>
+                      {d.note && (
+                        <span className="block text-[var(--text-dim)]">{d.note}</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Block>
+          )}
+        </div>
+      </div>
 
-      {/* Decision */}
+      {/* ── Decision ── */}
       <div className="px-4 sm:px-5 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-        <label className={labelCls} htmlFor={`note-${row.id}`}>
+        <label className={sectionCls} htmlFor={`note-${row.id}`}>
           Decision note {row.status === "pending" ? "· required to refuse" : ""}
         </label>
         <textarea
@@ -483,7 +551,7 @@ function Detail({
           onChange={(e) => onNote(e.target.value)}
           rows={2}
           placeholder="Why, in one line — whoever reads this row next will not have your context."
-          className="mt-1.5 w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-2 text-[12.5px] outline-none focus:border-[var(--text-faint)] resize-none"
+          className="mt-2 w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-2 text-[12.5px] outline-none focus:border-[var(--text-faint)] resize-none"
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
@@ -505,6 +573,8 @@ function Detail({
             Refuse
           </button>
 
+          <span className="hidden sm:block h-6 w-px bg-[var(--border-subtle)] mx-1" aria-hidden />
+
           {/* The hand-off: everything the account form needs is already here,
               so nobody retypes a name and an email off the screen above. */}
           <Link
@@ -519,7 +589,7 @@ function Detail({
               own client rather than pretending to send anything. */}
           <a
             href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent(`Koleex Hub · your request ${row.ref ?? ""}`)}`}
-            className="h-10 px-3 rounded-xl text-[var(--text-dim)] text-[12.5px] font-semibold inline-flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+            className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] text-[12.5px] font-semibold inline-flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--text-faint)] transition-colors"
           >
             <EnvelopeIcon className="h-3.5 w-3.5" />
             Email them
@@ -530,30 +600,37 @@ function Detail({
   );
 }
 
-function Group({
-  title, children, cols = 2,
-}: { title: string; children: React.ReactNode; cols?: 1 | 2 }) {
+/* A section — one step ABOVE a field label, which was the whole problem
+   before: both were the same 10px uppercase grey. */
+function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="px-4 sm:px-5 py-4 border-b border-[var(--border-subtle)]">
-      <h3 className={`${labelCls} mb-2.5`}>{title}</h3>
-      {cols === 1 ? (
-        children
-      ) : (
-        <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
-          {children}
-        </dl>
-      )}
+    <section className="min-w-0">
+      <h3 className={`${sectionCls} mb-2`}>{title}</h3>
+      {children}
     </section>
   );
 }
 
-function Field({ k, v, note }: { k: string; v: string; note?: string }) {
+/* Label THEN value on one line, not label stacked above value in a grid cell.
+   A spec sheet reads down a single column of aligned labels; a grid of
+   stacked pairs makes the eye zig-zag and leaves a third of every row empty
+   whenever a section has two facts instead of three. */
+function Row({
+  k, v, note, brand,
+}: { k: string; v: string; note?: string; brand?: string }) {
   if (!v) return null;
   return (
-    <div className="min-w-0">
-      <dt className={labelCls}>{k}</dt>
-      <dd className="text-[12.5px] break-words">{v}</dd>
-      {note && <div className="text-[11px] text-amber-400 mt-0.5">{note}</div>}
+    <div className="flex gap-3 py-[3px] min-w-0">
+      <span className="w-[104px] sm:w-[124px] shrink-0 text-[11.5px] text-[var(--text-faint)]">
+        {k}
+      </span>
+      <span className="min-w-0 flex-1 text-[12.5px] break-words">
+        <span className="inline-flex items-center gap-1.5">
+          {brand && <BrandGlyph name={brand} size={13} className="shrink-0" />}
+          <span>{v}</span>
+        </span>
+        {note && <span className="block text-[11px] text-amber-400">{note}</span>}
+      </span>
     </div>
   );
 }
