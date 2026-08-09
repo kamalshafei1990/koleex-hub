@@ -14,7 +14,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { COUNTRIES } from "@/types/product-form";
+import SelectChevron from "@/components/admin/SelectChevron";
+import { countriesFor, countryName, dialOf, flagOf } from "@/lib/countries-dial";
 import { useTranslation } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -53,17 +54,12 @@ const ASKS_USERNAME = new Set([
   "no_app_access", "suspicious_activity",
 ]);
 
-const DIALS = COUNTRIES.filter((c) => "dial" in c) as ReadonlyArray<{
-  code: string; name: string; dial: string;
-}>;
-
-/** 🇪🇬 from "EG" — the two letters shifted into Unicode's regional-indicator
- *  block. No flag assets, no lookup table, works for every country code. */
-function flagOf(code: string): string {
-  return code
-    .toUpperCase()
-    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
-}
+/* appearance-none, because the browser's own chevron is pinned ~4px from the
+   edge and ignores the padding reserved for it — which is exactly what the
+   owner saw: an arrow sitting on the border with 36px of empty gutter behind
+   it. SelectChevron paints the replacement at 16px. */
+const selectBase =
+  "w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 ps-3 pe-10 text-[14px] text-white outline-none focus:border-white/25 transition-colors appearance-none cursor-pointer";
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -112,7 +108,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const dial = DIALS.find((c) => c.code === country)?.dial ?? "";
+  const dial = dialOf(country);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -216,21 +212,20 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
                   measured at 375px, the longest option ran 61px past the box and
                   disappeared under the chevron. The labels were shortened too;
                   this is the guard for whatever gets added later. */}
-              <select
-                value={problem}
-                onChange={(e) => setProblem(e.target.value)}
-                /* ps-3 pe-9, not px-3: the browser draws the chevron inside
-                   the inline-END padding, so 12px reserved nothing and long
-                   text ran underneath it. Logical properties because that edge
-                   is the RIGHT in English and the LEFT in Arabic. */
-                className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 ps-3 pe-9 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
-              >
-                {PROBLEMS.map((id) => (
-                  <option key={id} value={id} className="bg-[#121212]">
-                    {t(`help.p.${id}`)}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={problem}
+                  onChange={(e) => setProblem(e.target.value)}
+                  className={selectBase}
+                >
+                  {PROBLEMS.map((id) => (
+                    <option key={id} value={id} className="bg-[#121212]">
+                      {t(`help.p.${id}`)}
+                    </option>
+                  ))}
+                </select>
+                <SelectChevron />
+              </div>
               {problem === "suspicious_activity" && (
                 /* Say it back to them. Someone reporting a possible break-in
                    needs to know it was not filed as a password reset. */
@@ -323,23 +318,29 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
               {/* The country gets its own full-width row so the NAME fits
                   beside the flag and the code. Squeezed into 124px next to the
                   number it could only ever show "+20", which tells someone
-                  scrolling a 29-item list nothing. */}
+                  scrolling a 199-item list nothing. */}
               <div>
                 <label className="block text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold mb-2">
                   {t("help.country")}
                 </label>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  aria-label="Country"
-                  className="w-full h-11 truncate rounded-xl bg-white/[0.04] border border-white/10 ps-3 pe-9 text-[14px] text-white outline-none focus:border-white/25 transition-colors"
-                >
-                  {DIALS.map((c) => (
-                    <option key={c.code} value={c.code} className="bg-[#121212]">
-                      {flagOf(c.code)}  {c.name}  ·  {c.dial}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    aria-label="Country"
+                    className={selectBase}
+                  >
+                    {/* Every country, in the reader's own alphabet. This used
+                        to be the 29-market PRICING list, so anyone outside
+                        those markets had no row to pick. */}
+                    {countriesFor(lang).map((c) => (
+                      <option key={c.code} value={c.code} className="bg-[#121212]">
+                        {flagOf(c.code)}  {countryName(c, lang)}  ·  {c.dial}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectChevron />
+                </div>
               </div>
 
               <div>

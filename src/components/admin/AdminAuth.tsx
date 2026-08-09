@@ -44,9 +44,9 @@ import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import TruckIcon from "@/components/icons/ui/TruckIcon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import SelectChevron from "@/components/admin/SelectChevron";
 import { setCurrentAccountId } from "@/lib/identity";
-import { COUNTRIES } from "@/types/product-form";
+import { countriesFor, countryName, dialOf, flagOf } from "@/lib/countries-dial";
 import SignInHelpDialog from "./SignInHelpDialog";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
@@ -136,18 +136,11 @@ const inputBase =
 /* `appearance-none` removes the browser's own chevron — and nothing was drawn
    in its place, so every dropdown on the join form looked like a plain text
    box with no hint you could open it. Room is reserved at the inline end
-   (logical, so Arabic flips) and SelectChevron paints the arrow. */
+   (logical, so Arabic flips) and SelectChevron paints the arrow.
+   pe-10, not pe-9: the arrow now sits 16px in, so 36px left the longest option
+   ending under it. */
 const selectBase =
-  "w-full h-11 ps-3 pe-9 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer truncate";
-
-function SelectChevron() {
-  return (
-    <AngleDownIcon
-      size={12}
-      className="absolute end-3 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none"
-    />
-  );
-}
+  "w-full h-11 ps-3 pe-10 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer truncate";
 const textareaBase =
   "w-full min-h-[86px] px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-colors resize-none";
 const labelBase =
@@ -280,9 +273,6 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
        request in the visitor's OWN localStorage and showed the success panel
        anyway. People were told a Super Admin would review a request nobody
        ever received. */
-    const dialRow = COUNTRIES.find(
-      (c) => c.code === joinCountry,
-    ) as { code: string; dial?: string } | undefined;
     try {
       const res = await fetch("/api/support/membership-request", {
         method: "POST",
@@ -292,7 +282,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           full_name: name,
           email,
           phone: joinPhone.trim(),
-          phone_code: dialRow?.dial ?? "",
+          phone_code: dialOf(joinCountry),
           country_code: joinCountry || "",
           company: joinCompany.trim(),
           job_title: joinJobTitle.trim(),
@@ -680,7 +670,7 @@ function JoinPanel({
   error,
   onSubmit,
 }: JoinPanelProps) {
-  const { t } = useTranslation(signInT);
+  const { t, lang } = useTranslation(signInT);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {/* Relationship — pill buttons. First thing the admin wants to
@@ -824,9 +814,12 @@ function JoinPanel({
               <option value="" className="bg-[#121212]">
                 {t("join.selectCountry")}
               </option>
-              {COUNTRIES.map((c) => (
+              {/* Every country, in the reader's own alphabet. The 29-market
+                  pricing list used to be here, so a visitor from Spain or
+                  Japan had no row to pick. */}
+              {countriesFor(lang).map((c) => (
                 <option key={c.code} value={c.code} className="bg-[#121212]">
-                  {c.name}
+                  {flagOf(c.code)}  {countryName(c, lang)}
                 </option>
               ))}
             </select>
