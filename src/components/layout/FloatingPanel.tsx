@@ -137,6 +137,16 @@ export default function FloatingPanel() {
      INCOME row). Persisted to localStorage so the choice survives
      navigation + reloads. */
   const [minimized, setMinimized] = useState<boolean>(false);
+  /* Drives the dock's exit keyframe before it unmounts into the restore pip
+     — same two-phase pattern as closing the panel. */
+  const [minimizing, setMinimizing] = useState(false);
+  const handleMinimize = useCallback(() => {
+    setMinimizing(true);
+    window.setTimeout(() => {
+      setMinimized(true);
+      setMinimizing(false);
+    }, 210);
+  }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
     setMinimized(window.localStorage.getItem("koleex-fab-minimized") === "1");
@@ -701,7 +711,7 @@ export default function FloatingPanel() {
         onClick={() => setMinimized(false)}
         aria-label="Show AI / Discuss"
         title="Show AI / Discuss"
-        className={`fixed ${fabPosClass} z-[90] flex h-8 w-8 md:h-7 md:w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
+        className={`fab-dock-in fixed ${fabPosClass} z-[90] flex h-8 w-8 md:h-7 md:w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
         style={{
           boxShadow: dk
             ? "0 4px 14px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)"
@@ -1170,6 +1180,26 @@ export default function FloatingPanel() {
           from { opacity: 1; transform: translateY(-50%) scale(1); }
           to   { opacity: 0; transform: translateY(calc(-50% + 20px)) scale(0.7); }
         }
+        /* Minimize / restore: the whole dock shrinks into the corner it
+           lives in and springs back out of it. Origin at the pill's end,
+           where the restore pip sits. */
+        @keyframes fab-dock-out-kf {
+          from { opacity: 1; transform: scale(1); }
+          to   { opacity: 0; transform: scale(0.4) translateY(8px); }
+        }
+        .fab-dock-out {
+          animation: fab-dock-out-kf 0.22s cubic-bezier(0.32, 0, 0.67, 0) both;
+          transform-origin: calc(100% - 22px) 100%;
+        }
+        @keyframes fab-dock-in-kf {
+          from { opacity: 0; transform: scale(0.4) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .fab-dock-in {
+          animation: fab-dock-in-kf 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          transform-origin: calc(100% - 22px) 100%;
+        }
+        [dir="rtl"] .fab-dock-out, [dir="rtl"] .fab-dock-in { transform-origin: 22px 100%; }
         @keyframes fab-pill-in {
           from { opacity: 0.6; transform: scaleX(0.3); }
           to   { opacity: 1; transform: scaleX(1); }
@@ -1185,7 +1215,8 @@ export default function FloatingPanel() {
         }
         .fab-x-enter { animation: fab-x-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
         @media (prefers-reduced-motion: reduce) {
-          .fab-panel-anim > *, .fab-x-enter, .fab-pill-return { animation: none; }
+          .fab-panel-anim > *, .fab-x-enter, .fab-pill-return,
+          .fab-dock-out, .fab-dock-in { animation: none; }
         }
 
         /* Panel surface. Aurora: the tile material — same glass as the
@@ -1276,13 +1307,13 @@ export default function FloatingPanel() {
           pointer-events: none;
         }
       `}</style>
-      <div className="fab-wrap relative">
+      <div className={`fab-wrap relative ${minimizing ? "fab-dock-out" : "fab-dock-in"}`}>
         {/* Minimise button — top-right corner of the FAB cluster.
             Hidden by default, fades in on hover. */}
         {!open && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setMinimized(true); }}
+            onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
             className="fab-minimize"
             aria-label="Hide AI / Discuss"
             title="Hide AI / Discuss"
