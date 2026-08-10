@@ -1068,19 +1068,54 @@ export default function HomePage() {
           0% { --ai-card-angle: 0deg; }
           100% { --ai-card-angle: 360deg; }
         }
+        ${skin === "aurora" ? `
+        /* Aurora: the BOX is exactly the neighbours' tile glass — the owner's
+           rule, "only the borders moving and glowing, the box color same as
+           the other apps." The translucent double-background attempt failed
+           the same way the search did: the conic painted under a see-through
+           fill washes the whole box blue. So the two are separate mechanisms
+           now — flat tile glass on the element, and the spinning conic on a
+           masked ::before that paints ONLY the 1.5px rim. The @property
+           angle animates on the element and the pseudo inherits it. */
+        .ai-card-neon {
+          animation: ai-card-spin 3s linear infinite;
+          border: 1.5px solid transparent;
+          background: ${dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)"};
+          -webkit-backdrop-filter: blur(16px) saturate(150%);
+          backdrop-filter: blur(16px) saturate(150%);
+          box-shadow:
+            0 0 12px rgba(86,127,178,0.18),
+            0 0 24px rgba(188,216,240,0.08);
+        }
+        .ai-card-neon::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          padding: 1.5px;
+          pointer-events: none;
+          background: conic-gradient(
+            from var(--ai-card-angle),
+            rgba(86,127,178,0.75),
+            rgba(127,169,214,0.65),
+            rgba(188,216,240,0.55),
+            rgba(86,127,178,0.15),
+            rgba(127,169,214,0.65),
+            rgba(86,127,178,0.75)
+          );
+          -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+        }
+        ` : `
         .ai-card-neon {
           animation: ai-card-spin 3s linear infinite;
           border: 1.5px solid transparent;
           background-origin: border-box;
           background-clip: padding-box, border-box;
-          /* Aurora: the fill layer of the double-background trick goes
-             TRANSLUCENT and the element gets its own backdrop blur, so the
-             AI tile wears the same glass as its neighbours while keeping the
-             spinning conic ring. The trick's solid fill was why this tile
-             was the one black square on a glass grid. Core keeps the solid. */
-          ${skin === "aurora" ? "-webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);" : ""}
           background-image:
-            linear-gradient(${skin === "aurora" ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)") : (dk ? "#0c0c0c" : "#f8f8f8")}, ${skin === "aurora" ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)") : (dk ? "#0c0c0c" : "#f8f8f8")}),
+            linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
             conic-gradient(
               from var(--ai-card-angle),
               rgba(86,127,178,0.75),
@@ -1094,6 +1129,7 @@ export default function HomePage() {
             0 0 12px rgba(86,127,178,0.18),
             0 0 24px rgba(188,216,240,0.08);
         }
+        `}
         /* Search bar: focusing it lights the same Hub Blue gradient border
            + glow the tiles use on hover — one interaction language. */
         ${skin === "aurora" ? `
