@@ -1114,6 +1114,112 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass { background: rgba(250, 251, 253, 0.94); }
 }
 
+/* ── Aurora: popovers, segments, and the glow ring ──────────────────────
+
+   POPOVERS GET THEIR OWN, DENSER GLASS. `.kx-glass` is 55% opaque, which is
+   right for a big panel with a moving ground behind it and wrong for a menu:
+   a dropdown lands over whatever the page is showing — a grid of tiles, a
+   table — and 12px type at 55% over that is unreadable. 88% still reads as
+   glass because the blur is doing the work, and the text stays solid. */
+[data-kx-skin="aurora"] .kx-glass-pop {
+  background: rgba(13, 16, 22, 0.88);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+              0 24px 60px -24px rgba(0, 0, 0, 0.85);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop {
+  background: rgba(252, 253, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+              0 24px 60px -28px rgba(16, 24, 40, 0.28);
+}
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-pop {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(14, 17, 23, 0.98);
+}
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-glass-pop {
+  background: rgba(252, 253, 255, 0.99);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-glass-pop { background: rgba(14, 17, 23, 0.98); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop { background: rgba(252, 253, 255, 0.99); }
+}
+
+/* Segmented controls. The selected pill was a grey wash — correct on a flat
+   grey bar, wrong once the bar became glass over a blue ground, where grey is
+   the one colour that reads as dirt. Hub Blue instead. */
+[data-kx-skin="aurora"] .kx-seg-on {
+  background: rgba(86, 127, 178, 0.30);
+  box-shadow: inset 0 0 0 1px rgba(188, 216, 240, 0.28);
+  color: #fff;
+}
+[data-kx-skin="aurora"] .kx-seg-off:hover {
+  background: rgba(86, 127, 178, 0.16);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-seg-on {
+  background: rgba(86, 127, 178, 0.20);
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.35);
+  color: #16324F;
+}
+
+/* ── The glow ring ──────────────────────────────────────────────────────
+   A bright arc travelling slowly around the edge of a card.
+
+   IT IS A ROTATED TEXTURE, NOT AN ANIMATED GRADIENT. The obvious way is to
+   animate a conic-gradient's angle with @property, but a custom-property
+   animation repaints the gradient every frame on the main thread. Here the
+   conic is painted ONCE into a square layer and the layer is spun with
+   `rotate`, which is a compositor transform — the GPU turns a texture it
+   already has, and the main thread does nothing.
+
+   The mask keeps only the 1px padding box, so all that survives is the rim.
+   That is also why the ring can sit above the card's content without any
+   z-index work: the only pixels it paints are the border, and text never
+   reaches there. */
+[data-kx-skin="aurora"] .kx-glow-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+[data-kx-skin="aurora"] .kx-glow-ring::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg 200deg,
+    rgba(86, 127, 178, 0.55) 250deg,
+    rgba(188, 216, 240, 0.95) 285deg,
+    rgba(86, 127, 178, 0.55) 320deg,
+    transparent 360deg);
+  animation: kx-ring-spin 9s linear infinite;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glow-ring::before {
+  background: conic-gradient(from 0deg,
+    transparent 0deg 200deg,
+    rgba(86, 127, 178, 0.45) 250deg,
+    rgba(62, 103, 150, 0.85) 285deg,
+    rgba(86, 127, 178, 0.45) 320deg,
+    transparent 360deg);
+}
+@keyframes kx-ring-spin { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-kx-skin="aurora"] .kx-glow-ring::before { animation: none; }
+}
+/* No ring on a machine that is already being spared the ground. */
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-glow-ring { display: none; }
+
 /* ── THE KOLEEX ORB — the one loading shape in the Hub ──────────────────
    Owner picks 2026-08-10: the uiverse loader (uiverse.io/dexter-st/
    bright-lizard-8, MIT) in "Hub Deep", the logo carried by a travelling

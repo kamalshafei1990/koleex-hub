@@ -312,8 +312,8 @@ export default function UserMenu({ dk }: { dk: boolean }) {
           role="menu"
           className={`kx-drop-in absolute top-full end-0 mt-2 w-64 rounded-xl border shadow-2xl overflow-hidden z-50 ${
             dk
-              ? "border-white/[0.08] bg-[#0f0f0f]"
-              : "border-black/[0.08] bg-white"
+              ? "border-white/[0.08] kx-glass-pop bg-[#0f0f0f]"
+              : "border-black/[0.08] kx-glass-pop bg-white"
           }`}
         >
           {/* Identity block */}

@@ -176,7 +176,7 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
         <div
           className={`absolute right-0 top-11 z-50 min-w-[240px] rounded-xl border shadow-2xl overflow-hidden ${
             dk
-              ? "bg-[#141414] border-white/10"
+              ? "kx-glass-pop bg-[#141414] border-white/10"
               : "bg-white border-black/10"
           }`}
         >

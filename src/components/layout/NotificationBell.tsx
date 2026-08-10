@@ -748,8 +748,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             role="menu"
             className={`kx-drop-in fixed inset-x-3 top-[calc(var(--kx-header-h)+8px)] w-auto rounded-2xl border md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] md:rounded-xl shadow-2xl overflow-hidden z-50 ${
               dk
-                ? "border-white/[0.08] bg-[#0f0f0f]"
-                : "border-black/[0.08] bg-white"
+                ? "border-white/[0.08] kx-glass-pop bg-[#0f0f0f]"
+                : "border-black/[0.08] kx-glass-pop bg-white"
             }`}
           >
           {/* Header */}

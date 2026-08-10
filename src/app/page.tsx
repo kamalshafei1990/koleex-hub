@@ -490,6 +490,11 @@ const AIGreeter = memo(function AIGreeter({
             : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
         }}
       >
+        {/* Aurora only, and inert under Core because the class is scoped.
+            Rendered unconditionally: it is one empty span and CSS decides
+            whether it exists visually — cheaper than a JS branch and it means
+            switching skin needs no re-render. */}
+        <span className="kx-glow-ring" aria-hidden />
         <h1
           aria-label={greetingText}
           className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}

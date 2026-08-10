@@ -217,7 +217,7 @@ function CollapsedGroup({
   const GroupIcon = group.icon;
   const label = t(group.tKey, group.label);
   const hasActiveChild = apps.some((a) => a.id === activeAppId);
-  const flyoutBg = dk ? "bg-[#141414]" : "bg-white";
+  const flyoutBg = dk ? "kx-glass-pop bg-[#141414]" : "kx-glass-pop bg-white";
   const flyoutBorder = dk ? "border-white/[0.08]" : "border-black/[0.08]";
   const textGhost = dk ? "text-white/25" : "text-black/25";
 
@@ -536,7 +536,7 @@ export default function Sidebar() {
   /* ── Tokens (only those used by the shell chrome here) ── */
   const bg = dk ? "bg-[#0A0A0A]" : "bg-[#FAFAFA]";
   const border = dk ? "border-white/[0.06]" : "border-black/[0.06]";
-  const flyoutBg = dk ? "bg-[#141414]" : "bg-white";
+  const flyoutBg = dk ? "kx-glass-pop bg-[#141414]" : "kx-glass-pop bg-white";
   const flyoutBorder = dk ? "border-white/[0.08]" : "border-black/[0.08]";
 
   /* Precompute per-group view data once; presentational components are

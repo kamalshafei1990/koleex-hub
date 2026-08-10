@@ -448,7 +448,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
       {open && (
         <div
           className={`absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-1rem)] rounded-xl border shadow-2xl overflow-hidden ${
-            dk ? "bg-[#141414] border-white/10" : "bg-white border-black/10"
+            dk ? "kx-glass-pop bg-[#141414] border-white/10" : "kx-glass-pop bg-white border-black/10"
           }`}
         >
           {/* Header label */}

@@ -229,13 +229,16 @@ export default function MainHeader() {
               key={l.code}
               onClick={() => setLang(l.code)}
               className={`relative h-7 w-[54px] rounded-md text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
+                /* kx-seg-on/off are inert under Core, so the grey pill stays
+                   exactly as it was there; under Aurora they repaint it Hub
+                   Blue, because grey over a blue ground reads as dirt. */
                 lang === l.code
                   ? dk
-                    ? "bg-white/[0.12] text-white shadow-sm"
-                    : "bg-black/[0.10] text-black shadow-sm"
+                    ? "kx-seg-on bg-white/[0.12] text-white shadow-sm"
+                    : "kx-seg-on bg-black/[0.10] text-black shadow-sm"
                   : dk
-                    ? "text-white/45 hover:text-white/75"
-                    : "text-black/45 hover:text-black/75"
+                    ? "kx-seg-off text-white/45 hover:text-white/75"
+                    : "kx-seg-off text-black/45 hover:text-black/75"
               }`}
             >
               {l.label}
