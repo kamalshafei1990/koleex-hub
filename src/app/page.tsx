@@ -5,7 +5,7 @@
 
    Zone A: Search (⌘K)
    Zone B: Favorites (compact row < 3, grid >= 3)
-   Zone C: Recent (auroratal scrollable strip)
+   Zone C: Recent (horizontal scrollable strip)
    Zone D: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
@@ -313,7 +313,7 @@ const AppCard = memo(function AppCard({
   );
 });
 
-/* ── Compact auroratal card (for favorites row / recent strip) ── */
+/* ── Compact horizontal card (for favorites row / recent strip) ── */
 const CompactCard = memo(function CompactCard({
   app,
   t,

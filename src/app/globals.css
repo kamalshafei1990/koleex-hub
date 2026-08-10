@@ -413,7 +413,7 @@ body {
 .notes-surface-ruled .notes-editor h2,
 .notes-surface-ruled .notes-editor h3 { line-height: var(--rule-h); margin: 0; }
 
-/* ── Utility: hide scrollbars on auroratally-scrollable rows ────
+/* ── Utility: hide scrollbars on horizontally-scrollable rows ────
    Used by tab strips, day pickers, filter pills — anywhere we want
    swipe/drag scrolling without the chunky browser scrollbar taking
    vertical space. Previously referenced from app pages but never
@@ -2042,7 +2042,7 @@ input[type="number"]:not(.kx-spinner) {
   padding: 1px 5px;
   border-radius: 4px;
 }
-/* Tables like ChatGPT: rounded container, padded cells, auroratal
+/* Tables like ChatGPT: rounded container, padded cells, horizontal
    separators only. */
 .koleex-md .koleex-md-table-wrap {
   overflow-x: auto;
