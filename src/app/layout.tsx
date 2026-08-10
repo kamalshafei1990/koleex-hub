@@ -58,6 +58,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  /* The keyboard RESIZES the layout viewport instead of overlaying it
+     (iOS 18.4+ / Chrome 108+). This is what lets chat composers sit above
+     the keyboard with ZERO JavaScript: the shell's vh/svh shrink, flex
+     re-lays out, done. Older engines ignore this and fall back to the
+     native overlay-and-pan behaviour — usable, and with no JS left to
+     make it worse. */
+  interactiveWidget: "resizes-content",
   themeColor: "#0A0A0A",
 };
 

@@ -1590,102 +1590,18 @@ export default function KoleexAiApp() {
      chat in place while the browser chrome animates. Desktop keeps
      100dvh because it has no such chrome. */
   const aurora = useSkin() === "aurora";
-  /* ── Stage height: CSS AT REST, JS ONLY WHILE THE KEYBOARD IS UP. ──────
-     Every "measure the viewport at some moment" scheme raced something on
-     iOS (standalone boot, keyboard animation, toolbar slide) and each race
-     froze the app at a wrong height — the owner's half-screen screenshot.
-     At rest the height is a pure CSS calc the engine keeps correct forever:
-     the installed PWA and desktop have no collapsible chrome (100vh),
-     browser tabs use 100svh (always fits above the toolbar, never moves).
-     JS takes over ONLY between focus and blur, where CSS cannot see the
-     keyboard: pre-lift on touchstart by the remembered keyboard height
-     (prevents the iOS pan — "the box jumps to the top then falls slowly"),
-     refine to the exact visualViewport height when the keyboard settles,
-     hand back to the CSS calc on blur. */
-  const restStage = () =>
-    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
-      ? "calc(100vh - var(--kx-header-h, 3.5rem))"
-      : "calc(100svh - var(--kx-header-h, 3.5rem))";
-  const [stageHeight, setStageHeight] = useState<string>("calc(100vh - var(--kx-header-h, 3.5rem))");
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
-    const headerH = () => {
-      const el = document.querySelector<HTMLElement>(".kx-mainheader");
-      return el ? el.getBoundingClientRect().height : 56;
-    };
-    const vv = window.visualViewport;
-    const viewportH = () => (vv ? vv.height : window.innerHeight);
-    const KB_KEY = "kx-kb-h";
-    const kbEstimate = () => {
-      try {
-        const v = parseInt(window.localStorage.getItem(KB_KEY) || "", 10);
-        if (Number.isFinite(v) && v > 150 && v < 560) return v;
-      } catch { /* storage blocked */ }
-      return 300;
-    };
-    let kbMode = false;
-
-    const pinOuter = () => {
-      if (!isMobile()) return;
-      if (window.scrollY) window.scrollTo(0, 0);
-      const sc = document.getElementById("main-scroll-container");
-      if (sc && sc.scrollTop) sc.scrollTop = 0;
-    };
-    const rest = () => {
-      kbMode = false;
-      setStageHeight(restStage());
-      pinOuter();
-    };
-    rest();
-
-    const preLift = () => {
-      if (!isMobile() || kbMode) return;
-      kbMode = true;
-      setStageHeight(`${Math.max(240, viewportH() - kbEstimate() - headerH())}px`);
-    };
-    const onTouchComposer = (e: TouchEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && t.closest(".kx-ai-root textarea")) preLift();
-    };
-    const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && /^(TEXTAREA|INPUT)$/.test(t.tagName)) {
-        preLift();
-        pinOuter();
-      }
-    };
-    const onFocusOut = () => {
-      /* Keyboard dismissed → hand the height back to CSS. The calc string
-         is correct by construction, so there is nothing to race. */
-      if (isMobile()) window.setTimeout(rest, 60);
-    };
-    const onVVResize = () => {
-      if (!isMobile() || !kbMode) return;
-      /* The keyboard settled: refine the estimate to the exact height and
-         remember it for the next pre-lift. */
-      const kb = Math.round(window.innerHeight - viewportH());
-      if (kb >= 120) {
-        try { window.localStorage.setItem(KB_KEY, String(kb)); } catch { /* ignore */ }
-        setStageHeight(`${Math.max(240, viewportH() - headerH())}px`);
-        pinOuter();
-      }
-    };
-
-    window.addEventListener("touchstart", onTouchComposer, { passive: true, capture: true });
-    window.addEventListener("focusin", onFocusIn);
-    window.addEventListener("focusout", onFocusOut);
-    vv?.addEventListener("resize", onVVResize);
-    vv?.addEventListener("scroll", pinOuter);
-    return () => {
-      window.removeEventListener("touchstart", onTouchComposer, { capture: true } as EventListenerOptions);
-      window.removeEventListener("focusin", onFocusIn);
-      window.removeEventListener("focusout", onFocusOut);
-      vv?.removeEventListener("resize", onVVResize);
-      vv?.removeEventListener("scroll", pinOuter);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /* ── NO STAGE JAVASCRIPT. This is load-bearing simplicity — read before
+     re-adding anything here. The app fills its parent (h-full on the root):
+     the shell owns the viewport height (one static unit per display mode in
+     RootShell), the scroller is flex-1 inside it, and this root inherits
+     whatever they say. The keyboard is the BROWSER's job: the viewport meta
+     declares interactive-widget=resizes-content, so on modern engines the
+     layout viewport shrinks, the shell's unit follows, flex re-lays out and
+     the composer rides above the keyboard natively; older engines fall back
+     to overlay-and-pan. Every JS scheme tried here — snapshots, keyboard
+     deltas, pre-lifts, pinned scrolls — raced some iOS moment (standalone
+     boot, keyboard-close-without-blur, toolbar slide) and each race froze
+     the app at a wrong height on the owner's phone. */
 
   /* ── Koleex AI character (Rive orb) — derive its reactive state from the
      live chat lifecycle without touching the streaming internals.
@@ -1767,8 +1683,7 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="kx-ai-root kx-app-fullbleed text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
-      style={{ height: stageHeight }}
+      className="kx-ai-root kx-app-fullbleed h-full text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
     >
       {inputDialog}
       {/* Aurora: the Hub ground behind the whole app — the root goes
