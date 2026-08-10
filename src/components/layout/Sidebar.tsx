@@ -372,7 +372,7 @@ function MobileQuickSettings({ dk }: { dk: boolean }) {
         : dk ? "text-white/45" : "text-black/45"
     }`;
   return (
-    <div className={`px-3 pb-2 pt-2 border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"} flex items-center gap-2`}>
+    <div className={`px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom,0px))] border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"} flex items-center gap-2`}>
       <div className={`flex flex-1 items-center rounded-lg border p-0.5 ${dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.08] bg-black/[0.03]"}`}>
         <button onClick={() => setLang("en")} className={chip(lang === "en")}>EN</button>
         <button onClick={() => setLang("zh")} className={chip(lang === "zh")}>中文</button>
@@ -595,10 +595,13 @@ export default function Sidebar() {
 
       {/* ── Mobile drawer ── */}
       <aside
-        className={`kx-below-header md:hidden fixed top-14 bottom-0 start-0 z-50 ${bg} border-e ${border} transition-transform duration-300 ease-in-out ${
+        /* Aurora: the drawer wears the menus' glass (kx-glass-drawer — the
+           solid ${bg} stays as the Core fallback) and slides with the family
+           motion: a mild spring in, a quicker plain ease out. */
+        className={`kx-below-header kx-glass-drawer md:hidden fixed top-14 bottom-0 start-0 z-50 ${bg} border-e ${border} transition-transform ${
           mobileOpen
-            ? "translate-x-0 rtl:-translate-x-0"
-            : "-translate-x-full rtl:translate-x-full"
+            ? "translate-x-0 rtl:-translate-x-0 duration-[340ms] ease-[cubic-bezier(0.34,1.3,0.5,1)]"
+            : "-translate-x-full rtl:translate-x-full duration-[240ms] ease-in"
         }`}
         style={{ width: SIDEBAR_EXPANDED_W }}
       >
