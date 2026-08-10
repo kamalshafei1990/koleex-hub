@@ -15,6 +15,7 @@ import {
 import { SettingsCard, ControlRow, Segmented, SwitchRow } from "./ui";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { getSkin, setSkin, DEFAULT_SKIN, type Skin } from "@/lib/appearance";
 
 /* The shipped defaults for everything this screen edits. Region formats are
    deliberately absent — those belong to Language & region. */
@@ -41,11 +42,16 @@ export default function DisplayTab({ account, onChanged }: {
 
   const { t } = useTranslation(settingsT);
   const [theme, setThemeState] = useState<ThemePreference>("dark");
+  /* Same reason as useSkin: reading storage during the first render is a
+     hydration mismatch, so it starts at the default and settles in an effect.
+     The attribute on <html> is already right from the bootstrap. */
+  const [skin, setSkinState] = useState<Skin>(DEFAULT_SKIN);
 
   /* Theme is the app's binary light/dark switch (localStorage). Read the
      current value on mount and keep in sync if the header toggle changes it. */
   useEffect(() => {
     setThemeState(getThemePreference());
+    setSkinState(getSkin());
     /* Listen for the MODE, not the resolved theme: while "Auto" is active the
        resolved value flips with the OS, and reacting to that would silently
        move the selection off Auto. */
@@ -56,6 +62,11 @@ export default function DisplayTab({ account, onChanged }: {
     window.addEventListener("thememodechange", onModeChange);
     return () => window.removeEventListener("thememodechange", onModeChange);
   }, []);
+
+  function pickSkin(v: Skin) {
+    setSkinState(v);
+    setSkin(v);   // writes storage + data-kx-skin + "skinchange"
+  }
 
   function pickTheme(t: ThemePreference) {
     setThemeState(t);
@@ -87,6 +98,19 @@ export default function DisplayTab({ account, onChanged }: {
   return (
     <div className="space-y-4">
       <SettingsCard title={t("display.title")} subtitle={t("display.sub")}>
+        {/* Style sits ABOVE theme deliberately: it is the bigger decision —
+            which visual language — and theme is the brightness within it.
+            The two are independent, so every style has both faces. */}
+        <ControlRow label={t("display.style")} hint={t("display.style.hint")}>
+          <Segmented<Skin>
+            value={skin}
+            onChange={pickSkin}
+            options={[
+              { value: "horizon", label: t("display.style.horizon") },
+              { value: "core", label: t("display.style.core") },
+            ]}
+          />
+        </ControlRow>
         <ControlRow label={t("display.theme")} hint={theme === "system" ? t("display.theme.autoHint") : t("display.theme.hint")}>
           <Segmented<ThemePreference>
             value={theme}

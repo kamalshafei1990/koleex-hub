@@ -50,6 +50,12 @@ export const settingsT: Translations = {
   /* ── Display & accessibility ── */
   "display.title":        { en: "Display", zh: "显示", ar: "العرض" },
   "display.sub":          { en: "Changes apply across the hub instantly.", zh: "更改会立即在整个平台生效。", ar: "تُطبَّق التغييرات فورًا في كامل المنصة." },
+  "display.style":        { en: "Style", zh: "风格", ar: "النمط" },
+  "display.style.hint":   { en: "Horizon adds the moving ground and glass surfaces. Core is the flat original.",
+                            zh: "Horizon 带有流动背景与玻璃质感表面；Core 是原本的扁平风格。",
+                            ar: "هورايزن يضيف الخلفية المتحركة والأسطح الزجاجية. الأساسي هو النمط المسطّح الأصلي." },
+  "display.style.horizon": { en: "Horizon", zh: "地平线", ar: "هورايزن" },
+  "display.style.core":    { en: "Core", zh: "基础", ar: "الأساسي" },
   "display.theme":        { en: "Theme", zh: "主题", ar: "المظهر" },
   "display.theme.hint":   { en: "Light or dark appearance.", zh: "浅色或深色外观。", ar: "مظهر فاتح أو داكن." },
   "display.light":        { en: "Light", zh: "浅色", ar: "فاتح" },

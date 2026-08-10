@@ -37,6 +37,7 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
    ssr:false because it measures the element before it can paint. */
@@ -240,10 +241,10 @@ const AppCard = memo(function AppCard({
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon kx-hover-card kx-hover-tile kx-glass border-white/[0.10]"
-                    : "tile-hover-neon kx-hover-card kx-hover-tile kx-glass border-black/[0.08]"
+                    ? "tile-hover-neon kx-hover-card kx-hover-tile kx-glass bg-[#0c0c0c] border-white/[0.06]"
+                    : "tile-hover-neon kx-hover-card kx-hover-tile kx-glass bg-[#f8f8f8] border-black/[0.06]"
                 }`
-            : `cursor-default border kx-glass ${dk ? "border-white/[0.04]" : "border-black/[0.04]"}`
+            : `cursor-default border kx-glass ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
     >
 
@@ -552,6 +553,7 @@ export default function HomePage() {
     return () => window.removeEventListener("themechange", h);
   }, []);
   const dk = theme === "dark";
+  const skin = useSkin();
 
   /* ── Search + filter ── */
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
@@ -859,7 +861,14 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
-      {/* The ground, FIXED rather than absolute. Home scrolls, and an
+      {/* THE GROUND — Horizon only. Every other surface on this page switches
+          skin in CSS, because `.kx-glass` is scoped to [data-kx-skin="horizon"]
+          and the elements keep their original solid classes underneath: under
+          Core nothing matches and the Hub's original flat launcher comes back
+          exactly, with no JS branch and no second copy of the markup. A canvas
+          is the one thing that cannot be done that way — it has to not mount.
+
+          The ground, FIXED rather than absolute. Home scrolls, and an
           absolutely positioned child of a scrolling page is laid against the
           full scroll height — it stretches and slides away as you go down,
           which is exactly the bug the sign-in gate had. Fixed pins it to the
@@ -869,9 +878,11 @@ export default function HomePage() {
           it. Written z-0 and not -z-0 — the negative form is not a Tailwind
           class, so it would have generated nothing and left the stacking to
           DOM order and luck. */}
-      <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-        <WavyBackground />
-      </div>
+      {skin === "horizon" && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
       {/* Shared paint server: tile icons switch their fill to this Hub Blue
           gradient on hover (CSS can't gradient-fill an inline SVG any other
           way). Zero-size, purely defs. */}
@@ -919,8 +930,8 @@ export default function HomePage() {
         <div className="mb-7">
           <div className={`search-neon relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 ${
             dk
-              ? "kx-glass border-white/[0.10]"
-              : "kx-glass border-black/[0.08]"
+              ? "kx-glass bg-[#0c0c0c] border-white/[0.07]"
+              : "kx-glass bg-black/[0.02] border-black/[0.07]"
           }`}>
             <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
             <input

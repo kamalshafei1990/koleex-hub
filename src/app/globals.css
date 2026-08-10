@@ -1085,28 +1085,33 @@ input[type="number"]:not(.kx-spinner) {
    what is behind it. data-kx-lowpower is stamped in display-prefs.
 
    The @supports arm covers browsers with no backdrop-filter at all, where a
-   translucent panel over a moving canvas would leave the text unreadable. */
-.kx-glass {
+   translucent panel over a moving canvas would leave the text unreadable.
+
+   EVERY RULE IS SCOPED TO [data-kx-skin="horizon"]. Core is not a degraded
+   Horizon, it is the Hub's original flat look and it has to come back exactly
+   — so `kx-glass` has to evaluate to nothing at all under Core, letting the
+   element's own solid classes show through untouched. */
+[data-kx-skin="horizon"] .kx-glass {
   background: rgba(11, 14, 20, 0.55);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-[data-theme="light"] .kx-glass {
+[data-kx-skin="horizon"][data-theme="light"] .kx-glass {
   background: rgba(255, 255, 255, 0.62);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-[data-kx-lowpower] .kx-glass {
+[data-kx-skin="horizon"][data-kx-lowpower] .kx-glass {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(12, 14, 18, 0.92);
 }
-[data-kx-lowpower][data-theme="light"] .kx-glass {
+[data-kx-skin="horizon"][data-kx-lowpower][data-theme="light"] .kx-glass {
   background: rgba(250, 251, 253, 0.94);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .kx-glass { background: rgba(12, 14, 18, 0.92); }
-  [data-theme="light"] .kx-glass { background: rgba(250, 251, 253, 0.94); }
+  [data-kx-skin="horizon"] .kx-glass { background: rgba(12, 14, 18, 0.92); }
+  [data-kx-skin="horizon"][data-theme="light"] .kx-glass { background: rgba(250, 251, 253, 0.94); }
 }
 
 /* ── THE KOLEEX ORB — the one loading shape in the Hub ──────────────────

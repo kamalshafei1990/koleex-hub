@@ -6,6 +6,7 @@ import DialogHost from "@/lib/ui-dialog";
 import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
 import Providers from "./providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { SKIN_BOOTSTRAP } from "@/lib/appearance";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -69,6 +70,12 @@ export default function RootLayout({
     /* data-scroll-behavior: our smooth scrolling (globals.css) is intentional —
        this silences Next.js's route-transition advisory warning hub-wide. */
     <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} h-full antialiased`}>
+      {/* Skin + theme stamped on <html> BEFORE the first frame. Both used to
+          be applied on mount by DisplayPreferencesApplier, which is one frame
+          late: the theme flash was survivable, but a skin arriving late means
+          the entire background appears after paint. Also sets the low-power
+          flag, so glass surfaces never have to blur once and then stop. */}
+      <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
       {/* Theme tokens (not hardcoded dark) so the base flips with light/dark —
           otherwise light mode showed a black body base behind gaps and any
           un-themed text inherited white → white-on-white. Dark mode is

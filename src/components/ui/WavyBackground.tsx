@@ -71,14 +71,19 @@ const PALETTES = {
 const BLUR = 10;
 const WAVE_WIDTH = 50;
 /* The original's "fast" default, and it runs on an unthrottled rAF. Both
-   numbers matter together: the waves advance SPEED per frame, so 0.002 at
-   60fps is 0.12 noise-units a second. This ran at 0.0018 on a 30fps throttle
-   — 0.054 a second, less than half — and the owner was right that it did not
-   look like the reference. The throttle also changed the picture, not just
+   numbers matter together: the waves advance SPEED per frame. This ran at
+   0.0018 on a 30fps throttle — 0.054 noise-units a second against the
+   original's 0.12 — and the owner was right that it did not look like the
+   reference. The throttle also changed the picture, not just
    the speed: the ground is refilled at half alpha every frame and never
    fully clears, so at 30fps each trail survives twice as long in wall-clock
    and the ribbons read thicker and smearier than the original's. */
-const SPEED = 0.002;
+/* 0.0013, not the original's 0.002 — the owner asked for it slower after
+   seeing the corrected version, so this is now a DELIBERATE deviation rather
+   than the drift it was before. It only changes travel: the trail decay is a
+   function of frame rate, which is still the original's unthrottled rAF, so
+   the ribbons keep the same thickness and softness they just gained. */
+const SPEED = 0.0013;
 const WAVE_OPACITY = 0.5;
 
 /* Draw past both edges so the strokes can never be seen ending. The original
