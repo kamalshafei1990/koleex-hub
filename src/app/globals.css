@@ -1301,6 +1301,33 @@ input[type="number"]:not(.kx-spinner) {
    keeps both. */
 [data-kx-skin="aurora"] .kx-ai-side { border-inline-end-color: transparent; }
 [data-kx-skin="aurora"] .kx-ai-side-sep { border-color: transparent; }
+/* Form fields inside AI-family FORM pages (kx-ai-form) wear the sign-in
+   gate's field grammar — the owner's reference for what an Aurora input
+   is (field-styles.ts: white 4% fill, 8% border, 30% focus border). The
+   chat surface is deliberately NOT in scope: its composer textarea is
+   transparent inside the glass card. Core keeps the var() classes. */
+[data-kx-skin="aurora"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-kx-skin="aurora"] .kx-ai-form textarea,
+[data-kx-skin="aurora"] .kx-ai-form select {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-kx-skin="aurora"] .kx-ai-form input:focus,
+[data-kx-skin="aurora"] .kx-ai-form textarea:focus,
+[data-kx-skin="aurora"] .kx-ai-form select:focus {
+  border-color: rgba(255, 255, 255, 0.30);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea,
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:focus,
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea:focus,
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select:focus {
+  border-color: rgba(0, 0, 0, 0.30);
+}
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
    it opens over the launcher and must read as the same material as the app

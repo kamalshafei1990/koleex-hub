@@ -230,7 +230,7 @@ export default function AiKnowledgePage() {
     /* kx-ai-root = the AI family's Aurora scope: transparent ground + the
        control-tint variable overrides, shared with the chat app. NOT
        kx-app-fullbleed — this page flows and scrolls normally. */
-    <div className="kx-ai-root min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="kx-ai-root kx-ai-form min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={lang === "ar" ? "rtl" : "ltr"}>
       {confirmDialog}
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
