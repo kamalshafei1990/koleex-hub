@@ -13,7 +13,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useSkin } from "@/lib/appearance";
+
+/* Aurora ground — the AI family's canvas, mounted only under the skin. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -91,6 +96,7 @@ const chip = "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-se
 
 export default function AiKnowledgePage() {
   const { t, lang } = useTranslation(T);
+  const aurora = useSkin() === "aurora";
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [counts, setCounts] = useState<Record<string, { draft: number; approved: number; retired: number }>>({});
@@ -221,9 +227,17 @@ export default function AiKnowledgePage() {
   const drafts = units.filter((u) => u.status === "draft").length;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={lang === "ar" ? "rtl" : "ltr"}>
+    /* kx-ai-root = the AI family's Aurora scope: transparent ground + the
+       control-tint variable overrides, shared with the chat app. NOT
+       kx-app-fullbleed — this page flows and scrolls normally. */
+    <div className="kx-ai-root min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={lang === "ar" ? "rtl" : "ltr"}>
       {confirmDialog}
-      <div className="w-full px-4 md:px-8 py-6 space-y-5">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] w-full px-4 md:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
           <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
@@ -242,7 +256,7 @@ export default function AiKnowledgePage() {
         </div>
 
         {showAdd && (
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 space-y-4">
+          <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 space-y-4">
             {/* How it works — three steps, so the bench explains itself. */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {[1, 2, 3].map((n) => (
@@ -331,7 +345,7 @@ export default function AiKnowledgePage() {
         {/* ── Taught Q&A ── the owner's canonical answers. The AI matches
             the MEANING of a user's question (any wording, any language)
             and replies with one of the taught variants. */}
-        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 space-y-3">
+        <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-[13px] font-bold">{t("kq.qaTitle", "Taught Q&A")}</h2>
             <span className="text-[11px] text-[var(--text-ghost)]">{t("kq.qaSub", "Teach a question once — the AI recognizes it in ANY wording or language and replies with your taught answer (rotating between your variants).")}</span>
@@ -411,7 +425,7 @@ export default function AiKnowledgePage() {
               const active = sel === s.id;
               return (
                 <button key={s.id} type="button" onClick={() => loadUnits(s.id)}
-                  className={`w-full text-start rounded-xl border p-3 transition-colors ${active ? "border-[var(--border-focus)] bg-[var(--bg-secondary)]" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]/60 hover:border-[var(--border-focus)]"}`}>
+                  className={`w-full text-start rounded-xl border p-3 transition-colors ${active ? "kx-glass border-[var(--border-focus)] bg-[var(--bg-secondary)]" : "kx-glass border-[var(--border-subtle)] bg-[var(--bg-secondary)]/60 hover:border-[var(--border-focus)]"}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-semibold truncate">{s.title}</span>
                     <span className={`${chip} border border-[var(--border-subtle)] text-[var(--text-ghost)] uppercase`}>{s.kind}</span>
