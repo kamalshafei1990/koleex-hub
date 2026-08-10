@@ -3433,7 +3433,11 @@ function WelcomeCard({
             key={i}
             type="button"
             onClick={() => onPick(p)}
-            className="group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+            /* Aurora: suggestion chips are mini app-tiles over the ground —
+               tile glass (owner: "this also can have the glass effect").
+               Solid var() bg stays for Core; hover keeps speaking in the
+               border (the glass fill owns the background under Aurora). */
+            className="kx-glass group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
             <span className="flex-1 leading-snug">{p}</span>
           </button>
