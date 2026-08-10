@@ -1122,14 +1122,28 @@ input[type="number"]:not(.kx-spinner) {
    table — and 12px type at 55% over that is unreadable. 88% still reads as
    glass because the blur is doing the work, and the text stays solid. */
 [data-kx-skin="aurora"] .kx-glass-pop {
-  background: rgba(13, 16, 22, 0.88);
-  -webkit-backdrop-filter: blur(28px) saturate(170%);
-  backdrop-filter: blur(28px) saturate(170%);
+  /* BRIGHTNESS IS THE LEVER, NOT RADIUS. Blur alone was not enough and more
+     of it would not have helped: a bigger radius smears the tile labels
+     behind the menu, it does not dim them, so they stayed legible as a grey
+     haze through the panel. brightness(0.55) crushes the backdrop before the
+     blur spreads it, so what comes through is colour and movement rather than
+     other people's text.
+
+     That also buys back transparency — the flat layer drops from 0.88 to
+     0.72, so the glass shows MORE of the ground than it did at the higher
+     opacity, while reading as more blurred rather than less. */
+  background: rgba(13, 16, 22, 0.72);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(0.55);
+  backdrop-filter: blur(40px) saturate(180%) brightness(0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
               0 24px 60px -24px rgba(0, 0, 0, 0.85);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop {
-  background: rgba(252, 253, 255, 0.9);
+  /* Mirrored: on white the backdrop is pushed UP, not down — washing it out
+     is what hides text on a light ground. */
+  background: rgba(252, 253, 255, 0.74);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.28);
+  backdrop-filter: blur(40px) saturate(180%) brightness(1.28);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
               0 24px 60px -28px rgba(16, 24, 40, 0.28);
 }
