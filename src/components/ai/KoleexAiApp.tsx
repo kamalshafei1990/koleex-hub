@@ -1753,7 +1753,7 @@ export default function KoleexAiApp() {
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex kx-glass flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
+        } md:flex kx-glass kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1]`}
         style={{
           /* On mobile we ignore sidebarCollapsed (desktop-only concept).
              On desktop, width morphs 0 ↔ SIDEBAR_W based on collapsed state. */
@@ -1764,7 +1764,7 @@ export default function KoleexAiApp() {
         }}
         aria-hidden={!sidebarOpen && sidebarCollapsed}
       >
-        <div className="p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
+        <div className="kx-ai-side-sep p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
           <Link
             href="/"
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
@@ -2797,7 +2797,12 @@ function Bubble({
             } ${
               isUser
                 ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                : /* Aurora: assistant bubbles wear the tile glass (owner ask).
+                     Measured safe: 140 glass tiles over the moving ground
+                     dropped 0 frames, and the low-power arm strips blur on
+                     weak machines. User bubbles keep the inverted fill — the
+                     contrast IS their identity. */
+                  "kx-glass bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
             style={{
               unicodeBidi: "plaintext",

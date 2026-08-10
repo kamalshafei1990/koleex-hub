@@ -1283,6 +1283,24 @@ input[type="number"]:not(.kx-spinner) {
    scrolls beneath them. */
 [data-kx-skin="aurora"] .kx-ai-root { background: transparent; }
 [data-kx-skin="aurora"] .kx-ai-bar { background: transparent; }
+/* Small controls (chips, inputs, row hovers) re-tint to the header-button
+   grammar by overriding the app's OWN surface variables — one rule instead
+   of touching a dozen elements. Tiny controls get translucency, not their
+   own blur pass (the ground behind them is soft; blur would buy nothing
+   and cost a pass per element). */
+[data-kx-skin="aurora"] .kx-ai-root {
+  --bg-surface: rgba(255, 255, 255, 0.04);
+  --bg-surface-subtle: rgba(255, 255, 255, 0.08);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-root {
+  --bg-surface: rgba(0, 0, 0, 0.04);
+  --bg-surface-subtle: rgba(0, 0, 0, 0.08);
+}
+/* Owner: "for the side bar in this app remove the borders" — the frame
+   line against the page and the separator under its header row. Core
+   keeps both. */
+[data-kx-skin="aurora"] .kx-ai-side { border-inline-end-color: transparent; }
+[data-kx-skin="aurora"] .kx-ai-side-sep { border-color: transparent; }
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
    it opens over the launcher and must read as the same material as the app
