@@ -1311,6 +1311,54 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"] .kx-header-pane,
 [data-kx-skin="aurora"] .kx-mainheader { border-color: transparent; }
 
+/* ── Gradient borders (owner, 2026-08-10: "make the borders gradients") ──
+   A LIGHTING gradient, not a colour one: bright at the top edge, fading out
+   toward the bottom, like the rim of real glass catching an overhead light.
+   Monochrome stays intact — this is white at three opacities, no hue.
+
+   Built exactly like the glow ring: a masked pseudo-element that paints only
+   the 1px padding rim, sitting over a border that goes transparent. NOT the
+   two-layer background trick (padding-box/border-box) — that writes the
+   element's `background`, which would have silently killed the tiles' hover
+   fills and the current-app highlight, both of which are background-color
+   utilities. ::before, because the tiles already spend ::after on
+   kx-hover-card's glow.
+
+   The elements' own `border` stays 1px so layout does not move. Every
+   surface this touches is already position:relative or fixed. */
+[data-kx-skin="aurora"] .kx-glass,
+[data-kx-skin="aurora"] .kx-glass-pop {
+  border-color: transparent;
+}
+[data-kx-skin="aurora"] .kx-glass::before,
+[data-kx-skin="aurora"] .kx-glass-pop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.05) 55%,
+    rgba(255, 255, 255, 0.02));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass::before,
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop::before {
+  background: linear-gradient(180deg,
+    rgba(16, 24, 40, 0.18),
+    rgba(16, 24, 40, 0.06) 55%,
+    rgba(16, 24, 40, 0.03));
+}
+/* The header pane stays rimless — the owner just had its hairline removed —
+   and it is not .kx-glass, but pin it anyway so nobody re-adds a line by
+   giving it the class later. */
+[data-kx-skin="aurora"] .kx-header-pane::before { content: none; }
+
 /* ── The glow ring ──────────────────────────────────────────────────────
    A bright arc travelling slowly around the edge of a card.
 
