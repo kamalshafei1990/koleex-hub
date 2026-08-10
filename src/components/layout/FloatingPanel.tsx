@@ -819,29 +819,10 @@ export default function FloatingPanel() {
                 </button>
               </div>
             )}
-            {tab === "ai" && (
-              <button
-                onClick={() => {
-                  /* Shortcut → the full Koleex AI app, landing on THIS
-                     same conversation (the app restores its active chat
-                     from this per-account key). */
-                  try {
-                    if (fabConvIdRef.current && accountIdRef.current) {
-                      window.localStorage.setItem(
-                        `koleex-ai-active-chat:${accountIdRef.current}`,
-                        fabConvIdRef.current,
-                      );
-                    }
-                  } catch { /* ignore */ }
-                  window.location.href = "/ai";
-                }}
-                className={`p-1.5 rounded-lg transition-colors ${hoverBg} ${textM}`}
-                title="Open in Koleex AI"
-                aria-label="Open in Koleex AI"
-              >
-                <ArrowUpRightIcon className="h-3.5 w-3.5" />
-              </button>
-            )}
+            {/* The ↗ open-in-app shortcut was removed at the owner's request
+                (2026-08-10, "no need to add this shortcut, delete it") — the
+                dock header keeps only the tabs and Close. The AI app remains
+                reachable from its launcher tile. */}
             <button
               onClick={handleClose}
               className={`p-1.5 rounded-lg transition-colors ${hoverBg} ${textM}`}
