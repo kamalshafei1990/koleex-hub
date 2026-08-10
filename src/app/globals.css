@@ -1155,6 +1155,56 @@ input[type="number"]:not(.kx-spinner) {
    was the last thing drawing a line across the ground. border-color rather
    than border-width so nothing shifts by the 1px. Core keeps its border. */
 [data-kx-skin="aurora"] .kx-mainheader { background: transparent; border-color: transparent; }
+
+/* ── Progressive edge blur (owner's reference: cult-ui edge-blur) ────────
+   Four sibling layers, each a stronger blur masked to a HIGHER band, inside
+   a pane that carries NO filter of its own (a filtered pane would form a
+   backdrop root and starve its own layers — the bug this header already
+   survived once). Content scrolling up meets 3 → 7 → 14 → 28px: a ramp,
+   not a wall. Masks overlap so no seam shows. */
+[data-kx-skin="aurora"] .kx-pane-progressive {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-kx-skin="aurora"] .kx-pane-progressive > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+[data-kx-skin="aurora"] .kx-pane-progressive > i:nth-child(1) {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 55%, transparent 82%);
+  mask: linear-gradient(to bottom, #000 0%, #000 55%, transparent 82%);
+}
+[data-kx-skin="aurora"] .kx-pane-progressive > i:nth-child(2) {
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 40%, transparent 66%);
+  mask: linear-gradient(to bottom, #000 0%, #000 40%, transparent 66%);
+}
+[data-kx-skin="aurora"] .kx-pane-progressive > i:nth-child(3) {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 27%, transparent 50%);
+  mask: linear-gradient(to bottom, #000 0%, #000 27%, transparent 50%);
+}
+[data-kx-skin="aurora"] .kx-pane-progressive > i:nth-child(4) {
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 14%, transparent 34%);
+  mask: linear-gradient(to bottom, #000 0%, #000 14%, transparent 34%);
+}
+/* Weak machines and no-backdrop browsers: back to the flat opaque bar at bar
+   height — four blur passes is exactly the cost they must not pay. */
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-pane-progressive { height: 3.5rem; }
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-pane-progressive > i { display: none; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-pane-progressive { height: 3.5rem; }
+  [data-kx-skin="aurora"] .kx-pane-progressive > i { display: none; }
+}
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-header-pane {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
