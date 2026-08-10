@@ -203,6 +203,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const colRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   /* The indicator is TWO nodes and neither is React state — see the effect. */
   const trackRef = useRef<HTMLSpanElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
@@ -343,6 +344,40 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     return () => ro.disconnect();
     /* Same reason as the indicator: mounted only after `authed` resolves. */
   }, [authed]);
+
+  /* CHANGING LANGUAGE USED TO BE ONE FRAME OF SNAP.
+
+     Measured on production before touching anything, because "it flashes"
+     could have meant a remount, a blanked panel or a layout jump, and it was
+     none of them: EN→中文 is four DOM mutations, EN→عربي is six, no node is
+     replaced, opacity never leaves 1, the card moves 2px. Nothing is broken.
+
+     That IS the problem. Every string on the card changes in a single frame
+     with no motion whatsoever — and in Arabic the whole layout mirrors in that
+     same frame, every icon and label jumping to the other side at once. Next
+     to the tab switch, which eases, it reads as a flash.
+
+     So it borrows the tab switch's entrance. NOT by adding `lang` to the
+     panel's key: React would remount the subtree, and JoinPanel's own UI state
+     would be thrown away every time somebody changed language mid-form. The
+     animation is replayed on the node that is already there — clear it, force
+     the browser to accept that, put it back — which is the identical motion at
+     no risk. The card height is already on the same 440ms curve, so the two
+     move together.
+
+     Skipped on first paint: `lang` is read from localStorage after mount, so
+     without the guard every visitor whose language is not English would see
+     the panel animate once for no reason. */
+  const langPainted = useRef<string | null>(null);
+  useIsoLayoutEffect(() => {
+    const el = panelRef.current;
+    const first = langPainted.current === null;
+    langPainted.current = lang;
+    if (!el || first) return;
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+  }, [lang, authed]);
 
   /* Sign-in form state */
   const [username, setUsername] = useState("");
@@ -760,6 +795,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               >
                 <div ref={bodyRef}>
                   <div
+                    ref={panelRef}
                     key={tab === "signin" ? "signin" : joinDone ? "done" : "join"}
                     /* kx-tab-in is the Hub-wide tab entrance and Product Data uses
                        the same class, so it is RETIMED HERE through the two
