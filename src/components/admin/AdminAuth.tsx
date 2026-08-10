@@ -148,7 +148,7 @@ const SWITCH_MOTION =
    card's apparent speed and lands it while the card is still settling, which
    is the order the eye expects: the label commits, then the panel follows. */
 const INK_MOTION =
-  "motion-safe:transition-[transform,width] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)]";
+  "motion-safe:transition-transform motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)]";
 
 /* Floor for the scrolling body. Below this the card stops being a card, so on
    a viewport too short even for that we let the outer area scroll instead —
@@ -203,23 +203,81 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const colRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
-  const [ink, setInk] = useState<{ x: number; w: number } | null>(null);
+  /* The indicator is TWO nodes and neither is React state — see the effect. */
+  const trackRef = useRef<HTMLSpanElement>(null);
+  const barRef = useRef<HTMLSpanElement>(null);
+  const lastGeom = useRef<{ x: number; w: number } | null>(null);
+  const lastTab = useRef<"signin" | "join" | null>(null);
   const [body, setBody] = useState<{ h: number; capped: boolean } | null>(null);
 
   /* The indicator. One bar that slides, not one per tab that blinks.
      The maths is in PHYSICAL pixels on purpose: getBoundingClientRect and
      translateX are both physical, and the bar is pinned with `left-0`, so
      this is already correct in Arabic. Rewriting it to `start-0` would
-     apply the RTL flip a second time and send the bar off the card. */
+     apply the RTL flip a second time and send the bar off the card.
+
+     IT IS TWO NODES, AND THAT IS THE WHOLE FIX. A single transitioned bar
+     stuttered, and the cause was not the curve:
+
+       one tab switch → 41 rewrites of the bar's inline style, target x
+       creeping 216 → 217 → 218 → … → 300 across 412ms
+
+     The card's max-width animates for 440ms, so the strip it is measured
+     against is a different width on every frame, so the ResizeObserver fires
+     on every frame — and every firing handed the transition a NEW target,
+     restarting a 240ms ease from wherever the bar had got to. It chased a
+     moving goal forty-one times and never once arrived; that is the glitch,
+     and no amount of retiming would have touched it.
+
+     So the two jobs are separated:
+
+       tracker  positioned from the measurement every frame, NO transition.
+                It is glued to the label through the whole widening.
+       bar      inside it, and the ONLY thing that animates. On a tab change
+                it is drawn back at the rect it just left and released once,
+                undisturbed by anything the tracker does afterwards.
+
+     That is FLIP, and the inversion is exact: with transform-origin at the
+     left edge, scaleX(prevW/w) restores the old width and translateX(prevX−x)
+     restores the old left edge, so frame zero is pixel-identical to where the
+     bar already was. Both are transforms — composited, no layout per frame.
+
+     Written straight to the DOM rather than through state on purpose: those
+     41 measurements were 41 React renders of the whole gate per switch. */
   useIsoLayoutEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
     const sync = () => {
+      const track = trackRef.current, bar = barRef.current;
       const label = strip.querySelector<HTMLElement>('[data-tab-active="true"] > span');
-      if (!label) return;
+      if (!label || !track || !bar) return;
       const s = strip.getBoundingClientRect();
       const l = label.getBoundingClientRect();
-      setInk({ x: Math.round(l.left - s.left) - 8, w: Math.round(l.width) + 16 });
+      const x = Math.round(l.left - s.left) - 8;
+      const w = Math.round(l.width) + 16;
+
+      const prev = lastGeom.current;
+      const switched = lastTab.current !== null && lastTab.current !== tab;
+
+      track.style.transform = `translateX(${x}px)`;
+      track.style.width = `${w}px`;
+      /* Revealed only once measured, so it never shows at the wrong tab for
+         a frame — the old code got this by not rendering at all. */
+      track.style.opacity = "1";
+
+      if (switched && prev) {
+        bar.style.transition = "none";
+        bar.style.transform = `translateX(${prev.x - x}px) scaleX(${prev.w / w})`;
+        /* Force the browser to accept that as the current value before the
+           transition comes back, or both writes coalesce into one frame and
+           there is nothing to animate FROM. */
+        void bar.offsetWidth;
+        bar.style.transition = "";
+        bar.style.transform = "translateX(0px) scaleX(1)";
+      }
+
+      lastGeom.current = { x, w };
+      lastTab.current = tab;
     };
     sync();
     /* Re-measure on width changes; the deps cover tab and language. Font
@@ -664,15 +722,21 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   </span>
                 </button>
 
-                {/* The one indicator. Rendered only once measured, so it never
-                    appears at the wrong tab for a frame. */}
-                {ink && (
+                {/* The one indicator: tracker outside, animated bar inside. */}
+                <span
+                  ref={trackRef}
+                  aria-hidden
+                  /* transition-none is not decoration. Unset, the computed
+                     transition-property is `all`; it is inert only because the
+                     duration happens to be 0s, and the entire fix rests on this
+                     node never animating. Say it out loud. */
+                  className="absolute bottom-0 left-0 h-[2px] opacity-0 transition-none"
+                >
                   <span
-                    aria-hidden
-                    className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${INK_MOTION}`}
-                    style={{ transform: `translateX(${ink.x}px)`, width: ink.w }}
+                    ref={barRef}
+                    className={`block h-full w-full origin-left rounded-full bg-white ${INK_MOTION}`}
                   />
-                )}
+                </span>
               </div>
 
               {/* Card body.
