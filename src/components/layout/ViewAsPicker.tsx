@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import { useSkin } from "@/lib/appearance";
 
 interface AccountRow {
   id: string;
@@ -218,6 +219,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
   const [roles, setRoles] = useState<RoleRow[] | null>(moduleCache.roles);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("user");
+  const aurora = useSkin() === "aurora";
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -473,10 +475,29 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
           {/* Mode tabs — segmented pill, equal width. */}
           <div className="px-2 pb-2">
             <div
-              className={`grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ${
+              className={`relative grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ${
                 dk ? "bg-white/[0.06]" : "bg-black/[0.05]"
               }`}
             >
+              {/* The dock's sliding outline, third deployment — the owner
+                  flagged these tabs cutting instead of moving. Two equal
+                  halves, so one own-width step; --kx-flip signs it in RTL.
+                  Core keeps the original swap untouched. */}
+              {aurora && (
+                <span
+                  aria-hidden
+                  className="absolute top-0.5 bottom-0.5 rounded-md pointer-events-none transition-transform duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  style={{
+                    insetInlineStart: 2,
+                    width: "calc(50% - 3px)",
+                    transform: mode === "user" ? "translateX(0)" : "translateX(calc(var(--kx-flip, 100%) + 2px))",
+                    background: "rgba(86,127,178,0.10)",
+                    boxShadow: dk
+                      ? "inset 0 0 0 1px rgba(86,127,178,0.70)"
+                      : "inset 0 0 0 1px rgba(62,103,150,0.75)",
+                  }}
+                />
+              )}
               {(["user", "role"] as Mode[]).map((m) => {
                 const active = mode === m;
                 return (
@@ -487,14 +508,20 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                       setMode(m);
                       setSearch("");
                     }}
-                    className={`h-7 rounded-md text-[11.5px] font-semibold transition-all ${
-                      active
-                        ? dk
-                          ? "kx-seg-on bg-[#1f1f1f] text-white shadow-sm"
-                          : "bg-white text-black shadow-sm"
-                        : dk
-                          ? "text-white/55 hover:text-white/80"
-                          : "text-black/55 hover:text-black/80"
+                    className={`relative h-7 rounded-md text-[11.5px] font-semibold transition-colors ${
+                      aurora
+                        ? active
+                          ? dk ? "text-white" : "text-black"
+                          : dk
+                            ? "text-white/55 hover:text-white/85"
+                            : "text-black/55 hover:text-black/85"
+                        : active
+                          ? dk
+                            ? "bg-[#1f1f1f] text-white shadow-sm"
+                            : "bg-white text-black shadow-sm"
+                          : dk
+                            ? "text-white/55 hover:text-white/80"
+                            : "text-black/55 hover:text-black/80"
                     }`}
                   >
                     {m === "user" ? "By user" : "By role"}

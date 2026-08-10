@@ -4,9 +4,7 @@
    App Launcher — system-level 4-zone launcher.
 
    Zone A: Search (⌘K)
-   Zone B: Favorites (compact row < 3, grid >= 3)
-   Zone C: Recent (horizontal scrollable strip)
-   Zone D: All Apps (category chips + flat grid)
+   Zone B: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
@@ -313,59 +311,8 @@ const AppCard = memo(function AppCard({
   );
 });
 
-/* ── Compact horizontal card (for favorites row / recent strip) ── */
-const CompactCard = memo(function CompactCard({
-  app,
-  t,
-  dk,
-  onAppClick,
-  onPrefetch,
-}: {
-  app: AppDef;
-  t: (key: string, fb: string) => string;
-  dk: boolean;
-  onAppClick: (app: AppDef) => void;
-  onPrefetch: (app: AppDef) => void;
-}) {
-  const Icon = app.icon;
-  const label = t(app.tKey, app.name);
-
-  return (
-    <div
-      role="button"
-      tabIndex={app.active ? 0 : -1}
-      onClick={() => onAppClick(app)}
-      onKeyDown={(e) => { if (e.key === "Enter") onAppClick(app); }}
-      onPointerEnter={() => onPrefetch(app)}
-      onTouchStart={() => onPrefetch(app)}
-      onFocus={() => onPrefetch(app)}
-      className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 select-none ${
-        app.active
-          ? `cursor-pointer group ${
-              dk
-                ? "kx-glass bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:bg-[#1a1a1a] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
-                : "kx-glass bg-white border-black/[0.06] hover:border-black/[0.14] hover:bg-[#fafafa] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]"
-            }`
-          : `cursor-default opacity-20 kx-glass ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
-      }`}
-    >
-      <span className={`transition-all duration-200 ${
-        app.active
-          ? dk ? "text-white opacity-100" : "text-black opacity-100"
-          : dk ? "text-white opacity-25" : "text-black opacity-25"
-      }`}>
-        <BoundIcon semanticKey={`app.${app.id}`} className="h-[17px] w-[17px]" fallback={<Icon size={17} />} />
-      </span>
-      <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
-        app.active
-          ? dk ? "text-white/90" : "text-black/90"
-          : dk ? "text-white/25" : "text-black/25"
-      }`}>
-        {label}
-      </span>
-    </div>
-  );
-});
+/* CompactCard (favorites row / recent strip) deleted 2026-08-10 — the owner
+   removed both zones and the component had zero call sites left. */
 
 /* Module-scope guard so the tile entrance animation plays once per full page
    load, then is permanently disabled — not every time the grid re-renders or
@@ -767,7 +714,7 @@ export default function HomePage() {
      The app launcher honors the same permitted-modules rule as the
      sidebar: if the viewer's role has can_view = false on a module (or
      an account-level override hides it), that app is removed from the
-     Launcher grid, favorites, recents, category groups, and search —
+     Launcher grid, category groups, and search —
      not just the sidebar. SA still sees everything.
 
      While the permission check is still loading we show NOTHING

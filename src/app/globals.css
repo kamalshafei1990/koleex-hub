@@ -1433,6 +1433,29 @@ input[type="number"]:not(.kx-spinner) {
    giving it the class later. */
 [data-kx-skin="aurora"] .kx-header-pane::before { content: none; }
 
+/* ── Popover entrance ───────────────────────────────────────────────────
+   One arrival for every menu: a short drop-and-grow from the trigger's
+   corner, faintly springy, family with the dock. kx-drop-in only covered
+   two of the four header menus and was subtle enough that the owner read
+   the set as "no ease motion at all"; this rides .kx-glass-pop so every
+   panel — bell, user, view-as, tenant, sidebar flyouts — arrives the same
+   way. The dock's own panel keeps its inline animation, which outranks
+   this. Exit stays instant for menus (standard for dismissal); the dock is
+   the one surface with a choreographed close. */
+@keyframes kx-pop-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+[data-kx-skin="aurora"] .kx-glass-pop {
+  animation: kx-pop-in 0.28s cubic-bezier(0.34, 1.3, 0.5, 1) both;
+  transform-origin: calc(100% - 28px) 0%;
+}
+[data-kx-skin="aurora"][dir="rtl"] .kx-glass-pop,
+[dir="rtl"] [data-kx-skin="aurora"] .kx-glass-pop { transform-origin: 28px 0%; }
+@media (prefers-reduced-motion: reduce) {
+  [data-kx-skin="aurora"] .kx-glass-pop { animation: none; }
+}
+
 /* ── The glow ring ──────────────────────────────────────────────────────
    A bright arc travelling slowly around the edge of a card.
 
