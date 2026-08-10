@@ -1122,29 +1122,31 @@ input[type="number"]:not(.kx-spinner) {
    table — and 12px type at 55% over that is unreadable. 88% still reads as
    glass because the blur is doing the work, and the text stays solid. */
 [data-kx-skin="aurora"] .kx-glass-pop {
-  /* THE SIGN-IN CARD'S RECIPE, to the value. The owner pointed at that card
-     and at an app tile and said the menus should look like those — so this is
-     no longer a separate material with its own numbers, it is the same one:
+  /* THE TILE MATERIAL, EXACTLY — owner's third and final word on this:
+     "the dropdown menus can be blurred same as the app icon box background
+     and the header also same way." So this is `.kx-glass` to the value
+     (rgba(11,14,20,.55) · blur 16 · saturate 150), not a denser cousin of it.
+     The only addition is a drop shadow, because a menu floats and a tile does
+     not — and it must live HERE: this box-shadow overrides Tailwind's
+     shadow-2xl on the element (unlayered CSS wins), so dropping it from the
+     recipe would silently remove the elevation too.
 
-       bg-[#0B0E14]/60  backdrop-blur-2xl (40px)  backdrop-saturate-150
-       inset 0 1px 0 rgba(255,255,255,.12)
-
-     The brightness(0.55) that was here is GONE. It was the honest answer to
-     "more blurred" — crushing the backdrop is what actually stops text behind
-     a panel being read — but it made the menus a darker material than the
-     rest of Aurora, and matching the system beats winning that argument. The
-     trade is real and worth stating: at 0.60 with no crush, bright content
-     directly behind a menu shows through as a faint ghost. */
-  background: rgba(11, 14, 20, 0.60);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  backdrop-filter: blur(40px) saturate(150%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
-              0 40px 80px -30px rgba(0, 0, 0, 0.9);
+     Two earlier recipes died on this spot: blur40+brightness(0.55) — the
+     technically-right answer to "more blurred", killed for being a darker
+     material than the rest of Aurora — and the sign-in card's 0.60/blur40.
+     Consistency won over both. The trade stands: at 0.55 a menu over bright
+     content shows it as a soft ghost. That is the owner's call, made three
+     times. */
+  background: rgba(11, 14, 20, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10),
+              0 24px 60px -24px rgba(0, 0, 0, 0.8);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop {
-  background: rgba(252, 253, 255, 0.68);
+  background: rgba(255, 255, 255, 0.62);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-              0 40px 80px -34px rgba(16, 24, 40, 0.28);
+              0 24px 60px -28px rgba(16, 24, 40, 0.28);
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-pop {
   -webkit-backdrop-filter: none;
