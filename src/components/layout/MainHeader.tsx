@@ -24,6 +24,7 @@ import ViewAsPicker from "./ViewAsPicker";
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { useSkin } from "@/lib/appearance";
 
 /* ── Route → translation-key map ──
    Built once from APP_REGISTRY so every navigable app in the Hub
@@ -107,6 +108,8 @@ export default function MainHeader() {
   }, [lang]);
 
   const dk = theme === "dark";
+  /* Drives the sliding language indicator; Core renders the original pill. */
+  const aurora = useSkin() === "aurora";
   const isHome = pathname === "/";
   const { mobileOpen, setMobileOpen } = useSidebar();
 
@@ -232,27 +235,56 @@ export default function MainHeader() {
       <div className="flex items-center gap-2 shrink-0">
         {/* Language — desktop pill bar */}
         <div
-          className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${
+          className={`hidden md:flex relative items-center h-9 rounded-lg border p-1 transition-colors ${
             dk
               ? "border-white/[0.08] bg-white/[0.03]"
               : "border-black/[0.08] bg-black/[0.03]"
           }`}
         >
+          {/* ONE outline that SLIDES between the three fixed-width segments —
+              the dock's mechanic, ported here because the owner asked for the
+              same smooth ease. The old version repainted each button's own
+              background, which is a cut, not a movement. Segments are all
+              w-[54px], so each step is exactly one own-width:
+              translateX(index × 100%), sign flipped in RTL by --kx-flip.
+              Aurora only — Core keeps its original grey pill. */}
+          {aurora && (
+            <span
+              aria-hidden
+              className="absolute top-1 bottom-1 w-[54px] rounded-md pointer-events-none transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+              style={{
+                insetInlineStart: 4,
+                transform: `translateX(calc(${languages.findIndex((x) => x.code === lang)} * var(--kx-flip, 100%)))`,
+                background: "rgba(86,127,178,0.10)",
+                boxShadow: dk
+                  ? "inset 0 0 0 1px rgba(86,127,178,0.70)"
+                  : "inset 0 0 0 1px rgba(62,103,150,0.75)",
+              }}
+            />
+          )}
           {languages.map((l) => (
             <button
               key={l.code}
               onClick={() => setLang(l.code)}
-              className={`relative h-7 w-[54px] rounded-md text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
-                /* kx-seg-on/off are inert under Core, so the grey pill stays
-                   exactly as it was there; under Aurora they repaint it Hub
-                   Blue, because grey over a blue ground reads as dirt. */
-                lang === l.code
-                  ? dk
-                    ? "kx-seg-on bg-white/[0.12] text-white shadow-sm"
-                    : "kx-seg-on bg-black/[0.10] text-black shadow-sm"
-                  : dk
-                    ? "kx-seg-off text-white/45 hover:text-white/75"
-                    : "kx-seg-off text-black/45 hover:text-black/75"
+              className={`relative h-7 w-[54px] rounded-md text-[11px] font-semibold tracking-wide transition-colors duration-200 text-center ${
+                aurora
+                  ? /* The sliding pill carries the selected state; buttons
+                       only speak in text weight. Hover is text-only too — the
+                       dock is the reference and its inactive tabs answer
+                       hover without a fill. */
+                    lang === l.code
+                    ? dk ? "text-white" : "text-black"
+                    : dk
+                      ? "text-white/45 hover:text-white/80"
+                      : "text-black/45 hover:text-black/80"
+                  : /* Core: the original grey pill, byte for byte. */
+                    lang === l.code
+                    ? dk
+                      ? "bg-white/[0.12] text-white shadow-sm"
+                      : "bg-black/[0.10] text-black shadow-sm"
+                    : dk
+                      ? "text-white/45 hover:text-white/75"
+                      : "text-black/45 hover:text-black/75"
               }`}
             >
               {l.label}

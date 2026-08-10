@@ -1251,8 +1251,12 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
   color: #fff;
 }
+/* Inactive-segment hover, quiet version — the dock is the reference and its
+   inactive tabs answer hover with TEXT only; a filled tint plus glow read as
+   a second selected state parked next to the real one. */
 [data-kx-skin="aurora"] .kx-seg-off:hover {
-  background: rgba(86, 127, 178, 0.16);
+  background: rgba(86, 127, 178, 0.08);
+  box-shadow: none;
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-seg-on {
   background: rgba(86, 127, 178, 0.10);
