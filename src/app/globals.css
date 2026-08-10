@@ -1114,6 +1114,58 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass { background: rgba(250, 251, 253, 0.94); }
 }
 
+/* ── The header hosts popovers, so its glass lives on ::before ──────────
+
+   THE BUG THAT MADE FOUR ROUNDS OF "MORE BLUR" CHANGE NOTHING. An element
+   with backdrop-filter becomes a BACKDROP ROOT: every descendant's
+   backdrop-filter stops sampling the page behind it and can only see content
+   painted inside that ancestor. The user menu, the bell and View-as are all
+   DOM children of the header — so the moment the header itself got kx-glass,
+   their blur silently stopped applying to the tiles behind them. The proof
+   was in the owner's screenshot: tile icons crisp THROUGH a panel declaring
+   blur(40px). Computed styles reported the filter faithfully the whole time;
+   only the rendering shows this failure, which is why measuring the CSS kept
+   saying everything was fine.
+
+   Moving the material to ::before fixes it: the pseudo-element blurs the
+   page behind the bar exactly as before, but the header ELEMENT no longer
+   carries a filter, so it forms no backdrop root and its children sample the
+   real page again. z-index: -1 keeps the pane under the header's own
+   controls; the bar's border and layout are untouched. */
+[data-kx-skin="aurora"] .kx-mainheader.kx-glass {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+[data-kx-skin="aurora"] .kx-mainheader.kx-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(11, 14, 20, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader.kx-glass::before {
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-mainheader.kx-glass::before {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(12, 14, 18, 0.92);
+}
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-mainheader.kx-glass::before {
+  background: rgba(250, 251, 253, 0.94);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-mainheader.kx-glass::before { background: rgba(12, 14, 18, 0.92); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-mainheader.kx-glass::before { background: rgba(250, 251, 253, 0.94); }
+}
+
 /* ── Aurora: popovers, segments, and the glow ring ──────────────────────
 
    POPOVERS GET THEIR OWN, DENSER GLASS. `.kx-glass` is 55% opaque, which is
@@ -1122,31 +1174,22 @@ input[type="number"]:not(.kx-spinner) {
    table — and 12px type at 55% over that is unreadable. 88% still reads as
    glass because the blur is doing the work, and the text stays solid. */
 [data-kx-skin="aurora"] .kx-glass-pop {
-  /* THE TILE MATERIAL, EXACTLY — owner's third and final word on this:
-     "the dropdown menus can be blurred same as the app icon box background
-     and the header also same way." So this is `.kx-glass` to the value
-     (rgba(11,14,20,.55) · blur 16 · saturate 150), not a denser cousin of it.
-     The only addition is a drop shadow, because a menu floats and a tile does
-     not — and it must live HERE: this box-shadow overrides Tailwind's
-     shadow-2xl on the element (unlayered CSS wins), so dropping it from the
-     recipe would silently remove the elevation too.
-
-     Two earlier recipes died on this spot: blur40+brightness(0.55) — the
-     technically-right answer to "more blurred", killed for being a darker
-     material than the rest of Aurora — and the sign-in card's 0.60/blur40.
-     Consistency won over both. The trade stands: at 0.55 a menu over bright
-     content shows it as a soft ghost. That is the owner's call, made three
-     times. */
-  background: rgba(11, 14, 20, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10),
-              0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  /* THE SIGN-IN CARD, COPIED TO THE VALUE — bg-[#0B0E14]/60,
+     backdrop-blur-2xl (40px), saturate-150, the same inset highlight and the
+     same deep drop. The owner asked "you can copy this design, what is the
+     problem with that?" and the honest answer was: none, once the real bug
+     below was found. Every earlier recipe on this spot LOOKED wrong for a
+     reason that had nothing to do with these numbers. */
+  background: rgba(11, 14, 20, 0.6);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+              0 40px 80px -30px rgba(0, 0, 0, 0.9);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(252, 253, 255, 0.68);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-              0 24px 60px -28px rgba(16, 24, 40, 0.28);
+              0 40px 80px -34px rgba(16, 24, 40, 0.28);
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-pop {
   -webkit-backdrop-filter: none;
