@@ -173,7 +173,23 @@ export default function MainHeader() {
 
           Under Core the pane is display:none and the header keeps its solid
           colour, exactly as before Aurora existed. */}
-      <div aria-hidden className="kx-header-pane fixed top-0 left-0 right-0 h-14 z-[99] pointer-events-none" />
+      <div
+        aria-hidden
+        /* EDGE BLUR (owner's reference: cult-ui edge-blur). On routes where
+           content scrolls under the bar, the pane is taller than the bar and
+           carries FOUR stacked backdrop layers, each stronger than the last
+           and masked to a higher band — so content blurs progressively as it
+           approaches the top, instead of hitting a hard blurred strip. The
+           layers are CHILDREN and the pane itself carries no filter: an
+           element with backdrop-filter would become a backdrop root and this
+           pane must never re-break anything. Elsewhere the pane stays the
+           flat bar-height blur. */
+        className={`kx-header-pane fixed top-0 left-0 right-0 z-[99] pointer-events-none ${
+          pathname === "/" ? "kx-pane-progressive h-[104px]" : "h-14"
+        }`}
+      >
+        <i /><i /><i /><i />
+      </div>
       <header
       dir="ltr"
       className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-2 px-3 md:px-6 border-b transition-colors duration-300 ${
