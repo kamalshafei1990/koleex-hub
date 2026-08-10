@@ -1073,8 +1073,14 @@ export default function HomePage() {
           border: 1.5px solid transparent;
           background-origin: border-box;
           background-clip: padding-box, border-box;
+          /* Aurora: the fill layer of the double-background trick goes
+             TRANSLUCENT and the element gets its own backdrop blur, so the
+             AI tile wears the same glass as its neighbours while keeping the
+             spinning conic ring. The trick's solid fill was why this tile
+             was the one black square on a glass grid. Core keeps the solid. */
+          ${skin === "aurora" ? "-webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);" : ""}
           background-image:
-            linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
+            linear-gradient(${skin === "aurora" ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)") : (dk ? "#0c0c0c" : "#f8f8f8")}, ${skin === "aurora" ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)") : (dk ? "#0c0c0c" : "#f8f8f8")}),
             conic-gradient(
               from var(--ai-card-angle),
               rgba(86,127,178,0.75),
@@ -1095,7 +1101,11 @@ export default function HomePage() {
           background-origin: border-box;
           background-clip: padding-box, border-box;
           background-image:
-            linear-gradient(${dk ? "#0c0c0c" : "#fafafa"}, ${dk ? "#0c0c0c" : "#fafafa"}),
+            /* "Little darker is enough, not black": focus deepens the glass
+               from 0.55 to 0.72 and the blur keeps working underneath —
+               the solid #0c0c0c here was why focusing the search snapped it
+               opaque. Core keeps the original. */
+            linear-gradient(${skin === "aurora" ? (dk ? "rgba(11,14,20,0.72)" : "rgba(252,253,255,0.85)") : (dk ? "#0c0c0c" : "#fafafa")}, ${skin === "aurora" ? (dk ? "rgba(11,14,20,0.72)" : "rgba(252,253,255,0.85)") : (dk ? "#0c0c0c" : "#fafafa")}),
             linear-gradient(
               135deg,
               rgba(86,127,178,0.9),
