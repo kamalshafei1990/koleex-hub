@@ -416,7 +416,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
             Aa
           </button>
           {showSizes && (
-            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-30 py-1 min-w-[140px]">
+            <div className="kx-glass-pop absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-30 py-1 min-w-[140px]">
               {FONT_SIZES.map((s) => (
                 <button key={s.value} type="button" onClick={() => setSize(s.value)} className="w-full px-4 py-1.5 text-left text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors" style={{ fontSize: s.value }}>
                   {s.label}
@@ -431,7 +431,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
             <PaletteIcon className="h-4 w-4" />
           </button>
           {showColors && (
-            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-30 p-2 grid grid-cols-6 gap-1.5">
+            <div className="kx-glass-pop absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-30 p-2 grid grid-cols-6 gap-1.5">
               {COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)} className="h-6 w-6 rounded-md border border-[var(--border-subtle)] hover:scale-110 transition-transform" style={{ backgroundColor: c }} title={c} />
               ))}

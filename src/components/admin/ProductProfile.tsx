@@ -416,7 +416,8 @@ const STEPS = [
    lookalike, the same component. */
 function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number) => void }) {
   return (
-    <nav className="sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+      <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"
         items={STEPS.map((st, i) => ({

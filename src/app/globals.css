@@ -1403,6 +1403,14 @@ input[type="number"]:not(.kx-spinner) {
   position: relative;
   z-index: 1;
 }
+/* A bar host must never filter ITSELF under Aurora (the layers do the
+   work; a filtered host would trap them and any popover children). The
+   form/profile navs carry a Core-era backdrop-blur-md utility — Core
+   keeps it, Aurora neutralizes it here. */
+[data-kx-skin="aurora"] .kx-bar-host {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 /* Progressive variant — the main header's edge-blur ramp at bar scale
    (owner: "for categories use the blur effect same way as the main
    header"). The layer itself goes filterless; its four children carry

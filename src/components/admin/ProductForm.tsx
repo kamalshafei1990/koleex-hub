@@ -397,7 +397,8 @@ function SectionTabs({
   onSelect: (i: number) => void;
 }) {
   return (
-    <nav className="sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+      <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"
         items={items.map((it) => ({
@@ -3142,7 +3143,7 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
-        <div className={onePage ? "space-y-10" : ""}>
+        <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " kx-tab-in"}>
         {(onePage || steps[currentStep]?.id === "identity") && (
           <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* ── HAS FAMILY ── the owner's switch: ON reveals the member
@@ -6584,7 +6585,7 @@ function TagsInput({ tags, onChange, suggestions = [], t }: { tags: string[]; on
           className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
         />
         {showDropdown && (filtered.length > 0 || canCreate) && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl shadow-black/30 overflow-hidden max-h-[200px] overflow-y-auto py-1">
+          <div className="kx-glass-pop absolute z-50 top-full left-0 right-0 mt-1.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl shadow-black/30 overflow-hidden max-h-[200px] overflow-y-auto py-1">
             {filtered.map(s => (
               <button
                 key={s}
