@@ -1286,6 +1286,26 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: 0 6px 16px -8px rgba(86, 127, 178, 0.5);
 }
 
+/* ── One border, everywhere ─────────────────────────────────────────────
+   The owner asked whether the header chips' borders match the app tiles'.
+   They did not: tiles 6%, search 7%, chips 8%, View-as 10%, popovers 8 and
+   10 mixed — five values for one idea. Under Aurora every bordered glass
+   surface and every header chip draws the same 8% line; Core keeps each
+   element's original value untouched. */
+[data-kx-skin="aurora"] .kx-glass,
+[data-kx-skin="aurora"] .kx-glass-pop,
+[data-kx-skin="aurora"] .kx-mainheader .kx-hover-glow {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass,
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop,
+[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader .kx-hover-glow {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+/* The pane is border-less and the rule above must not resurrect a line. */
+[data-kx-skin="aurora"] .kx-header-pane,
+[data-kx-skin="aurora"] .kx-mainheader { border-color: transparent; }
+
 /* ── The glow ring ──────────────────────────────────────────────────────
    A bright arc travelling slowly around the edge of a card.
 
