@@ -362,6 +362,20 @@ function EdgeToggle({
    footer (owner-approved 2026-07-31): one tap away via the hamburger, and
    the header keeps only menu · logo · bell · avatar. Mirrors MainHeader's
    storage keys + events so both stay in sync. */
+/* The short id of the bundle THIS client is running — read from the
+   kx-build meta the server stamps into the document. Deliberately read
+   in an effect (client truth), not from props (server truth): the whole
+   point is exposing what the device actually executes. */
+function BuildTag() {
+  const [b, setB] = useState("");
+  useEffect(() => {
+    const m = document.querySelector('meta[name="kx-build"]')?.getAttribute("content") || "";
+    if (m) setB(m === "dev" ? "dev" : m.slice(0, 7));
+  }, []);
+  if (!b) return null;
+  return <span className="normal-case tracking-normal"> · {b}</span>;
+}
+
 const DRAWER_LANGS = [
   { code: "en", label: "EN" },
   { code: "zh", label: "中文" },
@@ -536,11 +550,16 @@ function SidebarContent({
         )}
       </nav>
       {mobile && <MobileQuickSettings dk={dk} />}
-      {/* Footer — quiet brand mark in the expanded state. */}
+      {/* Footer — quiet brand mark in the expanded state, carrying the
+          running BUILD's short id (from the kx-build meta). This exists so a
+          phone can prove which bundle it is actually executing — four
+          deploys once looked identical on the owner's iPhone and nobody
+          could tell whether the PWA was stale or the fix was wrong. */}
       <div className="p-3 flex items-center justify-center">
         {showExpanded && (
           <span className={`text-[9px] font-semibold uppercase tracking-[0.22em] ${textGhost}`}>
             KOLEEX HUB
+            <BuildTag />
           </span>
         )}
       </div>

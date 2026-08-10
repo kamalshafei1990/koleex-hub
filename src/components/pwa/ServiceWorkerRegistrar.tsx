@@ -27,9 +27,24 @@ export default function ServiceWorkerRegistrar() {
     }
     // Register after load so it never competes with first paint.
     const register = () => {
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((e) => {
-        console.warn("[pwa] service worker registration failed:", e?.message ?? e);
-      });
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/" })
+        .then((reg) => {
+          /* iOS standalone does NOT reliably re-check the SW when the app
+             resumes from the switcher — a stuck installation can keep
+             serving an old bundle through deploy after deploy ("it looks
+             like you did nothing"). Force an update check on every return
+             to the foreground; the SW's skipWaiting + clients.claim make a
+             found update take over immediately. */
+          const onVisible = () => {
+            if (document.visibilityState === "visible") reg.update().catch(() => {});
+          };
+          document.addEventListener("visibilitychange", onVisible);
+          reg.update().catch(() => {});
+        })
+        .catch((e) => {
+          console.warn("[pwa] service worker registration failed:", e?.message ?? e);
+        });
     };
     if (document.readyState === "complete") register();
     else {
