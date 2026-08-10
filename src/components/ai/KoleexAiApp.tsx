@@ -1732,8 +1732,13 @@ export default function KoleexAiApp() {
            mobile transform transition. */
         className={`flex kx-glass-drawer kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1] max-md:!w-[248px] max-md:!min-w-[248px] max-md:transition-transform md:translate-x-0 md:transition-[width,min-width] md:duration-[340ms] md:ease-[cubic-bezier(0.33,1,0.5,1)] ${
           sidebarOpen
-            ? "max-md:translate-x-0 max-md:rtl:-translate-x-0 max-md:duration-[340ms] max-md:ease-[cubic-bezier(0.34,1.3,0.5,1)]"
-            : "max-md:-translate-x-full max-md:rtl:translate-x-full max-md:duration-[240ms] max-md:ease-in max-md:pointer-events-none"
+            ? /* Long-form arbitrary values ON PURPOSE: the negative-prefix
+                 shorthand behind stacked variants (max-md:-translate-x-full)
+                 generates NO rule — the exact trap the dock hit and memory
+                 recorded, re-hit here: the closed drawer sat at x=0, fully
+                 visible on every phone. */
+              "max-md:translate-x-[0%] max-md:duration-[340ms] max-md:ease-[cubic-bezier(0.34,1.3,0.5,1)]"
+            : "max-md:translate-x-[-100%] max-md:rtl:translate-x-[100%] max-md:duration-[240ms] max-md:ease-in max-md:pointer-events-none"
         }`}
         style={{
           /* Desktop-only geometry: the width morphs 0 ↔ SIDEBAR_W on
