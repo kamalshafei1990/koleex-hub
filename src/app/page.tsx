@@ -343,10 +343,10 @@ const CompactCard = memo(function CompactCard({
         app.active
           ? `cursor-pointer group ${
               dk
-                ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:bg-[#1a1a1a] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
-                : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:bg-[#fafafa] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]"
+                ? "kx-glass bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:bg-[#1a1a1a] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                : "kx-glass bg-white border-black/[0.06] hover:border-black/[0.14] hover:bg-[#fafafa] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]"
             }`
-          : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
+          : `cursor-default opacity-20 kx-glass ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
       }`}
     >
       <span className={`transition-all duration-200 ${
