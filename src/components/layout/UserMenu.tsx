@@ -255,12 +255,18 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`group flex items-center gap-2 rounded-full transition-all ${
-          open ? "ring-2 ring-offset-2 ring-offset-transparent ring-white/20" : ""
-        }`}
+        /* No pill outline around avatar-plus-name when open: ring-offset-2
+           with a transparent offset drew a floating band with a see-through
+           gap cutting across the text — the owner called the shape out. The
+           open state now lives on the avatar circle alone, below. */
+        className="group flex items-center gap-2 rounded-full transition-all"
       >
         <span
           className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full overflow-hidden text-[10px] md:text-[12px] font-semibold transition-all ring-1 ${
+            open
+              ? "ring-2 ring-[#7FA9D6]/80 shadow-[0_0_14px_rgba(86,127,178,0.55)] "
+              : ""
+          }${
             dk
               ? "bg-white text-black ring-white/20 group-hover:ring-white/40"
               : "bg-black text-white ring-black/15 group-hover:ring-black/30"

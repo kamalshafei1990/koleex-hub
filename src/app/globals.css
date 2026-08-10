@@ -1114,59 +1114,36 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass { background: rgba(250, 251, 253, 0.94); }
 }
 
-/* ── The header hosts popovers, so its glass lives on ::before ──────────
-
-   THE BUG THAT MADE FOUR ROUNDS OF "MORE BLUR" CHANGE NOTHING. An element
-   with backdrop-filter becomes a BACKDROP ROOT: every descendant's
-   backdrop-filter stops sampling the page behind it and can only see content
-   painted inside that ancestor. The user menu, the bell and View-as are all
-   DOM children of the header — so the moment the header itself got kx-glass,
-   their blur silently stopped applying to the tiles behind them. The proof
-   was in the owner's screenshot: tile icons crisp THROUGH a panel declaring
-   blur(40px). Computed styles reported the filter faithfully the whole time;
-   only the rendering shows this failure, which is why measuring the CSS kept
-   saying everything was fine.
-
-   Moving the material to ::before fixes it: the pseudo-element blurs the
-   page behind the bar exactly as before, but the header ELEMENT no longer
-   carries a filter, so it forms no backdrop root and its children sample the
-   real page again. z-index: -1 keeps the pane under the header's own
-   controls; the bar's border and layout are untouched. */
-[data-kx-skin="aurora"] .kx-mainheader.kx-glass {
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-[data-kx-skin="aurora"] .kx-mainheader.kx-glass::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  /* The login card's material, owner's ask: "the main header background also
-     transparent blurred same as login window." Heavier blur than the tiles,
-     which is right for the one surface content actually scrolls beneath. */
+/* ── The header pane ────────────────────────────────────────────────────
+   The header's glass lives on a SIBLING pane at z-[99] (see MainHeader.tsx
+   for the full story: element-level filter breaks the child menus' blur, and
+   Chromium never renders backdrop-filter on a ::before at z-index:-1 —
+   proven live, identical values, element blurred / pseudo did not).
+   The header element itself must NEVER carry backdrop-filter. */
+.kx-header-pane { display: none; }
+[data-kx-skin="aurora"] .kx-header-pane {
+  display: block;
   background: rgba(11, 14, 20, 0.6);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
   backdrop-filter: blur(40px) saturate(150%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader.kx-glass::before {
+[data-kx-skin="aurora"][data-theme="light"] .kx-header-pane {
   background: rgba(252, 253, 255, 0.68);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-[data-kx-skin="aurora"][data-kx-lowpower] .kx-mainheader.kx-glass::before {
+[data-kx-skin="aurora"] .kx-mainheader { background: transparent; }
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-header-pane {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: rgba(12, 14, 18, 0.92);
+  background: rgba(12, 14, 18, 0.96);
 }
-[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-mainheader.kx-glass::before {
-  background: rgba(250, 251, 253, 0.94);
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-header-pane {
+  background: rgba(250, 251, 253, 0.98);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-kx-skin="aurora"] .kx-mainheader.kx-glass::before { background: rgba(12, 14, 18, 0.92); }
-  [data-kx-skin="aurora"][data-theme="light"] .kx-mainheader.kx-glass::before { background: rgba(250, 251, 253, 0.94); }
+  [data-kx-skin="aurora"] .kx-header-pane { background: rgba(12, 14, 18, 0.96); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-header-pane { background: rgba(250, 251, 253, 0.98); }
 }
 
 /* ── Aurora: popovers, segments, and the glow ring ──────────────────────

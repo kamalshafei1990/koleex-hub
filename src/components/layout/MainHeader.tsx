@@ -127,17 +127,31 @@ export default function MainHeader() {
   }`;
 
   return (
-    <header
+    <>
+      {/* THE HEADER'S GLASS IS A SIBLING PANE, and the header itself carries
+          no backdrop-filter. This is the third home for this material and the
+          only one that works:
+
+          · on the header ELEMENT, the filter renders — but the header becomes
+            a backdrop root and every dropdown inside it loses its own blur
+            (the bug that ate four commits);
+          · on the header's ::before at z-index:-1, Chromium simply never
+            renders the filter — verified live: the element-level inline test
+            blurred the date scrolling beneath, the identical values on the
+            pseudo did nothing;
+          · on a SIBLING at z-[99], one notch under the header's z-[100], the
+            filter renders AND the header stays filterless, so its children
+            sample the real page.
+
+          Under Core the pane is display:none and the header keeps its solid
+          colour, exactly as before Aurora existed. */}
+      <div aria-hidden className="kx-header-pane fixed top-0 left-0 right-0 h-14 z-[99] pointer-events-none" />
+      <header
       dir="ltr"
-      /* kx-glass makes the bar translucent under Aurora so the ground shows
-         through it; under Core the class matches nothing and the solid colour
-         beside it is what paints, exactly as before. The controls inside were
-         already white-alpha chips — they only LOOKED solid because the bar
-         behind them was. */
       className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-2 px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
-          ? "border-white/[0.08] kx-glass bg-[#0A0A0A]"
-          : "kx-glass border-black/[0.08] bg-white"
+          ? "border-white/[0.08] bg-[#0A0A0A]"
+          : "border-black/[0.08] bg-white"
       }`}
     >
       {/* Left: Hamburger (mobile) + Logo + Breadcrumb */}
@@ -303,5 +317,6 @@ export default function MainHeader() {
         <UserMenu dk={dk} />
       </div>
     </header>
+    </>
   );
 }
