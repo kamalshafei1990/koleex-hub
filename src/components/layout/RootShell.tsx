@@ -129,6 +129,35 @@ function isBypassed(pathname: string | null): boolean {
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const pathname = usePathname();
+
+  /* Keep --kx-shell-h (stamped pre-paint by SKIN_BOOTSTRAP) honest across
+     REAL layout changes only. Touch devices re-stamp on orientation/width —
+     never on height-only jitter (that's the toolbar or the keyboard, and
+     reacting to those is exactly the resize-mid-scroll bug). Fine-pointer
+     devices (desktop, resizable windows) re-stamp on every resize. */
+  useEffect(() => {
+    const stamp = () =>
+      document.documentElement.style.setProperty(
+        "--kx-shell-h",
+        `${document.documentElement.clientHeight}px`,
+      );
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    let lastW = window.innerWidth;
+    const onResize = () => {
+      if (!coarse || window.innerWidth !== lastW) {
+        lastW = window.innerWidth;
+        stamp();
+      }
+    };
+    const onOrient = () => window.setTimeout(stamp, 120);
+    stamp();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onOrient);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onOrient);
+    };
+  }, []);
   /* The home launcher already lists every app grouped by category, so the
      persistent sidebar rail there is pure duplication. Hide it on "/" and
      reclaim the horizontal space (full-width launcher). Every inner route
@@ -212,23 +241,20 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         .kx-shell-top.kx-underglass { padding-top: var(--kx-safe-top, 0px) !important; }
         html.kx-desktop .kx-shell-top.kx-underglass { padding-top: var(--kx-titlebar) !important; }
         .kx-underglass #main-scroll-container { padding-top: 3.5rem; }
-        /* The shell is one STABLE viewport tall. 100vh over-counts on iOS
-           (bottom strip cropped behind Safari's toolbar) and 100dvh
-           over-corrects: it re-measures as the toolbar slides, so the whole
-           shell resized mid-scroll and every fixed-height app inside it
-           jumped ("a lot of problems in scrolling", 2026-08-11). svh is the
-           SMALL viewport: always fits, never changes during scroll, and in
-           the installed PWA (no browser chrome) svh = dvh = vh anyway. The
-           vh line stays as the fallback for engines without svh. */
-        .kx-shell-top { height: 100vh; height: 100svh; }
-        /* Installed PWA (A2HS): iOS computes svh SHORT of the real screen —
-           the owner's screenshot showed a dead band exactly the status bar +
-           home indicator tall (~93px), tiles clipped above it. In standalone
-           there is no collapsible chrome, so plain 100vh IS the stable,
-           correct height there; the svh line stays for the in-browser case
-           where the toolbar exists. */
+        /* The shell height is MEASURED, not a unit. Three rounds proved the
+           units cannot cover every iOS mode at once: 100vh over-counts in
+           the browser (bottom cropped behind the toolbar), 100dvh resizes
+           mid-scroll (everything jumped), and in the installed PWA svh came
+           up short by the status bar + home indicator (dead band, owner
+           screenshot). documentElement.clientHeight IS the right number in
+           every mode — stable small viewport in the browser, full screen in
+           standalone — stamped as --kx-shell-h before first paint
+           (SKIN_BOOTSTRAP) and re-stamped below only on real layout changes
+           (orientation / width), never while chrome slides or the keyboard
+           rises. The unit chain stays as the no-JS fallback. */
+        .kx-shell-top { height: 100vh; height: 100svh; height: var(--kx-shell-h, 100svh); }
         @media (display-mode: standalone) {
-          .kx-shell-top { height: 100vh; }
+          .kx-shell-top { height: 100vh; height: var(--kx-shell-h, 100vh); }
         }
         /* In-flow content can always scroll clear of the iPhone home
            indicator; env() is 0 everywhere else. Fixed elements (composers,
