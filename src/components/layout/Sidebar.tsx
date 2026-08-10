@@ -33,6 +33,7 @@ import {
   type SidebarGroup,
 } from "@/lib/navigation";
 import { useTranslation } from "@/lib/i18n";
+import { useSkin } from "@/lib/appearance";
 import { hubT } from "@/lib/translations/hub";
 import { usePermittedModules } from "@/lib/use-scope";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
@@ -340,8 +341,16 @@ function EdgeToggle({
    footer (owner-approved 2026-07-31): one tap away via the hamburger, and
    the header keeps only menu · logo · bell · avatar. Mirrors MainHeader's
    storage keys + events so both stay in sync. */
+const DRAWER_LANGS = [
+  { code: "en", label: "EN" },
+  { code: "zh", label: "中文" },
+  { code: "ar", label: "عربي" },
+] as const;
+type DrawerLang = (typeof DRAWER_LANGS)[number]["code"];
+
 function MobileQuickSettings({ dk }: { dk: boolean }) {
-  const [lang, setLangState] = useState<string>("en");
+  const aurora = useSkin() === "aurora";
+  const [lang, setLangState] = useState<DrawerLang>("en");
   useEffect(() => {
     const saved = window.localStorage.getItem("koleex-lang");
     if (saved === "en" || saved === "zh" || saved === "ar") setLangState(saved);
@@ -352,12 +361,31 @@ function MobileQuickSettings({ dk }: { dk: boolean }) {
     window.addEventListener("langchange", onLang);
     return () => window.removeEventListener("langchange", onLang);
   }, []);
-  const setLang = (code: "en" | "zh" | "ar") => {
+  const setLang = (code: DrawerLang) => {
     document.documentElement.setAttribute("lang", code);
     document.documentElement.setAttribute("dir", code === "ar" ? "rtl" : "ltr");
     localStorage.setItem("koleex-lang", code);
     window.dispatchEvent(new CustomEvent("langchange", { detail: code }));
     setLangState(code);
+  };
+  /* Same slide-then-mirror mechanic as MainHeader's bar: a direction flip
+     reflows the whole document, which janks the slide it interrupts — so the
+     pill slides FIRST on a pending value and the real language (text + dir)
+     applies as it lands. Same-direction picks are immediate. */
+  const [pendingLang, setPendingLang] = useState<DrawerLang | null>(null);
+  const shownLang = pendingLang ?? lang;
+  const pickLang = (next: DrawerLang) => {
+    if (next === lang || pendingLang) return;
+    const flips = (next === "ar") !== (lang === "ar");
+    if (aurora && flips) {
+      setPendingLang(next);
+      window.setTimeout(() => {
+        setLang(next);
+        setPendingLang(null);
+      }, 340);
+    } else {
+      setLang(next);
+    }
   };
   const toggleTheme = () => {
     const next = dk ? "light" : "dark";
@@ -365,24 +393,61 @@ function MobileQuickSettings({ dk }: { dk: boolean }) {
     window.dispatchEvent(new CustomEvent("thememodechange", { detail: next }));
     window.dispatchEvent(new CustomEvent("themechange", { detail: next }));
   };
-  const chip = (active: boolean) =>
-    `h-8 flex-1 rounded-lg text-[11px] font-semibold transition-colors ${
-      active
-        ? dk ? "bg-white/[0.14] text-white" : "bg-black/[0.10] text-black"
-        : dk ? "text-white/45" : "text-black/45"
-    }`;
   return (
     <div className={`px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom,0px))] border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"} flex items-center gap-2`}>
-      <div className={`flex flex-1 items-center rounded-lg border p-0.5 ${dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.08] bg-black/[0.03]"}`}>
-        <button onClick={() => setLang("en")} className={chip(lang === "en")}>EN</button>
-        <button onClick={() => setLang("zh")} className={chip(lang === "zh")}>中文</button>
-        <button onClick={() => setLang("ar")} className={chip(lang === "ar")}>عربي</button>
+      {/* The header's language bar, adapted to fluid width: three flex-1
+          segments, ONE Hub-Blue outline sliding between them. Each segment is
+          exactly one slider-width, so translateX(index × 100%) still lands
+          perfectly; --kx-flip mirrors the sign in RTL. Core keeps the
+          original grey pill, byte for byte. */}
+      <div className={`relative flex flex-1 items-center h-9 rounded-lg border p-1 transition-colors ${
+        dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.08] bg-black/[0.03]"
+      }`}>
+        {aurora && (
+          <span
+            aria-hidden
+            className="absolute top-1 bottom-1 w-[calc((100%-8px)/3)] rounded-md pointer-events-none transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{
+              insetInlineStart: 4,
+              transform: `translateX(calc(${DRAWER_LANGS.findIndex((x) => x.code === shownLang)} * var(--kx-flip, 100%)))`,
+              background: "rgba(86,127,178,0.10)",
+              boxShadow: dk
+                ? "inset 0 0 0 1px rgba(86,127,178,0.70)"
+                : "inset 0 0 0 1px rgba(62,103,150,0.75)",
+            }}
+          />
+        )}
+        {DRAWER_LANGS.map((l) => (
+          <button
+            key={l.code}
+            onClick={() => pickLang(l.code)}
+            className={`relative h-7 flex-1 rounded-md text-[11px] font-semibold tracking-wide transition-colors duration-200 text-center ${
+              aurora
+                ? shownLang === l.code
+                  ? dk ? "text-white" : "text-black"
+                  : dk
+                    ? "text-white/45 hover:text-white/80"
+                    : "text-black/45 hover:text-black/80"
+                : lang === l.code
+                  ? dk
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "bg-black/[0.10] text-black shadow-sm"
+                  : dk
+                    ? "text-white/45 hover:text-white/75"
+                    : "text-black/45 hover:text-black/75"
+            }`}
+          >
+            {l.label}
+          </button>
+        ))}
       </div>
       <button
         onClick={toggleTheme}
         aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
-        className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-colors ${
-          dk ? "border-white/[0.08] bg-white/[0.03] text-white/60" : "border-black/[0.08] bg-black/[0.03] text-black/60"
+        className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-all ${
+          dk
+            ? "kx-hover-glow border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+            : "kx-hover-glow border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
         }`}
       >
         {dk ? <SunIcon size={15} /> : <MoonIcon size={15} />}
