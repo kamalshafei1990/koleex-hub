@@ -305,6 +305,9 @@ const COPY: Record<Lang, {
 /* Aurora ground — same canvas as Home/the gate, client-only. Mounted ONLY
    under the aurora skin (the one JS branch pure CSS cannot switch). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+/* QA reporter (inline trigger in the top bars). Deferred like RootShell's
+   floating twin — heavy modal machinery stays off the critical path. */
+const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButton"), { ssr: false });
 
 const SIDEBAR_W = 248;
 
@@ -2023,6 +2026,9 @@ export default function KoleexAiApp() {
               {active?.title ?? "Koleex AI"}
             </div>
           </div>
+          {/* QA reporter, docked in the bar (owner: the floating pill sat
+              over the chat) — renders only while the platform flag is on. */}
+          <ReportIssueButton variant="inline" />
           <button
             type="button"
             onClick={startNewChat}
@@ -2066,6 +2072,7 @@ export default function KoleexAiApp() {
               <p className="text-[11.5px] text-[var(--text-dim)] truncate">{copy.welcomeSub}</p>
             )}
           </div>
+          <ReportIssueButton variant="inline" />
           {sidebarCollapsed && (
             <button
               type="button"
