@@ -83,8 +83,8 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
       onClick={() => setOpened(true)}
       className={`relative flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg border transition-all ${
         dk
-          ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
-          : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
+          ? "kx-hover-glow border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+          : "kx-hover-glow border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
       }`}
     >
       <BellIcon size={15} className="md:w-4 md:h-4" />
