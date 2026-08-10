@@ -212,17 +212,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         .kx-shell-top.kx-underglass { padding-top: var(--kx-safe-top, 0px) !important; }
         html.kx-desktop .kx-shell-top.kx-underglass { padding-top: var(--kx-titlebar) !important; }
         .kx-underglass #main-scroll-container { padding-top: 3.5rem; }
-        /* The shell is exactly ONE visual viewport tall. 100vh on iOS counts
-           the area hidden behind Safari's collapsible toolbar, so with
-           overflow-hidden the bottom strip of every app was cropped on
-           phones. dvh tracks the real visible height as chrome shows/hides —
-           on EVERY device, no phone-specific numbers — and the vh line stays
-           as the fallback for engines without dvh. */
-        .kx-shell-top { height: 100vh; height: 100dvh; }
+        /* The shell is one STABLE viewport tall. 100vh over-counts on iOS
+           (bottom strip cropped behind Safari's toolbar) and 100dvh
+           over-corrects: it re-measures as the toolbar slides, so the whole
+           shell resized mid-scroll and every fixed-height app inside it
+           jumped ("a lot of problems in scrolling", 2026-08-11). svh is the
+           SMALL viewport: always fits, never changes during scroll, and in
+           the installed PWA (no browser chrome) svh = dvh = vh anyway. The
+           vh line stays as the fallback for engines without svh. */
+        .kx-shell-top { height: 100vh; height: 100svh; }
         /* In-flow content can always scroll clear of the iPhone home
            indicator; env() is 0 everywhere else. Fixed elements (composers,
-           the dock) handle their own inset. */
+           the dock) handle their own inset. Full-bleed apps that OWN their
+           bottom inset (chat composers pad env themselves) opt out via
+           kx-app-fullbleed — otherwise the padding gives the outer scroller
+           34px of slack and the whole app rubber-bands on every swipe. */
         #main-scroll-container { padding-bottom: env(safe-area-inset-bottom, 0px); }
+        #main-scroll-container:has(> .kx-app-fullbleed) { padding-bottom: 0; }
       `}</style>
       <div className="kx-titlebar-drag" aria-hidden />
       <NavigationProgress />

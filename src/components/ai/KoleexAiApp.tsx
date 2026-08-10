@@ -1714,7 +1714,7 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="kx-ai-root text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
+      className="kx-ai-root kx-app-fullbleed text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       style={{ height: stageHeight }}
     >
       {inputDialog}
@@ -1753,7 +1753,7 @@ export default function KoleexAiApp() {
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex kx-glass kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1]`}
+        } md:flex kx-glass-drawer kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1]`}
         style={{
           /* On mobile we ignore sidebarCollapsed (desktop-only concept).
              On desktop, width morphs 0 ↔ SIDEBAR_W based on collapsed state. */
