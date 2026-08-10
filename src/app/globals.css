@@ -1079,6 +1079,13 @@ input[type="number"]:not(.kx-spinner) {
    at the rtl root covers every consumer. */
 :root { --kx-flip: 100%; }
 [dir="rtl"] { --kx-flip: -100%; }
+/* DIRECTION ISLANDS. The header is pinned dir="ltr" inside an Arabic page,
+   and a dir attribute does NOT reset an inherited custom property — the
+   island kept the page's -100% while laying out left-to-right, and its
+   slider flew out of the bar (owner's screenshot: a stray outlined pill
+   floating beside the language switcher). Every island must re-declare the
+   sign it lays out with. */
+[dir="ltr"] { --kx-flip: 100%; }
 
 /* ── Glass surfaces ─────────────────────────────────────────────────────
    The sign-in card's material, promoted to a class so Home can wear it too
