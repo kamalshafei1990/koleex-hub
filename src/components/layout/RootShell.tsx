@@ -221,6 +221,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
            the installed PWA (no browser chrome) svh = dvh = vh anyway. The
            vh line stays as the fallback for engines without svh. */
         .kx-shell-top { height: 100vh; height: 100svh; }
+        /* Installed PWA (A2HS): iOS computes svh SHORT of the real screen —
+           the owner's screenshot showed a dead band exactly the status bar +
+           home indicator tall (~93px), tiles clipped above it. In standalone
+           there is no collapsible chrome, so plain 100vh IS the stable,
+           correct height there; the svh line stays for the in-browser case
+           where the toolbar exists. */
+        @media (display-mode: standalone) {
+          .kx-shell-top { height: 100vh; }
+        }
         /* In-flow content can always scroll clear of the iPhone home
            indicator; env() is 0 everywhere else. Fixed elements (composers,
            the dock) handle their own inset. Full-bleed apps that OWN their
