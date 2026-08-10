@@ -1123,24 +1123,19 @@ input[type="number"]:not(.kx-spinner) {
 .kx-header-pane { display: none; }
 [data-kx-skin="aurora"] .kx-header-pane {
   display: block;
-  /* WHITE-ALPHA, NOT BLACK-ALPHA — the third and decisive revision. Dark
-     glass over the top of this page cannot read as glass at rest, because
-     the canvas is near-black up there (the waves cross at h*0.5): 60% dark
-     over black is black, 38% dark over black is still black, and the owner
-     said "no changed" both times — correctly. The tiles are the proof of the
-     fix: they sit over the same black regions and still read as material,
-     because their fill is a few percent of WHITE. Same trick here — a faint
-     film of light with the blur behind it. The ground shows through
-     (96% of it), scrolled content frosts, and the bar is visibly a surface
-     rather than a solid strip. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  /* NO FILL AT ALL — owner's final word: "totally transparent but blurred."
+     The pane is pure backdrop-filter; the only separation from the page is
+     the header's own hairline border-b, which is a line, not a colour. The
+     dark film, the light film and every opacity in between are gone — the
+     bar is now the ground itself, frosted. Legibility over bright scrolled
+     content rests entirely on the blur, which is the trade the owner chose
+     with the login card in front of him. */
+  background: transparent;
   -webkit-backdrop-filter: blur(40px) saturate(150%);
   backdrop-filter: blur(40px) saturate(150%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-header-pane {
-  background: rgba(252, 253, 255, 0.55);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: transparent;
 }
 [data-kx-skin="aurora"] .kx-mainheader { background: transparent; }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-header-pane {
