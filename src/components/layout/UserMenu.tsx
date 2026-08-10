@@ -308,6 +308,16 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       </button>
 
       {open && (
+        <>
+          {/* Same scrim the bell already has — the owner's standing rule is
+              dim + backdrop-blur-sm behind every popup, and once the bell's
+              came back to life (the backdrop-root fix) the menus without one
+              looked broken by comparison. Clicking it closes. */}
+          <div
+            aria-hidden
+            onClick={() => setOpen(false)}
+            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
+          />
         <div
           role="menu"
           className={`kx-drop-in absolute top-full end-0 mt-2 w-64 rounded-xl border shadow-2xl overflow-hidden z-50 ${
@@ -505,6 +515,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );

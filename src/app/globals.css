@@ -1144,13 +1144,16 @@ input[type="number"]:not(.kx-spinner) {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: rgba(11, 14, 20, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  /* The login card's material, owner's ask: "the main header background also
+     transparent blurred same as login window." Heavier blur than the tiles,
+     which is right for the one surface content actually scrolls beneath. */
+  background: rgba(11, 14, 20, 0.6);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-mainheader.kx-glass::before {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(252, 253, 255, 0.68);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-mainheader.kx-glass::before {
@@ -1233,6 +1236,15 @@ input[type="number"]:not(.kx-spinner) {
   background: rgba(62, 103, 150, 0.92);
   border-color: rgba(62, 103, 150, 0.9);
   color: #fff;
+}
+
+/* The count badge inside a SELECTED filter chip. The badge is authored
+   black-on-white for Core's solid-white active chip; on Aurora's Hub Blue
+   chip that same black pill reads as a smudge. White-on-blue instead —
+   scoped, so Core keeps its black badge on its white chip. */
+[data-kx-skin="aurora"] .kx-chip-on > span {
+  background: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Segmented controls. The selected pill was a grey wash — correct on a flat
