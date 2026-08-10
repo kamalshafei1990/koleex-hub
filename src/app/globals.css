@@ -1412,6 +1412,11 @@ input[type="number"]:not(.kx-spinner) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: transparent;
+  /* The ramp zone extends 3rem BELOW the bar (owner's annotation: "start
+     the edge blur a little down, maybe from here") — the same approach
+     zone the main header's pane carries. The faint edge begins under the
+     tiles and strengthens upward into them. */
+  inset: 0 0 -3rem 0;
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i {
   position: absolute;
