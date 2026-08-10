@@ -630,7 +630,14 @@ export default function FloatingPanel() {
   );
 
   /* ── Token colors ── */
-  const bg = dk ? "bg-[#111]" : "bg-white";
+  /* kx-glass-pop rides ALONGSIDE the solid colour, same pattern as the
+     launcher tiles: under Aurora the unlayered recipe out-cascades the
+     utility and the panel is the menus' glass (with the gradient rim and the
+     unified border arriving for free); under Core the class matches nothing
+     and the flat original paints. The owner caught the panel still solid —
+     the earlier fix landed on .panel-neon-border, which this panel never
+     wore. */
+  const bg = dk ? "kx-glass-pop bg-[#111]" : "kx-glass-pop bg-white";
   const border = dk ? "border-white/[0.08]" : "border-black/[0.08]";
   const textP = dk ? "text-white" : "text-black";
   const textM = dk ? "text-white/50" : "text-black/50";

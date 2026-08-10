@@ -1236,16 +1236,20 @@ input[type="number"]:not(.kx-spinner) {
    grey bar, wrong once the bar became glass over a blue ground, where grey is
    the one colour that reads as dirt. Hub Blue instead. */
 [data-kx-skin="aurora"] .kx-seg-on {
-  background: rgba(86, 127, 178, 0.30);
-  box-shadow: inset 0 0 0 1px rgba(188, 216, 240, 0.28);
+  /* Restyled to match the dock's tabs, which the owner picked as the
+     reference: a Hub Blue OUTLINE around a near-quiet fill, not a filled
+     pill. The ring is an inset shadow, not a real border, so the segment's
+     box does not grow by 2px and the row cannot shift. */
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
   color: #fff;
 }
 [data-kx-skin="aurora"] .kx-seg-off:hover {
   background: rgba(86, 127, 178, 0.16);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-seg-on {
-  background: rgba(86, 127, 178, 0.20);
-  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.35);
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
   color: #16324F;
 }
 
