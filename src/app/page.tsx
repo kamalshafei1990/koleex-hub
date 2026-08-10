@@ -66,7 +66,7 @@ const APP_DATA_PREFETCH: Record<string, string> = {
      downloaded and never read on every hover, which at the owner's 3000
      products becomes ~1.8 MB competing with the real page load. If
      ProductList's serverParams change, change this with them. */
-  products: "/api/products?view=list&paged=1&pageSize=150",
+  products: "/api/products?view=list&paged=1&pageSize=150&division=garment-machinery&status=active",
   "product-data": "/api/products?view=list&paged=1&pageSize=150",
   projects: "/api/projects",
   todo: "/api/todos",

@@ -679,7 +679,12 @@ export default function ProductList() {
      while the effect below still refetches fresh in the background. The scope
      key guarantees a cached list never bleeds across tenants / view-as. */
   const queryClient = useQueryClient();
-  const productsQK = ["products", "list", currentScopeKey()] as const;
+  /* The two front-ends hold DIFFERENT row sets — the catalogue is active-only
+     at the request level — so their warm caches must not share a key, or a
+     Product Data visit would seed draft rows into the catalogue's first
+     frame (and the catalogue would shrink PD's warm paint). */
+  const productsQK = ["products", "list", currentScopeKey(), isInternal ? "int" : "pub"] as const;
+  const listSnapshotKey = `kx_products_list_v1:${currentScopeKey()}${isInternal ? "" : ":pub"}`;
 
   const [products, setProducts] = useState<ProductRow[]>(
     () => queryClient.getQueryData<ProductRow[]>(productsQK) ?? [],
@@ -902,6 +907,14 @@ export default function ProductList() {
       if (filterStatus) p.set("status", filterStatus);
       if (filterVisible === "visible") p.set("visible", "true");
       if (filterVisible === "hidden") p.set("visible", "false");
+    } else {
+      /* The catalogue can only ever SHOW active products (owner rule:
+         non-active is invisible outside Product Data — the client predicate
+         below enforces the same), so ask the server for active only. The
+         header count and group counts become the truth of THIS view instead
+         of counting drafts the grid will never render, and draft rows stop
+         travelling over the wire just to be filtered out on arrival. */
+      p.set("status", "active");
     }
     if (filterFeatured === "yes") p.set("featured", "true");
     if (filterFeatured === "no") p.set("featured", "false");
@@ -917,7 +930,29 @@ export default function ProductList() {
   const serverSearchActive = deferredSearch.trim().length > 0;
   /* "No filter, no search" — the only state whose first page is safe to keep
      as the warm-start snapshot. */
-  const isDefaultView = serverParams === new URLSearchParams({ view: "list", paged: "1", pageSize: "150" }).toString();
+  /* "Default view" = what THIS front-end shows on a clean open: the flagship
+     division + forced status=active on the catalogue, bare on Product Data.
+     Comparing against the bare param string looked right but was wrong: the
+     catalogue's flagship default meant serverParams never equalled it, so the
+     catalogue's warm snapshot silently stopped refreshing. Deliberately NOT
+     "whatever the session restored" — a leftover filter must never be
+     persisted as if it were the whole catalogue (see the persist site). */
+  const defaultDivRef = useRef<string | null>(null);
+  if (defaultDivRef.current === null) {
+    let d = "";
+    if (!isInternal && typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(`kx_products_meta_v1:${currentScopeKey()}`);
+        const m = raw ? (JSON.parse(raw) as { divisions?: { slug: string }[] }) : null;
+        if (m?.divisions?.some((x) => x.slug === FLAGSHIP_DIVISION_SLUG)) d = FLAGSHIP_DIVISION_SLUG;
+      } catch { /* absent/corrupt cache → no division default */ }
+    }
+    defaultDivRef.current = d;
+  }
+  const defaultParams = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
+  if (defaultDivRef.current) defaultParams.set("division", defaultDivRef.current);
+  if (!isInternal) defaultParams.set("status", "active");
+  const isDefaultView = serverParams === defaultParams.toString();
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
@@ -940,8 +975,7 @@ export default function ProductList() {
        the normal load path. */
     let paintedFromCache = false;
     try {
-      const lsKey = `kx_products_list_v1:${currentScopeKey()}`;
-      const raw = typeof window !== "undefined" ? window.localStorage.getItem(lsKey) : null;
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(listSnapshotKey) : null;
       if (raw) {
         const cached = JSON.parse(raw) as ProductRow[];
         if (Array.isArray(cached) && cached.length) {
@@ -1112,7 +1146,7 @@ export default function ProductList() {
         if (isDefaultView) {
           try {
             const json = JSON.stringify(p);
-            if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+            if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
             /* The model maps go WITH the list. Without them the warm paint
                renders cards that have no code, no chips and no count — 208px
                — and they grow to 311px the moment the network answers. That
@@ -1798,7 +1832,7 @@ export default function ProductList() {
       queryClient.setQueryData(productsQK, next);
       try {
         const json = JSON.stringify(next);
-        if (json.length < 2_500_000) window.localStorage.setItem(`kx_products_list_v1:${currentScopeKey()}`, json);
+        if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
       } catch { /* quota guard */ }
       return next;
     });
