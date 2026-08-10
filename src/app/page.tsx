@@ -543,15 +543,28 @@ export default function HomePage() {
     return () => clearTimeout(off);
   }, [introMotion]);
 
-  /* ── Derive user's first name for greeting ── */
+  /* ── Derive user's first name for greeting ──
+     Owner rule 2026-08-10: the greeting is the ONE place the localized name
+     appears. In Arabic it greets with the Arabic name, in Chinese with the
+     Chinese one — but only if the stored native name is actually in that
+     script; a Chinese-script name under an Arabic UI is not a translation,
+     it is a different wrong language, so anything that does not match falls
+     back to English. Detection is by script range because `name_alt` is one
+     field, not one per language. */
   const firstName = useMemo(() => {
     if (!account) return null;
+    const alt = (account.person as { name_alt?: string | null } | null | undefined)?.name_alt?.trim();
+    if (alt) {
+      if (lang === "ar" && /[\u0600-\u06FF]/.test(alt)) return alt.split(/\s+/)[0];
+      /* Chinese names are not space-delimited; the whole mark is the name. */
+      if (lang === "zh" && /[\u4E00-\u9FFF]/.test(alt)) return alt;
+    }
     if (account.person?.first_name) return account.person.first_name;
     if (account.person?.display_name) return account.person.display_name.split(" ")[0];
     if (account.person?.full_name) return account.person.full_name.split(" ")[0];
     if (account.username) return account.username;
     return null;
-  }, [account]);
+  }, [account, lang]);
 
   /* ── Theme ── */
   const [theme, setTheme] = useState<"light" | "dark">("dark");

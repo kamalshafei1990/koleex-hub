@@ -115,15 +115,14 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     if (!account) return null;
     const avatar = account.avatar_url || account.person?.avatar_url || null;
     const fullName = account.person?.full_name || account.username;
-    const nameAlt =
-      (account.person as { name_alt?: string | null } | null | undefined)?.name_alt || null;
+
     const subtitle = [
       account.user_type,
       account.role?.name,
     ]
       .filter(Boolean)
       .join(" · ");
-    return { avatar, fullName, nameAlt, subtitle };
+    return { avatar, fullName, subtitle };
   }, [account]);
 
   /* Load initial identity + keep it in sync. */
@@ -303,16 +302,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             >
               {profile.fullName}
             </span>
-            {profile.nameAlt && (
-              <span
-                lang="zh"
-                className={`text-[10px] leading-tight max-w-[140px] truncate ${
-                  dk ? "text-white/55" : "text-black/55"
-                }`}
-              >
-                {profile.nameAlt}
-              </span>
-            )}
+            {/* No second-language name here — owner rule 2026-08-10: the
+                localized name's ONE home is the Home greeting, which shows it
+                only when it matches the UI language. A bar chip listing the
+                same person twice in two scripts read as clutter. */}
             <span
               className={`text-[10px] capitalize max-w-[140px] truncate ${
                 dk ? "text-white/45" : "text-black/45"
