@@ -182,6 +182,14 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+/* The dock/FAB anchors with bottom-6 etc.; on iPhones the home indicator
+   overlays the bottom ~34px, so the margin lifts the whole fab-root clear.
+   On bottom-anchored fixed elements the margin edge is what `bottom` places.
+   env() is 0 on desktop/Android, and Discuss's top-anchored variant simply
+   ignores margin-bottom. */
+.fab-root {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
 
 /* ── Notes app / TipTap editor ─────────────────────────────────────────── */
 

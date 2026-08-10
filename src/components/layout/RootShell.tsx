@@ -212,6 +212,17 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         .kx-shell-top.kx-underglass { padding-top: var(--kx-safe-top, 0px) !important; }
         html.kx-desktop .kx-shell-top.kx-underglass { padding-top: var(--kx-titlebar) !important; }
         .kx-underglass #main-scroll-container { padding-top: 3.5rem; }
+        /* The shell is exactly ONE visual viewport tall. 100vh on iOS counts
+           the area hidden behind Safari's collapsible toolbar, so with
+           overflow-hidden the bottom strip of every app was cropped on
+           phones. dvh tracks the real visible height as chrome shows/hides —
+           on EVERY device, no phone-specific numbers — and the vh line stays
+           as the fallback for engines without dvh. */
+        .kx-shell-top { height: 100vh; height: 100dvh; }
+        /* In-flow content can always scroll clear of the iPhone home
+           indicator; env() is 0 everywhere else. Fixed elements (composers,
+           the dock) handle their own inset. */
+        #main-scroll-container { padding-bottom: env(safe-area-inset-bottom, 0px); }
       `}</style>
       <div className="kx-titlebar-drag" aria-hidden />
       <NavigationProgress />
@@ -226,7 +237,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* pt-14 = header height. The view-as indicator is now a compact floating
           pill (overlay), so it no longer needs to push content down. */}
       <div
-        className={`kx-shell-top ${pathname === "/" ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`kx-shell-top ${pathname === "/" ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,
