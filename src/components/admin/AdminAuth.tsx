@@ -644,7 +644,9 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
         {/* The ground. Replaces the radial wash and the 64px grid — three
             backgrounds stacked would have been noise, and the waves already
             carry the depth those two were there to provide. */}
-        <WavyBackground />
+        {/* Pinned dark: this screen's card, type and lockup are all dark-only,
+            so the ground must not follow the user's theme. */}
+        <WavyBackground theme="dark" />
 
         <div className="relative h-full flex flex-col items-center px-4">
 

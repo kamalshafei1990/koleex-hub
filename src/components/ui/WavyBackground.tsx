@@ -19,17 +19,29 @@
    than water, and the waves spread 132px apart, which turns weaving ribbons
    into parallel stripes.
 
+   THE MOTION IS NOW THE ORIGINAL'S, EXACTLY. It was not, and the owner spotted
+   all three: this ran at 30fps on speed 0.0018 (0.054 noise-units a second
+   against the original's 0.12) and at device ratio 2 against the original's 1
+   — measured on ui.aceternity.com, whose backing store is 910x792 for a
+   910x792 box on a DPR-2 screen. Rendering at twice the resolution also
+   halves `ctx.filter = blur(10px)`, which is applied in device pixels, so the
+   picture came out roughly four times sharper than the thing it copied and
+   the ends of the strokes became visible. Ratio 1 at 60fps is also HALF the
+   pixels a second of ratio 2 at 30fps: closer to the source and cheaper.
+
    WHAT IS DELIBERATELY NOT THE ORIGINAL — none of it changes the picture:
 
-   · 30fps. The waves take ten seconds to cross; half the frames is invisible.
-   · It stops on tab hidden, on unmount, and under prefers-reduced-motion,
-     where one frame is painted and the loop never starts. The original runs
-     forever in a background tab, which on a login screen is the worst place
-     to do it.
-   · Device pixel ratio 1 on phones, so a mid-range Android paints a quarter
-     of the pixels.
+   · The strokes are drawn past both edges. The original runs x from 0 to w,
+     leaving a butt cap at each edge that its upscaling smears away; drawing
+     wider is the fix that holds at any resolution.
+   · It stops on tab hidden, on unmount, under prefers-reduced-motion, and on
+     a machine with four cores or fewer — one frame painted, loop never
+     started. The original runs forever in a background tab, which on a screen
+     that stays open is the worst place to do it.
    · A removable resize listener. The original assigns window.onresize
      directly, which stamps on anything else in the app using it.
+   · A second palette for light mode, and a `theme` prop so the sign-in gate
+     can pin dark — the gate's card and lockup do not follow data-theme.
    · simplex-noise inlined rather than added as a dependency.
    --------------------------------------------------------------------------- */
 
@@ -56,12 +68,25 @@ const PALETTES = {
   },
 } as const;
 
-const FPS = 30;
-const FRAME_MS = 1000 / FPS;
 const BLUR = 10;
 const WAVE_WIDTH = 50;
-const SPEED = 0.0018;
+/* The original's "fast" default, and it runs on an unthrottled rAF. Both
+   numbers matter together: the waves advance SPEED per frame, so 0.002 at
+   60fps is 0.12 noise-units a second. This ran at 0.0018 on a 30fps throttle
+   — 0.054 a second, less than half — and the owner was right that it did not
+   look like the reference. The throttle also changed the picture, not just
+   the speed: the ground is refilled at half alpha every frame and never
+   fully clears, so at 30fps each trail survives twice as long in wall-clock
+   and the ribbons read thicker and smearier than the original's. */
+const SPEED = 0.002;
 const WAVE_OPACITY = 0.5;
+
+/* Draw past both edges so the strokes can never be seen ending. The original
+   runs x from 0 to w, which leaves a butt cap at each edge; it gets away with
+   it because it renders at ratio 1 and lets the browser upscale, which smears
+   the ends into the blur. Overdrawing is the honest fix and it holds at any
+   resolution. 80px clears half a 50px stroke plus the 10px blur with room. */
+const OVERDRAW = 80;
 
 /* ── 3D simplex noise ────────────────────────────────────────────────────
    The same algorithm `simplex-noise` ships. Inlined because a dependency for
@@ -132,22 +157,31 @@ function buildNoise3D() {
   };
 }
 
-export default function WavyBackground() {
+export default function WavyBackground({ theme: forced }: { theme?: "dark" | "light" } = {}) {
   const ref = useRef<HTMLCanvasElement>(null);
-  /* Read once per mount and re-read on the app's own themechange event, which
-     display-prefs already dispatches. No attribute at all — the sign-in gate
-     before any client code has run — means dark, the Hub's base theme. */
-  const [theme, setTheme] = useState<"dark" | "light">(() =>
+  /* Follows the document by default — read once per mount and re-read on the
+     app's own themechange event, which display-prefs already dispatches. No
+     attribute at all means dark, the Hub's base theme.
+
+     `forced` exists for the SIGN-IN GATE, which is dark-only by design: its
+     card is a dark glass panel with white type and the lockup is the for-dark
+     composite, none of which follow data-theme. Letting the ground follow it
+     put a light background behind a dark card for every user whose theme is
+     light — a bug this component introduced the moment it learned about
+     themes, and one only visible if you actually switch. */
+  const [auto, setAuto] = useState<"dark" | "light">(() =>
     typeof document !== "undefined" &&
     document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+  const theme = forced ?? auto;
 
   useEffect(() => {
+    if (forced) return;
     const onTheme = () =>
-      setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+      setAuto(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
     onTheme();
     window.addEventListener("themechange", onTheme);
     return () => window.removeEventListener("themechange", onTheme);
-  }, []);
+  }, [forced]);
 
   useEffect(() => {
     const cv = ref.current;
@@ -171,42 +205,34 @@ export default function WavyBackground() {
     const weak = (navigator.hardwareConcurrency || 8) <= 4;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches || weak;
 
-    /* RESOLUTION IS BUDGETED IN PIXELS, NOT IN DEVICE RATIO.
+    /* RATIO 1, WHICH IS WHAT THE ORIGINAL DOES.
 
-       This used to be `small ? 1 : min(dpr, 2)` — device ratio 1 on anything
-       under 768px. The intent was to spare a mid-range Android, but a phone
-       screen is 3x, so it handed the compositor a 375x812 bitmap to stretch
-       across 1125x2436 physical pixels. Three times up, on a picture made of
-       soft gradients and a half-alpha trail that accumulates its own
-       quantisation: it goes blocky and it bands. That is the glitch.
+       Measured on ui.aceternity.com: their backing store is 910x792 for a
+       910x792 CSS box on a DPR-2 display. The browser upscales it, and that
+       upscale is part of the look — it is where a good deal of the softness
+       comes from. `ctx.filter = blur(10px)` is applied in device pixels, so
+       drawing at ratio 2 also halves the blur relative to the picture: this
+       was rendering roughly four times sharper than the thing it was copied
+       from, which is why the ends of the strokes became visible at all.
 
-       Cost tracks the number of pixels painted, so budget that directly. At
-       1.4M a 375x812 phone lands on ratio 2 and a 430x932 on 1.87 — sharp
-       either way, and still under a fifth of the 7.5M the desktop already
-       paints at a measured 8.3ms median.
-
-       And it is computed INSIDE size(), not captured once outside it. Held in
-       a closure it went stale the moment the viewport crossed the breakpoint —
-       rotate a phone, or resize a window past 768px, and the canvas kept
-       whichever ratio happened to be true when the effect first ran. */
-    const scaleFor = () => {
-      const raw = Math.min(window.devicePixelRatio || 1, 2);
-      if (!window.matchMedia("(max-width: 767px)").matches) return raw;
-      const area = Math.max(1, cv.clientWidth * cv.clientHeight);
-      return Math.max(1, Math.min(raw, Math.sqrt(1_400_000 / area)));
-    };
-
+       It is also cheaper than what it replaces. Ratio 2 at 30fps was 86.5M
+       pixels a second; ratio 1 at 60fps is 43.2M — half the work AND the
+       original's motion. The earlier "sharpen it on phones" change was
+       solving the wrong problem: the artefact was the visible stroke ends,
+       now fixed by overdrawing, not the resolution. */
     let w = 0, h = 0, nt = 0;
 
     const size = () => {
-      const dpr = scaleFor();
+      /* One backing pixel per CSS pixel, so no transform and no scaling
+         arithmetic — the same one line the original writes. Setting the
+         width also resets the context, which is why filter and lineWidth are
+         re-applied here rather than once at init. */
       w = cv.clientWidth;
       h = cv.clientHeight;
-      cv.width = Math.max(1, Math.round(w * dpr));
-      cv.height = Math.max(1, Math.round(h * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      /* Set ONCE, exactly as the original does — the context keeps it for
-         every stroke that follows. */
+      cv.width = Math.max(1, w);
+      cv.height = Math.max(1, h);
+      /* Set ONCE per resize, exactly as the original does — the context keeps
+         it for every stroke that follows. */
       ctx.filter = `blur(${BLUR}px)`;
       ctx.lineWidth = WAVE_WIDTH;
     };
@@ -215,7 +241,7 @@ export default function WavyBackground() {
       for (let i = 0; i < n; i++) {
         ctx.beginPath();
         ctx.strokeStyle = WAVE_COLORS[i % WAVE_COLORS.length];
-        for (let x = 0; x < w; x += 5) {
+        for (let x = -OVERDRAW; x < w + OVERDRAW; x += 5) {
           const y = noise3D(x / 800, 0.3 * i, nt) * 100;
           ctx.lineTo(x, y + h * 0.5);
         }
@@ -244,19 +270,21 @@ export default function WavyBackground() {
 
     if (still) return;
 
-    let raf = 0, last = 0, running = true;
-    const loop = (now: number) => {
+    /* Unthrottled, like the original. The 30fps cap was a saving that changed
+       the picture — see SPEED. The weak-machine case is handled by not
+       starting the loop at all, which is a real saving rather than a
+       half-speed version of the same cost. */
+    let raf = 0, running = true;
+    const loop = () => {
       if (!running) return;
       raf = requestAnimationFrame(loop);
-      if (now - last < FRAME_MS) return;
-      last = now;
       render();
     };
     raf = requestAnimationFrame(loop);
 
     const onVis = () => {
       if (document.hidden) { running = false; cancelAnimationFrame(raf); }
-      else if (!running) { running = true; last = 0; raf = requestAnimationFrame(loop); }
+      else if (!running) { running = true; raf = requestAnimationFrame(loop); }
     };
     document.addEventListener("visibilitychange", onVis);
 
