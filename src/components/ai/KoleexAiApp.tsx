@@ -1722,19 +1722,31 @@ export default function KoleexAiApp() {
       )}
 
       <aside
-        className={`${
-          sidebarOpen ? "flex" : "hidden"
-        } md:flex kx-glass-drawer kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1]`}
+        /* MOBILE: a real sliding drawer (canon: spring in 340ms, ease-in out
+           240ms). It used to toggle display hidden↔flex — no motion at all,
+           the owner's "not work in mobilephone". Width is pinned on mobile
+           (the slide is a transform); the !w overrides beat the desktop
+           inline width below.
+           DESKTOP: the width morph keeps its transition via md: classes —
+           it must NOT live in the inline style, where it would override the
+           mobile transform transition. */
+        className={`flex kx-glass-drawer kx-ai-side flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative top-[var(--kx-header-h)] md:top-auto bottom-0 md:bottom-auto start-0 z-[40] md:z-[1] max-md:!w-[248px] max-md:!min-w-[248px] max-md:transition-transform md:translate-x-0 md:transition-[width,min-width] md:duration-[340ms] md:ease-[cubic-bezier(0.33,1,0.5,1)] ${
+          sidebarOpen
+            ? "max-md:translate-x-0 max-md:rtl:-translate-x-0 max-md:duration-[340ms] max-md:ease-[cubic-bezier(0.34,1.3,0.5,1)]"
+            : "max-md:-translate-x-full max-md:rtl:translate-x-full max-md:duration-[240ms] max-md:ease-in max-md:pointer-events-none"
+        }`}
         style={{
-          /* On mobile we ignore sidebarCollapsed (desktop-only concept).
-             On desktop, width morphs 0 ↔ SIDEBAR_W based on collapsed state. */
-          width: sidebarOpen ? SIDEBAR_W : (sidebarCollapsed ? 0 : SIDEBAR_W),
-          minWidth: sidebarOpen ? SIDEBAR_W : (sidebarCollapsed ? 0 : SIDEBAR_W),
-          /* Phase UI.3 — spring cubic-bezier replaced with a calm ease-out. */
-          transition: "width 0.25s ease-out, min-width 0.25s ease-out",
+          /* Desktop-only geometry: the width morphs 0 ↔ SIDEBAR_W on
+             collapse. Mobile ignores these via the !w classes above. */
+          width: sidebarCollapsed ? 0 : SIDEBAR_W,
+          minWidth: sidebarCollapsed ? 0 : SIDEBAR_W,
         }}
         aria-hidden={!sidebarOpen && sidebarCollapsed}
       >
+        {/* Content rides a FIXED-width inner column so the collapse CLIPS it
+            instead of re-wrapping every text line on every frame — the
+            desktop "glitch". The aside's overflow-hidden does the clipping. */}
+        <div className="flex h-full w-[248px] shrink-0 flex-col">
         <div className="kx-ai-side-sep p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
           <Link
             href="/"
@@ -2001,6 +2013,7 @@ export default function KoleexAiApp() {
               )}
             </>
           )}
+        </div>
         </div>
       </aside>
 
