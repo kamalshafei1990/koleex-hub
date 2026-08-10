@@ -139,6 +139,22 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
 const SWITCH_MOTION =
   "motion-safe:transition-[height,transform,width] motion-safe:duration-[440ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)]";
 
+/* The underline is deliberately NOT on SWITCH_MOTION. Same curve, shorter
+   clock, because equal DURATION is not equal SPEED: the card travels about
+   860px while the bar slides roughly 200px, so at a shared 440ms the bar
+   crawls at a quarter of the card's velocity and visibly trails it. Worse, an
+   ease-in-out spends its first quarter barely moving — on something as small
+   as a 2px rule that reads as stuck-then-slide. 240ms puts the bar back at the
+   card's apparent speed and lands it while the card is still settling, which
+   is the order the eye expects: the label commits, then the panel follows. */
+const INK_MOTION =
+  "motion-safe:transition-[transform,width] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.4,0,0.2,1)]";
+
+/* Floor for the scrolling body. Below this the card stops being a card, so on
+   a viewport too short even for that we let the outer area scroll instead —
+   the tab strip scrolling away is the lesser evil at 300px of height. */
+const MIN_BODY_H = 160;
+
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
    explicit Sign Out. */
@@ -182,8 +198,13 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
      relationship is picked, and the label widths change with language. */
   const stripRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  /* The three the cap is computed from: the space available, the column that
+     has to fit inside it, and the box being sized. */
+  const areaRef = useRef<HTMLDivElement>(null);
+  const colRef = useRef<HTMLDivElement>(null);
+  const clipRef = useRef<HTMLDivElement>(null);
   const [ink, setInk] = useState<{ x: number; w: number } | null>(null);
-  const [bodyH, setBodyH] = useState<number | null>(null);
+  const [body, setBody] = useState<{ h: number; capped: boolean } | null>(null);
 
   /* The indicator. One bar that slides, not one per tab that blinks.
      The maths is in PHYSICAL pixels on purpose: getBoundingClientRect and
@@ -215,14 +236,52 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* The height. An explicit pixel height on the clipping wrapper is the
      only way to transition it — `height: auto` is not interpolable. The
      observer means this also covers the join form growing and shrinking
-     when the relationship changes, which jumped just as hard. */
+     when the relationship changes, which jumped just as hard.
+
+     AND IT IS CAPPED, which is what keeps the tab strip on screen. The card
+     used to grow to whatever the Join form needed — 1278px against a 792px
+     viewport — and the overflow went to the page, so scrolling down to reach
+     the submit button carried the tabs away with it. Now the body stops
+     growing at the space that is left and scrolls inside itself instead: the
+     strip, the card frame and the brand header are all fixed, and the form is
+     the only thing that moves. It is also the owner's standing rule — the
+     screen fits, and only what has to scroll scrolls.
+
+     `chrome` is DERIVED, not listed: the column's height minus the body's is
+     the tab strip plus the footer plus the gap plus the padding, whatever
+     those happen to be today. Listing them would go stale the first time one
+     of them changed. It survives being read mid-transition because both
+     measurements contain the same animating number, which cancels.
+
+     No feedback loop: the observed nodes are the UNCONSTRAINED content and
+     the area, and neither changes size when the imposed height does. */
   useIsoLayoutEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
-    const sync = () => setBodyH(el.offsetHeight);
+    const sync = () => {
+      const content = el.offsetHeight;
+      const area = areaRef.current, col = colRef.current, clip = clipRef.current;
+      let cap = Infinity;
+      if (area && col && clip) {
+        /* Fractional rects, then floor — NOT offsetHeight. offsetHeight rounds
+           each of the two to a whole pixel before they are subtracted, and the
+           two roundings do not cancel: it left one pixel of overflow, which is
+           one pixel the tab strip could be scrolled away by. Measured. */
+        const chrome =
+          col.getBoundingClientRect().height - clip.getBoundingClientRect().height;
+        cap = Math.max(MIN_BODY_H, Math.floor(area.clientHeight - chrome));
+      }
+      const h = Math.min(content, cap);
+      /* `capped` drives overflow. Left permanently on auto, the scrollbar
+         would flash on every switch whose content is briefly taller than the
+         animating box — which is every switch. */
+      setBody({ h, capped: content > h + 1 });
+    };
     sync();
     const ro = new ResizeObserver(sync);
     ro.observe(el);
+    /* The area covers viewport resize, rotation, and the mobile URL bar. */
+    if (areaRef.current) ro.observe(areaRef.current);
     return () => ro.disconnect();
     /* Same reason as the indicator: mounted only after `authed` resolves. */
   }, [authed]);
@@ -521,8 +580,12 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
               scrollbar-gutter reserves the track on BOTH edges, so the card
               stays optically centred and the screen does not jump sideways the
               moment the form gets long enough to overflow. */}
-          <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges] flex justify-center">
+          <div
+            ref={areaRef}
+            className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges] flex justify-center"
+          >
             <div
+              ref={colRef}
               /* Same curve and length as the height and the underline — the
                  card widening on a different easing read as a second, later
                  event. */
@@ -606,7 +669,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 {ink && (
                   <span
                     aria-hidden
-                    className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${SWITCH_MOTION}`}
+                    className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-white ${INK_MOTION}`}
                     style={{ transform: `translateX(${ink.x}px)`, width: ink.w }}
                   />
                 )}
@@ -625,8 +688,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   Product Data uses — replays on every switch instead of the
                   content simply being swapped under your eyes. */}
               <div
-                className={`overflow-hidden ${SWITCH_MOTION}`}
-                style={bodyH != null ? { height: bodyH } : undefined}
+                ref={clipRef}
+                /* overscroll-contain so flicking the form to its end does not
+                   hand the gesture on to the page behind it. */
+                className={`${body?.capped ? "overflow-y-auto overscroll-contain" : "overflow-hidden"} ${SWITCH_MOTION}`}
+                style={body ? { height: body.h } : undefined}
               >
                 <div ref={bodyRef}>
                   <div

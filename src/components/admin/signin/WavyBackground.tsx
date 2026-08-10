@@ -127,12 +127,36 @@ export default function WavyBackground() {
 
     const noise3D = buildNoise3D();
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const small = window.matchMedia("(max-width: 767px)").matches;
-    const dpr = small ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+
+    /* RESOLUTION IS BUDGETED IN PIXELS, NOT IN DEVICE RATIO.
+
+       This used to be `small ? 1 : min(dpr, 2)` — device ratio 1 on anything
+       under 768px. The intent was to spare a mid-range Android, but a phone
+       screen is 3x, so it handed the compositor a 375x812 bitmap to stretch
+       across 1125x2436 physical pixels. Three times up, on a picture made of
+       soft gradients and a half-alpha trail that accumulates its own
+       quantisation: it goes blocky and it bands. That is the glitch.
+
+       Cost tracks the number of pixels painted, so budget that directly. At
+       1.4M a 375x812 phone lands on ratio 2 and a 430x932 on 1.87 — sharp
+       either way, and still under a fifth of the 7.5M the desktop already
+       paints at a measured 8.3ms median.
+
+       And it is computed INSIDE size(), not captured once outside it. Held in
+       a closure it went stale the moment the viewport crossed the breakpoint —
+       rotate a phone, or resize a window past 768px, and the canvas kept
+       whichever ratio happened to be true when the effect first ran. */
+    const scaleFor = () => {
+      const raw = Math.min(window.devicePixelRatio || 1, 2);
+      if (!window.matchMedia("(max-width: 767px)").matches) return raw;
+      const area = Math.max(1, cv.clientWidth * cv.clientHeight);
+      return Math.max(1, Math.min(raw, Math.sqrt(1_400_000 / area)));
+    };
 
     let w = 0, h = 0, nt = 0;
 
     const size = () => {
+      const dpr = scaleFor();
       w = cv.clientWidth;
       h = cv.clientHeight;
       cv.width = Math.max(1, Math.round(w * dpr));
