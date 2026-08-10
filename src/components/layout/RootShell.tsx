@@ -193,6 +193,25 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           height: var(--kx-titlebar); z-index: 300;
           -webkit-app-region: drag; background: var(--bg-primary);
         }
+        /* UNDER-GLASS SCROLLING (Home only, for now). The shell normally pads
+           the whole scroller down by the header height, which means scrolled
+           content is CLIPPED at the header's bottom edge — it never passes
+           beneath the bar, so a translucent header had nothing behind it and
+           read as solid. The owner scrolled, watched elements vanish at the
+           edge, and called it: the black-canvas explanation was wrong, the
+           content simply never got there.
+
+           Under .kx-underglass the shell keeps only the safe-area/titlebar
+           offset, the SCROLLER extends up behind the header, and the header
+           height moves inside as scroller padding — so at rest nothing sits
+           under the bar, and on scroll the content genuinely slides beneath
+           the glass and frosts. Scoped to Home because every app screen was
+           built against the clipped geometry (sticky toolbars pin to the
+           scroller's top edge); they migrate one at a time with the skin
+           rollout. */
+        .kx-shell-top.kx-underglass { padding-top: var(--kx-safe-top, 0px) !important; }
+        html.kx-desktop .kx-shell-top.kx-underglass { padding-top: var(--kx-titlebar) !important; }
+        .kx-underglass #main-scroll-container { padding-top: 3.5rem; }
       `}</style>
       <div className="kx-titlebar-drag" aria-hidden />
       <NavigationProgress />
@@ -207,7 +226,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* pt-14 = header height. The view-as indicator is now a compact floating
           pill (overlay), so it no longer needs to push content down. */}
       <div
-        className={`kx-shell-top pt-14 flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`kx-shell-top ${pathname === "/" ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,
