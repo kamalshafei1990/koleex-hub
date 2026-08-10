@@ -757,17 +757,42 @@ export default function FloatingPanel() {
               </div>
             ) : (
               <div
-                className="flex items-center rounded-xl p-[3px] flex-1"
+                className="relative flex items-center rounded-xl p-[3px] flex-1"
                 style={{
                   border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)",
                 }}
               >
+                {/* ONE outline that SLIDES, instead of two buttons swapping
+                    their own borders — a border that pops off one box and
+                    onto another is a cut, not a movement, and the owner
+                    called it. Same medicine as the sign-in underline: the
+                    moving thing is a single element, translated. The buttons
+                    keep a transparent border so their boxes never change.
+
+                    translate, not inset animation: both segments are exactly
+                    half the row, so 0 / 100% of the pill's own width lands it
+                    perfectly, it composites on the GPU, and the logical
+                    direction is handled by the sign of the offset in RTL via
+                    dir-aware calc below. 320ms on Aurora's standard curve. */}
+                <span
+                  aria-hidden
+                  className="absolute top-[3px] bottom-[3px] rounded-[9px] pointer-events-none transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  style={{
+                    insetInlineStart: 3,
+                    width: "calc(50% - 3px)",
+                    transform: tab === "ai" ? "translateX(0)" : "translateX(var(--kx-flip, 100%))",
+                    background: "rgba(86,127,178,0.10)",
+                    boxShadow: dk
+                      ? "inset 0 0 0 1px rgba(86,127,178,0.70)"
+                      : "inset 0 0 0 1px rgba(62,103,150,0.75)",
+                  }}
+                />
                 <button
                   onClick={() => setTab("ai")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
+                  className={`relative flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold border border-transparent transition-colors duration-300 ${
                     tab === "ai"
-                      ? dk ? "border border-[#567fb2]/70 text-white" : "border border-[#567fb2]/60 text-black"
-                      : dk ? "border border-transparent text-white/35 hover:text-white/55" : "border border-transparent text-black/35 hover:text-black/55"
+                      ? dk ? "text-white" : "text-black"
+                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
                 >
                   <KoleexOrb state="idle" size={22} className={tab === "ai" ? "" : "opacity-40"} />
@@ -775,10 +800,10 @@ export default function FloatingPanel() {
                 </button>
                 <button
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
+                  className={`relative flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold border border-transparent transition-colors duration-300 ${
                     tab === "discuss"
-                      ? dk ? "border border-[#567fb2]/70 text-white" : "border border-[#567fb2]/60 text-black"
-                      : dk ? "border border-transparent text-white/35 hover:text-white/55" : "border border-transparent text-black/35 hover:text-black/55"
+                      ? dk ? "text-white" : "text-black"
+                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
                 >
                   <DiscussIcon size={13} />

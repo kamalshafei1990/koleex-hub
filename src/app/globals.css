@@ -1073,6 +1073,13 @@ input[type="number"]:not(.kx-spinner) {
   justify-content: center;
   gap: 18px;
 }
+/* Direction sign for physical translateX used by logical sliders: a pill
+   whose track is laid out with inset-inline-start needs its 100%-of-own-width
+   hop to point the OTHER way in RTL. Custom properties inherit, so one flip
+   at the rtl root covers every consumer. */
+:root { --kx-flip: 100%; }
+[dir="rtl"] { --kx-flip: -100%; }
+
 /* ── Glass surfaces ─────────────────────────────────────────────────────
    The sign-in card's material, promoted to a class so Home can wear it too
    (owner, 2026-08-10: "same background and the elements and app icons also
