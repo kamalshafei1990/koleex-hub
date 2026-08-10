@@ -817,8 +817,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                   className={`shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
                     active
                       ? dk
-                        ? "bg-white text-black border-white"
-                        : "bg-black text-white border-black"
+                        ? "kx-chip-on bg-white text-black border-white"
+                        : "kx-chip-on bg-black text-white border-black"
                       : dk
                         ? "bg-white/[0.04] text-white/60 border-white/[0.1] hover:text-white"
                         : "bg-black/[0.03] text-black/60 border-black/[0.1] hover:text-black"

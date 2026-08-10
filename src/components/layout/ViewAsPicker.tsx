@@ -480,7 +480,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                     className={`h-7 rounded-md text-[11.5px] font-semibold transition-all ${
                       active
                         ? dk
-                          ? "bg-[#1f1f1f] text-white shadow-sm"
+                          ? "kx-seg-on bg-[#1f1f1f] text-white shadow-sm"
                           : "bg-white text-black shadow-sm"
                         : dk
                           ? "text-white/55 hover:text-white/80"
@@ -575,8 +575,8 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                   <div
                     className={`sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur ${
                       dk
-                        ? "bg-[#141414]/95 text-white/45 border-b border-white/[0.06]"
-                        : "bg-white/95 text-black/45 border-b border-black/[0.06]"
+                        ? "kx-pop-sticky bg-[#141414]/95 text-white/45 border-b border-white/[0.06]"
+                        : "kx-pop-sticky bg-white/95 text-black/45 border-b border-black/[0.06]"
                     }`}
                   >
                     {g.name}
