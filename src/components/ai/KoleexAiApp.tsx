@@ -1614,10 +1614,24 @@ export default function KoleexAiApp() {
     const viewportH = () => (vv ? vv.height : window.innerHeight);
     let applied = viewportH();
 
+    /* iOS scrolls/pans the ANCESTORS to reveal a focused textarea the moment
+       the keyboard starts rising — before our height shrink lands. Owner's
+       screenshot: composer flung to the very top, over the status bar, dead
+       black where the app used to be. Our layout already keeps the composer
+       above the keyboard by construction, so any outer displacement is pure
+       damage — pin the window and the Hub scroller back to zero, repeatedly
+       through the keyboard animation (iOS re-pans mid-flight). */
+    const pinOuter = () => {
+      if (!isMobile()) return;
+      if (window.scrollY) window.scrollTo(0, 0);
+      const sc = document.getElementById("main-scroll-container");
+      if (sc && sc.scrollTop) sc.scrollTop = 0;
+    };
     const apply = () => {
       if (isMobile()) {
         applied = viewportH();
         setStageHeight(`${Math.max(240, applied - headerH())}px`);
+        pinOuter();
       } else {
         setStageHeight("calc(100dvh - var(--kx-header-h, 3.5rem))");
       }
@@ -1631,14 +1645,29 @@ export default function KoleexAiApp() {
       /* Same width → either chrome sliding (ignore) or the keyboard (follow). */
       if (Math.abs(viewportH() - applied) >= KEYBOARD_MIN_DELTA) apply();
     };
+    /* Focus = the moment iOS starts panning. Pin now and again as the
+       keyboard animation progresses (~250ms) and settles. */
+    let pinTimers: number[] = [];
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isMobile()) return;
+      const t = e.target as HTMLElement | null;
+      if (!t || !/^(TEXTAREA|INPUT)$/.test(t.tagName)) return;
+      pinTimers.forEach((id) => window.clearTimeout(id));
+      pinTimers = [0, 80, 200, 350, 600].map((ms) => window.setTimeout(pinOuter, ms));
+    };
 
     window.addEventListener("orientationchange", apply);
     window.addEventListener("resize", onResize);
+    window.addEventListener("focusin", onFocusIn);
     vv?.addEventListener("resize", onResize);
+    vv?.addEventListener("scroll", pinOuter);
     return () => {
       window.removeEventListener("orientationchange", apply);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("focusin", onFocusIn);
       vv?.removeEventListener("resize", onResize);
+      vv?.removeEventListener("scroll", pinOuter);
+      pinTimers.forEach((id) => window.clearTimeout(id));
     };
   }, []);
 
