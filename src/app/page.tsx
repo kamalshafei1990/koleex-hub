@@ -1096,16 +1096,36 @@ export default function HomePage() {
         }
         /* Search bar: focusing it lights the same Hub Blue gradient border
            + glow the tiles use on hover — one interaction language. */
+        ${skin === "aurora" ? `
+        /* Aurora focus. The first translucent attempt looked LIGHTER, not
+           darker, and the owner caught it: the double-background trick
+           paints the bright blue border-gradient UNDER the fill across the
+           whole box, and a see-through fill let it wash the entire bar
+           blue. So the two jobs are separated for good — the fill is a
+           single darker sheet of glass (blur keeps working beneath it), and
+           the blue gradient moves to the kx-glass ::before rim, which is
+           masked to the 1px edge and physically cannot tint the fill. */
+        .search-neon:focus-within {
+          border-color: transparent;
+          background: ${dk ? "rgba(3, 5, 9, 0.72)" : "rgba(222, 230, 240, 0.78)"};
+          box-shadow: 0 0 16px rgba(86,127,178,${dk ? "0.35" : "0.28"});
+        }
+        .search-neon:focus-within::before {
+          background: linear-gradient(
+            135deg,
+            rgba(86,127,178,0.9),
+            rgba(127,169,214,0.7),
+            rgba(188,216,240,0.6),
+            rgba(86,127,178,0.9)
+          );
+        }
+        ` : `
         .search-neon:focus-within {
           border-color: transparent;
           background-origin: border-box;
           background-clip: padding-box, border-box;
           background-image:
-            /* "Little darker is enough, not black": focus deepens the glass
-               from 0.55 to 0.72 and the blur keeps working underneath —
-               the solid #0c0c0c here was why focusing the search snapped it
-               opaque. Core keeps the original. */
-            linear-gradient(${skin === "aurora" ? (dk ? "rgba(11,14,20,0.72)" : "rgba(252,253,255,0.85)") : (dk ? "#0c0c0c" : "#fafafa")}, ${skin === "aurora" ? (dk ? "rgba(11,14,20,0.72)" : "rgba(252,253,255,0.85)") : (dk ? "#0c0c0c" : "#fafafa")}),
+            linear-gradient(${dk ? "#0c0c0c" : "#fafafa"}, ${dk ? "#0c0c0c" : "#fafafa"}),
             linear-gradient(
               135deg,
               rgba(86,127,178,0.9),
@@ -1115,6 +1135,7 @@ export default function HomePage() {
             );
           box-shadow: 0 0 16px rgba(86,127,178,${dk ? "0.35" : "0.28"});
         }
+        `}
         /* Hover: icon + app name take the Hub Blue gradient, smoothly.
            The label keeps the gradient painted underneath at all times and
            only its (opaque) text color fades out, so entry/exit crossfade
