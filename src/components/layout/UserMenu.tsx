@@ -255,11 +255,22 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        /* No pill outline around avatar-plus-name when open: ring-offset-2
-           with a transparent offset drew a floating band with a see-through
-           gap cutting across the text — the owner called the shape out. The
-           open state now lives on the avatar circle alone, below. */
-        className="group flex items-center gap-2 rounded-full transition-all"
+        /* A pill chip, like its neighbours. Every other control on this bar
+           — View as, the bell, the theme toggle — sits in a bordered chip;
+           the avatar floated bare, so any open-state outline looked bolted
+           on (the owner flagged the first two attempts). Same border and
+           fill grammar as the siblings, pill-shaped because the avatar is
+           round; open = Hub Blue border and tint, the accent every other
+           active control here already uses. */
+        className={`group flex items-center gap-2 rounded-full border transition-all ps-1 pe-1 md:pe-3 py-1 kx-hover-glow ${
+          open
+            ? dk
+              ? "border-[#7FA9D6]/50 bg-[#567FB2]/[0.18]"
+              : "border-[#3E6796]/50 bg-[#567FB2]/[0.12]"
+            : dk
+              ? "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]"
+              : "border-black/[0.08] bg-black/[0.03] hover:bg-black/[0.05]"
+        }`}
       >
         <span
           className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full overflow-hidden text-[10px] md:text-[12px] font-semibold transition-all ring-1 ${
