@@ -19,7 +19,7 @@
    CSS-only animation, theme-aware webp pair, reduced-motion-safe. */
 
 import { useEffect, useRef, useState } from "react";
-import { ensureLoadProgressPatch, snapshotLoadProgress, subscribeLoadProgress } from "@/lib/load-progress";
+import { acquireNavBaseline, ensureLoadProgressPatch, releaseNavBaseline, snapshotLoadProgress, subscribeLoadProgress } from "@/lib/load-progress";
 
 /* Minimum requests before a percentage is worth showing (3 → 0/33/66/100).
    Fewer than this and the bar runs indeterminate instead of pretending. */
@@ -50,16 +50,17 @@ export default function BrandLoading({
 
   useEffect(() => {
     ensureLoadProgressPatch();
-    const base = snapshotLoadProgress();
-    /* Requests already in flight when this gate appeared belong to the
-       thing the user is waiting for — count them into BOTH sides, so a
-       gate that mounts one tick after the screen fired its fetches still
-       shows an honest ratio instead of nothing (the "no percentage in
-       most apps" bug) or a fake instant-100%. */
-    const baseInflight = Math.max(0, base.started - base.settled);
+    /* The baseline belongs to the NAVIGATION, not to this instance: the
+       route boundary, the dynamic fallback and the page's data gate render
+       this same component back to back, and a per-mount baseline made the
+       bar reset and refill at each handoff (owner: "the loading bar…
+       appears and disappears"). Requests already in flight at chain start
+       count into both sides, so a gate mounting one tick after the screen
+       fired its fetches still shows an honest ratio. */
+    const base = acquireNavBaseline();
     const update = () => {
       const now = snapshotLoadProgress();
-      const started = now.started - base.started + baseInflight;
+      const started = now.started - base.started + base.inflight;
       const settled = now.settled - base.settled;
       /* A percentage only MEANS something when there are enough requests
          for intermediate values to exist. Waiting on one request over a
@@ -69,15 +70,21 @@ export default function BrandLoading({
          the threshold we show the moving indeterminate bar instead: the
          honest statement is "working", not a number we can't compute.
          Once it qualifies it stays qualified (no flicker back). */
-      if (started < MEANINGFUL_REQUESTS && maxRef.current === 0) return;
-      /* Monotonic display: late-starting requests grow the denominator,
-         but a bar that moves backwards reads as broken. */
-      const p = Math.max(maxRef.current, Math.min(100, Math.round((settled / Math.max(started, 1)) * 100)));
+      if (started < MEANINGFUL_REQUESTS && base.maxPct === 0) return;
+      /* Monotonic across the WHOLE chain: the max lives on the shared
+         baseline, so the next stage resumes from the same number instead
+         of flashing backwards. */
+      const p = Math.max(base.maxPct, Math.min(100, Math.round((settled / Math.max(started, 1)) * 100)));
+      base.maxPct = p;
       maxRef.current = p;
       setPct(p);
     };
     update();
-    return subscribeLoadProgress(update);
+    const unsub = subscribeLoadProgress(update);
+    return () => {
+      unsub();
+      releaseNavBaseline(base);
+    };
   }, []);
 
   return (

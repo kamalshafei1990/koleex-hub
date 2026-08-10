@@ -34,11 +34,30 @@ interface LpState {
   settled: number;
   listeners: Set<() => void>;
   patched: boolean;
+  nav: NavBaseline | null;
 }
+
+/* ONE navigation's baseline, shared by every loading surface in its chain.
+   A navigation renders several gates back to back — route boundary, dynamic
+   fallback, full-page data gate — and each used to snapshot its OWN
+   baseline on mount, so the bar visibly reset and refilled at every
+   handoff: the owner's "the loading bar… appears and disappears". The
+   baseline (and the monotonic max) now live here: an acquiring surface
+   reuses the chain's baseline if the previous holder released within the
+   handoff window, so the percentage CONTINUES across stages. */
+export interface NavBaseline {
+  started: number;
+  settled: number;
+  inflight: number;
+  maxPct: number;
+  holders: number;
+  releasedAt: number;
+}
+const HANDOFF_MS = 400;
 
 const g = globalThis as typeof globalThis & { __kxLoadProgress?: LpState };
 const st: LpState =
-  g.__kxLoadProgress ?? (g.__kxLoadProgress = { started: 0, settled: 0, listeners: new Set(), patched: false });
+  g.__kxLoadProgress ?? (g.__kxLoadProgress = { started: 0, settled: 0, listeners: new Set(), patched: false, nav: null });
 
 /* A request pending longer than this stops holding bars hostage: it gets
    counted as settled for PROGRESS purposes only (the request itself keeps
@@ -126,4 +145,28 @@ export function subscribeLoadProgress(cb: () => void): () => void {
 
 export function snapshotLoadProgress(): { started: number; settled: number } {
   return { started: st.started, settled: st.settled };
+}
+
+/** A loading surface joins the current navigation's progress chain (or
+ *  starts a new one if the previous chain ended more than a beat ago). */
+export function acquireNavBaseline(): NavBaseline {
+  const now = Date.now();
+  let b = st.nav;
+  if (!b || (b.holders === 0 && now - b.releasedAt > HANDOFF_MS)) {
+    b = st.nav = {
+      started: st.started,
+      settled: st.settled,
+      inflight: Math.max(0, st.started - st.settled),
+      maxPct: 0,
+      holders: 0,
+      releasedAt: 0,
+    };
+  }
+  b.holders += 1;
+  return b;
+}
+
+export function releaseNavBaseline(b: NavBaseline): void {
+  b.holders = Math.max(0, b.holders - 1);
+  b.releasedAt = Date.now();
 }
