@@ -1137,7 +1137,10 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"][data-theme="light"] .kx-header-pane {
   background: transparent;
 }
-[data-kx-skin="aurora"] .kx-mainheader { background: transparent; }
+/* No fill AND no hairline: with the bar reduced to pure blur, the border-b
+   was the last thing drawing a line across the ground. border-color rather
+   than border-width so nothing shifts by the 1px. Core keeps its border. */
+[data-kx-skin="aurora"] .kx-mainheader { background: transparent; border-color: transparent; }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-header-pane {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
