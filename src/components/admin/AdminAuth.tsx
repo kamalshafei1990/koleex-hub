@@ -85,14 +85,33 @@ function LangSwitch({ lang }: { lang: Lang }) {
     window.dispatchEvent(new CustomEvent("langchange", { detail: next }));
   };
   return (
-    <div className="flex items-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.07] p-1">
+    <div
+      /* dir="ltr" AGAINST the page. Picking Arabic flips the whole gate to
+         rtl, which mirrored this row and moved every button to a new place —
+         so the control you had just used was no longer where you left it, and
+         going back meant hunting for EN on the opposite side.
+
+         A language picker is a list of names, not prose. Its order carries no
+         reading direction, exactly like the Latin lockup the highlight sweeps
+         across, so it is pinned in one order in all three languages. */
+      dir="ltr"
+      className="flex items-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.07] p-1"
+    >
       {SIGNIN_LANGS.map((l) => (
         <button
           key={l.code}
           type="button"
           onClick={() => pick(l.code)}
           aria-pressed={lang === l.code}
-          className={`h-7 px-3 rounded-lg text-[11.5px] font-semibold transition-colors ${
+          /* Fixed segment width. Pinning dir stopped the buttons REORDERING,
+             but the row was still 4.7px wider in Arabic — the labels are
+             always drawn in their own script and those glyphs measure
+             differently — and a centred row that changes width moves every
+             button in it by half the difference. Equal segments make the row
+             a constant size, which is what a segmented control should be
+             anyway. Measured, not guessed: 149.7px in English, 154.4px in
+             Arabic, card identical in both. */
+          className={`h-7 min-w-[52px] px-3 rounded-lg text-[11.5px] font-semibold transition-colors ${
             lang === l.code
               ? "bg-white/90 text-black"
               : "text-white/50 hover:text-white/85 hover:bg-white/[0.06]"
