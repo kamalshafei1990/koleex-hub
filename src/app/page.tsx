@@ -5,7 +5,7 @@
 
    Zone A: Search (⌘K)
    Zone B: Favorites (compact row < 3, grid >= 3)
-   Zone C: Recent (horizontal scrollable strip)
+   Zone C: Recent (auroratal scrollable strip)
    Zone D: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
@@ -313,7 +313,7 @@ const AppCard = memo(function AppCard({
   );
 });
 
-/* ── Compact horizontal card (for favorites row / recent strip) ── */
+/* ── Compact auroratal card (for favorites row / recent strip) ── */
 const CompactCard = memo(function CompactCard({
   app,
   t,
@@ -385,6 +385,7 @@ const AIGreeter = memo(function AIGreeter({
   t: (key: string, fb: string) => string;
   lang: string;
 }) {
+  const skin = useSkin();
   const greetingText = `${t(getGreetingKey(), "")}${firstName ? `, ${firstName}` : ""}`;
   const [greet, setGreet] = useState(0);
   const [typed, setTyped] = useState("");
@@ -469,11 +470,18 @@ const AIGreeter = memo(function AIGreeter({
       {/* The CSS glow-orb is the system-wide AI face (owner-approved). */}
       <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0" />
       <div
-        className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
+        /* kx-glass cannot win against an inline style, so under Aurora the
+           inline background is simply not written and the class paints. Core
+           keeps its gradient — a flat colour would be a downgrade there. */
+        className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5 kx-glass"
         style={{
-          background: dk
-            ? "linear-gradient(180deg,#121212,#0c0c0c)"
-            : "linear-gradient(180deg,#ffffff,#f7f7f7)",
+          ...(skin === "aurora"
+            ? null
+            : {
+                background: dk
+                  ? "linear-gradient(180deg,#121212,#0c0c0c)"
+                  : "linear-gradient(180deg,#ffffff,#f7f7f7)",
+              }),
           border: dk
             ? "1px solid rgba(255,255,255,0.08)"
             : "1px solid rgba(0,0,0,0.08)",
@@ -861,8 +869,8 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
-      {/* THE GROUND — Horizon only. Every other surface on this page switches
-          skin in CSS, because `.kx-glass` is scoped to [data-kx-skin="horizon"]
+      {/* THE GROUND — Aurora only. Every other surface on this page switches
+          skin in CSS, because `.kx-glass` is scoped to [data-kx-skin="aurora"]
           and the elements keep their original solid classes underneath: under
           Core nothing matches and the Hub's original flat launcher comes back
           exactly, with no JS branch and no second copy of the markup. A canvas
@@ -878,7 +886,7 @@ export default function HomePage() {
           it. Written z-0 and not -z-0 — the negative form is not a Tailwind
           class, so it would have generated nothing and left the stacking to
           DOM order and luck. */}
-      {skin === "horizon" && (
+      {skin === "aurora" && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground />
         </div>

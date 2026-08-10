@@ -7,7 +7,7 @@
    language", and the two are independent: every skin has a light and a dark
    face, so a user picks a style and a brightness, not one of four fixed looks.
 
-     data-kx-skin="horizon"   the wavy ground + glass surfaces (DEFAULT)
+     data-kx-skin="aurora"   the wavy ground + glass surfaces (DEFAULT)
      data-kx-skin="core"      the original flat panels
 
    Owner, 2026-08-10: keep the old look — *"the dark and light mode is basic
@@ -16,7 +16,7 @@
    working: it is what the Hub looks like today, and every screen that has not
    been converted yet renders Core regardless of the setting.
 
-   HORIZON IS OPT-OUT-ABLE ON PURPOSE. It costs a canvas and a per-tile blur;
+   AURORA IS OPT-OUT-ABLE ON PURPOSE. It costs a canvas and a per-tile blur;
    anyone on hardware that cannot afford it, or who simply prefers the flat
    look, gets a first-class alternative rather than a degraded version of the
    new one. See [data-kx-lowpower] in globals.css for the automatic arm.
@@ -24,15 +24,15 @@
 
 import { useEffect, useState } from "react";
 
-export type Skin = "horizon" | "core";
+export type Skin = "aurora" | "core";
 
 export const SKINS: { value: Skin; en: string; zh: string; ar: string }[] = [
-  { value: "horizon", en: "Horizon", zh: "地平线", ar: "هورايزن" },
+  { value: "aurora", en: "Aurora", zh: "极光", ar: "أورورا" },
   { value: "core", en: "Core", zh: "基础", ar: "الأساسي" },
 ];
 
 const KEY = "koleex-skin";
-export const DEFAULT_SKIN: Skin = "horizon";
+export const DEFAULT_SKIN: Skin = "aurora";
 
 /** The pre-paint stamp, as a string. Injected in layout.tsx so the attribute
  *  is on <html> before the first frame — a skin arriving one frame late means

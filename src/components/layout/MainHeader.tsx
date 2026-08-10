@@ -129,10 +129,15 @@ export default function MainHeader() {
   return (
     <header
       dir="ltr"
+      /* kx-glass makes the bar translucent under Aurora so the ground shows
+         through it; under Core the class matches nothing and the solid colour
+         beside it is what paints, exactly as before. The controls inside were
+         already white-alpha chips — they only LOOKED solid because the bar
+         behind them was. */
       className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between gap-2 px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
-          ? "border-white/[0.08] bg-[#0A0A0A]"
-          : "border-black/[0.08] bg-white"
+          ? "border-white/[0.08] kx-glass bg-[#0A0A0A]"
+          : "kx-glass border-black/[0.08] bg-white"
       }`}
     >
       {/* Left: Hamburger (mobile) + Logo + Breadcrumb */}

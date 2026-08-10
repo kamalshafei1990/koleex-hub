@@ -106,7 +106,7 @@ export default function DisplayTab({ account, onChanged }: {
             value={skin}
             onChange={pickSkin}
             options={[
-              { value: "horizon", label: t("display.style.horizon") },
+              { value: "aurora", label: t("display.style.aurora") },
               { value: "core", label: t("display.style.core") },
             ]}
           />
