@@ -110,6 +110,31 @@ export default function MainHeader() {
   const dk = theme === "dark";
   /* Drives the sliding language indicator; Core renders the original pill. */
   const aurora = useSkin() === "aurora";
+
+  /* SEQUENCE THE SLIDE AND THE MIRROR. Switching to or from Arabic flips the
+     entire document to the other direction — a full-page reflow landing in
+     the same 320ms the indicator needs, so the one motion that should read
+     as calm was riding an earthquake ("not smooth same as english to
+     chinese", and Chinese is exactly the case with no flip). For
+     direction-changing picks the pill slides FIRST on a local pending value,
+     and the real language (text + dir mirror) applies the moment the slide
+     lands. Same-direction picks are unchanged. Guarded so a second click
+     mid-slide is ignored rather than queued into a fight. */
+  const [pendingLang, setPendingLang] = useState<Lang | null>(null);
+  const shownLang = pendingLang ?? lang;
+  const pickLang = (next: Lang) => {
+    if (next === lang || pendingLang) return;
+    const flips = (next === "ar") !== (lang === "ar");
+    if (aurora && flips) {
+      setPendingLang(next);
+      window.setTimeout(() => {
+        setLang(next);
+        setPendingLang(null);
+      }, 340);
+    } else {
+      setLang(next);
+    }
+  };
   const isHome = pathname === "/";
   const { mobileOpen, setMobileOpen } = useSidebar();
 
@@ -254,7 +279,7 @@ export default function MainHeader() {
               className="absolute top-1 bottom-1 w-[54px] rounded-md pointer-events-none transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
               style={{
                 insetInlineStart: 4,
-                transform: `translateX(calc(${languages.findIndex((x) => x.code === lang)} * var(--kx-flip, 100%)))`,
+                transform: `translateX(calc(${languages.findIndex((x) => x.code === shownLang)} * var(--kx-flip, 100%)))`,
                 background: "rgba(86,127,178,0.10)",
                 boxShadow: dk
                   ? "inset 0 0 0 1px rgba(86,127,178,0.70)"
@@ -265,14 +290,14 @@ export default function MainHeader() {
           {languages.map((l) => (
             <button
               key={l.code}
-              onClick={() => setLang(l.code)}
+              onClick={() => pickLang(l.code)}
               className={`relative h-7 w-[54px] rounded-md text-[11px] font-semibold tracking-wide transition-colors duration-200 text-center ${
                 aurora
                   ? /* The sliding pill carries the selected state; buttons
-                       only speak in text weight. Hover is text-only too — the
-                       dock is the reference and its inactive tabs answer
-                       hover without a fill. */
-                    lang === l.code
+                       only speak in text weight, and they follow the PILL
+                       (shownLang) so the label lights up as the slide lands,
+                       not 340ms before it. */
+                    shownLang === l.code
                     ? dk ? "text-white" : "text-black"
                     : dk
                       ? "text-white/45 hover:text-white/80"
