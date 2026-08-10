@@ -1275,6 +1275,15 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop { background: rgba(252, 253, 255, 0.99); }
 }
 
+/* ── Aurora: Koleex AI app ──────────────────────────────────────────────
+   The app root and its top bars go transparent so the fixed ground shows;
+   the conversations sidebar wears the tile glass, the composer/modals wear
+   the popover glass (classes added in KoleexAiApp.tsx, solid var() classes
+   kept underneath = Core untouched). Bars carry no blur: chat content never
+   scrolls beneath them. */
+[data-kx-skin="aurora"] .kx-ai-root { background: transparent; }
+[data-kx-skin="aurora"] .kx-ai-bar { background: transparent; }
+
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
    it opens over the launcher and must read as the same material as the app
    icon boxes, not as a denser popover. Its own class on purpose: a flush

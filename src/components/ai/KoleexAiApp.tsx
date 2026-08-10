@@ -22,8 +22,10 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
+import { useSkin } from "@/lib/appearance";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -300,6 +302,10 @@ const COPY: Record<Lang, {
    room than it needed without giving the titles more than they used. 248 is
    the narrowest width at which a two-word title plus its hover actions still
    fits without truncating on the first word. */
+/* Aurora ground — same canvas as Home/the gate, client-only. Mounted ONLY
+   under the aurora skin (the one JS branch pure CSS cannot switch). */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+
 const SIDEBAR_W = 248;
 
 /* How many project rows show before "See more". */
@@ -1575,10 +1581,19 @@ export default function KoleexAiApp() {
      changes that imply a real layout shift, not chrome slide) locks the
      chat in place while the browser chrome animates. Desktop keeps
      100dvh because it has no such chrome. */
-  const [stageHeight, setStageHeight] = useState<string>("calc(100dvh - 3.5rem)");
+  const aurora = useSkin() === "aurora";
+  const [stageHeight, setStageHeight] = useState<string>("calc(100dvh - var(--kx-header-h, 3.5rem))");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
+    /* The Hub chrome above this app is NOT a constant: the header grows by
+       the safe-area inset on notched iPhones (~115px in the installed PWA,
+       56px on desktop web). The hardcoded 56 left the composer ~59px below
+       the fold on the owner's iPhone. Measure the real header box. */
+    const headerH = () => {
+      const el = document.querySelector<HTMLElement>(".kx-mainheader");
+      return el ? el.getBoundingClientRect().height : 56;
+    };
     /* Only visualViewport reports the KEYBOARD. innerHeight does not shrink
        when iOS raises it, so ignoring every height change (the old rule)
        meant the composer stayed underneath the keyboard — the owner's "I
@@ -1593,11 +1608,10 @@ export default function KoleexAiApp() {
 
     const apply = () => {
       if (isMobile()) {
-        // 56 px = height of the Hub top chrome above the AI app shell.
         applied = viewportH();
-        setStageHeight(`${Math.max(240, applied - 56)}px`);
+        setStageHeight(`${Math.max(240, applied - headerH())}px`);
       } else {
-        setStageHeight("calc(100dvh - 3.5rem)");
+        setStageHeight("calc(100dvh - var(--kx-header-h, 3.5rem))");
       }
     };
     apply();
@@ -1700,15 +1714,19 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
+      className="kx-ai-root text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       style={{ height: stageHeight }}
     >
       {inputDialog}
-      {/* Hub design system: solid bg-primary surface, no animated halo.
-          Matches FinanceHome / InvoicesApp / Sales etc. The previous
-          Gemini-style breathing radial-gradient lived here and was
-          removed during the polish pass — Hub apps are calm, dense, and
-          monochrome by default; the chat content carries the page. */}
+      {/* Aurora: the Hub ground behind the whole app — the root goes
+          transparent under the skin (globals: .kx-ai-root) and the fixed
+          canvas shows through every glass surface, exactly like Home. Core
+          keeps this solid bg-primary page untouched. */}
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
 
       {/* ── Sidebar ──
           Desktop: inline flex sibling; width morphs between 280px
@@ -1735,7 +1753,7 @@ export default function KoleexAiApp() {
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
+        } md:flex kx-glass flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
         style={{
           /* On mobile we ignore sidebarCollapsed (desktop-only concept).
              On desktop, width morphs 0 ↔ SIDEBAR_W based on collapsed state. */
@@ -2016,12 +2034,11 @@ export default function KoleexAiApp() {
       </aside>
 
       {/* ── Main pane ── */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile top bar — Hub-native pattern.
-            Solid bg-secondary panel + hairline border, matching the
-            FinanceHeader / InvoicesApp top bars rather than a glass
-            blur over a glow. */}
-        <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center gap-2 relative z-[2]">
+      <main className="flex-1 flex flex-col min-w-0 relative z-[1]">
+        {/* Mobile top bar — solid panel under Core; under Aurora it goes
+            transparent (kx-ai-bar) and the ground shows: content never
+            scrolls beneath it, so it needs no blur of its own. */}
+        <div className="kx-ai-bar md:hidden shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center gap-2 relative z-[2]">
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
@@ -2053,7 +2070,7 @@ export default function KoleexAiApp() {
             + h1 + subtitle on the left, expand-sidebar control + new-chat
             on the right when collapsed). Mirrors FinanceHeader so an
             operator moving Finance → AI doesn't see a foreign UI. */}
-        <div className="hidden md:flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 lg:px-6 py-3 relative z-[2]">
+        <div className="kx-ai-bar hidden md:flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 lg:px-6 py-3 relative z-[2]">
           {sidebarCollapsed && (
             <button
               type="button"
@@ -2179,7 +2196,7 @@ export default function KoleexAiApp() {
                     setShowJumpToBottom(false);
                   }}
                   aria-label="Jump to latest"
-                  className="pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
+                  className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
                   ↓ Latest
                 </button>
@@ -2233,7 +2250,11 @@ export default function KoleexAiApp() {
                       the row's far end.
                   The whole pill is a single rounded-3xl surface with
                   a soft hairline border that brightens on focus. */}
-              <div className="rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* Aurora: the composer is the app's sign-in-card moment —
+                  kx-glass-pop (menus' dense glass + lighting rim + pop-in).
+                  Safe to carry backdrop-filter: the emoji picker portals to
+                  document.body, so nothing inside needs its own backdrop. */}
+              <div className="kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
@@ -2472,7 +2493,7 @@ function ProjectDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl p-4"
+        className="kx-glass-pop relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl p-4"
       >
         <div className="flex items-center gap-2 mb-3">
           <ProjectGlyph icon={draft.icon} color={draft.color} size={16} />
