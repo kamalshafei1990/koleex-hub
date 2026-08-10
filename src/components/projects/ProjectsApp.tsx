@@ -26,7 +26,6 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
@@ -83,6 +82,7 @@ import {
   type TaskRow,
   type TaskStatus,
 } from "@/lib/projects";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type TabId = "projects" | "mine" | "all" | "reporting" | "config";
 
@@ -375,7 +375,7 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
       {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
         </div>
       ) : projects.length === 0 ? (
         <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center">
@@ -661,7 +661,7 @@ function ProjectDetailView({
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -1180,7 +1180,7 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center text-[13px] text-[var(--text-dim)]">
@@ -1323,7 +1323,7 @@ function ReportingView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
       </div>
     );
   }

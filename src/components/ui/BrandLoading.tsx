@@ -5,7 +5,8 @@
    (Loading language v2, owner picks 2026-08-08: sample "B — logo breath"
    + progress style "P1 — thin line with a REAL percentage".)
 
-   The KOLEEX hub lockup breathing over a clean surface. Under it:
+   The KOLEEX hub lockup inside the Koleex orb (owner pick 2026-08-10 —
+   see the .kx-orb block in globals.css). Under it:
      · When same-origin /api GETs are observed since this surface mounted,
        a thin Hub Blue line FILLS with the real completion ratio
        (settled ÷ started — see lib/load-progress) and a small % reads out.
@@ -82,10 +83,20 @@ export default function BrandLoading({
     <div role="status" aria-busy="true" aria-live="polite" className={`relative w-full ${className}`}>
       <span className="sr-only">{label}</span>
       <div className="kx-brand-load" aria-hidden>
-        {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp, no optimization needed */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
-        {/* eslint-disable-next-line @next/next/no-img-element -- theme twin of the above */}
-        <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
+        {/* The orb. The lockup no longer breathes on its own — it sits inside
+            the sphere and a highlight travels across it. The progress line
+            below is UNCHANGED and deliberately so: the real completion ratio
+            is the part of this screen that actually tells you something. */}
+        <span className="kx-orb kx-orb--page">
+          <span className="kx-orb-ball" />
+          <span className="kx-orb-mark">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp, no optimization needed */}
+            <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- theme twin of the above */}
+            <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
+            <span className="kx-orb-shine"><i /></span>
+          </span>
+        </span>
         {/* P6 "comet head" — ONE bar in every gate. With trackable requests
             it fills to the REAL ratio and shows the number; otherwise the
             same bar slides indeterminately (chunk/RSC waits can't be

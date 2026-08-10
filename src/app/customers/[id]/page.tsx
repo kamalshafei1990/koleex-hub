@@ -27,7 +27,6 @@ import { useTranslation } from "@/lib/i18n";
 import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
@@ -56,6 +55,7 @@ import {
   type ActivityItem,
   type CustomerTier,
 } from "@/lib/customers-admin";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -492,7 +492,7 @@ export default function CustomerProfilePage({
           <div>
             {!activity ? (
               <div className="flex items-center justify-center py-16">
-                <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon size={20} className="text-[var(--text-dim)]" />
               </div>
             ) : activityTotal === 0 ? (
               <div className={`${panelCls} text-center py-10`}>

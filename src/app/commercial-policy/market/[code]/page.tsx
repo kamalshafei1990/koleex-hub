@@ -17,7 +17,6 @@ import AuthGate from "@/components/admin/AuthGate";
 import { getCountryByCode } from "@/lib/commercial-policy/countries";
 import type { MarketBandRow, BandCountryRow } from "@/lib/server/commercial-policy";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -25,6 +24,7 @@ import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const UNASSIGNED = "__none__";
 
@@ -200,7 +200,7 @@ function MarketProfileView() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 pb-28 space-y-5">
           {loading ? (
-            <div className="flex items-center justify-center py-24"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+            <div className="flex items-center justify-center py-24"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
           ) : !country ? (
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-8 text-center text-[13px] text-[var(--text-dim)]">
               Unknown country code &ldquo;{code}&rdquo;. <Link href="/commercial-policy#cp-markets" className="underline">Back to segmentation</Link>.
@@ -263,7 +263,7 @@ function MarketProfileView() {
                           {activeBands.map((b) => <option key={b.id} value={b.id}>Band {b.code} ({fmtPct(b.adjustment_percent)})</option>)}
                           <option value={UNASSIGNED}>Unassigned</option>
                         </select>
-                        {savingBand ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <CheckIcon size={14} className="text-[var(--text-dim)]" />}
+                        {savingBand ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} className="text-[var(--text-dim)]" />}
                       </span>
                     ) : (
                       <span className={`text-[10px] px-2 py-1 rounded-full shrink-0 ${
@@ -342,7 +342,7 @@ function MarketProfileView() {
                   />
                 </div>
                 {customers == null ? (
-                  <div className="flex items-center gap-2 py-6 text-[var(--text-dim)] text-[13px]"><SpinnerIcon className="h-4 w-4 animate-spin" /> Loading…</div>
+                  <div className="flex items-center gap-2 py-6 text-[var(--text-dim)] text-[13px]"><SpinnerIcon className="h-4 w-4" /> Loading…</div>
                 ) : customersView.length === 0 ? (
                   <p className="py-10 text-center text-[13px] text-[var(--text-dim)] border border-dashed border-[var(--border-subtle)] rounded-xl">
                     No customers linked to this market.

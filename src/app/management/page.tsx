@@ -30,7 +30,6 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -117,6 +116,7 @@ import {
   type RoleRow, type PermissionRow, type PositionHistoryRow,
   type EmployeeProfile, type HeadcountAnalytics,
 } from "@/lib/management-admin";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -232,7 +232,7 @@ function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; 
 }
 
 function Spinner() {
-  return <div className="flex items-center justify-center py-16"><SpinnerIcon size={20} className="text-[var(--text-dim)] animate-spin" /></div>;
+  return <div className="flex items-center justify-center py-16"><SpinnerIcon size={20} className="text-[var(--text-dim)]" /></div>;
 }
 
 /** Department icon renderer — system-style: uploaded images in rounded containers, emoji fallback */
@@ -388,7 +388,7 @@ function DepartmentModal({
               <div className="flex-1">
                 {uploading ? (
                   <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
-                    <SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.uploading")}
+                    <SpinnerIcon size={14} /> {t("mgmt.uploading")}
                   </div>
                 ) : (
                   <button onClick={() => fileRef.current?.click()}
@@ -803,7 +803,7 @@ function TransferModal({
         <div>
           <FieldLabel>{t("mgmt.targetPos")}</FieldLabel>
           {loadingPos ? (
-            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
+            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><SpinnerIcon size={14} /> {t("mgmt.loading")}</div>
           ) : deptPositions.length === 0 ? (
             <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noPosAvailable")}</div>
           ) : (
@@ -976,7 +976,7 @@ function PositionDetailModal({ open, onClose, position, people, t }: {
               <FieldLabel>{t("mgmt.posHistory")}</FieldLabel>
             </div>
             {loading ? (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><SpinnerIcon size={14} /> {t("mgmt.loading")}</div>
             ) : history.length === 0 ? (
               <div className="text-[12px] text-[var(--text-dim)] py-4 text-center">{t("mgmt.noHistory")}</div>
             ) : (
@@ -1248,7 +1248,7 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (loading) return <div className="flex items-center justify-center py-8"><SpinnerIcon size={16} className="text-[var(--text-dim)] animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-8"><SpinnerIcon size={16} className="text-[var(--text-dim)]" /></div>;
 
   const CheckCell = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
     <button onClick={onChange}
@@ -1969,7 +1969,7 @@ export default function ManagementPage() {
 
   /* ── Loading ── */
   if (loading) {
-    return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon size={24} className="text-[var(--text-dim)] animate-spin" /></div>;
+    return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon size={24} className="text-[var(--text-dim)]" /></div>;
   }
 
   /* ── Zoom helpers ── */

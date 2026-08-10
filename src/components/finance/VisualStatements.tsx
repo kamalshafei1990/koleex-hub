@@ -37,6 +37,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import { AngleLeftIcon, AngleRightIcon, CrossIcon } from "@/components/icons/ui";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Tab = "income" | "balance" | "cashflow";
 type Granularity = "week" | "month" | "quarter" | "year";
@@ -414,7 +415,7 @@ export function StatementsDashboard() {
       <div className="relative min-h-[300px]">
         {loading && (
           <div className="pointer-events-none absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-1 text-[11px] text-[var(--text-dim)] shadow-sm">
-            <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border border-[var(--border-color)] border-t-[var(--text-primary)]" />
+            <SpinnerIcon className="h-3 w-3" />
             {t("visual.loading", "Loading statements…")}
           </div>
         )}

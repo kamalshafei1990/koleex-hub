@@ -25,7 +25,6 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import type { TtsHandle } from "@/components/ai/MicButton";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 /* These two are the panel's heavy tail and neither is on screen until the
    panel is OPEN: MessageMarkdown pulls react-markdown (140 KB in the bundle
@@ -35,6 +34,7 @@ import KoleexOrb from "@/components/ai/KoleexGlowOrb";
    They were static imports, so they rode into every page's boot — the same
    trap the notification bell was in. The FAB itself is untouched, so the dock
    looks and behaves exactly as before; only what is behind it got later. */
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const MessageMarkdown = dynamic(() => import("@/components/ai/MessageMarkdown"), {
   ssr: false, loading: () => null,
 });
@@ -821,7 +821,7 @@ export default function FloatingPanel() {
                   <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                     {loadingMsgs && (
                       <div className="flex justify-center py-8">
-                        <SpinnerIcon className={`h-5 w-5 animate-spin ${textG}`} />
+                        <SpinnerIcon className={`h-5 w-5 ${textG}`} />
                       </div>
                     )}
                     {messages.map((msg) => {
@@ -1000,7 +1000,7 @@ export default function FloatingPanel() {
                       <div className={`px-3 py-2 rounded-2xl text-[13px] flex items-center gap-1.5 ${
                         dk ? "bg-white/[0.05] text-white/60" : "bg-black/[0.04] text-black/60"
                       }`}>
-                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                        <SpinnerIcon className="h-3.5 w-3.5" />
                         <span>…</span>
                       </div>
                     </div>

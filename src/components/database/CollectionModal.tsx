@@ -8,8 +8,8 @@ import {
   type VisualCollection,
 } from "@/lib/visual-library/types";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.colModal.editTitle":       { en: "Edit collection", zh: "编辑合集", ar: "تعديل المجموعة" },
@@ -92,7 +92,7 @@ export default function CollectionModal({
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.colModal.cancel", "Cancel")}</button>
           <button type="button" onClick={save} disabled={saving}
             className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-            {saving && <SpinnerIcon size={14} className="animate-spin" />}{existing ? t("vl.colModal.save", "Save") : t("vl.colModal.create", "Create")}
+            {saving && <SpinnerIcon size={14} />}{existing ? t("vl.colModal.save", "Save") : t("vl.colModal.create", "Create")}
           </button>
         </div>
       </div>

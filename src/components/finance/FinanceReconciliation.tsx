@@ -32,6 +32,7 @@ import type {
   ReconciliationCandidateType,
   ReconciliationConfidenceLevel,
 } from "@/lib/finance/types";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type FilterKey = "active" | "suggested" | "confirmed" | "rejected" | "all";
 
@@ -155,7 +156,7 @@ export default function FinanceReconciliation() {
             >
               {rescanBusy ? (
                 <>
-                  <RrIcon name="loading" size={12} className="animate-spin" />
+                  <SpinnerIcon size={12} />
                   {t("reconciliation.scanning", "Scanning…")}
                 </>
               ) : (
@@ -207,7 +208,7 @@ export default function FinanceReconciliation() {
           {loading ? (
             <SectionCard>
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
-                <RrIcon name="loading" size={14} className="animate-spin" />
+                <SpinnerIcon size={14} />
                 {t("reconciliation.loading", "Loading queue…")}
               </div>
             </SectionCard>
@@ -381,7 +382,7 @@ const CandidateRow = memo(function CandidateRow({
             disabled={busy}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-700 dark:text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-60"
           >
-            {busy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+            {busy ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
             {t("reconciliation.confirm", "Confirm match")}
           </button>
           <button

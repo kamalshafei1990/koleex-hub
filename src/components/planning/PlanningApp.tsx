@@ -34,7 +34,6 @@ import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
@@ -72,6 +71,7 @@ import {
   type LeaveSpan,
 } from "@/lib/planning";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type TabId = "schedule" | "open" | "mine" | "utilization" | "config";
 
@@ -304,7 +304,7 @@ export default function PlanningApp() {
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+              <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
             </div>
           ) : tab === "schedule" ? (
             <ScheduleView
@@ -1030,7 +1030,7 @@ function MyPlanningView({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
       </div>
     );
   }

@@ -61,7 +61,7 @@ export default function SecurityHeader({ window, onWindow, onRefresh, refreshing
           className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 disabled:opacity-50"
           aria-label="Refresh"
         >
-          {refreshing ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <span>Refresh</span>}
+          {refreshing ? <SpinnerIcon className="h-4 w-4" /> : <span>Refresh</span>}
         </button>
       </div>
     </div>

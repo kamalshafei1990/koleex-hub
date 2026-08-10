@@ -48,7 +48,7 @@ export default function DiscountsModule({ t }: SalesModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   const hasAny = tiers.length + vols.length > 0;
 

@@ -10,13 +10,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PowerIcon from "@/components/icons/ui/PowerIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import { eventLabel } from "@/lib/activity/modules";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface AccountInfo {
   account_id: string;
@@ -151,7 +151,7 @@ export default function UserActivityDrawer({
         </div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center"><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></div>
+          <div className="flex-1 flex items-center justify-center"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>
         ) : !detail ? (
           <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">Couldn’t load this user.</div>
         ) : (
@@ -176,7 +176,7 @@ export default function UserActivityDrawer({
                             disabled={revoking === s.session_id}
                             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[#FF3333]/30 text-[#FF6B6B] text-[11px] font-semibold hover:bg-[#FF3333]/10 disabled:opacity-50"
                           >
-                            {revoking === s.session_id ? <SpinnerIcon className="h-3 w-3 animate-spin" /> : <PowerIcon className="h-3 w-3" />}
+                            {revoking === s.session_id ? <SpinnerIcon className="h-3 w-3" /> : <PowerIcon className="h-3 w-3" />}
                             Force logout
                           </button>
                         )}

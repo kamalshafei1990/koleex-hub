@@ -25,6 +25,7 @@ import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import FileTextIcon from "@/components/icons/ui/FileIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── page chrome ── */
 
@@ -727,18 +728,15 @@ function Loading() {
           </div>
         </div>
       </Variant>
-      <Variant vid="SP-1" apps="SpinnerIcon — 319 sites" count="icon arc spinner" elected>
+      <Variant vid="SP-1" apps="SpinnerIcon — every inline site" count="Koleex orb, inline size" elected>
         <div className="flex items-center gap-3 text-[var(--text-dim)]">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className="animate-spin"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2z" /></svg>
+          <SpinnerIcon size={20} />
           <span className="text-[12px]">Loading…</span>
         </div>
       </Variant>
-      <Variant vid="SP-4" apps="ui/Button · AppLaunchLink (~10 sites)" count="CSS ring spinner">
-        <div className="flex items-center gap-3">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />
-          <span className="text-[12px] text-[var(--text-dim)]">Loading…</span>
-        </div>
-      </Variant>
+      {/* SP-4, the CSS ring, is gone rather than shown greyed out: ui/Button and
+          AppLaunchLink were its only callers and both render SpinnerIcon now, so
+          a sample here would be the last copy of a shape the Hub no longer has. */}
       <Variant vid="SP-BAR" apps="PermissionGate (seen on every app open)" count="indeterminate mini bar">
         <div className="h-2 w-32 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden"><div className="h-full w-1/2 bg-[var(--bg-inverted)] animate-pulse" /></div>
       </Variant>

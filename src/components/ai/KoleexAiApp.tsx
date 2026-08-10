@@ -29,7 +29,6 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
@@ -61,6 +60,7 @@ import {
   type ProjectColor,
   type ProjectIcon,
 } from "@/lib/ai-projects";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
@@ -2104,7 +2104,7 @@ export default function KoleexAiApp() {
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
             {loadingConv ? (
               <div className="flex items-center justify-center py-20">
-                <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+                <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>
             ) : messages.length === 0 ? (
               <WelcomeCard

@@ -19,7 +19,6 @@ import type {
 } from "@/lib/visual-library/types";
 import { REVIEW_STATUS_LABEL, REVIEW_PRIORITIES } from "@/lib/visual-library/types";
 import { RISK_TONE, reviewStatusTone } from "@/lib/visual-library/review";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
@@ -27,6 +26,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.review.loadFail":           { en: "Couldn’t load the review.", zh: "无法加载审核。", ar: "تعذّر تحميل المراجعة." },
@@ -158,7 +158,7 @@ export default function AssetReview({
     onChanged?.();
   };
 
-  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} /></div>;
   if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">{t("vl.review.loadFail", "Couldn’t load the review.")}</p>;
 
   const reco = data.recommendation;
@@ -296,7 +296,7 @@ export default function AssetReview({
                 className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-[11.5px] font-semibold transition-colors disabled:opacity-50
                   ${active ? "border-transparent bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                     : `border-[var(--border-subtle)] ${toneText(tone)} hover:border-[var(--border-color)]`}`}>
-                {saving === d.status ? <SpinnerIcon size={12} className="animate-spin" /> : null}{t(`vl.review.decision.${d.status}`, d.label)}
+                {saving === d.status ? <SpinnerIcon size={12} /> : null}{t(`vl.review.decision.${d.status}`, d.label)}
               </button>
             );
           })}
@@ -338,7 +338,7 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.review.searchPh", "Search by name…")}
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
-          {loading ? <div className="flex justify-center py-4 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+          {loading ? <div className="flex justify-center py-4 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>
             : results.length === 0 ? <p className="py-4 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim().length < 2 ? t("vl.review.typeToSearch", "Type to search…") : t("vl.review.noMatches", "No approved matches.")}</p>
             : results.map((a) => (
               <button key={a.id} type="button" onClick={() => onPick(a)}

@@ -9,8 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Contract = {
   id: string; contract_no: string | null; title: string;
@@ -63,7 +63,7 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
     }).length;
   }, [rows, nowMs]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="space-y-4">

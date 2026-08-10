@@ -30,8 +30,8 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { fpAvatar } from "@/lib/cdn";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 const isImage = (t: string) => t.startsWith("image/");
@@ -184,7 +184,7 @@ export default function TaskExtras({
           <button type="button" onClick={captureScreen} className={actionBtn} disabled={busy}>
             <CameraIcon className="h-4 w-4" /> {t("extras.captureScreen")}
           </button>
-          {busy && <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />}
+          {busy && <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />}
           <span className="text-[10.5px] text-[var(--text-ghost)]">{t("extras.pasteHint")}</span>
           <input
             ref={fileRef}

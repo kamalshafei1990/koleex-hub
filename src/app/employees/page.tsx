@@ -14,7 +14,6 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
@@ -38,6 +37,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -306,7 +306,7 @@ export default function EmployeesPage() {
         {/* Employee list */}
         {loading ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
-            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin mx-auto" />
+            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] mx-auto" />
             <p className="text-[13px] mt-3 text-[var(--text-dim)]">{t("loading")}</p>
           </div>
         ) : filtered.length === 0 ? (
@@ -467,7 +467,7 @@ export default function EmployeesPage() {
                 disabled={deleting}
                 className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-50"
               >
-                {deleting && <SpinnerIcon size={13} className="animate-spin" />}
+                {deleting && <SpinnerIcon size={13} />}
                 Delete employee
               </button>
             </div>

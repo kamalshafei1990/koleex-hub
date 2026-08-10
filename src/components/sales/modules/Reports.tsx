@@ -77,7 +77,7 @@ export default function ReportsModule({ t }: SalesModuleProps) {
     return { won, lost, total, winRate: total > 0 ? Math.round((won / total) * 100) : 0 };
   }, [opps]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   const haveAnyData = invoices.length + opps.length > 0;
   if (!haveAnyData) {

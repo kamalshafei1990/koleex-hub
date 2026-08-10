@@ -29,13 +29,13 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
 import PauseIcon from "@/components/icons/ui/PauseIcon";
 import PlayIcon from "@/components/icons/ui/PlayIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export interface VoiceRecorderProps {
   /** Called when the user clicks "send". Receives the raw Blob,
@@ -326,7 +326,7 @@ export default function VoiceRecorder({
   if (state === "requesting" || state === "idle") {
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-        <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
         <div className="flex-1 text-[12px] text-[var(--text-dim)]">
           {labels.recording}…
         </div>
@@ -429,7 +429,7 @@ export default function VoiceRecorder({
         className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
       >
         {state === "sending" ? (
-          <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+          <SpinnerIcon className="h-3.5 w-3.5" />
         ) : (
           <PaperPlaneIcon className="h-3.5 w-3.5" />
         )}

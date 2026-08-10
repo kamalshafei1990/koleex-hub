@@ -30,6 +30,7 @@ import type {
   AttachmentEntityType,
   FinanceAttachment,
 } from "@/lib/finance/types";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const ACCEPT = Array.from(ATTACHMENT_ALLOWED_MIME).join(",");
 
@@ -129,7 +130,7 @@ export default function AttachmentDropzone({
   const inner = (
     <>
       <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-[12px] text-gray-300">
-        {busy ? <Spinner /> : <PaperclipIcon />}
+        {busy ? <SpinnerIcon size={14} /> : <PaperclipIcon />}
       </span>
       <div className="min-w-0 flex-1 text-left">
         <div className="truncate text-[12px] font-medium text-gray-200">
@@ -201,11 +202,4 @@ function PaperclipIcon() {
   );
 }
 
-function Spinner() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" className="animate-spin">
-      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2.5" />
-      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
-}
+

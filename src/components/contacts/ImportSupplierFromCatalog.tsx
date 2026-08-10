@@ -31,6 +31,7 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const ACCENT = "#0066FF";
 const FILLED = "rgba(10,138,74,0.75)"; // green border for auto-filled / completed fields
@@ -314,7 +315,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated, on
           {/* ── Reading ── */}
           {phase === "reading" && (
             <div className="py-12 text-center">
-              <Spinner />
+              <SpinnerIcon className="mx-auto h-8 w-8" />
               <div className="mt-4 text-[13px] font-medium">{progress || "Working…"}</div>
               {usedOcr && <div className="mt-1 text-[11px]" style={{ color: "var(--text-dim, #999)" }}>First OCR run downloads the language model — this can take a moment.</div>}
             </div>
@@ -433,7 +434,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated, on
           {/* ── Creating ── */}
           {phase === "creating" && (
             <div className="py-12 text-center">
-              <Spinner />
+              <SpinnerIcon className="mx-auto h-8 w-8" />
               <div className="mt-4 text-[13px] font-medium">{progress || "Creating…"}</div>
             </div>
           )}
@@ -674,15 +675,6 @@ function MiniInput({ placeholder, value, onChange }: { placeholder: string; valu
     <input placeholder={placeholder} value={value ?? ""} onChange={(e) => onChange(e.target.value)}
       className="w-full rounded-md px-2 py-1.5 text-[12px] bg-transparent outline-none focus:ring-2"
       style={{ border: "1px solid var(--border-subtle, #e0e0e0)", ["--tw-ring-color" as string]: "rgba(0,102,255,0.25)" }} />
-  );
-}
-
-function Spinner() {
-  return (
-    <svg className="mx-auto h-8 w-8 animate-spin" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke="var(--border-subtle, #ddd)" strokeWidth="3" />
-      <path d="M22 12a10 10 0 0 0-10-10" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
-    </svg>
   );
 }
 

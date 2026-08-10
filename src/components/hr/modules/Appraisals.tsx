@@ -320,7 +320,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -489,7 +489,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
                   onClick={handleAddEveryone}
                   disabled={bulkAdding || employees.length === 0}
                 >
-                  {bulkAdding ? <SpinnerIcon size={14} className="animate-spin" /> : <UserIcon size={14} />}
+                  {bulkAdding ? <SpinnerIcon size={14} /> : <UserIcon size={14} />}
                   {t("hr.addEveryone")}
                 </button>
               </div>
@@ -606,7 +606,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
                   {t("hr.cancel")}
                 </button>
                 <button className={primaryBtnCls} onClick={handleSaveReview} disabled={saving}>
-                  {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.save")}
+                  {saving ? <SpinnerIcon size={14} /> : t("hr.save")}
                 </button>
               </div>
             </div>
@@ -785,7 +785,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               disabled={!appraisalForm.employee_id || saving}
               onClick={handleCreateAppraisal}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.create")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.create")}
             </button>
           </>
         }
@@ -831,7 +831,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               disabled={!cycleForm.name || !cycleForm.start_date || !cycleForm.end_date || saving}
               onClick={handleCreateCycle}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.create")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.create")}
             </button>
           </>
         }
@@ -913,7 +913,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               disabled={!goalForm.title || saving}
               onClick={handleCreateGoal}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.add")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.add")}
             </button>
           </>
         }

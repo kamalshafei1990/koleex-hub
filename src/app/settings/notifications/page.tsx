@@ -10,7 +10,6 @@ import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import BellIcon from "@/components/icons/ui/BellIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
@@ -26,6 +25,7 @@ import {
 } from "@/lib/push-client";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Device {
   id: string;
@@ -128,7 +128,7 @@ export default function NotificationsSettingsPage() {
   if (bootLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function NotificationsSettingsPage() {
 
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={enable} disabled={busy || (!supported && perm !== "granted")} className={btnPrimary}>
-              {busy ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <BellIcon className="h-4 w-4" />}
+              {busy ? <SpinnerIcon className="h-4 w-4" /> : <BellIcon className="h-4 w-4" />}
               {t("push.enableBtn")}
             </button>
             <button onClick={sendTest} disabled={busy} className={btnGhost}>

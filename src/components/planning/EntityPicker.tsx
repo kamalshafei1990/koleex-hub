@@ -12,10 +12,10 @@
 import { useEffect, useRef, useState } from "react";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { searchEntities, type EntitySearchResult } from "@/lib/planning";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type EntityType = "customer" | "supplier" | "contact" | "product";
 
@@ -103,7 +103,7 @@ export default function EntityPicker({
             className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
           />
           {loading && (
-            <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)] animate-spin shrink-0" />
+            <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
           )}
         </div>
       )}

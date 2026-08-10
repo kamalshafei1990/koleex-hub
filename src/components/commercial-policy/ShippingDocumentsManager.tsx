@@ -15,10 +15,10 @@ import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./CatalogEditorModal";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const DOC_FIELDS: CatalogField[] = [
   { key: "code", label: "Code", type: "text", required: true, placeholder: "bill_of_lading" },
@@ -200,7 +200,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
 
       {loading && (
         <div className="flex items-center justify-center py-16 gap-2 text-[var(--text-dim)]">
-          <SpinnerIcon className="h-4 w-4 animate-spin" />
+          <SpinnerIcon className="h-4 w-4" />
           <span className="text-[13px]">Loading documents…</span>
         </div>
       )}

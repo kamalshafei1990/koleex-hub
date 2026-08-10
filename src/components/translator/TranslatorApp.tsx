@@ -44,6 +44,7 @@ import {
   extractDocumentText,
 } from "@/lib/translator-document";
 import { IMG_ACCEPT, recognizeImage, type OcrLine } from "@/lib/translator-image";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 350;
@@ -1380,7 +1381,7 @@ export default function TranslatorApp() {
                 </div>
                 {/* Right side stays clear of the floating AI orb on desktop. */}
                 <span className="flex items-center gap-1.5 pe-10 text-[11px] text-[var(--text-dim)] md:pe-0">
-                  {busy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
+                  {busy && <SpinnerIcon size={12} />}
                   {!busy && cached && translated && t("tr.fromCache", "instant")}
                 </span>
               </div>
@@ -1514,7 +1515,7 @@ export default function TranslatorApp() {
                         </button>
                       </div>
                       <span className="flex items-center gap-1.5 pe-10 text-[11px] tabular-nums text-[var(--text-dim)] md:pe-0">
-                        {docBusy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
+                        {docBusy && <SpinnerIcon size={12} />}
                         {docStep && docStep.done < docStep.total
                           ? t("tr.docProgress", "Translating {done} of {total}")
                               .replace("{done}", String(docStep.done + 1))
@@ -1672,7 +1673,7 @@ export default function TranslatorApp() {
                   </div>
                   {imgBusy ? (
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                      <VlIcon slug="spinner" size={16} className="animate-spin text-[var(--text-dim)]" />
+                      <SpinnerIcon size={16} />
                       <div className="text-[12.5px] text-[var(--text-muted)]">
                         {t("tr.imgReading", "Reading the image…")} {imgPct > 0 && `${imgPct}%`}
                       </div>
@@ -1844,7 +1845,7 @@ export default function TranslatorApp() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-1.5 text-[11px] tabular-nums text-[var(--text-dim)]">
-                  {pageBusy && <VlIcon slug="spinner" size={12} className="animate-spin" />}
+                  {pageBusy && <SpinnerIcon size={12} />}
                   {pageStep && pageStep.done < pageStep.total
                     ? t("tr.docProgress", "Translating {done} of {total}")
                         .replace("{done}", String(pageStep.done + 1))

@@ -19,10 +19,10 @@ import { inQuietHours } from "@/lib/notification-activity";
 import { fetchMyChannels, setChannelMuted } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
 import type { DiscussChannelWithState } from "@/types/supabase";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app" | "quiet_hours">;
 
@@ -199,7 +199,7 @@ function MutedConversationsCard() {
   return (
     <SettingsCard title={t("notif.muted")} subtitle={t("notif.muted.sub")}>
       {channels === null ? (
-        <div className="flex justify-center py-4"><SpinnerIcon size={14} className="animate-spin text-[var(--text-dim)]" /></div>
+        <div className="flex justify-center py-4"><SpinnerIcon size={14} className="text-[var(--text-dim)]" /></div>
       ) : channels.length === 0 ? (
         <p className="py-2 text-[12px] text-[var(--text-faint)]">{t("notif.muted.none")}</p>
       ) : channels.map((c, i) => (

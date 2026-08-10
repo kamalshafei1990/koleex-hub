@@ -71,7 +71,7 @@ export default function AlertPreferencesModal({ onClose }: { onClose: () => void
           </button>
         </div>
         {loading ? (
-          <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+          <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
@@ -95,7 +95,7 @@ export default function AlertPreferencesModal({ onClose }: { onClose: () => void
             <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-subtle)]">
               <button onClick={onClose} className="h-9 px-4 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]">Cancel</button>
               <button onClick={save} disabled={saving} className="h-9 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
-                {saving && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+                {saving && <SpinnerIcon className="h-3.5 w-3.5" />}
                 Save
               </button>
             </div>

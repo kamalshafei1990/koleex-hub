@@ -9,11 +9,11 @@
 
 import { useEffect, useState } from "react";
 import { REGISTRY_USAGE_ROLES, type RegistryUsageRole } from "@/lib/visual-library/types";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.registry.loadFailed":       { en: "Couldn’t load registry.", zh: "无法加载分类映射。", ar: "تعذّر تحميل السجل." },
@@ -115,7 +115,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
     setBusy(false); await load(); onChanged?.();
   };
 
-  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} /></div>;
   if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">{t("vl.registry.loadFailed", "Couldn’t load registry.")}</p>;
 
   return (
@@ -160,7 +160,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
             </label>
             <button type="button" disabled={!divId || busy} onClick={addLink}
               className="inline-flex w-full items-center justify-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-              {busy ? <SpinnerIcon size={12} className="animate-spin" /> : null} {t("vl.registry.addMapping", "Add mapping")}
+              {busy ? <SpinnerIcon size={12} /> : null} {t("vl.registry.addMapping", "Add mapping")}
             </button>
           </div>
         )}

@@ -11,9 +11,9 @@
    --------------------------------------------------------------------------- */
 
 import { Suspense } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import dynamic from "next/dynamic";
 import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* SW-4: code-split the 165KB Discuss app (realtime chat client) off the
    initial route bundle. Client-only (WebSocket/presence) so ssr:false is
@@ -29,7 +29,7 @@ export default function DiscussPage() {
     <Suspense
       fallback={
         <div className="flex-1 min-h-0 flex items-center justify-center bg-[var(--bg-primary)]">
-          <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
         </div>
       }
     >

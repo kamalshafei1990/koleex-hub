@@ -1073,12 +1073,168 @@ input[type="number"]:not(.kx-spinner) {
   justify-content: center;
   gap: 18px;
 }
-.kx-brand-load img {
-  width: min(200px, 56vw);
-  height: auto;
-  opacity: 0.5;
-  animation: kx-brand-breath 1.5s ease-in-out infinite;
+/* ── THE KOLEEX ORB — the one loading shape in the Hub ──────────────────
+   Owner picks 2026-08-10: the uiverse loader (uiverse.io/dexter-st/
+   bright-lizard-8, MIT) in "Hub Deep", the logo carried by a travelling
+   highlight ("B · Sweep"), and an inverted sphere for light mode ("L1").
+   Geometry and timing are the original's; the colours are not.
+
+   IT SCALES BY ITSELF. The original hard-codes the shadow offsets in pixels
+   at one size, so at 16px its 60px blurs collapse into a solid blob and the
+   sphere is gone. Every offset here is an `em` fraction and the ball's
+   font-size is 100cqmin — one em is exactly the orb's own diameter — so one
+   recipe is literally correct at 150px on a route gate and at 14px inside a
+   button, which is what "one loading shape" has to mean.
+
+   The fractions are of 150, NOT of the original's 180. The preview the owner
+   approved rendered the original's pixel values inside a 150px circle, which
+   is proportionally a heavier sphere than the original at its own size —
+   brighter rim, deeper core. Dividing by 180 was "more faithful" and looked
+   visibly flatter than the thing that was signed off. 10/150 = .0667,
+   20/150 = .1333, 30/150 = .2, 40/150 = .2667, 60/150 = .4.
+
+   Light mode is not the dark orb on a white page. The top of the circle is
+   transparent by design — the unlit side — so against white the white rim
+   takes over and the blue washes out to silver. L1 inverts the crescent:
+   dark rim, pale core, and the logo highlight darkens instead of brightening,
+   because darkening is what reads as movement on white. */
+.kx-orb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  container-type: size;
 }
+.kx-orb-ball {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  font-size: 100cqmin;
+  animation: kx-orb-spin 2s linear infinite;
+}
+/* Container queries are everywhere current, but the Hub is opened from
+   WeChat in China on whatever Chromium that ships. Without them the orb
+   still draws — it just stops being size-independent. */
+@supports not (container-type: size) {
+  .kx-orb-ball { font-size: 150px; }
+  .kx-orb--panel .kx-orb-ball { font-size: 110px; }
+  .kx-orb--card .kx-orb-ball { font-size: 72px; }
+  .kx-orb--inline .kx-orb-ball { font-size: 18px; }
+}
+
+@keyframes kx-orb-spin {
+  0% { transform: rotate(90deg);
+    box-shadow: 0 .0667em .1333em 0 #fff inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #1B2A3C inset; }
+  50% { transform: rotate(270deg);
+    box-shadow: 0 .0667em .1333em 0 #fff inset,
+                0 .1333em .0667em 0 #BCD8F0 inset,
+                0 .2667em .4em 0 #2E4B6B inset; }
+  100% { transform: rotate(450deg);
+    box-shadow: 0 .0667em .1333em 0 #fff inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #1B2A3C inset; }
+}
+[data-theme="light"] .kx-orb-ball { animation-name: kx-orb-spin-light; }
+@keyframes kx-orb-spin-light {
+  0% { transform: rotate(90deg);
+    box-shadow: 0 .0667em .1333em 0 #1B2A3C inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #BCD8F0 inset; }
+  50% { transform: rotate(270deg);
+    box-shadow: 0 .0667em .1333em 0 #2E4B6B inset,
+                0 .1333em .0667em 0 #8FB0D4 inset,
+                0 .2667em .4em 0 #DCEBFA inset; }
+  100% { transform: rotate(450deg);
+    box-shadow: 0 .0667em .1333em 0 #1B2A3C inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #BCD8F0 inset; }
+}
+
+/* The mark. The lockup is a flat WebP with no separate letters, so the
+   original's per-letter stagger is reproduced as one bright band travelling
+   across the glyphs on the same 2s clock — which is what the stagger looks
+   like anyway. The band is clipped to the letter shapes by masking with the
+   lockup itself, so the logo keeps its own colours underneath. */
+.kx-orb-mark {
+  position: relative;
+  z-index: 1;
+  width: 62%;
+  aspect-ratio: 640 / 99;
+}
+/* NO `display:block` on the shared selector. `.kx-orb-mark img` is (0,1,1)
+   and `.kx-brand-logo-light` is (0,1,0), so a blanket display here outranks
+   the hide rule and BOTH lockups render, stacked — the exact failure the
+   comment below already warns about, reintroduced from the other side.
+   Display is decided per lockup, at matching specificity. */
+.kx-orb-mark img { width: 100%; opacity: .42; }
+.kx-orb-mark .kx-brand-logo-dark { display: block; }
+.kx-orb-mark .kx-brand-logo-light { display: none; }
+[data-theme="light"] .kx-orb-mark .kx-brand-logo-dark { display: none; }
+[data-theme="light"] .kx-orb-mark .kx-brand-logo-light { display: block; }
+.kx-orb-shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: url("/brand/hub-logo/koleex-hub-logo-for-dark.webp") center/contain no-repeat;
+  mask: url("/brand/hub-logo/koleex-hub-logo-for-dark.webp") center/contain no-repeat;
+}
+.kx-orb-shine i {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, #fff 45%, #DCEBFA 58%, transparent);
+  animation: kx-orb-band 2s linear infinite;
+}
+/* NOT flipped in Arabic. translateX is physical, and the lockup is Latin —
+   it reads left to right whatever the page direction is, so the highlight
+   has to travel the way the word is read, not the way the page is. */
+@keyframes kx-orb-band {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(310%); }
+}
+[data-theme="light"] .kx-orb-mark img { opacity: .34; }
+[data-theme="light"] .kx-orb-shine {
+  -webkit-mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light.webp");
+  mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light.webp");
+}
+[data-theme="light"] .kx-orb-shine i {
+  background: linear-gradient(90deg, transparent, #0A1520 45%, #1B3A57 58%, transparent);
+}
+.kx-orb--inline .kx-orb-mark { display: none; }
+
+/* Sizes live in the components layer ON PURPOSE, so a caller's own h-4 w-4
+   still wins — 141 call sites size the spinner that way and 119 pass a
+   number, and both conventions have to keep working. Unlayered CSS beats
+   every Tailwind utility regardless of specificity, which would have
+   silently resized all 141 of them. */
+@layer components {
+  .kx-orb--page   { width: 150px; height: 150px; }
+  .kx-orb--panel  { width: 110px; height: 110px; }
+  .kx-orb--card   { width: 72px;  height: 72px;  }
+  .kx-orb--inline { width: 1em;   height: 1em;   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-orb-ball {
+    animation: none;
+    box-shadow: 0 .0667em .1333em 0 #fff inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #1B2A3C inset;
+  }
+  [data-theme="light"] .kx-orb-ball {
+    box-shadow: 0 .0667em .1333em 0 #1B2A3C inset,
+                0 .1333em .2em 0 #567FB2 inset,
+                0 .4em .4em 0 #BCD8F0 inset;
+  }
+  .kx-orb-shine i { animation: none; opacity: 0; }
+  .kx-orb-mark img { opacity: .7; }
+}
+
 /* data-theme is stamped by CLIENT code only — the first paint after a full
    reload has NO attribute, and two attribute-scoped hide rules meant BOTH
    lockups rendered stacked in that window (owner caught it mid-update).
@@ -1099,6 +1255,9 @@ input[type="number"]:not(.kx-spinner) {
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.07);
 }
+/* The track was a white alpha on every theme, so in light mode it was white
+   on white — an invisible rail with a blue bar floating along nothing. */
+[data-theme="light"] .kx-brand-progress { background: rgba(13, 13, 13, 0.10); }
 .kx-brand-progress i {
   position: absolute;
   left: 0;
@@ -1156,13 +1315,6 @@ input[type="number"]:not(.kx-spinner) {
 @keyframes kx-comet-slide-rtl {
   0%   { transform: translateX(110%); }
   100% { transform: translateX(-320%); }
-}
-@keyframes kx-brand-breath {
-  0%, 100% { opacity: 0.45; transform: scale(0.985); }
-  50%      { opacity: 1;    transform: scale(1); }
-}
-@keyframes kx-brand-sweep {
-  to { transform: translateX(100%); }
 }
 
 .kx-shimmer {

@@ -19,6 +19,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { UI_COMPONENT_MODULES, UI_COMPONENT_TOTALS } from "./manifest";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "db.uiComp.title":        { en: "UI Components", zh: "界面组件", ar: "مكوّنات الواجهة" },
@@ -160,7 +161,7 @@ function LivePrimitives() {
       </PrimitiveBlock>
       <PrimitiveBlock name="Surfaces & states">
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">Card</div>
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-4 w-4" />
         <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-bold text-white">Accent</span>
       </PrimitiveBlock>
     </div>

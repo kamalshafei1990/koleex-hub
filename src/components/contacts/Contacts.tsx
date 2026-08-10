@@ -133,6 +133,7 @@ import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import SupplierDetail from "@/components/suppliers/SupplierDetail";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -5997,7 +5998,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[var(--border-focus)] border-t-white rounded-full animate-spin" />
+        <SpinnerIcon className="w-6 h-6" />
       </div>
     );
   }
@@ -8696,7 +8697,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               disabled={saving || formHydrating || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
               className="flex items-center gap-1 md:gap-1.5 h-10 px-5 rounded-xl text-[13px] bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
             >
-              {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <DiskIcon size={14} />}
+              {saving ? <SpinnerIcon className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <DiskIcon size={14} />}
               {saving ? t("btn.saving") : t("btn.save")}
             </button>
           </div>

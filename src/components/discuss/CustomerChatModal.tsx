@@ -23,7 +23,6 @@ import { fpAvatar } from "@/lib/cdn";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -34,6 +33,7 @@ import {
   searchContactsForChat,
 } from "@/lib/discuss";
 import type { DiscussLinkedContact } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Cheap debounce hook — keeps the RPC quiet while the user is typing. */
 function useDebounced<T>(value: T, delay = 220): T {
@@ -133,7 +133,7 @@ export function CustomerChatModal({
     if (loading) {
       return (
         <div className="p-6 flex items-center justify-center text-[var(--text-dim)]">
-          <SpinnerIcon className="h-4 w-4 animate-spin" />
+          <SpinnerIcon className="h-4 w-4" />
         </div>
       );
     }
@@ -287,7 +287,7 @@ export function CustomerChatModal({
           >
             {creating ? (
               <>
-                <SpinnerIcon className="h-3 w-3 animate-spin" />
+                <SpinnerIcon className="h-3 w-3" />
                 {t("btn.creating", "Starting…")}
               </>
             ) : (

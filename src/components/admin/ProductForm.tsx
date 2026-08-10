@@ -14,7 +14,6 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
@@ -116,6 +115,7 @@ import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 /* Lazy: this modal imports country-state-city, whose city.json is 7.7 MB.
    Statically imported it rode in the editor chunk for every product open,
    even though the modal is closed. Now it downloads on first use only. */
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const CreateSupplierModal = dynamic(() => import("./form-sections/CreateSupplierModal"), { ssr: false });
 import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
@@ -2965,7 +2965,7 @@ export default function ProductForm({ productId }: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -3021,7 +3021,7 @@ export default function ProductForm({ productId }: Props) {
               disabled={saving}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
             >
-              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
               <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
             </button>
           </div>
@@ -6101,7 +6101,7 @@ export default function ProductForm({ productId }: Props) {
                   disabled={saving}
                   className={`h-11 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 inline-flex items-center gap-2 shadow-lg shrink-0 ${saveBtnCls}`}
                 >
-                  {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+                  {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
                   {saving ? t("action.saving", "Saving...") : saveLabel}
                 </button>
               </div>
@@ -6142,7 +6142,7 @@ export default function ProductForm({ productId }: Props) {
               disabled={saving}
               className={`h-10 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg ${saveBtnCls}`}
             >
-              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
               {saving ? t("action.saving", "Saving...") : saveLabel}
             </button>
           )}

@@ -30,7 +30,6 @@ import ForwardMsgIcon from "@/components/icons/ui/ForwardMsgIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
@@ -62,6 +61,7 @@ import {
 import { fetchProductMainImages, fetchProducts } from "@/lib/products-admin";
 import { useCurrentAccount } from "@/lib/identity";
 import type { InboxMessageWithSender, ProductRow } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Recipient = {
   id: string;
@@ -683,7 +683,7 @@ export default function InboxPage() {
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loading ? (
               <div className="h-full flex items-center justify-center">
-                <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>
             ) : filtered.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
@@ -1736,7 +1736,7 @@ function ComposeView({
                 <div className="absolute top-full start-4 end-4 z-10 mt-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl max-h-56 overflow-y-auto">
                   {loadingRecipients ? (
                     <div className="h-16 flex items-center justify-center">
-                      <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+                      <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
                     </div>
                   ) : filteredRecipients.length === 0 ? (
                     <div className="h-16 flex items-center justify-center text-[12px] text-[var(--text-dim)]">
@@ -1957,7 +1957,7 @@ function ComposeView({
               className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors disabled:opacity-50"
             >
               {uploading ? (
-                <SpinnerIcon className="h-4 w-4 animate-spin" />
+                <SpinnerIcon className="h-4 w-4" />
               ) : (
                 <PaperclipIcon className="h-4 w-4" />
               )}
@@ -1988,7 +1988,7 @@ function ComposeView({
               aria-label="Send"
             >
               {busy ? (
-                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                <SpinnerIcon className="h-3.5 w-3.5" />
               ) : (
                 <PaperPlaneIcon className="h-3.5 w-3.5" />
               )}
@@ -2152,7 +2152,7 @@ function ProductPickerModal({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+              <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">

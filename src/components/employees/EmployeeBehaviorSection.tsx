@@ -19,7 +19,6 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import {
@@ -30,6 +29,7 @@ import { summarize, gapStatus, isCriticalGap, type BehaviorItem } from "@/lib/be
 import { useTranslation } from "@/lib/i18n";
 import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean; sort_order: number }
 interface BaselineRow { behavior_indicator_id: string; source: "position" | "additional"; employee_score: number | null; comment: string | null }
@@ -168,7 +168,7 @@ export default function EmployeeBehaviorSection({
   const toggleCat = (id: string) => setCollapsed((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   if (loading) {
-    return <div className="flex items-center justify-center py-10"><SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" /></div>;
+    return <div className="flex items-center justify-center py-10"><SpinnerIcon size={18} className="text-[var(--text-dim)]" /></div>;
   }
 
   /* ── EDIT: read-only standing + history + link to HR ── */

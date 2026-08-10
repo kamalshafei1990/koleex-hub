@@ -45,6 +45,7 @@ import {
   compareForecasts,
   rankLiquidityRisks,
 } from "@/lib/intelligence/treasury-forecast";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ────────────────────────────────────────────────────────────────────────
    Helpers
@@ -237,7 +238,7 @@ export default function FinanceTreasuryForecast() {
                 disabled={loading}
                 className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
               >
-                {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
+                {loading ? <SpinnerIcon size={12} /> : <RrIcon name="recycle" size={12} />}
                 {t("forecast.resetToBase", "Reset to base")}
               </button>
             </div>
@@ -318,7 +319,7 @@ export default function FinanceTreasuryForecast() {
                     }}
                     className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
                   >
-                    {saveBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+                    {saveBusy ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
                     {t("forecast.save.confirm", "Save plan")}
                   </button>
                 </div>
@@ -340,7 +341,7 @@ export default function FinanceTreasuryForecast() {
         {!base && loading ? (
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
-              <RrIcon name="loading" size={14} className="animate-spin" />
+              <SpinnerIcon size={14} />
               {t("forecast.building", "Building forecast…")}
             </div>
           </SectionCard>

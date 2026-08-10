@@ -9,7 +9,6 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
@@ -43,6 +42,7 @@ import {
 } from "@/lib/product-attributes";
 import type { AttributeConfig, AttributeUsage, AttributeItem } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── Tabs ── */
 const TABS = [
@@ -240,7 +240,7 @@ function AttributeModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4" />}
             {saving ? "Saving..." : editValue ? "Save" : "Create"}
           </button>
         </div>
@@ -344,7 +344,7 @@ function ClassificationModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
+            {saving && <SpinnerIcon className="h-4 w-4" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
           </button>
         </div>
       </div>
@@ -371,7 +371,7 @@ function DeleteModal({ open, onClose, title, message, warning, onConfirm, deleti
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
           <button onClick={onConfirm} disabled={deleting} className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-40">
-            {deleting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}{deleting ? "Deleting..." : "Delete"}
+            {deleting ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-3.5 w-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
@@ -704,7 +704,7 @@ export default function ProductSettingsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+          <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
         ) : (
           <div key={activeTab} className="kx-tab-in min-h-[500px]">
 

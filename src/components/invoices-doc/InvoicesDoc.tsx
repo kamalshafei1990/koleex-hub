@@ -14,7 +14,6 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import SharedKpiCard from "@/components/ui/KpiCard";
 import { useTranslation } from "@/lib/i18n";
@@ -33,6 +32,7 @@ import {
   deleteDoc,
   type RemoteDocRow,
 } from "@/lib/docs-sync";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* The invoice editor reuses QuotationA4Preview (~9k LOC). Lazy-load it
    client-side so it stays out of the invoice list/initial bundle; props
@@ -1906,7 +1906,7 @@ export default function Quotations() {
                           title="Duplicate this invoice as a new draft"
                         >
                           {duplicatingId === q.id ? (
-                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                            <SpinnerIcon className="h-4 w-4" />
                           ) : (
                             <CopyIcon size={16} />
                           )}

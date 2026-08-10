@@ -43,9 +43,9 @@ import type { LeaveTypeRow, LeaveBalanceRow } from "@/types/supabase";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── Date maths for the live request summary ──
    Mirrors computeBusinessDays() in hr-admin (the value the server actually
@@ -311,7 +311,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon size={24} className="text-[var(--text-dim)]" />
       </div>
     );
   }

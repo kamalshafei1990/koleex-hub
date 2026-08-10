@@ -35,6 +35,7 @@ import type {
 } from "@/lib/finance/types";
 import type { ForecastResult } from "@/lib/intelligence/treasury-forecast";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 function fmtCompactUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -225,7 +226,7 @@ export default function FinanceTreasuryPlans() {
         {loading ? (
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
-              <RrIcon name="loading" size={14} className="animate-spin" />
+              <SpinnerIcon size={14} />
               {t("treasuryPlans.loading", "Loading treasury plans…")}
             </div>
           </SectionCard>
@@ -435,7 +436,7 @@ function PlanDetail({
               disabled={actionBusy}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-50"
             >
-              {actionBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+              {actionBusy ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
               {t("treasuryPlans.detail.approve", "Approve")}
             </button>
           )}
@@ -498,7 +499,7 @@ function PlanDetail({
               disabled={compareBusy}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
             >
-              {compareBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="recycle" size={11} />}
+              {compareBusy ? <SpinnerIcon size={11} /> : <RrIcon name="recycle" size={11} />}
               {t("treasuryPlans.compare.recompare", "Re-compare")}
             </button>
           }

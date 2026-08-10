@@ -17,8 +17,8 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Storage base for taxonomy icons (divisions/categories live as SVGs under
    media/<level>/<slug>.svg; the classification-icon hub overrides win). */
@@ -262,7 +262,7 @@ export default function ProductPicker({
         <div className="flex-1 overflow-y-auto p-4 md:p-5">
           {loading ? (
             <div className="h-40 flex items-center justify-center text-[var(--text-dim)]">
-              <SpinnerIcon className="h-5 w-5 animate-spin" />
+              <SpinnerIcon className="h-5 w-5" />
             </div>
           ) : filtered.length === 0 ? (
             <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">{t("picker.noMatch")}</p>

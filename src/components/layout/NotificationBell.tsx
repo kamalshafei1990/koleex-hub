@@ -35,7 +35,6 @@ import { useRouter } from "next/navigation";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import {
   fetchInboxMessages,
@@ -69,6 +68,7 @@ import type {
   DiscussChannelWithState,
   InboxMessageWithSender,
 } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Refresh inbox unread count every 60s while the tab is open. Discuss
    also polls every 15s as a safety net since the WebSocket can drop
@@ -1096,9 +1096,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               messages.length === 0 && (
                 <div className="flex items-center justify-center py-10">
                   <SpinnerIcon
-                    className={`h-4 w-4 animate-spin ${
-                      dk ? "text-white/40" : "text-black/40"
-                    }`}
+                    className={`h-4 w-4 ${ dk ? "text-white/40" : "text-black/40" }`}
                   />
                 </div>
               )}

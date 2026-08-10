@@ -89,7 +89,7 @@ export default function PaymentsModule({ t }: SalesModuleProps) {
     return { t30, t90, total };
   }, [rows, nowMs]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="p-4 md:p-6 space-y-4">

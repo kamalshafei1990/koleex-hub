@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type RFQ = {
   id: string; rfq_no: string | null; status: string | null;
@@ -51,7 +51,7 @@ export default function RFQsModule({ t }: PurchaseModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="space-y-4">

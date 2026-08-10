@@ -18,10 +18,10 @@ import SelectChevron from "@/components/admin/SelectChevron";
 import { countriesFor, countryName, dialOf, flagOf } from "@/lib/countries-dial";
 import { useTranslation } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Ordered by how often an administrator is actually asked. A forgotten
    USERNAME sits second because the Hub signs in by username, not email, so it
@@ -380,7 +380,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
               className="w-full h-11 rounded-xl bg-white/90 text-black text-[14px] font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {busy ? (
-                <><SpinnerIcon size={16} className="animate-spin" /> {t("help.sending")}</>
+                <><SpinnerIcon size={16} /> {t("help.sending")}</>
               ) : (
                 t("help.send")
               )}

@@ -17,7 +17,6 @@ import CollectionModal from "@/components/database/CollectionModal";
 import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
 import UsageGovernance from "@/components/database/UsageGovernance";
 import { COLLECTION_STYLES } from "@/lib/visual-library/types";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -26,6 +25,7 @@ import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.colDetail.collections":      { en: "Collections", zh: "合集", ar: "المجموعات" },
@@ -115,7 +115,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
     });
   };
 
-  if (loading) return <div className="flex justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
   if (!col) return (
     <div className="py-16 text-center">
       <p className="text-[14px] text-[var(--text-muted)]">{t("vl.colDetail.notFound", "Collection not found.")}</p>
@@ -301,7 +301,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
           <PlusIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.colDetail.addSearchPlaceholder", "Search the library to add assets…")} className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
-          {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
+          {searching && <SpinnerIcon size={13} className="text-[var(--text-dim)]" />}
         </div>
         <button type="button" onClick={() => setUploadOpen(true)}
           className="inline-flex shrink-0 items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
@@ -321,7 +321,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
                 ) : null}
               </span>
               {a.title}
-              {adding === a.id ? <SpinnerIcon size={10} className="animate-spin" /> : <PlusIcon size={10} className="text-[var(--text-dim)]" />}
+              {adding === a.id ? <SpinnerIcon size={10} /> : <PlusIcon size={10} className="text-[var(--text-dim)]" />}
             </button>
           ))}
         </div>

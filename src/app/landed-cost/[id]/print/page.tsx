@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import { fetchSimulation } from "@/lib/landed-cost-admin";
 import { sumExportCosts, sumShippingCosts, sumImportFixed, sumInlandCosts, sumFinancialCosts } from "@/lib/landed-cost-calc";
 import type { SimulationRow, SimulationResults } from "@/lib/landed-cost-types";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -39,7 +39,7 @@ export default function PrintReportPage() {
   }, [id]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><SpinnerIcon className="h-6 w-6 animate-spin text-gray-400" /></div>;
+    return <div className="min-h-screen flex items-center justify-center"><SpinnerIcon className="h-6 w-6 text-gray-400" /></div>;
   }
   if (!sim) {
     return <div className="min-h-screen flex items-center justify-center text-gray-500">Simulation not found</div>;

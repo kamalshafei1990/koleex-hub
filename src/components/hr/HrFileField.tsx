@@ -245,7 +245,7 @@ export default function HrFileField({
         }`}
       >
         {busy ? (
-          <SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon size={18} className="text-[var(--text-dim)]" />
         ) : (
           <UploadIcon size={18} className="text-[var(--text-dim)]" />
         )}

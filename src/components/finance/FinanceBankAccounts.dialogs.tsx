@@ -31,6 +31,7 @@ import type {
 } from "@/lib/finance/types";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export const INPUT =
   "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
@@ -188,7 +189,7 @@ export function EditDrawer({
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("bank.action.cancel", "Cancel")}</button>
               <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-                {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+                {saving ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
                 {isEdit ? t("bank.action.saveChanges", "Save changes") : t("bank.action.createAccount", "Create account")}
               </button>
             </div>
@@ -346,7 +347,7 @@ export function ManualMovementDrawer({
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("bank.action.cancel", "Cancel")}</button>
               <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-                {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+                {saving ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
                 {t("movement.action.record", "Record movement")}
               </button>
             </div>

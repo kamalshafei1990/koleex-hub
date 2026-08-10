@@ -27,7 +27,6 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { fpAvatar } from "@/lib/cdn";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
@@ -40,6 +39,7 @@ import {
 } from "@/lib/discuss";
 import { TranslatableBody } from "./TranslatableBody";
 import type { DiscussMessageWithAuthor } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Quick-pick reactions shown in the hover row — matches Slack defaults. */
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"];
@@ -247,7 +247,7 @@ export function ThreadPane({
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
         {loading ? (
           <div className="flex items-center justify-center py-8 text-[var(--text-dim)]">
-            <SpinnerIcon className="h-4 w-4 animate-spin" />
+            <SpinnerIcon className="h-4 w-4" />
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -301,7 +301,7 @@ export function ThreadPane({
               className="h-7 px-3 rounded-md bg-blue-500 text-white text-[11px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
             >
               {sending ? (
-                <SpinnerIcon className="h-3 w-3 animate-spin" />
+                <SpinnerIcon className="h-3 w-3" />
               ) : (
                 <PaperPlaneIcon className="h-3 w-3" />
               )}

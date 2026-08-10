@@ -101,7 +101,7 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
       .slice(0, 10);
   }, [payments, suppliers]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   const hasAny = payments.length + billItems.length > 0;
   if (!hasAny) {

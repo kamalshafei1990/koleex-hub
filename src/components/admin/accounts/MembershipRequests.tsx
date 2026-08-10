@@ -23,12 +23,12 @@ import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import UserPlus2Icon from "@/components/icons/ui/UserPlusIcon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { flagOf, countryName, COUNTRY_DIALS } from "@/lib/countries-dial";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Status = "pending" | "approved" | "rejected";
 
@@ -560,7 +560,7 @@ function Detail({
             onClick={() => onDecide("approved")}
             className="h-10 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[12.5px] font-semibold inline-flex items-center gap-2 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
           >
-            {busy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckCircleIcon className="h-3.5 w-3.5" />}
+            {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <CheckCircleIcon className="h-3.5 w-3.5" />}
             Approve
           </button>
           <button

@@ -85,7 +85,7 @@ export default function ForecastModule({ t }: SalesModuleProps) {
 
   const max = Math.max(1, ...buckets.map((b) => b.unweighted));
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   const haveAnyForecast = buckets.some((b) => b.count > 0);
 

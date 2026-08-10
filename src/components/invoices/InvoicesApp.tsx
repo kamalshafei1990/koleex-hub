@@ -43,6 +43,7 @@ import {
   type InvoiceRow,
   type InvoiceStatus,
 } from "@/lib/invoices";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function InvoicesApp() {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -167,7 +168,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
           {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <RrIcon name="loading" size={20} className="text-[var(--text-dim)] animate-spin" />
+              <SpinnerIcon size={20} />
             </div>
           ) : visible.length === 0 ? (
             <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center text-[13px] text-[var(--text-dim)]">
@@ -411,7 +412,7 @@ function InvoiceDetailView({
   if (loading || !state) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <RrIcon name="loading" size={20} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={20} />
       </div>
     );
   }

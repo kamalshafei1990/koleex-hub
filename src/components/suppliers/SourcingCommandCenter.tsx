@@ -22,10 +22,10 @@ import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import BookmarkIcon from "@/components/icons/ui/BookmarkIcon";
 import Globe2Icon from "@/components/icons/ui/Globe2Icon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── types mirror the overview API ── */
 interface Overview { totalSuppliers: number; activeSuppliers: number; preferredSuppliers: number; blockedSuppliers: number; highRiskSuppliers: number; soleSourceSuppliers: number; missingCerts: number; avgSourcingScore: number | null; avgNegotiationScore: number | null; avgReadiness: number | null; }
@@ -158,7 +158,7 @@ export default function SourcingCommandCenter() {
   }, [watchlists]);
 
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center text-[var(--text-secondary)]"><SpinnerIcon className="h-5 w-5 animate-spin" /><span className="ml-2 text-sm">{t("scc.loading", "Loading command center…")}</span></div>;
+    return <div className="flex min-h-[60vh] items-center justify-center text-[var(--text-secondary)]"><SpinnerIcon className="h-5 w-5" /><span className="ml-2 text-sm">{t("scc.loading", "Loading command center…")}</span></div>;
   }
   if (err || !data) {
     return (
@@ -385,7 +385,7 @@ export default function SourcingCommandCenter() {
               <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{selected.length > 0 ? `${selected.length} ${t("scc.suppliersWillBeFollowed", "supplier(s) will be followed (from compare selection).")}` : t("scc.currentFiltersSaved", "Current filters will be saved. Select suppliers in compare mode to follow them.")}</p>
               <div className="mt-2 flex justify-end gap-2">
                 <button onClick={() => { setShowCreate(false); setWlName(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("scc.cancel", "Cancel")}</button>
-                <button onClick={() => void createWatchlist()} disabled={!wlName.trim() || wlBusy} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">{wlBusy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : null}{t("scc.save", "Save")}</button>
+                <button onClick={() => void createWatchlist()} disabled={!wlName.trim() || wlBusy} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">{wlBusy ? <SpinnerIcon className="h-3.5 w-3.5" /> : null}{t("scc.save", "Save")}</button>
               </div>
             </div>
           ) : null}

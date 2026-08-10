@@ -18,9 +18,9 @@ import type { VisualAsset, ReviewStatus, RiskLevel } from "@/lib/visual-library/
 import { REVIEW_STATUS_LABEL } from "@/lib/visual-library/types";
 import { RISK_TONE, reviewStatusTone } from "@/lib/visual-library/review";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.board.reviewed":       { en: "Reviewed",         zh: "已审核",   ar: "تمت مراجعتها" },
@@ -190,7 +190,7 @@ export default function ReviewBoard() {
         </div>
 
         {loadingQueue ? (
-          <div className="flex justify-center py-16 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>
+          <div className="flex justify-center py-16 text-[var(--text-dim)]"><SpinnerIcon size={18} /></div>
         ) : items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-12 text-center">
             <p className="text-[12.5px] text-[var(--text-muted)]">{t("vl.board.emptyTitle", "No reviews match these filters yet.")}</p>

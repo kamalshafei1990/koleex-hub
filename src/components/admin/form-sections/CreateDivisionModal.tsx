@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import Modal from "@/components/kds/FormModal";
 import { createDivision } from "@/lib/products-admin";
 import type { DivisionRow } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Props {
   open: boolean;
@@ -65,7 +65,7 @@ export default function CreateDivisionModal({ open, onClose, onCreated, existing
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : null}
             {saving ? "Creating..." : "Create Division"}
           </button>
         </>

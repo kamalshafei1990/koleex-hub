@@ -12,12 +12,12 @@ import {
 } from "@/lib/visual-library/types";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -161,7 +161,7 @@ export default function VisualRelationshipModal({
               <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.rel.search-placeholder", "Search the library to link…")}
                 className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
-              {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
+              {searching && <SpinnerIcon size={13} className="text-[var(--text-dim)]" />}
             </div>
 
             {results.length > 0 && (
@@ -203,7 +203,7 @@ export default function VisualRelationshipModal({
             <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.rel.cancel", "Cancel")}</button>
             <button type="button" onClick={save} disabled={saving || !picked.length}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-              {saving && <SpinnerIcon size={14} className="animate-spin" />}{saving ? t("vl.rel.linking", "Linking…") : t("vl.rel.link", "Link")}
+              {saving && <SpinnerIcon size={14} />}{saving ? t("vl.rel.linking", "Linking…") : t("vl.rel.link", "Link")}
             </button>
           </div>
         </div>

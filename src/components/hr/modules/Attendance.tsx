@@ -98,7 +98,7 @@ export default function Attendance({ employees, t, lang }: HRModuleProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon size={24} className="text-[var(--text-dim)]" />
       </div>
     );
   }

@@ -28,7 +28,6 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import type {
   AccountWithLinks,
   AccountPermissionOverrideRow,
@@ -47,6 +46,7 @@ import {
   tabSectionTitle,
   TabActionBar,
 } from "./shared";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    PERMISSION GROUPS — same as the Roles page
@@ -572,7 +572,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
     return (
       <div className={tabCardClass}>
         <div className="flex items-center justify-center py-12">
-          <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon size={20} className="text-[var(--text-dim)]" />
         </div>
       </div>
     );
@@ -638,7 +638,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
             >
               {t("acc.access.resetToRoleDefaults", "Reset to role defaults")}
             </button>
-            {applyingTemplate && <SpinnerIcon size={14} className="animate-spin text-[var(--text-dim)]" />}
+            {applyingTemplate && <SpinnerIcon size={14} className="text-[var(--text-dim)]" />}
           </div>
         )}
 

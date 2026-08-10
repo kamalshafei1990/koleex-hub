@@ -6,10 +6,10 @@
 
 import { useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const MIN_LENGTH = 8;
 
@@ -68,7 +68,7 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
             disabled={!canSubmit}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
-            {busy ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
+            {busy ? <SpinnerIcon className="h-4 w-4" /> : null}
             {busy ? t("pwd.updating") : t("pwd.update")}
           </button>
           {ok && (

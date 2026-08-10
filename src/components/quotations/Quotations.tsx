@@ -17,7 +17,6 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
@@ -44,6 +43,7 @@ import {
   type RemoteDocRow,
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* QuotationA4Preview is ~9k LOC (+ large embedded port-geo data tables)
    and only renders inside the editor view, so load it lazily on the
@@ -2456,7 +2456,7 @@ export default function Quotations() {
                           title="Duplicate this quotation as a new draft"
                         >
                           {duplicatingId === q.id ? (
-                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                            <SpinnerIcon className="h-4 w-4" />
                           ) : (
                             <CopyIcon size={16} />
                           )}

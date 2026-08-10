@@ -11,8 +11,8 @@ import { cardCls, formatDate, sectionTitleCls } from "../shared";
 import { NewReceiptDialog } from "../dialogs";
 import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Receipt = {
   id: string; gr_no: string | null; status: string | null;
@@ -55,7 +55,7 @@ export default function ReceiptsModule({ t }: PurchaseModuleProps) {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="space-y-4">

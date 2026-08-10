@@ -14,7 +14,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PlanningIcon from "@/components/icons/PlanningIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import {
   fetchLinkedItems,
@@ -24,6 +23,7 @@ import {
   ITEM_TYPE_LABELS,
   type PlanningItem,
 } from "@/lib/planning";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function EntityPlanningStrip({
   entityType,
@@ -54,7 +54,7 @@ export default function EntityPlanningStrip({
   if (items === null) {
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 flex items-center gap-2">
-        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
         <span className="text-[12px] text-[var(--text-dim)]">
           Loading schedule…
         </span>

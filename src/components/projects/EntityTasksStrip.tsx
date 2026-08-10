@@ -14,7 +14,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import {
   fetchTasks,
@@ -23,6 +22,7 @@ import {
   PRIORITY_COLOR,
   type TaskRow,
 } from "@/lib/projects";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function EntityTasksStrip({
   entityType,
@@ -57,7 +57,7 @@ export default function EntityTasksStrip({
   if (tasks === null) {
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 flex items-center gap-2">
-        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
         <span className="text-[12px] text-[var(--text-dim)]">Loading tasks…</span>
       </div>
     );

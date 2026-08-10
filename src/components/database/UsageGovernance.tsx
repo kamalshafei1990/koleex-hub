@@ -14,10 +14,10 @@ import {
 import { scoreVerdict } from "@/lib/visual-library/governance";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.gov.title":          { en: "Usage governance", zh: "使用治理", ar: "ضوابط الاستخدام" },
@@ -81,7 +81,7 @@ export default function UsageGovernance({
     return m;
   }, [contexts, usedContextIds, picker]);
 
-  if (loading) return <div className="mt-4 flex justify-center py-4 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>;
+  if (loading) return <div className="mt-4 flex justify-center py-4 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>;
 
   return (
     <div className="mt-4">

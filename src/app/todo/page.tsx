@@ -10,7 +10,6 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
 import SquareIcon from "@/components/icons/ui/SquareIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -64,6 +63,7 @@ import type {
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { usePermissions } from "@/lib/permissions";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── Priority config ── */
 const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [
@@ -206,7 +206,7 @@ function DeleteModal({ open, deleting, onConfirm, onClose }: {
           </button>
           <button onClick={onConfirm} disabled={deleting}
             className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-50">
-            {deleting && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+            {deleting && <SpinnerIcon className="h-3.5 w-3.5" />}
             {t("modal.delete")}
           </button>
         </div>
@@ -850,7 +850,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           </button>
           <button onClick={handleSave} disabled={saving || !title.trim()}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4" />}
             {saving ? t("modal.saving") : editEntry ? t("modal.save") : t("modal.add")}
           </button>
         </div>
@@ -2242,7 +2242,7 @@ export default function TodoPage() {
         {/* Task List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">

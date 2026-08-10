@@ -18,6 +18,7 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import MarketsIcon from "@/components/icons/MarketsIcon";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ─────────── Reference Data ─────────── */
 
@@ -366,7 +367,7 @@ export default function Markets() {
             {loadingCustomers ? (
               <div className="flex items-center justify-center py-16">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-2 border-[var(--border-focus)] border-t-white/60 rounded-full animate-spin" />
+                  <SpinnerIcon className="w-8 h-8" />
                   <span className="text-sm text-[var(--text-faint)]">
                     Loading customers...
                   </span>

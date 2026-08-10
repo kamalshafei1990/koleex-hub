@@ -9,13 +9,13 @@
    --------------------------------------------------------------------------- */
 
 import { Suspense } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import dynamic from "next/dynamic";
 import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
 
 /* SW-4: code-split the 158KB CRM board off the initial route bundle. It is a
    client-only interactive board (DnD) — ssr:false avoids shipping+hydrating it
    until the route actually renders. Skeleton prevents a blank flash. */
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const CRM = dynamic(() => import("@/components/crm/CRM"), {
   ssr: false,
   loading: () => <AppLoadingSkeleton label="Loading CRM…" />,
@@ -28,7 +28,7 @@ export default function CrmPage() {
       <Suspense
         fallback={
           <div className="flex-1 min-h-0 flex items-center justify-center bg-[var(--bg-primary)]">
-            <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
           </div>
         }
       >

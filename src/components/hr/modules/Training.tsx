@@ -119,7 +119,7 @@ export default function Training({ employees, t, lang }: HRModuleProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon size={24} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -227,7 +227,7 @@ export default function Training({ employees, t, lang }: HRModuleProps) {
               {t("hr.cancel")}
             </button>
             <button className={primaryBtnCls} disabled={saving || !courseForm.name} onClick={handleCreateCourse}>
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.create")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.create")}
             </button>
           </>
         }
@@ -296,7 +296,7 @@ export default function Training({ employees, t, lang }: HRModuleProps) {
               disabled={saving || !enrollForm.employee_id || !enrollForm.course_id}
               onClick={handleEnroll}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.enroll")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.enroll")}
             </button>
           </>
         }

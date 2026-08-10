@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* The commit this BUNDLE was compiled from. Primary source: the kx-build
    <meta> the root layout bakes into the HTML at build time (deterministic —
@@ -202,10 +203,7 @@ export default function UpdateWatcher() {
         >
           <span className={`col-start-1 row-start-1 ${updating ? "invisible" : ""}`}>{t("u.refresh")}</span>
           <span className={`col-start-1 row-start-1 inline-flex items-center gap-1.5 ${updating ? "" : "invisible"}`}>
-            <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
+            <SpinnerIcon size={12} />
             {t("u.updating")}
           </span>
         </button>

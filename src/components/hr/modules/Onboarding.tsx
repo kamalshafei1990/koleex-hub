@@ -151,7 +151,7 @@ export default function OnboardingModule({ employees, t, lang }: HRModuleProps) 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -367,7 +367,7 @@ export default function OnboardingModule({ employees, t, lang }: HRModuleProps) 
               disabled={saving || !assignForm.employee_id || !assignForm.checklist_id}
               className={primaryBtnCls + " flex items-center gap-2"}
             >
-              {saving && <SpinnerIcon size={14} className="animate-spin" />}
+              {saving && <SpinnerIcon size={14} />}
               {t("hr.assign")}
             </button>
           </>

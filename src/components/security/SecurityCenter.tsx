@@ -117,7 +117,7 @@ export default function SecurityCenter() {
     [report, goTab],
   );
 
-  if (boot.loading) return <Center><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></Center>;
+  if (boot.loading) return <Center><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></Center>;
   if (!isSuperAdmin || status === "forbidden") return <AccessDenied />;
 
   const refreshing = status === "refreshing";

@@ -35,6 +35,7 @@ import type {
 } from "@/lib/finance/types";
 
 type StepKey = "pick" | "upload" | "preview" | "done";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function FinanceBankImports() {
   const { t } = useTranslation(financeT);
@@ -308,7 +309,7 @@ export default function FinanceBankImports() {
                 disabled={!accountId || busy}
                 className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
-                {busy ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="upload" size={12} />}
+                {busy ? <SpinnerIcon size={12} /> : <RrIcon name="upload" size={12} />}
                 {t("bankImports.choose", "Choose statement file")}
               </button>
             </div>
@@ -322,7 +323,7 @@ export default function FinanceBankImports() {
           <div className="mt-5">
             <SectionCard title={t("bankImports.uploading", "Uploading and parsing")} subtitle={t("bankImports.uploadingHint", "The parser detects columns automatically. You'll review every row before anything lands in the cash book.")}>
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
-                <RrIcon name="loading" size={14} className="animate-spin" />
+                <SpinnerIcon size={14} />
                 {busy ? t("bankImports.uploadingMsg", "Uploading + parsing…") : t("bankImports.pickFile", "Pick a file")}
               </div>
             </SectionCard>
@@ -352,7 +353,7 @@ export default function FinanceBankImports() {
                   disabled={busy || kpis.ready === 0}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
                 >
-                  {busy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+                  {busy ? <SpinnerIcon size={11} /> : <RrIcon name="check" size={11} />}
                   {t("bankImports.confirm", "Confirm import ({n})").replace("{n}", String(kpis.ready))}
                 </button>
               }

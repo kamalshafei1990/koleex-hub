@@ -32,7 +32,6 @@ import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import SelectChevron from "@/components/admin/SelectChevron";
 import { countriesFor, countryName, flagOf } from "@/lib/countries-dial";
@@ -45,6 +44,7 @@ import { signInJoinT } from "@/lib/translations/signin-join";
    resident — it ships in the boot chunk — so this costs nothing beyond the
    join copy that arrives with this file, and a missing key is impossible
    because the form can still read anything the gate can. */
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const joinDict = { ...signInT, ...signInJoinT };
 import { inputBase, selectBase, textareaBase, labelBase, primaryButton } from "./field-styles";
 
@@ -653,7 +653,7 @@ export default function JoinPanel({
       >
         {busy ? (
           <>
-            <SpinnerIcon className="h-4 w-4 animate-spin" /> Submitting…
+            <SpinnerIcon className="h-4 w-4" /> Submitting…
           </>
         ) : (
           <>

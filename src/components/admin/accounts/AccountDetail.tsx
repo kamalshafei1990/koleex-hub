@@ -50,7 +50,6 @@ import LockIcon from "@/components/icons/ui/LockIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import {
   fetchAccountWithLinks,
@@ -82,6 +81,7 @@ import CalendarTab from "./tabs/CalendarTab";
 import PrivateTab from "./tabs/PrivateTab";
 import SecurityTab from "./tabs/SecurityTab";
 import NotesTab from "./tabs/NotesTab";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const levelColors: Record<CustomerLevel, string> = {
   silver: "bg-slate-400/15 text-slate-300 border-slate-400/25",
@@ -588,14 +588,14 @@ export default function AccountDetail({ accountId }: Props) {
                 )}
                 <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   {uploadingAvatar ? (
-                    <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
+                    <SpinnerIcon className="h-5 w-5 text-white" />
                   ) : (
                     <CameraIcon className="h-5 w-5 text-white" />
                   )}
                 </span>
                 {uploadingAvatar && (
                   <span className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
+                    <SpinnerIcon className="h-5 w-5 text-white" />
                   </span>
                 )}
               </button>

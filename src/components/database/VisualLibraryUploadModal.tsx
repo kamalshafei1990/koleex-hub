@@ -15,9 +15,9 @@ import { ASSET_TYPES } from "@/lib/visual-library/types";
 import { GENERAL_ICON_CATEGORIES, CATEGORY_BY_KEY, fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -179,7 +179,7 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("vl.upload.cancel", "Cancel")}</button>
           <button type="button" onClick={submit} disabled={busy}
             className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-            {busy && <SpinnerIcon size={14} className="animate-spin" />}
+            {busy && <SpinnerIcon size={14} />}
             {busy ? t("vl.upload.saving", "Saving…") : file ? t("vl.upload.upload-create", "Upload & create") : t("vl.upload.create-entity", "Create entity")}
           </button>
         </div>

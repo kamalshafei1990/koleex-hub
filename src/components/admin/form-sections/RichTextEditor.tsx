@@ -31,10 +31,10 @@ import Heading1Icon from "@/components/icons/ui/Heading1Icon";
 import Heading2Icon from "@/components/icons/ui/Heading2Icon";
 import Heading3Icon from "@/components/icons/ui/Heading3Icon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "@/components/kds/FormModal";
 import { uploadProductFile } from "@/lib/products-admin";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Props {
   value: string;
@@ -631,7 +631,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
               disabled={imageUploading || (!imageFile && !imageUrl.trim())}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
             >
-              {imageUploading && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+              {imageUploading && <SpinnerIcon className="h-4 w-4" />}
               {imageUploading ? "Uploading…" : "Insert"}
             </button>
           </>

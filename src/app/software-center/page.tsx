@@ -32,6 +32,7 @@ import {
   type DetectedPlatform,
   type InstallGuide,
 } from "@/lib/software-center";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function SoftwareCenterPage() {
   return (
@@ -52,7 +53,7 @@ function DownloadCenterView() {
   if (boot === undefined) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-[var(--border-strong)] border-t-transparent animate-spin" />
+        <SpinnerIcon className="h-5 w-5" />
       </div>
     );
   }

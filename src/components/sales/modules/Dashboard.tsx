@@ -19,9 +19,9 @@ import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Stats {
   pipelineValue: number;
@@ -129,7 +129,7 @@ export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
   if (loading || !stats) {
     return (
       <div className="h-full flex items-center justify-center text-[var(--text-dim)]">
-        <SpinnerIcon size={20} className="animate-spin" />
+        <SpinnerIcon size={20} />
       </div>
     );
   }

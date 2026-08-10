@@ -61,6 +61,7 @@ import Undo2Icon from "@/components/icons/ui/Undo2Icon";
 import Redo2Icon from "@/components/icons/ui/Redo2Icon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { PromptDialog } from "./NotesDialog";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ---------------------------------------------------------------------------
    Note surfaces — the value stored in `notes.color`. Two families:
@@ -824,7 +825,7 @@ function EditorToolbar({
         <TB active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title={t("fmt.codeBlock")}><FileCode2Icon className="h-3.5 w-3.5" /></TB>
         <TB active={editor.isActive("link")} onClick={onOpenLink} title={t("fmt.link")}><LinkIcon className="h-3.5 w-3.5" /></TB>
         <TB active={false} onClick={onUploadImage} title={t("tt.image")}>
-          {uploading ? <span className="h-3.5 w-3.5 rounded-full border-2 border-[var(--text-primary)] border-t-transparent animate-spin" /> : <ImageRawIcon className="h-3.5 w-3.5" />}
+          {uploading ? <SpinnerIcon className="h-3.5 w-3.5" /> : <ImageRawIcon className="h-3.5 w-3.5" />}
         </TB>
         <TB active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t("tt.divider")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="12" x2="20" y2="12" /></svg>

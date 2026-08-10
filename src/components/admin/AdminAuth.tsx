@@ -28,7 +28,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
@@ -56,6 +55,7 @@ import { setCurrentAccountId } from "@/lib/identity";
 /* Both are gate-only. AdminAuth wraps every route, so a static import here is
    a download for every signed-in user of a screen they will never open —
    measured at 71 KB of a 1083 KB boot before this split. */
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 const JoinPanel = dynamic(() => import("@/components/admin/signin/JoinPanel"), {
   ssr: false,
   loading: () => <div className="h-[420px]" aria-hidden />,
@@ -993,7 +993,7 @@ function SignInPanel({
       >
         {busy ? (
           <>
-            <SpinnerIcon className="h-4 w-4 animate-spin" /> {t("signingIn")}
+            <SpinnerIcon className="h-4 w-4" /> {t("signingIn")}
           </>
         ) : (
           <>

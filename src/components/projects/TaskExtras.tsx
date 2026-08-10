@@ -12,7 +12,6 @@ import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
@@ -26,6 +25,7 @@ import {
   fetchTasks, createTask, updateTask, deleteTask,
   type ChecklistItem, type TaskComment, type TimeEntry, type TaskAttachment, type Milestone, type TaskRow,
 } from "@/lib/projects";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const card = "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]";
 const inputCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
@@ -234,7 +234,7 @@ export function AttachmentsPanel({ taskId }: { taskId: string }) {
       </div>
       <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center gap-1.5 disabled:opacity-50">
-        {busy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <UploadIcon size={13} />}
+        {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <UploadIcon size={13} />}
         {busy ? "Uploading…" : "Upload file (max 25 MB)"}
       </button>
     </div>
@@ -360,7 +360,7 @@ export function MilestoneStrip({ projectId }: { projectId: string }) {
 
 /* ── shared bits ────────────────────────────────────────────────────── */
 function PanelSpinner() {
-  return <div className="flex items-center justify-center py-8"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)] animate-spin" /></div>;
+  return <div className="flex items-center justify-center py-8"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>;
 }
 function Empty({ text }: { text: string }) {
   return <div className="text-[12px] text-[var(--text-dim)] text-center py-5">{text}</div>;

@@ -16,7 +16,7 @@ export default function QuotationPreviewSkeleton() {
       aria-live="polite"
       className="mx-auto flex min-h-[60vh] w-full max-w-[820px] flex-col items-center justify-center gap-3 rounded-lg border border-white/[0.06] bg-[#141414] text-gray-500"
     >
-      <SpinnerIcon className="h-6 w-6 animate-spin" />
+      <SpinnerIcon className="h-6 w-6" />
       <span className="text-xs uppercase tracking-wider">Loading document…</span>
     </div>
   );

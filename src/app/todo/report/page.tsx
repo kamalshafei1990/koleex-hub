@@ -17,9 +17,9 @@ import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Period = "today" | "week" | "month" | "custom";
 
@@ -198,7 +198,7 @@ export default function TodoReportPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5">
           {loading ? (
-            <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></div>
+            <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>
           ) : (
             <>
               {/* Summary tiles */}

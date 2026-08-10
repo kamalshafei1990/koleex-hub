@@ -56,6 +56,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import UndoToast from "@/components/ui/UndoToast";
 /* Phase 2.5 — operational guidance. */
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type TabKey = ExpensesTabKey;
 
@@ -885,7 +886,7 @@ function ExpenseEditor({
               >
                 {saving ? (
                   <>
-                    <RrIcon name="loading" size={11} className="animate-spin" />
+                    <SpinnerIcon size={11} />
                     {t("editor.saving", "Saving…")}
                   </>
                 ) : (

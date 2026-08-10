@@ -17,6 +17,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useRef } from "react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -113,10 +114,7 @@ export default function ConfirmDialog({
             }
           >
             {busy && (
-              <svg viewBox="0 0 24 24" width="11" height="11" className="animate-spin">
-                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
-                <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
+              <SpinnerIcon size={11} />
             )}
             {confirmLabel}
           </button>

@@ -5,12 +5,12 @@
 
 import { useEffect, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { withDefaults } from "@/lib/access-control";
 import type { DisplayPrefs } from "@/lib/access-control";
 import { formatDatePref, formatTimePref } from "@/lib/display-prefs";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Attempt {
   ip_address: string;
@@ -81,7 +81,7 @@ export default function LoginHistoryTab({ account }: { account: AccountWithLinks
 
         {rows === null && !error && (
           <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4">
-            <SpinnerIcon className="h-4 w-4 animate-spin" /> {t("hist.loading")}
+            <SpinnerIcon className="h-4 w-4" /> {t("hist.loading")}
           </div>
         )}
         {error && <p className="text-[12px] text-[#FF3333] py-2">{t("hist.error")} {error}</p>}

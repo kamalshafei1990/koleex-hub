@@ -103,7 +103,7 @@ function AccessorySide({ label, products, country, applied, applyNonce, onChange
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</span>
         <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)] inline-flex items-center gap-1">
-          {pricing ? <SpinnerIcon className="h-3 w-3 animate-spin text-[var(--text-dim)]" /> : null}
+          {pricing ? <SpinnerIcon className="h-3 w-3 text-[var(--text-dim)]" /> : null}
           {fob != null ? `+${usd(fob)}` : (product?.baseCostCny == null ? "cost —" : "—")}
         </span>
       </div>
@@ -211,7 +211,7 @@ export default function CompleteSetConfigurator({ country, headFobUsd, machineSu
         <BoxIcon className="h-4 w-4 text-[var(--text-dim)]" />
         <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Complete set</h4>
         <span className="text-[10px] text-[var(--text-ghost)]">head + table + stand, each configured &amp; priced separately</span>
-        {loading && <SpinnerIcon className="ms-auto h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />}
+        {loading && <SpinnerIcon className="ms-auto h-3.5 w-3.5 text-[var(--text-dim)]" />}
       </div>
 
       {empty ? (

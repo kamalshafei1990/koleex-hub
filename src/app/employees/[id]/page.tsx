@@ -17,7 +17,6 @@ import { useRouter } from "next/navigation";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -45,6 +44,7 @@ import { usePermissions } from "@/lib/permissions";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { EmployeeWithLinks } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -765,7 +765,7 @@ export default function EmployeeProfilePage({
             <GroupLabel>{t("grp.activity")}</GroupLabel>
             {!activity ? (
               <div className="flex items-center justify-center py-16">
-                <SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon size={20} className="text-[var(--text-dim)]" />
               </div>
             ) : (
               <div className="mx-4 md:mx-6 my-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -900,7 +900,7 @@ export default function EmployeeProfilePage({
                 disabled={deleting}
                 className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-50"
               >
-                {deleting && <SpinnerIcon size={13} className="animate-spin" />}
+                {deleting && <SpinnerIcon size={13} />}
                 Delete employee
               </button>
             </div>

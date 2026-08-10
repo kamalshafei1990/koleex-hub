@@ -9,8 +9,8 @@ import { useEffect, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Rule = {
   id: string; code: string | null; name: string;
@@ -42,7 +42,7 @@ export default function ApprovalsModule({ t }: PurchaseModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="space-y-4">

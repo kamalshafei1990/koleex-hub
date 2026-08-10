@@ -10,8 +10,8 @@ import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import { NewPaymentDialog } from "../dialogs";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Payment = {
   id: string; payment_no: string | null; bill_id: string | null;
@@ -72,7 +72,7 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
     return { t30, t90, total };
   }, [rows, nowMs]);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   return (
     <div className="space-y-4">

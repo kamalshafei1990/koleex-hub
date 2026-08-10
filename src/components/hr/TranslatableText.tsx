@@ -97,7 +97,7 @@ export default function TranslatableText({
           className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)] hover:underline disabled:opacity-50"
         >
           {busy
-            ? <SpinnerIcon size={11} className="animate-spin" />
+            ? <SpinnerIcon size={11} />
             : <LanguagesIcon size={11} />}
           {showing ? showOriginalLabel : translateLabel}
         </button>

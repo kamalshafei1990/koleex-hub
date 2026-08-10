@@ -51,8 +51,8 @@ interface PurchaseDashRow {
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import RrIcon from "@/components/ui/RrIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { formatMoney, relativeTime } from "./shared";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ---------------------------------------------------------------------------
    Section eyebrow + small primitives reused from the Inventory home so the
@@ -264,7 +264,7 @@ export default function PurchaseHome() {
   if (loading || !stats) {
     return (
       <div className="flex items-center justify-center py-20 text-[var(--text-dim)]">
-        <SpinnerIcon size={20} className="animate-spin" />
+        <SpinnerIcon size={20} />
       </div>
     );
   }

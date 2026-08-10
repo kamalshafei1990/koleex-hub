@@ -16,12 +16,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { DiscussMention } from "@/types/supabase";
 import { renderDiscussMarkdown } from "./markdown";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import {
   translateText,
   peekTranslation,
   translateLangLabel,
 } from "@/lib/discuss-translate";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export function TranslatableBody({
   body,
@@ -94,7 +94,7 @@ export function TranslatableBody({
       <div className="mt-1 flex items-center gap-2 not-italic whitespace-normal">
         {loading ? (
           <span className="inline-flex items-center gap-1 h-6 px-2 text-[10.5px] text-[var(--text-dim)]">
-            <SpinnerIcon className="h-3 w-3 animate-spin" />
+            <SpinnerIcon className="h-3 w-3" />
             {t("translate.working", "Translating…")}
           </span>
         ) : canToggle ? (

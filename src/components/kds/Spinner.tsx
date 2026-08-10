@@ -13,5 +13,5 @@ export default function Spinner({
   size?: number;
   className?: string;
 }) {
-  return <SpinnerIcon size={size} className={`animate-spin ${className}`} />;
+  return <SpinnerIcon size={size} className={`${className}`} />;
 }

@@ -19,7 +19,6 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
 import {
   levelForScore, gapStatus, summarize, type ScorableSkill,
@@ -27,6 +26,7 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { LIBRARY_PAYLOAD_VERSION, localizedName, nameMatches } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /** Skill level (from levelForScore) → translation key. */
 const SKILL_LEVEL_KEY: Record<string, string> = {
@@ -271,7 +271,7 @@ export default function EmployeeSkillsSection({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
-        <SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon size={18} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -666,7 +666,7 @@ function PositionSkillsConfig({
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loading ? (
-            <div className="flex justify-center py-8"><SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" /></div>
+            <div className="flex justify-center py-8"><SpinnerIcon size={18} className="text-[var(--text-dim)]" /></div>
           ) : reqs.length === 0 ? (
             <p className="py-6 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.sk.noRequirements")}</p>
           ) : reqs.map((r) => (

@@ -38,9 +38,9 @@ import {
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Salaries here are paid from the Chinese entity, so CNY leads and is the
    default. Kept as a closed list because the register is read by payroll and
@@ -209,7 +209,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -390,7 +390,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
               disabled={saving || !salaryForm.employee_id || !salaryForm.base_salary || !salaryForm.effective_from}
               className={primaryBtnCls + " flex items-center gap-2"}
             >
-              {saving && <SpinnerIcon size={14} className="animate-spin" />}
+              {saving && <SpinnerIcon size={14} />}
               {t("hr.save")}
             </button>
           </>
@@ -516,7 +516,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
               disabled={saving || !payslipForm.employee_id || !payslipForm.period_start || !payslipForm.period_end}
               className={primaryBtnCls + " flex items-center gap-2"}
             >
-              {saving && <SpinnerIcon size={14} className="animate-spin" />}
+              {saving && <SpinnerIcon size={14} />}
               {t("hr.create")}
             </button>
           </>

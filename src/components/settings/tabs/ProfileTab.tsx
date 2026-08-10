@@ -23,7 +23,6 @@ import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
 import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
@@ -39,6 +38,7 @@ import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { SettingsCard } from "@/components/settings/tabs/ui";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── State shape ── */
 interface PeopleForm {
@@ -251,7 +251,7 @@ export default function ProfileTab({
             )}
             {uploadingAvatar ? (
               <span className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
+                <SpinnerIcon className="h-5 w-5 text-white" />
               </span>
             ) : (
               <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -370,7 +370,7 @@ export default function ProfileTab({
             disabled={!dirty || saving}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
           >
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <CheckIcon size={14} />}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
             {saving ? t("prof.saving") : t("prof.save")}
           </button>
         </div>

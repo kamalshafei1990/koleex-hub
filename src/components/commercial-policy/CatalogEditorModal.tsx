@@ -10,8 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export type CatalogField =
   | { key: string; label: string; type: "text" | "textarea" | "number"; required?: boolean; placeholder?: string; help?: string; full?: boolean }
@@ -132,7 +132,7 @@ export function CatalogEditorModal({
           {error && <span className="text-[12px] text-red-400 flex-1">{error}</span>}
           <button type="button" onClick={onClose} disabled={saving} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">Cancel</button>
           <button type="button" onClick={save} disabled={saving} className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-            {saving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon size={14} />}
+            {saving ? <SpinnerIcon className="h-3.5 w-3.5" /> : <CheckIcon size={14} />}
             {idValue ? "Save changes" : "Create"}
           </button>
         </div>

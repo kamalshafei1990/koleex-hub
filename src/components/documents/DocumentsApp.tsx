@@ -429,7 +429,7 @@ function SavedList({
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-[var(--text-dim)]">
-          <SpinnerIcon className="h-5 w-5 animate-spin" />
+          <SpinnerIcon className="h-5 w-5" />
         </div>
       ) : shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-primary)] p-8 text-center text-sm text-[var(--text-faint)]">

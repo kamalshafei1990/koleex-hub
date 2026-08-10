@@ -19,7 +19,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CommentIcon from "@/components/icons/ui/CommentIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
@@ -29,6 +28,7 @@ import type {
   DiscussChannelKind,
   DiscussSearchResult,
 } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 function useDebounced<T>(value: T, delay = 240): T {
   const [d, setD] = useState(value);
@@ -175,7 +175,7 @@ export function SearchPanel({
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && (
           <div className="flex items-center justify-center py-10 text-[var(--text-dim)]">
-            <SpinnerIcon className="h-4 w-4 animate-spin" />
+            <SpinnerIcon className="h-4 w-4" />
           </div>
         )}
         {!loading && query.trim().length < 2 && (

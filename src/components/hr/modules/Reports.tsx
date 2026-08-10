@@ -21,8 +21,8 @@ import {
 } from "@/lib/hr-admin";
 
 /* ── Icons ── */
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    MAIN COMPONENT
@@ -103,7 +103,7 @@ export default function ReportsModule({ employees, t, lang }: HRModuleProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }

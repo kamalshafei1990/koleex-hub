@@ -22,7 +22,6 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -46,6 +45,7 @@ import {
   fetchPermissions, upsertPermissions,
   type RoleRow, type PermissionRow, type DataScope,
 } from "@/lib/management-admin";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -396,7 +396,7 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (loading) return <div className="flex items-center justify-center py-8"><SpinnerIcon size={16} className="text-[var(--text-dim)] animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-8"><SpinnerIcon size={16} className="text-[var(--text-dim)]" /></div>;
 
   const CheckCell = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
     <button onClick={onChange}
@@ -790,7 +790,7 @@ export default function RolesPage() {
         {/* Roles list */}
         {loading ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
-            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin mx-auto" />
+            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] mx-auto" />
             <p className="text-[13px] mt-3 text-[var(--text-dim)]">{t("state.loading")}</p>
           </div>
         ) : filtered.length === 0 ? (

@@ -15,12 +15,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CompleteSetConfigurator from "./CompleteSetConfigurator";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Preview {
   ok?: boolean;
@@ -183,7 +183,7 @@ export default function PricingIntelligenceCard({
               }
             >
               {loading
-                ? <SpinnerIcon className="h-3 w-3 animate-spin text-[var(--accent)]" />
+                ? <SpinnerIcon className="h-3 w-3 text-[var(--accent)]" />
                 : <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
               <span className="text-[var(--accent)]">FX</span>
               <span className="tabular-nums">¥{pricingFx} / $1</span>
@@ -209,7 +209,7 @@ export default function PricingIntelligenceCard({
         </div>
       ) : !base ? (
         <div className="flex items-center gap-2 py-8 text-[var(--text-dim)] text-[13px]">
-          <SpinnerIcon className="h-4 w-4 animate-spin" /> Computing…
+          <SpinnerIcon className="h-4 w-4" /> Computing…
         </div>
       ) : (
         <>

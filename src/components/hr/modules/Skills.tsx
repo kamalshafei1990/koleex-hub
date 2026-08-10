@@ -13,13 +13,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EmployeePicker from "@/components/hr/EmployeePicker";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { usePermissions } from "@/lib/permissions";
 import { levelForScore, summarize, gapStatus, type ScorableSkill } from "@/lib/skills/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import type { Lang } from "@/lib/i18n";
 import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Assessment { skill_id: string; source: string; employee_score: number | null; last_assessed_at: string | null }
 interface HistoryRow { skill_id: string; employee_score: number | null; recorded_at: string }
@@ -228,7 +228,7 @@ export default function SkillsModule({ employees, t, lang }: HRModuleProps) {
           {t("hr.skills.pickEmployee")}
         </p>
       ) : loading ? (
-        <div className="flex justify-center py-12"><SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" /></div>
+        <div className="flex justify-center py-12"><SpinnerIcon size={20} className="text-[var(--text-dim)]" /></div>
       ) : assessments.length === 0 ? (
         <p className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-10 text-center text-[13px] text-[var(--text-faint)]">
           {t("hr.skills.none")}

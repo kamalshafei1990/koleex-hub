@@ -17,6 +17,7 @@ import {
   STATUS_COLOR,
   type InvoiceRow,
 } from "@/lib/invoices";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function EntityInvoicesStrip({
   customerId,
@@ -43,7 +44,7 @@ export default function EntityInvoicesStrip({
   if (invoices === null) {
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 flex items-center gap-2">
-        <RrIcon name="loading" size={14} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={14} />
         <span className="text-[12px] text-[var(--text-dim)]">Loading invoices…</span>
       </div>
     );

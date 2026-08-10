@@ -4,8 +4,8 @@
 
    Loading language v2 (owner pick, motion sample "B — logo breath"): every
    route-level loading.tsx shows the SAME brand moment — the KOLEEX hub
-   lockup breathing over a clean surface with a light sweep underline
-   (globals: .kx-brand-load). The five shape-specific exports remain so the
+   lockup inside the Koleex orb, over the real progress line
+   (globals: .kx-orb, .kx-brand-progress). The five shape-specific exports remain so the
    ~30 loading.tsx call sites and their labels keep compiling — they all
    render the shared brand loader now; their old layout params are accepted
    and ignored. Rules unchanged: no data fetching, CSS-only animation,

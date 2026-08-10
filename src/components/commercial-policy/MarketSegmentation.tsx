@@ -18,8 +18,8 @@ import { useRouter } from "next/navigation";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import type { MarketBandRow, BandCountryRow } from "@/lib/server/commercial-policy";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const UNASSIGNED = "__none__";
 
@@ -169,7 +169,7 @@ export default function MarketSegmentation({
                 disabled={saving}
                 className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
-                {saving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon size={14} />}
+                {saving ? <SpinnerIcon className="h-3.5 w-3.5" /> : <CheckIcon size={14} />}
                 Save
               </button>
             </>

@@ -39,7 +39,7 @@ export default function PipelineModule({ t }: SalesModuleProps) {
   }, []);
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+    return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
   }
 
   const byStage = new Map<string, Opp[]>();

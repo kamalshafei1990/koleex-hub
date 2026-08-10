@@ -23,7 +23,6 @@ import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -32,6 +31,7 @@ import UserIcon from "@/components/icons/ui/UserIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import PermissionGate from "@/components/layout/PermissionGate";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Status =
   | "draft"
@@ -533,7 +533,7 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
                 disabled={working}
                 className="h-9 px-4 rounded-lg text-[12px] font-medium bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
-                {working ? <SpinnerIcon size={12} className="animate-spin" /> : <TrashIcon size={12} />}
+                {working ? <SpinnerIcon size={12} /> : <TrashIcon size={12} />}
                 Delete
               </button>
             </div>

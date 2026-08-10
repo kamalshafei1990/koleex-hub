@@ -50,7 +50,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 
   const sorted = [...rows].sort((a, b) => {
     const sa = spendBySupplier[a.id] || 0;

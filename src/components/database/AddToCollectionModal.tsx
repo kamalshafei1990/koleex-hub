@@ -8,11 +8,11 @@ import { COLLECTION_TYPE_LABEL, type VisualCollection, type CollectionType } fro
 import CollectionModal from "@/components/database/CollectionModal";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.addCol.title":             { en: "Add to collection", zh: "添加到合集", ar: "إضافة إلى مجموعة" },
@@ -90,7 +90,7 @@ export default function AddToCollectionModal({
             {t("vl.addCol.createNew", "Create new collection")}
           </button>
           {loading ? (
-            <div className="flex justify-center py-8 text-[var(--text-dim)]"><SpinnerIcon size={16} className="animate-spin" /></div>
+            <div className="flex justify-center py-8 text-[var(--text-dim)]"><SpinnerIcon size={16} /></div>
           ) : filtered.map((c) => {
             const on = sel.has(c.id);
             return (
@@ -118,7 +118,7 @@ export default function AddToCollectionModal({
           <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{t("vl.addCol.selectedCount", "{n} selected").replace("{n}", String(sel.size))}</span>
           <button type="button" onClick={save} disabled={saving || sel.size === 0}
             className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-            {saving && <SpinnerIcon size={14} className="animate-spin" />}{t("vl.addCol.add", "Add")}
+            {saving && <SpinnerIcon size={14} />}{t("vl.addCol.add", "Add")}
           </button>
         </div>
       </div>

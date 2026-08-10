@@ -66,7 +66,6 @@ import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import MicIcon from "@/components/icons/ui/MicIcon";
@@ -176,6 +175,7 @@ import type {
   DiscussAuthor,
   ProductRow,
 } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Small helpers — shared by multiple subsections of the file
@@ -2205,7 +2205,7 @@ export default function DiscussApp() {
   if (accountLoading) {
     return (
       <div className="flex-1 min-h-0 bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -2407,7 +2407,7 @@ export default function DiscussApp() {
             </button>
             {loadingChannels ? (
               <div className="h-full flex items-center justify-center">
-                <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>
             ) : filteredChannels.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
@@ -2637,7 +2637,7 @@ export default function DiscussApp() {
               >
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center">
-                    <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                    <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
                   </div>
                 ) : messages.length === 0 ? (
                   <ThreadEmptyState
@@ -4582,7 +4582,7 @@ function Composer({
 
           {uploading && (
             <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-              <SpinnerIcon className="h-3 w-3 animate-spin" />
+              <SpinnerIcon className="h-3 w-3" />
               Uploading…
             </span>
           )}
@@ -4594,7 +4594,7 @@ function Composer({
             className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {sending ? (
-              <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+              <SpinnerIcon className="h-3.5 w-3.5" />
             ) : (
               <PaperPlaneIcon className="h-3.5 w-3.5" />
             )}
@@ -5372,7 +5372,7 @@ function ProductPicker({
         </div>
         {loading ? (
           <div className="p-10 flex justify-center">
-            <SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon size={18} className="text-[var(--text-dim)]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-[11px] text-[var(--text-dim)]">

@@ -39,8 +39,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import MicIcon from "@/components/icons/ui/MicIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Minimal typings for the vendor-prefixed Web Speech API. The browser
    ships this under either `SpeechRecognition` or
@@ -303,7 +303,7 @@ export default function MicButton({
      so its square geometry doesn't crowd the circle. */
   const icon =
     computedState === "processing" ? (
-      <SpinnerIcon className="h-4 w-4 animate-spin" />
+      <SpinnerIcon className="h-4 w-4" />
     ) : computedState === "speaking" ? (
       <StopIcon size={14} />
     ) : computedState === "listening" ? (

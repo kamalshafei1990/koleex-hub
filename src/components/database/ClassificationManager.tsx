@@ -19,7 +19,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -39,6 +38,7 @@ import {
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.class.divisions":         { en: "Divisions",       zh: "大类",     ar: "الأقسام" },
@@ -298,7 +298,7 @@ export default function ClassificationManager() {
             <button type="button" onClick={() => { setTrail([]); setAdding(true); }} title={t("vl.class.newDivision", "New division")}
               className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><PlusIcon size={12} /></button>
           </div>
-          {loading && divisions.length === 0 ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+          {loading && divisions.length === 0 ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>
             : [...divisions].sort((a, b) => ord(a.order) - ord(b.order)).map((d) => (
               <button key={d.id} type="button" onClick={() => setTrail([{ level: "categories", id: d.id, name: d.name, slug: d.slug }])}
                 className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-[12.5px] transition-colors ${
@@ -347,14 +347,14 @@ export default function ClassificationManager() {
               onKeyDown={(e) => { if (e.key === "Enter") create(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
               placeholder={t("vl.class.newNamePh", "New {x} name…").replace("{x}", oneLabel)}
               className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-            <button type="button" disabled={busyId === "new"} onClick={create} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} className="animate-spin" /> : t("vl.class.add", "Add")}</button>
+            <button type="button" disabled={busyId === "new"} onClick={create} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{busyId === "new" ? <SpinnerIcon size={12} /> : t("vl.class.add", "Add")}</button>
             <button type="button" onClick={() => { setAdding(false); setNewName(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("vl.class.cancel", "Cancel")}</button>
           </div>
         )}
 
         {/* Grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>
+          <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
             <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
@@ -410,7 +410,7 @@ function ClassificationCard({
       {/* icon tile — empty by default; click to assign a Visual Library icon */}
       <button type="button" onClick={onOpenIcon} title={iconUrl ? t("vl.class.changeIcon", "Change icon") : t("vl.class.addIcon", "Add icon from Visual Library")}
         className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
-        {busy ? <SpinnerIcon size={18} className="animate-spin text-neutral-400" /> : iconUrl ? (
+        {busy ? <SpinnerIcon size={18} className="text-neutral-400" /> : iconUrl ? (
           // Render the override via a CSS mask so single-tone SVGs (incl.
           // white-stroked ones) stay visible on the white tile, in theme color.
           <MonoImg src={iconUrl} className="h-full w-full" />
@@ -580,7 +580,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
         )}
 
         <div className="mt-2 max-h-[280px] min-h-[120px] overflow-y-auto" onScroll={onScroll}>
-          {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+          {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>
             : items.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? t("vl.class.noIconsFound", "No icons found.") : t("vl.class.noIconsYet", "No icons here yet.")}</p>
             : (
               <>
@@ -593,7 +593,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
                     </button>
                   ))}
                 </div>
-                {more && <div className="flex justify-center py-3 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>}
+                {more && <div className="flex justify-center py-3 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>}
               </>
             )}
         </div>

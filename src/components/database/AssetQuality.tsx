@@ -12,11 +12,11 @@ import { useEffect, useState } from "react";
 import type { QualityProfile, QualityWarning, QualityStatus } from "@/lib/visual-library/types";
 import { QUALITY_STATUSES } from "@/lib/visual-library/types";
 import { statusTone } from "@/lib/visual-library/quality";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.quality.loadFail":          { en: "Couldn’t load quality profile.", zh: "无法加载质量档案。", ar: "تعذّر تحميل ملف الجودة." },
@@ -93,7 +93,7 @@ export default function AssetQuality({
     setSavingReview(false); load();
   };
 
-  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} /></div>;
   if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">{t("vl.quality.loadFail", "Couldn’t load quality profile.")}</p>;
 
   const q = data.quality;
@@ -236,7 +236,7 @@ export default function AssetQuality({
           ))}
           <button type="button" disabled={savingReview} onClick={() => review()}
             className="ml-auto inline-flex items-center gap-1 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-            {savingReview ? <SpinnerIcon size={12} className="animate-spin" /> : null} {t("vl.quality.saveNotes", "Save notes")}
+            {savingReview ? <SpinnerIcon size={12} /> : null} {t("vl.quality.saveNotes", "Save notes")}
           </button>
         </div>
         {q.reviewed_at && <p className="mt-1.5 text-[10.5px] text-[var(--text-dim)]">{t("vl.quality.lastReviewed", "Last reviewed {date}").replace("{date}", new Date(q.reviewed_at).toLocaleString())}</p>}

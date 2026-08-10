@@ -6,10 +6,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Kind = "stamp" | "signature";
 interface Assets { stampUrl: string | null; signatureUrl: string | null }
@@ -73,7 +73,7 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-6">
-        <SpinnerIcon className="h-4 w-4 animate-spin" /> {t("assets.loading")}
+        <SpinnerIcon className="h-4 w-4" /> {t("assets.loading")}
       </div>
     );
   }
@@ -106,7 +106,7 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
           <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{label}</h2>
           <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{hint}</p>
         </div>
-        {busy && <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />}
+        {busy && <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />}
       </div>
 
       <div className="flex items-center gap-4">

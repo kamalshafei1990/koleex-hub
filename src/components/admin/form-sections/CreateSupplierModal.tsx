@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -20,6 +19,7 @@ import {
 import Modal from "@/components/kds/FormModal";
 import { createContact } from "@/lib/contacts-admin";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Props {
   open: boolean;
@@ -550,7 +550,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving || !companyNameEn.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : null}
             {saving ? "Creating..." : "Create Supplier"}
           </button>
         </>

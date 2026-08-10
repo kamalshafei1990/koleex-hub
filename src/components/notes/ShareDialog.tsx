@@ -17,7 +17,6 @@ import { notesT } from "@/lib/translations/notes";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import {
   fetchNoteShares,
@@ -29,6 +28,7 @@ import {
   type NoteSharesResponse,
   type ShareAccount,
 } from "@/lib/notes";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Thin adapter over the elected KDS Avatar (AV-3). */
 function Avatar({ name, src }: { name: string; src?: string | null }) {
@@ -152,7 +152,7 @@ export default function ShareDialog({
                   placeholder={t("share.search")}
                   className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10"
                 />
-                {searching && <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />}
+                {searching && <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />}
               </div>
 
               {candidates.length > 0 && (
@@ -170,7 +170,7 @@ export default function ShareDialog({
                         <div className="text-[11px] text-[var(--text-dim)] truncate">{a.login_email || a.role || ""}</div>
                       </div>
                       {busyId === a.id ? (
-                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />
+                        <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                       ) : (
                         <span className="text-[11px] font-semibold text-[#0066FF]">{t("share.add")}</span>
                       )}
@@ -192,7 +192,7 @@ export default function ShareDialog({
 
             {loading ? (
               <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-3">
-                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> {t("share.loading")}
+                <SpinnerIcon className="h-3.5 w-3.5" /> {t("share.loading")}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -240,7 +240,7 @@ export default function ShareDialog({
                           title="Remove"
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
                         >
-                          {busyId === s.id ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}
+                          {busyId === s.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <TrashIcon className="h-3.5 w-3.5" />}
                         </button>
                       </>
                     ) : (

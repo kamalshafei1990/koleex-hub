@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EmployeePicker from "@/components/hr/EmployeePicker";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -24,6 +23,7 @@ import { summarize, gapStatus, isCriticalGap, requiresJustification, canFinalize
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import type { Lang } from "@/lib/i18n";
 import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface AssessmentHeader { id: string; assessment_type: string; status: string; assessment_period_start: string | null; assessment_period_end: string | null; overall_behavior_score: number | null; position_behavior_match: number | null; critical_gap_count: number | null; recommendation: string | null; finalized_at: string | null; created_at: string }
 interface Requirement { behavior_indicator_id: string; required_score: number; weight: number; is_mandatory: boolean; is_critical: boolean }
@@ -213,7 +213,7 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
       </div>
 
       {!employeeId ? null : loading ? (
-        <div className="flex justify-center py-12"><SpinnerIcon size={20} className="animate-spin text-[var(--text-dim)]" /></div>
+        <div className="flex justify-center py-12"><SpinnerIcon size={20} className="text-[var(--text-dim)]" /></div>
       ) : editing ? (
         /* ── Draft editor ── */
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 space-y-4">

@@ -6,7 +6,6 @@ import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
@@ -23,6 +22,7 @@ import {
   DEFAULT_CONFIG,
   type PricingConfig, type CustomerChannel, type CountryEntry, type PricingCategory,
 } from "@/lib/pricing-config";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════ TABS ═══════════════════ */
 
@@ -122,7 +122,7 @@ export default function PricingSettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -141,7 +141,7 @@ export default function PricingSettingsPage() {
             <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">System Control Panel</h1>
           </div>
           <button onClick={handleSave} disabled={saving} className="ml-auto h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shrink-0">
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
             {saving ? "Saving..." : saved ? "Saved!" : "Save & Apply"}
           </button>
         </div>
@@ -352,7 +352,7 @@ export default function PricingSettingsPage() {
         {/* ── Bottom Save ── */}
         <div className="mt-6 flex items-center justify-end">
           <button onClick={handleSave} disabled={saving} className="h-12 px-8 rounded-xl bg-emerald-600 text-white text-[14px] font-semibold flex items-center gap-2.5 hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg">
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
             {saving ? "Saving..." : saved ? "Saved!" : "Save Settings & Apply"}
           </button>
         </div>

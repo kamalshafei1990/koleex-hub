@@ -30,12 +30,12 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -297,7 +297,7 @@ export default function VisualAssetDetailDrawer({
             <button type="button" disabled={!!busy || !asset.svg_path} onClick={() => run("approve", { action: "approve" })}
               title={!asset.svg_path ? t("vl.drawer.upload-before-approve", "Upload an icon before approving") : ""}
               className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-              {busy === "approve" ? <SpinnerIcon size={13} className="animate-spin" /> : <BadgeCheckIcon size={13} />} {t("vl.drawer.approve", "Approve")}
+              {busy === "approve" ? <SpinnerIcon size={13} /> : <BadgeCheckIcon size={13} />} {t("vl.drawer.approve", "Approve")}
             </button>
           ) : (
             <button type="button" disabled={!!busy} onClick={() => run("unapprove", { action: "unapprove" })}
@@ -306,7 +306,7 @@ export default function VisualAssetDetailDrawer({
           {!isArchived ? (
             <button type="button" disabled={!!busy} onClick={() => run("archive", { action: "archive" })}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">
-              {busy === "archive" ? <SpinnerIcon size={13} className="animate-spin" /> : <ArchiveIcon size={13} />} {t("vl.drawer.archive", "Archive")}
+              {busy === "archive" ? <SpinnerIcon size={13} /> : <ArchiveIcon size={13} />} {t("vl.drawer.archive", "Archive")}
             </button>
           ) : (
             <button type="button" disabled={!!busy} onClick={() => run("restore", { action: "restore" })}
@@ -343,7 +343,7 @@ function OverviewTab({ asset, busy, fileRef, onFile, onPickFile }: {
       <input ref={fileRef} type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
       <button type="button" onClick={onPickFile} disabled={busy === "attach"}
         className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50">
-        {busy === "attach" ? <SpinnerIcon size={13} className="animate-spin" /> : <UploadIcon size={13} />}
+        {busy === "attach" ? <SpinnerIcon size={13} /> : <UploadIcon size={13} />}
         {asset.public_url ? t("vl.drawer.replace-icon", "Replace icon") : t("vl.drawer.upload-icon", "Upload icon for this entity")}
       </button>
 
@@ -368,7 +368,7 @@ function OverviewTab({ asset, busy, fileRef, onFile, onPickFile }: {
               <button key={opt.key} type="button" disabled={!!dlBusy}
                 onClick={async () => { setDlBusy(opt.key); try { await opt.fn(); patch(asset.id, { action: "use" }); } finally { setDlBusy(null); } }}
                 className="flex flex-col items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">
-                {dlBusy === opt.key ? <SpinnerIcon size={14} className="animate-spin" /> : <span>{opt.label}</span>}
+                {dlBusy === opt.key ? <SpinnerIcon size={14} /> : <span>{opt.label}</span>}
                 <span className="text-[9px] font-normal text-[var(--text-dim)]">{opt.note}</span>
               </button>
             ))}
@@ -409,7 +409,7 @@ function IntelligenceTab({ asset, onChanged }: { asset: VisualAsset; onChanged: 
     <div>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("vl.drawer.semantic-intelligence", "Semantic intelligence")}</span>
-        {dirty && <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{saving ? <SpinnerIcon size={11} className="animate-spin" /> : null} {t("vl.drawer.save", "Save")}</button>}
+        {dirty && <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">{saving ? <SpinnerIcon size={11} /> : null} {t("vl.drawer.save", "Save")}</button>}
       </div>
       <AiField label={t("vl.drawer.semantic-meaning", "Semantic meaning")} placeholder={t("vl.drawer.ph-semantic", "e.g. Represents backward navigation")} value={ai.semantic_meaning} onChange={(v) => set("semantic_meaning", v)} />
       <AiField label={t("vl.drawer.visual-style", "Visual style")} placeholder={t("vl.drawer.ph-visual-style", "e.g. Minimal monochrome rounded outline icon")} value={ai.visual_style_description} onChange={(v) => set("visual_style_description", v)} />
@@ -455,7 +455,7 @@ function CollectionsTab({ assetId }: { assetId: string }) {
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("vl.drawer.collections", "Collections")}{memberships.length ? ` · ${memberships.length}` : ""}</span>
         <button type="button" onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><LayersIcon size={12} /> {t("vl.drawer.add", "Add")}</button>
       </div>
-      {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+      {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>
         : memberships.length === 0 ? <p className="text-[11.5px] text-[var(--text-dim)]">{t("vl.drawer.not-in-collection", "Not in any collection yet.")}</p>
         : <div className="flex flex-wrap gap-1.5">{memberships.map((m) => (
             <a key={m.link_id} href={m.slug ? `/database/collections/${m.slug}` : "#"} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] text-[var(--text-primary)] hover:border-[var(--border-color)]"><LayersIcon size={11} className="text-[var(--text-dim)]" /> {m.name}</a>
@@ -513,7 +513,7 @@ function HistoryTab({ assetId }: { assetId: string }) {
       .then((r) => r.ok ? r.json() : { events: [] }).then((j) => { if (alive) setEvents(j.events ?? []); }).catch(() => {}).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [assetId]);
-  if (loading) return <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} /></div>;
   if (events.length === 0) return (
     <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-8 text-center">
       <ClockIcon size={22} className="mx-auto text-[var(--text-dim)]" />

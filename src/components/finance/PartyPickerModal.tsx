@@ -26,6 +26,7 @@ import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import type { FinancePartyRow } from "@/app/api/finance/parties/route";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export type { FinancePartyRow };
 
@@ -146,7 +147,7 @@ export default function PartyPickerModal({
         <div className="max-h-[420px] overflow-y-auto px-2 pb-3">
           {loading && rows.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-[var(--text-dim)]">
-              <RrIcon name="loading" size={14} className="animate-spin" />
+              <SpinnerIcon size={14} />
               <span className="ml-2 text-sm">{t("party.searching", "Searching contacts…")}</span>
             </div>
           ) : error ? (

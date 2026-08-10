@@ -14,8 +14,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { record } from "@/lib/perf/client";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export interface CustomerPickResult {
   id: string;
@@ -196,7 +196,7 @@ export default function CustomerPickerModal({
         <div style={{ overflowY: "auto", flex: 1, padding: 8 }}>
           {loading && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 32, gap: 8, opacity: 0.7 }}>
-              <SpinnerIcon className="h-4 w-4 animate-spin" />
+              <SpinnerIcon className="h-4 w-4" />
               <span style={{ fontSize: 13 }}>Searching…</span>
             </div>
           )}

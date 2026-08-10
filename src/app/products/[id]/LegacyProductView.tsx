@@ -92,6 +92,7 @@ import { FIELD_GLYPHS } from "@/lib/machine-specs/icons";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { IMG } from "@/lib/cdn";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ---------------- helpers ---------------- */
 
@@ -1061,7 +1062,7 @@ export default function LegacyProductView() {
     return (
       <div className="min-h-[80vh] flex items-center justify-center bg-[var(--bg-card)]">
         <div className="flex items-center gap-3 text-[var(--text-secondary)] text-[13px]">
-          <div className="h-4 w-4 rounded-full border-2 border-[var(--border-subtle)] border-t-[var(--accent)] animate-spin" />
+          <SpinnerIcon className="h-4 w-4" />
           Loading product…
         </div>
       </div>

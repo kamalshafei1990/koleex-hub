@@ -27,6 +27,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -88,10 +89,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       {...rest}
     >
       {loading ? (
-        <span
-          aria-hidden
-          className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-        />
+        <SpinnerIcon className="h-3.5 w-3.5" />
       ) : (
         renderIcon(icon, size)
       )}

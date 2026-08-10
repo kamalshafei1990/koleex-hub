@@ -16,7 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
@@ -42,6 +41,7 @@ import type {
   ApprovalAuthorityRow,
   VolumeDiscountTierRow,
 } from "@/lib/server/commercial-policy";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export default function CommercialPolicyPage() {
   return (
@@ -141,7 +141,7 @@ function CommercialPolicyView() {
 function LoadingState() {
   return (
     <div className="flex items-center justify-center py-24">
-      <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+      <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
     </div>
   );
 }
@@ -400,7 +400,7 @@ function SectionShell({
                 disabled={saving || !canSave}
                 className="h-8 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wide bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
               >
-                {saving && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+                {saving && <SpinnerIcon className="h-3.5 w-3.5" />}
                 Save
               </button>
             </>
@@ -594,7 +594,7 @@ function SettingsSection({
                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {fxRefreshing
-                  ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                  ? <SpinnerIcon className="h-3.5 w-3.5" />
                   : <RefreshCwIcon className="h-3.5 w-3.5" />}
                 {fxRefreshing ? "Updating…" : "Update FX now"}
               </button>

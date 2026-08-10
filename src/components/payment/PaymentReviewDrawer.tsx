@@ -35,6 +35,7 @@ import { isImageMime, isPdfMime } from "@/lib/attachments/client";
 import { fmtMoney } from "@/lib/finance/calc";
 import { approvalTierForAmount, approvalTierExplanation } from "@/lib/finance/payment-thresholds";
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Props {
   open: boolean;
@@ -517,10 +518,7 @@ function ActionButton({
       }
     >
       {busy && (
-        <svg viewBox="0 0 24 24" width="11" height="11" className="animate-spin">
-          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
-          <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
+        <SpinnerIcon size={11} />
       )}
       {children}
     </button>

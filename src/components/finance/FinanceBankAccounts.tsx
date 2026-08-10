@@ -40,6 +40,7 @@ import type {
 } from "@/lib/finance/types";
 import type { BankAccountListItem } from "@/app/api/finance/bank-accounts/route";
 import type { BankAccountDetailResponse } from "@/app/api/finance/bank-accounts/[id]/route";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ────────────────────────────────────────────────────────────────────────
    Helpers
@@ -196,7 +197,7 @@ export default function FinanceBankAccounts() {
         {loading ? (
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
-              <RrIcon name="loading" size={14} className="animate-spin" />
+              <SpinnerIcon size={14} />
               {t("bankAccounts.loading", "Loading bank accounts…")}
             </div>
           </SectionCard>
@@ -255,7 +256,7 @@ export default function FinanceBankAccounts() {
             {detailLoading ? (
               <SectionCard>
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-[var(--text-dim)]">
-                  <RrIcon name="loading" size={14} className="animate-spin" />
+                  <SpinnerIcon size={14} />
                   {t("bankAccounts.loadingAccount", "Loading account…")}
                 </div>
               </SectionCard>

@@ -11,7 +11,6 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
@@ -70,6 +69,7 @@ import {
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow } from "@/types/supabase";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── i18n — full catalog app translation (en / zh / ar) ── */
 const T: Translations = {
@@ -902,7 +902,7 @@ function QuickAddContactModal({
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("common.cancel")}</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
             className="flex h-10 items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4" />}
             {saving ? t("quick.creating") : t("quick.create")}
           </button>
         </div>
@@ -1493,7 +1493,7 @@ function CatalogModal({
                   {thumbPreview ? (
                     <img src={thumbPreview} alt="" className="w-full h-full object-contain bg-white" />
                   ) : generatingThumb ? (
-                    <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+                    <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
                   ) : (
                     (() => { const Icon = (FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.icon) || FileIcon; return <Icon className={`h-5 w-5 ${FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.color || "text-zinc-400"}`} />; })()
                   )}
@@ -1744,7 +1744,7 @@ function CatalogModal({
             </button>
             <button onClick={handleSave} disabled={saving || (batchFiles.length > 0 ? false : (!file && !editEntry) || !title.trim())}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-              {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+              {saving && <SpinnerIcon className="h-4 w-4" />}
               {saving ? (progress || t("modal.uploading")) : editEntry ? t("modal.saveChanges") : batchFiles.length > 0 ? t("modal.uploadBatch").replace("{n}", String(batchFiles.length)) : t("modal.uploadBtn")}
             </button>
           </div>
@@ -1799,7 +1799,7 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
               <span>{t("del.delete")}</span>
             </span>
             <span className={`absolute inset-0 inline-flex items-center justify-center gap-2 transition-opacity duration-150 ${deleting ? "opacity-100" : "opacity-0"}`}>
-              <SpinnerIcon className="h-4 w-4 animate-spin shrink-0" />
+              <SpinnerIcon className="h-4 w-4 shrink-0" />
               <span>{t("del.deleting")}</span>
             </span>
           </button>
@@ -3397,7 +3397,7 @@ function CatalogsApp() {
             </button>
             <button onClick={handleBulkDelete} disabled={bulkDeleting}
               className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold inline-flex items-center gap-1.5 hover:bg-red-500/30 transition-all disabled:opacity-50">
-              {bulkDeleting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />} {t("cat.deleteSelected")}
+              {bulkDeleting ? <SpinnerIcon className="h-3.5 w-3.5" /> : <TrashIcon className="h-3.5 w-3.5" />} {t("cat.deleteSelected")}
             </button>
             <button onClick={clearSelection}
               className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors inline-flex items-center gap-1.5">
@@ -3550,7 +3550,7 @@ function CatalogsApp() {
         {/* Infinite scroll — auto-loads the next batch as the sentinel nears view */}
         {!catalogsLoading && filtered.length > visibleCount && (
           <div ref={loadMoreRef} className="mt-6 flex items-center justify-center gap-2 py-2 text-[12px] text-[var(--text-dim)]">
-            <SpinnerIcon className="h-4 w-4 animate-spin" />
+            <SpinnerIcon className="h-4 w-4" />
             {t("cat.loading", "Loading…")}
           </div>
         )}

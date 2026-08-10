@@ -21,13 +21,13 @@ import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import UserActivityDrawer from "@/components/super-admin/UserActivityDrawer";
 import AlertPreferencesModal from "@/components/super-admin/AlertPreferencesModal";
 import { routeToModule, eventLabel } from "@/lib/activity/modules";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── client-side mirror types ── */
 interface AccountInfo {
@@ -386,7 +386,7 @@ function UsageSection({ onOpenUser }: { onOpenUser: (id: string) => void }) {
         <span className="text-[10.5px] text-[var(--text-ghost)]">active time · idle excluded · ~ = estimated from events</span>
       </div>
       {rows === null ? (
-        <div className="h-28 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+        <div className="h-28 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
       ) : rows.length === 0 ? (
         <p className="h-28 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No usage recorded yet — accurate tracking starts with the first active heartbeat after this deploy.</p>
       ) : (
@@ -533,7 +533,7 @@ export default function SuperAdminActivityPage() {
   if (bootLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -607,7 +607,7 @@ export default function SuperAdminActivityPage() {
             </div>
             <div className="overflow-y-auto max-h-[520px]">
               {loadingMonitor && online.length === 0 ? (
-                <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+                <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
               ) : visibleOnline.length === 0 ? (
                 <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No users online right now.</p>
               ) : (
@@ -648,7 +648,7 @@ export default function SuperAdminActivityPage() {
               <div className="flex items-center gap-2">
                 <ActivityIcon className="h-4 w-4 text-[var(--text-dim)]" />
                 <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Activity feed</h3>
-                {loadingFeed && <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />}
+                {loadingFeed && <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[150px]">
@@ -678,7 +678,7 @@ export default function SuperAdminActivityPage() {
             </div>
             <div className="overflow-y-auto max-h-[520px]">
               {loadingFeed && feed.length === 0 ? (
-                <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+                <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
               ) : feed.length === 0 ? (
                 <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No activity matches these filters.</p>
               ) : (

@@ -12,9 +12,9 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Base {
   factoryCostCny: number;
@@ -80,7 +80,7 @@ export default function BaseFobCard({
     );
   }
   if (!base) {
-    return <div className="flex items-center gap-2 py-6 text-[var(--text-dim)] text-[13px]"><SpinnerIcon className="h-4 w-4 animate-spin" /> Computing…</div>;
+    return <div className="flex items-center gap-2 py-6 text-[var(--text-dim)] text-[13px]"><SpinnerIcon className="h-4 w-4" /> Computing…</div>;
   }
 
   const steps = [
@@ -109,7 +109,7 @@ export default function BaseFobCard({
         {/* accent edge bar */}
         <div className="absolute inset-y-0 left-0 w-1 bg-[var(--accent)]" />
         <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
-          Base FOB (USD) {loading && <SpinnerIcon className="h-3 w-3 animate-spin" />}
+          Base FOB (USD) {loading && <SpinnerIcon className="h-3 w-3" />}
         </div>
         <div className="text-[26px] font-black text-[var(--accent)] leading-tight mt-0.5 tabular-nums">{usd(base.globalFobUsd)}</div>
         <div className="text-[10px] text-[var(--text-ghost)]">Global · before market &amp; customer{fx ? ` · fx ¥${fx}/$` : ""}</div>

@@ -15,7 +15,6 @@ import { fpAvatar } from "@/lib/cdn";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -67,6 +66,7 @@ import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { useTranslation } from "@/lib/i18n";
 import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -1542,7 +1542,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               aria-label={t("save.employee")}
             >
-              {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
+              {saving ? <SpinnerIcon size={16} /> : <CheckIcon size={16} />}
               <span className="hidden xs:inline sm:inline">{saving ? t("saving") : t("save.employee")}</span>
             </button>
           </div>
@@ -1563,7 +1563,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             />
             <div className="relative h-28 w-28 rounded-2xl border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center overflow-hidden group-hover:border-[var(--border-focus)] transition-colors">
               {photoUploading ? (
-                <SpinnerIcon size={22} className="animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon size={22} className="text-[var(--text-dim)]" />
               ) : form.photo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={fpAvatar(form.photo_url)} alt="" className="h-full w-full object-cover" />
@@ -1978,7 +1978,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
               {loadingDeps ? (
                 <div className="flex items-center gap-2 text-xs text-[var(--text-faint)] py-3">
-                  <SpinnerIcon size={14} className="animate-spin" /> Loading...
+                  <SpinnerIcon size={14} /> Loading...
                 </div>
               ) : departments.length === 0 && !form.create_new_department ? (
                 <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-dashed border-[var(--border-subtle)] text-center">

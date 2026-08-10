@@ -9,9 +9,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* -- Prompt dialog (replaces window.prompt) ------------------------------- */
 
@@ -122,7 +122,7 @@ export function PromptDialog({
             disabled={busy}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40"
           >
-            {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+            {busy && <SpinnerIcon className="h-3.5 w-3.5" />}
             {confirmLabel ?? "OK"}
           </button>
         </div>
@@ -212,7 +212,7 @@ export function ConfirmDialog({
             disabled={busy}
             className={`h-10 px-5 rounded-xl text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-40 ${confirmBtn}`}
           >
-            {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+            {busy && <SpinnerIcon className="h-3.5 w-3.5" />}
             {confirmLabel ?? "Confirm"}
           </button>
         </div>

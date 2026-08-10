@@ -40,9 +40,9 @@ import WalletIcon from "@/components/icons/ui/WalletIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════════════════════════════════════
    MAIN COMPONENT
@@ -85,7 +85,7 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }

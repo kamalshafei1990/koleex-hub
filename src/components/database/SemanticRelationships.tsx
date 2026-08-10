@@ -13,7 +13,6 @@ import {
 } from "@/lib/visual-library/types";
 import VisualRelationshipModal from "@/components/database/VisualRelationshipModal";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -21,6 +20,7 @@ import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   ...VL_LABELS_T,
@@ -113,7 +113,7 @@ export default function SemanticRelationships({
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={16} className="animate-spin" /></div>
+        <div className="flex items-center justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={16} /></div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-6 text-center">
           <p className="text-[12px] text-[var(--text-muted)]">{t("vl.sem.no-relationships", "No relationships yet.")}</p>
@@ -170,7 +170,7 @@ function IconBtn({ children, title, onClick, busy }: { children: React.ReactNode
   return (
     <button type="button" title={title} onClick={onClick} disabled={busy}
       className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50">
-      {busy ? <SpinnerIcon size={12} className="animate-spin" /> : children}
+      {busy ? <SpinnerIcon size={12} /> : children}
     </button>
   );
 }

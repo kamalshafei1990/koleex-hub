@@ -11,10 +11,10 @@
 import { useEffect, useState } from "react";
 import type { DnaAnalysis } from "@/lib/visual-library/types";
 import { dnaMatchStatus } from "@/lib/visual-library/design-dna";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.dna.loadFailed":       { en: "Couldn’t load DNA profile.", zh: "无法加载 DNA 档案。", ar: "تعذّر تحميل ملف الـ DNA." },
@@ -71,7 +71,7 @@ export default function AssetDna({
   };
   useEffect(() => { load(); }, [asset.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={18} /></div>;
   if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">{t("vl.dna.loadFailed", "Couldn’t load DNA profile.")}</p>;
 
   const d = data.dna;

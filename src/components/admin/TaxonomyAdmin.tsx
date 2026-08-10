@@ -9,7 +9,6 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
@@ -20,6 +19,7 @@ import { getDivisionIcon } from "@/components/icons/divisions";
 import { slugify } from "@/types/product-form";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ---------------------------------------------------------------------------
    TaxonomyAdmin — Reusable CRUD admin for divisions, categories, subcategories.
@@ -536,7 +536,7 @@ export default function TaxonomyAdmin({
                 disabled={saving}
                 className="h-10 px-6 rounded-lg bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-50"
               >
-                {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+                {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
                 {saving ? "Saving..." : editId ? "Update" : "Create"}
               </button>
             </div>

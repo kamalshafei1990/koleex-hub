@@ -10,11 +10,11 @@ import { useEffect, useMemo, useState } from "react";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { behaviorLevel, type BehaviorLevel } from "@/lib/behavior/scoring";
 import { useTranslation } from "@/lib/i18n";
 import { localizedName, nameMatches } from "@/lib/i18n-name";
 import { hrT } from "@/lib/translations/hr";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /** Behaviour level → translation key, so the slider label localises. */
 const LEVEL_KEY: Record<BehaviorLevel, string> = {
@@ -245,7 +245,7 @@ export function PositionBehaviorConfig({
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loading ? (
-            <div className="flex justify-center py-8"><SpinnerIcon size={18} className="animate-spin text-[var(--text-dim)]" /></div>
+            <div className="flex justify-center py-8"><SpinnerIcon size={18} className="text-[var(--text-dim)]" /></div>
           ) : reqs.length === 0 ? (
             <p className="py-6 text-center text-[12.5px] text-[var(--text-faint)]">{t("hr.bhv.noRequirements")}</p>
           ) : reqs.map((r) => (

@@ -188,7 +188,7 @@ export default function RecruitmentModule({ employees, t, lang }: HRModuleProps)
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <SpinnerIcon size={28} className="text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon size={28} className="text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -350,7 +350,7 @@ export default function RecruitmentModule({ employees, t, lang }: HRModuleProps)
               disabled={!postingForm.title || saving}
               onClick={handleCreatePosting}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.create")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.create")}
             </button>
           </>
         }
@@ -454,7 +454,7 @@ export default function RecruitmentModule({ employees, t, lang }: HRModuleProps)
               disabled={!applicantForm.full_name || saving}
               onClick={handleCreateApplicant}
             >
-              {saving ? <SpinnerIcon size={14} className="animate-spin" /> : t("hr.add")}
+              {saving ? <SpinnerIcon size={14} /> : t("hr.add")}
             </button>
           </>
         }

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
 import TruckIcon from "@/components/icons/ui/TruckIcon";
@@ -55,6 +54,7 @@ import {
   DEFAULT_PRODUCT_INFO, DEFAULT_EXPORT_COSTS, DEFAULT_SHIPPING,
   DEFAULT_IMPORT_COSTS, DEFAULT_INLAND, DEFAULT_FINANCIAL,
 } from "@/lib/landed-cost-types";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
@@ -617,7 +617,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   const updateFinancial = (key: keyof FinancialSettings, v: number | string | boolean) => setFinancial(prev => ({ ...prev, [key]: v }));
 
   if (loading) {
-    return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></div>;
+    return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>;
   }
 
   const productTotal = unitPrice * (quantity || 1);
@@ -668,7 +668,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </div>
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
             <button onClick={() => handleSave()} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg">
-              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
               {saving ? t("saving") : t("save")}
             </button>
             {status === "draft" && (

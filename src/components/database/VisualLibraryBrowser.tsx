@@ -27,13 +27,13 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { VL_LABELS_T } from "@/lib/translations/visual-library-labels";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.browse.binding-any":   { en: "Bound & free", zh: "绑定+空闲", ar: "المرتبطة والحرة" },
@@ -376,7 +376,7 @@ export default function VisualLibraryBrowser() {
 
         {/* Results */}
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>
+          <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
             <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
@@ -430,7 +430,7 @@ export default function VisualLibraryBrowser() {
           <div className="ml-auto flex items-center gap-2">
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("approve")}
               className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
-              {bulkBusy ? <SpinnerIcon size={12} className="animate-spin" /> : <BadgeCheckIcon size={12} />} {t("vl.browse.approve", "Approve")}
+              {bulkBusy ? <SpinnerIcon size={12} /> : <BadgeCheckIcon size={12} />} {t("vl.browse.approve", "Approve")}
             </button>
             <button type="button" disabled={bulkBusy} onClick={() => setShowBulkCol(true)}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">

@@ -21,7 +21,6 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import RefreshIcon from "@/components/icons/ui/RefreshIcon";
 import BrandIcon from "@/components/icons/BrandIcon";
@@ -30,6 +29,7 @@ import {
   uploadBrandLogo, deleteBrandLogo,
 } from "@/lib/products-admin";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.brands.nameRequired":  { en: "Brand name is required",                zh: "品牌名称为必填项",     ar: "اسم العلامة التجارية مطلوب" },
@@ -251,7 +251,7 @@ function BrandModal({
             disabled={saving || !name.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--accent)] text-white text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
           >
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4" /> : null}
             {saving ? t("vl.brands.saving", "Saving...") : brand ? t("vl.brands.saveChanges", "Save Changes") : t("vl.brands.createBrand", "Create Brand")}
           </button>
         </div>
@@ -311,7 +311,7 @@ function DeleteModal({
             disabled={deleting}
             className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-40"
           >
-            {deleting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}
+            {deleting ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-3.5 w-3.5" />}
             {deleting ? t("vl.brands.deleting", "Deleting...") : t("vl.brands.deleteBrand", "Delete Brand")}
           </button>
         </div>
@@ -422,7 +422,7 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
       {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+          <SpinnerIcon className="h-5 w-5 text-[var(--text-muted)]" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-[var(--border-subtle)] rounded-xl">

@@ -14,11 +14,11 @@ import {
 import CollectionModal from "@/components/database/CollectionModal";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const T: Translations = {
   "vl.col.searchPlaceholder": { en: "Search collections…", zh: "搜索合集…", ar: "ابحث في المجموعات…" },
@@ -110,7 +110,7 @@ export default function CollectionsBrowser() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>
+        <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>
       ) : cols.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
           <LayersIcon size={32} className="text-[var(--text-dim)]" />

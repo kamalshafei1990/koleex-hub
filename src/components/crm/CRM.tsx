@@ -54,7 +54,6 @@ import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -105,6 +104,7 @@ import type {
   CrmOpportunityWithRelations,
   CrmStageRow,
 } from "@/types/supabase";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ════════════════════════════════════════════════════════════════════════
    Helpers
@@ -764,7 +764,7 @@ export default function CRM() {
         {/* ─ Body ─ */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
           </div>
         ) : opps.length === 0 ? (
           <EmptyState onCreate={() => setEditingId("new")} t={t} />
@@ -1310,7 +1310,7 @@ function PipelineColumn({
                   disabled={quickBusy || !quickName.trim()}
                   className="h-7 px-2.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                 >
-                  {quickBusy && <SpinnerIcon className="h-3 w-3 animate-spin" />}
+                  {quickBusy && <SpinnerIcon className="h-3 w-3" />}
                   {t("quick.add.btn")}
                 </button>
               </div>
@@ -1901,7 +1901,7 @@ function ContactComboboxField({
                 >
                   <div className="h-7 w-7 rounded-full bg-[var(--bg-inverted)]/[0.08] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] shrink-0">
                     {creating ? (
-                      <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                      <SpinnerIcon className="h-3.5 w-3.5" />
                     ) : (
                       <PlusIcon className="h-3.5 w-3.5" />
                     )}
@@ -2674,7 +2674,7 @@ function OpportunityModal({
               disabled={saving}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
             >
-              {saving && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <SpinnerIcon className="h-3.5 w-3.5" />}
               {isNew ? t("form.create") : t("form.save")}
             </button>
           </div>
@@ -2833,7 +2833,7 @@ function ActivitiesPanel({
 
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
         </div>
       ) : activities.length === 0 ? (
         <p className="text-[11.5px] text-[var(--text-ghost)] italic py-2">
@@ -3641,7 +3641,7 @@ function ActivityView({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -3890,7 +3890,7 @@ function GenerateLeadsModal({
             disabled={busy || count < 1}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+            {busy && <SpinnerIcon className="h-3.5 w-3.5" />}
             {t("gen.create")}
           </button>
         </div>
@@ -4088,7 +4088,7 @@ function StageEditModal({
               disabled={busy || !name.trim()}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-1.5"
             >
-              {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
+              {busy && <SpinnerIcon className="h-3.5 w-3.5" />}
               {t("stage.edit.save")}
             </button>
           </div>
@@ -4207,7 +4207,7 @@ function ReportingPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -4342,7 +4342,7 @@ function ConfigurationPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
