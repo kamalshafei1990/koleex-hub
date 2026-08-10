@@ -7,11 +7,7 @@ import BrandLoading from "@/components/ui/BrandLoading";
 
 const PlanningApp = dynamic(() => import("@/components/planning/PlanningApp"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading />
-    </div>
-  ),
+  loading: () => <BrandLoading />,
 });
 
 export default function PlanningPage() {

@@ -1275,6 +1275,17 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop { background: rgba(252, 253, 255, 0.99); }
 }
 
+/* ── Loading surface ─────────────────────────────────────────────────────
+   The one height for full-page loading gates: exactly the visible content
+   area, using the SAME per-display-mode units as the shell (vh in the
+   installed PWA / desktop, svh only in browser tabs). The old dvh version
+   re-measured as the toolbar slid, which made the orb and its progress
+   line drift mid-load. */
+.kx-load-surface { height: calc(100vh - var(--kx-header-h, 3.5rem)); }
+@media (display-mode: browser) {
+  .kx-load-surface { height: calc(100svh - var(--kx-header-h, 3.5rem)); }
+}
+
 /* ── Aurora: Koleex AI app ──────────────────────────────────────────────
    The app root and its top bars go transparent so the fixed ground shows;
    the conversations sidebar wears the tile glass, the composer/modals wear

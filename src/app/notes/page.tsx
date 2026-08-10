@@ -10,11 +10,7 @@ import BrandLoading from "@/components/ui/BrandLoading";
    shell anyway since the editor won't mount until hydration. */
 const NotesApp = dynamic(() => import("@/components/notes/NotesApp"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading />
-    </div>
-  ),
+  loading: () => <BrandLoading />,
 });
 
 export default function NotesPage() {

@@ -29,10 +29,11 @@ const MEANINGFUL_REQUESTS = 3;
    centred, it dances up and down because I can scroll while it's showing".
    Cause: the gate was min-h-screen (100vh) sitting BELOW the app header, so
    the page was taller than the viewport by the header height — the logo was
-   centred in the block, not on screen, and the whole thing scrolled. Fixed
-   height = visible area (dvh, so the iOS URL bar can't change it mid-scroll)
-   minus the header, and nothing can overflow. */
-const SURFACE = "h-[calc(100dvh-var(--kx-header-h,3.5rem))] overflow-hidden";
+   centred in the block, not on screen, and the whole thing scrolled.
+   .kx-load-surface (globals) = exactly the visible area, with the shell's
+   per-display-mode units — the earlier dvh version re-measured while the
+   iOS toolbar slid and the orb drifted mid-load. */
+const SURFACE = "kx-load-surface overflow-hidden";
 
 export default function BrandLoading({
   label = "Loading…",

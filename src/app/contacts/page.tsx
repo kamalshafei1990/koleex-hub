@@ -10,13 +10,11 @@
    never touches. */
 
 import dynamic from "next/dynamic";
-import BrandLoading from "@/components/ui/BrandLoading";
+import { DirectoryListSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 
 const Contacts = dynamic(() => import("@/components/contacts/Contacts"), {
   ssr: false,
-  loading: () => (
-    <BrandLoading />
-  ),
+  loading: () => <DirectoryListSkeleton label="Loading contacts…" />,
 });
 
 export default function ContactsPage() {

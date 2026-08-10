@@ -12,11 +12,7 @@ import BrandLoading from "@/components/ui/BrandLoading";
    QuotationA4Preview, which is a browser-only component. */
 const DocumentsApp = dynamic(() => import("@/components/documents/DocumentsApp"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <BrandLoading />
-    </div>
-  ),
+  loading: () => <BrandLoading />,
 });
 
 export default function DocumentsPage() {

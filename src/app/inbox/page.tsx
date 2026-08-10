@@ -30,7 +30,7 @@ import ForwardMsgIcon from "@/components/icons/ui/ForwardMsgIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
-import BrandLoading from "@/components/ui/BrandLoading";
+import { DirectoryListSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
@@ -465,7 +465,7 @@ export default function InboxPage() {
 
   if (accountLoading) {
     return (
-      <BrandLoading />
+      <DirectoryListSkeleton label="Loading mail…" />
     );
   }
 

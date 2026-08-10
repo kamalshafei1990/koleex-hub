@@ -29,7 +29,7 @@ import AuthGate from "@/components/admin/AuthGate";
 import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import BrandLoading from "@/components/ui/BrandLoading";
+import { WorkspaceSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
@@ -114,7 +114,7 @@ function SettingsContent() {
 
   if (!account) {
     return (
-      <BrandLoading />
+      <WorkspaceSkeleton label="Loading settings…" />
     );
   }
 
