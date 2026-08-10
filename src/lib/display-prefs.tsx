@@ -130,7 +130,14 @@ export function getTheme(): ThemeMode {
    the frames it is trying to save. */
 function applyLowPower(): void {
   if (typeof document === "undefined" || typeof navigator === "undefined") return;
-  if ((navigator.hardwareConcurrency || 8) <= 4) {
+  /* iOS reports hardwareConcurrency as 4 on every iPhone (anti-
+     fingerprinting), which made this stamp strip the glass off the whole
+     skin on mobile. Apple hardware is never "low power" in the sense this
+     guard exists for. */
+  if (
+    (navigator.hardwareConcurrency || 8) <= 4 &&
+    !/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent)
+  ) {
     document.documentElement.setAttribute("data-kx-lowpower", "1");
   }
 }

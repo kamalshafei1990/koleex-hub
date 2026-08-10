@@ -207,7 +207,13 @@ export default function WavyBackground({ theme: forced }: { theme?: "dark" | "li
        hardwareConcurrency is a crude proxy and it is the only one available
        without measuring frames and then reacting, which would itself cost the
        frames it is trying to save. */
-    const weak = (navigator.hardwareConcurrency || 8) <= 4;
+    /* iOS CAPS hardwareConcurrency AT 4 for fingerprinting protection, so
+       this heuristic classified every iPhone — some of the strongest GPUs
+       shipping — as a weak machine and froze the ground ("in mobile version
+       is not moving"). Apple devices are excluded; the gate still guards
+       its actual target, mid-range Windows boxes opened from WeChat. */
+    const apple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+    const weak = !apple && (navigator.hardwareConcurrency || 8) <= 4;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches || weak;
 
     /* RATIO 1, WHICH IS WHAT THE ORIGINAL DOES.
@@ -236,9 +242,22 @@ export default function WavyBackground({ theme: forced }: { theme?: "dark" | "li
       h = cv.clientHeight;
       cv.width = Math.max(1, w);
       cv.height = Math.max(1, h);
-      /* Set ONCE per resize, exactly as the original does — the context keeps
-         it for every stroke that follows. */
+      /* Set ONCE per resize, exactly as the original does — the context
+         keeps it for every stroke that follows.
+
+         EXCEPT ON WEBKIT, WHICH NEVER IMPLEMENTED ctx.filter: Safari drops
+         the assignment silently, the blur the whole picture is built on
+         vanishes, and the waves render as sharp bands — the owner's
+         screenshot from the macOS Safari web app, while every Chromium
+         measurement said fine. Detected by writing the property and reading
+         it back; where unsupported, the SAME blur moves to the canvas
+         element as a CSS filter (one GPU composite per frame), and the
+         canvas box already extends past the viewport so the blurred edge
+         falloff lives off-screen. */
       ctx.filter = `blur(${BLUR}px)`;
+      if (ctx.filter === "none" || !ctx.filter) {
+        cv.style.filter = `blur(${BLUR}px)`;
+      }
       ctx.lineWidth = WAVE_WIDTH;
     };
 
@@ -311,7 +330,15 @@ export default function WavyBackground({ theme: forced }: { theme?: "dark" | "li
 
   return (
     <>
-      <canvas ref={ref} aria-hidden className="absolute inset-0 h-full w-full pointer-events-none" />
+      {/* The box runs 48px past the viewport on every side — uniform across
+          engines so both blur paths (ctx.filter / CSS element filter) render
+          the same picture, and the CSS path's edge falloff stays off-screen. */}
+      <canvas
+        ref={ref}
+        aria-hidden
+        className="absolute pointer-events-none"
+        style={{ inset: -48, width: "calc(100% + 96px)", height: "calc(100% + 96px)" }}
+      />
       {/* Contrast floor. The waves cross the middle of the screen, which is
           exactly where the password field sits, and the brightest stop is
           #BCD8F0 under white type. */}

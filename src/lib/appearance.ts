@@ -45,7 +45,7 @@ d.setAttribute('data-kx-skin',s==='core'?'core':'${DEFAULT_SKIN}');
 var m=localStorage.getItem('koleex-theme-mode'),t=localStorage.getItem('koleex-theme');
 var r=m==='light'||m==='dark'?m:(m==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):(t==='light'?'light':'dark'));
 d.setAttribute('data-theme',r);
-if((navigator.hardwareConcurrency||8)<=4)d.setAttribute('data-kx-lowpower','1');
+if((navigator.hardwareConcurrency||8)<=4&&!/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent))d.setAttribute('data-kx-lowpower','1');
 }catch(e){}})();`;
 
 export function getSkin(): Skin {
