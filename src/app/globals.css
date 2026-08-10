@@ -1289,18 +1289,23 @@ input[type="number"]:not(.kx-spinner) {
 /* ── One border, everywhere ─────────────────────────────────────────────
    The owner asked whether the header chips' borders match the app tiles'.
    They did not: tiles 6%, search 7%, chips 8%, View-as 10%, popovers 8 and
-   10 mixed — five values for one idea. Under Aurora every bordered glass
-   surface and every header chip draws the same 8% line; Core keeps each
-   element's original value untouched. */
+   10 mixed — five values for one idea. The owner picked the TILE as the
+   reference, so under Aurora every bordered glass surface and every header
+   chip draws the tile's 6% line; Core keeps each element's original value.
+   The attribute-substring selectors sweep in the language-switcher frame and
+   any other bordered chip inside the bar without hunting each one down. */
 [data-kx-skin="aurora"] .kx-glass,
 [data-kx-skin="aurora"] .kx-glass-pop,
-[data-kx-skin="aurora"] .kx-mainheader .kx-hover-glow {
-  border-color: rgba(255, 255, 255, 0.08);
+[data-kx-skin="aurora"] .kx-mainheader .kx-hover-glow,
+[data-kx-skin="aurora"] .kx-mainheader .kx-seg-on,
+[data-kx-skin="aurora"] .kx-mainheader [class*="border-white/"] {
+  border-color: rgba(255, 255, 255, 0.06);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass,
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop,
-[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader .kx-hover-glow {
-  border-color: rgba(0, 0, 0, 0.08);
+[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader .kx-hover-glow,
+[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader [class*="border-black/"] {
+  border-color: rgba(0, 0, 0, 0.06);
 }
 /* The pane is border-less and the rule above must not resurrect a line. */
 [data-kx-skin="aurora"] .kx-header-pane,
