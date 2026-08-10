@@ -435,7 +435,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         onMouseEnter={handleTriggerHover}
         className={`h-8 w-8 px-0 justify-center sm:w-auto sm:px-3 md:h-9 rounded-lg md:rounded-xl border text-[12px] font-medium flex items-center sm:gap-2 transition-all ${
           dk
-            ? "bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
+            ? "kx-hover-glow bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
             : "bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"
         }`}
         title="Super Admin — view the system as another user or role"
