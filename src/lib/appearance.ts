@@ -46,12 +46,6 @@ var m=localStorage.getItem('koleex-theme-mode'),t=localStorage.getItem('koleex-t
 var r=m==='light'||m==='dark'?m:(m==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):(t==='light'?'light':'dark'));
 d.setAttribute('data-theme',r);
 if((navigator.hardwareConcurrency||8)<=4&&!/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent))d.setAttribute('data-kx-lowpower','1');
-/* MEASURED shell height — the end of the vh/svh/dvh guessing game. The
-   layout-viewport height is exactly what the shell must be in EVERY mode:
-   the stable small viewport in the browser (toolbar visible), the full
-   screen in the installed PWA. Stamped before first paint; RootShell
-   re-stamps it on orientation/width changes only. */
-d.style.setProperty('--kx-shell-h',d.clientHeight+'px');
 }catch(e){}})();`;
 
 export function getSkin(): Skin {

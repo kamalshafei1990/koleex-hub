@@ -130,34 +130,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const pathname = usePathname();
 
-  /* Keep --kx-shell-h (stamped pre-paint by SKIN_BOOTSTRAP) honest across
-     REAL layout changes only. Touch devices re-stamp on orientation/width —
-     never on height-only jitter (that's the toolbar or the keyboard, and
-     reacting to those is exactly the resize-mid-scroll bug). Fine-pointer
-     devices (desktop, resizable windows) re-stamp on every resize. */
-  useEffect(() => {
-    const stamp = () =>
-      document.documentElement.style.setProperty(
-        "--kx-shell-h",
-        `${document.documentElement.clientHeight}px`,
-      );
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    let lastW = window.innerWidth;
-    const onResize = () => {
-      if (!coarse || window.innerWidth !== lastW) {
-        lastW = window.innerWidth;
-        stamp();
-      }
-    };
-    const onOrient = () => window.setTimeout(stamp, 120);
-    stamp();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onOrient);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onOrient);
-    };
-  }, []);
   /* The home launcher already lists every app grouped by category, so the
      persistent sidebar rail there is pure duplication. Hide it on "/" and
      reclaim the horizontal space (full-width launcher). Every inner route
@@ -241,20 +213,17 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         .kx-shell-top.kx-underglass { padding-top: var(--kx-safe-top, 0px) !important; }
         html.kx-desktop .kx-shell-top.kx-underglass { padding-top: var(--kx-titlebar) !important; }
         .kx-underglass #main-scroll-container { padding-top: 3.5rem; }
-        /* The shell height is MEASURED, not a unit. Three rounds proved the
-           units cannot cover every iOS mode at once: 100vh over-counts in
-           the browser (bottom cropped behind the toolbar), 100dvh resizes
-           mid-scroll (everything jumped), and in the installed PWA svh came
-           up short by the status bar + home indicator (dead band, owner
-           screenshot). documentElement.clientHeight IS the right number in
-           every mode — stable small viewport in the browser, full screen in
-           standalone — stamped as --kx-shell-h before first paint
-           (SKIN_BOOTSTRAP) and re-stamped below only on real layout changes
-           (orientation / width), never while chrome slides or the keyboard
-           rises. The unit chain stays as the no-JS fallback. */
-        .kx-shell-top { height: 100vh; height: 100svh; height: var(--kx-shell-h, 100svh); }
-        @media (display-mode: standalone) {
-          .kx-shell-top { height: 100vh; height: var(--kx-shell-h, 100vh); }
+        /* Shell height: ONE static unit per display mode, no JS, no races.
+           The saga so far — 100vh cropped in the browser, dvh resized
+           mid-scroll, svh ran short in the installed PWA, and a pre-paint
+           JS measurement raced the standalone boot and froze the shell at
+           half a screen (owner screenshot). The truth is static per MODE:
+           installed PWA / desktop have no collapsible chrome, so plain
+           100vh is exact and stable there; only real browser tabs get svh,
+           which always fits above the toolbar and never moves mid-scroll. */
+        .kx-shell-top { height: 100vh; }
+        @media (display-mode: browser) {
+          .kx-shell-top { height: 100vh; height: 100svh; }
         }
         /* In-flow content can always scroll clear of the iPhone home
            indicator; env() is 0 everywhere else. Fixed elements (composers,

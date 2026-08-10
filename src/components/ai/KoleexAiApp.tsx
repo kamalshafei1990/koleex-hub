@@ -1590,40 +1590,32 @@ export default function KoleexAiApp() {
      chat in place while the browser chrome animates. Desktop keeps
      100dvh because it has no such chrome. */
   const aurora = useSkin() === "aurora";
-  const [stageHeight, setStageHeight] = useState<string>("calc(100dvh - var(--kx-header-h, 3.5rem))");
+  /* ── Stage height: CSS AT REST, JS ONLY WHILE THE KEYBOARD IS UP. ──────
+     Every "measure the viewport at some moment" scheme raced something on
+     iOS (standalone boot, keyboard animation, toolbar slide) and each race
+     froze the app at a wrong height — the owner's half-screen screenshot.
+     At rest the height is a pure CSS calc the engine keeps correct forever:
+     the installed PWA and desktop have no collapsible chrome (100vh),
+     browser tabs use 100svh (always fits above the toolbar, never moves).
+     JS takes over ONLY between focus and blur, where CSS cannot see the
+     keyboard: pre-lift on touchstart by the remembered keyboard height
+     (prevents the iOS pan — "the box jumps to the top then falls slowly"),
+     refine to the exact visualViewport height when the keyboard settles,
+     hand back to the CSS calc on blur. */
+  const restStage = () =>
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
+      ? "calc(100vh - var(--kx-header-h, 3.5rem))"
+      : "calc(100svh - var(--kx-header-h, 3.5rem))";
+  const [stageHeight, setStageHeight] = useState<string>("calc(100vh - var(--kx-header-h, 3.5rem))");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
-    /* The Hub chrome above this app is NOT a constant: the header grows by
-       the safe-area inset on notched iPhones (~115px in the installed PWA,
-       56px on desktop web). The hardcoded 56 left the composer ~59px below
-       the fold on the owner's iPhone. Measure the real header box. */
     const headerH = () => {
       const el = document.querySelector<HTMLElement>(".kx-mainheader");
       return el ? el.getBoundingClientRect().height : 56;
     };
-    /* Only visualViewport reports the KEYBOARD. innerHeight does not shrink
-       when iOS raises it, so ignoring every height change (the old rule)
-       meant the composer stayed underneath the keyboard — the owner's "I
-       write a message and I can't send it". The distinction that matters:
-       url/toolbar chrome slides by ~60-90 px, a keyboard takes 250 px+.
-       Track the big changes, ignore the small ones, and the pane neither
-       shakes nor hides the send button. */
-    const KEYBOARD_MIN_DELTA = 120;
     const vv = window.visualViewport;
     const viewportH = () => (vv ? vv.height : window.innerHeight);
-    let applied = viewportH();
-
-    /* ── iOS keyboard: PREVENT the pan, don't fight it. ──────────────────
-       iOS pans the page the instant a focused caret would sit under the
-       incoming keyboard — before any resize event fires. Correcting after
-       the fact is what the owner saw: "the type box jumps to the top then
-       falls down slowly" (the pan, then our staggered corrections). So the
-       stage now shrinks BEFORE focus: touchstart fires ahead of focus, we
-       pre-lift by the keyboard height remembered from the last session
-       (first ever: 300px), the caret is already above the keyboard's area
-       when focus lands, and iOS finds nothing to pan. The real vv resize
-       then refines the estimate to the exact height and stores it. */
     const KB_KEY = "kx-kb-h";
     const kbEstimate = () => {
       try {
@@ -1632,8 +1624,7 @@ export default function KoleexAiApp() {
       } catch { /* storage blocked */ }
       return 300;
     };
-    let preLifted = false;
-    let preLiftGuard = 0;
+    let kbMode = false;
 
     const pinOuter = () => {
       if (!isMobile()) return;
@@ -1641,30 +1632,17 @@ export default function KoleexAiApp() {
       const sc = document.getElementById("main-scroll-container");
       if (sc && sc.scrollTop) sc.scrollTop = 0;
     };
-    const apply = () => {
-      if (isMobile()) {
-        applied = viewportH();
-        setStageHeight(`${Math.max(240, applied - headerH())}px`);
-        pinOuter();
-      } else {
-        setStageHeight("calc(100dvh - var(--kx-header-h, 3.5rem))");
-      }
+    const rest = () => {
+      kbMode = false;
+      setStageHeight(restStage());
+      pinOuter();
     };
-    apply();
+    rest();
 
     const preLift = () => {
-      if (!isMobile() || preLifted) return;
-      preLifted = true;
+      if (!isMobile() || kbMode) return;
+      kbMode = true;
       setStageHeight(`${Math.max(240, viewportH() - kbEstimate() - headerH())}px`);
-      /* If no keyboard actually arrives (it was a scroll flick over the
-         composer), restore the full stage. */
-      window.clearTimeout(preLiftGuard);
-      preLiftGuard = window.setTimeout(() => {
-        if (preLifted && Math.abs(viewportH() - applied) < KEYBOARD_MIN_DELTA) {
-          preLifted = false;
-          apply();
-        }
-      }, 900);
     };
     const onTouchComposer = (e: TouchEvent) => {
       const t = e.target as HTMLElement | null;
@@ -1678,49 +1656,35 @@ export default function KoleexAiApp() {
       }
     };
     const onFocusOut = () => {
-      if (!isMobile()) return;
-      /* Keyboard dismissed → back to the full stage once vv settles. */
-      window.setTimeout(() => {
-        preLifted = false;
-        apply();
-      }, 60);
+      /* Keyboard dismissed → hand the height back to CSS. The calc string
+         is correct by construction, so there is nothing to race. */
+      if (isMobile()) window.setTimeout(rest, 60);
     };
-
-    let lastWidth = window.innerWidth;
-    const onResize = () => {
-      if (!isMobile()) { apply(); return; }
-      if (window.innerWidth !== lastWidth) { lastWidth = window.innerWidth; apply(); return; }
-      const delta = window.innerHeight - viewportH();
-      if (preLifted && delta >= KEYBOARD_MIN_DELTA) {
-        /* The real keyboard height: refine the stage exactly and remember
-           it for the next pre-lift. */
-        try { window.localStorage.setItem(KB_KEY, String(Math.round(delta))); } catch { /* ignore */ }
-        applied = viewportH();
-        setStageHeight(`${Math.max(240, applied - headerH())}px`);
+    const onVVResize = () => {
+      if (!isMobile() || !kbMode) return;
+      /* The keyboard settled: refine the estimate to the exact height and
+         remember it for the next pre-lift. */
+      const kb = Math.round(window.innerHeight - viewportH());
+      if (kb >= 120) {
+        try { window.localStorage.setItem(KB_KEY, String(kb)); } catch { /* ignore */ }
+        setStageHeight(`${Math.max(240, viewportH() - headerH())}px`);
         pinOuter();
-        return;
       }
-      /* Same width → either chrome sliding (ignore) or the keyboard (follow). */
-      if (Math.abs(viewportH() - applied) >= KEYBOARD_MIN_DELTA) apply();
     };
 
-    window.addEventListener("orientationchange", apply);
-    window.addEventListener("resize", onResize);
     window.addEventListener("touchstart", onTouchComposer, { passive: true, capture: true });
     window.addEventListener("focusin", onFocusIn);
     window.addEventListener("focusout", onFocusOut);
-    vv?.addEventListener("resize", onResize);
+    vv?.addEventListener("resize", onVVResize);
     vv?.addEventListener("scroll", pinOuter);
     return () => {
-      window.removeEventListener("orientationchange", apply);
-      window.removeEventListener("resize", onResize);
       window.removeEventListener("touchstart", onTouchComposer, { capture: true } as EventListenerOptions);
       window.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("focusout", onFocusOut);
-      vv?.removeEventListener("resize", onResize);
+      vv?.removeEventListener("resize", onVVResize);
       vv?.removeEventListener("scroll", pinOuter);
-      window.clearTimeout(preLiftGuard);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Koleex AI character (Rive orb) — derive its reactive state from the
