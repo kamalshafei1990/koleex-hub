@@ -734,23 +734,21 @@ export default function FloatingPanel() {
             boxShadow: dk
               ? "0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)"
               : "0 12px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)",
-            /* ENTER is a keyframe spring growing out of the pill's corner;
-               EXIT is the inline transition collapsing back toward it. The
-               old code had only the exit — mounting landed on the final
-               values in one frame, which was the snap the owner felt on
-               every open. transform-origin puts the growth at the pill. */
+            /* BOTH directions are keyframes. The first cut drove the exit
+               with a transition that switched on in the same style recalc
+               that removed the entrance animation — and the browser never
+               animated it: the panel held full size until unmount (measured:
+               0 shrinking frames). Keyframes fire unconditionally on the
+               class of change we make here, so enter AND exit are springs of
+               the same family. transform-origin roots both at the pill. */
             transformOrigin: isDiscussApp ? "100% 50%" : "calc(100% - 40px) 100%",
             animation: closing
-              ? "none"
+              ? `${isDiscussApp ? "fab-panel-out-side" : "fab-panel-out"} 0.24s cubic-bezier(0.32, 0, 0.67, 0) both`
               : `${isDiscussApp ? "fab-panel-in-side" : "fab-panel-in"} 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
-            transition: "opacity 0.22s ease-in, transform 0.22s cubic-bezier(0.32, 0, 0.67, 0)",
-            opacity: closing ? 0 : 1,
             /* Discuss docks the panel vertically-centred on the right-edge orb
                (top-1/2), so the resting transform must carry the -50% Y itself —
                the inline transform wins over any Tailwind -translate-y class. */
-            transform: isDiscussApp
-              ? closing ? "translateY(calc(-50% + 20px)) scale(0.7)" : "translateY(-50%) scale(1)"
-              : closing ? "translateY(20px) scale(0.7)" : "translateY(0) scale(1)",
+            transform: isDiscussApp ? "translateY(-50%) scale(1)" : "translateY(0) scale(1)",
           }}
         >
           {/* ── Header ── */}
@@ -1156,6 +1154,14 @@ export default function FloatingPanel() {
         }
         .fab-panel-anim > * {
           animation: fab-content-in 0.32s ease-out 0.12s both;
+        }
+        @keyframes fab-panel-out {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to   { opacity: 0; transform: translateY(20px) scale(0.7); }
+        }
+        @keyframes fab-panel-out-side {
+          from { opacity: 1; transform: translateY(-50%) scale(1); }
+          to   { opacity: 0; transform: translateY(calc(-50% + 20px)) scale(0.7); }
         }
         @keyframes fab-x-in {
           from { opacity: 0; transform: rotate(-90deg) scale(0.4); }
