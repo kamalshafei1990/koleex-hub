@@ -7,7 +7,7 @@
    (ui.aceternity.com/components/wavy-background), read from its registry
    source rather than from memory. The draw loop is the original's:
 
-     ctx.filter    = blur(10px)          set once in init, not per frame
+     blur(10px)    on the canvas ELEMENT (CSS), one GPU composite per frame
      lineWidth     = 50
      for x += 5:   y = noise3D(x/800, 0.3*i, nt) * 100
      all five drawn at the SAME baseline h*0.5, so they cross and weave
@@ -242,22 +242,18 @@ export default function WavyBackground({ theme: forced }: { theme?: "dark" | "li
       h = cv.clientHeight;
       cv.width = Math.max(1, w);
       cv.height = Math.max(1, h);
-      /* Set ONCE per resize, exactly as the original does — the context
-         keeps it for every stroke that follows.
-
-         EXCEPT ON WEBKIT, WHICH NEVER IMPLEMENTED ctx.filter: Safari drops
-         the assignment silently, the blur the whole picture is built on
-         vanishes, and the waves render as sharp bands — the owner's
-         screenshot from the macOS Safari web app, while every Chromium
-         measurement said fine. Detected by writing the property and reading
-         it back; where unsupported, the SAME blur moves to the canvas
-         element as a CSS filter (one GPU composite per frame), and the
-         canvas box already extends past the viewport so the blurred edge
+      /* ONE BLUR PATH FOR EVERY ENGINE: CSS on the canvas element, always.
+         ctx.filter is deleted from this file on purpose and must not come
+         back. The history: WebKit rendered ctx.filter's blur wrong or not at
+         all (the owner's Safari showed sharp bands twice, including after a
+         write-and-read-back detection pass), and no amount of Chromium-side
+         measurement can debug that. The element filter blurs the composed
+         frame once on the GPU — the same picture on every engine BY
+         CONSTRUCTION — and it is cheaper on Chromium too, where ctx.filter
+         re-blurs every stroke and is the most expensive call in the 2D API.
+         The box extends 48px past the viewport, so the CSS blur's edge
          falloff lives off-screen. */
-      ctx.filter = `blur(${BLUR}px)`;
-      if (ctx.filter === "none" || !ctx.filter) {
-        cv.style.filter = `blur(${BLUR}px)`;
-      }
+      cv.style.filter = `blur(${BLUR}px)`;
       ctx.lineWidth = WAVE_WIDTH;
     };
 
