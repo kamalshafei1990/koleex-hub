@@ -72,6 +72,7 @@ const SHELL_SECTION: Record<string, string> = {
   "/api/me/permissions": "permissions",
   "/api/me/work": "work",
   "/api/fx/cny-usd": "fx",
+  "/api/platform-settings": "platform",
 };
 /* SYS-4: Turbopack duplicates this module across chunks, so a plain
    module-level promise becomes several independent ones and the "single"

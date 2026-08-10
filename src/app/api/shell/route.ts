@@ -6,6 +6,7 @@ import { GET as permissionsGET } from "../me/permissions/route";
 import { GET as workGET } from "../me/work/route";
 import { GET as fxGET } from "../fx/cny-usd/route";
 import { GET as bindingsGET } from "../visual-bindings/route";
+import { GET as platformGET } from "../platform-settings/route";
 
 /* ---------------------------------------------------------------------------
    /api/shell — ONE round trip for the payloads every screen needs.
@@ -61,6 +62,7 @@ export async function GET() {
     ["work", () => workGET()],
     ["fx", () => fxGET()],
     ["bindings", () => bindingsGET()],
+    ["platform", () => platformGET()],
   ];
 
   const entries = await Promise.all(sections.map(collect));

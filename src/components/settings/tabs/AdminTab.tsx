@@ -1,15 +1,20 @@
 "use client";
 
 /* Settings → Admin (super-admin only). Quick links into the tools that
-   already live elsewhere in the hub — a launchpad, not new functionality. */
+   already live elsewhere in the hub, plus the PLATFORM switches only the
+   owner may flip (first: the QA report-issue button, hub-wide). */
 
 import Link from "next/link";
+import { useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { SwitchRow } from "@/components/settings/tabs/ui";
+import { useQaReporterEnabled, setQaReporterEnabled } from "@/lib/platform-settings";
 
 function LinkRow({ href, icon, label, hint, last }: {
   href: string; icon: React.ReactNode; label: string; hint: string; last?: boolean;
@@ -33,8 +38,30 @@ function LinkRow({ href, icon, label, hint, last }: {
 
 export default function AdminTab(_props: { account: AccountWithLinks }) {
   const { t } = useTranslation(settingsT);
+  const qaEnabled = useQaReporterEnabled();
+  const [savingQa, setSavingQa] = useState(false);
+  const flipQa = async (v: boolean) => {
+    if (savingQa) return;
+    setSavingQa(true);
+    /* setQaReporterEnabled broadcasts the new value on success, so this
+       row (and every mounted trigger) follows through the shared hook;
+       on failure nothing was announced and the switch simply stays put. */
+    await setQaReporterEnabled(v);
+    setSavingQa(false);
+  };
   return (
     <div className="space-y-4">
+      {/* Platform switches — these change the Hub for EVERYONE. */}
+      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-3">
+        <SwitchRow
+          icon={<MessageSquarePlusIcon size={15} />}
+          label={t("admin.qaReporter", "Report-issue button")}
+          hint={t("admin.qaReporter.hint", "Show the floating QA reporter to everyone across the Hub")}
+          checked={qaEnabled === true}
+          onChange={flipQa}
+          last
+        />
+      </div>
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         <LinkRow
           href="/super-admin/activity"

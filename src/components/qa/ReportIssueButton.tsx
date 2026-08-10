@@ -37,6 +37,7 @@ import {
 import { useInspector, type PickedComponent } from "@/lib/qa/inspector";
 import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
+import { useQaReporterEnabled } from "@/lib/platform-settings";
 
 interface Env {
   route: string;
@@ -77,10 +78,20 @@ function AssigneeAvatar({ a }: { a: { name: string; avatar_url?: string | null }
   return <Avatar src={a.avatar_url ? fpAvatar(a.avatar_url) : null} name={a.name} size={24} />;
 }
 
-export default function ReportIssueButton() {
+export default function ReportIssueButton({ variant = "floating" }: {
+  /** "floating" = the global bottom-end pill (RootShell). "inline" = a
+   *  bar-sized ghost button an app places in its own chrome — the AI app
+   *  hosts one in its top bars because the floating pill sat over the
+   *  chat and the dock there. */
+  variant?: "floating" | "inline";
+}) {
   const { t } = useTranslation(qaT);
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
+  /* Platform kill-switch (Settings → Admin, super-admin only). null = flag
+     not known yet → render nothing rather than flash a button that may be
+     off. The modal machinery below never mounts while disabled. */
+  const qaEnabled = useQaReporterEnabled();
 
   // Keep the support window open as you navigate the system / refresh — it's a
   // standalone, free-roaming window, not a one-page modal. Restored after mount
@@ -109,7 +120,29 @@ export default function ReportIssueButton() {
     ? "bottom-[13.5rem] md:bottom-[10.5rem]"
     : "bottom-[5.75rem]";
 
+  /* Disabled platform-wide, or flag still loading → nothing at all. */
+  if (qaEnabled !== true) return null;
+  /* The AI app hosts its own INLINE trigger in its top bars — the global
+     floating pill stands down there so the chat never carries two. */
+  if (variant === "floating" && (pathname === "/ai" || pathname.startsWith("/ai/"))) return null;
+
   if (!open) {
+    if (variant === "inline") {
+      return (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title={t("qa.report.fabTitle", "Report an issue or suggestion")}
+          aria-label={t("qa.report.title", "Report an issue")}
+          data-qa-capture-skip=""
+          /* Matches the host bar's chip grammar (the AI app re-tints
+             --bg-surface under Aurora, so this follows its neighbours). */
+          className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
+        >
+          <MessageSquarePlusIcon size={14} />
+        </button>
+      );
+    }
     return (
       <button
         type="button"
