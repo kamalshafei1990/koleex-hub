@@ -16,7 +16,7 @@
    keeps the tree stable.
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import { usePathname } from "next/navigation";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
@@ -152,6 +152,24 @@ function ExpandedGroup({
   const label = t(group.tKey, group.label);
   const hoverBg = dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.05]";
 
+  /* MEASURED accordion (the max-height trick is what made this feel rough:
+     closing spent the first ~40% of the duration walking 500px down to the
+     real content height with nothing moving on screen, then snapped). The
+     clip animates the TRUE height from a ResizeObserver on the content node;
+     spacing lives as padding, not margin, so offsetHeight includes it.
+     Until first measurement (SSR + first client paint) an open group gets
+     height:auto — the number arrives before any toggle, so nothing shifts. */
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const [contentH, setContentH] = useState<number | null>(null);
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setContentH(el.offsetHeight));
+    ro.observe(el);
+    setContentH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div>
       <button
@@ -172,15 +190,18 @@ function ExpandedGroup({
         <span className="flex-1 text-start truncate">{label}</span>
         <AngleRightIcon
           size={12}
-          className={`transition-transform duration-300 ${isOpen ? "rotate-90" : ""}`}
+          className={`transition-transform duration-[340ms] ease-[cubic-bezier(0.33,1,0.5,1)] ${isOpen ? "rotate-90" : ""}`}
         />
       </button>
       <div
-        className={`overflow-hidden transition-all duration-300 ${
-          isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-        }`}
+        aria-hidden={!isOpen}
+        className="overflow-hidden transition-[height,opacity] duration-[340ms] ease-[cubic-bezier(0.33,1,0.5,1)]"
+        style={{
+          height: isOpen ? (contentH ?? undefined) : 0,
+          opacity: isOpen ? 1 : 0,
+        }}
       >
-        <div className={`ms-[19px] ps-3 mt-0.5 mb-1 space-y-0.5 border-s ${dk ? "border-white/[0.07]" : "border-black/[0.07]"}`}>
+        <div ref={innerRef} className={`ms-[19px] ps-3 pt-0.5 pb-1 space-y-0.5 border-s ${dk ? "border-white/[0.07]" : "border-black/[0.07]"}`}>
           {apps.map((app) => (
             <AppLink
               key={app.id}
