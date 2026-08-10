@@ -1271,36 +1271,38 @@ input[type="number"]:not(.kx-spinner) {
   color: #16324F;
 }
 
-/* Hover, taken from the sign-in button — the owner asked for the rest of the
-   Hub to be "inspired by the login window", and that button is the one
-   interaction on the whole screen he signed off on.
+/* Hover on the header chips — owner's final word, 2026-08-10: "it only that
+   you can change the borders colors, no more." So the box answers a pointer
+   with its BORDER alone: no fill tint, no underglow, no lift. The earlier
+   sign-in-style treatment (glow + tint + 1px lift) was three signals where
+   he wants one. Icon/text brightening is left to the elements' own hover
+   utilities — that is content feedback, not the box.
 
-   Its three parts, in order of how much they matter: a Hub Blue UNDERGLOW
-   (the thing you actually notice), a colour shift TOWARD the accent rather
-   than away from it, and a 1px lift. Never a dim — a control that darkens
-   under the cursor reads as unavailable, which is the opposite of what a
-   hover is for.
+   background-color is pinned to the chips' resting fill on purpose: the
+   elements carry their own hover:bg-* utilities, and without this pin the
+   fill would still tint. 0.03 covers both resting values (0.03 / 0.04) —
+   the difference is below perception.
 
-   `translate` and not `transform`: Tailwind v4 emits the standalone property,
-   and a transition naming transform leaves the lift snapping. */
+   Both selectors, because the unified-border rule is header-scoped at
+   (0,3,0) and a bare :hover at (0,3,0) would tie with it — the scoped twin
+   guarantees the hover wins inside the bar. */
 [data-kx-skin="aurora"] .kx-hover-glow {
-  transition: box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
-              translate 200ms cubic-bezier(0.22, 1, 0.36, 1),
-              background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-[data-kx-skin="aurora"] .kx-hover-glow:hover {
-  background: rgba(86, 127, 178, 0.18);
-  border-color: rgba(188, 216, 240, 0.30);
-  box-shadow: 0 8px 20px -8px rgba(86, 127, 178, 0.65);
+[data-kx-skin="aurora"] .kx-hover-glow:hover,
+[data-kx-skin="aurora"] .kx-mainheader .kx-hover-glow:hover {
+  border-color: rgba(127, 169, 214, 0.55);
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
+  translate: none;
 }
-@media (prefers-reduced-motion: no-preference) {
-  [data-kx-skin="aurora"] .kx-hover-glow:hover { translate: 0 -1px; }
-  [data-kx-skin="aurora"] .kx-hover-glow:active { translate: 0 0; }
+[data-kx-skin="aurora"][data-theme="light"] .kx-hover-glow:hover,
+[data-kx-skin="aurora"][data-theme="light"] .kx-mainheader .kx-hover-glow:hover {
+  border-color: rgba(62, 103, 150, 0.6);
+  background-color: rgba(0, 0, 0, 0.03);
 }
-[data-kx-skin="aurora"] .kx-hover-glow:active {
-  box-shadow: 0 3px 10px -6px rgba(86, 127, 178, 0.55);
-}
+
 /* The selected segment already carries the accent, so hovering it should
    deepen rather than re-tint. */
 [data-kx-skin="aurora"] .kx-seg-off:hover {
