@@ -19,7 +19,7 @@ export default function ConfirmWithReason({ open, title, reasonPlaceholder = "Re
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm" onClick={onCancel} role="alertdialog" aria-modal="true">
-      <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-glass-pop w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-4 py-3.5">
           <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</p>
           <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder={reasonPlaceholder}

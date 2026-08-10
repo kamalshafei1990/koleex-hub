@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
     >
-      <div className={`${width} w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200`}>
+      <div className={`${width} kx-glass-pop w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200`}>
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-subtle)] shrink-0">
           <div>

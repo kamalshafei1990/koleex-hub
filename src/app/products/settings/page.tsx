@@ -43,6 +43,21 @@ import {
 import type { AttributeConfig, AttributeUsage, AttributeItem } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import nextDynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
+
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+/* Tiny wrapper so the aurora branch (the one JS piece CSS can't switch)
+   stays out of the page component's already-long body. */
+function ControlPanelGround() {
+  const aurora = useSkin() === "aurora";
+  if (!aurora) return null;
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+      <WavyBackground />
+    </div>
+  );
+}
 
 /* ── Tabs ── */
 const TABS = [
@@ -673,8 +688,12 @@ export default function ProductSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    /* kx-pd: the Control Panel is part of the Product Data family — same
+       Aurora scope (variable remap + well fields). Ground canvas included
+       via CSS-less mount below. */
+    <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <ControlPanelGround />
+      <div className="relative z-[1] max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">

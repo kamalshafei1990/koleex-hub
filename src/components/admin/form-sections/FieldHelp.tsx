@@ -54,7 +54,7 @@ function BilingualTip({ anchorRect, en, zh }: { anchorRect: DOMRect; en: string;
       role="tooltip"
       dir="ltr"
       style={{ position: "fixed", top, left, width: WIDTH, zIndex: 99999 }}
-      className="block px-3 py-2.5 rounded-lg bg-[#1f2937] text-white border border-white/[0.18] shadow-2xl text-[11px] leading-relaxed font-normal normal-case tracking-normal whitespace-normal text-left pointer-events-none"
+      className="kx-glass-pop block px-3 py-2.5 rounded-lg bg-[#1f2937] text-white border border-white/[0.18] shadow-2xl text-[11px] leading-relaxed font-normal normal-case tracking-normal whitespace-normal text-left pointer-events-none"
     >
       <span className="block text-[9px] font-bold tracking-widest text-white/55 mb-0.5">EN</span>
       <span className="block mb-2">{en}</span>
