@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import TabStrip from "@/components/ui/TabStrip";
 
 /* Aurora ground — the Hub canvas, client-only, mounted only under the skin.
    Lives HERE (not in the two thin page wrappers) so /products and
@@ -2277,64 +2278,45 @@ export default function ProductList() {
         )}
         {orderedDivisions.length > 0 && (
           <div className="mb-4">
-            {/* Sliding-pill nav shell — matches the Database/app tab nav:
-                one bordered rounded-xl container, compact pills inside, the
-                active one filled. Divisions are client filters (buttons), so
-                this mirrors SlidingPillNav's look without its href routing. */}
-            <div
-              role="tablist"
-              aria-label={t("list.divisions")}
-              className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {/* "All" — clears the division filter. */}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={filterDiv === ""}
-                onClick={() => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); }}
-                className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
-                  filterDiv === ""
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <LayoutGridIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
-                {t("list.allDivisions", "All divisions")}
-              </button>
-
-              {orderedDivisions.map((d) => {
-                const isActive = filterDiv === d.slug;
-                /* Prefer the icon saved for this division in the Classification
-                   Icon Hub (classIcons.division[slug]); fall back to a built-in
-                   keyword icon when none is assigned yet. */
-                const savedIcon = classIcons.division?.[d.slug];
-                const DivIcon = divisionIcon(d.name);
-                return (
-                  <button
-                    key={d.slug}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => { setFilterDiv(d.slug); setFilterCat(""); setFilterSub(""); }}
-                    className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
-                      isActive
-                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                        : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-                    }`}
-                  >
-                    {/* Fixed 16px icon slot: the saved hub icon replaces the
-                        fallback async — identical boxes mean the pill width
-                        never changes when it lands (no bar jitter). */}
-                    <span className="h-4 w-4 flex items-center justify-center shrink-0">
-                      {savedIcon
-                        ? <ClassMonoIcon src={savedIcon} className="h-4 w-4" />
-                        : <DivIcon className="h-3.5 w-3.5 opacity-80" />}
-                    </span>
-                    {localizedName(d, lang)}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Divisions ride the canonical TabStrip — under Aurora the
+                selected state is the ONE Hub-Blue pill sliding between tabs
+                (measured, labels vary), under Core the original filled pill,
+                byte for byte. Bespoke tab markup deleted, per TabStrip's own
+                doctrine. */}
+            <TabStrip
+              ariaLabel={t("list.divisions")}
+              className="inline-flex max-w-full"
+              items={[
+                {
+                  key: "",
+                  label: t("list.allDivisions", "All divisions"),
+                  icon: <LayoutGridIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />,
+                  active: filterDiv === "",
+                  onClick: () => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); },
+                },
+                ...orderedDivisions.map((d) => {
+                  /* Prefer the icon saved for this division in the
+                     Classification Icon Hub; fall back to a built-in keyword
+                     icon. Fixed 16px slot so the pill width never changes
+                     when the hub icon lands (no bar jitter). */
+                  const savedIcon = classIcons.division?.[d.slug];
+                  const DivIcon = divisionIcon(d.name);
+                  return {
+                    key: d.slug,
+                    label: localizedName(d, lang),
+                    icon: (
+                      <span className="h-4 w-4 flex items-center justify-center shrink-0">
+                        {savedIcon
+                          ? <ClassMonoIcon src={savedIcon} className="h-4 w-4" />
+                          : <DivIcon className="h-3.5 w-3.5 opacity-80" />}
+                      </span>
+                    ),
+                    active: filterDiv === d.slug,
+                    onClick: () => { setFilterDiv(d.slug); setFilterCat(""); setFilterSub(""); },
+                  };
+                }),
+              ]}
+            />
           </div>
         )}
 
@@ -2468,8 +2450,13 @@ export default function ProductList() {
               <nav
                 style={{ top: "var(--kx-pd-tools-h, 52px)" }}
                 className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]"
+                data-kx-progressive=""
                 aria-label="Categories"
               >
+                {/* Progressive edge blur (owner: "same way as the main
+                    header"): four masked layers ramp 3→28px as the cards
+                    slide under the bar; the host stays filterless. */}
+                <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the
                     two rows read as a clear primary/secondary hierarchy. */}
@@ -2494,7 +2481,7 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 max-sm:h-[36px] max-sm:w-auto max-sm:shrink-0 max-sm:flex-row max-sm:justify-start max-sm:gap-1.5 max-sm:px-3 max-sm:py-0 max-sm:rounded-full"
+                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 max-sm:h-[36px] max-sm:w-auto max-sm:shrink-0 max-sm:flex-row max-sm:justify-start max-sm:gap-1.5 max-sm:px-3 max-sm:py-0 max-sm:rounded-full"
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 max-sm:h-4 max-sm:w-4 max-sm:shrink-0" />
