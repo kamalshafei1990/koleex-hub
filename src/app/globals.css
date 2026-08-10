@@ -1320,31 +1320,88 @@ input[type="number"]:not(.kx-spinner) {
    focus. Element-level so every future field on the page follows. The chat
    surface is deliberately NOT in scope: its composer textarea is
    transparent inside the glass card. Core keeps the var() classes. */
-[data-kx-skin="aurora"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-[data-kx-skin="aurora"] .kx-ai-form textarea,
-[data-kx-skin="aurora"] .kx-ai-form select {
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) textarea,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) select {
   background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-[data-kx-skin="aurora"] .kx-ai-form input:focus,
-[data-kx-skin="aurora"] .kx-ai-form textarea:focus,
-[data-kx-skin="aurora"] .kx-ai-form select:focus {
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) input:focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) textarea:focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) select:focus {
   border-color: rgba(86, 127, 178, 0.70);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea,
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) textarea,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) select {
   background-color: rgba(255, 255, 255, 0.70);
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:focus,
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea:focus,
-[data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select:focus {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) input:focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) textarea:focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) select:focus {
   border-color: rgba(62, 103, 150, 0.75);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
+}
+
+/* ── Aurora: Product Data / Products (kx-pd scope) ──────────────────────
+   10k+ lines of app convert through the VARIABLES, not through classes:
+   the whole surface system is var()-driven, so remapping the app's own
+   tokens under the scope turns every panel, chip, row and hover
+   translucent in one block. TRUE backdrop-blur goes only where the
+   backdrop-root/containing-block traps cannot bite (FormModal renders
+   fixed WITHOUT a portal inside form sections — a blurred ancestor there
+   would capture it): the grid cards (leaf), the sticky bars (pane
+   pattern, filterless host), the search dropdown, and overlays. */
+[data-kx-skin="aurora"] .kx-pd {
+  --bg-primary: transparent;
+  --bg-secondary: rgba(13, 16, 22, 0.55);
+  --bg-surface: rgba(255, 255, 255, 0.04);
+  --bg-surface-subtle: rgba(255, 255, 255, 0.07);
+  --bg-surface-active: rgba(255, 255, 255, 0.12);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-pd {
+  --bg-secondary: rgba(255, 255, 255, 0.62);
+  --bg-surface: rgba(0, 0, 0, 0.04);
+  --bg-surface-subtle: rgba(0, 0, 0, 0.07);
+  --bg-surface-active: rgba(0, 0, 0, 0.12);
+}
+/* Sticky bars (toolbar / category nav): the glass is a REAL child layer —
+   the host stays filterless so the search dropdown inside can carry the
+   popover glass without being starved (the header's backdrop-root lesson,
+   applied at toolbar scale). Core: the layer doesn't exist. */
+.kx-glass-bar { display: none; }
+[data-kx-skin="aurora"] .kx-glass-bar {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(8, 10, 14, 0.35);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass-bar {
+  background: rgba(250, 251, 253, 0.45);
+}
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(12, 14, 18, 0.96);
+}
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-glass-bar {
+  background: rgba(250, 251, 253, 0.98);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-glass-bar { background: rgba(12, 14, 18, 0.96); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-glass-bar { background: rgba(250, 251, 253, 0.98); }
+}
+/* Everything in a bar host paints above its glass layer. */
+[data-kx-skin="aurora"] .kx-bar-host > :not(.kx-glass-bar) {
+  position: relative;
+  z-index: 1;
 }
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:

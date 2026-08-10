@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
+import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
+
+/* Aurora ground — the Hub canvas, client-only, mounted only under the skin.
+   Lives HERE (not in the two thin page wrappers) so /products and
+   /product-data — one source, two front-ends — convert together. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -269,7 +276,7 @@ const ProductCard = memo(function ProductCard({
     <div
       key={p.id}
       {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-      className="group relative kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+      className="group relative kx-glass kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
     >
       {/* Stretched navigation link — covers the whole card and
           is the ONLY card-level anchor, so the edit/delete actions
@@ -666,6 +673,7 @@ export default function ProductList() {
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */
   const isInternal = (pathname || "").startsWith("/product-data");
+  const aurora = useSkin() === "aurora";
 
   /* The /products catalogue shows ONLY active products (owner rule,
      2026-08-05). The API already refuses non-active rows to callers
@@ -1841,8 +1849,13 @@ export default function ProductList() {
   const selectClass = "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -1923,7 +1936,8 @@ export default function ProductList() {
             4px under the app header when pinned — on a phone that read as the
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
-        <div ref={toolbarRef} className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+        <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+          <div aria-hidden className="kx-glass-bar" />
         <div>
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
@@ -1976,7 +1990,7 @@ export default function ProductList() {
               {searchOpen && suggestions.length > 0 && (
                 <div
                   role="listbox"
-                  className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+                  className="kx-glass-pop absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
                 >
                   {(() => {
                     const groups: { title: string; items: Suggestion[] }[] = [];
@@ -2453,7 +2467,7 @@ export default function ProductList() {
             {categoryTree.length > 1 && (
               <nav
                 style={{ top: "var(--kx-pd-tools-h, 52px)" }}
-                className="sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]"
+                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]"
                 aria-label="Categories"
               >
                 {/* Light secondary jump-nav — quieter than the Divisions filter

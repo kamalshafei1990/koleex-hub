@@ -46,6 +46,10 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
+import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
+
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* ── Translation ──────────────────────────────────────────────────────────
    Per-file dictionary merged over PRODUCTS_UI_I18N, so the media slot labels
@@ -482,6 +486,7 @@ export default function ProductProfile() {
   const handle = params?.id;
   const router = useRouter();
   const { t } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
+  const aurora = useSkin() === "aurora";
 
   const [data, setData] = useState<Profile | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
@@ -571,8 +576,13 @@ export default function ProductProfile() {
   const s2 = (k: string) => p[k];
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-4">
+    <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-4">
       {/* The edit screen leads with the tabs, not a page title — so does the
          record. A slim identity strip keeps "what am I looking at?" answered
          without pushing the tabs down the page. */}

@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
+
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCT_ARRAY_COLUMNS, toTextArray } from "@/lib/product-array-columns";
@@ -537,6 +540,7 @@ interface Props {
 export default function ProductForm({ productId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const aurora = useSkin() === "aurora";
   /* The wizard is mounted under BOTH /products and /product-data. Keep
      back / cancel / post-save inside whichever app the operator is
      actually in — mirrors ProductList's baseRoute logic so the
@@ -2964,15 +2968,20 @@ export default function ProductForm({ productId }: Props) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="kx-pd min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+    <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
 
         {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style.
               Back-arrow + Cancel both route to /products via handleCancel,
