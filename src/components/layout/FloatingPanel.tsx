@@ -52,6 +52,7 @@ import {
   subscribeToChannel,
 } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
+import { useSkin } from "@/lib/appearance";
 import type {
   DiscussChannelWithState,
   DiscussMessageWithAuthor,
@@ -102,6 +103,12 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
 export default function FloatingPanel() {
   const pathname = usePathname();
   const dk = useTheme();
+  /* Aurora restyles the dock's three surfaces; Core keeps every value below
+     exactly as it was. Branching here, not in globals: this component's own
+     <style> tag comes after globals.css in document order and would win any
+     same-specificity fight, so the aurora recipe has to live in the same
+     template that carries the core one. */
+  const aurora = useSkin() === "aurora";
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
   const accountIdRef = useRef(accountId);
@@ -1081,8 +1088,17 @@ export default function FloatingPanel() {
            a quiet operator surface — embedded intelligence, not a
            chatbot widget. */
         .fab-outer {
-          /* Flat ring, 1px hairline, no animation. */
-          background: ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"};
+          /* The FAB's border is this padding-ring, which makes it the one
+             surface where the gradient border costs nothing extra — the ring
+             IS a background. Aurora: lit at the top, fading down, same
+             grammar as every .kx-glass rim. Core: the flat hairline. */
+          background: ${
+            aurora
+              ? dk
+                ? "linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04))"
+                : "linear-gradient(180deg, rgba(16,24,40,0.18), rgba(16,24,40,0.05))"
+              : dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"
+          };
           padding: 1px;
         }
         .ai-neon-text {
@@ -1100,10 +1116,21 @@ export default function FloatingPanel() {
         }
         .fab-badge { animation: badge-pulse 2s ease-in-out infinite; }
 
-        /* Panel surface — flat, hairline-bordered. */
+        /* Panel surface. Aurora: the tile material — same glass as the
+           header menus, per the owner's "one material" ruling — with the
+           unified 6% border. Core: the flat original. */
         .panel-neon-border {
-          border: 1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"};
-          background: ${dk ? "#111" : "#fff"};
+          border: 1px solid ${
+            aurora
+              ? dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
+              : dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"
+          };
+          background: ${
+            aurora
+              ? dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)"
+              : dk ? "#111" : "#fff"
+          };
+          ${aurora ? "-webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);" : ""}
         }
         /* Minimise handle — small chevron tab that appears above the
            pill. Lets the operator collapse the FAB so it stops
@@ -1129,7 +1156,11 @@ export default function FloatingPanel() {
           justify-content: center;
           background: ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"};
           color: ${dk ? "rgba(255,255,255,0.80)" : "rgba(0,0,0,0.70)"};
-          border: 1px solid ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"};
+          border: 1px solid ${
+            aurora
+              ? dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
+              : dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"
+          };
           opacity: 1;
           transform: translateY(0) scale(1);
           transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1210,11 +1241,17 @@ export default function FloatingPanel() {
               width: open ? 44 : undefined,
               height: open ? 44 : undefined,
               transition: "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
-              background: dk
-                ? "linear-gradient(135deg, rgba(18,18,18,0.95) 0%, rgba(10,10,10,0.98) 100%)"
-                : "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,248,248,0.98) 100%)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
+              /* Aurora: the tile material. The old fill was 95-98% opaque,
+                 which made its own blur(20px) unfalsifiable decoration — a
+                 solid pill with a filter nobody could see through. Core keeps
+                 it byte-for-byte. */
+              background: aurora
+                ? dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)"
+                : dk
+                  ? "linear-gradient(135deg, rgba(18,18,18,0.95) 0%, rgba(10,10,10,0.98) 100%)"
+                  : "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,248,248,0.98) 100%)",
+              backdropFilter: aurora ? "blur(16px) saturate(150%)" : "blur(20px)",
+              WebkitBackdropFilter: aurora ? "blur(16px) saturate(150%)" : "blur(20px)",
               overflow: "hidden",
             }}
           >
