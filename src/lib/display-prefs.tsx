@@ -119,9 +119,26 @@ export function getTheme(): ThemeMode {
   return pref === "system" ? systemTheme() : pref;
 }
 
+/* GLASS COSTS MONEY ON A WEAK MACHINE. backdrop-filter is a separate blur pass
+   per element, and Home has 34 tiles; the launcher is opened dozens of times a
+   day and the Hub is opened from WeChat on mid-range Windows in China. This
+   stamps one attribute so CSS can drop the filter and use an opaque surface
+   instead — the same composition, none of the per-tile cost. Stamped beside
+   data-theme because both are "how this document paints" and both have to be
+   set before first paint. hardwareConcurrency is crude, and it is the only
+   signal available without measuring frames and reacting, which would cost
+   the frames it is trying to save. */
+function applyLowPower(): void {
+  if (typeof document === "undefined" || typeof navigator === "undefined") return;
+  if ((navigator.hardwareConcurrency || 8) <= 4) {
+    document.documentElement.setAttribute("data-kx-lowpower", "1");
+  }
+}
+
 /** Apply a resolved theme to the document + tell everyone. */
 function applyTheme(theme: ThemeMode): void {
   if (typeof document === "undefined") return;
+  applyLowPower();
   document.documentElement.setAttribute("data-theme", theme);
   try { localStorage.setItem("koleex-theme", theme); } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));

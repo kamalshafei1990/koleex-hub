@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   WavyBackground — the sign-in screen's ground.
+   WavyBackground — the Hub's ground. Sign-in gate and Home.
 
    A faithful port of the Aceternity component the owner chose
    (ui.aceternity.com/components/wavy-background), read from its registry
@@ -33,11 +33,28 @@
    · simplex-noise inlined rather than added as a dependency.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* Hub Blue instead of the original's sky / indigo / purple / fuchsia / cyan —
-   a rainbow, and against everything the brand says. */
-const WAVE_COLORS = ["#BCD8F0", "#8FB0D4", "#567FB2", "#2E4B6B", "#1B2A3C"];
+   a rainbow, and against everything the brand says.
+
+   TWO PALETTES, because this now runs on Home as well as the gate and Home
+   has a light theme. On white the dark set is invisible: the ground fill is
+   what every stroke fades toward, so light-on-light leaves a blank page. The
+   light set inverts that relationship — mid and deep blues over a near-white
+   ground — rather than lightening the same colours. */
+const PALETTES = {
+  dark: {
+    waves: ["#BCD8F0", "#8FB0D4", "#567FB2", "#2E4B6B", "#1B2A3C"],
+    ground: "#05070C",
+    floor: "radial-gradient(72% 60% at 50% 50%, rgba(5,7,12,.55) 0%, rgba(5,7,12,.30) 56%, rgba(5,7,12,.74) 100%)",
+  },
+  light: {
+    waves: ["#567FB2", "#8FB0D4", "#3E6796", "#A9C4DE", "#7FA9D6"],
+    ground: "#F4F7FA",
+    floor: "radial-gradient(72% 60% at 50% 50%, rgba(247,249,252,.62) 0%, rgba(247,249,252,.34) 56%, rgba(247,249,252,.80) 100%)",
+  },
+} as const;
 
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
@@ -45,7 +62,6 @@ const BLUR = 10;
 const WAVE_WIDTH = 50;
 const SPEED = 0.0018;
 const WAVE_OPACITY = 0.5;
-const BACKGROUND = "#05070C";
 
 /* ── 3D simplex noise ────────────────────────────────────────────────────
    The same algorithm `simplex-noise` ships. Inlined because a dependency for
@@ -118,6 +134,20 @@ function buildNoise3D() {
 
 export default function WavyBackground() {
   const ref = useRef<HTMLCanvasElement>(null);
+  /* Read once per mount and re-read on the app's own themechange event, which
+     display-prefs already dispatches. No attribute at all — the sign-in gate
+     before any client code has run — means dark, the Hub's base theme. */
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    typeof document !== "undefined" &&
+    document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+
+  useEffect(() => {
+    const onTheme = () =>
+      setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+    onTheme();
+    window.addEventListener("themechange", onTheme);
+    return () => window.removeEventListener("themechange", onTheme);
+  }, []);
 
   useEffect(() => {
     const cv = ref.current;
@@ -125,8 +155,21 @@ export default function WavyBackground() {
     const ctx = cv.getContext("2d");
     if (!ctx) return;
 
+    const { waves: WAVE_COLORS, ground: BACKGROUND } = PALETTES[theme];
+
     const noise3D = buildNoise3D();
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    /* STILL, NOT ABSENT, on a weak machine. This used to run only on the gate,
+       which is opened once; Home is opened dozens of times a day and stays
+       open, so a permanent draw loop there has to be something the device can
+       actually afford. Four cores or fewer gets one painted frame and no loop
+       — the same picture, none of the cost. The Hub is opened from WeChat on
+       mid-range Windows in China, where this is not a hypothetical.
+
+       hardwareConcurrency is a crude proxy and it is the only one available
+       without measuring frames and then reacting, which would itself cost the
+       frames it is trying to save. */
+    const weak = (navigator.hardwareConcurrency || 8) <= 4;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches || weak;
 
     /* RESOLUTION IS BUDGETED IN PIXELS, NOT IN DEVICE RATIO.
 
@@ -231,7 +274,7 @@ export default function WavyBackground() {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("resize", onResize);
     };
-  }, []);
+  }, [theme]);
 
   return (
     <>
@@ -242,10 +285,7 @@ export default function WavyBackground() {
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(72% 60% at 50% 50%, rgba(5,7,12,.55) 0%, rgba(5,7,12,.30) 56%, rgba(5,7,12,.74) 100%)",
-        }}
+        style={{ background: PALETTES[theme].floor }}
       />
     </>
   );

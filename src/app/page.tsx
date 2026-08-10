@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import { type OrbState } from "@/components/ai/KoleexOrb";
@@ -36,6 +37,10 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+/* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
+   most-opened screen in the Hub and its budget is the tightest one there is.
+   ssr:false because it measures the element before it can paint. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 /* discuss/inbox are imported DYNAMICALLY inside the badge effects below —
    keeping the heavy data layer off Home's first-paint critical path. */
 
@@ -235,10 +240,10 @@ const AppCard = memo(function AppCard({
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "tile-hover-neon kx-hover-card kx-hover-tile bg-[#0c0c0c] border-white/[0.06]"
-                    : "tile-hover-neon kx-hover-card kx-hover-tile bg-[#f8f8f8] border-black/[0.06]"
+                    ? "tile-hover-neon kx-hover-card kx-hover-tile kx-glass border-white/[0.10]"
+                    : "tile-hover-neon kx-hover-card kx-hover-tile kx-glass border-black/[0.08]"
                 }`
-            : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
+            : `cursor-default border kx-glass ${dk ? "border-white/[0.04]" : "border-black/[0.04]"}`
       }`}
     >
 
@@ -854,6 +859,19 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
+      {/* The ground, FIXED rather than absolute. Home scrolls, and an
+          absolutely positioned child of a scrolling page is laid against the
+          full scroll height — it stretches and slides away as you go down,
+          which is exactly the bug the sign-in gate had. Fixed pins it to the
+          viewport, so the waves stay centred however far the launcher runs.
+          z-0 against the content's z-10 keeps it underneath; the header is
+          fixed at z-[100] and the sidebar at z-[60], so both still paint over
+          it. Written z-0 and not -z-0 — the negative form is not a Tailwind
+          class, so it would have generated nothing and left the stacking to
+          DOM order and luck. */}
+      <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+        <WavyBackground />
+      </div>
       {/* Shared paint server: tile icons switch their fill to this Hub Blue
           gradient on hover (CSS can't gradient-fill an inline SVG any other
           way). Zero-size, purely defs. */}
@@ -882,7 +900,7 @@ export default function HomePage() {
         .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
-      <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
+      <div className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         {/* min-height = card (~96px) + the orb's 27px float amplitude on
@@ -901,8 +919,8 @@ export default function HomePage() {
         <div className="mb-7">
           <div className={`search-neon relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 ${
             dk
-              ? "bg-[#0c0c0c] border-white/[0.07]"
-              : "bg-black/[0.02] border-black/[0.07]"
+              ? "kx-glass border-white/[0.10]"
+              : "kx-glass border-black/[0.08]"
           }`}>
             <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
             <input

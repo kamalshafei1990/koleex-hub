@@ -64,7 +64,7 @@ const SignInHelpDialog = dynamic(() => import("./SignInHelpDialog"), { ssr: fals
 /* Canvas + a draw loop must never sit in the boot chunk, and must never mount
    for somebody who is already signed in. ssr:false because it measures the
    element before it can paint. */
-const WavyBackground = dynamic(() => import("@/components/admin/signin/WavyBackground"), { ssr: false });
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { signInT } from "@/lib/translations/signin";
 
