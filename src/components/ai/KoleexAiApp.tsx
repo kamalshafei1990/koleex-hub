@@ -1614,13 +1614,27 @@ export default function KoleexAiApp() {
     const viewportH = () => (vv ? vv.height : window.innerHeight);
     let applied = viewportH();
 
-    /* iOS scrolls/pans the ANCESTORS to reveal a focused textarea the moment
-       the keyboard starts rising — before our height shrink lands. Owner's
-       screenshot: composer flung to the very top, over the status bar, dead
-       black where the app used to be. Our layout already keeps the composer
-       above the keyboard by construction, so any outer displacement is pure
-       damage — pin the window and the Hub scroller back to zero, repeatedly
-       through the keyboard animation (iOS re-pans mid-flight). */
+    /* ── iOS keyboard: PREVENT the pan, don't fight it. ──────────────────
+       iOS pans the page the instant a focused caret would sit under the
+       incoming keyboard — before any resize event fires. Correcting after
+       the fact is what the owner saw: "the type box jumps to the top then
+       falls down slowly" (the pan, then our staggered corrections). So the
+       stage now shrinks BEFORE focus: touchstart fires ahead of focus, we
+       pre-lift by the keyboard height remembered from the last session
+       (first ever: 300px), the caret is already above the keyboard's area
+       when focus lands, and iOS finds nothing to pan. The real vv resize
+       then refines the estimate to the exact height and stores it. */
+    const KB_KEY = "kx-kb-h";
+    const kbEstimate = () => {
+      try {
+        const v = parseInt(window.localStorage.getItem(KB_KEY) || "", 10);
+        if (Number.isFinite(v) && v > 150 && v < 560) return v;
+      } catch { /* storage blocked */ }
+      return 300;
+    };
+    let preLifted = false;
+    let preLiftGuard = 0;
+
     const pinOuter = () => {
       if (!isMobile()) return;
       if (window.scrollY) window.scrollTo(0, 0);
@@ -1638,36 +1652,74 @@ export default function KoleexAiApp() {
     };
     apply();
 
+    const preLift = () => {
+      if (!isMobile() || preLifted) return;
+      preLifted = true;
+      setStageHeight(`${Math.max(240, viewportH() - kbEstimate() - headerH())}px`);
+      /* If no keyboard actually arrives (it was a scroll flick over the
+         composer), restore the full stage. */
+      window.clearTimeout(preLiftGuard);
+      preLiftGuard = window.setTimeout(() => {
+        if (preLifted && Math.abs(viewportH() - applied) < KEYBOARD_MIN_DELTA) {
+          preLifted = false;
+          apply();
+        }
+      }, 900);
+    };
+    const onTouchComposer = (e: TouchEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest(".kx-ai-root textarea")) preLift();
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(TEXTAREA|INPUT)$/.test(t.tagName)) {
+        preLift();
+        pinOuter();
+      }
+    };
+    const onFocusOut = () => {
+      if (!isMobile()) return;
+      /* Keyboard dismissed → back to the full stage once vv settles. */
+      window.setTimeout(() => {
+        preLifted = false;
+        apply();
+      }, 60);
+    };
+
     let lastWidth = window.innerWidth;
     const onResize = () => {
       if (!isMobile()) { apply(); return; }
       if (window.innerWidth !== lastWidth) { lastWidth = window.innerWidth; apply(); return; }
+      const delta = window.innerHeight - viewportH();
+      if (preLifted && delta >= KEYBOARD_MIN_DELTA) {
+        /* The real keyboard height: refine the stage exactly and remember
+           it for the next pre-lift. */
+        try { window.localStorage.setItem(KB_KEY, String(Math.round(delta))); } catch { /* ignore */ }
+        applied = viewportH();
+        setStageHeight(`${Math.max(240, applied - headerH())}px`);
+        pinOuter();
+        return;
+      }
       /* Same width → either chrome sliding (ignore) or the keyboard (follow). */
       if (Math.abs(viewportH() - applied) >= KEYBOARD_MIN_DELTA) apply();
-    };
-    /* Focus = the moment iOS starts panning. Pin now and again as the
-       keyboard animation progresses (~250ms) and settles. */
-    let pinTimers: number[] = [];
-    const onFocusIn = (e: FocusEvent) => {
-      if (!isMobile()) return;
-      const t = e.target as HTMLElement | null;
-      if (!t || !/^(TEXTAREA|INPUT)$/.test(t.tagName)) return;
-      pinTimers.forEach((id) => window.clearTimeout(id));
-      pinTimers = [0, 80, 200, 350, 600].map((ms) => window.setTimeout(pinOuter, ms));
     };
 
     window.addEventListener("orientationchange", apply);
     window.addEventListener("resize", onResize);
+    window.addEventListener("touchstart", onTouchComposer, { passive: true, capture: true });
     window.addEventListener("focusin", onFocusIn);
+    window.addEventListener("focusout", onFocusOut);
     vv?.addEventListener("resize", onResize);
     vv?.addEventListener("scroll", pinOuter);
     return () => {
       window.removeEventListener("orientationchange", apply);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("touchstart", onTouchComposer, { capture: true } as EventListenerOptions);
       window.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener("focusout", onFocusOut);
       vv?.removeEventListener("resize", onResize);
       vv?.removeEventListener("scroll", pinOuter);
-      pinTimers.forEach((id) => window.clearTimeout(id));
+      window.clearTimeout(preLiftGuard);
     };
   }, []);
 
