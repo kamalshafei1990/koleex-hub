@@ -597,7 +597,7 @@ export default function FloatingPanel() {
     setTimeout(() => {
       setOpen(false);
       setClosing(false);
-    }, 200);
+    }, 230);
   }, []);
 
   /* ── Close on outside click ── */
@@ -725,7 +725,7 @@ export default function FloatingPanel() {
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
-          className={`absolute ${isDiscussApp ? "end-[52px] top-1/2" : "bottom-[56px] end-0"} w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
+          className={`absolute ${isDiscussApp ? "end-[52px] top-1/2" : "bottom-[56px] end-0"} w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden border ${border} ${bg} ${closing ? "" : "fab-panel-anim"}`}
           style={{
             /* Calm enterprise shadow — same regardless of tab so the
                Copilot panel reads as a Hub surface, not a chatbot
@@ -734,14 +734,23 @@ export default function FloatingPanel() {
             boxShadow: dk
               ? "0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)"
               : "0 12px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)",
-            transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
+            /* ENTER is a keyframe spring growing out of the pill's corner;
+               EXIT is the inline transition collapsing back toward it. The
+               old code had only the exit — mounting landed on the final
+               values in one frame, which was the snap the owner felt on
+               every open. transform-origin puts the growth at the pill. */
+            transformOrigin: isDiscussApp ? "100% 50%" : "calc(100% - 40px) 100%",
+            animation: closing
+              ? "none"
+              : `${isDiscussApp ? "fab-panel-in-side" : "fab-panel-in"} 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
+            transition: "opacity 0.22s ease-in, transform 0.22s cubic-bezier(0.32, 0, 0.67, 0)",
             opacity: closing ? 0 : 1,
             /* Discuss docks the panel vertically-centred on the right-edge orb
                (top-1/2), so the resting transform must carry the -50% Y itself —
                the inline transform wins over any Tailwind -translate-y class. */
             transform: isDiscussApp
-              ? closing ? "translateY(calc(-50% + 8px)) scale(0.97)" : "translateY(-50%) scale(1)"
-              : closing ? "translateY(8px) scale(0.97)" : "translateY(0) scale(1)",
+              ? closing ? "translateY(calc(-50% + 20px)) scale(0.7)" : "translateY(-50%) scale(1)"
+              : closing ? "translateY(20px) scale(0.7)" : "translateY(0) scale(1)",
           }}
         >
           {/* ── Header ── */}
@@ -1129,6 +1138,34 @@ export default function FloatingPanel() {
         }
         .fab-badge { animation: badge-pulse 2s ease-in-out infinite; }
 
+        /* Family-button choreography (owner's reference — the MOTION, not a
+           copy): the panel GROWS OUT OF THE PILL with a spring, its content
+           lands a beat later, and the ✕ rotates in. The container is the
+           star; everything else follows it. */
+        @keyframes fab-panel-in {
+          from { opacity: 0; transform: translateY(28px) scale(0.55); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fab-panel-in-side {
+          from { opacity: 0; transform: translateY(calc(-50% + 28px)) scale(0.55); }
+          to   { opacity: 1; transform: translateY(-50%) scale(1); }
+        }
+        @keyframes fab-content-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fab-panel-anim > * {
+          animation: fab-content-in 0.32s ease-out 0.12s both;
+        }
+        @keyframes fab-x-in {
+          from { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+          to   { opacity: 1; transform: rotate(0deg) scale(1); }
+        }
+        .fab-x-enter { animation: fab-x-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+        @media (prefers-reduced-motion: reduce) {
+          .fab-panel-anim > *, .fab-x-enter { animation: none; }
+        }
+
         /* Panel surface. Aurora: the tile material — same glass as the
            header menus, per the owner's "one material" ruling — with the
            unified 6% border. Core: the flat original. */
@@ -1281,7 +1318,7 @@ export default function FloatingPanel() {
               </button>
             ) : (
               /* ── Expanded: pill with AI | Discuss (solo-aware) ── */
-              <div className="relative flex items-center z-[2]">
+              <div className="relative flex items-center z-[2]" style={{ animation: "fab-content-in 0.3s ease-out both" }}>
                 {/* Sliding selection indicator.
                     In solo mode it stretches to fill the whole (single) button;
                     in dual mode it snaps under the active tab. */}
