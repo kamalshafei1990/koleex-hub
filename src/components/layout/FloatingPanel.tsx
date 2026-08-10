@@ -128,6 +128,7 @@ export default function FloatingPanel() {
 
   /* ── State ── */
   const [open, setOpen] = useState(false);
+  const [returning, setReturning] = useState(false);
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<"ai" | "discuss">("ai");
   /* Minimised mode — collapses the FAB to a tiny handle in the corner
@@ -597,6 +598,12 @@ export default function FloatingPanel() {
     setTimeout(() => {
       setOpen(false);
       setClosing(false);
+      /* One spring pop as the 44px circle becomes the pill again. The width
+         change itself cannot animate — it lands on `auto`, which is not
+         interpolable — so the returning pill plays a scaleX keyframe rooted
+         at the circle's spot instead. Cleared after the run. */
+      setReturning(true);
+      window.setTimeout(() => setReturning(false), 500);
     }, 230);
   }, []);
 
@@ -1163,13 +1170,22 @@ export default function FloatingPanel() {
           from { opacity: 1; transform: translateY(-50%) scale(1); }
           to   { opacity: 0; transform: translateY(calc(-50% + 20px)) scale(0.7); }
         }
+        @keyframes fab-pill-in {
+          from { opacity: 0.6; transform: scaleX(0.3); }
+          to   { opacity: 1; transform: scaleX(1); }
+        }
+        .fab-pill-return {
+          animation: fab-pill-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          transform-origin: calc(100% - 22px) 50%;
+        }
+        [dir="rtl"] .fab-pill-return { transform-origin: 22px 50%; }
         @keyframes fab-x-in {
           from { opacity: 0; transform: rotate(-90deg) scale(0.4); }
           to   { opacity: 1; transform: rotate(0deg) scale(1); }
         }
         .fab-x-enter { animation: fab-x-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
         @media (prefers-reduced-motion: reduce) {
-          .fab-panel-anim > *, .fab-x-enter { animation: none; }
+          .fab-panel-anim > *, .fab-x-enter, .fab-pill-return { animation: none; }
         }
 
         /* Panel surface. Aurora: the tile material — same glass as the
@@ -1292,7 +1308,7 @@ export default function FloatingPanel() {
           }}
         >
           <div
-            className="relative flex items-center justify-center rounded-full cursor-pointer"
+            className={`relative flex items-center justify-center rounded-full cursor-pointer${returning ? " fab-pill-return" : ""}`}
             style={{
               width: open ? 44 : undefined,
               height: open ? 44 : undefined,
