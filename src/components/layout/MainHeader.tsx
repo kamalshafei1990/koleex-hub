@@ -185,7 +185,7 @@ export default function MainHeader() {
            pane must never re-break anything. Elsewhere the pane stays the
            flat bar-height blur. */
         className={`kx-header-pane fixed top-0 left-0 right-0 z-[99] pointer-events-none ${
-          pathname === "/" ? "kx-pane-progressive h-[104px]" : "h-14"
+          pathname === "/" ? "kx-pane-progressive" : ""
         }`}
       >
         <i /><i /><i /><i />

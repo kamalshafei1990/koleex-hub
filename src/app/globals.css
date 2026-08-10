@@ -1137,6 +1137,13 @@ input[type="number"]:not(.kx-spinner) {
 .kx-header-pane { display: none; }
 [data-kx-skin="aurora"] .kx-header-pane {
   display: block;
+  /* The pane's height must TRACK the real header, which grows by the
+     safe-area inset on notched iPhones (RootShell: --kx-header-h). It was
+     hardcoded to bar height, which put the whole blur strip behind the iOS
+     status bar and left the actual header row glassless — "the blur doesn't
+     work on mobile". Proven on the iOS Simulator: WebKit renders both pane
+     recipes fine; the failure was pure geometry. */
+  height: var(--kx-header-h, 3.5rem);
   /* NO FILL AT ALL — owner's final word: "totally transparent but blurred."
      The pane is pure backdrop-filter; the only separation from the page is
      the header's own hairline border-b, which is a line, not a colour. The
@@ -1166,6 +1173,10 @@ input[type="number"]:not(.kx-spinner) {
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  /* Header height + 3rem of approach ramp: 104px on desktop (unchanged),
+     safe-area-grown on phones. The mask bands are percentages, so the ramp
+     stretches with the pane instead of parking behind the status bar. */
+  height: calc(var(--kx-header-h, 3.5rem) + 3rem);
 }
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
   position: absolute;
@@ -1199,10 +1210,10 @@ input[type="number"]:not(.kx-spinner) {
 }
 /* Weak machines and no-backdrop browsers: back to the flat opaque bar at bar
    height — four blur passes is exactly the cost they must not pay. */
-[data-kx-skin="aurora"][data-kx-lowpower] .kx-pane-progressive { height: 3.5rem; }
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-pane-progressive { height: var(--kx-header-h, 3.5rem); }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-pane-progressive > i { display: none; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-kx-skin="aurora"] .kx-pane-progressive { height: 3.5rem; }
+  [data-kx-skin="aurora"] .kx-pane-progressive { height: var(--kx-header-h, 3.5rem); }
   [data-kx-skin="aurora"] .kx-pane-progressive > i { display: none; }
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-header-pane {
