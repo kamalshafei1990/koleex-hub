@@ -1301,32 +1301,39 @@ input[type="number"]:not(.kx-spinner) {
    keeps both. */
 [data-kx-skin="aurora"] .kx-ai-side { border-inline-end-color: transparent; }
 [data-kx-skin="aurora"] .kx-ai-side-sep { border-color: transparent; }
-/* Form fields inside AI-family FORM pages (kx-ai-form) wear the sign-in
-   gate's field grammar — the owner's reference for what an Aurora input
-   is (field-styles.ts: white 4% fill, 8% border, 30% focus border). The
-   chat surface is deliberately NOT in scope: its composer textarea is
+/* Form fields inside AI-family FORM pages (kx-ai-form) are RECESSED WELLS —
+   the Home search bar's language (the owner-approved Aurora input): a fill
+   clearly DARKER than the glass panel they sit on (a white-tint like the
+   gate's disappears against a dark panel — tried, owner: "you didn't change
+   the design"), an inset depth shadow, and the system's Hub-Blue ring on
+   focus. Element-level so every future field on the page follows. The chat
+   surface is deliberately NOT in scope: its composer textarea is
    transparent inside the glass card. Core keeps the var() classes. */
 [data-kx-skin="aurora"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 [data-kx-skin="aurora"] .kx-ai-form textarea,
 [data-kx-skin="aurora"] .kx-ai-form select {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
 [data-kx-skin="aurora"] .kx-ai-form input:focus,
 [data-kx-skin="aurora"] .kx-ai-form textarea:focus,
 [data-kx-skin="aurora"] .kx-ai-form select:focus {
-  border-color: rgba(255, 255, 255, 0.30);
+  border-color: rgba(86, 127, 178, 0.70);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea,
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select {
-  background-color: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form input:focus,
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form textarea:focus,
 [data-kx-skin="aurora"][data-theme="light"] .kx-ai-form select:focus {
-  border-color: rgba(0, 0, 0, 0.30);
+  border-color: rgba(62, 103, 150, 0.75);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
