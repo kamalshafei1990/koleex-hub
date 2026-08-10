@@ -1538,9 +1538,17 @@ export default function KoleexAiApp() {
     lastCountRef.current = messages.length;
 
     if (firstScrollRef.current) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-      firstScrollRef.current = false;
-      userFollowingRef.current = true;
+      /* Empty state stays at the TOP — the bottom-snap was firing with zero
+         messages too, which scrolled the greeting stack down and cropped
+         the orb's face on phones (owner screenshot). The composer lives
+         OUTSIDE this scroller, so starting at the top hides nothing. The
+         flag stays armed on empty so the first loaded batch still gets the
+         instant (not smooth) snap it was built for. */
+      if (messages.length > 0) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+        firstScrollRef.current = false;
+        userFollowingRef.current = true;
+      }
       return;
     }
     if (countGrew) {
@@ -3423,12 +3431,12 @@ function WelcomeCard({
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-6" />
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-4 md:py-8">
+      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-4 md:mb-6" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
         {greeting}
       </h2>
-      <p className="text-[12.5px] text-[var(--text-dim)] mb-9 max-w-md">
+      <p className="text-[12.5px] text-[var(--text-dim)] mb-5 md:mb-9 max-w-md">
         {copy.welcomeSub}
       </p>
 
