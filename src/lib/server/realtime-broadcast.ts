@@ -17,8 +17,8 @@ import "server-only";
    triggered it (the refetch-on-focus / interval safety net still reconciles).
    --------------------------------------------------------------------------- */
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 export type BroadcastPing = { topic: string; event?: string; payload?: Record<string, unknown> };
 

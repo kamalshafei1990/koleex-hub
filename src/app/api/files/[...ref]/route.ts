@@ -37,8 +37,8 @@ import { discussMediaList } from "@/lib/server/discuss-media";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
 
 const MAX_BYTES = 200 * 1024 * 1024; // 413 above this
 const UPSTREAM_TIMEOUT_MS = 50_000;

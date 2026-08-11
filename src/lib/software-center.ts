@@ -36,7 +36,7 @@ export const KOLEEX_APP_ICON = "/icon-512.png";
    (docs/infrastructure/DISCUSS_SCOPED_STAGING_ARCHITECTURE.md): staging has no
    `media` bucket objects, so these logos resolve to the placeholder there. That
    is intended — Software Center is out of scope for Discuss Unit 2 Run B. */
-const SUPABASE_PUBLIC_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_PUBLIC_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 /** Local placeholder used when the asset host is unknown or the object is
  *  absent (e.g. staging). Never resolves to production Storage. */
 const MISSING_ASSET = "/icon-512.png";

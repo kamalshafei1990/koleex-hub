@@ -57,7 +57,7 @@ import "server-only";
    and leaves legacy URL parsing silently failing closed if the env was not yet
    populated. Cheap to read per call. */
 function supabaseHost(): string | null {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!raw) return null;
   try {
     return new URL(raw).hostname;

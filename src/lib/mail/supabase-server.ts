@@ -25,8 +25,8 @@ let _cached: SupabaseClient<Database> | null = null;
 export function getServerSupabase(): SupabaseClient<Database> {
   if (_cached) return _cached;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   if (!url) {
     throw new Error(

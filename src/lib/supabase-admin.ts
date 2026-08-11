@@ -22,8 +22,23 @@ let _cached: SupabaseClient | null = null;
 export function getSupabaseAdmin(): SupabaseClient {
   if (_cached) return _cached;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  /* TRIM. Not defensive politeness — a measured production outage.
+     The deployed NEXT_PUBLIC_SUPABASE_ANON_KEY carries a trailing newline
+     (pasted into the dashboard with the line break), so this client opened
+     its Realtime socket at
+       …/realtime/v1/websocket?apikey=sb_publishable_…Shha%0A
+     and the %0A made every handshake fail. `reconnectAfterMs` tops out at
+     8s and never gives up, so EVERY open tab retried forever — 40+ failed
+     WebSocket errors in the console of a single Product Data session, plus
+     the battery and socket churn behind them, on every screen in the Hub.
+
+     Proved in the live page: the key as shipped → connection FAILED; the
+     same key `.trim()`ed → connection OPEN.
+
+     Fixing the env var alone would leave the next paste to re-break it, and
+     half the repo already trims for exactly this reason. */
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !key) {
     throw new Error(
       "[supabase-admin] Supabase env variables are missing " +

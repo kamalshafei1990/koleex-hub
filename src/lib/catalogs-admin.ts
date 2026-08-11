@@ -85,8 +85,8 @@ function uploadResumable(
 ): Promise<boolean> {
   /* Runtime env access — fails clearly at the first upload call if
      vars are absent, never at module import time. */
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!supabaseUrl || !supabaseKey) {
     return Promise.reject(
       new Error(
