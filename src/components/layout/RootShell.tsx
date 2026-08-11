@@ -289,9 +289,17 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <ViewAsBanner />
       <Sidebar />
       {/* pt-14 = header height. The view-as indicator is now a compact floating
-          pill (overlay), so it no longer needs to push content down. */}
+          pill (overlay), so it no longer needs to push content down.
+
+          NO TRANSITION HERE. The only thing that ever changes on this element
+          is padding-top, and it changes for exactly one reason: the route
+          crossed the underglass boundary (0 ↔ 56px). `transition-all` turned
+          that into a 300ms slide of the entire scroller — measured on prod,
+          Home → Contacts: top edge 0 → 26 → 41 → 47 → 51 → 53 → 55 → 56px,
+          height 798 → 742, CLS 0.0399, all of it after the fix to the
+          horizontal offset below. Same mistake, other axis. */}
       <div
-        className={`kx-shell-top ${isUnderglassRoute(pathname) ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`kx-shell-top ${isUnderglassRoute(pathname) ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 overflow-hidden`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,
