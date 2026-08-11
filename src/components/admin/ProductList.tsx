@@ -1877,7 +1877,8 @@ export default function ProductList() {
       <div className="relative z-[1] max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-3 mb-1">
+        {/* relative z-30: the top strip's ramp (z-20) runs BEHIND this. */}
+        <div className="relative z-30 flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
@@ -1918,7 +1919,7 @@ export default function ProductList() {
         {/* Long catalogues need a way back up — one control serves both
             /products and /product-data since they share this component. */}
         <BackToTop label={t("list.backToTop", "Back to top")} />
-        <p className="text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
+        <p className="relative z-30 text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
           <span>
             {/* The server's exact count, not how many rows happen to be
                 loaded — with paging those are different numbers, and the one
@@ -2322,7 +2323,9 @@ export default function ProductList() {
           </div>
         )}
         {orderedDivisions.length > 0 && (
-          <div className="mb-4">
+          /* relative z-30: sits ABOVE the top strip's ramp. Without it a
+             28px backdrop blur painted this whole row out of existence. */
+          <div className="relative z-30 mb-4">
             {/* Divisions ride the canonical TabStrip — under Aurora the
                 selected state is the ONE Hub-Blue pill sliding between tabs
                 (measured, labels vary), under Core the original filled pill,
@@ -2493,29 +2496,29 @@ export default function ProductList() {
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
               <nav
-                /* NO --kx-ramp-top. It used to lift this bar's ramp 58px
-                   UPWARD to make one continuous frosted edge with the
-                   toolbar — correct once the page is scrolled and the two
-                   bars are stacked at the top, and wrong at scroll 0, where
-                   those 58px are the DIVISIONS ROW sitting in normal flow.
-                   A 28px backdrop blur painted over a live, interactive row
-                   turns it into a dark smear with hard mask edges: that is
-                   the "black background with a black border" the owner kept
-                   reporting, and why /products — which has no ramp at all —
-                   looked right next to it. Proved by hiding .kx-bar-prog on
-                   prod: the whole divisions row reappeared.
+                /* ONE ramp for the whole top strip, and it runs BEHIND every
+                   component in that strip — owner: "put the blured edge on
+                   the back of the top page components and make more longer".
 
-                   A ramp may only cover what actually passes BEHIND it. This
-                   one now spans its own bar plus its tail, and the header
-                   pane keeps its own flat frost — still one ramp per screen. */
-                style={{ top: "var(--kx-pd-tools-h, 52px)" }}
-                /* Short tail: the fade ends just under the category cards
-                   (owner: "the blurred edge is too long… you can make it
-                   under the categories cards with very short distance").
-                   Kept at 0.75rem when the upward lift was removed — the
-                   tail length is the part he signed off, so it does not
-                   move while a separate defect is being fixed. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:0.75rem]"
+                   --kx-ramp-top reaches well past the title block so the
+                   frost starts at the top of the page whatever the title
+                   wraps to; anything higher than needed is simply clipped
+                   above the viewport. What made this a dark smear before was
+                   not the height, it was z-order: the title, the count and
+                   the divisions row sat BELOW the ramp and got blurred away
+                   as if they were scrolled-under content. They now carry
+                   `relative z-30` (above the ramp's z-20 host), so the frost
+                   passes behind them and only real scrolling content
+                   dissolves into it. */
+                style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "26rem" }}
+                /* The tail lands JUST UNDER the category cards: the layer is
+                   fully frosted down to this bar's bottom edge (which is the
+                   cards' bottom) and spends the whole fade in the 5rem below
+                   it. --kx-ramp-fade must be a LENGTH here, not the default
+                   45%: a percentage is taken from the layer's own height, so
+                   once the layer grew to cover the strip the fade grew with
+                   it and started dissolving halfway up the cards. */
+                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:5rem] [--kx-ramp-fade:5rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >

@@ -36,8 +36,11 @@ export interface TabStripItem {
   disabled?: boolean;
 }
 
+/* kx-glass: the strip is a real glass surface, not a flat panel (owner, on
+   the Divisions bar: "this tab bar make it's background with glass effect").
+   The class evaluates to nothing under Core, so this is Aurora-only. */
 const SHELL =
-  "relative flex items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "kx-glass relative flex items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 function tabClass(active: boolean, aurora: boolean): string {
   const base =
