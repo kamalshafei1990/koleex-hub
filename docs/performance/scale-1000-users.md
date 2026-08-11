@@ -148,7 +148,58 @@ Per the standing rule, these are owner calls:
 
 ---
 
-## 5. The one-line answer
+## 5. What it costs
+
+Published rates, read 2026-08-12. Re-check before committing — they move.
+
+**Correction to §1:** `max_connections = 60` is the *direct* limit. Micro also
+provides **200 pooler connections**, and the app goes through the pooler. The
+ceiling is wider than "60" suggests — still nowhere near 1,000.
+
+### Where we are
+
+| | Plan | Monthly |
+|---|---|---|
+| Supabase | Pro + Micro compute | ~$25 (Pro includes $10 compute credit) |
+| Vercel | Pro, per member | $20 / member |
+
+### Supabase compute — the one lever that matters
+
+| Size | RAM | CPU | Pooler conns | $/mo |
+|---|---|---|---|---|
+| **Micro** (current) | 1 GB | 2-core | 200 | $10 |
+| Small | 2 GB | 2-core | 400 | $15 |
+| **Medium** ← recommended next | 4 GB | 2-core | 600 | $60 |
+| Large | 8 GB | 2-core | 800 | $110 |
+| **XL** ← floor for 1,000 users | 16 GB | 4-core | 1,000 | $210 |
+| 2XL | 32 GB | 8-core | 1,500 | $410 |
+
+Storage is not a cost problem: ~2 GB of database against 8 GB included, and
+the photos + 500 PDFs live in file storage, inside the Pro allowance.
+
+### Projected bill at 1,000 concurrent users
+
+Invocation estimate: 1,000 users × ~50 screen opens/day × 5 requests ≈ 7.5M/mo
+— **plus ~29M/mo of presence heartbeats alone**, which is why heartbeat
+batching (Phase 3, item 9) is a cost item and not only a load item.
+
+| | Monthly |
+|---|---|
+| Supabase Pro + XL compute | ~$225 |
+| Vercel Pro (3 members) + usage | ~$150 |
+| **Total** | **~$375** |
+
+On 2XL instead of XL: ~$575. Egress stays inside the included 1 TB at this
+usage; heavy PDF traffic would change that.
+
+### The number worth acting on now
+
+Micro → **Medium is +$50/month** and buys 4× the RAM and 3× the pooler
+connections. That is not a 1,000-user answer — it is what makes the system
+comfortable *today* and carries it into the hundreds. It is the cheapest
+meaningful thing on this page.
+
+## 6. The one-line answer
 
 **Building for 1,000 does not slow down 9 — if the work is sequenced.**
 Phase 1 makes today faster. Phase 2 makes today faster and tomorrow possible.
