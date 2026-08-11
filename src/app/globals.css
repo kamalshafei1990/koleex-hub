@@ -1765,6 +1765,17 @@ input[type="number"]:not(.kx-spinner) {
   }
 }
 
+/* RESERVE THE SCROLLBAR GUTTER on every pane that scrolls inside an app.
+   A detail pane whose content changes height between sections gains and
+   loses its scrollbar, and with `scrollbar-gutter: auto` the content width
+   jumps by the scrollbar's width each time — the layout "dances" on any
+   platform with classic (non-overlay) scrollbars, which is most desktops.
+   Reserving the gutter always costs a few pixels and removes the entire
+   class of shift. Overlay-scrollbar browsers are unaffected. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(main, aside, [data-kx-pane]) {
+  scrollbar-gutter: stable;
+}
+
 /* A root that hosts the Aurora ground must LIFT its own content above it.
    The ground is a `fixed z-0` child, and a positioned child paints above
    static siblings — so without this the canvas (and its dark vignette)

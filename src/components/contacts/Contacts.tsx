@@ -5009,8 +5009,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      the state they follow, or they would read it before initialisation. */
   const statusSeg = useSegSlider(statusFilter);
   const entitySeg = useSegSlider(entityFilter);
+  const typeSeg = useSegSlider(typeTab);
   /* Customer tier filter — Diamond / Platinum / Gold / Silver / End User. */
   const [tierFilter, setTierFilter] = useState<"all" | CustomerTier>("all");
+  const tierSeg = useSegSlider(tierFilter);
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
   /* Department filter for the supplier form — null = show all sections.
      Lets a Finance/Legal/QC owner collapse the form to just their fields. */
@@ -6352,11 +6354,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             the wider list panel fits all six. Falls back to horizontal scroll
             only on unusually narrow viewports. */}
         {filterType === "customer" && (
-          <div className="flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={tierSeg.ref} className="relative flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            {aurora && <SegSlider box={tierSeg.box} />}
             <button
               onClick={() => setTierFilter("all")}
-              className={`flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
-                tierFilter === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+              data-seg-active={tierFilter === "all" ? "true" : undefined}
+              className={`relative flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
+                tierFilter === "all" ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
               {t("filter.allTiers", "All Tiers")}
@@ -6368,8 +6372,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <button
                   key={tk}
                   onClick={() => setTierFilter(tk)}
-                  className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-center whitespace-nowrap transition-colors ${
-                    active ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-hover)]"
+                  data-seg-active={active ? "true" : undefined}
+                  /* The tier tint is this chip's IDENTITY (material colours),
+                     so it stays even under Aurora — the slider adds the
+                     travelling ring around it rather than replacing it. */
+                  className={`relative flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-center whitespace-nowrap transition-colors ${
+                    active && !aurora ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-hover)]"
                   }`}
                   style={active ? { backgroundColor: meta.tintBg } : undefined}
                 >
@@ -6380,13 +6388,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
-        {/* Type tabs */}
+        {/* Type tabs — a grid, not a ragged wrap: five chips of different
+            label lengths wrapped 3 + 2 and read as unaligned. Equal columns
+            line them up at every width. */}
         {!filterType && (
-          <div className="flex flex-wrap gap-1 mt-3">
+          <div ref={typeSeg.ref} className="relative grid grid-cols-3 @[22rem]:grid-cols-5 gap-1 mt-3">
+            {aurora && <SegSlider box={typeSeg.box} />}
             <button
               onClick={() => setTypeTab("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                typeTab === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+              data-seg-active={typeTab === "all" ? "true" : undefined}
+              className={`relative px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                typeTab === "all" ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
               {t("tab.all")} ({contacts.length})
@@ -6397,8 +6409,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <button
                   key={ct.value}
                   onClick={() => setTypeTab(ct.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] flex items-center gap-1.5 ${
-                    typeTab === ct.value ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                  data-seg-active={typeTab === ct.value ? "true" : undefined}
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] flex items-center gap-1.5 ${
+                    typeTab === ct.value ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                 >
                   {ct.icon} {ct.value === "company" ? t("tab.companies") : ct.value === "people" ? t("tab.people") : ct.value === "supplier" ? t("tab.suppliers") : t("tab.customers")} ({count})
