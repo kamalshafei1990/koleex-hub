@@ -102,7 +102,17 @@ export default function UpdateWatcher() {
       window.location.reload();
     };
     document.addEventListener("visibilitychange", onHide);
-    const onVis = () => { if (document.visibilityState === "visible") void check(); };
+    /* THROTTLED, for the same reason the presence beat is: this fires on
+       BOTH visibilitychange and focus, so switching between two windows can
+       trigger it twice in a row, and a rapid flicker triggers it per flip.
+       The build id cannot change faster than a deploy — 10s is generous. */
+    let lastCheckAt = 0;
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastCheckAt < 10_000) return;
+      lastCheckAt = Date.now();
+      void check();
+    };
     document.addEventListener("visibilitychange", onVis);
     /* Also on window focus — visibilitychange misses focus switches between
        two visible windows (common on desktop). */

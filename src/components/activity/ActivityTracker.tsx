@@ -124,13 +124,22 @@ export default function ActivityTracker() {
     if (ric) ric(startBeats, { timeout: 3000 });
     else startTimer = window.setTimeout(startBeats, 1500);
 
+    /* The catch-up ping is THROTTLED. Coming back to the tab fires an
+       immediate beat, which is right for a real return — but a user flicking
+       between apps, or any environment that toggles visibility rapidly, then
+       gets one request per toggle. Observed while instrumenting: 12
+       visibility flips in 12 seconds produced 12 heartbeats. One beat per
+       RESUME_MIN_MS is all the revocation check needs. */
+    let lastBeatAt = 0;
+    const RESUME_MIN_MS = 10_000;
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         lastInputRef.current = Date.now();
-        /* Immediate catch-up ping on resume: instant revocation + presence,
-           then reschedule at the (now fast) active cadence. */
         if (timer !== undefined) window.clearTimeout(timer);
-        void sendHeartbeat();
+        if (Date.now() - lastBeatAt >= RESUME_MIN_MS) {
+          lastBeatAt = Date.now();
+          void sendHeartbeat();
+        }
         timer = window.setTimeout(loop, HEARTBEAT_ACTIVE_MS);
       }
     };
