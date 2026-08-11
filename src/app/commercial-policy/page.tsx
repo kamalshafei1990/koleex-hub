@@ -42,6 +42,12 @@ import type {
   VolumeDiscountTierRow,
 } from "@/lib/server/commercial-policy";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useSkin } from "@/lib/appearance";
+import nextDynamic from "next/dynamic";
+import AppIcon from "@/components/common/AppIcon";
+
+/* Aurora ground — mounted only under the skin. */
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function CommercialPolicyPage() {
   return (
@@ -57,6 +63,7 @@ export default function CommercialPolicyPage() {
 /* ─── Top-level view ──────────────────────────────────────── */
 
 function CommercialPolicyView() {
+  const aurora = useSkin() === "aurora";
   const [snapshot, setSnapshot] = useState<CommercialPolicySnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,22 +102,28 @@ function CommercialPolicyView() {
   );
 
   return (
-    <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full relative"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
-    >
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full">
+    /* h-full, not a dvh calculation: the shell already resolves the
+       per-mode viewport unit and a child that re-measures it re-opens the
+       bottom-crop bug. kx-app = the Aurora var-remap scope. */
+    <div className="kx-app h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full relative">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="kx-bar-host relative z-[1] shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] w-full">
+        <div aria-hidden className="kx-glass-bar" />
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
             <Link
               href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+              className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
             >
               <ArrowLeftIcon className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <CommercialPolicyIcon className="h-4 w-4" />
+              <div className="kx-glass h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <AppIcon appId="commercial-policy" className="h-4 w-4" size={16} />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
                 Commercial Setup
@@ -267,7 +280,7 @@ function PolicyHealthStrip({ s }: { s: CommercialPolicySnapshot }) {
   })();
 
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
       <HealthPill
         ok={engineOn}
         label={engineOn ? "Pricing engine: LIVE" : "Pricing engine: OFF (legacy)"}
@@ -313,7 +326,7 @@ function PriceCalculatorCTA() {
   return (
     <Link
       href="/price-calculator?from=/commercial-policy"
-      className="group flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
+      className="group flex items-center gap-4 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <PriceCalculatorIcon className="h-5 w-5" />
@@ -329,7 +342,7 @@ function PriceCalculatorCTA() {
 
 function InfoBanner() {
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 flex items-start gap-3">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 flex items-start gap-3">
       <InfoIcon className="h-4 w-4 text-[var(--text-dim)] mt-0.5 shrink-0" />
       <div className="min-w-0 text-[12px] text-[var(--text-muted)] leading-relaxed">
         Click <span className="text-[var(--text-primary)] font-semibold">Edit</span> on any
@@ -366,7 +379,7 @@ function SectionShell({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+    <section id={id} className="scroll-mt-20 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)] flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
@@ -1697,7 +1710,7 @@ function KpiGrid({ children }: { children: React.ReactNode }) {
 
 function KpiReadonly({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+    <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       <div className="text-[18px] font-semibold tabular-nums mt-1 text-[var(--text-primary)]">{value}</div>
     </div>
@@ -1718,7 +1731,7 @@ function KpiEditable({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 flex flex-col">
+    <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 flex flex-col">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       {!editing ? (
         <div className="text-[18px] font-semibold tabular-nums mt-1 text-[var(--text-primary)]">
@@ -1750,7 +1763,7 @@ function KpiBool({
 }) {
   const tone = value ? "text-amber-300" : "text-emerald-300";
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+    <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       {!editing ? (
         <>
@@ -1803,7 +1816,7 @@ function DeleteRowBtn({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Delete row"
       title="Delete row"
-      className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
+      className="h-8 w-8 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 6h18" />

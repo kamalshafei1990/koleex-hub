@@ -26,6 +26,11 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useSkin } from "@/lib/appearance";
+import nextDynamic from "next/dynamic";
+
+/* Aurora ground — mounted only under the skin. */
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* ── types mirror the overview API ── */
 interface Overview { totalSuppliers: number; activeSuppliers: number; preferredSuppliers: number; blockedSuppliers: number; highRiskSuppliers: number; soleSourceSuppliers: number; missingCerts: number; avgSourcingScore: number | null; avgNegotiationScore: number | null; avgReadiness: number | null; }
@@ -56,7 +61,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="flex min-h-[96px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+    <div className="flex min-h-[96px] flex-col kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
       <div className="text-[10px] font-semibold uppercase leading-tight tracking-[0.14em] text-[var(--text-faint)]">{label}</div>
       <div className="mt-auto text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{value}</div>
       <div className="min-h-[14px] text-[11px] leading-tight text-[var(--text-secondary)]">{hint ?? ""}</div>
@@ -83,6 +88,7 @@ function SevTag({ sev, label }: { sev: "info" | "warning" | "critical"; label: s
 }
 
 export default function SourcingCommandCenter() {
+  const aurora = useSkin() === "aurora";
   const { t } = useTranslation(contactsT);
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,7 +182,12 @@ export default function SourcingCommandCenter() {
     sev === "critical" ? t("scc.sevCritical", "Critical") : sev === "warning" ? t("scc.sevAttention", "Attention") : t("scc.sevInfo", "Info");
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+    <div className="kx-app relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
       <SuppliersHeader
         title={t("scc.title", "Sourcing Command Center")}
         subtitle={`${o.activeSuppliers} ${t("scc.activeSuppliers", "active suppliers")} · ${data.categories.length} ${t("scc.categories", "categories")} · ${t("scc.viewingAs", "viewing as")} ${titleCase(data.callerTier)}`}
@@ -203,7 +214,7 @@ export default function SourcingCommandCenter() {
         {/* B. Category sourcing matrix */}
         <section className="lg:col-span-2">
           <SectionHeader icon={<LayersIcon className="h-4 w-4" />} title={t("scc.categoryMatrixTitle", "Category sourcing matrix")} sub={t("scc.categoryMatrixSub", "Coverage, roles, and backup posture per category")} />
-          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+          <div className="overflow-hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
             <div className="overflow-x-auto">
               <table className="w-full min-w-0 text-sm sm:min-w-[480px]">
                 <thead>
@@ -242,7 +253,7 @@ export default function SourcingCommandCenter() {
         <section>
           <SectionHeader icon={<NetworkIcon className="h-4 w-4" />} title={t("scc.dependencyTitle", "Dependency & concentration")} sub={t("scc.dependencySub", "Single-source and geographic exposure")} />
           <div className="space-y-3">
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+            <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
               <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]"><Globe2Icon className="h-3.5 w-3.5" />{t("scc.countryConcentration", "Country concentration")}</div>
               {data.concentration.length === 0 ? <p className="text-[12px] text-[var(--text-faint)]">{t("scc.noCountryData", "No country data.")}</p> : data.concentration.slice(0, 6).map((c) => (
                 <div key={c.country} className="mb-1.5 last:mb-0">
@@ -253,9 +264,9 @@ export default function SourcingCommandCenter() {
             </div>
             <div className="space-y-2">
               {data.dependencies.length === 0 ? (
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-[12px] text-[var(--text-faint)]">{t("scc.noDependencyWarnings", "No dependency warnings — coverage looks healthy.")}</div>
+                <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-[12px] text-[var(--text-faint)]">{t("scc.noDependencyWarnings", "No dependency warnings — coverage looks healthy.")}</div>
               ) : data.dependencies.map((d) => (
-                <div key={d.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                <div key={d.key} className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[13px] font-medium text-[var(--text-primary)]">{d.title}</p>
                     <SevTag sev={d.severity} label={sevLabel(d.severity)} />
@@ -283,13 +294,13 @@ export default function SourcingCommandCenter() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[180px]">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("scc.searchPlaceholder", "Search name or country")} className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 pl-9 pr-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)] focus:outline-none" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("scc.searchPlaceholder", "Search name or country")} className="w-full kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 pl-9 pr-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)] focus:outline-none" />
           </div>
-          <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[13px] text-[var(--text-primary)] focus:outline-none">
+          <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[13px] text-[var(--text-primary)] focus:outline-none">
             <option value="">{t("scc.allRisk", "All risk")}</option><option value="low">{t("opt.low", "Low")}</option><option value="medium">{t("opt.medium", "Medium")}</option><option value="high">{t("opt.high", "High")}</option><option value="critical">{t("opt.critical", "Critical")}</option>
           </select>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)]"><input type="checkbox" checked={preferredOnly} onChange={(e) => setPreferredOnly(e.target.checked)} className="accent-[var(--text-primary)]" />{t("scc.preferredOnly", "Preferred only")}</label>
-          <div className="flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)]"><input type="checkbox" checked={preferredOnly} onChange={(e) => setPreferredOnly(e.target.checked)} className="accent-[var(--text-primary)]" />{t("scc.preferredOnly", "Preferred only")}</label>
+          <div className="flex items-center gap-1 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5">
             {SORTS.map((s) => (
               <button key={s.key} onClick={() => setSortKey(s.key)} className={`rounded-md px-2.5 py-1 text-[12px] font-medium ${sortKey === s.key ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{t("scc." + s.key, s.label)}</button>
             ))}
@@ -307,7 +318,7 @@ export default function SourcingCommandCenter() {
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+        <div className="overflow-hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-0 text-sm sm:min-w-[640px]">
               <thead>
@@ -351,11 +362,11 @@ export default function SourcingCommandCenter() {
         <section className="lg:col-span-2">
           <SectionHeader icon={<SparklesIcon className="h-4 w-4" />} title={t("scc.insightsTitle", "Procurement insights")} sub={`${t("scc.insightsSub", "Rule-generated recommendations")}${isMgmt ? "" : ` ${t("scc.procurementView", "(procurement view)")}`}`} />
           {data.recommendations.length === 0 ? (
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-[12px] text-[var(--text-faint)]">{t("scc.noRecommendations", "No recommendations — sourcing posture looks balanced.")}</div>
+            <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-[12px] text-[var(--text-faint)]">{t("scc.noRecommendations", "No recommendations — sourcing posture looks balanced.")}</div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {data.recommendations.map((r) => (
-                <div key={r.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                <div key={r.id} className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[13px] font-medium text-[var(--text-primary)]">{r.title}</p>
                     <SevTag sev={r.severity} label={sevLabel(r.severity)} />
@@ -380,7 +391,7 @@ export default function SourcingCommandCenter() {
             right={<button onClick={() => setShowCreate((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"><PlusIcon className="h-3.5 w-3.5" />{t("scc.new", "New")}</button>}
           />
           {showCreate ? (
-            <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+            <div className="mb-3 kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
               <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder={t("scc.watchlistNamePlaceholder", "Watchlist name")} className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)] focus:outline-none" />
               <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{selected.length > 0 ? `${selected.length} ${t("scc.suppliersWillBeFollowed", "supplier(s) will be followed (from compare selection).")}` : t("scc.currentFiltersSaved", "Current filters will be saved. Select suppliers in compare mode to follow them.")}</p>
               <div className="mt-2 flex justify-end gap-2">
@@ -391,9 +402,9 @@ export default function SourcingCommandCenter() {
           ) : null}
           <div className="space-y-2">
             {watchlists.length === 0 ? (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-[12px] text-[var(--text-faint)]">{t("scc.noSavedViews", "No saved views yet.")}</div>
+              <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-[12px] text-[var(--text-faint)]">{t("scc.noSavedViews", "No saved views yet.")}</div>
             ) : watchlists.map((w) => (
-              <div key={w.id} className="flex items-start justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+              <div key={w.id} className="flex items-start justify-between gap-2 kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{w.name}</p>
                   <p className="text-[11px] text-[var(--text-secondary)]">{w.kind === "view" ? t("scc.savedView", "Saved view") : t("scc.watchlist", "Watchlist")}{w.supplier_ids.length ? ` · ${w.supplier_ids.length} ${t("scc.followed", "followed")}` : ""}</p>

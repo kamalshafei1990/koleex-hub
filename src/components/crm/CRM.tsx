@@ -106,6 +106,11 @@ import type {
 } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
+import { useSkin } from "@/lib/appearance";
+import nextDynamic from "next/dynamic";
+
+/* Aurora ground — mounted only under the skin. */
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* ════════════════════════════════════════════════════════════════════════
    Helpers
@@ -167,6 +172,7 @@ const SWATCH_COLORS = [
 const CRM_BOARD_SNAP_KEY = "kx-crm-board-v1";
 
 export default function CRM() {
+  const aurora = useSkin() === "aurora";
   const { askConfirm, confirmDialog } = useConfirm();
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
@@ -569,7 +575,12 @@ export default function CRM() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="kx-app relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
       {confirmDialog}
       {/* ── Page header — canonical Hub PageHeader with sliding-pill nav ── */}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
@@ -999,7 +1010,7 @@ function PipelineView({
                 onClick={() => onStageFold(col.stage!)}
                 onDragOver={(e) => onDragOver(e, col.id)}
                 onDrop={(e) => onDrop(e, col.id)}
-                className="w-[44px] shrink-0 self-stretch rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-surface)] transition-colors flex flex-col items-center justify-between py-4 min-h-[280px]"
+                className="w-[44px] shrink-0 self-stretch kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-surface)] transition-colors flex flex-col items-center justify-between py-4 min-h-[280px]"
                 title={`${col.name} — ${list.length}`}
               >
                 <div className="flex flex-col items-center gap-1.5">

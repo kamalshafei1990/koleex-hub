@@ -3005,6 +3005,10 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
      super-admin-only Account tab). */
   extraTabs?: { id: CustomerTab; label: string; icon: React.ReactNode }[];
 }) {
+  /* Read the skin here rather than threading a prop: this bar renders ONCE
+     per screen (it is memoised), so a subscription costs nothing — unlike a
+     list row, which would open one per record. */
+  const aurora = useSkin() === "aurora";
   const t = translate ?? ((_k: string, f: string) => f);
   const tabs = extraTabs && extraTabs.length ? [...CUSTOMER_TABS, ...extraTabs] : CUSTOMER_TABS;
   /* Full-width opaque strip (panel bg) masks scrolling content behind the
@@ -3023,9 +3027,9 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
             key={tab.id}
             onClick={() => onChange(tab.id)}
             aria-current={active ? "true" : undefined}
-            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] whitespace-nowrap ${
               active
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]")
                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
             }`}
           >
@@ -6259,7 +6263,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setTypeTab("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 typeTab === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
@@ -6271,7 +6275,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <button
                   key={ct.value}
                   onClick={() => setTypeTab(ct.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] flex items-center gap-1.5 ${
                     typeTab === ct.value ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                 >
@@ -6582,7 +6586,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Link
                     key={c.href}
                     href={c.href}
-                    className="group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                    className="kx-glass kx-hover-glow group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
                       {c.icon}
@@ -6772,7 +6776,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Link
                     key={c.href}
                     href={c.href}
-                    className="group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                    className="kx-glass kx-hover-glow group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
                       {c.icon}

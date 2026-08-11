@@ -31,6 +31,11 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
+import { useSkin } from "@/lib/appearance";
+import nextDynamic from "next/dynamic";
+
+/* Aurora ground — mounted only under the skin. */
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* ── role label + tone (monochrome; rose only for blocked) ── */
 function roleLabel(t: (k: string, f?: string) => string, role: CoverageRole): string {
@@ -74,6 +79,7 @@ function writeCache(key: string, data: unknown): void {
 }
 
 export default function KoleexMainSuppliers() {
+  const aurora = useSkin() === "aurora";
   const { t } = useTranslation(contactsT);
   const router = useRouter();
 
@@ -204,7 +210,12 @@ export default function KoleexMainSuppliers() {
   const plannedDivisions = tree.filter((d) => d.categories.length === 0);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+    <div className="kx-app relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
       <SuppliersHeader
         title={t("cov.title", "Koleex Main Suppliers")}
         subtitle={t("cov.subtitle", "Sourcing coverage map — who we depend on, by division → category → subcategory")}
@@ -236,7 +247,7 @@ export default function KoleexMainSuppliers() {
                 <button
                   type="button"
                   onClick={() => setCollapsedDiv((s) => { const n = new Set(s); n.has(d.id) ? n.delete(d.id) : n.add(d.id); return n; })}
-                  className="sticky top-0 z-20 flex w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-5 py-4 text-start backdrop-blur"
+                  className="sticky top-0 z-20 flex w-full items-center gap-3 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-5 py-4 text-start backdrop-blur"
                 >
                   <AngleDownIcon className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform ${divCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
                   <div className="min-w-0 flex-1">
@@ -365,7 +376,7 @@ export default function KoleexMainSuppliers() {
 function SummaryStat({ label, value, tone, hint }: { label: string; value: number | string; tone?: "rose" | "amber" | "emerald"; hint?: string }) {
   const toneText = tone === "rose" ? "text-rose-500" : tone === "amber" ? "text-amber-500" : tone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]";
   return (
-    <div className="flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+    <div className="flex flex-col kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
       <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{label}</span>
       <span className={`mt-1 text-2xl font-bold tabular-nums ${toneText}`}>{value}</span>
       {hint ? <span className="mt-0.5 text-[11px] text-[var(--text-ghost)]">{hint}</span> : null}
@@ -389,7 +400,7 @@ function SubcategoryCard({ label, code, rows, t, onAdd, onOpen, onRemove, onChan
     : t("cov.empty", "Empty");
 
   return (
-    <div className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 ring-1 ring-inset ${tone.ring}`}>
+    <div className={`kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 ring-1 ring-inset ${tone.ring}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -507,7 +518,7 @@ function SupplierChip({ row, t, onOpen, onRemove, onChangeRole, onViewCatalog }:
 function CatalogModal({ catalog, t, onClose }: { catalog: CatalogTarget; t: (k: string, f?: string) => string; onClose: () => void }) {
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--bg-overlay)] p-4" onClick={onClose}>
-      <div className="flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <FileIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)]" />
@@ -594,7 +605,7 @@ function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--bg-overlay)] p-4" onClick={onClose}>
-      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-subtle)] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -643,7 +654,7 @@ function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
           </div>
 
           {/* search */}
-          <div className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+          <div className="mt-3 flex items-center gap-2 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
             <SearchIcon size={14} className="text-[var(--text-faint)]" />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("cov.searchSuppliers", "Search suppliers…")}
               className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
