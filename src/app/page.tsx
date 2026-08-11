@@ -292,18 +292,13 @@ const AppCard = memo(function AppCard({
                 animated?: boolean;
                 scaleClass?: string;
               }>;
-              /* The orb is ANIMATED, and a bound icon is a static mask — so
-                 the orb stays the fallback rather than the other way round.
-                 Still routed through BoundIcon so `app.ai` behaves like
-                 every other app if it is ever bound; unbound (today) this
-                 renders exactly the orb it always did. */
-              return (
-                <BoundIcon
-                  semanticKey="app.ai"
-                  className="h-[34px] w-[34px]"
-                  fallback={<AnimatedIcon size={34} animated scaleClass="scale-100" />}
-                />
-              );
+              /* THE ORB IS NOT BINDABLE. Routing this through BoundIcon was
+                 a mistake: a binding already existed for `app.ai`, so the
+                 launcher swapped Koleex's animated face for a static brain
+                 mask — owner: "the Koleex AI Icon should be our Animated AI
+                 face (orb)". The orb is the product's identity and it moves;
+                 a bound icon is a flat SVG mask and can never be it. */
+              return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
             }
             return <BoundIcon semanticKey={`app.${app.id}`} className="h-[34px] w-[34px]" fallback={<Icon size={34} />} />;
           })()}

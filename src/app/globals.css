@@ -1499,29 +1499,38 @@ input[type="number"]:not(.kx-spinner) {
    the time it reaches the bottom edge only the 3px veil is left and there
    is nothing to see a boundary of. Each layer also starts where the
    previous one is still going, so no two share a start line. */
-[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(1) {
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.3), transparent 100%);
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.3), transparent 100%);
-}
-[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(2) {
-  -webkit-backdrop-filter: blur(7px);
-  backdrop-filter: blur(7px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.55), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.12));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.55), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.12));
+/* EACH LAYER OWNS A BAND — they must not all cover the top. Four
+   backdrop-filters stacked over the same pixels blur the blur: every pass
+   re-samples the previous result, and over a strip this tall that compounds
+   into a flat dark slab (owner: "in the product data app why it looks in
+   the top of the page have a black background?"). Over a single short bar
+   the same stacking read as "frosted", which is why it survived this long.
+   Now the heavy layer holds the top alone and each lighter one fades in as
+   the one above it fades out, so no more than two ever overlap — the ramp
+   still walks 28 → 14 → 7 → 3, at one blur pass per pixel. */
+[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(4) {
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.62));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.62));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(3) {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.8), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.3));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.8), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.3));
+  -webkit-mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 1.02), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.78), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.58), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.36));
+  mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 1.02), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.78), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.58), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.36));
 }
-[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(4) {
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.5));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.5));
+[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(2) {
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  -webkit-mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.7), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.52), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.34), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.14));
+  mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.7), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.52), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.34), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.14));
+}
+[data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(1) {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  -webkit-mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.42), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.26), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.1), transparent 100%);
+  mask: linear-gradient(to bottom, transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.42), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.26), #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.1), transparent 100%);
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-bar-prog > i { display: none; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

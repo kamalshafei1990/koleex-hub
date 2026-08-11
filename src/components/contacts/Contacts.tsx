@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
@@ -3011,6 +3011,26 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   const aurora = useSkin() === "aurora";
   const t = translate ?? ((_k: string, f: string) => f);
   const tabs = extraTabs && extraTabs.length ? [...CUSTOMER_TABS, ...extraTabs] : CUSTOMER_TABS;
+
+  /* Measured slider — the TabStrip mechanic. offsetLeft/offsetWidth of the
+     current tab, re-measured on resize AND once after hydration, because
+     web fonts land after first paint and every label is a translation. */
+  const navRef = useRef<HTMLElement | null>(null);
+  const [ind, setInd] = useState<{ x: number; w: number }>({ x: 0, w: 0 });
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const el = nav.querySelector<HTMLElement>('[aria-current="true"]');
+      if (!el) return;
+      setInd({ x: el.offsetLeft, w: el.offsetWidth });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    const settle = window.setTimeout(measure, 250);
+    return () => { ro.disconnect(); window.clearTimeout(settle); };
+  }, [activeTab, tabs.length]);
   /* Full-width opaque strip (panel bg) masks scrolling content behind the
      pill. Under Aurora that fill is TRANSPARENT (the kx-app remap), so the
      strip stops masking anything — the pane pattern supplies a real frosted
@@ -3019,7 +3039,19 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   return (
     <div className={`kx-bar-host sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
     <div aria-hidden className="kx-glass-bar" />
-    <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
+    <nav ref={navRef} className="relative flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
+      {/* The selection SLIDES between tabs instead of blinking from one to
+          the next (owner: "slider tabs" still had no motion). Measured, not
+          calculated: these labels are translated, so their widths differ
+          per language and no fixed step would land. Core keeps its filled
+          pill, which is why the indicator only renders under Aurora. */}
+      {aurora && ind.w > 0 ? (
+        <span
+          aria-hidden
+          className="kx-tabstrip-ind !rounded-full"
+          style={{ transform: `translateX(${ind.x}px)`, width: ind.w, top: 6, bottom: 6 }}
+        />
+      ) : null}
       {tabs.map(tab => {
         const active = activeTab === tab.id;
         return (
@@ -3027,13 +3059,13 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
             key={tab.id}
             onClick={() => onChange(tab.id)}
             aria-current={active ? "true" : undefined}
-            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] whitespace-nowrap ${
+            className={`relative shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] whitespace-nowrap ${
               active
-                ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]")
+                ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]")
                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
             }`}
           >
-            <span className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
+            <span className={active && !aurora ? "text-[var(--text-inverted)]" : active ? "text-[var(--text-primary)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
             <span>{t(`customerTab.${tab.id}`, tab.label)}</span>
           </button>
         );
