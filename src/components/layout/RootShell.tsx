@@ -143,6 +143,47 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       ? SIDEBAR_EXPANDED_W
       : SIDEBAR_COLLAPSED_W;
 
+  /* ── The content offset must NEVER animate across a route change ──
+     MEASURED on prod (889px viewport, Home → Product Data, soft nav):
+     `padding-inline-start` ran 0 → 60px over the 300ms transition, so the
+     content box narrowed 882 → 829px in ~9 steps. Every step relaid the whole
+     322-card sectioned grid: cards re-wrapped, section heights changed, and
+     the page height swung 13873 → 13592 → 13661 (281px) inside 450ms.
+     That is the owner's "the elements resize themselves, not smoothly" — a
+     shell animation, NOT data arriving late (card count was 322 from the very
+     first sampled frame, sections 6, both constant throughout).
+
+     Proof: injecting `transition:none` on this element and repeating the exact
+     same navigation took CLS 0.0402 → 0, with the width at its final 829px on
+     the first painted frame and zero page-height drift out to 4.5s.
+
+     So: skip the transition for the render in which the path changed, and
+     restore it two frames later. The sidebar's own expand/collapse toggle
+     (`expanded` flips with no path change) keeps its 300ms slide — that one is
+     user-initiated and reflowing under the user's finger is the point. */
+  const [padInstant, setPadInstant] = useState(false);
+  const [padPath, setPadPath] = useState(pathname);
+  if (padPath !== pathname) {
+    /* Adjusted DURING render, not in an effect: the new padding and
+       `transition: none` then land in the same commit — the same <style> tag —
+       so the browser's next style recalculation sees both together and has no
+       old value to animate away from. An effect would run a commit later, with
+       the animation already under way. */
+    setPadPath(pathname);
+    setPadInstant(true);
+  }
+  useEffect(() => {
+    if (!padInstant) return;
+    /* Two frames: one for the instant padding to be painted, one more before
+       the transition is allowed back. Restoring it any sooner would hand the
+       browser a transition and a fresh value in the same recalculation. */
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setPadInstant(false));
+    });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+  }, [padInstant]);
+
   /* Desktop (Electron) shell uses a frameless window (titleBarStyle:
      hiddenInset on macOS), so the macOS traffic-light buttons float over the
      top-left of the web content and cover the KOLEEX logo. The preload exposes
@@ -261,7 +302,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             On mobile the sidebar is an overlay so no offset needed. */}
         <style>{`
           @media (min-width: 768px) {
-            .shell-content-offset { padding-inline-start: ${desktopPad}px !important; }
+            .shell-content-offset {
+              padding-inline-start: ${desktopPad}px !important;
+              /* Named property, not "all": this is the only thing on the Hub's
+                 scroller that is ever meant to move — and none at all while a
+                 route change is landing. See the measurement note above. */
+              transition: ${padInstant ? "none" : "padding-inline-start 300ms cubic-bezier(0.4, 0, 0.2, 1)"} !important;
+            }
           }
         `}</style>
         {/* scrollbar-gutter: stable — the fix for the horizontal flash on app
@@ -283,7 +330,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         <div
           id="main-scroll-container"
           style={{ scrollbarGutter: "stable" }}
-          className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out"
+          /* The offset transition is declared in the <style> tag above, beside
+             the padding it animates, so the two can never arrive in separate
+             recalculations. `transition-all duration-300` used to live here and
+             animated every animatable property this scroller ever changed. */
+          className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto"
         >
           <ScrollToTopOnRouteChange />
           {children}
