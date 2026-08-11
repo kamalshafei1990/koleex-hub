@@ -48,12 +48,32 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
   useEffect(() => {
     if (opened) return;
     let alive = true;
+    /* FIRST read rides the shell batch, which every screen fetches anyway
+       and which now carries both counts in their default shape — two
+       guaranteed round trips removed from every screen open. The 60s poll
+       below still goes to the endpoints: the shell is a cached snapshot of
+       the open, not a live feed, so it must not become the source of a
+       number the user watches change. */
+    let firstRead = true;
     const read = async () => {
       try {
-        const [inbox, channels] = await Promise.all([
-          cachedGet<Badges>("/api/inbox/feed?resource=badges", 15_000).catch(() => null),
-          cachedGet<Channels>("/api/discuss/read?resource=myChannels", 15_000).catch(() => null),
-        ]);
+        let inbox: Badges | null = null;
+        let channels: Channels | null = null;
+        if (firstRead) {
+          firstRead = false;
+          try {
+            const { getShell } = await import("@/lib/client-cache");
+            const shell = await getShell();
+            inbox = (shell?.badges ?? null) as Badges | null;
+            channels = (shell?.channels ?? null) as Channels | null;
+          } catch { /* fall through to the endpoints */ }
+        }
+        if (!inbox && !channels) {
+          [inbox, channels] = await Promise.all([
+            cachedGet<Badges>("/api/inbox/feed?resource=badges", 15_000).catch(() => null),
+            cachedGet<Channels>("/api/discuss/read?resource=myChannels", 15_000).catch(() => null),
+          ]);
+        }
         if (!alive) return;
         const unreadInbox = inbox?.data?.unread ?? 0;
         const unreadDiscuss = (channels?.data ?? []).reduce((n, c) => n + (c?.unread_count ?? 0), 0);

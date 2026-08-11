@@ -7,6 +7,8 @@ import { GET as workGET } from "../me/work/route";
 import { GET as fxGET } from "../fx/cny-usd/route";
 import { GET as bindingsGET } from "../visual-bindings/route";
 import { GET as platformGET } from "../platform-settings/route";
+import { GET as inboxGET } from "../inbox/feed/route";
+import { GET as discussReadGET } from "../discuss/read/route";
 
 /* ---------------------------------------------------------------------------
    /api/shell — ONE round trip for the payloads every screen needs.
@@ -30,9 +32,18 @@ import { GET as platformGET } from "../platform-settings/route";
    key instead of failing the batch, so a partial answer still saves the
    round trips that did work.
 
-   inbox/feed is deliberately NOT here: its callers pass query params, so a
-   single batched shape could not serve them and it would burn server time
-   for a payload nobody reads.
+   THE TWO BADGE COUNTS ARE HERE, and only in their default shape. The
+   original note said inbox/feed could not be batched because its callers
+   pass query params — true in general, but measured on prod every screen
+   open asks for exactly `inbox/feed?resource=badges` and
+   `discuss/read?resource=myChannels`, always those two, always with those
+   params, because the notification bell reads them on mount. That is two
+   guaranteed round trips per screen for ~1 KB. Any OTHER shape (a real
+   inbox page, a channel's messages) still calls the endpoints directly —
+   the batch answers the default and nothing else.
+
+   The bell's 60s poll also keeps using the endpoints: the shell is a
+   15s-cached snapshot for the OPEN, not a live feed.
    --------------------------------------------------------------------------- */
 
 export const dynamic = "force-dynamic";
@@ -50,11 +61,17 @@ async function collect([key, run]: Section): Promise<[string, unknown]> {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   /* Auth once, here, so an unauthenticated caller costs one 401 instead of
      seven. The inner handlers still check for themselves. */
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+
+  /* The two badge handlers read their params off the URL, so they get a
+     synthetic Request carrying the default shape — same origin and headers
+     as the real call, so auth and locale behave identically. */
+  const origin = new URL(req.url).origin;
+  const sub = (path: string) => new Request(`${origin}${path}`, { headers: req.headers });
 
   const sections: Section[] = [
     ["bootstrap", () => bootstrapGET()],
@@ -63,6 +80,8 @@ export async function GET() {
     ["fx", () => fxGET()],
     ["bindings", () => bindingsGET()],
     ["platform", () => platformGET()],
+    ["badges", () => inboxGET(sub("/api/inbox/feed?resource=badges"))],
+    ["channels", () => discussReadGET(sub("/api/discuss/read?resource=myChannels"))],
   ];
 
   const entries = await Promise.all(sections.map(collect));
