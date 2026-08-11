@@ -293,8 +293,12 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             avatarLabel
           )}
         </span>
+        {/* Name + role only from lg. Between md and lg the row cannot hold
+            the logo, the language bar, the pickers AND this block — the logo
+            was being overlapped on a 768 tablet. The avatar still identifies
+            the account, and the full name is one tap away in the menu. */}
         {profile && (
-          <span className="hidden md:flex flex-col items-start leading-tight pe-1">
+          <span className="hidden lg:flex flex-col items-start leading-tight pe-1">
             <span
               className={`text-[12px] font-semibold max-w-[140px] truncate tracking-tight ${
                 dk ? "text-white" : "text-black"
