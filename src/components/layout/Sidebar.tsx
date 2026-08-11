@@ -335,12 +335,16 @@ function CollapsedGroup({
 
 /* ── Collapse toggle ──
    Core: the curved pull tab tucked into the rail seam, unchanged.
-   Aurora: the SAME anchor — flush on the rail's inline-end edge, owner's
-   call ("I want a design can touch the right side border of the sidebar")
-   — but built to be seen on glass: 20px wide instead of 13, a full rim,
-   a denser fill than the rail behind it, and a brighter chevron. A disc
-   floating 6px inside the panel was tried first and rejected: detached
-   from the edge it reads as a stray control, not as the panel's handle. */
+   Aurora: "A — carved slot", the owner's pick from five candidates shown on
+   the real rail material. A 12×40 groove flush on the inline-end edge, cut
+   INTO the panel: no fill of its own beyond a darkening, no outer shadow,
+   and inset shadow falling in from three sides with a single light pixel on
+   the open edge. Two earlier attempts are recorded so they are not retried:
+   a 28px disc floating 6px inside the rail (rejected — detached from the
+   edge it reads as a stray control, and he asked for one that "can touch
+   the right side border"), then a 20px raised tab with a full rim
+   (rejected — "need to be more thinner", and a raised tab sits ON the glass
+   instead of belonging to it). */
 function EdgeToggle({
   dk,
   aurora,
@@ -363,25 +367,24 @@ function EdgeToggle({
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         className={
           aurora
-            ? "relative flex items-center justify-center w-[20px] h-14 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[24px]"
+            ? "relative flex items-center justify-center w-[12px] h-10 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[15px]"
             : "relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
         }
         /* Both skins paint from here because the shape is asymmetric — only
-           the INNER corners are round, so the tab meets the rail's edge as a
-           straight line. Aurora just carries denser values so the handle
-           separates from the glass it sits on. */
+           the INNER corners are round, so the handle meets the rail's edge
+           as a straight line. Aurora's values are the carved recipe: every
+           shadow is INSET (an outer shadow would lift it back off the
+           surface), and the one bright pixel sits on the open edge, where a
+           real groove catches light. */
         style={
           aurora
             ? {
-                background: dk ? "rgba(6,9,14,0.88)" : "rgba(255,255,255,0.92)",
-                borderTop: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
-                borderBottom: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
-                borderInlineStart: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
-                borderStartStartRadius: "999px",
-                borderEndStartRadius: "999px",
+                background: dk ? "rgba(0,0,0,0.28)" : "rgba(16,24,40,0.10)",
+                borderStartStartRadius: "8px",
+                borderEndStartRadius: "8px",
                 boxShadow: dk
-                  ? "-4px 0 14px rgba(0,0,0,0.45), inset 1px 0 0 rgba(255,255,255,0.06)"
-                  : "-4px 0 14px rgba(16,24,40,0.10), inset 1px 0 0 rgba(255,255,255,0.9)",
+                  ? "inset 2px 0 4px rgba(0,0,0,0.55), inset 0 2px 3px rgba(0,0,0,0.45), inset 0 -2px 3px rgba(0,0,0,0.45), inset -1px 0 0 rgba(255,255,255,0.10)"
+                  : "inset 2px 0 4px rgba(16,24,40,0.22), inset 0 2px 3px rgba(16,24,40,0.16), inset 0 -2px 3px rgba(16,24,40,0.16), inset -1px 0 0 rgba(255,255,255,0.85)",
               }
             : {
                 background: dk ? "#0E0E0E" : "#F4F4F4",
@@ -395,7 +398,7 @@ function EdgeToggle({
         }
       >
         <AngleRightIcon
-          size={aurora ? 12 : 11}
+          size={11}
           className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} rtl:-scale-x-100 ${
             aurora
               ? dk ? "text-white/80 group-hover/toggle:text-white" : "text-black/70 group-hover/toggle:text-black"
