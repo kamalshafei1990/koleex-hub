@@ -1420,11 +1420,12 @@ input[type="number"]:not(.kx-spinner) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: transparent;
-  /* The ramp zone extends 3rem BELOW the bar (owner's annotation: "start
-     the edge blur a little down, maybe from here") — the same approach
-     zone the main header's pane carries. The faint edge begins under the
-     tiles and strengthens upward into them. */
-  inset: 0 0 -3rem 0;
+  /* The ramp zone extends BELOW the bar (owner's annotation: "start the
+     edge blur a little down… make it MORE down") — like the header pane's
+     approach zone, but tunable per bar: the host sets --kx-ramp-ext and
+     the layer inherits it. Category nav runs deeper (6rem) than the slim
+     form/profile navs (default 3rem). */
+  inset: 0 0 calc(var(--kx-ramp-ext, 3rem) * -1) 0;
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i {
   position: absolute;

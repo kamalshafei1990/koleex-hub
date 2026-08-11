@@ -2449,7 +2449,7 @@ export default function ProductList() {
             {categoryTree.length > 1 && (
               <nav
                 style={{ top: "var(--kx-pd-tools-h, 52px)" }}
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)]"
+                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:6rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
