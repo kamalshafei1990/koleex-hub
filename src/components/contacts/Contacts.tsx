@@ -5110,6 +5110,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /* TRUE while fresh rows are being fetched UNDER a list that is already on
+     screen — the warm-start paint, and every background revalidation. This
+     screen is the only one in the Hub with a warm start, so it was also the
+     only one that could swap its rows with nothing to explain the change; the
+     owner read that as "contacts is always loading". `loading` covers the
+     blank first visit, this covers the silent ones. */
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -5224,48 +5231,59 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         }
       }
     } catch { /* corrupt/absent cache → normal load path */ }
+    /* Painted from cache → the rows on screen are last visit's. Say so with a
+       small indicator instead of pretending the screen is settled; without it
+       the list simply changed under the user a second later. */
     if (!paintedFromCache) setLoading(true);
-    /* PERF: the old code AWAITED a checkContactsSetup() round-trip to Supabase
-       BEFORE starting the real fetch — a pure serial waterfall that delayed
-       every load by a network round-trip. Start the contacts fetch immediately;
-       the setup probe runs in parallel and is only consulted when the directory
-       comes back empty (the only case where "table not set up" matters). */
-    const setupProbe = checkContactsSetup().catch(() => false);
-    /* Scope the fetch to the app's contact type when we have one
-       (Suppliers / Customers / …). Without this the Suppliers app
-       downloaded EVERY contact in the tenant (~789 KB of customers,
-       people & companies) just to render ~a dozen suppliers. The
-       type-scoped endpoint returns only what this app renders. */
-    const data = filterType
-      ? await fetchContactsByType(filterType, scopeCtx)
-      : await fetchContacts();
-    if (data.length === 0 && !(await setupProbe)) {
-      setSetupNeeded(true); setLoading(false); return;
-    }
-    /* An empty result while the cache already painted rows is almost always a
-       transient failure (expired session mid-flight, network blip) — keep the
-       cached view instead of blanking a directory the user is looking at. */
-    if (data.length === 0 && paintedFromCache) return;
-    // Exclude employees — they are managed via the Employees app now
-    const slim = data.filter(c => c.contact_type !== "employee");
-    setContacts(slim);
-    setLoading(false);
-    /* Refresh the warm-start cache (skip oversized payloads — quota safety). */
+    else setRefreshing(true);
     try {
-      const json = JSON.stringify(slim);
-      if (json.length < 2_500_000) localStorage.setItem(cacheKey, json);
-    } catch { /* quota exceeded → next visit just cold-loads */ }
-    /* The list endpoint drops heavy base64 avatars so the response stays under
-       the function size limit. Lazy-load the real logos in small batches and
-       merge them in, so the directory paints instantly and logos stream in. */
-    const missing = slim.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
-    if (missing.length) {
-      fetchContactAvatars(missing).then((map) => {
-        if (!map || Object.keys(map).length === 0) return;
-        setContacts(prev => prev.map(c => map[c.id]
-          ? { ...c, logo_url: map[c.id].logo_url ?? c.logo_url, photo_url: map[c.id].photo_url ?? c.photo_url }
-          : c));
-      }).catch(() => {});
+      /* PERF: the old code AWAITED a checkContactsSetup() round-trip to Supabase
+         BEFORE starting the real fetch — a pure serial waterfall that delayed
+         every load by a network round-trip. Start the contacts fetch immediately;
+         the setup probe runs in parallel and is only consulted when the directory
+         comes back empty (the only case where "table not set up" matters). */
+      const setupProbe = checkContactsSetup().catch(() => false);
+      /* Scope the fetch to the app's contact type when we have one
+         (Suppliers / Customers / …). Without this the Suppliers app
+         downloaded EVERY contact in the tenant (~789 KB of customers,
+         people & companies) just to render ~a dozen suppliers. The
+         type-scoped endpoint returns only what this app renders. */
+      const data = filterType
+        ? await fetchContactsByType(filterType, scopeCtx)
+        : await fetchContacts();
+      if (data.length === 0 && !(await setupProbe)) {
+        setSetupNeeded(true); setLoading(false); return;
+      }
+      /* An empty result while the cache already painted rows is almost always a
+         transient failure (expired session mid-flight, network blip) — keep the
+         cached view instead of blanking a directory the user is looking at. */
+      if (data.length === 0 && paintedFromCache) return;
+      // Exclude employees — they are managed via the Employees app now
+      const slim = data.filter(c => c.contact_type !== "employee");
+      setContacts(slim);
+      setLoading(false);
+      /* Refresh the warm-start cache (skip oversized payloads — quota safety). */
+      try {
+        const json = JSON.stringify(slim);
+        if (json.length < 2_500_000) localStorage.setItem(cacheKey, json);
+      } catch { /* quota exceeded → next visit just cold-loads */ }
+      /* The list endpoint drops heavy base64 avatars so the response stays under
+         the function size limit. Lazy-load the real logos in small batches and
+         merge them in, so the directory paints instantly and logos stream in. */
+      const missing = slim.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
+      if (missing.length) {
+        fetchContactAvatars(missing).then((map) => {
+          if (!map || Object.keys(map).length === 0) return;
+          setContacts(prev => prev.map(c => map[c.id]
+            ? { ...c, logo_url: map[c.id].logo_url ?? c.logo_url, photo_url: map[c.id].photo_url ?? c.photo_url }
+            : c));
+        }).catch(() => {});
+      }
+    } finally {
+      /* Every exit above returns from inside the try — including the two
+         early ones — so the indicator can never be left spinning, and a
+         throw (expired session, network drop) clears it too. */
+      setRefreshing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeKey, filterType]);
@@ -5285,9 +5303,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const silentRefresh = useCallback(async () => {
     if (!scopeCtx || !filterType) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    /* "Silent" used to mean invisible: rows changed on focus and every 90s with
+       nothing on screen to account for it. Still no blocking spinner — the point
+       of this path is that the list stays usable — just the same small indicator
+       the warm start uses, so a change always has something behind it. */
     let data: ContactRow[];
+    setRefreshing(true);
     try { data = await fetchContactsByType(filterType, scopeCtx, { fresh: true }); }
     catch { return; }
+    finally { setRefreshing(false); }
     // Empty almost always means a transient blip (expired session / network) —
     // keep what the user is looking at rather than blanking a live directory.
     if (!data.length) return;
@@ -6223,6 +6247,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
           </h1>
+          {/* Refresh indicator. The slot is ALWAYS in the layout and only the
+              orb's opacity changes, so nothing in this header moves when it
+              comes and goes — a capsule that appears and disappears here would
+              be the same "it wrapped / it jumped" defect in new clothes. Text
+              is deliberately absent for the same reason: three languages, three
+              widths. Title only, on hover. */}
+          <span
+            role="status"
+            aria-label={refreshing ? t("refreshing", "Updating…") : ""}
+            title={refreshing ? t("refreshing", "Updating…") : undefined}
+            className="w-5 h-5 shrink-0 flex items-center justify-center"
+          >
+            <SpinnerIcon
+              size={14}
+              className={`transition-opacity duration-200 ${refreshing ? "opacity-100" : "opacity-0"}`}
+            />
+          </span>
           {/* CSV export — customer directory only. Dumps whatever the
               current filters produce (search, tier filter, active
               filter) so the download matches what the user sees. */}

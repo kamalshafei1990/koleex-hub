@@ -12,6 +12,9 @@ export const contactsT: Translations = {
   "back":                 { en: "Back",                  zh: "返回",                 ar: "رجوع" },
   "hub":                  { en: "Hub",                   zh: "中心",                 ar: "المركز" },
   "searchPlaceholder":    { en: "Search contacts...",    zh: "搜索联系人...",          ar: "بحث جهات الاتصال..." },
+  /* Shown beside the list title while fresh rows are fetched under a list that
+     is already on screen (warm start + background revalidation). */
+  "refreshing":           { en: "Updating…",             zh: "更新中…",               ar: "جارٍ التحديث…" },
   "searchSuppliers":      { en: "Search suppliers — name, 中文名, country, app ID…", zh: "搜索供应商 — 名称、中文名、国家、App ID…", ar: "ابحث عن الموردين — الاسم، الاسم الصيني، الدولة، معرّف التطبيق…" },
   "searchCustomers":      { en: "Search — name, company, email, phone, country, tier…", zh: "搜索 — 名称、公司、邮箱、电话、国家、级别…", ar: "ابحث — الاسم، الشركة، البريد، الهاتف، الدولة، الفئة…" },
   "filter.notActive":     { en: "Inactive",              zh: "停用",                   ar: "غير نشط" },
