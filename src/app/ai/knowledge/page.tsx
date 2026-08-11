@@ -240,7 +240,7 @@ export default function AiKnowledgePage() {
       <div className="relative z-[1] w-full px-4 md:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
           <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
+            className="kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
             <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
           </Link>
           <BookOpenIcon className="h-5 w-5 text-[var(--text-muted)]" />

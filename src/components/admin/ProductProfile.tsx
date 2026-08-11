@@ -591,7 +591,7 @@ export default function ProductProfile() {
         <Link
           href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
-          className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+          className="kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
         >
           <ArrowLeftIcon className="h-3.5 w-3.5" />
         </Link>

@@ -1860,11 +1860,11 @@ export default function ProductList() {
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+          <Link href="/" className="kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <div className="kx-glass h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
@@ -1882,7 +1882,7 @@ export default function ProductList() {
                 catalog is read-only for customers. */}
             {isInternal && (
               <>
-                <Link href={`${baseRoute}/settings`} className="h-10 px-4 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+                <Link href={`${baseRoute}/settings`} className="kx-hover-glow h-10 px-4 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <SettingsIcon2 className="h-4 w-4" />
                   <span className="hidden sm:inline">{t("list.controlPanel")}</span>
                 </Link>
@@ -2135,7 +2135,7 @@ export default function ProductList() {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`h-10 px-4 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
+              className={`kx-hover-glow h-10 px-4 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
                 showFilters || activeFilterCount > 0
                   ? aurora
                     ? "kx-seg-on border-transparent text-[var(--text-primary)]"
