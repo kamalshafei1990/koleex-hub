@@ -236,10 +236,14 @@ function readModelCache(scopeKey: string): ModelMaps | null {
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
 }: {
   p: ProductRow;
   imgUrl?: string;
+  /* Passed down, never read from useSkin() here: this component renders
+     once per product (121 today, 3000 planned) and each call would be its
+     own subscription to the skin. */
+  aurora: boolean;
   models: number;
   suppliers: string[];
   lvl: string;
@@ -338,17 +342,31 @@ const ProductCard = memo(function ProductCard({
            actions by default on small screens and keep the clean
            hover-reveal on desktop (md+). */
         <div className="absolute bottom-2.5 right-2.5 z-10 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+          {/* These sit ON the product photo, which is usually white, so they
+              cannot take their fill from a theme token: under the kx-pd remap
+              `--bg-primary` is TRANSPARENT, which left them invisible over a
+              light image (owner: "I can't see clearly if under white
+              background"). A fixed dark scrim + a light rim reads on any
+              photo in any theme; Core keeps the token, where it is solid. */}
           <Link
             href={`${baseRoute}/${p.id}/edit`}
             onClick={(e) => e.stopPropagation()}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+              aurora
+                ? "bg-black/60 border-white/25 text-white/85 hover:text-white hover:bg-black/75"
+                : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            }`}
             title={t("card.editProduct")}
           >
             <PencilIcon className="h-3.5 w-3.5" />
           </Link>
           <button
             onClick={(e) => onAskDelete(e, p.id, p.product_name)}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
+            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+              aurora
+                ? "bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75"
+                : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-red-400"
+            }`}
             title={t("card.deleteProduct")}
           >
             <TrashIcon className="h-3.5 w-3.5" />
@@ -2604,6 +2622,7 @@ export default function ProductList() {
                 lvl={levelColors[p.level || ""] || ""}
                 baseRoute={baseRoute}
                 isInternal={isInternal}
+                aurora={aurora}
                 catMap={catMap}
                 subMap={subMap}
                 divMap={divMap}

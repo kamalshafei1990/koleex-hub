@@ -335,13 +335,12 @@ function CollapsedGroup({
 
 /* ── Collapse toggle ──
    Core: the curved pull tab tucked into the rail seam, unchanged.
-   Aurora: a real round button. The tab was a 13px sliver that read only
-   because it was a solid slab against a solid rail with a hairline seam —
-   once the rail became glass and lost its border there was nothing left to
-   see, and the owner's first question after the conversion was literally
-   "where is the button that I can close or open the sidebar?". A control
-   you have to hunt for is a broken control, so under the skin it becomes a
-   28px glass disc with its own rim, parked inside the rail's edge. */
+   Aurora: the SAME anchor — flush on the rail's inline-end edge, owner's
+   call ("I want a design can touch the right side border of the sidebar")
+   — but built to be seen on glass: 20px wide instead of 13, a full rim,
+   a denser fill than the rail behind it, and a brighter chevron. A disc
+   floating 6px inside the panel was tried first and rejected: detached
+   from the edge it reads as a stray control, not as the panel's handle. */
 function EdgeToggle({
   dk,
   aurora,
@@ -364,21 +363,25 @@ function EdgeToggle({
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         className={
           aurora
-            ? "kx-hover-glow relative flex items-center justify-center h-7 w-7 rounded-full border cursor-pointer transition-all duration-200 active:scale-95"
+            ? "relative flex items-center justify-center w-[20px] h-14 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[24px]"
             : "relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
         }
-        /* Core paints from an inline style and must keep every value it had.
-           Aurora's disc takes its fill from here too — but only the fill: the
-           rim, the hover and the motion are classes, so the skin can reach
-           them. */
+        /* Both skins paint from here because the shape is asymmetric — only
+           the INNER corners are round, so the tab meets the rail's edge as a
+           straight line. Aurora just carries denser values so the handle
+           separates from the glass it sits on. */
         style={
           aurora
             ? {
-                background: dk ? "rgba(11,14,20,0.72)" : "rgba(255,255,255,0.78)",
-                borderColor: dk ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)",
+                background: dk ? "rgba(6,9,14,0.88)" : "rgba(255,255,255,0.92)",
+                borderTop: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
+                borderBottom: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
+                borderInlineStart: dk ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(0,0,0,0.12)",
+                borderStartStartRadius: "999px",
+                borderEndStartRadius: "999px",
                 boxShadow: dk
-                  ? "0 4px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10)"
-                  : "0 4px 14px rgba(16,24,40,0.12), inset 0 1px 0 rgba(255,255,255,0.9)",
+                  ? "-4px 0 14px rgba(0,0,0,0.45), inset 1px 0 0 rgba(255,255,255,0.06)"
+                  : "-4px 0 14px rgba(16,24,40,0.10), inset 1px 0 0 rgba(255,255,255,0.9)",
               }
             : {
                 background: dk ? "#0E0E0E" : "#F4F4F4",
@@ -395,7 +398,7 @@ function EdgeToggle({
           size={aurora ? 12 : 11}
           className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} rtl:-scale-x-100 ${
             aurora
-              ? dk ? "text-white/70 group-hover/toggle:text-white" : "text-black/60 group-hover/toggle:text-black"
+              ? dk ? "text-white/80 group-hover/toggle:text-white" : "text-black/70 group-hover/toggle:text-black"
               : dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
           } group-hover/toggle:scale-110`}
         />
@@ -750,10 +753,9 @@ export default function Sidebar() {
               into the sidebar as a pull tab (stays inside the border). */}
           <div
             className="absolute top-1/2 -translate-y-1/2 z-50"
-            /* Core's tab is flush with the seam (it IS the seam). Aurora's
-               disc sits fully inside the rail, clear of the edge, so nothing
-               clips it and it never overlaps page content. */
-            style={{ insetInlineEnd: aurora ? "6px" : "0px" }}
+            /* Flush with the rail's edge in BOTH skins — the handle belongs
+               to the seam. */
+            style={{ insetInlineEnd: "0px" }}
           >
             <EdgeToggle
               dk={dk}
