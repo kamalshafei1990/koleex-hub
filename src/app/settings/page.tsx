@@ -318,7 +318,7 @@ function SettingsContent() {
               onClick={() => setMobileDetail(false)}
               className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
             >
-              <Chevron className="rtl:rotate-0 rotate-180" /> {t("allSettings")}
+              <Chevron back /> {t("allSettings")}
             </button>
             {/* Fill the detail pane on desktop; cap only so ultra-wide
                 monitors don't stretch forms to unreadable line lengths.

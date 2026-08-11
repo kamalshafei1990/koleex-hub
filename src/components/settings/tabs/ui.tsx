@@ -10,10 +10,16 @@ import { useSkin } from "@/lib/appearance";
 
 /** The ONE disclosure chevron for the Settings app — the master list, the
  *  admin link rows and the push link all draw this, so they can never drift
- *  apart (they used to mix this glyph with a literal "›" character). */
-export function Chevron({ className = "" }: { className?: string }) {
+ *  apart (they used to mix this glyph with a literal "›" character).
+ *
+ *  Direction is baked in, because a chevron is a DIRECTION, not decoration:
+ *  the default points the way the reader is going and mirrors itself under
+ *  RTL (it used to keep pointing right in Arabic, away from the row it
+ *  opens); `back` is the return arrow and mirrors the other way. */
+export function Chevron({ className = "", back = false }: { className?: string; back?: boolean }) {
+  const facing = back ? "rotate-180 rtl:rotate-0" : "rtl:rotate-180";
   return (
-    <svg className={className} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <svg className={`${facing} ${className}`} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
