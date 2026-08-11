@@ -1457,7 +1457,13 @@ input[type="number"]:not(.kx-spinner) {
      approach zone, but tunable per bar: the host sets --kx-ramp-ext and
      the layer inherits it. Category nav runs deeper (6rem) than the slim
      form/profile navs (default 3rem). */
-  inset: 0 0 calc(var(--kx-ramp-ext, 3rem) * -1) 0;
+  /* --kx-ramp-top extends the SAME layer UPWARD, so one ramp can cover a
+     whole stack of sticky bars instead of each bar growing its own. Owner,
+     after counting them on Product Data: "you are using three blur edge and
+     this is wrong, you only can use one but more longer — it can work for
+     main header, search area and categories area." A bar that sits inside
+     another bar's ramp therefore carries NO layer of its own. */
+  inset: calc(var(--kx-ramp-top, 0px) * -1) 0 calc(var(--kx-ramp-ext, 3rem) * -1) 0;
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i {
   position: absolute;

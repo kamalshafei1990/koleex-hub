@@ -1956,10 +1956,11 @@ export default function ProductList() {
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
         <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
-          {/* Progressive, not flat (owner: the flat bar read as a hard
-              rectangle over the ramped zone below) — the whole top strip
-              is now one continuous soft frost. */}
-          <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
+          {/* NO layer of its own. This bar sits inside the category nav's
+              ramp, which now reaches up over it (--kx-ramp-top) — one
+              blurred edge for the whole top strip, owner's rule: "you are
+              using three blur edge and this is wrong, you only can use one
+              but more longer". */}
         <div>
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
@@ -2492,14 +2493,21 @@ export default function ProductList() {
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
               <nav
-                style={{ top: "var(--kx-pd-tools-h, 52px)" }}
+                /* --kx-ramp-top lifts this bar's ramp UP over the toolbar, so
+                   the screen has exactly ONE blurred edge running from under
+                   the header down past the categories — the owner counted
+                   three and rejected it. It stops AT the header's bottom on
+                   purpose: the header pane already frosts its own strip, and
+                   overlapping the two would be the double pass all over
+                   again. The extra height also stretches the masks, which is
+                   the "more longer" half of the same instruction. */
+                style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "var(--kx-pd-tools-h, 52px)" }}
                 className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:6rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
-                {/* Progressive edge blur (owner: "same way as the main
-                    header"): four masked layers ramp 3→28px as the cards
-                    slide under the bar; the host stays filterless. */}
+                {/* The screen's ONE progressive edge: four masked layers
+                    ramp 3→28px, stretched over the whole top strip. */}
                 <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
                 {/* Light secondary jump-nav — quieter than the Divisions filter
                     above: borderless ghost links with plain muted counts, so the

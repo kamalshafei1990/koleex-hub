@@ -17,3 +17,17 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/product-data")
   );
 }
+
+/* Routes where the APP owns the top edge-blur, so the header pane must NOT
+   add a second one.
+   ONE RAMP PER SCREEN is an owner rule: he counted three stacked on Product
+   Data (header pane 0→104, toolbar 56→162, category nav 114→318) and called
+   it wrong — "you only can use one but more longer". Where a screen has its
+   own sticky bar stack, that stack runs a single tall ramp (the lowest bar
+   carries it and extends upward over the ones above via --kx-ramp-top), and
+   the header keeps only its own flat frost. Home, which has no sticky bars,
+   still gets the pane ramp. */
+export function appOwnsTopRamp(pathname: string | null): boolean {
+  const p = pathname || "/";
+  return p === "/products" || p.startsWith("/products/") || p.startsWith("/product-data");
+}

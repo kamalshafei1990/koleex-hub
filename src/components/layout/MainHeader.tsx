@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isUnderglassRoute } from "@/lib/underglass";
+import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import MoonIcon from "@/components/icons/ui/MoonIcon";
 import SunIcon from "@/components/icons/ui/SunIcon";
@@ -185,8 +185,11 @@ export default function MainHeader() {
            element with backdrop-filter would become a backdrop root and this
            pane must never re-break anything. Elsewhere the pane stays the
            flat bar-height blur. */
+        /* …and NOT where the screen already runs its own ramp: one blurred
+           edge per screen, owner's rule. There the header keeps its flat
+           frost and the app's sticky stack owns the long fade. */
         className={`kx-header-pane fixed top-0 left-0 right-0 z-[99] pointer-events-none ${
-          isUnderglassRoute(pathname) ? "kx-pane-progressive" : ""
+          isUnderglassRoute(pathname) && !appOwnsTopRamp(pathname) ? "kx-pane-progressive" : ""
         }`}
       >
         <i /><i /><i /><i />
