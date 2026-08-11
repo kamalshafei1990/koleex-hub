@@ -453,7 +453,7 @@ function DrawerShell({
       <div
         onClick={(e) => e.stopPropagation()}
         /* INV-H5C — full-screen on mobile, side drawer on desktop. */
-        className="kx-glass-drawer flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-s border-[var(--border-color)]"
+        className="kx-glass-drawer flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-s-[1px] border-[var(--border-color)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <h2 className="text-[14px] font-semibold">{title}</h2>

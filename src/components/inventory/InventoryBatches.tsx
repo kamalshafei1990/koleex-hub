@@ -284,7 +284,7 @@ function CreateBatchDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
       <div
-        className="kx-glass-drawer h-full w-full max-w-md overflow-y-auto border-s border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-5"
+        className="kx-glass-drawer h-full w-full max-w-md overflow-y-auto border-s-[1px] border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-5"
         role="dialog"
       >
         <div className="mb-4 flex items-center justify-between">
