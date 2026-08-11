@@ -575,7 +575,7 @@ export default function CRM() {
   );
 
   return (
-    <div className="kx-app relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="kx-app kx-ground-host relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground />

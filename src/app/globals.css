@@ -1711,6 +1711,22 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
 }
 
+/* A root that hosts the Aurora ground must LIFT its own content above it.
+   The ground is a `fixed z-0` child, and a positioned child paints above
+   static siblings — so without this the canvas (and its dark vignette)
+   covered the page and everything appeared to slide underneath it while
+   scrolling. Marked with a class rather than applied to every .kx-app so
+   it stays opt-in: turning a static element into a positioned one also
+   makes it the containing block for absolutely-positioned descendants,
+   which is not a change to make blindly across an 11k-line app.
+   Children that position themselves are excluded — same reason as the
+   bar-host rule: overwriting their own positioning throws them out of
+   place (that is how the sidebar's collapse button went missing). */
+[data-kx-skin="aurora"] .kx-ground-host > :not(.fixed):not(.absolute):not(.sticky) {
+  position: relative;
+  z-index: 1;
+}
+
 /* Alphabet section headers in the contacts list. They asked for
    `backdrop-blur-sm`, but they live INSIDE the list pane, which carries the
    drawer glass — a filtered ancestor starves a descendant's

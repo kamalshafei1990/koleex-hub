@@ -107,17 +107,24 @@ export default function SourcingCommandCenter() {
   const [wlName, setWlName] = useState("");
   const [wlBusy, setWlBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [wlErr, setWlErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
-      const [ov, wl] = await Promise.all([
+      /* allSettled, not all: the watchlists call is a SIDE panel. Coupled
+         with Promise.all, one rejection there threw away a perfectly good
+         overview payload and rendered the full-page error instead — the
+         whole command center gone because a saved list failed to load. */
+      const [ovR, wlR] = await Promise.allSettled([
         fetch("/api/suppliers/sourcing/overview", { cache: "no-store" }),
         fetch("/api/suppliers/sourcing/watchlists", { cache: "no-store" }),
       ]);
+      if (ovR.status === "rejected") throw new Error("Failed to load command center");
+      const ov = ovR.value;
       if (!ov.ok) throw new Error((await ov.json().catch(() => ({}))).error || "Failed to load command center");
       setData(await ov.json());
-      if (wl.ok) setWatchlists((await wl.json()).watchlists ?? []);
+      if (wlR.status === "fulfilled" && wlR.value.ok) setWatchlists((await wlR.value.json()).watchlists ?? []);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally { setLoading(false); }
@@ -150,7 +157,18 @@ export default function SourcingCommandCenter() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: wlName.trim(), kind: "watchlist", supplier_ids: selected, filters: { query, riskFilter, preferredOnly, sortKey } }),
       });
-      if (res.ok) { setWlName(""); setShowCreate(false); const wl = await fetch("/api/suppliers/sourcing/watchlists", { cache: "no-store" }); if (wl.ok) setWatchlists((await wl.json()).watchlists ?? []); }
+      if (res.ok) {
+        setWlName(""); setShowCreate(false); setWlErr(null);
+        const wl = await fetch("/api/suppliers/sourcing/watchlists", { cache: "no-store" });
+        if (wl.ok) setWatchlists((await wl.json()).watchlists ?? []);
+      } else {
+        /* Never fail silently: the spinner used to stop, the dialog stayed
+           open with the name still typed, and nothing said it had not
+           saved. */
+        setWlErr((await res.json().catch(() => ({}))).error || "Could not save the watchlist. Try again.");
+      }
+    } catch {
+      setWlErr("Could not save the watchlist. Check your connection and try again.");
     } finally { setWlBusy(false); }
   }, [wlName, selected, query, riskFilter, preferredOnly, sortKey]);
 
@@ -182,7 +200,7 @@ export default function SourcingCommandCenter() {
     sev === "critical" ? t("scc.sevCritical", "Critical") : sev === "warning" ? t("scc.sevAttention", "Attention") : t("scc.sevInfo", "Info");
 
   return (
-    <div className="kx-app relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+    <div className="kx-app kx-ground-host relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground />
@@ -394,6 +412,9 @@ export default function SourcingCommandCenter() {
             <div className="mb-3 kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
               <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder={t("scc.watchlistNamePlaceholder", "Watchlist name")} className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)] focus:outline-none" />
               <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{selected.length > 0 ? `${selected.length} ${t("scc.suppliersWillBeFollowed", "supplier(s) will be followed (from compare selection).")}` : t("scc.currentFiltersSaved", "Current filters will be saved. Select suppliers in compare mode to follow them.")}</p>
+              {wlErr ? (
+                <p role="alert" className="mt-1.5 text-[11.5px] text-[#FF6B6B]">{wlErr}</p>
+              ) : null}
               <div className="mt-2 flex justify-end gap-2">
                 <button onClick={() => { setShowCreate(false); setWlName(""); }} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("scc.cancel", "Cancel")}</button>
                 <button onClick={() => void createWatchlist()} disabled={!wlName.trim() || wlBusy} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">{wlBusy ? <SpinnerIcon className="h-3.5 w-3.5" /> : null}{t("scc.save", "Save")}</button>

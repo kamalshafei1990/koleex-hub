@@ -5074,7 +5074,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
        directory twice (an "anon" fetch immediately superseded by the real one).
        PermissionGate only renders this page after bootstrap loads, so waiting
        here costs nothing and halves the network work. */
-    if (!scopeCtx) return;
+    if (!scopeCtx) {
+      /* NEVER leave the spinner running. useScopeContext settles
+         permanently on null when bootstrap has no auth and there is no
+         cached account id — with `loading` initialised true and no error
+         branch, /contacts, /customers and /suppliers span forever with no
+         way out. Stop spinning and let the empty/setup state speak. */
+      setLoading(false);
+      return;
+    }
     /* PERF — warm start: paint the last-known directory instantly from
        localStorage (same pattern as the hub bootstrap warm-start), then
        refresh from the network in the background and silently replace it.
@@ -5163,9 +5171,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const prevById = new Map(contactsRef.current.map(c => [c.id, c]));
     const merged = slim.map(c => {
       const p = prevById.get(c.id);
-      return p && (p.logo_url || p.photo_url)
-        ? { ...c, logo_url: c.logo_url ?? p.logo_url, photo_url: c.photo_url ?? p.photo_url }
-        : c;
+      if (!p) return c;
+      /* A row the user opened has been HYDRATED with the full record. The
+         refresh payload is the slim projection (26 heavy fields omitted), so
+         overwriting the row with it emptied contact persons, documents and
+         card scans out of whatever detail was on screen — every 90s, and on
+         every tab focus. Keep any field the fresh row does not carry; the
+         slim values still win where both have one, so real edits land. */
+      const keep: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p as unknown as Record<string, unknown>)) {
+        if (!(k in (c as unknown as Record<string, unknown>)) || (c as unknown as Record<string, unknown>)[k] === undefined) {
+          if (v !== undefined) keep[k] = v;
+        }
+      }
+      return {
+        ...c,
+        ...keep,
+        logo_url: c.logo_url ?? p.logo_url,
+        photo_url: c.photo_url ?? p.photo_url,
+      } as ContactRow;
     });
     setContacts(merged);
     try {
@@ -5284,7 +5308,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         return terms.every((term) => hay.includes(term));
       });
     }
-    return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
+    /* Copy before sorting. With every filter on "all" and no search, `list`
+       IS the `contacts` state array, so .sort() was mutating React state
+       in place during render — the classic source of rows that reorder
+       only after some unrelated re-render. */
+    return [...list].sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
   }, [contacts, typeTab, filterType, debouncedSearch, statusFilter, entityFilter, tierFilter]);
 
   /* Typeahead suggestions — the top matches with a "why it matched" hint. */
@@ -5730,7 +5758,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      from the new data (never overwrite), attach the catalog, then open it. */
   const mergeIntoExisting = async (existingId: string) => {
     setDupMerging(existingId);
-    const existing = contacts.find((c) => c.id === existingId) as unknown as Record<string, unknown> | undefined;
+    /* The FULL record, never the list row. The list endpoint drops 26 heavy
+       fields (contact_persons, documents, catalogues, card scans, bank
+       accounts…), so against a slim row every one of them looks empty and
+       this "fill only what's blank" loop would PATCH the new form's values
+       straight over the existing supplier's real data — silent data loss on
+       the one action whose entire promise is "never overwrite". If the
+       fetch fails we merge nothing rather than merge blind. */
+    const full = await hydrateContact(existingId);
+    const existing = (full ?? undefined) as unknown as Record<string, unknown> | undefined;
+    if (!full) {
+      setDupMerging(null);
+      setDupMatches([]);
+      setFormModalOpen(false);
+      router.push(`/suppliers/${existingId}`);
+      return;
+    }
     const row = formToRow(form) as unknown as Record<string, unknown>;
     const isEmpty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
     const patch: Record<string, unknown> = {};

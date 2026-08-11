@@ -210,7 +210,7 @@ export default function KoleexMainSuppliers() {
   const plannedDivisions = tree.filter((d) => d.categories.length === 0);
 
   return (
-    <div className="kx-app relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+    <div className="kx-app kx-ground-host relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground />
@@ -564,8 +564,12 @@ function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
       setLoading(true);
       try {
         const res = await fetch("/api/suppliers", { credentials: "include" });
+        /* An error body still parses as JSON, so without this check a 401 or
+           500 landed as `suppliers: undefined` → an empty list reading
+           "No suppliers match" — the failure looked like an empty database. */
+        if (!res.ok) throw new Error(String(res.status));
         const json = (await res.json()) as { suppliers?: PickerSupplier[] };
-        if (alive) setAll(Array.isArray(json.suppliers) ? json.suppliers : []);
+        if (alive) { setAll(Array.isArray(json.suppliers) ? json.suppliers : []); setError(null); }
       } catch { if (alive) setError(t("cov.pickLoadError", "Couldn't load suppliers.")); }
       finally { if (alive) setLoading(false); }
     })();
