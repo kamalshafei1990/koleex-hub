@@ -86,7 +86,7 @@ export default function RegionTab({ account, onChanged }: {
       {/* Live preview. Every control on this screen appears here — the old
           one showed date/time/number only, so three of the seven settings
           had no visible effect at all while you were choosing them. */}
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+      <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
         <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider mb-2">{t("region.preview")}</p>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px] font-medium text-[var(--text-primary)]">
           <span>{formatDatePref(now, d.date_format)}</span>

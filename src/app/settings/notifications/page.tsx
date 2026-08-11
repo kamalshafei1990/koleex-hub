@@ -148,7 +148,7 @@ export default function NotificationsSettingsPage() {
     );
   }
 
-  const card = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5";
+  const card = "kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5";
   const btnPrimary =
     "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-2";
   const btnGhost =
@@ -173,7 +173,9 @@ export default function NotificationsSettingsPage() {
       </div>
 
       <div className="relative z-[1] flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-5 space-y-5 max-w-2xl w-full mx-auto">
-        {/* iOS install hint */}
+        {/* iOS install hint. Functional warning surface — the amber tint IS
+            the signal, so it stays literal and does NOT take kx-glass (the
+            glass background would win over the tint and erase it). */}
         {needsInstall && (
           <div className="rounded-2xl border border-[#FFCC00]/30 bg-[#FFCC00]/[0.06] p-4 text-[12.5px] text-[var(--text-secondary)]">
             <strong className="text-[var(--text-primary)]">{t("push.iosLabel")}</strong> {t("push.iosHint")}

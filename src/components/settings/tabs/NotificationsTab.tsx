@@ -209,7 +209,7 @@ function MutedConversationsCard() {
             type="button"
             disabled={busyId === c.id}
             onClick={() => void unmute(c.id)}
-            className="shrink-0 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+            className="kx-hover-glow shrink-0 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
           >
             {busyId === c.id ? "…" : t("notif.muted.unmute")}
           </button>

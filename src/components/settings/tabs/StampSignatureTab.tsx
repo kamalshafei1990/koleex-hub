@@ -100,7 +100,7 @@ function Slot({ kind, label, hint, url, square, busy, onUpload, onRemove }: {
   const { t } = useTranslation(settingsT);
   const fileRef = useRef<HTMLInputElement>(null);
   return (
-    <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+    <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{label}</h2>

@@ -106,7 +106,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
   return (
     <div className="space-y-4">
       {/* Timezone */}
-      <section className={tabCardClass}>
+      <section className={`${tabCardClass} kx-glass`}>
         <h2 className={tabSectionTitle}>
           <Globe2Icon className="h-3.5 w-3.5" />
           {t("acc.cal.timezone")}
@@ -128,7 +128,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       </section>
 
       {/* Working Hours */}
-      <section className={tabCardClass}>
+      <section className={`${tabCardClass} kx-glass`}>
         <h2 className={tabSectionTitle}>
           <ClockIcon className="h-3.5 w-3.5" />
           {t("acc.cal.workingHours")}
@@ -184,7 +184,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       </section>
 
       {/* Default Meeting Duration */}
-      <section className={tabCardClass}>
+      <section className={`${tabCardClass} kx-glass`}>
         <h2 className={tabSectionTitle}>
           <CalendarIcon className="h-3.5 w-3.5" />
           {t("acc.cal.defaultMeeting")}
@@ -209,7 +209,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       </section>
 
       {/* Out of Office */}
-      <section className={tabCardClass}>
+      <section className={`${tabCardClass} kx-glass`}>
         <h2 className={tabSectionTitle}>
           <PlaneIcon className="h-3.5 w-3.5" />
           {t("acc.cal.outOfOffice")}
@@ -275,7 +275,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
         </div>
       )}
 
-      <section className={tabCardClass}>
+      <section className={`${tabCardClass} kx-glass`}>
         <TabActionBar
           dirty={dirty}
           saving={saving}

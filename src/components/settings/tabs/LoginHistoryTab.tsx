@@ -73,7 +73,7 @@ export default function LoginHistoryTab({ account }: { account: AccountWithLinks
 
   return (
     <div className="space-y-4">
-      <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
+      <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{t("hist.title")}</h2>
         <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-4">
           {t("hist.sub")}

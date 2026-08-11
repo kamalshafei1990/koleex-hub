@@ -38,7 +38,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
 
   return (
     <div className="space-y-4">
-      <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
+      <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-11 w-11 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center text-[15px] font-bold tracking-tight">KX</div>
           <div>
@@ -53,7 +53,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
         </div>
       </section>
 
-      <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
+      <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-3">{t("about.workspace")}</h2>
         <div className="space-y-1">
           <Row label={t("about.signedIn")} value={`@${account.username}`} />
@@ -62,7 +62,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
         </div>
       </section>
 
-      <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
+      <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("about.support")}</h2>
         <p className="text-[12px] text-[var(--text-dim)]">
           {t("about.support.pre")} <span className="font-medium text-[var(--text-secondary)]">{t("about.support.report")}</span> {t("about.support.post")}

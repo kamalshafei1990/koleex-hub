@@ -12,7 +12,11 @@ export function SettingsCard({ title, subtitle, children, flush }: {
   title?: string; subtitle?: string; children: ReactNode; flush?: boolean;
 }) {
   return (
-    <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
+    /* kx-glass: detail cards are LEAF tiles — nothing inside a settings tab
+       renders a fixed-without-portal child, so they can carry true frost
+       (a translucent panel with no blur would show the moving ground
+       straight through the text). Core: the solid card is untouched. */
+    <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
       {title && <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{title}</h2>}
       {subtitle && <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-4">{subtitle}</p>}
       {!subtitle && title && <div className="mb-4" />}

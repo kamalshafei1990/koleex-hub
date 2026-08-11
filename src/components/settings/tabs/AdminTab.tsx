@@ -52,7 +52,7 @@ export default function AdminTab(_props: { account: AccountWithLinks }) {
   return (
     <div className="space-y-4">
       {/* Platform switches — these change the Hub for EVERYONE. */}
-      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-3">
+      <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-3">
         <SwitchRow
           icon={<MessageSquarePlusIcon size={15} />}
           label={t("admin.qaReporter", "Report-issue button")}
@@ -62,7 +62,7 @@ export default function AdminTab(_props: { account: AccountWithLinks }) {
           last
         />
       </div>
-      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+      <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         <LinkRow
           href="/super-admin/activity"
           icon={<ActivityIcon className="h-4 w-4" />}

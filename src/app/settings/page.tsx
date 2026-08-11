@@ -378,12 +378,18 @@ function SettingsRow({
   active?: boolean; onClick?: () => void; href?: string;
   icon: React.ReactNode; label: string; subtitle?: string; isLast?: boolean;
 }) {
+  const aurora = useSkin() === "aurora";
   const inner = (
     <>
+      {/* Selected tile: Aurora marks selection with the Hub-Blue ring
+          (kx-seg-on) — a solid inverted block is the loudest flat shape on a
+          glass surface. Core keeps the inverted tile. */}
       <span
         className={`h-8 w-8 rounded-[10px] flex items-center justify-center shrink-0 border transition-colors ${
           active
-            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+            ? aurora
+              ? "kx-seg-on text-[var(--text-primary)] border-transparent"
+              : "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
             : "bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)]"
         }`}
       >
