@@ -2511,14 +2511,18 @@ export default function ProductList() {
                    passes behind them and only real scrolling content
                    dissolves into it. */
                 style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "26rem" }}
-                /* The tail lands JUST UNDER the category cards: the layer is
-                   fully frosted down to this bar's bottom edge (which is the
-                   cards' bottom) and spends the whole fade in the 5rem below
-                   it. --kx-ramp-fade must be a LENGTH here, not the default
-                   45%: a percentage is taken from the layer's own height, so
-                   once the layer grew to cover the strip the fade grew with
-                   it and started dissolving halfway up the cards. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:5rem] [--kx-ramp-fade:5rem]"
+                /* The tail dies JUST UNDER the category cards. The fade runs
+                   BEHIND the cards (they are this bar's own content, lifted
+                   above the layer, so they stay crisp) and is fully clear
+                   ~25px below them — measured, because at 5rem of overhang
+                   the ramp reached y=451 and swallowed the "Fabric
+                   preparation" heading at y=396, which is the same
+                   blur-over-live-content defect one row further down.
+
+                   --kx-ramp-fade must be a LENGTH here, not the default 45%:
+                   a percentage is taken from the layer's own height, so once
+                   the layer grew to cover the strip the fade grew with it. */
+                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
