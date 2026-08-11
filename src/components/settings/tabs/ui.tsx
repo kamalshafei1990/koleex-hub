@@ -8,6 +8,17 @@
 import type { ReactNode } from "react";
 import { useSkin } from "@/lib/appearance";
 
+/** The ONE disclosure chevron for the Settings app — the master list, the
+ *  admin link rows and the push link all draw this, so they can never drift
+ *  apart (they used to mix this glyph with a literal "›" character). */
+export function Chevron({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function SettingsCard({ title, subtitle, children, flush }: {
   title?: string; subtitle?: string; children: ReactNode; flush?: boolean;
 }) {

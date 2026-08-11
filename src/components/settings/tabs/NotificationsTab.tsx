@@ -12,7 +12,7 @@ import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { NotificationPrefs } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
-import { SettingsCard, SwitchRow } from "./ui";
+import { SettingsCard, SwitchRow, Chevron } from "./ui";
 import { isPushSupported, isIosNeedsInstall, permissionState, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
 import type { QuietHoursPref } from "@/lib/access-control";
 import { inQuietHours } from "@/lib/notification-activity";
@@ -290,7 +290,7 @@ export default function NotificationsTab({ account, onChanged }: {
           className="kx-hover-glow flex items-center justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
         >
           <span>{t("notif.managePush")}</span>
-          <span className="text-[var(--text-faint)]">›</span>
+          <Chevron className="text-[var(--text-faint)] shrink-0" />
         </Link>
       )}
     </div>

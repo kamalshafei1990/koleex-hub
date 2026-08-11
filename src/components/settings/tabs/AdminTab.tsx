@@ -13,7 +13,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
-import { SwitchRow } from "@/components/settings/tabs/ui";
+import { SwitchRow, Chevron } from "@/components/settings/tabs/ui";
 import { useQaReporterEnabled, setQaReporterEnabled } from "@/lib/platform-settings";
 
 function LinkRow({ href, icon, label, hint, last }: {
@@ -31,7 +31,7 @@ function LinkRow({ href, icon, label, hint, last }: {
         <span className="block text-[13px] font-medium text-[var(--text-primary)]">{label}</span>
         <span className="block text-[11px] text-[var(--text-dim)]">{hint}</span>
       </span>
-      <span className="text-[var(--text-faint)]">›</span>
+      <Chevron className="text-[var(--text-faint)] shrink-0" />
     </Link>
   );
 }
@@ -55,8 +55,8 @@ export default function AdminTab(_props: { account: AccountWithLinks }) {
       <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-3">
         <SwitchRow
           icon={<MessageSquarePlusIcon size={15} />}
-          label={t("admin.qaReporter", "Report-issue button")}
-          hint={t("admin.qaReporter.hint", "Show the floating QA reporter to everyone across the Hub")}
+          label={t("admin.qaReporter")}
+          hint={t("admin.qaReporter.hint")}
           checked={qaEnabled === true}
           onChange={flipQa}
           last

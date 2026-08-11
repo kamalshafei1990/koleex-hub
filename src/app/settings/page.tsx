@@ -58,6 +58,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { Chevron } from "@/components/settings/tabs/ui";
 import type { AccountWithLinks } from "@/types/supabase";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
@@ -78,15 +79,6 @@ export default function SettingsPage() {
     >
       <SettingsContent />
     </AuthGate>
-  );
-}
-
-/* Small chevron used for the iOS-style disclosure rows. */
-function Chevron({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
