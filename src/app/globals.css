@@ -536,15 +536,26 @@ body {
    The ::view-transition-* pseudo-elements are inert on engines without the
    API, so nothing here needs a @supports guard. */
 @media (prefers-reduced-motion: no-preference) {
+  /* The outgoing page leaves quickly and CLEARS THE WAY — it does not linger
+     under the arriving one, which is what made a heavy screen (Product Data,
+     Products) read as a jump: two full pages cross-dissolving while the new
+     one was still filling in. */
   ::view-transition-old(root) {
-    animation: kx-vt-out 140ms cubic-bezier(0.4, 0, 1, 1) both;
+    animation: kx-vt-out 120ms cubic-bezier(0.4, 0, 1, 1) both;
   }
+  /* The arriving page settles: a longer fade plus a 6px rise, so the motion
+     has a DIRECTION instead of being a pure dissolve. 6px is deliberately
+     under the threshold where it reads as "sliding" — it reads as the screen
+     coming to rest. Flat 2D only, per the brand rule: no scale, no depth. */
   ::view-transition-new(root) {
-    animation: kx-vt-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: kx-vt-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
 @keyframes kx-vt-out { to { opacity: 0; } }
-@keyframes kx-vt-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kx-vt-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
 
