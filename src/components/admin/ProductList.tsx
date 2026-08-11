@@ -1938,7 +1938,10 @@ export default function ProductList() {
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
         <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
-          <div aria-hidden className="kx-glass-bar" />
+          {/* Progressive, not flat (owner: the flat bar read as a hard
+              rectangle over the ramped zone below) — the whole top strip
+              is now one continuous soft frost. */}
+          <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
         <div>
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
