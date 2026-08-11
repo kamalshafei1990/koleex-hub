@@ -136,6 +136,7 @@ import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useSkin } from "@/lib/appearance";
 import nextDynamic from "next/dynamic";
+import AppIcon from "@/components/common/AppIcon";
 
 /* Aurora ground — mounted only under the skin, so Core never pays for it. */
 const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -6023,20 +6024,27 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5 mb-3">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
           </Link>
           {/* Neutral surface tile — matches the shared PageHeader and every
               other app's header icon. (Was amber-tinted for /customers only,
               which made it the odd one out.) */}
           <div
-            className={`h-8 w-8 rounded-xl border flex items-center justify-center shrink-0 ${
+            className={`kx-glass h-8 w-8 rounded-xl border flex items-center justify-center shrink-0 ${
               filterType === "company" || filterType === "people"
                 ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
                 : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
           >
-            {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : <ContactsIcon size={16} />}
+            {/* Routed through the registry binding like every other app
+                identity glyph — this screen serves three apps, so it picks
+                the id from the same filter that names the page. */}
+            <AppIcon
+              appId={filterType === "supplier" ? "suppliers" : filterType === "customer" ? "customers" : "contacts"}
+              className="h-4 w-4"
+              size={16}
+            />
           </div>
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
@@ -6180,7 +6188,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 onClick={() => setStatusFilter(opt.k)}
                 className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
                   statusFilter === opt.k
-                    ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
+                    ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
                     : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                 }`}
               >
@@ -6203,7 +6211,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 onClick={() => setEntityFilter(opt.k)}
                 className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1.5 ${
                   entityFilter === opt.k
-                    ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
+                    ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
                     : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                 }`}
               >
@@ -6222,7 +6230,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <button
               onClick={() => setTierFilter("all")}
               className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
-                tierFilter === "all" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                tierFilter === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
               {t("filter.allTiers", "All Tiers")}
@@ -6252,7 +6260,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <button
               onClick={() => setTypeTab("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                typeTab === "all" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                typeTab === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
               {t("tab.all")} ({contacts.length})
@@ -6264,7 +6272,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   key={ct.value}
                   onClick={() => setTypeTab(ct.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-                    typeTab === ct.value ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                    typeTab === ct.value ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                 >
                   {ct.icon} {ct.value === "company" ? t("tab.companies") : ct.value === "people" ? t("tab.people") : ct.value === "supplier" ? t("tab.suppliers") : t("tab.customers")} ({count})
@@ -6350,7 +6358,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         ) : (
           grouped.map(([letter, items]) => (
             <div key={letter}>
-              <div className="px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 backdrop-blur-sm">
+              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 backdrop-blur-sm">
                 {letter}
               </div>
               {items.map(c => {
@@ -7055,11 +7063,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <div className="px-5 sm:px-8 md:px-10 pt-5 md:pt-6">
             {/* Top bar — back (start) · Edit / Delete (end) */}
             <div className="flex items-center justify-between gap-3">
-              <button onClick={handleBack} className="flex items-center gap-1.5 min-w-0 shrink rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+              <button onClick={handleBack} className="kx-glass kx-hover-glow flex items-center gap-1.5 min-w-0 shrink rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
                 <ArrowLeftIcon size={14} className="rtl:rotate-180 shrink-0" /> <span className="truncate">{backLabel}</span>
               </button>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={handleEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+                <button onClick={handleEdit} className="kx-glass kx-hover-glow flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
                   <Edit3Icon size={14} /> <span className="hidden sm:inline">{t("btn.edit")}</span>
                 </button>
                 <button onClick={() => requestDelete(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors">

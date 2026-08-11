@@ -1480,29 +1480,38 @@ input[type="number"]:not(.kx-spinner) {
    the fade always happens inside --kx-ramp-ext — the tail, and only the
    tail, is what "longer" lengthens. Layers still stagger: the heaviest
    blur clears first, the lightest carries to the very end. */
+/* The four layers must STAGGER, not end together. When they all held to
+   the same stop and only their end points differed, every layer started
+   fading at one shared line — and a shared line is exactly what the eye
+   reads as an edge (owner: "I don't want to see it as a line, should be
+   from light to more heavy blurred"). Each layer now starts fading where
+   the one below it finishes, so walking DOWN the tail the blur sheds
+   28 → 14 → 7 → 3 → none, and walking UP toward the bar it thickens
+   smoothly. Everything is measured back from the bottom, so the bars stay
+   fully frosted at any height and --kx-ramp-ext alone sets the tail. */
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(1) {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent 100%);
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent 100%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.35), transparent 100%);
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.35), transparent 100%);
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(2) {
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.25));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.25));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.6), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.2));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.6), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.2));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(3) {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.5));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.5));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.85), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.45));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.85), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.45));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(4) {
   -webkit-backdrop-filter: blur(28px) saturate(150%);
   backdrop-filter: blur(28px) saturate(150%);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 1.1), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 1.1), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-bar-prog > i { display: none; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1700,6 +1709,21 @@ input[type="number"]:not(.kx-spinner) {
 }
 [data-kx-skin="aurora"][data-theme="light"] [role="switch"] > span {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
+}
+
+/* Alphabet section headers in the contacts list. They asked for
+   `backdrop-blur-sm`, but they live INSIDE the list pane, which carries the
+   drawer glass — a filtered ancestor starves a descendant's
+   backdrop-filter, so that blur never rendered, and under the remap their
+   7% tint left them see-through (owner: "for the letter bar make it more
+   heavy blurred to make it not totally transparent"). A dense fill is the
+   honest answer at this depth: no second filter, and the letters read over
+   whatever scrolls beneath. */
+[data-kx-skin="aurora"] .kx-letterbar {
+  background: rgba(9, 12, 18, 0.82);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-letterbar {
+  background: rgba(248, 250, 252, 0.88);
 }
 
 /* Stat/metric mini-cards that were filled with `--bg-primary` — a token the

@@ -2508,7 +2508,7 @@ export default function ProductList() {
                    6rem was tuned when this ramp only had to cover itself;
                    now that it also covers the toolbar, the frosted zone is
                    long enough without a long tail. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1.5rem]"
+                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:0.75rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
