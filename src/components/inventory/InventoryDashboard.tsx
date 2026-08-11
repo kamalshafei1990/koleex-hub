@@ -153,24 +153,28 @@ export default function InventoryDashboard() {
         <section data-testid="inv-home-kpis">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard
+              className="kx-glass"
               icon="box-open"
               label="Stock Items"
               value="—"
               loading={loading}
             />
             <KpiCard
+              className="kx-glass"
               icon="download"
               label="Today's Receipts"
               value={op?.today.receipts ?? 0}
               loading={loading}
             />
             <KpiCard
+              className="kx-glass"
               icon="truck-side"
               label="Today's Shipments"
               value={op?.today.shipments ?? 0}
               loading={loading}
             />
             <KpiCard
+              className="kx-glass"
               icon="shield-check"
               label="Pending Actions"
               value={totalAlerts}

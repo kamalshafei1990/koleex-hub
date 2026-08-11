@@ -290,7 +290,7 @@ export function ActionCard({
   const inner = (
     <div
       data-testid={testId}
-      className={`group relative flex h-full flex-col rounded-xl border bg-[var(--bg-surface)] transition-colors hover:bg-[var(--bg-elevated)] ${
+      className={`group relative kx-glass flex h-full flex-col rounded-xl border bg-[var(--bg-surface)] transition-colors hover:bg-[var(--bg-elevated)] ${
         isPrimary
           ? "min-h-[140px] border-[var(--border-color)] px-5 py-4 shadow-sm"
           : "min-h-[80px] border-[var(--border-subtle)] px-3.5 py-3"
@@ -357,9 +357,9 @@ export function AlertCard({
     tone === "info" ? "bg-blue-400 dark:bg-blue-300" :
                       "bg-amber-400 dark:bg-amber-300";
   const inner = (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+    <div className="kx-glass flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
       <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+      <span className="kx-stat flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
         <RrIcon name={icon} size={12} />
       </span>
       <div className="min-w-0 flex-1">
@@ -388,8 +388,8 @@ export function TodayTile({
   href?: string;
 }) {
   const inner = (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+    <div className="kx-glass flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+      <span className="kx-stat flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
         <RrIcon name={icon} size={12} />
       </span>
       <div className="text-[11.5px] text-[var(--text-dim)]">{label}</div>
@@ -418,9 +418,9 @@ export function IntelTile({
   href?: string;
 }) {
   const inner = (
-    <div className="flex h-full flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+    <div className="kx-glass flex h-full flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
       <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+        <span className="kx-stat flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
           <RrIcon name={icon} size={11} />
         </span>
         <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
@@ -666,7 +666,7 @@ export function TraceabilityCard({
           {links.map((l, i) => (
             <li key={`${l.label}-${i}`} className="flex items-center gap-2">
               {l.icon && (
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                <span className="kx-stat flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
                   <RrIcon name={l.icon} size={11} />
                 </span>
               )}

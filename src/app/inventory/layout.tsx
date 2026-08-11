@@ -26,10 +26,17 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import { InventoryShortcutsLegend } from "@/components/inventory/InventoryUx";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
+import { useSkin } from "@/lib/appearance";
+
+/* The Aurora ground. ssr:false and mounted only under Aurora — a canvas is
+   the one thing the skin switch cannot do in CSS, so Core renders zero
+   canvases (canon B). */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* Each route maps to a translation key base; title/subtitle resolve via t()
    so the page header follows the selected system language (en/zh/ar). */
@@ -57,11 +64,27 @@ function keyFor(pathname: string): string {
 export default function InventoryLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/inventory";
   const { t } = useTranslation(inventoryT);
+  const aurora = useSkin() === "aurora";
   const k = keyFor(pathname);
   const meta = { title: t(`inv.page.${k}.title`), subtitle: t(`inv.page.${k}.subtitle`) };
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
+    /* AURORA SCOPE — one class, the whole var-remap step of the Scale Pattern.
+       It sits on the SEGMENT LAYOUT rather than on each page, so all fourteen
+       inventory routes inherit the remap, the recessed-well form fields and
+       the pane rules from a single place, and any route added later is
+       converted the day it is created.
+
+       kx-ground-host lifts this layout's own children above the fixed z-0
+       canvas (positioned children excluded — that rule is what threw the
+       sidebar's collapse button off-screen when it was written without the
+       :not()s). Core keeps the solid --bg-primary it always had. */
+    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6`}>
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground topLight />
+        </div>
+      )}
+      <div className="relative z-[1] mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader title={meta.title} subtitle={meta.subtitle} />
         {children}
       </div>
