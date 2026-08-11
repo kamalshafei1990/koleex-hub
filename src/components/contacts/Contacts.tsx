@@ -107,6 +107,7 @@ import { countryNameLocalized, provinceNameLocalized, cityNameLocalized, chinaCi
 import { divisionNameLocalized, categoryNameLocalized } from "@/lib/geo/taxonomy-cn";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
 /* SYS-3: Country (96 KB) is the only slice cheap enough to import
    statically — State/City drag the 8 MB world city dataset onto this
@@ -5001,15 +5002,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);   // controls the suggestions dropdown
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);     // gates sensitive edits (internal score)
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/me", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (alive && j) setIsSuperAdmin(!!j.is_super_admin); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  /* Super-admin gate for sensitive edits (internal score).
+
+     Read from the shell batch, NOT a dedicated /api/me call. This used to
+     spend a whole round trip — a third of a second on the owner's link, on
+     every open of Contacts, Customers AND Suppliers — to fetch a full
+     profile and keep one boolean off it. The bootstrap section of
+     /api/shell already carries `isSuperAdmin`, and the shell is fetched by
+     every screen regardless.
+
+     The flag starts false and turns true when the batch lands, so a
+     sensitive control appears a moment late rather than appearing and being
+     taken away. That is the safe direction: under-granting, never
+     over-granting. Server-side gating is unaffected either way — this only
+     decides what is drawn. */
+  const { data: meBoot } = useMeBootstrap();
+  const isSuperAdmin = !!meBoot?.isSuperAdmin;
   /* Active/Archived status filter — surfaced in the supplier + customer views. */
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   /* Individual vs Company filter — customer/company/people views. */
