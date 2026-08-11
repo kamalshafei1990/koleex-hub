@@ -214,8 +214,20 @@ export default function WavyBackground(
        shipping — as a weak machine and froze the ground ("in mobile version
        is not moving"). Apple devices are excluded; the gate still guards
        its actual target, mid-range Windows boxes opened from WeChat. */
-    const apple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
-    const weak = !apple && (navigator.hardwareConcurrency || 8) <= 4;
+    /* THE GATE IS FOR DESKTOPS. hardwareConcurrency is capped for privacy
+       on iOS — which already froze every iPhone once ("in mobile version is
+       not moving") — and several Android skins do the same: ColorOS reports
+       4 on an eight-core phone, so the owner's Oppo was classified weak and
+       the ground stopped ("the background solid not moving"). Excluding
+       Apple by name only patched the first half of the same mistake.
+
+       The target was never phones. It was mid-range WINDOWS boxes opened
+       from WeChat, where a permanent draw loop genuinely hurts. So the gate
+       now applies to non-touch machines only, and a phone always animates. */
+    const mobile =
+      /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(navigator.userAgent) ||
+      navigator.maxTouchPoints > 1;
+    const weak = !mobile && (navigator.hardwareConcurrency || 8) <= 4;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches || weak;
 
     /* RATIO 1, WHICH IS WHAT THE ORIGINAL DOES.

@@ -8,7 +8,11 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Koleex Hub",
-    short_name: "Koleex",
+    /* This is the label under the installed icon — iOS and Android both
+       prefer short_name over name for the Home Screen, which is why the
+       app installed as plain "Koleex". Ten characters, so it still fits
+       the launcher without being truncated. */
+    short_name: "Koleex Hub",
     description: "Koleex ERP — products, operations, finance, and more",
     start_url: "/",
     scope: "/",
