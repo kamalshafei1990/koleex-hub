@@ -39,13 +39,28 @@ const DOMAINS = ["classification", "field", "spec", "attribute", "app", "activit
    Invalidated by the same invalidateAppIconInline() the PUT already calls,
    so an icon edit is visible immediately — the TTL is just the backstop for
    other warm instances. Same globalThis pattern as app-icon-inline (SYS-4). */
-interface BindingsMemo { at: number; bindings: Record<string, string> }
+interface BindingsMemo { at: number; bindings: Record<string, string>; prefix: string }
 const gb = globalThis as typeof globalThis & { __kxVisualBindings?: BindingsMemo | null };
 const BINDINGS_TTL_MS = 10 * 60_000;
 
 export function invalidateVisualBindings(): void {
   gb.__kxVisualBindings = null;
 }
+
+/* THE SHARED PREFIX IS SENT ONCE, NOT 528 TIMES.
+
+   Measured on prod: the payload is 113,549 bytes over 556 keys, and 38,016
+   of them — 33% — are the SAME storage prefix repeated on every icon URL.
+   Brotli squeezes that repetition on the wire, but the browser still
+   decodes and JSON.parses the full 113 KB on every cold screen, and the
+   body download was timed at 0.9–1.9s on the owner's link.
+
+   So the route hoists the prefix and sends relative values. Anything that
+   is already absolute (a data: URI, an icon hosted elsewhere) is left
+   exactly as it is, and the client re-attaches the prefix in the one place
+   that reads this map (lib/visual-bindings). */
+const STORAGE_PREFIX =
+  "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -54,7 +69,7 @@ export async function GET() {
   const memo = gb.__kxVisualBindings;
   if (memo && Date.now() - memo.at < BINDINGS_TTL_MS) {
     return NextResponse.json(
-      { bindings: memo.bindings },
+      { bindings: memo.bindings, prefix: memo.prefix },
       { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
     );
   }
@@ -81,10 +96,18 @@ export async function GET() {
   const inlined = await inlineAppIcons(appBindings);
   Object.assign(bindings, inlined);
 
-  gb.__kxVisualBindings = { at: Date.now(), bindings };
+  /* Strip the shared prefix LAST, after the app icons have been inlined —
+     a data: URI must never be touched. */
+  for (const k in bindings) {
+    if (bindings[k].startsWith(STORAGE_PREFIX)) {
+      bindings[k] = bindings[k].slice(STORAGE_PREFIX.length);
+    }
+  }
+
+  gb.__kxVisualBindings = { at: Date.now(), bindings, prefix: STORAGE_PREFIX };
 
   return NextResponse.json(
-    { bindings },
+    { bindings, prefix: STORAGE_PREFIX },
     { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
   );
 }

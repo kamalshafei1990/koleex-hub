@@ -44,6 +44,22 @@ if (!state.cache && typeof window !== "undefined") {
   } catch { /* corrupt mirror — cold-start as before */ }
 }
 
+/* The route sends the shared storage prefix ONCE and the icon paths
+   relative to it — 33% of the payload was that one string repeated 528
+   times. Re-attach it here, the single place this map is read. Values that
+   are already absolute (data: URIs from the inlined app icons, anything
+   hosted elsewhere) are left untouched, so an old cached payload with full
+   URLs still resolves correctly. */
+function expand(map: BindingsMap, prefix: string): BindingsMap {
+  if (!prefix) return map;
+  const out: BindingsMap = {};
+  for (const k in map) {
+    const v = map[k];
+    out[k] = v.startsWith("data:") || v.startsWith("http") ? v : prefix + v;
+  }
+  return out;
+}
+
 function persist(map: BindingsMap): void {
   try {
     if (typeof window !== "undefined") window.localStorage.setItem(LS_KEY, JSON.stringify(map));
@@ -72,13 +88,16 @@ export async function fetchIconBindings(): Promise<BindingsMap> {
          client-cache for why the request COUNT is what costs seconds. */
       const { getShell } = await import("./client-cache");
       const shell = await getShell();
-      let map: BindingsMap | null =
-        (shell?.bindings as { bindings?: BindingsMap } | null)?.bindings ?? null;
+      const fromShell = shell?.bindings as { bindings?: BindingsMap; prefix?: string } | null;
+      let map: BindingsMap | null = fromShell?.bindings ?? null;
+      let prefix = fromShell?.prefix ?? "";
       if (!map) {
         const res = await fetch("/api/visual-bindings", { credentials: "include" });
-        const json = (await res.json().catch(() => null)) as { bindings?: BindingsMap } | null;
+        const json = (await res.json().catch(() => null)) as { bindings?: BindingsMap; prefix?: string } | null;
         map = json?.bindings ?? {};
+        prefix = json?.prefix ?? "";
       }
+      map = expand(map, prefix);
       state.cache = { at: Date.now(), map };
       persist(map);
       return map;
