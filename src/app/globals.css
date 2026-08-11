@@ -2259,24 +2259,6 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: none;
 }
 
-/* A tile INSIDE a glass bar must not run its own blur pass. The bar is
-   already the material — the toolbar and category ramps stack to a 318px
-   frosted band at the top of the screen — and putting eight more
-   backdrop-filters inside that band blurs an already-blurred backdrop,
-   which is what turned the whole upper strip to mush (owner: "the upper
-   part still blurred"). It is also eight filter passes in the hottest
-   region of the page, re-composited on every scroll frame. Tint only; the
-   ring and the neon icon still carry the hover. Core is unaffected —
-   kx-glass has no Core definition to begin with. */
-[data-kx-skin="aurora"] .kx-bar-host .kx-hover-tile.kx-glass {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: rgba(255, 255, 255, 0.05);
-}
-[data-kx-skin="aurora"][data-theme="light"] .kx-bar-host .kx-hover-tile.kx-glass {
-  background: rgba(0, 0, 0, 0.05);
-}
-
 /* White-ring variant (owner call: Products / Product Data cards) —
    same canonical physics, ring + glow in white instead of Hub Blue. */
 .kx-hover-card.kx-ring-white::after {
