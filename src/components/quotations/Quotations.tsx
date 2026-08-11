@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
@@ -718,6 +718,14 @@ export const PRINT_AND_DOC_STYLES = `
   padding-inline: 360px;
   box-sizing: border-box;
 }
+/* Fit-to-width host (SCREEN ONLY). The A4 doc and its stack keep every
+   dimension the owner set; this box only carries the visual scale and
+   catches any residual overflow so the PAGE never drags sideways again —
+   at worst the paper scrolls inside its own box, never the whole app.
+   Neutralised entirely under @media print below, and invisible to the PDF
+   export (separate iframe, separate document). */
+.quot-fit-host { overflow-x: auto; overflow-y: hidden; }
+
 /* Focus view — the header toggle hides every editor-only gutter card
    (Cost Price + Internal notes share .pq-row-note; Document Settings +
    Cost Price share .pq-gutter-card) so only the A4 document shows. */
@@ -974,11 +982,24 @@ export const PRINT_AND_DOC_STYLES = `
   [class*="h-screen"],
   [class*="h-[calc"],
   [class*="min-h-screen"],
+  [class*="min-h-full"],
+  [class*="h-full"],
   [class*="min-h-0"],
   [class*="overflow-hidden"] {
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
+  }
+
+  /* The screen-only fit box: drop the scale, the reclaiming negative margin
+     and the clipping, so print gets the document at its true 210mm. Inline
+     styles carry the transform, so these need !important to win. */
+  .quot-fit-host, .quot-fit-box {
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    transform: none !important;
   }
   [class~="pt-14"] { padding-top: 0 !important; }
   .shell-content-offset { padding: 0 !important; }
@@ -1140,6 +1161,64 @@ export default function Quotations() {
   /* Focus view — hides the editor-only gutter cards (cost price,
      internal notes, document settings). Editor-only, never persisted. */
   const [hidePanels, setHidePanels] = useState(false);
+  /* Set the moment the operator uses the Hide/Show panels button, so the
+     narrow-screen auto-default below never overrides a deliberate choice. */
+  const panelsTouched = useRef(false);
+
+  /* ── FIT-TO-WIDTH (screen only — the A4 geometry is NEVER touched) ──
+     .quot-a4-doc is 210mm (794px) and .quot-a4-stack adds 360px of gutter on
+     each side for the editor cards, so the editor surface is intrinsically
+     1514px wide. On anything narrower the OVERFLOW WAS THE PAGE'S: the whole
+     app — toolbar included — dragged sideways (iPad portrait has 964px of app
+     width, a phone 375). Hence "floating".
+
+     The paper itself is left exactly as the owner set it: 210mm × 270mm, and
+     the gutter cards keep their absolute per-row anchoring. We only scale the
+     finished surface visually with a transform, which does NOT re-lay-out the
+     document — so what is on screen still matches the PDF line for line. Do
+     NOT swap this for `zoom`: zoom re-flows at the scaled size and would let
+     text re-wrap, which is exactly the WYSIWYG guarantee this editor sells.
+
+     PDF export is untouched either way: it renders /quotations/[id]/print in
+     a separate hidden iframe with its own stylesheet, so nothing here can
+     reach it. Browser print is neutralised in the @media print block. */
+  const [fitHost, setFitHost] = useState<HTMLDivElement | null>(null);
+  const fitHostRef = useCallback((n: HTMLDivElement | null) => setFitHost(n), []);
+  const [fitInner, setFitInner] = useState<HTMLDivElement | null>(null);
+  const fitInnerRef = useCallback((n: HTMLDivElement | null) => setFitInner(n), []);
+  const [fitW, setFitW] = useState(0);
+  const [stackH, setStackH] = useState(0);
+  useLayoutEffect(() => {
+    if (!fitHost) return;
+    const read = () => setFitW(fitHost.getBoundingClientRect().width);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(fitHost);
+    return () => ro.disconnect();
+  }, [fitHost]);
+  useLayoutEffect(() => {
+    if (!fitInner) return;
+    /* Unscaled height of the doc stack — the transform doesn't shrink the
+       layout box, so we reclaim the leftover with a negative margin below. */
+    const read = () => setStackH(fitInner.offsetHeight);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(fitInner);
+    return () => ro.disconnect();
+  }, [fitInner]);
+  const QUOT_PAPER_W = 794;    // 210mm at 96dpi
+  const QUOT_GUTTERS_W = 720;  // .quot-a4-stack padding-inline: 360px × 2
+  const fitNeeded = (hidePanels ? QUOT_PAPER_W : QUOT_PAPER_W + QUOT_GUTTERS_W) + 24;
+  const fitScale = fitW > 0 ? Math.min(1, fitW / fitNeeded) : 1;
+  /* Narrow screens open in focus view: with the gutter cards shown, a phone
+     would scale the surface to ~0.24 and nothing would be legible. This only
+     picks the DEFAULT — the toolbar's Show panels button still works, and
+     showing them just scales the whole surface down instead of overflowing. */
+  useEffect(() => {
+    if (panelsTouched.current || fitW === 0) return;
+    setHidePanels(fitW < QUOT_PAPER_W + QUOT_GUTTERS_W + 24);
+  }, [fitW]);
+
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   /* "+ From catalog" picker. Owned by the parent so the modal can
      stay mounted across A4-page renders without each page mounting
@@ -2306,7 +2385,10 @@ export default function Quotations() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      /* min-h-full, never min-h-screen: the Hub scroller is already
+         100svh − var(--kx-header-h), so 100vh here is a phantom scroll the
+         exact height of the header on every quotations screen. */
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-gray-400 text-lg">Loading...</div>
       </div>
     );
@@ -2317,7 +2399,7 @@ export default function Quotations() {
      ══════════════════════════════════════════════════════════ */
   if (view === "list") {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar — canonical Hub PageHeader */}
@@ -2489,7 +2571,7 @@ export default function Quotations() {
   if (!current) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
 
       {/* ── Toolbar (dark bar above A4) ── */}
@@ -2513,7 +2595,7 @@ export default function Quotations() {
           {t("btn.back")}
         </button>
         <button
-          onClick={() => setHidePanels((v) => !v)}
+          onClick={() => { panelsTouched.current = true; setHidePanels((v) => !v); }}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
           title={
             hidePanels
@@ -2803,6 +2885,23 @@ export default function Quotations() {
           The A4 paper, pagination, items table, action buttons,
           rich-text toolbar, notes panel, and footer (stamp /
           signature / bank / terms) all live in QuotationA4Preview. */}
+      <div ref={fitHostRef} className="quot-fit-host">
+      <div
+        className="quot-fit-box"
+        style={
+          fitScale < 1
+            ? {
+                width: fitNeeded,
+                transform: `scale(${fitScale})`,
+                transformOrigin: "top left",
+                /* The transform doesn't shrink the layout box, so without this
+                   the editor would end with a tall band of empty page. */
+                marginBottom: stackH ? -(stackH * (1 - fitScale)) : undefined,
+              }
+            : undefined
+        }
+      >
+      <div ref={fitInnerRef}>
       <QuotationA4Preview
         current={current}
         /* The parent's Quotation type adds two fields the preview
@@ -2840,6 +2939,9 @@ export default function Quotations() {
         fmt={fmt}
         numberToWords={numberToWords}
       />
+      </div>
+      </div>
+      </div>
       <ProductPickerModal
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setInsertAtIdx(null); }}

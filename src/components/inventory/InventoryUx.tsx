@@ -772,6 +772,7 @@ const INVENTORY_SHORTCUTS: Array<{ keyLabel: string; label: string; desc: string
 ];
 
 export function InventoryShortcutsLegend() {
+  const { t } = useTranslation(inventoryT);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -800,11 +801,11 @@ export function InventoryShortcutsLegend() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="kx-glass-pop kx-hover-glow fixed bottom-4 start-4 md:start-[76px] z-40 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-dim)] shadow-lg transition-colors hover:text-[var(--text-primary)]"
-        title="Keyboard shortcuts (press ?)"
+        title={t("inv.shortcuts.tooltip")}
         aria-expanded={open}
       >
         <kbd className="rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-bold">?</kbd>
-        Shortcuts
+        {t("inv.shortcuts.pill")}
       </button>
 
       {open && (
@@ -817,18 +818,18 @@ export function InventoryShortcutsLegend() {
           />
           <div
             role="dialog"
-            aria-label="Keyboard shortcuts"
+            aria-label={t("inv.shortcuts.title")}
             className="kx-glass-pop fixed bottom-16 start-4 md:start-[76px] z-50 w-[300px] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3.5 py-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-                Keyboard shortcuts
+                {t("inv.shortcuts.title")}
               </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                aria-label="Close"
+                aria-label={t("inv.shortcuts.close")}
               >
                 ✕
               </button>

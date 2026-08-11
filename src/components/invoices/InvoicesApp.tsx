@@ -115,10 +115,14 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
   }, [invoices]);
 
   return (
-    <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
-    >
+    /* h-full, never a dvh calculation. The Hub scroller is already
+       100svh − var(--kx-header-h); this box used to be 100dvh − 3.5rem, which
+       is (a) taller than its parent whenever the mobile browser toolbar is
+       retracted, (b) LIVE-resized as that toolbar hides and shows — the whole
+       reason the app danced under the finger — and (c) wrong by the iOS
+       safe-area inset in the installed PWA and by the 30px title bar in the
+       desktop app, both of which --kx-header-h already accounts for. */
+    <div className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full">
       {/* Header — canonical Hub PageHeader */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0 pt-5 pb-4">
@@ -411,7 +415,10 @@ function InvoiceDetailView({
 
   if (loading || !state) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      /* h-full, not min-h-screen — the loading state must be exactly as tall
+         as the scroller, or the app opens with a header-height phantom
+         scroll before the first paint of real content. */
+      <div className="h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon size={20} />
       </div>
     );
@@ -483,10 +490,8 @@ function InvoiceDetailView({
   };
 
   return (
-    <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
-    >
+    /* h-full — see the note on the list view's root above. */
+    <div className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full">
       {confirmDialog}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden print:hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">

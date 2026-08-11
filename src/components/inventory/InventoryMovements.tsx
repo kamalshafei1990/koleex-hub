@@ -492,7 +492,7 @@ export default function InventoryMovements() {
           <OperatorMovementMenu />
           <div className="text-[10.5px] text-[var(--text-dim)]">
             {/* helpful hint — desktop only */}
-            <span className="hidden sm:inline">Shortcuts: R · S · T · A · F</span>
+            <span className="hidden sm:inline">{t("inv.shortcuts.hint")}</span>
           </div>
         </div>
 

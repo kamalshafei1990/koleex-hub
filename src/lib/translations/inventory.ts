@@ -314,6 +314,11 @@ export const inventoryT: Translations = {
   /* ── KPI ───────────────────────────────────────────────────── */
   /* The four KPI cards at the top of /inventory — the only strings on that
      strip that were still English in every language. */
+  /* The keyboard-shortcuts legend (desktop) — pill, panel heading, close. */
+  "inv.shortcuts.pill":  { en: "Shortcuts",          zh: "快捷键",       ar: "الاختصارات" },
+  "inv.shortcuts.title": { en: "Keyboard shortcuts", zh: "键盘快捷键",   ar: "اختصارات لوحة المفاتيح" },
+  "inv.shortcuts.tooltip": { en: "Keyboard shortcuts (press ?)", zh: "键盘快捷键（按 ?）", ar: "اختصارات لوحة المفاتيح (اضغط ؟)" },
+  "inv.shortcuts.close": { en: "Close",              zh: "关闭",         ar: "إغلاق" },
   "inv.dashboard.kpi.stockItems":      { en: "Stock Items",      zh: "库存物品",   ar: "أصناف المخزون" },
   "inv.dashboard.kpi.todayReceipts":   { en: "Today's Receipts",  zh: "今日入库",   ar: "استلامات اليوم" },
   "inv.dashboard.kpi.todayShipments":  { en: "Today's Shipments", zh: "今日出库",   ar: "شحنات اليوم" },
