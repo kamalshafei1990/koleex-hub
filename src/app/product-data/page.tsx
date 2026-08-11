@@ -1,25 +1,24 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /product-data — the landing screen (was: the catalogue itself).
+   /product-data — internal admin catalog (full fields).
 
-   The catalogue now lives at /product-data/catalog and this route opens on
-   ProductDataHome, matching how Inventory and Purchase open. See
-   ProductDataHome.tsx for the measurement behind the change.
+   Same underlying UI as /products, but:
+     · Guarded by the "Product Data" module permission
+     · Shows cost_price, supplier, internal notes, etc.
+     · This is the working tool admins use to ADD / EDIT / REMOVE products.
 
-   PermissionGate stays exactly where it was: the "Product Data" module grant
-   still governs everything in this segment, landing screen included — the
-   numbers on it (cost gaps, supplier gaps) are internal signals customers
-   must never see.
+   The PUBLIC /products page is a cleaned-up read view of the same rows,
+   visible to customers without secrets.
    --------------------------------------------------------------------------- */
 
 import PermissionGate from "@/components/layout/PermissionGate";
-import ProductDataHome from "@/components/admin/ProductDataHome";
+import ProductList from "@/components/admin/ProductList";
 
 export default function ProductDataPage() {
   return (
     <PermissionGate module="Product Data">
-      <ProductDataHome />
+      <ProductList />
     </PermissionGate>
   );
 }

@@ -603,9 +603,7 @@ export default function ProductProfile() {
          without pushing the tabs down the page. */}
       <div className="flex items-center gap-3 mb-3 min-w-0">
         <Link
-          /* The catalogue, not the landing screen — this is where the user
-             came from. */
-          href="/product-data/catalog"
+          href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
           className="kx-glass kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
         >

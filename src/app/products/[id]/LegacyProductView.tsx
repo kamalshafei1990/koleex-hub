@@ -455,11 +455,9 @@ export default function LegacyProductView() {
      /products/[id] (the PUBLIC page) we hide supplier names, cost
      info, and other admin-only fields. */
   const isInternal = (pathname || "").startsWith("/product-data");
-  /* Back link returns to the LIST of whichever app we're in, so the internal
-     /product-data detail never bounces to the public catalog — and, since
-     /product-data became a landing screen, back means the catalogue you came
-     from, not the landing screen above it. */
-  const backHref = isInternal ? "/product-data/catalog" : "/products";
+  /* Back link returns to the list of whichever app we're in, so the
+     internal /product-data detail never bounces to the public catalog. */
+  const backHref = isInternal ? "/product-data" : "/products";
   const handle = (params.id as string) || "";
 
   const [loading, setLoading] = useState(true);

@@ -1230,41 +1230,4 @@ export const PRODUCTS_UI_I18N: Translations = {
   "cls.addKind": { en: "Add machine kind (optional)", zh: "添加机器类型(可选)", ar: "إضافة نوع الماكينة (اختياري)" },
   "cls.kindNa": { en: "doesn\u2019t apply to this subcategory — you can move on.", zh: "不适用于此子类别——可以继续下一步。", ar: "لا ينطبق على هذه الفئة الفرعية — يمكنك المتابعة." },
   "list.needsName": { en: "Needs name", zh: "缺名称", ar: "يحتاج اسماً" },
-
-  /* ═══════════════════════════════════════════════════════════════════
-     PRODUCT DATA — LANDING SCREEN (/product-data)
-     The same shape Inventory and Purchase open with: a few numbers, what
-     needs doing, and what you might want to do. The catalogue itself is
-     one tab across. */
-  "home.catalogue":         { en: "Catalogue",            zh: "目录",             ar: "الكتالوج" },
-  "home.total":             { en: "Products",             zh: "产品",             ar: "المنتجات" },
-  "home.published":         { en: "Live for customers",   zh: "客户可见",          ar: "ظاهرة للعملاء" },
-  "home.draft":             { en: "Draft",                zh: "草稿",             ar: "مسودّة" },
-  "home.readiness":         { en: "Avg. completeness",    zh: "平均完整度",         ar: "متوسط الاكتمال" },
-  "home.needsWork":         { en: "Needs work",           zh: "待处理",            ar: "محتاج شغل" },
-  "home.missingData":       { en: "Missing data",         zh: "数据缺失",          ar: "بيانات ناقصة" },
-  "home.noPrice":           { en: "No cost price",        zh: "无成本价",          ar: "بدون سعر تكلفة" },
-  "home.noSupplier":        { en: "No supplier linked",   zh: "未关联供应商",       ar: "بدون مورّد مرتبط" },
-  "home.quickActions":      { en: "Quick actions",        zh: "快捷操作",          ar: "إجراءات سريعة" },
-  "home.openCatalogue":     { en: "Open catalogue",       zh: "打开目录",          ar: "افتح الكتالوج" },
-  "home.openCatalogueHint": { en: "Browse, filter and edit every product.", zh: "浏览、筛选并编辑所有产品。", ar: "تصفّح وفلترة وتعديل كل المنتجات." },
-  "home.addProductHint":    { en: "Create a new product record from scratch.", zh: "从零创建新的产品记录。", ar: "إنشاء سجل منتج جديد من الصفر." },
-  "home.controlPanelHint":  { en: "Divisions, categories and spec templates.", zh: "分部、类别与规格模板。", ar: "الأقسام والفئات وقوالب المواصفات." },
-  "home.visualLibrary":     { en: "Visual library",       zh: "可视化库",          ar: "المكتبة البصرية" },
-  "home.visualLibraryHint": { en: "Specs, attributes and the icon registry.", zh: "规格、属性与图标注册表。", ar: "المواصفات والخصائص وسجل الأيقونات." },
-
-  /* Page hero titles/subtitles for the /product-data segment header. */
-  "page.home.title":        { en: "Product Data",         zh: "产品数据",          ar: "بيانات المنتجات" },
-  "page.home.subtitle":     { en: "The working catalogue — add, complete and publish products.", zh: "工作目录——添加、完善并发布产品。", ar: "الكتالوج التشغيلي — إضافة واستكمال ونشر المنتجات." },
-  "page.catalog.title":     { en: "Catalogue",            zh: "目录",             ar: "الكتالوج" },
-  "page.catalog.subtitle":  { en: "Every product record, with cost, supplier and completeness.", zh: "全部产品记录，含成本、供应商与完整度。", ar: "كل سجلات المنتجات، بالتكلفة والمورّد ونسبة الاكتمال." },
-  "page.new.title":         { en: "New product",          zh: "新建产品",          ar: "منتج جديد" },
-  "page.new.subtitle":      { en: "Create a product record.", zh: "创建产品记录。",     ar: "إنشاء سجل منتج." },
-  "page.settings.title":    { en: "Control Panel",        zh: "控制面板",          ar: "لوحة التحكم" },
-  "page.settings.subtitle": { en: "Divisions, categories, subcategories and spec templates.", zh: "分部、类别、子类别与规格模板。", ar: "الأقسام والفئات والفئات الفرعية وقوالب المواصفات." },
-
-  /* Tab labels for the segment header. */
-  "tab.home":               { en: "Home",                 zh: "首页",             ar: "الرئيسية" },
-  "tab.catalog":            { en: "Catalogue",            zh: "目录",             ar: "الكتالوج" },
-  "tab.settings":           { en: "Control Panel",        zh: "控制面板",          ar: "لوحة التحكم" },
 };
