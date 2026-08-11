@@ -911,6 +911,27 @@ export default function ProductList() {
      even interrupt a stale filter pass when the next keystroke lands. */
   const deferredSearch = useDeferredValue(search);
 
+  /* ── The search box was firing one full round trip PER KEYSTROKE ──
+     Measured on prod: typing "spread" (6 characters) fired 13 requests — six
+     `/api/products?q=…` and six `/api/products/signals`, one set per letter.
+     `useDeferredValue` above defers RENDERING, which keeps typing smooth; it
+     does nothing about the network, and on a fast machine it settles between
+     every keypress, so every letter got its own SQL search.
+
+     On the operators' link (~1s per request, documented) that is six seconds
+     of work to answer a query the user finished typing in one.
+
+     300ms: long enough that a normal typist sends ONE request per word, short
+     enough that it never feels like a lag after they stop. The local filter
+     below still narrows the grid on `deferredSearch` — i.e. instantly, on the
+     rows already loaded — so the screen reacts on the keystroke and the
+     server merely confirms it. */
+  const [searchForServer, setSearchForServer] = useState(search);
+  useEffect(() => {
+    const id = setTimeout(() => setSearchForServer(search), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
   /* The screen's filter state translated into the endpoint's allowlisted
      params. `filterSupplier` is deliberately absent: supplier links live on
      the model rows, not on products, so it stays a client-side refinement
@@ -921,7 +942,8 @@ export default function ProductList() {
      changed filter starts a fresh page 1 and an unchanged one does not. */
   const serverParams = useMemo(() => {
     const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
-    if (deferredSearch.trim()) p.set("q", deferredSearch.trim());
+    /* The DEBOUNCED term, not the deferred one — see the note beside it. */
+    if (searchForServer.trim()) p.set("q", searchForServer.trim());
     if (filterDiv) p.set("division", filterDiv);
     if (filterCat) p.set("category", filterCat);
     if (filterSub) p.set("subcategory", filterSub);
@@ -946,15 +968,22 @@ export default function ProductList() {
     if (filterFeatured === "yes") p.set("featured", "true");
     if (filterFeatured === "no") p.set("featured", "false");
     return p.toString();
-  }, [deferredSearch, filterDiv, filterCat, filterSub, filterBrand, filterLevel,
+  }, [searchForServer, filterDiv, filterCat, filterSub, filterBrand, filterLevel,
       filterStatus, filterVisible, filterFeatured, isInternal]);
 
   /* While a server search is running, the client must NOT re-apply its own
      token match. The client haystack carries model codes and supplier names
      that arrive with the SIGNALS payload — so before signals land it would
      reject rows the server correctly matched by model code, and the result
-     would look like "search finds nothing for a second". */
-  const serverSearchActive = deferredSearch.trim().length > 0;
+     would look like "search finds nothing for a second".
+
+     Keyed on the DEBOUNCED term, deliberately: this must be true exactly when
+     the rows on screen came from a server search. During the 300ms before the
+     request goes out the term is typed but not yet sent, so the server's rows
+     are still the unsearched set — and there the local token filter is
+     precisely what the user wants, narrowing the loaded rows on the keystroke
+     instead of leaving the full grid up until the network answers. */
+  const serverSearchActive = searchForServer.trim().length > 0;
   /* "No filter, no search" — the only state whose first page is safe to keep
      as the warm-start snapshot. */
   /* "Default view" = what THIS front-end shows on a clean open: the flagship
@@ -1035,16 +1064,9 @@ export default function ProductList() {
     } catch { /* corrupt/absent cache → normal load path */ }
     setLoading(!paintedFromCache);
     setLoadError(null);
-    /* Thumbnails arrive from either the signals bundle or the standalone
-       media endpoint — one place applies them and persists the warm-start
-       copy, so the next open paints photos with the first frame. */
-    const applyMainImages = (imgs: Record<string, string>) => {
-      setMainImages(imgs);
-      try {
-        const json = JSON.stringify(imgs);
-        if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
-      } catch { /* quota guard */ }
-    };
+    /* Thumbnails are applied by the two effects that actually receive them
+       (signals on /product-data, the media endpoint on /products) — this
+       effect no longer fetches anything but the page of rows. */
     (async () => {
       try {
         /* Products are the CRITICAL fetch — if this fails we must surface a
@@ -1056,77 +1078,18 @@ export default function ProductList() {
            tolerant (a missing filter list shouldn't block the catalogue). */
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
-        /* The meta fetches don't depend on the products response — start
-           them immediately so they load alongside it instead of queueing
-           behind the largest request on the page. */
-        /* Internally the signals call already carries the model summary and
-           the thumbnail map (it reads both tables anyway), so we don't pay
-           two more round trips for them — on the operators' network every
-           request costs ~1-2s of pure latency. The public catalogue, which
-           has no signals call, still fetches them directly. */
-        const metaPromise = Promise.all([
-          fetchTaxonomyAll(),
-          isInternal ? Promise.resolve(null) : fetchModelSummaries(),
-          isInternal ? Promise.resolve(null) : fetchProductMainImages(),
-        ]);
-        /* If the products fetch throws we bail to the error state without
-           awaiting meta — observe its rejection so it can't surface as an
-           unhandled-promise error. */
-        metaPromise.catch(() => {});
-        /* Work signals: Product Data only, fire-and-forget so a slow or
-           failed signals call can never delay (or break) the grid — the
-           cards simply render without the readiness strip. */
-        if (isInternal) {
-          fetch("/api/products/signals", { credentials: "include", signal: ctrl.signal })
-            .then((r) => {
-              if (!r.ok) throw new Error(`HTTP ${r.status}`);
-              return r.json();
-            })
-            .then((j: {
-              signals?: Record<string, ProductSignal>;
-              models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; modelNames?: Record<string, string[]>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
-              mainImages?: Record<string, string>;
-            }) => {
-              if (cancelled) return;
-              if (j?.signals) setSignals(j.signals);
-              if (j?.models) {
-                setModelCounts(j.models.counts);
-                setProductSuppliers(j.models.suppliers);
-                if (j.models.nameAlts) setNameAlts(j.models.nameAlts);
-                if (j.models.supplierAlt) setSupplierAlt(j.models.supplierAlt);
-                setAllSuppliers(j.models.allSuppliers);
-                if (j.models.supplierLogos) setSupplierLogos(j.models.supplierLogos);
-                setPrimaryModelNames(j.models.primaryModelNames || {});
-                setModelNames(j.models.modelNames || {});
-              }
-              if (j?.mainImages) applyMainImages(j.mainImages);
-              /* The supplier answer has arrived — cards may now state it,
-                 including stating that there ISN'T one. */
-              setSignalsReady(true);
-            })
-            .catch(async () => {
-              /* Signals are optional, but model codes and thumbnails are
-                 not — fall back to the standalone endpoints so a signals
-                 failure never strips the grid of its identity. */
-              if (cancelled) return;
-              try {
-                const [ms, imgs] = await Promise.all([fetchModelSummaries(), fetchProductMainImages()]);
-                if (cancelled) return;
-                setModelCounts(ms.counts);
-                setProductSuppliers(ms.suppliers);
-                setAllSuppliers(ms.allSuppliers);
-                if ((ms as { nameAlts?: Record<string, string> }).nameAlts) setNameAlts((ms as { nameAlts?: Record<string, string> }).nameAlts!);
-                if ((ms as { supplierAlt?: Record<string, string> }).supplierAlt) setSupplierAlt((ms as { supplierAlt?: Record<string, string> }).supplierAlt!);
-                setPrimaryModelNames(ms.primaryModelNames || {});
-            setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
-                applyMainImages(imgs);
-              } catch { /* grid still renders without either */ }
-              /* Released on the fallback too — otherwise a signals outage
-                 would leave every card stuck in the placeholder forever,
-                 which is worse than saying "no supplier linked". */
-              if (!cancelled) setSignalsReady(true);
-            });
-        }
+        /* The taxonomy and the public model/photo maps used to be started
+           HERE, so a filter change or a search keystroke re-fetched
+           /api/catalog-refs along with the page. Divisions and categories do
+           not change because someone typed — they now load once, in their own
+           effect below. */
+        /* Work signals used to be fetched HERE, inside the effect keyed on
+           `serverParams` — so every search keystroke and every filter change
+           re-ran this 15KB call, which recomputes readiness for every product
+           server-side and returns the SAME answer each time. Measured: typing
+           "spread" fired it six times. It depends on neither the search nor
+           the filters, so it now lives in its own effect below and runs once
+           per screen open. */
         let p: ProductRow[];
         try {
           /* ?view=list keeps the response to the ~15 columns this grid
@@ -1193,39 +1156,6 @@ export default function ProductList() {
            grid used to wait for the SLOWEST of five secondary requests. */
         setProducts(p);
         setLoading(false);
-        /* Meta hydration — tolerant: a failed secondary fetch degrades a
-           filter/photo, it must not blank an already-painted catalogue. */
-        try {
-          const [taxonomy, ms, imgs] = await metaPromise;
-          if (cancelled) return;
-          const { divisions: d, categories: c, subcategories: s } = taxonomy;
-          setDivisions(d); setCategories(c);
-          setSubcategories(s);
-          setMetaReady(true);
-          /* Persist the taxonomy for the next open's first paint. */
-          try {
-            const metaJson = JSON.stringify({ divisions: d, categories: c, subcategories: s });
-            if (metaJson.length < 400_000) window.localStorage.setItem(`kx_products_meta_v1:${currentScopeKey()}`, metaJson);
-          } catch { /* quota guard */ }
-          /* null = the signals bundle is carrying these instead. */
-          if (ms) {
-            setModelCounts(ms.counts);
-            setProductSuppliers(ms.suppliers);
-            setAllSuppliers(ms.allSuppliers);
-            setPrimaryModelNames(ms.primaryModelNames || {});
-            setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
-          }
-          if (imgs) applyMainImages(imgs);
-          /* Public catalog lands on Garment Machinery by default — it's
-             the flagship. Only when the user has NO stored filter. */
-          if (
-            !isInternal &&
-            !initialFilters.div &&
-            d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
-          ) {
-            setFilterDiv(FLAGSHIP_DIVISION_SLUG);
-          }
-        } catch { /* secondary data only — the grid is already up */ }
       } catch (e) {
         if (!cancelled) {
           const aborted = e instanceof DOMException && e.name === "AbortError";
@@ -1259,6 +1189,141 @@ export default function ProductList() {
        an older response after a newer one. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInternal, retryKey, serverParams]);
+
+  /* ── Taxonomy (+ the public catalogue's model & photo maps) — ONE call ──
+     Divisions, categories and subcategories describe the SHAPE of the
+     catalogue, not the current query. They used to be fetched inside the
+     load effect, so /api/catalog-refs went out again on every filter change
+     and every debounced search — measured on prod, once per filter change.
+
+     On /product-data the model summary and thumbnails ride along with the
+     signals bundle (it reads both tables anyway), so only the public
+     catalogue fetches them here. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [taxonomy, ms, imgs] = await Promise.all([
+          fetchTaxonomyAll(),
+          isInternal ? Promise.resolve(null) : fetchModelSummaries(),
+          isInternal ? Promise.resolve(null) : fetchProductMainImages(),
+        ]);
+        if (cancelled) return;
+        const { divisions: d, categories: c, subcategories: sub } = taxonomy;
+        setDivisions(d); setCategories(c); setSubcategories(sub);
+        setMetaReady(true);
+        /* Persist the taxonomy for the next open's first paint. */
+        try {
+          const metaJson = JSON.stringify({ divisions: d, categories: c, subcategories: sub });
+          if (metaJson.length < 400_000) window.localStorage.setItem(`kx_products_meta_v1:${currentScopeKey()}`, metaJson);
+        } catch { /* quota guard */ }
+        /* null = the signals bundle is carrying these instead. */
+        if (ms) {
+          setModelCounts(ms.counts);
+          setProductSuppliers(ms.suppliers);
+          setAllSuppliers(ms.allSuppliers);
+          setPrimaryModelNames(ms.primaryModelNames || {});
+          setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
+        }
+        if (imgs) {
+          setMainImages(imgs);
+          try {
+            const json = JSON.stringify(imgs);
+            if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
+          } catch { /* quota guard */ }
+        }
+        /* Public catalog lands on Garment Machinery by default — it's the
+           flagship. Only when the user has NO stored filter. */
+        if (!isInternal && !initialFilters.div && d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
+          setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+        }
+      } catch { /* secondary data only — the grid renders without it */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInternal, retryKey]);
+
+  /* ── Work signals — ONE call per screen open ──
+     Product Data only. Carries three payloads the grid needs and the public
+     catalogue never sees: per-product readiness/gaps/cost/supplier, the model
+     summary (codes, counts, supplier names) and the thumbnail map.
+
+     It answers the same thing regardless of what is typed in the search box
+     or which filters are set, so it is keyed on neither. It used to sit in
+     the load effect above and therefore re-ran on every keystroke: six
+     identical 15KB responses to type one word, each one recomputing readiness
+     for the whole catalogue server-side.
+
+     Still fire-and-forget: a slow or failed signals call must never delay or
+     break the grid — the cards simply render without the readiness strip. */
+  useEffect(() => {
+    if (!isInternal) return;
+    let cancelled = false;
+    const ctrl = new AbortController();
+    /* Thumbnails land here or from the standalone media endpoint; one place
+       applies them and persists the warm-start copy, so the next open paints
+       photos with the first frame. */
+    const applyImgs = (imgs: Record<string, string>) => {
+      if (cancelled) return;
+      setMainImages(imgs);
+      try {
+        const json = JSON.stringify(imgs);
+        if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
+      } catch { /* quota guard */ }
+    };
+    fetch("/api/products/signals", { credentials: "include", signal: ctrl.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((j: {
+        signals?: Record<string, ProductSignal>;
+        models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; modelNames?: Record<string, string[]>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
+        mainImages?: Record<string, string>;
+      }) => {
+        if (cancelled) return;
+        if (j?.signals) setSignals(j.signals);
+        if (j?.models) {
+          setModelCounts(j.models.counts);
+          setProductSuppliers(j.models.suppliers);
+          if (j.models.nameAlts) setNameAlts(j.models.nameAlts);
+          if (j.models.supplierAlt) setSupplierAlt(j.models.supplierAlt);
+          setAllSuppliers(j.models.allSuppliers);
+          if (j.models.supplierLogos) setSupplierLogos(j.models.supplierLogos);
+          setPrimaryModelNames(j.models.primaryModelNames || {});
+          setModelNames(j.models.modelNames || {});
+        }
+        if (j?.mainImages) applyImgs(j.mainImages);
+        /* The supplier answer has arrived — cards may now state it,
+           including stating that there ISN'T one. */
+        setSignalsReady(true);
+      })
+      .catch(async (e) => {
+        /* An abort is this effect being torn down, not a failure — running
+           the fallback there would fire two more requests on the way out. */
+        if (cancelled || (e instanceof DOMException && e.name === "AbortError")) return;
+        /* Signals are optional, but model codes and thumbnails are not — fall
+           back to the standalone endpoints so a signals failure never strips
+           the grid of its identity. */
+        try {
+          const [ms, imgs] = await Promise.all([fetchModelSummaries(), fetchProductMainImages()]);
+          if (cancelled) return;
+          setModelCounts(ms.counts);
+          setProductSuppliers(ms.suppliers);
+          setAllSuppliers(ms.allSuppliers);
+          if ((ms as { nameAlts?: Record<string, string> }).nameAlts) setNameAlts((ms as { nameAlts?: Record<string, string> }).nameAlts!);
+          if ((ms as { supplierAlt?: Record<string, string> }).supplierAlt) setSupplierAlt((ms as { supplierAlt?: Record<string, string> }).supplierAlt!);
+          setPrimaryModelNames(ms.primaryModelNames || {});
+          setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
+          applyImgs(imgs);
+        } catch { /* grid still renders without either */ }
+        /* Released on the fallback too — otherwise a signals outage would
+           leave every card stuck in the placeholder forever, which is worse
+           than saying "no supplier linked". */
+        if (!cancelled) setSignalsReady(true);
+      });
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [isInternal, retryKey]);
 
   /* Finish a SMALL catalogue in the background instead of waiting for scroll.
      Paging by 48 broke something the grid depends on: it groups by category,
@@ -2375,9 +2440,9 @@ export default function ProductList() {
         {(activeFilterCount > 0 || search) && (
           <p className="text-[12px] text-[var(--text-dim)] mb-4 px-1">
             {filtered.length === 0 ? (
-              <span className="text-amber-400">{t("list.noMatchesFor")} <strong className="text-[var(--text-primary)]">"{search}"</strong></span>
+              <span className="text-amber-400">{t("list.noMatchesFor")} <strong className="text-[var(--text-primary)]">&quot;{search}&quot;</strong></span>
             ) : (
-              <>{t("list.showing")} <strong className="text-[var(--text-primary)] tabular-nums">{filtered.length}</strong> {t("list.ofProducts").replace("{total}", String(products.length))}{search ? <> {t("list.matching")} <strong className="text-[var(--text-primary)]">"{search}"</strong></> : null}</>
+              <>{t("list.showing")} <strong className="text-[var(--text-primary)] tabular-nums">{filtered.length}</strong> {t("list.ofProducts").replace("{total}", String(products.length))}{search ? <> {t("list.matching")} <strong className="text-[var(--text-primary)]">&quot;{search}&quot;</strong></> : null}</>
             )}
           </p>
         )}
@@ -2406,8 +2471,12 @@ export default function ProductList() {
             <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-primary)] text-[14px] font-semibold">{t("state.sessionExpiredTitle", "Session expired")}</p>
             <p className="text-[var(--text-muted)] text-[13px] mt-1">{t("state.sessionExpiredHint", "Please sign in again to load the catalog.")}</p>
+            {/* A real document load, NOT next/link: the session is gone, so
+                the point is to drop all client state and let the root render
+                the sign-in form fresh. A soft navigation would carry the dead
+                session with it. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
-              /* The root renders the sign-in form when the session is gone. */
               href="/"
               className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
