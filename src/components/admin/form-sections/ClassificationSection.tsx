@@ -157,7 +157,17 @@ export default function ClassificationSection({
      whenever the subcategory changes so a skip never leaks across
      taxonomies. */
   const [kindSkipped, setKindSkipped] = useState(false);
-  useEffect(() => { setKindSkipped(false); }, [data.subcategory_slug]);
+  /* Reset DURING render, not in an effect. An effect runs a paint later, so
+     for one frame the newly-chosen subcategory was still carrying the previous
+     one's "skipped" flag — `step` computed from it, and the panel could show
+     step 4 before snapping back to the machine-kind step. React discards this
+     render and re-runs before committing, so that frame never exists.
+     (Also what the react-hooks lint rule asks for here.) */
+  const [lastSub, setLastSub] = useState(data.subcategory_slug);
+  if (lastSub !== data.subcategory_slug) {
+    setLastSub(data.subcategory_slug);
+    if (kindSkipped) setKindSkipped(false);
+  }
 
   const rawStep = getStep(data, hasKindStage, machineKindSlug);
   const step = rawStep === 3 && kindSkipped ? 4 : rawStep;
@@ -171,7 +181,7 @@ export default function ClassificationSection({
           {selectedDiv && (
             <button
               onClick={() => onChange({ division_slug: "", category_slug: "", subcategory_slug: "" })}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+              className="kx-hover-glow inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
             >
               {(() => {
                 const ovr = iconOverrides?.division?.[selectedDiv.slug];
@@ -189,7 +199,7 @@ export default function ClassificationSection({
               <span className="text-[var(--text-ghost)] text-[10px]">/</span>
               <button
                 onClick={() => onChange({ category_slug: "", subcategory_slug: "" })}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+                className="kx-hover-glow inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
               >
                 {categoryLogos?.[selectedCat.slug] && (
                   <Image src={categoryLogos[selectedCat.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />
@@ -226,7 +236,7 @@ export default function ClassificationSection({
                       });
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+                  className="kx-hover-glow inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
                 >
                   {localizedName(selectedSub, lang)}
                 </button>
@@ -283,8 +293,8 @@ export default function ClassificationSection({
                  the hub's main division at a glance. Other tiles keep
                  the neutral surface treatment. */
               const tileCls = isFlagship
-                ? "group relative flex flex-col items-center justify-center gap-3 col-span-2 row-span-2 aspect-square p-5 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.05] shadow-lg hover:border-[var(--text-primary)]/50 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
-                : "group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
+                ? "group kx-hover-glow relative flex flex-col items-center justify-center gap-3 col-span-2 row-span-2 aspect-square p-5 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.05] shadow-lg hover:border-[var(--text-primary)]/50 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
+                : "group kx-hover-glow flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
               return (
                 <button
                   key={div.id}
@@ -356,7 +366,7 @@ export default function ClassificationSection({
                   <button
                     key={cat.id}
                     onClick={() => onChange({ category_slug: cat.slug, subcategory_slug: "" })}
-                    className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                    className="group kx-hover-glow flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
                     {ovr ? (
                       <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
@@ -425,7 +435,7 @@ export default function ClassificationSection({
                         });
                       }
                     }}
-                    className="group flex items-center justify-center min-h-[56px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                    className="group kx-hover-glow flex items-center justify-center min-h-[56px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
                     <span className="text-[12.5px] font-medium text-[var(--text-primary)] leading-snug">{localizedName(sub, lang)}</span>
                   </button>
@@ -473,7 +483,7 @@ export default function ClassificationSection({
               <button
                 type="button"
                 onClick={() => setKindSkipped(true)}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+                className="kx-hover-glow text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
               >
                 {t("cls.skip", "Skip")}
               </button>

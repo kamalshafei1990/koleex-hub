@@ -2408,9 +2408,18 @@ export default function ProductList() {
           </div>
         )}
         {orderedDivisions.length > 0 && (
-          /* relative z-30: sits ABOVE the top strip's ramp. Without it a
-             28px backdrop blur painted this whole row out of existence. */
-          <div className="relative z-30 mb-4">
+          /* BETWEEN the two, and it has to be exactly that.
+             ABOVE the category nav's ramp (z-20) — without that a 28px
+             backdrop blur painted this whole row out of existence, which is
+             why it was raised in the first place.
+             BELOW the sticky search toolbar (z-30) — at z-30 it TIED with
+             that bar and won on DOM order, being the later sibling. So on
+             scroll it rode up over the toolbar's blurred edge and over the
+             open filter panel instead of passing behind them. Owner: "this
+             have bug when i scroll it's over the blur edge"; measured with
+             elementsFromPoint, this strip sat above the filter <select> it
+             was overlapping. */
+          <div className="relative z-[25] mb-4">
             {/* Divisions ride the canonical TabStrip — under Aurora the
                 selected state is the ONE Hub-Blue pill sliding between tabs
                 (measured, labels vary), under Core the original filled pill,
