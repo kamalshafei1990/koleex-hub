@@ -1879,7 +1879,10 @@ export default function ProductList() {
         {/* Header */}
         {/* relative z-30: the top strip's ramp (z-20) runs BEHIND this. */}
         <div className="relative z-30 flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+          {/* Under /product-data the catalogue is now one level down from the
+              landing screen, so back means the landing screen. /products has
+              no such parent and still goes Home. */}
+          <Link href={isInternal ? "/product-data" : "/"} className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
