@@ -2979,7 +2979,7 @@ export default function ProductForm({ productId }: Props) {
     <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       <div className="relative z-[1] w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">

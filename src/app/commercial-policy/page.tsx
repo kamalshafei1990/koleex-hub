@@ -108,7 +108,7 @@ function CommercialPolicyView() {
     <div className="kx-app h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full relative">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       <div className="kx-bar-host relative z-[1] shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] w-full">

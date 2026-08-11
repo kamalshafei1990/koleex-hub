@@ -11715,7 +11715,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           frosts this canvas. Core keeps its solid page. */}
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
 

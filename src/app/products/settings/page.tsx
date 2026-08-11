@@ -54,7 +54,7 @@ function ControlPanelGround() {
   if (!aurora) return null;
   return (
     <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-      <WavyBackground />
+      <WavyBackground topLight />
     </div>
   );
 }

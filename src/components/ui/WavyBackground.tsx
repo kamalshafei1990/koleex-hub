@@ -162,7 +162,9 @@ function buildNoise3D() {
   };
 }
 
-export default function WavyBackground({ theme: forced }: { theme?: "dark" | "light" } = {}) {
+export default function WavyBackground(
+  { theme: forced, topLight }: { theme?: "dark" | "light"; topLight?: boolean } = {},
+) {
   const ref = useRef<HTMLCanvasElement>(null);
   /* Follows the document by default — read once per mount and re-read on the
      app's own themechange event, which display-prefs already dispatches. No
@@ -341,7 +343,20 @@ export default function WavyBackground({ theme: forced }: { theme?: "dark" | "li
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
-        style={{ background: PALETTES[theme].floor }}
+        /* topLight: pull the vignette's dark edge away from the TOP. The
+           default floor reaches rgba(5,7,12,.74) at 100%, and the top of
+           the viewport sits exactly on that outer stop — fine on Home,
+           where only the 56px header covers it, but Product Data's frosted
+           bar zone runs ~250px deep and lands entirely inside the darkest
+           band, which reads as a black slab (owner, three times). Apps opt
+           in; Home keeps the floor it was signed off with. */
+        style={{
+          background: topLight
+            ? (theme === "light"
+                ? "radial-gradient(120% 90% at 50% 78%, rgba(247,249,252,.30) 0%, rgba(247,249,252,.34) 56%, rgba(247,249,252,.72) 100%)"
+                : "radial-gradient(120% 90% at 50% 78%, rgba(5,7,12,.22) 0%, rgba(5,7,12,.30) 56%, rgba(5,7,12,.66) 100%)")
+            : PALETTES[theme].floor,
+        }}
       />
     </>
   );

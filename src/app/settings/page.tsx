@@ -219,7 +219,7 @@ function SettingsContent() {
           canvas, exactly like Home. Core keeps the solid page. */}
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       {/* Canonical Koleex app header — identical to every other app.

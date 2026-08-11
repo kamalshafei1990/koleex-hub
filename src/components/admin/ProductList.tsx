@@ -1871,7 +1871,7 @@ export default function ProductList() {
     <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       <div className="relative z-[1] max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">

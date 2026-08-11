@@ -160,7 +160,7 @@ export default function NotificationsSettingsPage() {
     <div className="kx-app relative flex-1 min-h-0 flex flex-col">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       <div className="relative z-[1]">

@@ -203,7 +203,7 @@ export default function SourcingCommandCenter() {
     <div className="kx-app kx-ground-host relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          <WavyBackground topLight />
         </div>
       )}
       <SuppliersHeader
