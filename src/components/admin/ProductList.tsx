@@ -2058,7 +2058,11 @@ export default function ProductList() {
                   }
                 }}
                 placeholder={t("list.searchPlaceholder")}
+                /* The full list of searchable fields — too long to fit the
+                   placeholder on a phone, so it lives here and in the title
+                   where it is never truncated. */
                 aria-label={t("list.searchAria")}
+                title={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
                 className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-[border-color,box-shadow] focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] [&::-webkit-search-cancel-button]:hidden"

@@ -311,12 +311,21 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pp.f.techDiff": { en: "Technical differences vs product specs", zh: "与产品规格的技术差异", ar: "الفروقات التقنية عن مواصفات المنتج" },
   "pp.f.inheritsSpecs": { en: "Inherits all product specifications — no per-model differences recorded yet.", zh: "继承产品全部规格 — 尚未录入该型号的差异。", ar: "يرث كل مواصفات المنتج — لا فروقات مسجَّلة لهذا الموديل بعد." },
   "hero.galleryHint": { en: "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.", zh: "更多角度与细节 — 显示在产品图库中。全部媒体可在“媒体”标签管理。", ar: "زوايا وتفاصيل إضافية — تظهر في معرض المنتج. أدر كل الوسائط من تبويب الوسائط." },
+  /* Kept short enough to READ. Measured at 375px: the full sentence needed
+     329px of a 263px text area, so the phone showed "Search by name, model
+     code, bra…" — the list of what you can search by, cut off mid-list, which
+     is the one thing a placeholder exists to say. The long form now lives in
+     the aria-label and the title, where nothing truncates it. */
   "list.searchPlaceholder": {
-    en: "Search by name, model code, brand, category, tags…",
-    zh: "按名称、型号编码、品牌、类别、标签搜索…",
-    ar: "ابحث بالاسم أو رمز الموديل أو العلامة التجارية أو الفئة أو الوسوم…",
+    en: "Search name, code, brand, tags…",
+    zh: "搜索名称、编码、品牌、标签…",
+    ar: "ابحث بالاسم أو الرمز أو العلامة أو الوسوم…",
   },
-  "list.searchAria": { en: "Search products", zh: "搜索产品", ar: "ابحث عن المنتجات" },
+  "list.searchAria": {
+    en: "Search products by name, model code, brand, category or tags",
+    zh: "按名称、型号编码、品牌、类别或标签搜索产品",
+    ar: "ابحث عن المنتجات بالاسم أو رمز الموديل أو العلامة التجارية أو الفئة أو الوسوم",
+  },
   "list.clearSearch": { en: "Clear search", zh: "清除搜索", ar: "مسح البحث" },
   "list.allOption": { en: "All", zh: "全部", ar: "الكل" },
   "list.divisions": { en: "Divisions", zh: "部门", ar: "الأقسام" },
