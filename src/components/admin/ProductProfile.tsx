@@ -416,7 +416,21 @@ const STEPS = [
    lookalike, the same component. */
 function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number) => void }) {
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+    /* Ramp length is tuned to THIS page, not inherited from the list.
+
+       The default 3rem tail is measured from the bar's own box, and on the
+       list page that lands in empty space. Here the very next thing under
+       the bar is the model-chip row, so the tail was painting a 48px blur
+       straight over live data — the owner circled it, and the chips were
+       unreadable. Same defect as the list's divisions row, one page along:
+       a ramp may only blur what actually passes BEHIND it.
+
+       1rem clears the bar and dies inside the 24px gap above the content;
+       the fade is spent behind the tab strip itself, which is this bar's
+       own lifted content and stays crisp. */
+    <nav
+      className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-ext:1rem] [--kx-ramp-fade:2.5rem]"
+    >
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"

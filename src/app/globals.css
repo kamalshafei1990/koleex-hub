@@ -507,6 +507,20 @@ body {
   outline: none;
 }
 
+/* NEVER BLUR THROUGH A BLUR. A bar that carries the progressive ramp must
+   not also run a backdrop-filter of its own: the ramp's layers then sample
+   an already-blurred backdrop, every pass compounds, and the strip turns
+   into a flat dark slab instead of frosted glass. Found on the product
+   editor's tab bar, which had `backdrop-blur-md` on the host AND the four
+   ramp layers inside it.
+
+   Aurora only — under Core there are no ramp layers, so the host's own blur
+   is the entire effect and must stay. */
+[data-kx-skin="aurora"] .kx-bar-host:has(> .kx-bar-prog) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* PAGE CROSS-FADE. Paired with components/layout/ViewTransitions.tsx, which
    runs the App Router push inside document.startViewTransition().
 
