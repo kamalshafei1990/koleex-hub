@@ -2986,6 +2986,45 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
   );
 });
 
+/* ── Segmented-row slider ──
+   The selection SLIDES between chips instead of blinking. Measured, not
+   stepped: these labels are translated (EN / 中文 / عربي) so every chip is a
+   different width, and the rows WRAP on a narrow panel — which is why the
+   indicator tracks top and height as well as left and width, and simply
+   travels diagonally when the selection moves to the next line. Aurora only;
+   Core keeps its filled chip. */
+function useSegSlider(activeKey: string | number, deps: unknown[] = []) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    const measure = () => {
+      const el = host.querySelector<HTMLElement>('[data-seg-active="true"]');
+      if (!el) { setBox(null); return; }
+      setBox({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(host);
+    const settle = window.setTimeout(measure, 250);
+    return () => { ro.disconnect(); window.clearTimeout(settle); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey, ...deps]);
+  return { ref, box };
+}
+
+function SegSlider({ box }: { box: { x: number; y: number; w: number; h: number } | null }) {
+  if (!box) return null;
+  return (
+    <span
+      aria-hidden
+      className="kx-tabstrip-ind"
+      style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h, top: 0, bottom: "auto", left: 0 }}
+    />
+  );
+}
+
 /* ── Customer Tab Bar — premium sticky tabs for Customer form & detail ── */
 const CustomerTabBar = React.memo(function CustomerTabBar({
   activeTab,
@@ -4966,6 +5005,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   /* Individual vs Company filter — customer/company/people views. */
   const [entityFilter, setEntityFilter] = useState<"all" | "person" | "company">("all");
+  /* Measured sliders for the two segmented filter rows — declared after
+     the state they follow, or they would read it before initialisation. */
+  const statusSeg = useSegSlider(statusFilter);
+  const entitySeg = useSegSlider(entityFilter);
   /* Customer tier filter — Diamond / Platinum / Gold / Silver / End User. */
   const [tierFilter, setTierFilter] = useState<"all" | CustomerTier>("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
@@ -6256,7 +6299,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Status filter (All / Active / Not Active) — suppliers + customers.
             Customers say "Not Active"; suppliers keep "Archived". */}
         {(filterType === "supplier" || filterType === "customer") && (
-          <div className="flex w-full gap-1 mt-3 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={statusSeg.ref} className="relative flex w-full gap-1 mt-3 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            {aurora && <SegSlider box={statusSeg.box} />}
             {([
               { k: "all", label: t("sd.statusAll", "All") },
               { k: "active", label: t("sd.active", "Active") },
@@ -6265,9 +6309,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <button
                 key={opt.k}
                 onClick={() => setStatusFilter(opt.k)}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
+                data-seg-active={statusFilter === opt.k ? "true" : undefined}
+                className={`relative flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
                   statusFilter === opt.k
-                    ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
+                    ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
                     : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                 }`}
               >
@@ -6279,7 +6324,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Individual vs Company filter — customer/company/people views. */}
         {(filterType === "customer" || filterType === "company" || filterType === "people") && (
-          <div className="flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={entitySeg.ref} className="relative flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            {aurora && <SegSlider box={entitySeg.box} />}
             {([
               { k: "all", label: t("filter.everyone", "Everyone"), icon: null },
               { k: "person", label: t("filter.individuals", "Individuals"), icon: <UserIcon size={13} /> },
@@ -6288,9 +6334,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <button
                 key={opt.k}
                 onClick={() => setEntityFilter(opt.k)}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1.5 ${
+                data-seg-active={entityFilter === opt.k ? "true" : undefined}
+                className={`relative flex-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1.5 ${
                   entityFilter === opt.k
-                    ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
+                    ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]")
                     : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                 }`}
               >
