@@ -89,7 +89,7 @@ export default function BackToTop({ label }: { label: string }) {
         aria-hidden={!visible}
         tabIndex={visible ? 0 : -1}
         className={`group fixed z-[35] end-4 md:end-5 h-11 w-11 rounded-full
-          bg-[var(--bg-secondary)] border border-[var(--border-subtle)]
+          kx-glass-pop bg-[var(--bg-secondary)] border border-[var(--border-subtle)]
           shadow-[0_6px_24px_rgba(0,0,0,0.35)]
           flex items-center justify-center
           text-[var(--text-muted)] hover:text-[var(--text-primary)]

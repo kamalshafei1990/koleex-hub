@@ -2098,7 +2098,12 @@ export default function ProductList() {
                 onClick={() => setViewMode("grid")}
                 className={`h-10 w-10 flex items-center justify-center transition-all ${
                   viewMode === "grid"
-                    ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                    ? aurora
+                      ? /* Aurora selected state = the system's Hub-Blue
+                           ring (the old surface-tint active was barely
+                           distinguishable over glass). Core unchanged. */
+                        "kx-seg-on rounded-lg text-[var(--text-primary)]"
+                      : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}
               >
@@ -2108,7 +2113,9 @@ export default function ProductList() {
                 onClick={() => setViewMode("list")}
                 className={`h-10 w-10 flex items-center justify-center border-l border-[var(--border-subtle)] transition-all ${
                   viewMode === "list"
-                    ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                    ? aurora
+                      ? "kx-seg-on rounded-lg text-[var(--text-primary)]"
+                      : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}
               >
@@ -2119,7 +2126,9 @@ export default function ProductList() {
               onClick={() => setShowFilters(!showFilters)}
               className={`h-10 px-4 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
                 showFilters || activeFilterCount > 0
-                  ? "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
+                  ? aurora
+                    ? "kx-seg-on border-transparent text-[var(--text-primary)]"
+                    : "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
                   : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
