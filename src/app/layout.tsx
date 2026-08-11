@@ -84,13 +84,33 @@ export default function RootLayout({
   return (
     /* data-scroll-behavior: our smooth scrolling (globals.css) is intentional —
        this silences Next.js's route-transition advisory warning hub-wide. */
-    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} h-full antialiased`}>
-      {/* Skin + theme stamped on <html> BEFORE the first frame. Both used to
-          be applied on mount by DisplayPreferencesApplier, which is one frame
-          late: the theme flash was survivable, but a skin arriving late means
-          the entire background appears after paint. Also sets the low-power
-          flag, so glass surfaces never have to blur once and then stop. */}
-      <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
+    /* suppressHydrationWarning is REQUIRED here, not a way of hiding a bug.
+       The bootstrap script below stamps data-kx-skin and data-theme onto this
+       element before React ever runs, so the client tree deliberately differs
+       from the server's — the server cannot know the user's theme. Without
+       this, React reports a root-level mismatch and says plainly "This won't
+       be patched up". It scopes to this element's own attributes only; a real
+       mismatch anywhere else still reports. */
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      {/* IN <head>, NOT LOOSE UNDER <html>. A <script> is not valid as a
+          direct child of <html>: React flagged it ("cannot be a child of
+          <html>… will cause a hydration error") and the browser cannot order
+          it. Inside <head> it still runs before the first paint, which is the
+          whole point of it.
+
+          Skin + theme stamped BEFORE the first frame. Both used to be applied
+          on mount by DisplayPreferencesApplier, which is one frame late: the
+          theme flash was survivable, but a skin arriving late means the
+          entire background appears after paint. Also sets the low-power flag,
+          so glass surfaces never have to blur once and then stop. */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
+      </head>
       {/* Theme tokens (not hardcoded dark) so the base flips with light/dark —
           otherwise light mode showed a black body base behind gaps and any
           un-themed text inherited white → white-on-white. Dark mode is
