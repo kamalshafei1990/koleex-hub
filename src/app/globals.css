@@ -2242,6 +2242,22 @@ input[type="number"]:not(.kx-spinner) {
   transform: scale(1.05);
   box-shadow: inset 0 0 26px rgba(86,127,178,.32), 0 0 16px rgba(86,127,178,.35);
 }
+/* …but NEVER when the tile is made of glass. Scaling a backdrop-filtered
+   box makes the browser re-sample its backdrop at the new size, so the
+   frost smears and jitters under the pointer — owner, on the Product Data
+   category tiles: "when I hover those button it still have the blur
+   effect". The gradient ring (::after) and the neon icon/label carry the
+   hover on their own, which is also the standing rule for this skin:
+   "only the borders colors, no more". Press feedback is deliberately left
+   alone — :active is 100ms and is the only response a touch screen gets.
+   Core, where tiles are solid and nothing re-samples, is untouched.
+   Scoped to a converted app root ON PURPOSE: Home's launcher tiles share
+   this physics, but their hover was signed off long ago and confirmed work
+   is not re-cut without being asked. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-hover-card.kx-hover-tile.kx-glass:hover:not(:active) {
+  transform: none;
+  box-shadow: none;
+}
 
 /* White-ring variant (owner call: Products / Product Data cards) —
    same canonical physics, ring + glow in white instead of Hub Blue. */
