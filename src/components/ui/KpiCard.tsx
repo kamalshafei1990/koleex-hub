@@ -21,8 +21,12 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
-import { type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+
+/* The canonical value type size, and the floor we will not shrink past. */
+const VALUE_PX = 26;
+const VALUE_MIN_PX = 15;
 
 export type KpiTone = "default" | "positive" | "warning" | "rose" | "info";
 
@@ -64,6 +68,50 @@ export default function KpiCard({
   onClick,
   className = "",
 }: KpiCardProps) {
+  /* ── Shrink-to-fit for long values ──────────────────────────────────────
+     A formatted total is ONE unbreakable token: comma separators are not
+     break opportunities, so `1,316,387.10` at 26px is 165px of ink that will
+     not wrap, will not shrink and — with overflow visible — simply paints
+     past the card's border. MEASURED on /quotations at 1024: 165px of ink in
+     a 136px content box, 28px outside the tile. Nothing catches it: the
+     element's own box stays 136px wide, so no bounding rect and no page
+     overflow ever reports it. Only scrollWidth sees it (165 vs 136), which
+     is exactly what this measures.
+
+     Short values are untouched — the effect only ever sets a size when the
+     text genuinely does not fit, so every existing dashboard keeps its 26px.
+
+     The width guard is load-bearing: the observer watches this element, and
+     changing the font size changes its HEIGHT, which fires the observer
+     again. Re-fitting only when the WIDTH actually changed stops that from
+     oscillating between 26px and the fitted size forever. */
+  const valueRef = useRef<HTMLDivElement | null>(null);
+  const lastWidth = useRef(-1);
+  useLayoutEffect(() => {
+    const el = valueRef.current;
+    if (!el) return;
+    lastWidth.current = -1; // the value changed — re-fit from scratch
+    const fit = () => {
+      const node = valueRef.current;
+      if (!node) return;
+      const width = node.clientWidth;
+      if (width === lastWidth.current) return;
+      lastWidth.current = width;
+      node.style.fontSize = ""; // always measure against the canonical size
+      const needed = node.scrollWidth;
+      if (width > 0 && needed > width) {
+        node.style.fontSize = `${Math.max(
+          VALUE_MIN_PX,
+          Math.floor((VALUE_PX * width) / needed),
+        )}px`;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [value]);
+
   const baseClass =
     "block rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors " +
     (href || onClick
@@ -88,6 +136,7 @@ export default function KpiCard({
         </div>
       </div>
       <div
+        ref={valueRef}
         className={`mt-2 text-[26px] font-semibold leading-tight tracking-tight tabular-nums ${TONE_CLASSES[tone]}`}
       >
         {loading ? <span className="text-[var(--text-dim)]">—</span> : value}

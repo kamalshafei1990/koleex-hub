@@ -1983,14 +1983,17 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"] .kx-app .kx-ph-chrome:hover {
   border-color: rgba(127, 169, 214, 0.55);
   background-color: rgba(255, 255, 255, 0.03);
-  /* BOTH, and `translate` is the one that matters. Tailwind v4 compiles
-     `-translate-y-0.5` to the `translate:` PROPERTY, not to `transform:` —
-     so `transform: none` alone leaves the lift running. That is why the
-     shipped .kx-hover-glow rule says `translate: none`; I copied the wrong
-     half of it and the back arrow still rose on hover. `transform` stays for
-     any call site that writes a real transform. */
+  /* `translate`, NOT `transform`, and ONLY it. Two findings, both measured
+     against the built bundle:
+     1. Tailwind v4 compiles `-translate-y-0.5` to the `translate:` PROPERTY
+        (`translate: var(--tw-translate-x) var(--tw-translate-y)`), so
+        `transform: none` never touches it and the lift kept running.
+     2. Writing BOTH is worse than writing one: Lightning CSS treats them as
+        redundant and drops `translate: none` from the output — verified in
+        .next/static, where the rule shipped with `transform:none` alone.
+        The stock `.kx-hover-glow` declares `translate: none` by itself and
+        survives minification intact. Same shape here. */
   translate: none;
-  transform: none;
   box-shadow: none;
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-chrome:hover {
