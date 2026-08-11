@@ -257,6 +257,35 @@ export async function getMeBootstrap(opts?: {
   if (!noStore && inflight) return inflight;
   inflight = (async () => {
     try {
+      /* RIDE THE SHELL BATCH. /api/shell already carries the bootstrap
+         section, and every screen asks for the shell — so the dedicated
+         call was a second request for a payload already on its way.
+         Measured on prod: 10 concurrent calls on a Product Data open, and
+         on this link they block each other (six of Home's eight shared an
+         identical 1342ms TTFB), so dropping one speeds up the rest.
+
+         Same pattern lib/visual-bindings already uses. Two guards:
+         · NEVER on noStore — the caller just entered or left view-as and
+           needs the freshest identity, and a shell response could predate
+           the switch.
+         · Anything unexpected falls through to the direct endpoint below,
+           which keeps its timeouts, retries and 401 handling untouched.
+           Identity must never depend on the batch succeeding. */
+      if (!noStore) {
+        try {
+          const { getShell } = await import("./client-cache");
+          const shell = await getShell();
+          const fromShell = (shell?.bootstrap ?? null) as MeBootstrapPayload | null;
+          if (fromShell?.auth?.account_id) {
+            cache = { payload: fromShell, expiresAt: Date.now() + CACHE_TTL_MS };
+            persistCache(fromShell);
+            _lastError = null;
+            for (const cb of listeners) cb(fromShell);
+            return fromShell;
+          }
+        } catch { /* batch unavailable — the direct endpoint below stands */ }
+      }
+
       for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
         const timeoutMs = TIMEOUTS_MS[attempt];
         try {
