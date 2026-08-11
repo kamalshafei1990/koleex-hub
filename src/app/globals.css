@@ -1609,19 +1609,21 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08),
               inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-/* The ON track is GREEN because the standing rule says a toggle is green —
-   but `emerald-500` is a high-chroma hue and Aurora is a low-chroma world
-   (graphite, frost, and a Hub Blue that is itself muted). Owner, second
-   pass: "toggle buttons color still not match aurora style". So the green
-   is rebuilt at HUB BLUE'S OWN CHROMA — #5FB795 is to green what #567FB2 is
-   to blue — translucent enough for the ground to modulate it, with the
-   glass inner light edge. The outer halo is gone: a permanent glow on every
-   ON row is ten glows on a page of ten toggles, and the canon reserves
-   glow for hover. Core keeps the saturated emerald. */
+/* ON = HUB BLUE under Aurora. OWNER DECISION, 2026-08-11, after seeing four
+   candidates rendered on the real glass: he picked Hub Blue over saturated
+   emerald, muted emerald and a near-neutral graphite-teal. Green is a hue
+   that appears NOWHERE else in Aurora, so no amount of desaturating stopped
+   it reading as a sticker on the surface — "still not match aurora colors",
+   three passes running. Core keeps emerald: the green rule was written for
+   the flat skin and still holds there.
+
+   Blue also marks SELECTION in Aurora, so the two stay apart by treatment,
+   not hue: selection is an outline (kx-seg-on = 1px ring + a 10% wash), a
+   live toggle is a SOLID fill. Never give the switch the ring-only look. */
 [data-kx-skin="aurora"] [role="switch"][aria-checked="true"] {
-  background: linear-gradient(180deg, rgba(95, 183, 149, 0.90), rgba(52, 110, 90, 0.90));
+  background: linear-gradient(180deg, rgba(122, 163, 206, 0.92), rgba(70, 105, 150, 0.92));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
-              inset 0 0 0 1px rgba(95, 183, 149, 0.45);
+              inset 0 0 0 1px rgba(140, 180, 220, 0.45);
 }
 /* The knob is the one solid object in the control — it keeps its white and
    gains the depth that sells the track as a recess. */
@@ -1634,11 +1636,12 @@ input[type="number"]:not(.kx-spinner) {
               inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
 [data-kx-skin="aurora"][data-theme="light"] [role="switch"][aria-checked="true"] {
-  /* A shade deeper than the dark arm: the same mid-green that reads as
-     "lit" on graphite reads as "washed" on white glass. */
-  background: linear-gradient(180deg, rgba(79, 165, 130, 0.95), rgba(43, 100, 80, 0.95));
+  /* A shade deeper than the dark arm: the mid Hub Blue that reads as "lit"
+     on graphite reads as "washed" on white glass, and the knob is white in
+     both themes, so the track has to hold the contrast on its own. */
+  background: linear-gradient(180deg, rgba(98, 142, 192, 0.95), rgba(58, 92, 138, 0.95));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
-              inset 0 0 0 1px rgba(43, 100, 80, 0.40);
+              inset 0 0 0 1px rgba(58, 92, 138, 0.40);
 }
 [data-kx-skin="aurora"][data-theme="light"] [role="switch"] > span {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
