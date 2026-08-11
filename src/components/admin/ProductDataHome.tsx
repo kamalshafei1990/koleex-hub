@@ -154,23 +154,11 @@ export default function ProductDataHome() {
 
       if (listRes.status === "fulfilled" && listRes.value.ok) {
         try {
-          /* TWO shapes, and reading the wrong one is not a harmless miss.
-             The unpaged path returns { products }, the ?paged=1 path returns
-             { rows } — reading only `rows` here got `undefined`, and
-             `undefined ?? []` then reported the catalogue as 0 products with
-             full confidence. A shape this code does not recognise must leave
-             the numbers UNKNOWN (em dash), never collapse them to zero: a
-             wrong number is worse than no number, because it is believed. */
-          const json = (await listRes.value.json()) as {
-            products?: { status?: string | null }[];
-            rows?: { status?: string | null }[];
-          };
-          const rows = json.products ?? json.rows;
-          if (Array.isArray(rows)) {
-            next.total = rows.length;
-            next.published = rows.filter((r) => (r.status || "draft") === "active").length;
-            next.draft = next.total - next.published;
-          }
+          const json = (await listRes.value.json()) as { rows?: { status?: string | null }[] };
+          const rows = json.rows ?? [];
+          next.total = rows.length;
+          next.published = rows.filter((r) => (r.status || "draft") === "active").length;
+          next.draft = next.total - next.published;
         } catch { /* leave as unknown — an em dash beats a wrong number */ }
       }
 
