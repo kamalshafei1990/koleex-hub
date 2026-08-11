@@ -62,7 +62,7 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import {
-  fetchDivisions, fetchCategories, fetchSubcategories,
+  fetchTaxonomyAll,
   fetchProductById, fetchModelsByProductId, fetchMediaByProductId,
   fetchTranslationsByProductId, fetchMarketPricesByModelIds, fetchRelatedProducts,
   createProduct, updateProduct,
@@ -926,10 +926,15 @@ export default function ProductForm({ productId }: Props) {
       ]);
     (async () => {
      try {
-      const [divs, cats, subs, supplierList, brandList, familyList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
-        guard(fetchDivisions(), [] as Awaited<ReturnType<typeof fetchDivisions>>),
-        guard(fetchCategories(), [] as Awaited<ReturnType<typeof fetchCategories>>),
-        guard(fetchSubcategories(), [] as Awaited<ReturnType<typeof fetchSubcategories>>),
+      /* ONE taxonomy trip, not three. fetchDivisions + fetchCategories +
+         fetchSubcategories are three separate endpoints carrying what
+         /api/catalog-refs returns in a single response — and fetchTaxonomyAll
+         also reads the local mirror the catalogue has usually already filled,
+         so arriving here from the grid now costs zero taxonomy requests
+         instead of three. Measured on /product-data/new: 15 requests on open,
+         four of them taxonomy. */
+      const [taxo, supplierList, brandList, familyList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
+        guard(fetchTaxonomyAll(), { divisions: [], categories: [], subcategories: [] } as Awaited<ReturnType<typeof fetchTaxonomyAll>>),
         guard(fetchSupplierNames(), [] as Awaited<ReturnType<typeof fetchSupplierNames>>),
         guard(fetchUniqueBrands(), [] as Awaited<ReturnType<typeof fetchUniqueBrands>>),
         guard(fetchUniqueFamilies(), [] as Awaited<ReturnType<typeof fetchUniqueFamilies>>),
@@ -941,6 +946,7 @@ export default function ProductForm({ productId }: Props) {
         guard(fetchClassificationIcons(), {} as Awaited<ReturnType<typeof fetchClassificationIcons>>),
       ]);
       if (cancelled) return;
+      const divs = taxo.divisions, cats = taxo.categories, subs = taxo.subcategories;
       setDivisions(divs);
       setCategories(cats);
       setSubcategories(subs);

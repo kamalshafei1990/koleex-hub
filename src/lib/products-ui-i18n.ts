@@ -1230,4 +1230,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "cls.addKind": { en: "Add machine kind (optional)", zh: "添加机器类型(可选)", ar: "إضافة نوع الماكينة (اختياري)" },
   "cls.kindNa": { en: "doesn\u2019t apply to this subcategory — you can move on.", zh: "不适用于此子类别——可以继续下一步。", ar: "لا ينطبق على هذه الفئة الفرعية — يمكنك المتابعة." },
   "list.needsName": { en: "Needs name", zh: "缺名称", ar: "يحتاج اسماً" },
+  /* Accessible names for the icon-only grid/list toggle. */
+  "list.viewGrid": { en: "Grid view", zh: "网格视图", ar: "عرض شبكي" },
+  "list.viewList": { en: "List view", zh: "列表视图", ar: "عرض قائمة" },
 };

@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { cachedGet } from "@/lib/client-cache";
 import {
   uploadToStorage,
   removeFromStorage,
@@ -599,15 +600,28 @@ export async function fetchSupplierNames(): Promise<SupplierLite[]> {
   return json.suppliers ?? [];
 }
 
-// ── Unique brand names → /api/products/facets ──
+/* ── Facets → /api/products/facets ──
+   ONE response carries brands, families and tags, and the product form asks
+   for two of them — so with a plain fetch each, opening /product-data/new
+   downloaded the identical payload TWICE (measured on prod: 15 requests on
+   that screen, `products/facets` among the duplicates).
+
+   `cachedGet` de-duplicates in flight and caches briefly, so the second
+   caller joins the first request instead of starting its own. The endpoint
+   already sends Cache-Control, but that only helps the SECOND visit; two
+   calls fired in the same tick are both cache misses. */
 export async function fetchUniqueBrands(): Promise<string[]> {
-  const json = await jget<{ brands?: string[] }>("/api/products/facets", {});
-  return json.brands ?? [];
+  try {
+    const json = await cachedGet<{ brands?: string[] }>("/api/products/facets");
+    return json.brands ?? [];
+  } catch { return []; }
 }
 
 export async function fetchUniqueFamilies(): Promise<string[]> {
-  const json = await jget<{ families?: string[] }>("/api/products/facets", {});
-  return json.families ?? [];
+  try {
+    const json = await cachedGet<{ families?: string[] }>("/api/products/facets");
+    return json.families ?? [];
+  } catch { return []; }
 }
 
 // ── Taxonomy logos (storage proxy — no secrets, unchanged) ──

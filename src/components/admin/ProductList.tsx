@@ -2196,6 +2196,13 @@ export default function ProductList() {
               : "flex rounded-xl border border-[var(--border-subtle)] overflow-hidden"}>
               <button
                 onClick={() => setViewMode("grid")}
+                /* Icon-only, so it needs a name of its own: measured on prod
+                   both view buttons had no aria-label, no title and no text —
+                   a screen reader announced two anonymous "button"s, and a
+                   sighted user got no tooltip either. */
+                aria-label={t("list.viewGrid", "Grid view")}
+                title={t("list.viewGrid", "Grid view")}
+                aria-pressed={viewMode === "grid"}
                 className={aurora
                   ? `h-8 w-9 rounded-lg flex items-center justify-center transition-all ${
                       viewMode === "grid"
@@ -2212,6 +2219,9 @@ export default function ProductList() {
               </button>
               <button
                 onClick={() => setViewMode("list")}
+                aria-label={t("list.viewList", "List view")}
+                title={t("list.viewList", "List view")}
+                aria-pressed={viewMode === "list"}
                 className={aurora
                   ? `h-8 w-9 rounded-lg flex items-center justify-center transition-all ${
                       viewMode === "list"
