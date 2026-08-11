@@ -1525,7 +1525,12 @@ input[type="number"]:not(.kx-spinner) {
    always drops its own fill under Aurora. */
 [data-kx-skin="aurora"] .kx-rail {
   background: transparent;
-  border-inline-end-color: transparent;
+  /* WIDTH zero, not just a transparent colour: a transparent border still
+     occupies its 1px, and the collapse handle — positioned at
+     inset-inline-end:0 — stopped 1px short of the panel edge because of it.
+     The owner asked for a handle that touches the border; 1px of invisible
+     border is still 1px of not touching. */
+  border-inline-end-width: 0;
 }
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
