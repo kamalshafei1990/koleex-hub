@@ -4982,21 +4982,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   /* Saved accounts/employees — used to pick WeChat group members. Fetched once;
      cheap (allowlisted columns, no blobs). */
   const [accountNames, setAccountNames] = useState<string[]>([]);
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/accounts", { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(j => {
-        if (!alive || !j?.accounts) return;
-        const names = (j.accounts as { username?: string | null; login_email?: string | null }[])
-          .map(a => (a.username || a.login_email || "").trim())
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b));
-        setAccountNames([...new Set(names)]);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  /* Loaded ON DEMAND — see the effect further down, next to the form state
+     it depends on. This list has exactly one consumer: the WeChat group
+     members picker, which only renders once the user turns on
+     `wechat_sales_group_available` inside the edit form. Fetching it on
+     screen open meant a full round trip — plus an Accounts permission check
+     and a table read — on every open of Contacts, Customers AND Suppliers,
+     for data most sessions never touch. */
+  const accountNamesLoaded = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
@@ -5031,6 +5024,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [tierFilter, setTierFilter] = useState<"all" | CustomerTier>("all");
   const tierSeg = useSegSlider(tierFilter);
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
+
+  /* Teammate names for the WeChat group-members picker, fetched the first
+     time that picker can actually appear — not on screen open. The ref makes
+     it once-per-mount; the field already renders a "Type a name" placeholder
+     while the list is empty, so the user is never blocked waiting for it. */
+  useEffect(() => {
+    if (!form.wechat_sales_group_available || accountNamesLoaded.current) return;
+    accountNamesLoaded.current = true;
+    let alive = true;
+    fetch("/api/accounts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!alive || !j?.accounts) return;
+        const names = (j.accounts as { username?: string | null; login_email?: string | null }[])
+          .map(a => (a.username || a.login_email || "").trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        setAccountNames([...new Set(names)]);
+      })
+      /* A failed load is not an error state: the field falls back to free
+         text, which is what it does before the list arrives anyway. */
+      .catch(() => { accountNamesLoaded.current = false; });
+    return () => { alive = false; };
+  }, [form.wechat_sales_group_available]);
+
   /* Department filter for the supplier form — null = show all sections.
      Lets a Finance/Legal/QC owner collapse the form to just their fields. */
   const [supplierDept, setSupplierDept] = useState<string | null>(null);
