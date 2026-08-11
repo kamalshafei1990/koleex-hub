@@ -1664,6 +1664,34 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.10),
               inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
+/* RTL: the browser runs a range's VALUE AXIS right-to-left, but a painted
+   track knows nothing about that — measured in Arabic, the thumb sat far
+   left at 80% while the fill still started at the physical left edge, so
+   the bar was filled on the empty side. Paint from the inline start in both
+   directions, and mirror the gradient so its light end always marks the
+   value. (Pre-existing since the flat fill; the gradient only made it
+   obvious.) Keyed on <html dir> — the same element that carries the skin,
+   which is what lets the Aurora twin outrank the LTR rule. */
+[dir="rtl"] .kx-range {
+  background: linear-gradient(
+    to left,
+    var(--kx-slider-fill) 0 var(--kx-slider-pos),
+    var(--kx-slider-rest) var(--kx-slider-pos) 100%
+  );
+}
+[data-kx-skin="aurora"][dir="rtl"] .kx-range {
+  background:
+    linear-gradient(270deg, #567FB2 0%, #BCD8F0 100%) right center /
+      var(--kx-slider-pos) 100% no-repeat,
+    rgba(3, 5, 9, 0.55);
+}
+[data-kx-skin="aurora"][data-theme="light"][dir="rtl"] .kx-range {
+  background:
+    linear-gradient(270deg, #567FB2 0%, #BCD8F0 100%) right center /
+      var(--kx-slider-pos) 100% no-repeat,
+    rgba(255, 255, 255, 0.70);
+}
+
 /* Vendor thumb selectors NEVER share a rule — one unknown pseudo-element
    drops the whole declaration block in the other engine. */
 [data-kx-skin="aurora"] .kx-range::-webkit-slider-thumb {
