@@ -1609,11 +1609,19 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08),
               inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
+/* The ON track is GREEN because the standing rule says a toggle is green —
+   but `emerald-500` is a high-chroma hue and Aurora is a low-chroma world
+   (graphite, frost, and a Hub Blue that is itself muted). Owner, second
+   pass: "toggle buttons color still not match aurora style". So the green
+   is rebuilt at HUB BLUE'S OWN CHROMA — #5FB795 is to green what #567FB2 is
+   to blue — translucent enough for the ground to modulate it, with the
+   glass inner light edge. The outer halo is gone: a permanent glow on every
+   ON row is ten glows on a page of ten toggles, and the canon reserves
+   glow for hover. Core keeps the saturated emerald. */
 [data-kx-skin="aurora"] [role="switch"][aria-checked="true"] {
-  background: linear-gradient(180deg, rgba(52, 211, 153, 0.95), rgba(5, 150, 105, 0.95));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
-              inset 0 0 0 1px rgba(16, 185, 129, 0.55),
-              0 0 0 3px rgba(16, 185, 129, 0.12);
+  background: linear-gradient(180deg, rgba(95, 183, 149, 0.90), rgba(52, 110, 90, 0.90));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
+              inset 0 0 0 1px rgba(95, 183, 149, 0.45);
 }
 /* The knob is the one solid object in the control — it keeps its white and
    gains the depth that sells the track as a recess. */
@@ -1626,10 +1634,11 @@ input[type="number"]:not(.kx-spinner) {
               inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
 [data-kx-skin="aurora"][data-theme="light"] [role="switch"][aria-checked="true"] {
-  background: linear-gradient(180deg, rgba(52, 211, 153, 0.95), rgba(5, 150, 105, 0.95));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
-              inset 0 0 0 1px rgba(5, 150, 105, 0.45),
-              0 0 0 3px rgba(16, 185, 129, 0.14);
+  /* A shade deeper than the dark arm: the same mid-green that reads as
+     "lit" on graphite reads as "washed" on white glass. */
+  background: linear-gradient(180deg, rgba(79, 165, 130, 0.95), rgba(43, 100, 80, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
+              inset 0 0 0 1px rgba(43, 100, 80, 0.40);
 }
 [data-kx-skin="aurora"][data-theme="light"] [role="switch"] > span {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
