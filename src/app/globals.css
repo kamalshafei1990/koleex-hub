@@ -507,6 +507,31 @@ body {
   outline: none;
 }
 
+/* PAGE CROSS-FADE. Paired with components/layout/ViewTransitions.tsx, which
+   runs the App Router push inside document.startViewTransition().
+
+   Owner, on an iPad: entering an app and coming back to Home "look jump, not
+   smooth and ease enough". Entering had the launch splash; coming back had
+   nothing at all, so the two directions never matched.
+
+   Short and symmetrical on purpose — 180ms on the Aurora curve. A page
+   transition that announces itself is worse than none: this should read as
+   the screen settling, not as an effect. The old page leaves slightly faster
+   than the new one arrives so they overlap rather than dip through empty.
+
+   The ::view-transition-* pseudo-elements are inert on engines without the
+   API, so nothing here needs a @supports guard. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: kx-vt-out 140ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  ::view-transition-new(root) {
+    animation: kx-vt-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes kx-vt-out { to { opacity: 0; } }
+@keyframes kx-vt-in { from { opacity: 0; } to { opacity: 1; } }
+
 /* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
 
    Reported from an Oppo on the ColorOS browser: "most of the things the

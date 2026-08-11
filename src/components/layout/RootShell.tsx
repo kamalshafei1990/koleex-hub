@@ -14,6 +14,7 @@ import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
 import AppLaunchSplash from "./AppLaunchSplash";
+import ViewTransitions from "./ViewTransitions";
 import Sidebar from "./Sidebar";
 import ViewAsBanner from "./ViewAsBanner";
 import dynamic from "next/dynamic";
@@ -237,6 +238,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       `}</style>
       <div className="kx-titlebar-drag" aria-hidden />
       <NavigationProgress />
+      <ViewTransitions />
       <AppLaunchSplash />
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
