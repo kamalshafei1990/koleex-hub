@@ -1379,6 +1379,10 @@ input[type="number"]:not(.kx-spinner) {
   position: absolute;
   inset: 0;
   z-index: 0;
+  /* PURELY VISUAL — the layer (especially the progressive variant, which
+     extends BELOW its host) must never intercept clicks or swipes: without
+     this it sat over the divisions strip and made it un-swipeable. */
+  pointer-events: none;
   background: rgba(8, 10, 14, 0.35);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
