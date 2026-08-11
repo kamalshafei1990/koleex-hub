@@ -88,13 +88,26 @@ export default function BackToTop({ label }: { label: string }) {
         aria-label={label}
         aria-hidden={!visible}
         tabIndex={visible ? 0 : -1}
+        /* kx-glass-pop ONLY while visible — it was permanently pinning this
+           button on screen. In Aurora that class is
+             animation: kx-pop-in 0.28s … both;
+           and `both` keeps the animation's final frame applied forever. An
+           animation's computed value outranks a plain declaration, so the
+           `opacity-0` below never took effect: measured on prod, the button
+           reported aria-hidden="true" with the opacity-0 class present and a
+           computed opacity of 1, at scrollTop 0. It sat over the catalogue on
+           every screen, and on a phone it covered the division strip.
+
+           Applying the class only in the visible state gives the pop-in
+           exactly where it belongs — on appearance — and lets the hidden
+           state actually hide. */
         className={`group fixed z-[35] end-4 md:end-5 h-11 w-11 rounded-full
-          kx-glass-pop bg-[var(--bg-secondary)] border border-[var(--border-subtle)]
+          bg-[var(--bg-secondary)] border border-[var(--border-subtle)]
           shadow-[0_6px_24px_rgba(0,0,0,0.35)]
           flex items-center justify-center
           text-[var(--text-muted)] hover:text-[var(--text-primary)]
           transition-all duration-300
-          ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}`}
+          ${visible ? "kx-glass-pop opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}`}
         style={{
           /* The bottom-right column is already occupied: AI/Discuss pill at
              ~24px, panel launcher at 92px (its top ≈132px). This sits at

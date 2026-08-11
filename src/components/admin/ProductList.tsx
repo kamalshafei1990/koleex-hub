@@ -2028,8 +2028,14 @@ export default function ProductList() {
               using three blur edge and this is wrong, you only can use one
               but more longer". */}
         <div>
-          <div className="flex gap-3">
-            <div className="relative flex-1" ref={searchBoxRef}>
+          {/* On a phone this row had to hold the search field, the grid/list
+              toggle and Filters in 375px, which left the input about 140px —
+              its placeholder read "Search by" and stopped, so the one control
+              that tells you what you can search by (name, model code, brand,
+              category, tags) was the one cut off. It now takes a row of its
+              own below 640px; desktop is unchanged. */}
+          <div className="flex flex-wrap gap-3">
+            <div className="relative basis-full sm:basis-0 sm:flex-1 min-w-0" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
               <input
                 type="search"
