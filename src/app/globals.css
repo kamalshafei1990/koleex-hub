@@ -1471,29 +1471,38 @@ input[type="number"]:not(.kx-spinner) {
   display: block;
   pointer-events: none;
 }
+/* The stops are ANCHORED TO THE BOTTOM, not spread as percentages of the
+   box. Percentages were fine while the layer was one bar tall, but the
+   moment one ramp had to cover a whole sticky stack (2.4× taller) every
+   stop stretched with it: the strong blur was spent in the first 90px and
+   a half-legible product card sat in the middle of the chrome zone.
+   Anchored this way, the bars stay FULLY frosted whatever their height and
+   the fade always happens inside --kx-ramp-ext — the tail, and only the
+   tail, is what "longer" lengthens. Layers still stagger: the heaviest
+   blur clears first, the lightest carries to the very end. */
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(1) {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
-  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 55%, transparent 82%);
-  mask: linear-gradient(to bottom, #000 0%, #000 55%, transparent 82%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent 100%);
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent 100%);
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(2) {
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
-  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 40%, transparent 66%);
-  mask: linear-gradient(to bottom, #000 0%, #000 40%, transparent 66%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.25));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.25));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(3) {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 27%, transparent 50%);
-  mask: linear-gradient(to bottom, #000 0%, #000 27%, transparent 50%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.5));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.5));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(4) {
   -webkit-backdrop-filter: blur(28px) saturate(150%);
   backdrop-filter: blur(28px) saturate(150%);
-  -webkit-mask: linear-gradient(to bottom, #000 0%, #000 14%, transparent 34%);
-  mask: linear-gradient(to bottom, #000 0%, #000 14%, transparent 34%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem)), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-bar-prog > i { display: none; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
