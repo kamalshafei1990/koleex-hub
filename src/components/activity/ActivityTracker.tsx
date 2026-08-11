@@ -107,7 +107,23 @@ export default function ActivityTracker() {
       if (stopped) return;
       timer = window.setTimeout(loop, nextDelay());
     };
-    void loop();
+    /* THE FIRST BEAT WAITS FOR THE SCREEN.
+
+       Measured on prod (2026-08-11): opening Product Data fires 10 API calls
+       in the same instant and the last one lands at 4.08s — on this link
+       concurrent requests block each other, so six of Home's eight shared an
+       identical 1342ms TTFB. Presence is background work: nothing on screen
+       waits for it, so it must not compete with the data that is.
+
+       Idle callback with a 3s ceiling, so it still starts promptly on a busy
+       page. The revocation check rides this beat, but the normal cadence is
+       already 30s — a few seconds later on the first one changes nothing. */
+    const startBeats = () => { void loop(); };
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    let startTimer: number | undefined;
+    if (ric) ric(startBeats, { timeout: 3000 });
+    else startTimer = window.setTimeout(startBeats, 1500);
+
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         lastInputRef.current = Date.now();
@@ -138,6 +154,7 @@ export default function ActivityTracker() {
     return () => {
       stopped = true;
       if (timer !== undefined) window.clearTimeout(timer);
+      if (startTimer !== undefined) window.clearTimeout(startTimer);
       events.forEach((e) => window.removeEventListener(e, onInput));
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onLeave);

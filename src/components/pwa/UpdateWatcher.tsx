@@ -76,7 +76,16 @@ export default function UpdateWatcher() {
         /* offline / transient — ignore */
       }
     };
-    void check();
+    /* NOT during the screen open. The build-id check is background work —
+       nothing on screen waits for it — and on this link every concurrent
+       request delays the ones that DO matter (measured: 10 calls at once on
+       Product Data, the last landing at 4.08s). It runs once the page has
+       gone quiet; a stale build stays stale for a couple more seconds, which
+       is nothing against the interval this already runs on. */
+    let firstCheck: number | undefined;
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    if (ric) ric(() => { void check(); }, { timeout: 4000 });
+    else firstCheck = window.setTimeout(() => { void check(); }, 2000);
     /* HEAL WHILE HIDDEN. The user must never watch a full page load: the
        browser keeps the OLD page on screen until the new document commits,
        so a reload triggered mid-tap looks like "it threw me back to Home,
@@ -110,6 +119,7 @@ export default function UpdateWatcher() {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
       window.clearInterval(iv);
+      if (firstCheck !== undefined) window.clearTimeout(firstCheck);
     };
   }, []);
 
