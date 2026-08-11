@@ -24,6 +24,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import type { PageTab } from "@/components/ui/PageHeader";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import AppIcon from "@/components/common/AppIcon";
 
 /* Visual Library owns these routes (it's the parent "visual identity" section). */
 const VL_PREFIXES = [
@@ -97,7 +98,7 @@ export default function DatabaseHeader({
       <PageHeader
         title={title}
         subtitle={subtitle}
-        icon="database"
+        icon={<AppIcon appId="database" className="h-4 w-4" size={16} />}
         action={action}
         controls={controls}
         meta={meta}

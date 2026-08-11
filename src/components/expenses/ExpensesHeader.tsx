@@ -15,6 +15,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import ExpensesTabs, { type ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { useTranslation } from "@/lib/i18n";
 import { expensesT } from "@/lib/translations/expenses";
+import AppIcon from "@/components/common/AppIcon";
 
 export default function ExpensesHeader({
   title,
@@ -51,7 +52,7 @@ export default function ExpensesHeader({
       <PageHeader
         title={title}
         subtitle={subtitle}
-        icon="receipt"
+        icon={<AppIcon appId="expenses" className="h-4 w-4" size={16} />}
         action={
           <>
             {analyticsLink}

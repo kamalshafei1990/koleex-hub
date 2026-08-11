@@ -33,6 +33,7 @@ import {
   type RemoteDocRow,
 } from "@/lib/docs-sync";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppIcon from "@/components/common/AppIcon";
 
 /* The invoice editor reuses QuotationA4Preview (~9k LOC). Lazy-load it
    client-side so it stays out of the invoice list/initial bundle; props
@@ -1776,7 +1777,7 @@ export default function Quotations() {
                 <ArrowLeftIcon className="h-4 w-4" />
               </Link>
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <DocumentIcon size={16} />
+                <AppIcon appId="invoices" className="h-4 w-4" size={16} />
               </div>
               <div className="flex items-center gap-2.5 min-w-0">
                 <h1 className="text-xl md:text-[22px] font-bold tracking-tight">

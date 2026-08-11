@@ -46,6 +46,7 @@ import {
   type RoleRow, type PermissionRow, type DataScope,
 } from "@/lib/management-admin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppIcon from "@/components/common/AppIcon";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -719,7 +720,7 @@ export default function RolesPage() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <ShieldIcon className="h-4 w-4" />
+              <AppIcon appId="roles" className="h-4 w-4" size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               {t("app.title")}

@@ -45,6 +45,7 @@ import {
 } from "@/lib/translator-document";
 import { IMG_ACCEPT, recognizeImage, type OcrLine } from "@/lib/translator-image";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppIcon from "@/components/common/AppIcon";
 
 const MAX_CHARS = 5_000;
 const DEBOUNCE_MS = 350;
@@ -1188,7 +1189,7 @@ export default function TranslatorApp() {
         <PageHeader
           title={t("tr.title", "Translator")}
           subtitle={t("tr.subtitle", "Translate text between {n} languages").replace("{n}", String(LANGUAGES.length))}
-          icon={<VlIcon slug="translate" size={20} />}
+          icon={<AppIcon appId="translator" className="h-5 w-5" size={20} />}
           backHref="/"
           /* History and Saved live HERE, not in the tab rail below — they
              open over the workspace instead of replacing it. Labels are

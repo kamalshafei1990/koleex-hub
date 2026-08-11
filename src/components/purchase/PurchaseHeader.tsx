@@ -21,6 +21,7 @@ import type { RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { ACCENT } from "@/lib/accentColors";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
+import AppIcon from "@/components/common/AppIcon";
 
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
   { key: "/purchase",              label: "Home",         icon: "home",         i18nKey: "pur.nav.home" },
@@ -128,7 +129,7 @@ export default function PurchaseHeader({
     <PageHeader
       title={title}
       subtitle={subtitle}
-      icon="box-open"
+      icon={<AppIcon appId="purchase" className="h-4 w-4" size={16} />}
       action={action}
       controls={controls}
       meta={meta}

@@ -25,6 +25,7 @@ import type { ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import type { PageTab } from "@/components/ui/PageHeader";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import AppIcon from "@/components/common/AppIcon";
 
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
   /* Ordered as the natural workflow: browse every supplier → see sourcing
@@ -71,7 +72,7 @@ export default function SuppliersHeader({
     <PageHeader
       title={title}
       subtitle={subtitle}
-      icon="building"
+      icon={<AppIcon appId="suppliers" className="h-4 w-4" size={16} />}
       backHref="/suppliers"
       action={action}
       controls={controls}

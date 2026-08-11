@@ -1687,6 +1687,17 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
 }
 
+/* Stat/metric mini-cards that were filled with `--bg-primary` — a token the
+   app-scope remap turns TRANSPARENT, which left them as floating text with
+   a border. They take a surface tint instead of a blur pass: there are a
+   dozen of them side by side, and blur is priced per element. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-stat {
+  background: rgba(255, 255, 255, 0.05);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-stat {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 /* Range sliders. The track paint lives HERE and not in an inline style so
    Aurora can swap a flat colour for a gradient — the component only passes
    the position (`--kx-slider-pos`), which is data, not styling. */

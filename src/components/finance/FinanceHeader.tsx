@@ -19,6 +19,7 @@ import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 import { ACCENT } from "@/lib/accentColors";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
+import AppIcon from "@/components/common/AppIcon";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -172,7 +173,7 @@ export default function FinanceHeader({
     <PageHeader
       title={title}
       subtitle={subtitle}
-      icon="coins"
+      icon={<AppIcon appId="finance" className="h-4 w-4" size={16} />}
       action={
         <>
           {createBtn}

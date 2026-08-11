@@ -33,6 +33,7 @@ import {
   type InstallGuide,
 } from "@/lib/software-center";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppIcon from "@/components/common/AppIcon";
 
 export default function SoftwareCenterPage() {
   return (
@@ -119,7 +120,7 @@ function DownloadCenterContent() {
         <PageHeader
           title="Download Center"
           subtitle="Download apps, updates, drivers and installers"
-          icon="download"
+          icon={<AppIcon appId="software-center" className="h-4 w-4" size={16} />}
           backHref="/"
           searchPlaceholder="Search downloads…"
           onSearchSubmit={setQuery}

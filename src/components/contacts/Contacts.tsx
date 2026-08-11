@@ -134,6 +134,11 @@ import SupplierDetail from "@/components/suppliers/SupplierDetail";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useSkin } from "@/lib/appearance";
+import nextDynamic from "next/dynamic";
+
+/* Aurora ground — mounted only under the skin, so Core never pays for it. */
+const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -3001,9 +3006,14 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
 }) {
   const t = translate ?? ((_k: string, f: string) => f);
   const tabs = extraTabs && extraTabs.length ? [...CUSTOMER_TABS, ...extraTabs] : CUSTOMER_TABS;
-  /* Full-width opaque strip (panel bg) masks scrolling content behind the pill. */
+  /* Full-width opaque strip (panel bg) masks scrolling content behind the
+     pill. Under Aurora that fill is TRANSPARENT (the kx-app remap), so the
+     strip stops masking anything — the pane pattern supplies a real frosted
+     layer instead: filterless host, .kx-glass-bar child at z-0, content
+     lifted above it by the globals rule. */
   return (
-    <div className={`sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
+    <div className={`kx-bar-host sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
+    <div aria-hidden className="kx-glass-bar" />
     <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
       {tabs.map(tab => {
         const active = activeTab === tab.id;
@@ -4847,7 +4857,7 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
   };
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={close}>
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-glass-pop bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{pending.title || t("delete.title")}</h3>
         <p className={`text-sm text-[var(--text-subtle)] ${pending.note ? "mb-2" : "mb-6"}`}>
           {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{pending.name}</strong>{t("delete.cannotUndo")}
@@ -4876,6 +4886,7 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
 export default function Contacts({ filterType }: { filterType?: ContactType } = {}) {
   /* ── i18n ── */
   const { t, lang } = useTranslation(contactsT);
+  const aurora = useSkin() === "aurora";
   const router = useRouter();
   /** Translate a dropdown option value. Falls back to the raw value. */
   const tOpt = (val: string) => t("opt." + val, val);
@@ -5950,7 +5961,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   if (setupNeeded) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center p-6">
+      <div className="kx-app h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
@@ -5997,7 +6008,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="kx-app h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon className="w-6 h-6" />
       </div>
     );
@@ -6269,19 +6280,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
         {moduleKpis && filterType === "customer" && (
           <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-violet-400">{moduleKpis.vip}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-violet-400/40">{t("kpi.vip")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">{t("kpi.countries")}</p>
             </div>
@@ -6290,19 +6301,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Compact KPI strip — mobile only (supplier variant) */}
         {supplierKpis && filterType === "supplier" && (
           <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{supplierKpis.active}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "—"}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">{t("field.rating")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-orange-400">{supplierKpis.countries}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-orange-400/40">{t("kpi.countries")}</p>
             </div>
@@ -6312,19 +6323,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Compact KPI strip — mobile only (employee/company/people) */}
         {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
           <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">{t("kpi.countries")}</p>
             </div>
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+            <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">{t("kpi.new")}</p>
             </div>
@@ -8676,8 +8687,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
     return (
       <div className="h-full overflow-y-auto overflow-x-hidden">
-        {/* Form header */}
-        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between sticky top-0 bg-[var(--bg-secondary)] z-10 gap-2">
+        {/* Form header. Pane pattern under Aurora: the remap turns the
+            solid panel fill translucent, so the form would scroll visibly
+            through its own header without a real frosted layer. */}
+        <div className="kx-bar-host px-3 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between sticky top-0 bg-[var(--bg-secondary)] z-10 gap-2">
+          <div aria-hidden className="kx-glass-bar" />
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <button onClick={handleBack} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
               <ArrowLeftIcon size={18} className="rtl:rotate-180" />
@@ -11471,7 +11485,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderTypeChooser = () => (
     <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+      <div className="kx-glass-pop bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
         {typeChooserStep === 1 ? (
           <>
             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t("typeChooser.title")}</h3>
@@ -11546,14 +11560,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]">
-      {/* Left panel -- contact list */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[400px] lg:w-[480px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
+    /* h-full, never 100vh maths: the shell already resolves the per-mode
+       viewport unit, and a child that re-measures it is the bottom-crop bug
+       all over again. kx-app = the Aurora var-remap scope (globals). */
+    <div className="kx-app relative h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]">
+      {/* Aurora: the Hub ground behind the whole app — every glass surface
+          frosts this canvas. Core keeps its solid page. */}
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+
+      {/* Left panel -- contact list. A flush full-height panel, so it wears
+          the DRAWER glass (tile recipe, no lighting rim on the edges), not
+          .kx-glass. Filtering at element level is safe here: every overlay
+          in this app either portals to <body> (ScrollLockOverlay) or renders
+          as a SIBLING of these panes, so no fixed child can be trapped. */}
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} relative z-[1] kx-glass-drawer flex-col w-full md:w-[400px] lg:w-[480px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
         {renderListPanel()}
       </div>
 
       {/* Right panel -- detail / form */}
-      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
+      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} relative z-[1] flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
         {view === "form" && !formModalOpen ? renderFormPanel() : renderDetailPanel()}
       </div>
 
@@ -11563,13 +11592,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       {/* Catalog import → the REAL New Supplier form (renderFormPanel) inside a
           modal, pre-filled. Identical to a manual add because it IS the form. */}
       {formModalOpen && view === "form" && (
-        <div className="fixed inset-0 z-[200] flex items-start justify-center p-4 overflow-y-auto"
-          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
+        /* The scrim and the box painted themselves from INLINE styles, which
+           beat every rule — so no skin could ever restate them. The box now
+           takes the popup glass as a class and only keeps the border inline;
+           the scrim keeps its dim but gets the standing backdrop-blur-sm. */
+        <div className="fixed inset-0 z-[200] flex items-start justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setFormModalOpen(false); pendingCatalogFileRef.current = null; setView("list"); } }}>
-          <div className="w-full max-w-4xl my-6 rounded-2xl shadow-2xl overflow-hidden"
-            style={{ background: "var(--bg-card, #fff)", border: "1px solid var(--border-subtle, #e0e0e0)" }}>
+          <div className={`w-full max-w-4xl my-6 rounded-2xl shadow-2xl overflow-hidden ${aurora ? "kx-glass-pop" : ""}`}
+            style={{ background: aurora ? undefined : "var(--bg-card, #fff)", border: "1px solid var(--border-subtle, #e0e0e0)" }}>
             <div className="flex items-center justify-between px-5 py-4 sticky top-0 z-10"
-              style={{ background: "var(--bg-card, #fff)", borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}>
+              style={{ background: aurora ? "transparent" : "var(--bg-card, #fff)", borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}>
               <div>
                 <h2 className="text-[15px] font-semibold">New supplier from catalog</h2>
                 <p className="text-[12px]" style={{ color: "var(--text-dim, #888)" }}>Review the imported details, set Division &amp; Category, then Save.</p>
@@ -11607,10 +11639,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       {/* Possible-duplicate guard — shown before a new supplier is created when
           it looks like one we already have. Operator decides: open / merge / create. */}
       {dupMatches.length > 0 && (
-        <div className="fixed inset-0 z-[320] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}
+        <div className="fixed inset-0 z-[320] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onMouseDown={(e) => { if (e.target === e.currentTarget && !dupMerging) setDupMatches([]); }}>
-          <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col max-h-[85vh]"
-            style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className={`w-full max-w-lg rounded-2xl overflow-hidden flex flex-col max-h-[85vh] ${aurora ? "kx-glass-pop" : ""}`}
+            style={{ background: aurora ? undefined : "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border-color)" }}>
               <div className="text-[15px] font-semibold text-[var(--text-primary)]">{t("dup.title", "Possible duplicate supplier")}</div>
               <div className="text-[12px] text-[var(--text-muted)] mt-0.5">

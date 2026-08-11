@@ -292,7 +292,18 @@ const AppCard = memo(function AppCard({
                 animated?: boolean;
                 scaleClass?: string;
               }>;
-              return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
+              /* The orb is ANIMATED, and a bound icon is a static mask — so
+                 the orb stays the fallback rather than the other way round.
+                 Still routed through BoundIcon so `app.ai` behaves like
+                 every other app if it is ever bound; unbound (today) this
+                 renders exactly the orb it always did. */
+              return (
+                <BoundIcon
+                  semanticKey="app.ai"
+                  className="h-[34px] w-[34px]"
+                  fallback={<AnimatedIcon size={34} animated scaleClass="scale-100" />}
+                />
+              );
             }
             return <BoundIcon semanticKey={`app.${app.id}`} className="h-[34px] w-[34px]" fallback={<Icon size={34} />} />;
           })()}

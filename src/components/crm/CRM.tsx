@@ -105,6 +105,7 @@ import type {
   CrmStageRow,
 } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppIcon from "@/components/common/AppIcon";
 
 /* ════════════════════════════════════════════════════════════════════════
    Helpers
@@ -575,7 +576,7 @@ export default function CRM() {
         <PageHeader
           title={t("title")}
           subtitle={t("subtitle")}
-          icon={<TrendingUpIcon className="h-4 w-4" />}
+          icon={<AppIcon appId="crm" className="h-4 w-4" size={16} />}
           tabs={[
             { key: "pipeline",      label: t("nav.sales"),         icon: <LayoutGridIcon size={14} />, onClick: () => setMainView("pipeline"),      active: mainView === "pipeline" },
             { key: "reporting",     label: t("nav.reporting"),     icon: <ChartPieIcon size={14} />,   onClick: () => setMainView("reporting"),     active: mainView === "reporting" },
