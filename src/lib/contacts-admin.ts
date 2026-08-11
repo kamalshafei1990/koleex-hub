@@ -312,6 +312,27 @@ export async function fetchContacts(): Promise<ContactRow[]> {
  * stay under the response-size limit. Fetched in small batches and returned as a
  * map keyed by contact id, so the caller can merge them into the rendered rows.
  */
+/* Measured on prod: /contacts fired the SAME avatar batch twice, 7ms apart —
+   two callers hydrating the same rows with no coalescing between them, so the
+   second request was 100% waste. Keyed by the exact batch, an in-flight
+   request is shared instead of duplicated. Short-lived by design: the entry
+   is dropped the moment it settles, so this never serves a stale avatar. */
+const avatarInflight = new Map<string, Promise<{ id: string; logo_url: string | null; photo_url: string | null }[]>>();
+
+function fetchAvatarBatch(batch: string[]) {
+  const key = batch.join(",");
+  const existing = avatarInflight.get(key);
+  if (existing) return existing;
+  const p = (async () => {
+    const res = await fetch(`/api/contacts/avatars?ids=${encodeURIComponent(key)}`, { credentials: "include" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { avatars?: { id: string; logo_url: string | null; photo_url: string | null }[] };
+    return json.avatars ?? [];
+  })().finally(() => { avatarInflight.delete(key); });
+  avatarInflight.set(key, p);
+  return p;
+}
+
 export async function fetchContactAvatars(
   ids: string[],
 ): Promise<Record<string, { logo_url: string | null; photo_url: string | null }>> {
@@ -324,10 +345,9 @@ export async function fetchContactAvatars(
   for (let i = 0; i < unique.length; i += CHUNK) {
     const batch = unique.slice(i, i + CHUNK);
     try {
-      const res = await fetch(`/api/contacts/avatars?ids=${encodeURIComponent(batch.join(","))}`, { credentials: "include" });
-      if (!res.ok) continue;
-      const json = (await res.json()) as { avatars: { id: string; logo_url: string | null; photo_url: string | null }[] };
-      for (const a of json.avatars || []) out[a.id] = { logo_url: a.logo_url ?? null, photo_url: a.photo_url ?? null };
+      for (const a of await fetchAvatarBatch(batch)) {
+        out[a.id] = { logo_url: a.logo_url ?? null, photo_url: a.photo_url ?? null };
+      }
     } catch { /* a failed batch just leaves those avatars as placeholders */ }
   }
   return out;

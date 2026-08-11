@@ -5152,6 +5152,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   // their own (empty) book; Koleex staff sees Koleex's book. Without
   // this, everyone would see Koleex's contacts regardless of tenant.
   const scopeCtx = useScopeContext();
+  /* IDENTITY, NOT REFERENCE. Every effect below keyed off `scopeCtx`, which is
+     a fresh object on each resolve — so when the real scope arrived it never
+     compared equal to the warm-start one even when the two were identical,
+     and the whole directory was fetched a SECOND time. Measured on prod:
+     `contacts?probe=1` and `contacts` each fired twice, the second wave 25ms
+     after /api/shell landed.
+
+     Comparing the serialised value collapses that to one fetch when nothing
+     actually changed, and still refetches the moment any field differs.
+     Deliberately strict — a scope change must always win, so this compares
+     the WHOLE object rather than a hand-picked field or two. */
+  const scopeKey = useMemo(() => (scopeCtx ? JSON.stringify(scopeCtx) : ""), [scopeCtx]);
 
   const loadContacts = useCallback(async () => {
     /* PERF — wait for the resolved scope before fetching. scopeCtx starts null
@@ -5229,7 +5241,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           : c));
       }).catch(() => {});
     }
-  }, [scopeCtx, filterType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey, filterType]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
@@ -5292,7 +5305,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           : c));
       }).catch(() => {});
     }
-  }, [scopeCtx, filterType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey, filterType]);
 
   useEffect(() => {
     if (!scopeCtx || !filterType) return;
@@ -5313,7 +5327,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(id);
     };
-  }, [scopeCtx, filterType, silentRefresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey, filterType, silentRefresh]);
 
   /* ── Deep link handler: /customers?selected=<contactId> auto-opens the detail view.
         This is how the CRM (and any other app) can hand off to us. ── */
