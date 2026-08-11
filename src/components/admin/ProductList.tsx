@@ -1937,7 +1937,7 @@ export default function ProductList() {
             4px under the app header when pinned — on a phone that read as the
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
-        <div ref={toolbarRef} className="kx-bar-host sticky top-[var(--kx-header-h,3.5rem)] z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+        <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
           {/* Progressive, not flat (owner: the flat bar read as a hard
               rectangle over the ramped zone below) — the whole top strip
               is now one continuous soft frost. */}
@@ -2471,7 +2471,7 @@ export default function ProductList() {
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
               <nav
-                style={{ top: "calc(var(--kx-header-h, 3.5rem) + var(--kx-pd-tools-h, 52px))" }}
+                style={{ top: "var(--kx-pd-tools-h, 52px)" }}
                 className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:6rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
