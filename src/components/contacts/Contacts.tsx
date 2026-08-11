@@ -2994,23 +2994,32 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
    travels diagonally when the selection moves to the next line. Aurora only;
    Core keeps its filled chip. */
 function useSegSlider(activeKey: string | number, deps: unknown[] = []) {
-  const ref = useRef<HTMLDivElement | null>(null);
+  /* CALLBACK ref, not useRef: these rows mount AFTER the first paint (the
+     panel renders once its scope resolves). A ref object is still null when
+     the effect first runs, and the effect only re-runs on activeKey — so the
+     indicator stayed missing until the user clicked a chip. Holding the node
+     in state re-runs the measurement the moment it attaches. */
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const ref = useCallback((node: HTMLDivElement | null) => setHost(node), []);
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   useLayoutEffect(() => {
-    const host = ref.current;
-    if (!host) return;
+    if (!host) { setBox(null); return; }
     const measure = () => {
       const el = host.querySelector<HTMLElement>('[data-seg-active="true"]');
       if (!el) { setBox(null); return; }
       setBox({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     };
     measure();
+    /* Observe the chips too, not just the row: a count landing (121 → 268)
+       or a webfont swap changes chip width without changing row size. */
     const ro = new ResizeObserver(measure);
     ro.observe(host);
+    for (const child of Array.from(host.children)) ro.observe(child);
+    const raf = requestAnimationFrame(measure);
     const settle = window.setTimeout(measure, 250);
-    return () => { ro.disconnect(); window.clearTimeout(settle); };
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); window.clearTimeout(settle); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeKey, ...deps]);
+  }, [host, activeKey, ...deps]);
   return { ref, box };
 }
 
@@ -6146,7 +6155,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderListPanel = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
+      {/* @container: the filter grids below size themselves against THIS
+          panel, not the window. Without it the @[..] variants never fire and
+          every row is stuck at its narrowest column count. */}
+      <div className="@container px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5 mb-3">
           <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
@@ -6301,7 +6313,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Status filter (All / Active / Not Active) — suppliers + customers.
             Customers say "Not Active"; suppliers keep "Archived". */}
         {(filterType === "supplier" || filterType === "customer") && (
-          <div ref={statusSeg.ref} className="relative flex w-full gap-1 mt-3 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={statusSeg.ref} className="relative grid grid-cols-3 w-full gap-1 mt-3 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             {aurora && <SegSlider box={statusSeg.box} />}
             {([
               { k: "all", label: t("sd.statusAll", "All") },
@@ -6326,7 +6338,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Individual vs Company filter — customer/company/people views. */}
         {(filterType === "customer" || filterType === "company" || filterType === "people") && (
-          <div ref={entitySeg.ref} className="relative flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={entitySeg.ref} className="relative grid grid-cols-3 w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             {aurora && <SegSlider box={entitySeg.box} />}
             {([
               { k: "all", label: t("filter.everyone", "Everyone"), icon: null },
@@ -6349,17 +6361,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
-        {/* Customer tier filter — All + Diamond/Platinum/Gold/Silver/End User,
-            painted with the canonical material tier colors. Kept on one line;
-            the wider list panel fits all six. Falls back to horizontal scroll
-            only on unusually narrow viewports. */}
+        {/* Customer tier filter — All + Diamond/Platinum/Gold/Silver/Standard,
+            painted with the canonical material tier colors. A GRID, not a
+            wrap: six chips of unequal label length wrapped 5 + 1 and left
+            "Standard" orphaned mid-row. Equal columns give two tidy rows of
+            three when the panel is narrow and one row of six when it isn't. */}
         {filterType === "customer" && (
-          <div ref={tierSeg.ref} className="relative flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={tierSeg.ref} className="relative grid grid-cols-3 @[30rem]:grid-cols-6 w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             {aurora && <SegSlider box={tierSeg.box} />}
             <button
               onClick={() => setTierFilter("all")}
               data-seg-active={tierFilter === "all" ? "true" : undefined}
-              className={`relative flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
+              className={`relative px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
                 tierFilter === "all" ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
@@ -6376,7 +6389,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   /* The tier tint is this chip's IDENTITY (material colours),
                      so it stays even under Aurora — the slider adds the
                      travelling ring around it rather than replacing it. */
-                  className={`relative flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-center whitespace-nowrap transition-colors ${
+                  className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold text-center whitespace-nowrap transition-colors ${
                     active && !aurora ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-hover)]"
                   }`}
                   style={active ? { backgroundColor: meta.tintBg } : undefined}

@@ -364,7 +364,11 @@ export default function ProfileTab({
           gradient vanishes — the pane pattern supplies the scrim instead
           (filterless host + real .kx-glass-bar child; globals lift the
           content above it). */}
-      <div className="kx-bar-host sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
+      {/* No negative margin. `-mx-1 px-1` made this bar 4px wider than the
+          pane it lives in, which gave the pane 4px of horizontal scroll —
+          harmless with a mouse, but on an iPad it let the whole detail
+          column slide left and right under a finger. */}
+      <div className="kx-bar-host sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
         <div aria-hidden className="kx-glass-bar" />
         {/* pe-14 reserves the floating AI/Discuss dock's gutter (end-6 + a
             32px handle): the bar is pinned to the viewport bottom, so at

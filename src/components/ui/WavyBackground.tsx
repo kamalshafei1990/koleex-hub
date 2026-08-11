@@ -259,13 +259,37 @@ export default function WavyBackground(
       ctx.lineWidth = WAVE_WIDTH;
     };
 
+    /* THE FIELD, and why it has two shapes.
+
+       The original weaves all five ribbons around h*0.5 with a ±100px
+       excursion. That puts every lit pixel inside a band roughly 270px tall
+       in the middle of the screen — measured on prod: rgb(5,7,12) at 5%, 20%
+       and 35% of the canvas height, light only at 50%. On Home that is the
+       picture. On an app page it means the top of the screen is not "the
+       aurora, which is dark up there" — it is the flat ground colour with a
+       hard horizontal edge where the light starts, which the owner read as a
+       black band with a border, three times.
+
+       So `topLight` also grows the field: a bigger excursion, and the five
+       centres spread down the height instead of stacked on one line. They
+       still cross and weave — the spread (89px) is a fraction of the
+       excursion (210px), which is what separates this from the parallel
+       stripes the first version of this component was rejected for. Same
+       five strokes per frame; only the y values differ, so it costs nothing.
+
+       Home and the sign-in gate keep the original numbers exactly. */
+    const AMP = topLight ? 210 : 100;
+    const MID = topLight ? 0.40 : 0.5;
+    const SPAN = topLight ? 0.10 : 0;
+
     const drawWave = (n: number) => {
       for (let i = 0; i < n; i++) {
         ctx.beginPath();
         ctx.strokeStyle = WAVE_COLORS[i % WAVE_COLORS.length];
+        const centre = h * (MID + SPAN * (i - 2));
         for (let x = -OVERDRAW; x < w + OVERDRAW; x += 5) {
-          const y = noise3D(x / 800, 0.3 * i, nt) * 100;
-          ctx.lineTo(x, y + h * 0.5);
+          const y = noise3D(x / 800, 0.3 * i, nt) * AMP;
+          ctx.lineTo(x, y + centre);
         }
         ctx.stroke();
         ctx.closePath();
@@ -324,7 +348,7 @@ export default function WavyBackground(
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("resize", onResize);
     };
-  }, [theme]);
+  }, [theme, topLight]);
 
   return (
     <>

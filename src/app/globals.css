@@ -1776,6 +1776,18 @@ input[type="number"]:not(.kx-spinner) {
   scrollbar-gutter: stable;
 }
 
+/* AND NO PANE MAY PAN SIDEWAYS. Both skins — this is a layout bug, not a
+   look. One element bleeding past the pane (a negative margin, a table
+   nobody wrapped) turns a vertical scroller into a two-axis one; on a
+   touch device the whole screen then floats left and right under your
+   finger, which is what the owner saw in Settings on an iPad in portrait.
+   Measured there: the Profile pane was 308px wide with a 312px scroll
+   width, from `-mx-1` on its sticky save bar. `clip` rather than `hidden`
+   so this never creates a scroll container of its own. */
+:is(.kx-pd, .kx-app) :is(main, aside, [data-kx-pane]) {
+  overflow-x: clip;
+}
+
 /* A root that hosts the Aurora ground must LIFT its own content above it.
    The ground is a `fixed z-0` child, and a positioned child paints above
    static siblings — so without this the canvas (and its dark vignette)
