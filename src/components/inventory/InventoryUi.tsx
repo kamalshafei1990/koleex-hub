@@ -253,9 +253,13 @@ export function PageTitleIcon({ icon, size = 14 }: { icon: RrIconName; size?: nu
 /* ─── Section card ────────────────────────────────────────────
    Light wrapper used by table panels for a consistent look. */
 
+/* The list/table wrapper every inventory screen puts its rows in — ten files
+   use it, so it is the single biggest lever in the app. `kx-glass` frosts it
+   under Aurora and evaluates to nothing under Core, where the original
+   `bg-[var(--bg-surface-subtle)]` still paints. */
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ${className}`}>
+    <div className={`kx-glass overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ${className}`}>
       {children}
     </div>
   );

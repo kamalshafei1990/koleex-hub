@@ -1888,6 +1888,81 @@ input[type="number"]:not(.kx-spinner) {
   background: rgba(248, 250, 252, 0.88);
 }
 
+/* ── The shared PageHeader, INSIDE a converted app ──────────────────────
+   PageHeader is the chrome for 22 apps and most are still Core-flat, so its
+   markup carries only identity hooks and every paint decision lives here,
+   bound to `.kx-app`. An app converts and its header converts with it; an
+   app that hasn't been converted renders exactly what it rendered before.
+
+   Three surfaces need it:
+
+   1. `.kx-ph-band` — the sticky strip the tab bar rides in, filled with
+      `--bg-primary`. The remap turns that token TRANSPARENT, so content
+      scrolled straight through the bar. It takes the app's own glass rather
+      than a token: a sticky bar over unknown scrolling content is exactly
+      the case a fixed fill exists for.
+   2. `.kx-ph-tabs` — the tab strip. TabStrip (the canonical one) already
+      ships `kx-glass`; this older twin inside PageHeader predates it and was
+      left translucent-without-frost by the remap.
+   3. `.kx-ph-search` — the search box, filled with `--bg-card`, which the
+      remap does not cover. It becomes a recessed well like every other field
+      on a glassed page (canon C: a white tint disappears against dark glass;
+      fields are wells, not tints).
+
+   All three carry the same low-power / no-backdrop-filter arms as .kx-glass:
+   blur is a pass per element and the Hub runs on mid-range Windows in China. */
+[data-kx-skin="aurora"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+  background: rgba(11, 14, 20, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+}
+[data-kx-skin="aurora"] .kx-app .kx-ph-tabs {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+  background: rgba(255, 255, 255, 0.62);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(12, 14, 18, 0.92);
+}
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+  background: rgba(250, 251, 253, 0.94);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) { background: rgba(12, 14, 18, 0.92); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) { background: rgba(250, 251, 253, 0.94); }
+}
+/* The search box is a WELL, matching the input rules above — same fill, same
+   inset, same Hub-Blue focus ring, so the box and the field inside it read as
+   one control. */
+[data-kx-skin="aurora"] .kx-app .kx-ph-search {
+  background-color: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] .kx-app .kx-ph-search:focus-within {
+  border-color: rgba(86, 127, 178, 0.70);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-search {
+  background-color: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+/* The input INSIDE that well must not draw a second well on top of it —
+   two nested recesses read as a box in a box. It goes transparent and lets
+   the wrapper be the field. */
+[data-kx-skin="aurora"] .kx-app .kx-ph-search input {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 /* Stat/metric mini-cards that were filled with `--bg-primary` — a token the
    app-scope remap turns TRANSPARENT, which left them as floating text with
    a border. They take a surface tint instead of a blur pass: there are a

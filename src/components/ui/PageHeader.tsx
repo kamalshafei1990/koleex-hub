@@ -189,7 +189,7 @@ export default function PageHeader({
           -mx + px restore the page's horizontal padding so the bar
           bleeds to the edges and content scrolling under is hidden. */}
     {hasTabs && (
-      <div className="sticky top-0 z-30 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6">
+      <div className="kx-ph-band sticky top-0 z-30 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6">
         <SlidingPillNav
           tabs={mergedTabs}
           activeKey={active}
@@ -407,7 +407,7 @@ function SlidingPillNav({
       // bar completely hid the fact that more tabs existed off-screen. A
       // thin, low-contrast scrollbar gives the cue without harming the
       // brand-minimal aesthetic.
-      className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="kx-ph-tabs relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
@@ -541,7 +541,7 @@ function HomeSearchBar({
   };
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="group flex h-11 w-full items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 transition-colors duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:h-12 sm:gap-3 sm:px-4">
+      <div className="kx-ph-search group flex h-11 w-full items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 transition-colors duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:h-12 sm:gap-3 sm:px-4">
         <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
           ref={inputRef}
