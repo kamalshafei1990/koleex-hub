@@ -72,6 +72,33 @@ const T: Translations = {
   "inv.nav.r.transfers": { en: "Transfers", zh: "调拨",   ar: "التحويلات" },
   "inv.nav.r.returns":   { en: "Returns",   zh: "退货",   ar: "المرتجعات" },
   "inv.nav.r.balances":  { en: "Balances",  zh: "余额",   ar: "الأرصدة" },
+  /* These four reach the tab strip through OVERFLOW_GROUPS, which PageHeader
+     flattens into the same bar — so they were the only tabs still reading
+     "Search / Serials / Batches / Warehouses" in Arabic and Chinese. */
+  "inv.nav.r.search":     { en: "Search",     zh: "搜索",   ar: "بحث" },
+  "inv.nav.r.serials":    { en: "Serials",    zh: "序列号", ar: "الأرقام التسلسلية" },
+  "inv.nav.r.batches":    { en: "Batches",    zh: "批次",   ar: "الدفعات" },
+  "inv.nav.r.warehouses": { en: "Warehouses", zh: "仓库",   ar: "المستودعات" },
+  "inv.nav.g.do":        { en: "Actions",   zh: "操作",   ar: "إجراءات" },
+  "inv.nav.g.lookup":    { en: "Look up",   zh: "查询",   ar: "بحث واستعلام" },
+  "inv.nav.g.setup":     { en: "Setup",     zh: "设置",   ar: "الإعداد" },
+  "inv.nav.popupTitle":  { en: "Inventory", zh: "库存",   ar: "المخزون" },
+  "inv.nav.popupSub":    { en: "Pick where to go.", zh: "选择要前往的位置。", ar: "اختر الوجهة." },
+};
+
+/* route → translation key, for the overflow groups (their labels are written
+   in English inside the group config, which the tab bar then renders). */
+const ROUTE_LABEL_KEY: Record<string, string> = {
+  "/inventory": "inv.nav.r.home",
+  "/inventory/items": "inv.nav.r.items",
+  "/inventory/movements": "inv.nav.r.movements",
+  "/inventory/transfers": "inv.nav.r.transfers",
+  "/inventory/returns": "inv.nav.r.returns",
+  "/inventory/balances": "inv.nav.r.balances",
+  "/inventory/search": "inv.nav.r.search",
+  "/inventory/serials": "inv.nav.r.serials",
+  "/inventory/batches": "inv.nav.r.batches",
+  "/inventory/warehouses": "inv.nav.r.warehouses",
 };
 
 export default function InventoryHeader({
@@ -95,13 +122,25 @@ export default function InventoryHeader({
   const { t } = useTranslation(T);
   const searchPlaceholder = useSearchPlaceholder("inventory");
 
+  /* One resolver for both sources, so a route added to either list is
+     translated the same way. */
+  const label = (key: string, fallback: string) => {
+    const k = ROUTE_LABEL_KEY[key];
+    if (!k) return fallback;
+    const translated = t(k);
+    return translated === k ? fallback : translated;
+  };
+
   const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
     key: tab.key,
     icon: tab.icon,
-    label: (() => {
-      const translated = t(tab.i18nKey);
-      return translated === tab.i18nKey ? tab.label : translated;
-    })(),
+    label: label(tab.key, tab.label),
+  }));
+
+  const overflowGroups: NavGroup[] = OVERFLOW_GROUPS.map((g) => ({
+    ...g,
+    label: t(`inv.nav.g.${g.id}`) === `inv.nav.g.${g.id}` ? g.label : t(`inv.nav.g.${g.id}`),
+    items: g.items.map((i) => ({ ...i, label: label(i.key, i.label) })),
   }));
 
   return (
@@ -113,9 +152,9 @@ export default function InventoryHeader({
       controls={controls}
       meta={meta}
       tabs={tabs}
-      overflowTabs={OVERFLOW_GROUPS}
-      popupTitle="Inventory"
-      popupSubtitle="Pick where to go."
+      overflowTabs={overflowGroups}
+      popupTitle={t("inv.nav.popupTitle")}
+      popupSubtitle={t("inv.nav.popupSub")}
       showTabs={showTabs}
       searchPlaceholder={searchPlaceholder}
       searchHref="/inventory/search"

@@ -155,28 +155,28 @@ export default function InventoryDashboard() {
             <KpiCard
               className="kx-glass"
               icon="box-open"
-              label="Stock Items"
+              label={t("inv.dashboard.kpi.stockItems")}
               value="—"
               loading={loading}
             />
             <KpiCard
               className="kx-glass"
               icon="download"
-              label="Today's Receipts"
+              label={t("inv.dashboard.kpi.todayReceipts")}
               value={op?.today.receipts ?? 0}
               loading={loading}
             />
             <KpiCard
               className="kx-glass"
               icon="truck-side"
-              label="Today's Shipments"
+              label={t("inv.dashboard.kpi.todayShipments")}
               value={op?.today.shipments ?? 0}
               loading={loading}
             />
             <KpiCard
               className="kx-glass"
               icon="shield-check"
-              label="Pending Actions"
+              label={t("inv.dashboard.kpi.pendingActions")}
               value={totalAlerts}
               loading={loading}
             />

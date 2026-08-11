@@ -312,6 +312,12 @@ export const inventoryT: Translations = {
   "inv.batches.form.save":           { en: "Create batch",         zh: "创建批次",        ar: "إنشاء دفعة" },
 
   /* ── KPI ───────────────────────────────────────────────────── */
+  /* The four KPI cards at the top of /inventory — the only strings on that
+     strip that were still English in every language. */
+  "inv.dashboard.kpi.stockItems":      { en: "Stock Items",      zh: "库存物品",   ar: "أصناف المخزون" },
+  "inv.dashboard.kpi.todayReceipts":   { en: "Today's Receipts",  zh: "今日入库",   ar: "استلامات اليوم" },
+  "inv.dashboard.kpi.todayShipments":  { en: "Today's Shipments", zh: "今日出库",   ar: "شحنات اليوم" },
+  "inv.dashboard.kpi.pendingActions":  { en: "Pending Actions",   zh: "待处理事项", ar: "إجراءات معلّقة" },
   "inv.dashboard.kpi.expired_batches":    { en: "Expired batches",    zh: "过期批次",        ar: "دفعات منتهية" },
   "inv.dashboard.kpi.near_expiry_batches":{ en: "Near-expiry batches",zh: "临期批次",        ar: "دفعات قاربت الانتهاء" },
 

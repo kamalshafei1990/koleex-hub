@@ -778,7 +778,7 @@ function Step1({
         /* ── Category grid ──────────────────────────────── */
         <>
           <h3 className="mt-4 text-[17px] font-semibold tracking-tight">{t("inv.int.step1.title")}</h3>
-          <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">Choose the type that best fits what you're adding.</p>
+          <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">Choose the type that best fits what you&apos;re adding.</p>
           <div
             data-testid="inv-internal-cat-grid"
             className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
