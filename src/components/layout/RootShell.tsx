@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import { isUnderglassRoute } from "@/lib/underglass";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
@@ -247,7 +248,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* pt-14 = header height. The view-as indicator is now a compact floating
           pill (overlay), so it no longer needs to push content down. */}
       <div
-        className={`kx-shell-top ${pathname === "/" ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`kx-shell-top ${isUnderglassRoute(pathname) ? "kx-underglass" : "pt-14"} flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,

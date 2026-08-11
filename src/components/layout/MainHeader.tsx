@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isUnderglassRoute } from "@/lib/underglass";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import MoonIcon from "@/components/icons/ui/MoonIcon";
 import SunIcon from "@/components/icons/ui/SunIcon";
@@ -185,7 +186,7 @@ export default function MainHeader() {
            pane must never re-break anything. Elsewhere the pane stays the
            flat bar-height blur. */
         className={`kx-header-pane fixed top-0 left-0 right-0 z-[99] pointer-events-none ${
-          pathname === "/" ? "kx-pane-progressive" : ""
+          isUnderglassRoute(pathname) ? "kx-pane-progressive" : ""
         }`}
       >
         <i /><i /><i /><i />
