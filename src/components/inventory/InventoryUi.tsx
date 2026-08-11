@@ -284,7 +284,7 @@ export function InventoryKpi({
                           "bg-white/30";
   return (
     <div className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-3.5">
-      <div aria-hidden className={`absolute left-4 top-0 h-px w-8 ${accent}`} />
+      <div aria-hidden className={`absolute start-4 top-0 h-px w-8 ${accent}`} />
       <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className="mt-2 text-[24px] font-medium leading-none tabular-nums tracking-[-0.01em]">{value}</div>
       {hint && <div className="mt-1.5 text-[10.5px] text-[var(--text-dim)]">{hint}</div>}

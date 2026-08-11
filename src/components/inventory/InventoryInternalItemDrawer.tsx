@@ -742,7 +742,7 @@ function Step1({
     <div>
       {/* ── Search bar ────────────────────────────────────── */}
       <div className="relative">
-        <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
+        <span aria-hidden className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
           <RrIcon name="search" size={14} />
         </span>
         <input
@@ -750,14 +750,14 @@ function Step1({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t("inv.int.search.ph")}
-          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 pl-9 pr-9 text-[13px] outline-none transition-colors focus:border-[var(--text-dim)] placeholder:text-[var(--text-dim)]"
+          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 ps-9 pr-9 text-[13px] outline-none transition-colors focus:border-[var(--text-dim)] placeholder:text-[var(--text-dim)]"
         />
         {hasQuery && (
           <button
             type="button"
             onClick={() => setSearchQuery("")}
             aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-elevated)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            className="absolute end-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-elevated)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
           >
             <RrIcon name="cross" size={9} />
           </button>

@@ -296,7 +296,7 @@ export function ActionCard({
           : "min-h-[80px] border-[var(--border-subtle)] px-3.5 py-3"
       }`}
     >
-      <div aria-hidden className={`absolute left-4 top-0 h-px ${isPrimary ? "w-14" : "w-8"} ${accent}`} />
+      <div aria-hidden className={`absolute start-4 top-0 h-px ${isPrimary ? "w-14" : "w-8"} ${accent}`} />
       <div className={`flex items-center ${isPrimary ? "gap-3" : "gap-2"}`}>
         <span
           className={`flex shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] ${
@@ -570,7 +570,7 @@ export function MobileFab() {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation(inventoryT);
   return (
-    <div data-testid="inv-mobile-fab" className="fixed bottom-20 right-4 z-30 md:hidden">
+    <div data-testid="inv-mobile-fab" className="fixed bottom-20 end-4 z-30 md:hidden">
       {open && (
         <div className="mb-2 flex flex-col items-end gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-2 shadow-lg">
           <FabLink href="/inventory/movements?create=receive"   icon="download"         label={t("inv.action.receive")} />
@@ -799,7 +799,7 @@ export function InventoryShortcutsLegend() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-dim)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)]"
+        className="kx-glass-pop kx-hover-glow fixed bottom-4 start-4 md:start-[76px] z-40 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-dim)] shadow-lg transition-colors hover:text-[var(--text-primary)]"
         title="Keyboard shortcuts (press ?)"
         aria-expanded={open}
       >
@@ -810,14 +810,15 @@ export function InventoryShortcutsLegend() {
       {open && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            /* Standing scrim: dim + backdrop-blur-sm on every popup. */
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
             onClick={() => setOpen(false)}
             aria-hidden
           />
           <div
             role="dialog"
             aria-label="Keyboard shortcuts"
-            className="fixed bottom-16 left-4 z-50 w-[300px] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
+            className="kx-glass-pop fixed bottom-16 start-4 md:start-[76px] z-50 w-[300px] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3.5 py-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">

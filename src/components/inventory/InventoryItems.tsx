@@ -199,7 +199,7 @@ export default function InventoryItems() {
                 onClick={() => setAddMenuOpen(false)}
                 className="fixed inset-0 z-40 cursor-default"
               />
-              <div className="absolute right-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
+              <div className="absolute end-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
                 <Link
                   href="/products/new"
                   onClick={() => setAddMenuOpen(false)}
@@ -255,14 +255,14 @@ export default function InventoryItems() {
         <Panel className="px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="relative">
-              <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--text-dim)]">
+              <span aria-hidden className="pointer-events-none absolute inset-y-0 start-2 flex items-center text-[var(--text-dim)]">
                 <RrIcon name="search" size={12} />
               </span>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Name, code, brand, SKU…"
-                className="w-[260px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
+                className="w-[260px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 ps-7 pe-2 text-[12px]"
               />
             </span>
             <button

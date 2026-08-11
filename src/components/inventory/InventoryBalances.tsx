@@ -172,14 +172,14 @@ export default function InventoryBalances() {
             <label className="flex flex-col">
               <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Search item</span>
               <span className="relative">
-                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--text-dim)]">
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 start-2 flex items-center text-[var(--text-dim)]">
                   <RrIcon name="search" size={12} />
                 </span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Code or item name…"
-                  className="w-[220px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
+                  className="w-[220px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 ps-7 pe-2 text-[12px]"
                 />
               </span>
             </label>

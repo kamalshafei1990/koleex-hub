@@ -154,7 +154,7 @@ export default function InventorySerials() {
       <Panel className="mt-5 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
+            <span className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
               <RrIcon name="search" size={12} />
             </span>
             <input
@@ -162,7 +162,7 @@ export default function InventorySerials() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("inv.serials.search.placeholder", "Search serial number…")}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 pl-7 pr-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1.5 ps-7 pe-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)]"
             />
           </div>
           <select

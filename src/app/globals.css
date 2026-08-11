@@ -1911,31 +1911,42 @@ input[type="number"]:not(.kx-spinner) {
 
    All three carry the same low-power / no-backdrop-filter arms as .kx-glass:
    blur is a pass per element and the Hub runs on mid-range Windows in China. */
-[data-kx-skin="aurora"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+/* THE BAND CARRIES THE ONLY BLUR IN THIS STRIP. The tab strip lives INSIDE
+   the band, so giving both a backdrop-filter was the canon's "never stack
+   blur on blur" — measured on prod: band at y=201 h=49, strip at y=207 h=37,
+   both blur(16px). A child of a filtered ancestor cannot sample the page at
+   all (it becomes a backdrop root), and the two passes turn the busiest
+   strip on the screen to mush. The strip takes a TINT instead, exactly as
+   the Product Data category tiles do inside their bar. */
+[data-kx-skin="aurora"] .kx-app .kx-ph-band {
   background: rgba(11, 14, 20, 0.55);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
 }
 [data-kx-skin="aurora"] .kx-app .kx-ph-tabs {
+  background: rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-band {
   background: rgba(255, 255, 255, 0.62);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs {
+  background: rgba(0, 0, 0, 0.05);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-[data-kx-skin="aurora"][data-kx-lowpower] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-app .kx-ph-band {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(12, 14, 18, 0.92);
 }
-[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) {
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-app .kx-ph-band {
   background: rgba(250, 251, 253, 0.94);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-kx-skin="aurora"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) { background: rgba(12, 14, 18, 0.92); }
-  [data-kx-skin="aurora"][data-theme="light"] .kx-app :is(.kx-ph-band, .kx-ph-tabs) { background: rgba(250, 251, 253, 0.94); }
+  [data-kx-skin="aurora"] .kx-app .kx-ph-band { background: rgba(12, 14, 18, 0.92); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-band { background: rgba(250, 251, 253, 0.94); }
 }
 /* The search box is a WELL, matching the input rules above — same fill, same
    inset, same Hub-Blue focus ring, so the box and the field inside it read as
