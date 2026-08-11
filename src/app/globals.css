@@ -507,6 +507,25 @@ body {
   outline: none;
 }
 
+/* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
+
+   Reported from an Oppo on the ColorOS browser: "most of the things the
+   colors change from white to black", app icons and the AI orb rendered as
+   black squares. ColorOS — like UC, Quark, Samsung Internet and Chrome's
+   own "Force dark" flag — runs an automatic dark mode that INVERTS a page
+   it believes is light. `color-scheme` was only ever declared on date/time
+   inputs, so the Hub never told anyone it is already dark, and the browser
+   inverted an interface that was correct to begin with. White surfaces
+   became black; icons, which are masks painted in `currentColor`, inverted
+   with the text colour around them.
+
+   This is the whole fix, and it is the standard one: a page that states its
+   scheme is exempted from auto-dark on every engine that ships it. The
+   value has to FOLLOW the skin — forcing `dark` would make the light theme
+   the thing being inverted instead. */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
 /* Native date/time pickers — make the calendar/clock indicator follow the
    active theme so it stays visible (was near-invisible/dark in dark mode). */
 input[type="time"],

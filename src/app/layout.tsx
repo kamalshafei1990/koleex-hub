@@ -66,6 +66,14 @@ export const viewport: Viewport = {
      make it worse. */
   interactiveWidget: "resizes-content",
   themeColor: "#0A0A0A",
+  /* Belt and braces with the `color-scheme` rule in globals.css. A phone
+     browser that auto-darkens (ColorOS, UC, Quark, Samsung Internet) reads
+     this meta BEFORE any stylesheet arrives, so it never starts inverting
+     in the first place — the CSS rule alone can leave a visible flash of
+     inverted colour on a slow connection. Both values are listed because
+     the Hub genuinely ships both skins; `dark` leads since that is the
+     default. */
+  colorScheme: "dark light",
 };
 
 export default function RootLayout({
