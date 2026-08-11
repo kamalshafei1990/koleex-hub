@@ -2092,32 +2092,43 @@ export default function ProductList() {
                 </div>
               )}
             </div>
-            {/* View Toggle */}
-            <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+            {/* View Toggle. Aurora: the language-bar segment grammar — a
+                padded shell with FREE rounded buttons, so the seg-on ring's
+                corners never fight a clipping container (the owner's "UI
+                bug": rounded ring inside overflow-hidden rounded-xl). Core:
+                the original joined pair, untouched. */}
+            <div className={aurora
+              ? "flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1"
+              : "flex rounded-xl border border-[var(--border-subtle)] overflow-hidden"}>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`h-10 w-10 flex items-center justify-center transition-all ${
-                  viewMode === "grid"
-                    ? aurora
-                      ? /* Aurora selected state = the system's Hub-Blue
-                           ring (the old surface-tint active was barely
-                           distinguishable over glass). Core unchanged. */
-                        "kx-seg-on rounded-lg text-[var(--text-primary)]"
-                      : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
-                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                }`}
+                className={aurora
+                  ? `h-8 w-9 rounded-lg flex items-center justify-center transition-all ${
+                      viewMode === "grid"
+                        ? "kx-seg-on text-[var(--text-primary)]"
+                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    }`
+                  : `h-10 w-10 flex items-center justify-center transition-all ${
+                      viewMode === "grid"
+                        ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                        : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    }`}
               >
                 <LayoutGridIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`h-10 w-10 flex items-center justify-center border-l border-[var(--border-subtle)] transition-all ${
-                  viewMode === "list"
-                    ? aurora
-                      ? "kx-seg-on rounded-lg text-[var(--text-primary)]"
-                      : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
-                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                }`}
+                className={aurora
+                  ? `h-8 w-9 rounded-lg flex items-center justify-center transition-all ${
+                      viewMode === "list"
+                        ? "kx-seg-on text-[var(--text-primary)]"
+                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    }`
+                  : `h-10 w-10 flex items-center justify-center border-l border-[var(--border-subtle)] transition-all ${
+                      viewMode === "list"
+                        ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                        : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    }`}
               >
                 <ListIcon className="h-4 w-4" />
               </button>
