@@ -6642,7 +6642,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       if (filterType === "supplier" && supplierKpis) {
         return (
           <div className="h-full overflow-y-auto">
-            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
+            <div className="@container w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
                 <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t("type.supplier")} {t("kpi.overview")}</h2>
@@ -6653,7 +6653,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   surfaces. Ordered like the header tabs (coverage → intelligence)
                   so the nav reads consistently; kept lightweight so they read as
                   shortcuts, not a second competing nav. */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 @[34rem]:grid-cols-2">
                 {[
                   { href: "/suppliers/main", icon: <StarIcon size={18} />, title: t("supplier.mainSuppliers", "Koleex Main Suppliers"), desc: t("supplier.mainSuppliersDesc", "Sourcing coverage map — main/backup suppliers by division, category & subcategory") },
                   { href: "/suppliers/sourcing", icon: <TargetIcon size={18} />, title: t("supplier.commandCenter", "Sourcing Command Center"), desc: t("supplier.commandCenterDesc", "Tenant-wide procurement intelligence — ranking, dependencies & recommendations") },
@@ -6676,7 +6676,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Main KPI Row - 4 cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 @[44rem]:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Suppliers */}
                 <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
@@ -6833,7 +6833,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         const topCountries = countryStats;
         return (
           <div className="h-full overflow-y-auto">
-            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
+            <div className="@container w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
                 <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t("type.customer")} {t("kpi.overview")}</h2>
@@ -6843,7 +6843,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {/* Explore — two compact entry points to the deeper customer
                   surfaces, mirroring the Supplier Overview's feature cards
                   (Main Suppliers / Sourcing Command Center). */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 @[34rem]:grid-cols-2">
                 {[
                   { href: "/crm", icon: <TargetIcon size={18} />, title: t("customer.crmPipeline", "CRM Pipeline"), desc: t("customer.crmPipelineDesc", "Opportunities, deals & follow-ups across your customer book") },
                   { href: "/commercial-policy", icon: <DollarSignIcon size={18} />, title: t("customer.commercialPolicy", "Commercial Policy & Pricing"), desc: t("customer.commercialPolicyDesc", "Customer tiers, price levels, discounts & credit rules") },
@@ -6866,7 +6866,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Main KPI Row — neutral chip styling, same as Supplier Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 @[44rem]:grid-cols-4 gap-3 md:gap-4">
                 {/* Total */}
                 <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
@@ -7024,12 +7024,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         const accentColor = filterType === "company" ? "purple" : "green";
         return (
           <div className="h-full overflow-y-auto">
-            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
+            <div className="@container w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-[var(--text-primary)]">{typeLabel} {t("kpi.overview")}</h2>
                 <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 @[44rem]:grid-cols-4 gap-3 md:gap-4">
                 <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${accentColor}-500/10`}>{typeIcon}</div>
@@ -10261,7 +10261,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneContact", "At least one of phone / mobile / email is required")} <span className="text-rose-400">*</span></p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 @[34rem]:grid-cols-2">
                   <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code || "CN"} />
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>

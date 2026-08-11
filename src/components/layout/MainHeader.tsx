@@ -254,7 +254,13 @@ export default function MainHeader() {
                the desktop shell, drops a stray image onto whatever is behind
                the window. */
             draggable={false}
-            className="w-auto h-5 md:h-8 select-none [-webkit-user-drag:none]"
+            /* The lockup is ~207px wide at h-8. On a 768 tablet that plus the
+               language bar, theme, bell and avatar does not fit the row, and
+               the logo — which cannot shrink — was overlapped by the right
+               group (measured: logo ended at 231px, the language bar started
+               at 166px). It steps down between md and lg, where the space
+               actually runs out, and keeps its full size from lg up. */
+            className="w-auto h-5 md:h-6 lg:h-8 select-none [-webkit-user-drag:none]"
           />
         </Link>
         {appName && (
