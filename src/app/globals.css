@@ -1588,6 +1588,93 @@ input[type="number"]:not(.kx-spinner) {
   color: #16324F;
 }
 
+/* ── Switches and sliders under Aurora ──────────────────────────────────
+   Two standing owner rules stay intact: a toggle is EMERALD when on with a
+   white knob, a bar-type control is BLUE with a white knob. What changes is
+   the MATERIAL. Shipped flat, both read as Core paint dropped on frosted
+   glass — owner, 2026-08-11: "this items designs and color not match aurora
+   style". The off-track was a solid grey blob, the on-track a saturated
+   block with a hard edge, and the slider filled with #0066FF, i.e. a SECOND
+   blue sitting next to Aurora's Hub Blue everywhere else on the screen.
+
+   Aurora restates them in the system's own grammar: off = the recessed well
+   (same recipe as the form fields), on = the same emerald with an inner
+   light edge and a low halo, slider = the Hub Blue gradient over a well.
+
+   Scoped by ROLE, not by a class: every switch in the Hub — the 13 that
+   exist and every one written later — follows with no per-file edit, and
+   Core keeps its own flat classes because none of this exists there. */
+[data-kx-skin="aurora"] [role="switch"] {
+  background: rgba(3, 5, 9, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+              inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] [role="switch"][aria-checked="true"] {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.95), rgba(5, 150, 105, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
+              inset 0 0 0 1px rgba(16, 185, 129, 0.55),
+              0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+/* The knob is the one solid object in the control — it keeps its white and
+   gains the depth that sells the track as a recess. */
+[data-kx-skin="aurora"] [role="switch"] > span {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+[data-kx-skin="aurora"][data-theme="light"] [role="switch"] {
+  background: rgba(255, 255, 255, 0.70);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.10),
+              inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] [role="switch"][aria-checked="true"] {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.95), rgba(5, 150, 105, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
+              inset 0 0 0 1px rgba(5, 150, 105, 0.45),
+              0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+[data-kx-skin="aurora"][data-theme="light"] [role="switch"] > span {
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
+}
+
+/* Range sliders. The track paint lives HERE and not in an inline style so
+   Aurora can swap a flat colour for a gradient — the component only passes
+   the position (`--kx-slider-pos`), which is data, not styling. */
+.kx-range {
+  --kx-slider-pos: 0%;
+  --kx-slider-fill: var(--accent-blue, #0066FF);
+  --kx-slider-rest: var(--border-color, #6b7280);
+  background: linear-gradient(
+    to right,
+    var(--kx-slider-fill) 0 var(--kx-slider-pos),
+    var(--kx-slider-rest) var(--kx-slider-pos) 100%
+  );
+}
+[data-kx-skin="aurora"] .kx-range {
+  background:
+    linear-gradient(90deg, #567FB2 0%, #BCD8F0 100%) left center /
+      var(--kx-slider-pos) 100% no-repeat,
+    rgba(3, 5, 9, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+              inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-range {
+  background:
+    linear-gradient(90deg, #567FB2 0%, #BCD8F0 100%) left center /
+      var(--kx-slider-pos) 100% no-repeat,
+    rgba(255, 255, 255, 0.70);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.10),
+              inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+/* Vendor thumb selectors NEVER share a rule — one unknown pseudo-element
+   drops the whole declaration block in the other engine. */
+[data-kx-skin="aurora"] .kx-range::-webkit-slider-thumb {
+  border-color: rgba(255, 255, 255, 0.30);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+[data-kx-skin="aurora"] .kx-range::-moz-range-thumb {
+  border-color: rgba(255, 255, 255, 0.30);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
 /* Hover on the header chips — owner's final word, 2026-08-10: "it only that
    you can change the borders colors, no more." So the box answers a pointer
    with its BORDER alone: no fill tint, no underglow, no lift. The earlier

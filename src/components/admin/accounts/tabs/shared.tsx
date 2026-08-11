@@ -94,9 +94,11 @@ export function Toggle({
             : "bg-zinc-600 dark:bg-zinc-600"
         }`}
       >
+        {/* Logical positioning — a physical left+translate knob travels the
+            wrong way under RTL. */}
         <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-            checked ? "translate-x-5" : ""
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${
+            checked ? "start-[22px]" : "start-0.5"
           }`}
         />
       </button>

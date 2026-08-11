@@ -81,11 +81,16 @@ export default function AlertPreferencesModal({ onClose }: { onClose: () => void
               {KINDS.map((k) => (
                 <label key={k.key} className="flex items-center justify-between gap-3 py-2 cursor-pointer">
                   <span className="text-[13px] text-[var(--text-primary)]">{k.label}</span>
+                  {/* The Hub's ONE toggle: emerald track when on, white knob,
+                      role=switch — this one had drifted to --accent and no
+                      switch role, which also kept it out of the Aurora arm. */}
                   <button
                     type="button"
                     onClick={() => toggle(k.key)}
-                    className={`relative h-5 w-9 rounded-full transition-colors shrink-0 ${isOn(k.key) ? "bg-[var(--accent)]" : "bg-[var(--bg-inverted)]/[0.15]"}`}
-                    aria-pressed={isOn(k.key)}
+                    className={`relative h-5 w-9 rounded-full transition-colors shrink-0 ${isOn(k.key) ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"}`}
+                    role="switch"
+                    aria-checked={isOn(k.key)}
+                    aria-label={k.label}
                   >
                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${isOn(k.key) ? "start-[18px]" : "start-0.5"}`} />
                   </button>

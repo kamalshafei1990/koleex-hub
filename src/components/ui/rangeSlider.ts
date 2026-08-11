@@ -10,14 +10,19 @@
    which is exactly the green-on-green / blue-on-blue thumb we had to undo.
    So the track is a linear-gradient and the thumb is styled explicitly.
 
+   The track PAINT lives in globals under `.kx-range` (Core flat blue,
+   Aurora Hub-Blue gradient over a recessed well); this file passes only the
+   filled position as `--kx-slider-pos`. Painting from an inline style, as
+   this used to, made the fill unoverridable — inline beats every rule — so
+   Aurora could never give the bar its own material.
+
    Usage:
      <input type="range" className={KX_RANGE_CLASS} style={kxRangeStyle(pct)} … />
    where `pct` is 0–100.
    --------------------------------------------------------------------------- */
 
 export const KX_RANGE_CLASS =
-  "h-1.5 w-full cursor-pointer appearance-none rounded-full " +
-  "[--kx-slider-fill:var(--accent-blue,#0066FF)] [--kx-slider-rest:var(--border-color,#6b7280)] " +
+  "kx-range h-1.5 w-full cursor-pointer appearance-none rounded-full " +
   "[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none " +
   "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-black/10 " +
   "[&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow " +
@@ -25,11 +30,9 @@ export const KX_RANGE_CLASS =
   "[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-black/10 " +
   "[&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow";
 
-/** Track fill for a 0–100 percentage. Clamped so a bad value can't paint
- *  outside the bar. */
+/** Filled position for a 0–100 percentage. Clamped so a bad value can't
+ *  paint outside the bar. */
 export function kxRangeStyle(pct: number): React.CSSProperties {
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  return {
-    background: `linear-gradient(to right, var(--kx-slider-fill) 0 ${p}%, var(--kx-slider-rest) ${p}% 100%)`,
-  };
+  return { "--kx-slider-pos": `${p}%` } as React.CSSProperties;
 }

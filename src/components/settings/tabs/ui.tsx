@@ -126,7 +126,10 @@ export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
           checked ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"
         }`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
+        {/* Logical, not physical: left-0.5 + translate-x-5 ran the knob the
+            WRONG WAY in Arabic (off parked at the inline-end). inset-inline
+            keeps "off = start, on = end" true in both directions. */}
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${checked ? "start-[22px]" : "start-0.5"}`} />
       </button>
     </div>
   );
