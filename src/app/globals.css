@@ -1319,35 +1319,38 @@ input[type="number"]:not(.kx-spinner) {
    the design"), an inset depth shadow, and the system's Hub-Blue ring on
    focus. Element-level so every future field on the page follows. The chat
    surface is deliberately NOT in scope: its composer textarea is
-   transparent inside the glass card. Core keeps the var() classes. */
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) textarea,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) select {
+   transparent inside the glass card. Core keeps the var() classes.
+   type="range" is excluded: sliders draw their own blue track (standing
+   rule) — a well fill/ring behind an appearance-none track is an artifact,
+   not a field. */
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select {
   background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) input:focus,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) textarea:focus,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd) select:focus {
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="range"]):focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
   border-color: rgba(86, 127, 178, 0.70);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) textarea,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) select {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select {
   background-color: rgba(255, 255, 255, 0.70);
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) input:focus,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) textarea:focus,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd) select:focus {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="range"]):focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
   border-color: rgba(62, 103, 150, 0.75);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
 
-/* ── Aurora: Product Data / Products (kx-pd scope) ──────────────────────
+/* ── Aurora: converted-app scope (kx-app; kx-pd = Products/PD alias) ────
    10k+ lines of app convert through the VARIABLES, not through classes:
    the whole surface system is var()-driven, so remapping the app's own
    tokens under the scope turns every panel, chip, row and hover
@@ -1355,15 +1358,18 @@ input[type="number"]:not(.kx-spinner) {
    backdrop-root/containing-block traps cannot bite (FormModal renders
    fixed WITHOUT a portal inside form sections — a blurred ancestor there
    would capture it): the grid cards (leaf), the sticky bars (pane
-   pattern, filterless host), the search dropdown, and overlays. */
-[data-kx-skin="aurora"] .kx-pd {
+   pattern, filterless host), the search dropdown, and overlays.
+   NEW APPS: put `kx-app` on the app root — this one class is the whole
+   var-remap step of the Scale Pattern. kx-pd stays for the already
+   shipped Products/Product Data roots. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) {
   --bg-primary: transparent;
   --bg-secondary: rgba(13, 16, 22, 0.55);
   --bg-surface: rgba(255, 255, 255, 0.04);
   --bg-surface-subtle: rgba(255, 255, 255, 0.07);
   --bg-surface-active: rgba(255, 255, 255, 0.12);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-pd {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) {
   --bg-secondary: rgba(255, 255, 255, 0.62);
   --bg-surface: rgba(0, 0, 0, 0.04);
   --bg-surface-subtle: rgba(0, 0, 0, 0.07);

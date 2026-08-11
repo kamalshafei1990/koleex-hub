@@ -25,7 +25,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import AuthGate from "@/components/admin/AuthGate";
+import { useSkin } from "@/lib/appearance";
 import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
@@ -57,6 +59,9 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import type { AccountWithLinks } from "@/types/supabase";
+
+/* Aurora ground — loaded only under the skin (Core never pays for it). */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 type Tab = "profile" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
@@ -107,6 +112,7 @@ function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
   const { t } = useTranslation(settingsT);
   const { data: boot } = useMeBootstrap();
+  const aurora = useSkin() === "aurora";
   const isSA = !!boot?.isSuperAdmin;
   const [tab, setTab] = useState<Tab>("profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
@@ -211,11 +217,23 @@ function SettingsContent() {
   const aboutItems = (["about"] as Tab[]).map(byId);
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full max-w-[100vw]">
+    /* h-full, NOT 100vh maths: the shell already resolves the per-mode
+       viewport unit (svh in browser / vh standalone) — a child re-measuring
+       100vh here is exactly the old bottom-crop bug. kx-app = the Aurora
+       var-remap scope (globals); Core reads the same vars, solid. */
+    <div className="kx-app relative h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full max-w-[100vw]">
+      {/* Aurora: the Hub ground behind the whole app — the root goes
+          transparent under the skin and every glass surface frosts this
+          canvas, exactly like Home. Core keeps the solid page. */}
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
       {/* Canonical Koleex app header — identical to every other app.
           Shares the body's max-width + padding so the title aligns with the
           master list below and the whole page fills the desktop viewport. */}
-      <div className="shrink-0 w-full mx-auto max-w-[1600px] px-4 md:px-6 pt-4 sm:pt-5">
+      <div className="relative z-[1] shrink-0 w-full mx-auto max-w-[1600px] px-4 md:px-6 pt-4 sm:pt-5">
         <PageHeader
           title={t("title")}
           subtitle={t("subtitle")}
@@ -225,7 +243,7 @@ function SettingsContent() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0">
+      <div className="relative z-[1] flex-1 min-h-0">
         <div className="mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
 
           {/* Master list — sidebar on iPad, full screen on iPhone. */}
@@ -234,7 +252,7 @@ function SettingsContent() {
             <button
               type="button"
               onClick={() => openSection("profile")}
-              className="w-full flex items-center gap-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 text-start hover:border-[var(--border-focus)] transition-colors"
+              className="kx-glass kx-hover-glow w-full flex items-center gap-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 text-start hover:border-[var(--border-focus)] transition-colors"
             >
               <span className="h-12 w-12 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
                 {avatarUrl ? (
@@ -260,7 +278,7 @@ function SettingsContent() {
             {/* Notifications — preferences (in-pane) + link to the push page. */}
             <div>
               <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">{t("group.notifications")}</p>
-              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+              <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
                 <SettingsRow
                   active={!mobileDetail && tab === "notifications"}
                   onClick={() => openSection("notifications")}
@@ -333,7 +351,9 @@ function MasterGroup({
   return (
     <div>
       <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">{label}</p>
-      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+      {/* kx-glass: the master-list groups are floating leaf tiles over the
+          Aurora canvas (true frost, like Home's tiles). Core: solid card. */}
+      <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         {items.map((s, i) => (
           <SettingsRow
             key={s.id}

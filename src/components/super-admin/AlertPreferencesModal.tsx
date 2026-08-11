@@ -61,7 +61,7 @@ export default function AlertPreferencesModal({ onClose }: { onClose: () => void
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-[0_24px_80px_rgba(0,0,0,0.55)] flex flex-col max-h-[85vh]"
+        className="kx-glass-pop w-full max-w-md rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-[0_24px_80px_rgba(0,0,0,0.55)] flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">

@@ -287,7 +287,7 @@ export default function NotificationsTab({ account, onChanged }: {
       {!!boot?.isSuperAdmin && (
         <Link
           href="/settings/notifications"
-          className="flex items-center justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+          className="kx-hover-glow flex items-center justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
         >
           <span>{t("notif.managePush")}</span>
           <span className="text-[var(--text-faint)]">›</span>

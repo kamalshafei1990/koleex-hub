@@ -261,6 +261,8 @@ export const settingsT: Translations = {
   "assets.loading":       { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
 
   /* ── Admin tools ── */
+  "admin.qaReporter":     { en: "Report-issue button", zh: "问题反馈按钮", ar: "زر الإبلاغ عن مشكلة" },
+  "admin.qaReporter.hint": { en: "Show the floating QA reporter to everyone across the Hub.", zh: "向所有人显示悬浮的问题反馈按钮，覆盖整个平台。", ar: "إظهار زر الإبلاغ العائم للجميع في كل أنحاء المنصة." },
   "admin.activity":       { en: "Activity monitor", zh: "活动监控", ar: "مراقب النشاط" },
   "admin.activity.hint":  { en: "Who did what, and when, across the hub.", zh: "谁在何时做了什么，覆盖整个平台。", ar: "من فعل ماذا ومتى عبر المنصة." },
   "admin.roles":          { en: "Roles and permissions", zh: "角色与权限", ar: "الأدوار والصلاحيات" },

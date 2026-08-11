@@ -7,7 +7,9 @@
    Super-Admin only (normal users never see push controls). */
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
+import { useSkin } from "@/lib/appearance";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
@@ -26,6 +28,9 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Aurora ground — loaded only under the skin (Core never pays for it). */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 interface Device {
   id: string;
@@ -54,6 +59,7 @@ function fmt(ts: string | null): string {
 export default function NotificationsSettingsPage() {
   const { t } = useTranslation(settingsT);
   const { data: boot, loading: bootLoading } = useMeBootstrap();
+  const aurora = useSkin() === "aurora";
   const isSA = !!boot?.isSuperAdmin;
 
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
@@ -146,18 +152,27 @@ export default function NotificationsSettingsPage() {
   const btnPrimary =
     "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-2";
   const btnGhost =
-    "h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 inline-flex items-center gap-2";
+    "kx-hover-glow h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 inline-flex items-center gap-2";
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <PageHeader
-        title={t("push.title")}
-        subtitle={t("push.subtitle")}
-        icon={<BellIcon className="h-5 w-5" />}
-        backHref="/settings"
-      />
+    /* kx-app = Aurora var-remap scope; the fixed ground canvas sits at z-0
+       and both content blocks ride above it. Core: solid page, no canvas. */
+    <div className="kx-app relative flex-1 min-h-0 flex flex-col">
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1]">
+        <PageHeader
+          title={t("push.title")}
+          subtitle={t("push.subtitle")}
+          icon={<BellIcon className="h-5 w-5" />}
+          backHref="/settings"
+        />
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-5 space-y-5 max-w-2xl w-full mx-auto">
+      <div className="relative z-[1] flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-5 space-y-5 max-w-2xl w-full mx-auto">
         {/* iOS install hint */}
         {needsInstall && (
           <div className="rounded-2xl border border-[#FFCC00]/30 bg-[#FFCC00]/[0.06] p-4 text-[12.5px] text-[var(--text-secondary)]">

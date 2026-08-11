@@ -36,6 +36,7 @@ import {
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
+import { useSkin } from "@/lib/appearance";
 import {
   tabCardClass,
   tabSectionTitle,
@@ -54,6 +55,7 @@ interface Props {
 
 export default function CalendarTab({ account, onChanged }: Props) {
   const { t } = useTranslation(accountsT);
+  const aurora = useSkin() === "aurora";
   const initial = useMemo(
     () => withDefaults(account.preferences),
     [account.preferences],
@@ -167,7 +169,9 @@ export default function CalendarTab({ account, onChanged }: Props) {
                   onClick={() => toggleDay(d.iso)}
                   className={`h-9 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
                     on
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      ? aurora
+                        ? "kx-seg-on text-[var(--text-primary)]"
+                        : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                       : "bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   }`}
                 >

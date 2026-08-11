@@ -359,8 +359,13 @@ export default function ProfileTab({
         </div>
       </SettingsCard>
 
-      {/* Status + save */}
-      <div className="sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
+      {/* Status + save. Core: gradient scrim from the solid page colour.
+          Aurora: --bg-primary is transparent under the kx-app remap, so the
+          gradient vanishes — the pane pattern supplies the scrim instead
+          (filterless host + real .kx-glass-bar child; globals lift the
+          content above it). */}
+      <div className="kx-bar-host sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
+        <div aria-hidden className="kx-glass-bar" />
         <div className="flex items-center justify-end gap-3">
           {error && <span className="text-[12px] text-red-400 flex-1">{error}</span>}
           {toast && !error && <span className="text-[12px] text-emerald-400 flex-1 flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>}

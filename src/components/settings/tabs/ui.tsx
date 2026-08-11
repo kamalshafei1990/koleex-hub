@@ -1,9 +1,12 @@
 "use client";
 
 /* Shared iOS-style building blocks for the Settings detail tabs. Monochrome
-   per brand; the accent (blue) only marks the selected segment / on-toggle. */
+   per brand; the accent (blue) only marks the selected segment / on-toggle.
+   Dual-skin: Aurora selection = kx-seg-on (Hub-Blue ring + 10% fill), Core
+   keeps the original inverted pill. */
 
 import type { ReactNode } from "react";
+import { useSkin } from "@/lib/appearance";
 
 export function SettingsCard({ title, subtitle, children, flush }: {
   title?: string; subtitle?: string; children: ReactNode; flush?: boolean;
@@ -37,12 +40,16 @@ export function ControlRow({ label, hint, children, last }: {
   );
 }
 
-/** iOS-style segmented control. */
+/** iOS-style segmented control. The shell is PADDED (p-0.5) so the Aurora
+ *  seg-on ring renders free of the container edge — a ring inside an
+ *  overflow-hidden joined pair clips at the corners (burned on the PD view
+ *  toggle; this shell was never joined, so both skins share the markup). */
 export function Segmented<T extends string | number>({ value, onChange, options }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
+  const aurora = useSkin() === "aurora";
   return (
     <div className="inline-flex items-center gap-0.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5">
       {options.map((o) => {
@@ -55,7 +62,9 @@ export function Segmented<T extends string | number>({ value, onChange, options 
             onClick={() => onChange(o.value)}
             className={`px-3 h-7 rounded-md text-[12px] font-medium transition-colors ${
               active
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                ? aurora
+                  ? "kx-seg-on text-[var(--text-primary)]"
+                  : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                 : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
             }`}
           >
