@@ -329,8 +329,10 @@ function SettingsContent() {
               <Chevron className="rtl:rotate-0 rotate-180" /> {t("allSettings")}
             </button>
             {/* Fill the detail pane on desktop; cap only so ultra-wide
-                monitors don't stretch forms to unreadable line lengths. */}
-            <div className="max-w-[1040px] pb-8">
+                monitors don't stretch forms to unreadable line lengths.
+                key + kx-tab-in: switching sections must RIDE in, never
+                appear suddenly (owner rule, learned on the AI tabs). */}
+            <div key={tab} className="kx-tab-in max-w-[1040px] pb-8">
               {active.node}
             </div>
           </main>

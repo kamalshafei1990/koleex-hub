@@ -366,7 +366,10 @@ export default function ProfileTab({
           content above it). */}
       <div className="kx-bar-host sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
         <div aria-hidden className="kx-glass-bar" />
-        <div className="flex items-center justify-end gap-3">
+        {/* pe-14 reserves the floating AI/Discuss dock's gutter (end-6 + a
+            32px handle): the bar is pinned to the viewport bottom, so at
+            justify-end the Save button sat exactly under the dock. */}
+        <div className="flex items-center justify-end gap-3 pe-14">
           {error && <span className="text-[12px] text-red-400 flex-1">{error}</span>}
           {toast && !error && <span className="text-[12px] text-emerald-400 flex-1 flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>}
           <button
