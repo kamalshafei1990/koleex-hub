@@ -241,10 +241,35 @@ export async function archiveChannel(channelId: string): Promise<boolean> {
  *
  *  Sorted by `last_message_at DESC` so the most-recently-active thread
  *  sits at the top, Slack-style. */
+/* Module-scoped: the shell snapshot may seed the FIRST read of the page and
+   nothing after it. See the note inside fetchMyChannels. */
+let shellChannelsUsed = false;
+
 export async function fetchMyChannels(
   accountId: string,
 ): Promise<DiscussChannelWithState[]> {
   void accountId; // identity comes from the session server-side
+
+  /* THE FIRST READ OF THE PAGE RIDES THE SHELL BATCH, which already carries
+     this exact shape (`channels`) — that removes the last guaranteed round
+     trip from a screen open.
+
+     ONCE, and only once. Every discuss mutate calls
+     invalidateCachedGet("/api/discuss/read?resource=myChannels") so that
+     mark-read / pin / mute never read their own stale snapshot — and that
+     invalidation cannot reach inside the shell's cache. So after this first
+     read the function goes back to the endpoint permanently, and the
+     freshness contract above is untouched. */
+  if (!shellChannelsUsed) {
+    shellChannelsUsed = true;
+    try {
+      const { getShell } = await import("./client-cache");
+      const shell = await getShell();
+      const seeded = (shell?.channels as { data?: DiscussChannelWithState[] } | null)?.data;
+      if (Array.isArray(seeded)) return seeded;
+    } catch { /* fall through to the endpoint */ }
+  }
+
   /* Coalesced: myChannels is the most expensive Discuss read and FIVE
      consumers request it on one Home load (bell recount, floating panel,
      home tile badge, realtime resubscribe, focus resync) — measured 5
