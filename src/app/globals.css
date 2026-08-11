@@ -1489,29 +1489,39 @@ input[type="number"]:not(.kx-spinner) {
    28 → 14 → 7 → 3 → none, and walking UP toward the bar it thickens
    smoothly. Everything is measured back from the bottom, so the bars stay
    fully frosted at any height and --kx-ramp-ext alone sets the tail. */
+/* FADE DISTANCE ≠ OVERHANG. Tying the gradient to --kx-ramp-ext meant that
+   shortening the overhang to 12px also squeezed the whole transition into
+   12px — and a 28px blur that dies in five pixels IS a hard line, which is
+   what the owner kept seeing ("the edge blur looks a line not as a
+   gradient"). The two are now separate: --kx-ramp-ext is only how far the
+   layer hangs BELOW its bar, while --kx-ramp-fade is how much of the layer
+   the transition takes. The fade starts high — inside the bar area — so by
+   the time it reaches the bottom edge only the 3px veil is left and there
+   is nothing to see a boundary of. Each layer also starts where the
+   previous one is still going, so no two share a start line. */
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(1) {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.35), transparent 100%);
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.35), transparent 100%);
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.3), transparent 100%);
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.3), transparent 100%);
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(2) {
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.6), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.2));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.6), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.2));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.55), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.12));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.55), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.12));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(3) {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.85), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.45));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 0.85), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.45));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.8), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.3));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%) * 0.8), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.3));
 }
 [data-kx-skin="aurora"] .kx-bar-prog > i:nth-child(4) {
   -webkit-backdrop-filter: blur(28px) saturate(150%);
   backdrop-filter: blur(28px) saturate(150%);
-  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 1.1), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
-  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-ext, 3rem) * 1.1), transparent calc(100% - var(--kx-ramp-ext, 3rem) * 0.7));
+  -webkit-mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.5));
+  mask: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--kx-ramp-fade, 45%)), transparent calc(100% - var(--kx-ramp-fade, 45%) * 0.5));
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-bar-prog > i { display: none; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
