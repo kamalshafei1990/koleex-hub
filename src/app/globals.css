@@ -1721,6 +1721,25 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.20);
 }
 
+/* WHY AURORA STATES LOOKED UNANIMATED. Almost every control in the Hub
+   carries Tailwind's `transition-colors`, which animates colour,
+   background-color, border-color and fill — and NOTHING else. But this
+   skin says "selected" and "hover" with a box-shadow: kx-seg-on's ring,
+   the glass rim, the recessed-well focus ring are all shadows. So the
+   colours eased and the ring snapped on in the same instant — owner, on
+   the contacts tabs and cards: "have no ease motion".
+   Inside a converted app scope, interactive elements therefore transition
+   shadow and transform too, on the Aurora out-curve. Duration is left to
+   the element, so anything already tuned (75ms press, 340ms drawer) keeps
+   its own timing; `transition-none` and reduced-motion are respected. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-kx-skin="aurora"] :is(.kx-pd, .kx-app)
+    :is(button, a, [role="tab"], [role="switch"], summary):not(.transition-none) {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 /* A root that hosts the Aurora ground must LIFT its own content above it.
    The ground is a `fixed z-0` child, and a positioned child paints above
    static siblings — so without this the canvas (and its dark vignette)

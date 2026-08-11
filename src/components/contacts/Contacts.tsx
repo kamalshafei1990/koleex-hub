@@ -2134,7 +2134,7 @@ const Section = React.memo(function Section({ title, icon, children }: { title: 
      tinted header row (icon tile + title) with its own bottom-border
      divider, then the content below. */
   return (
-    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+    <div className="mx-4 md:mx-6 my-3 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       <div className="flex w-full items-center gap-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
         <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{title}</h3>
@@ -2301,7 +2301,7 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.map((opt, i) => (
             <button
               key={opt}
@@ -2483,7 +2483,7 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl overflow-hidden">
+        <div className="absolute z-30 mt-1 w-full kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl overflow-hidden">
           <div className="p-2 border-b border-[var(--border-subtle)]">
             <div className="relative">
               <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]"><SearchIcon size={13} /></span>
@@ -2627,7 +2627,7 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
         <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>{value || "--:--"}</span>
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg p-2 flex gap-2">
+        <div className="absolute z-30 mt-1 w-full kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg p-2 flex gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] mb-1 px-1">{"Hour"}</p>
             <div className="max-h-40 overflow-y-auto grid grid-cols-3 gap-1 pe-1">
@@ -2791,7 +2791,7 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {options.map((o) => (
             <button
               key={o}
@@ -2853,7 +2853,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
           placeholder={placeholder}
           className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
         />
-        <button type="button" onClick={() => setCreating(false)} title="Pick from list" className="h-10 shrink-0 px-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+        <button type="button" onClick={() => setCreating(false)} title="Pick from list" className="h-10 shrink-0 px-2.5 kx-glass rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
           <AngleDownIcon size={14} />
         </button>
       </div>
@@ -2874,7 +2874,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           <div className="p-2 border-b border-[var(--border-faint)]">
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
           </div>
@@ -2955,7 +2955,7 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
      so the add/edit form and the detail page look like one system. */
   return (
     <div
-      className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+      className="mx-4 md:mx-6 my-3 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
       {...(kxComponent ? kxInspectAttrs({ component: kxComponent, module: kxModule || "Suppliers", section: kxSection }) : {})}
     >
       <div className="flex items-center justify-between gap-3 rounded-t-2xl border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
@@ -3422,11 +3422,11 @@ const CustomerActivityHub = React.memo(function CustomerActivityHub({ contactId,
           <p className="text-[12px] text-[var(--text-faint)]">{t("loading", "Loading…")}</p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            <a href={`/quotations?customer=${contactId}`} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
+            <a href={`/quotations?customer=${contactId}`} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
               <div className="text-2xl font-semibold text-[var(--text-primary)]">{linked.quotes.length}</div>
               <div className="text-[11px] text-[var(--text-faint)]">{t("activity.quotations", "Quotations")}</div>
             </a>
-            <a href={`/invoices?customer=${contactId}`} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
+            <a href={`/invoices?customer=${contactId}`} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
               <div className="text-2xl font-semibold text-[var(--text-primary)]">{linked.invoices.length}</div>
               <div className="text-[11px] text-[var(--text-faint)]">{t("activity.invoices", "Invoices")}</div>
             </a>
@@ -3551,7 +3551,7 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.map(opt => (
             <button key={opt} type="button" onClick={() => { addValue(opt); setDraft(""); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors">
               <CarrierLogo name={opt} />{opt}
@@ -3657,7 +3657,7 @@ const TagEditor = React.memo(function TagEditor({
         {suggestions && <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />}
       </div>
       {suggestions && open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.map(opt => (
             <button
               key={opt}
@@ -4062,7 +4062,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
           className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
         />
         {open && (
-          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
             <div className="p-2 border-b border-[var(--border-faint)]">
               <input
                 autoFocus
@@ -4353,7 +4353,7 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
       </button>
 
       {open && (
-        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-2xl`}>
+        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-2xl`}>
           {/* Header: month/year + nav */}
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => stepMonth(-1)} aria-label="Previous month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="left" /></button>
@@ -4433,7 +4433,7 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
         />
         <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
         {open && filtered.length > 0 && (
-          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-2xl">
+          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-2xl">
             {filtered.map((o, i) => (
               <button
                 key={i}
@@ -4537,7 +4537,7 @@ const SegmentedField = React.memo(function SegmentedField({ label, value, onChan
 }) {
   const row = layout === "row";
   const pills = (
-    <div className="flex w-full sm:flex-1 gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-0.5">
+    <div className="flex w-full sm:flex-1 gap-0.5 kx-glass rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-0.5">
       {options.map((o) => {
         const sel = value === o;
         const tone = segTone(o, polarity);
@@ -4629,7 +4629,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
@@ -4711,7 +4711,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
@@ -4805,7 +4805,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
@@ -6190,7 +6190,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {/* Smart suggestions — each row names the supplier AND why it matched
               (brand, contact person, app ID, country…). Click opens that supplier. */}
           {searchFocused && debouncedSearch.trim() && suggestions.length > 0 && (
-            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
               {suggestions.map(c => {
                 const reason = searchMatchReason(c, searchTerms);
                 const cn = (c as unknown as Record<string, unknown>).company_name_cn;
@@ -6646,7 +6646,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {/* Main KPI Row - 4 cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Suppliers */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <Building2Icon size={16} className="text-[var(--text-secondary)]" />
@@ -6658,7 +6658,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Active */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <UserCheckIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6670,7 +6670,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <GlobeIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6682,7 +6682,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Avg Rating */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <StarIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6697,7 +6697,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {/* Supplier Details Grid - 2x2 */}
               <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {/* Catalogues */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <BookOpenIcon size={16} className="text-[var(--text-secondary)]" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.catalogues")}</span>
@@ -6707,7 +6707,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Contact Persons */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <UsersIcon size={16} className="text-[var(--text-secondary)]" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.contacts")}</span>
@@ -6717,7 +6717,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Divisions */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <BriefcaseIcon size={16} className="text-[var(--text-secondary)]" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.divisions")}</span>
@@ -6727,7 +6727,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Categories */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <PackageIcon size={16} className="text-[var(--text-secondary)]" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.categories")}</span>
@@ -6739,7 +6739,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* New This Month */}
               {supplierKpis.newThisMonth > 0 && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                     <TrendingUpIcon size={20} className="text-[var(--text-secondary)]" />
                   </div>
@@ -6836,7 +6836,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {/* Main KPI Row — neutral chip styling, same as Supplier Overview */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <UsersIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6848,7 +6848,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Active */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <UserCheckIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6860,7 +6860,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* VIP */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <GemIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6872,7 +6872,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                       <MapPinnedIcon size={16} className="text-[var(--text-secondary)]" />
@@ -6885,7 +6885,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Tier Breakdown */}
-              <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+              <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                 <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customerTiers")}</h3>
                 <div className="space-y-3">
                   {[
@@ -6940,7 +6940,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* Customers by Country (flagged) */}
               {topCountries.length > 0 && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center justify-between gap-2 mb-4">
                     <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">{t("kpi.customersByCountry")}</h3>
                     <span className="text-xs font-semibold text-[var(--text-faint)] shrink-0">{topCountries.length}</span>
@@ -6967,7 +6967,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   (The old Active/Inactive 2-col block was removed: it repeated
                   the Active KPI above; the supplier layout has no such block.) */}
               {moduleKpis.newThisMonth > 0 && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                     <TrendingUpIcon size={20} className="text-[var(--text-secondary)]" />
                   </div>
@@ -6998,14 +6998,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${accentColor}-500/10`}>{typeIcon}</div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
                 </div>
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10"><UserCheckIcon size={16} className="text-emerald-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
@@ -7013,7 +7013,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% {t("kpi.ofTotal")}</p>
                 </div>
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10"><MapPinnedIcon size={16} className="text-blue-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
@@ -7021,7 +7021,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.globalReach")}</p>
                 </div>
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10"><TrendingUpIcon size={16} className="text-amber-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("kpi.new")}</span>
@@ -7031,14 +7031,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.active")}</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                 </div>
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.inactive")}</span>
@@ -7047,7 +7047,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               </div>
               {moduleKpis.newThisMonth > 0 && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="kx-glass bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUpIcon size={20} className="text-green-400" />
                   </div>
@@ -7106,7 +7106,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           const primaryPhone = phones.find((p) => p.number)?.number || c.phone || "";
           const primaryEmail = emails.find((e) => e.email)?.email || c.email || "";
           return (
-        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+        <div className="mx-4 md:mx-6 mt-4 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
           <div className="px-5 sm:px-8 md:px-10 pt-5 md:pt-6">
             {/* Top bar — back (start) · Edit / Delete (end) */}
             <div className="flex items-center justify-between gap-3">
@@ -10122,7 +10122,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
         {isCustomer && showTab("account") && isSuperAdmin && !editingId && (
-          <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-6 text-sm text-[var(--text-secondary)]">
+          <div className="mx-4 md:mx-6 my-3 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-6 text-sm text-[var(--text-secondary)]">
             {t("account.saveFirst", "Save the customer first, then you can create a portal account here.")}
           </div>
         )}
