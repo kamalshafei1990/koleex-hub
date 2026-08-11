@@ -6155,10 +6155,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderListPanel = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      {/* @container: the filter grids below size themselves against THIS
-          panel, not the window. Without it the @[..] variants never fire and
-          every row is stuck at its narrowest column count. */}
-      <div className="@container px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
+      <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5 mb-3">
           <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
@@ -6367,7 +6364,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             "Standard" orphaned mid-row. Equal columns give two tidy rows of
             three when the panel is narrow and one row of six when it isn't. */}
         {filterType === "customer" && (
-          <div ref={tierSeg.ref} className="relative grid grid-cols-3 @[30rem]:grid-cols-6 w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div ref={tierSeg.ref} className="relative grid grid-cols-[repeat(auto-fit,minmax(4.75rem,1fr))] w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             {aurora && <SegSlider box={tierSeg.box} />}
             <button
               onClick={() => setTierFilter("all")}
@@ -6401,11 +6398,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
-        {/* Type tabs — a grid, not a ragged wrap: five chips of different
-            label lengths wrapped 3 + 2 and read as unaligned. Equal columns
-            line them up at every width. */}
+        {/* Type tabs — auto-fit columns, NOT breakpoints. A fixed
+            `@[22rem]:grid-cols-5` put five 138px chips into a 440px pane and
+            they overlapped each other; and any hand-picked breakpoint is
+            wrong in another language, since these labels are translated.
+            auto-fit + a min column width lets the browser fit as many equal
+            columns as the pane can actually hold and wrap the rest. */}
         {!filterType && (
-          <div ref={typeSeg.ref} className="relative grid grid-cols-3 @[22rem]:grid-cols-5 gap-1 mt-3">
+          <div ref={typeSeg.ref} className="relative grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-1 mt-3">
             {aurora && <SegSlider box={typeSeg.box} />}
             <button
               onClick={() => setTypeTab("all")}

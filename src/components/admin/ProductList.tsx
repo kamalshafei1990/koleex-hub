@@ -2493,21 +2493,28 @@ export default function ProductList() {
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
               <nav
-                /* --kx-ramp-top lifts this bar's ramp UP over the toolbar, so
-                   the screen has exactly ONE blurred edge running from under
-                   the header down past the categories — the owner counted
-                   three and rejected it. It stops AT the header's bottom on
-                   purpose: the header pane already frosts its own strip, and
-                   overlapping the two would be the double pass all over
-                   again. The extra height also stretches the masks, which is
-                   the "more longer" half of the same instruction. */
-                style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "var(--kx-pd-tools-h, 52px)" }}
+                /* NO --kx-ramp-top. It used to lift this bar's ramp 58px
+                   UPWARD to make one continuous frosted edge with the
+                   toolbar — correct once the page is scrolled and the two
+                   bars are stacked at the top, and wrong at scroll 0, where
+                   those 58px are the DIVISIONS ROW sitting in normal flow.
+                   A 28px backdrop blur painted over a live, interactive row
+                   turns it into a dark smear with hard mask edges: that is
+                   the "black background with a black border" the owner kept
+                   reporting, and why /products — which has no ramp at all —
+                   looked right next to it. Proved by hiding .kx-bar-prog on
+                   prod: the whole divisions row reappeared.
+
+                   A ramp may only cover what actually passes BEHIND it. This
+                   one now spans its own bar plus its tail, and the header
+                   pane keeps its own flat frost — still one ramp per screen. */
+                style={{ top: "var(--kx-pd-tools-h, 52px)" }}
                 /* Short tail: the fade ends just under the category cards
                    (owner: "the blurred edge is too long… you can make it
                    under the categories cards with very short distance").
-                   6rem was tuned when this ramp only had to cover itself;
-                   now that it also covers the toolbar, the frosted zone is
-                   long enough without a long tail. */
+                   Kept at 0.75rem when the upward lift was removed — the
+                   tail length is the part he signed off, so it does not
+                   move while a separate defect is being fixed. */
                 className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:0.75rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
