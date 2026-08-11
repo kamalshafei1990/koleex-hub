@@ -333,7 +333,15 @@ function CollapsedGroup({
   );
 }
 
-/* ── Collapse toggle — curved pull tab tucked inside the rail seam ── */
+/* ── Collapse toggle ──
+   Core: the curved pull tab tucked into the rail seam, unchanged.
+   Aurora: a real round button. The tab was a 13px sliver that read only
+   because it was a solid slab against a solid rail with a hairline seam —
+   once the rail became glass and lost its border there was nothing left to
+   see, and the owner's first question after the conversion was literally
+   "where is the button that I can close or open the sidebar?". A control
+   you have to hunt for is a broken control, so under the skin it becomes a
+   28px glass disc with its own rim, parked inside the rail's edge. */
 function EdgeToggle({
   dk,
   aurora,
@@ -354,29 +362,41 @@ function EdgeToggle({
       <button
         onClick={onToggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className="relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
-        /* The tab used to paint itself from an inline style — solid #0E0E0E
-           against a rail that is now glass, and unreachable by any skin rule
-           (inline beats everything). Aurora gets the tile fill and a
-           hairline; Core keeps the exact solid it always had. */
-        style={{
-          background: aurora
-            ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)")
-            : (dk ? "#0E0E0E" : "#F4F4F4"),
-          borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          borderBottom: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          borderInlineStart: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          borderStartStartRadius: "999px",
-          borderEndStartRadius: "999px",
-          boxShadow: aurora
-            ? (dk ? "-3px 0 10px rgba(0,0,0,0.30)" : "-3px 0 10px rgba(0,0,0,0.06)")
-            : (dk ? "-3px 0 10px rgba(0,0,0,0.45)" : "-3px 0 10px rgba(0,0,0,0.08)"),
-        }}
+        className={
+          aurora
+            ? "kx-hover-glow relative flex items-center justify-center h-7 w-7 rounded-full border cursor-pointer transition-all duration-200 active:scale-95"
+            : "relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
+        }
+        /* Core paints from an inline style and must keep every value it had.
+           Aurora's disc takes its fill from here too — but only the fill: the
+           rim, the hover and the motion are classes, so the skin can reach
+           them. */
+        style={
+          aurora
+            ? {
+                background: dk ? "rgba(11,14,20,0.72)" : "rgba(255,255,255,0.78)",
+                borderColor: dk ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)",
+                boxShadow: dk
+                  ? "0 4px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10)"
+                  : "0 4px 14px rgba(16,24,40,0.12), inset 0 1px 0 rgba(255,255,255,0.9)",
+              }
+            : {
+                background: dk ? "#0E0E0E" : "#F4F4F4",
+                borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+                borderBottom: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+                borderInlineStart: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+                borderStartStartRadius: "999px",
+                borderEndStartRadius: "999px",
+                boxShadow: dk ? "-3px 0 10px rgba(0,0,0,0.45)" : "-3px 0 10px rgba(0,0,0,0.08)",
+              }
+        }
       >
         <AngleRightIcon
-          size={11}
-          className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
-            dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
+          size={aurora ? 12 : 11}
+          className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} rtl:-scale-x-100 ${
+            aurora
+              ? dk ? "text-white/70 group-hover/toggle:text-white" : "text-black/60 group-hover/toggle:text-black"
+              : dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
           } group-hover/toggle:scale-110`}
         />
       </button>
@@ -730,7 +750,10 @@ export default function Sidebar() {
               into the sidebar as a pull tab (stays inside the border). */}
           <div
             className="absolute top-1/2 -translate-y-1/2 z-50"
-            style={{ insetInlineEnd: "0px" }}
+            /* Core's tab is flush with the seam (it IS the seam). Aurora's
+               disc sits fully inside the rail, clear of the edge, so nothing
+               clips it and it never overlaps page content. */
+            style={{ insetInlineEnd: aurora ? "6px" : "0px" }}
           >
             <EdgeToggle
               dk={dk}

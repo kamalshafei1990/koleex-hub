@@ -1860,7 +1860,7 @@ export default function ProductList() {
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -1882,7 +1882,7 @@ export default function ProductList() {
                 catalog is read-only for customers. */}
             {isInternal && (
               <>
-                <Link href={`${baseRoute}/settings`} className="kx-hover-glow h-10 px-4 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+                <Link href={`${baseRoute}/settings`} className="kx-glass kx-hover-glow h-10 px-4 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <SettingsIcon2 className="h-4 w-4" />
                   <span className="hidden sm:inline">{t("list.controlPanel")}</span>
                 </Link>
@@ -2101,7 +2101,7 @@ export default function ProductList() {
                 bug": rounded ring inside overflow-hidden rounded-xl). Core:
                 the original joined pair, untouched. */}
             <div className={aurora
-              ? "flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1"
+              ? "kx-glass flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1"
               : "flex rounded-xl border border-[var(--border-subtle)] overflow-hidden"}>
               <button
                 onClick={() => setViewMode("grid")}
@@ -2138,12 +2138,15 @@ export default function ProductList() {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
+              /* kx-glass only on the RESTING button: when it is on, kx-seg-on
+                 owns the fill, and stacking a glass background over the
+                 selection wash would erase the state. */
               className={`kx-hover-glow h-10 px-4 rounded-xl border text-[12px] font-medium flex items-center gap-2 transition-all ${
                 showFilters || activeFilterCount > 0
                   ? aurora
                     ? "kx-seg-on border-transparent text-[var(--text-primary)]"
                     : "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
-                  : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                  : `${aurora ? "kx-glass " : ""}bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]`
               }`}
             >
               <FilterIcon className="h-3.5 w-3.5" />
