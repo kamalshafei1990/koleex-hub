@@ -1423,8 +1423,15 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"] .kx-glass-bar { background: rgba(12, 14, 18, 0.96); }
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass-bar { background: rgba(250, 251, 253, 0.98); }
 }
-/* Everything in a bar host paints above its glass layer. */
-[data-kx-skin="aurora"] .kx-bar-host > :not(.kx-glass-bar) {
+/* Everything in a bar host paints above its glass layer — by being LIFTED
+   out of static flow. Children that already position themselves are
+   excluded: this rule used to overwrite their `absolute` with `relative`,
+   which on the sidebar rail threw the collapse button out of the panel
+   entirely (measured at x=-6, y=1118 — off-screen, in normal flow at the
+   bottom of the column) and cost the owner the control: "where is the
+   button that I can close or open the sidebar?". They need no lift anyway:
+   a positioned child later in the DOM already paints above the layer. */
+[data-kx-skin="aurora"] .kx-bar-host > :not(.kx-glass-bar):not(.absolute):not(.fixed):not(.sticky) {
   position: relative;
   z-index: 1;
 }
