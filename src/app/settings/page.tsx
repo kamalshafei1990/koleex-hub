@@ -324,7 +324,7 @@ function SettingsContent() {
                 monitors don't stretch forms to unreadable line lengths.
                 key + kx-tab-in: switching sections must RIDE in, never
                 appear suddenly (owner rule, learned on the AI tabs). */}
-            <div key={tab} className="kx-tab-in max-w-[1040px] pb-8">
+            <div key={tab} className="kx-tab-in-soft max-w-[1040px] pb-8">
               {active.node}
             </div>
           </main>

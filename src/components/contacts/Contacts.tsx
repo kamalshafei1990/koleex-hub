@@ -6279,7 +6279,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Individual vs Company filter — customer/company/people views. */}
         {(filterType === "customer" || filterType === "company" || filterType === "people") && (
-          <div className="flex w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div className="flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             {([
               { k: "all", label: t("filter.everyone", "Everyone"), icon: null },
               { k: "person", label: t("filter.individuals", "Individuals"), icon: <UserIcon size={13} /> },
@@ -6305,10 +6305,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             the wider list panel fits all six. Falls back to horizontal scroll
             only on unusually narrow viewports. */}
         {filterType === "customer" && (
-          <div className="flex w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div className="flex flex-wrap w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             <button
               onClick={() => setTierFilter("all")}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
+              className={`flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap transition-colors ${
                 tierFilter === "all" ? (aurora ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-surface-active)] text-[var(--text-primary)]") : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
@@ -6335,7 +6335,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Type tabs */}
         {!filterType && (
-          <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
+          <div className="flex flex-wrap gap-1 mt-3">
             <button
               onClick={() => setTypeTab("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
