@@ -136,11 +136,11 @@ export default function PageHeader({
           <Link
             href={resolvedBackHref}
             aria-label="Back"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10 sm:rounded-xl sm:hover:-translate-y-0.5"
+            className="kx-ph-chrome flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10 sm:rounded-xl sm:hover:-translate-y-0.5"
           >
             <RrIcon name="arrow-left" size={14} />
           </Link>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
+          <div className="kx-ph-chrome flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
             {typeof icon === "string" ? (
               <RrIcon name={icon as RrIconName} size={16} />
             ) : isValidElement(icon) ? (

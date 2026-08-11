@@ -14,7 +14,14 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p === "/" ||
     p === "/products" ||
     p.startsWith("/products/") ||
-    p.startsWith("/product-data")
+    p.startsWith("/product-data") ||
+    /* Inventory, 2026-08-12. THIS is what makes the main header glass on an
+       app screen — the pane only frosts on under-glass routes, so converting
+       an app's own surfaces and stopping there leaves a solid black bar at
+       the top of a glass page. Sticky audit done: the app's one sticky
+       (PageHeader's tab band) stays at top-0, because a sticky inside the
+       padded under-glass scroller already lands below the header. */
+    p.startsWith("/inventory")
   );
 }
 
@@ -29,5 +36,8 @@ export function isUnderglassRoute(pathname: string | null): boolean {
    still gets the pane ramp. */
 export function appOwnsTopRamp(pathname: string | null): boolean {
   const p = pathname || "/";
-  return p === "/products" || p.startsWith("/products/") || p.startsWith("/product-data");
+  /* Inventory has a sticky tab band of its own, so the header keeps its flat
+     frost and the screen shows ONE blurred edge, not two stacked. */
+  return p === "/products" || p.startsWith("/products/") || p.startsWith("/product-data")
+    || p.startsWith("/inventory");
 }
