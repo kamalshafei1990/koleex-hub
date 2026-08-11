@@ -1983,6 +1983,13 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"] .kx-app .kx-ph-chrome:hover {
   border-color: rgba(127, 169, 214, 0.55);
   background-color: rgba(255, 255, 255, 0.03);
+  /* BOTH, and `translate` is the one that matters. Tailwind v4 compiles
+     `-translate-y-0.5` to the `translate:` PROPERTY, not to `transform:` —
+     so `transform: none` alone leaves the lift running. That is why the
+     shipped .kx-hover-glow rule says `translate: none`; I copied the wrong
+     half of it and the back arrow still rose on hover. `transform` stays for
+     any call site that writes a real transform. */
+  translate: none;
   transform: none;
   box-shadow: none;
 }

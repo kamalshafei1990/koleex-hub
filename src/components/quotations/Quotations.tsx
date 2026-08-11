@@ -2427,7 +2427,10 @@ export default function Quotations() {
         </div>
 
         {/* KPI strip */}
-        <div className="max-w-[1500px] mx-auto px-4 pt-4">
+        {/* Same px-4 md:px-6 lg:px-8 as the header above and the list below.
+            MEASURED: the header resolved to 32px of padding and these two to
+            16px, so the title sat 16px inboard of every card under it. */}
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4">
           {(() => {
             const drafts = quotations.filter((q) => q.status === "draft").length;
             const sent = quotations.filter((q) => q.status === "sent").length;
@@ -2454,7 +2457,17 @@ export default function Quotations() {
                 <KpiCard label={t("kpi.drafts")} value={String(drafts)}            icon="file"         tone="warning"  />
                 <KpiCard label="SENT"            value={String(sent)}              icon="paper-plane"  tone="info"     />
                 <KpiCard label="ACCEPTED"        value={String(accepted)}          icon="check"        tone="positive" />
+                {/* The money tile spans both mobile columns. KpiCard renders its
+                    value at a fixed 26px and a formatted total is ONE unbreakable
+                    token (comma separators are not break opportunities), so at a
+                    173px card the text measured 163px of ink inside a 141px
+                    content box and simply painted past the border — no wrapping,
+                    no clipping, no scrollWidth to catch it. As the 5th tile in a
+                    2-column grid it was alone on its row with an empty 173px slot
+                    beside it, so spanning costs nothing and keeps every digit at
+                    full size. */}
                 <KpiCard
+                  className="col-span-2 md:col-span-1"
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
                   icon="balance-scale-left"
@@ -2466,7 +2479,7 @@ export default function Quotations() {
         </div>
 
         {/* List */}
-        <div className="max-w-[1500px] mx-auto px-4 py-6">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6">
           {sortedQuotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
               <DocumentIcon size={48} className="mb-4 opacity-40" />
@@ -2476,7 +2489,17 @@ export default function Quotations() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3">
+            /* grid-cols-1 is NOT cosmetic here. A bare `grid` leaves the
+               implicit column at `auto`, whose minimum is the item's
+               min-content — and a card full of `truncate` (nowrap) text has a
+               min-content of ~518px. MEASURED at 390px viewport: the column
+               computed to 517.8px inside a 358px container, the cards ran
+               160px past their parent and the Hub scroller gained 144px of
+               horizontal scroll, so the whole app slid sideways under the
+               finger. Tailwind's grid-cols-1 emits repeat(1, minmax(0, 1fr));
+               that explicit 0 minimum is what lets the column shrink.
+               Re-measured after: overflow 144px → 0. */
+            <div className="grid grid-cols-1 gap-3">
               {sortedQuotations.map((q) => {
                 /* The list endpoint strips items from the doc payload
                    to keep responses small, so recomputing here gives 0.

@@ -752,6 +752,8 @@ const PRINT_AND_DOC_STYLES = `
   [class*="h-screen"],
   [class*="h-[calc"],
   [class*="min-h-screen"],
+  [class*="min-h-full"],
+  [class*="h-full"],
   [class*="min-h-0"],
   [class*="overflow-hidden"] {
     height: auto !important;
@@ -1755,7 +1757,11 @@ export default function Quotations() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)]">
+      /* min-h-full, never min-h-screen: the Hub scroller is already
+         100svh − var(--kx-header-h), so 100vh here adds a phantom scroll the
+         exact height of the header. NOTE: this removes the phantom scroll —
+         it is not by itself proven to be the whole of the "dancing". */
+      <div className="min-h-full bg-[var(--bg-primary)]">
         <BrandLoading />
       </div>
     );
@@ -1766,7 +1772,7 @@ export default function Quotations() {
      ══════════════════════════════════════════════════════════ */
   if (view === "list") {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar */}
@@ -1822,7 +1828,14 @@ export default function Quotations() {
                 <SharedKpiCard label={t("kpi.drafts")} value={String(drafts)} tone="warning" />
                 <SharedKpiCard label="SENT" value={String(sent)} tone="info" />
                 <SharedKpiCard label="PAID" value={String(paid)} tone="positive" />
+                {/* Spans both mobile columns — same reason as the quotations
+                    money tile: KpiCard's 26px value is one unbreakable token
+                    and paints past the border once the total gets long
+                    (measured 142px of ink in a 141px content box here, and
+                    24px past it on the quotations total). The 5th tile is
+                    alone on its row anyway, so the space is free. */}
                 <SharedKpiCard
+                  className="col-span-2 md:col-span-1"
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
                 />
@@ -1842,7 +1855,11 @@ export default function Quotations() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3">
+            /* grid-cols-1, not a bare grid — see the measured note in
+               Quotations.tsx. The implicit `auto` column sized itself to the
+               cards' min-content (517.8px) inside a 358px container and gave
+               the Hub scroller 144px of horizontal drag on a 390px phone. */
+            <div className="grid grid-cols-1 gap-3">
               {sortedQuotations.map((q) => {
                 /* The list endpoint strips items from the doc payload
                    to keep responses small, so recomputing here gives 0.
@@ -1940,7 +1957,7 @@ export default function Quotations() {
   if (!current) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {toastElement}
 
