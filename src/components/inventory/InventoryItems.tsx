@@ -199,7 +199,7 @@ export default function InventoryItems() {
                 onClick={() => setAddMenuOpen(false)}
                 className="fixed inset-0 z-40 cursor-default"
               />
-              <div className="absolute end-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
+              <div className="kx-glass-pop absolute end-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
                 <Link
                   href="/products/new"
                   onClick={() => setAddMenuOpen(false)}
@@ -453,7 +453,7 @@ function DrawerShell({
       <div
         onClick={(e) => e.stopPropagation()}
         /* INV-H5C — full-screen on mobile, side drawer on desktop. */
-        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-color)]"
+        className="kx-glass-drawer flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-s border-[var(--border-color)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <h2 className="text-[14px] font-semibold">{title}</h2>

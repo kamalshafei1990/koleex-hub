@@ -139,10 +139,10 @@ export default function InventoryMovementDetail({
       <button
         type="button"
         onClick={onClose}
-        className="flex-1 bg-black/40"
+        className="flex-1 bg-black/40 backdrop-blur-sm"
         aria-label="Close"
       />
-      <div className="w-full max-w-md overflow-y-auto border-l border-[var(--border-color)] bg-[var(--bg-primary)] p-5 text-[var(--text-primary)]">
+      <div className="kx-glass-drawer w-full max-w-md overflow-y-auto border-s border-[var(--border-color)] bg-[var(--bg-primary)] p-5 text-[var(--text-primary)]">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">

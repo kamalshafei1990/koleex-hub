@@ -248,7 +248,7 @@ function NewLocationDrawer({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-color)]"
+        className="kx-glass-drawer flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-s border-[var(--border-color)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
           <h2 className="text-[14px] font-semibold">New Location</h2>

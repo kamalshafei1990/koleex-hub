@@ -5156,6 +5156,51 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [categoryLogos, form.division, lang]);
   const [expandedResumeLine, setExpandedResumeLine] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+
+  /* ── Split vs stacked, decided by AVAILABLE width, not the viewport ──
+     The master/detail split used to be gated on `md:` / `lg:` — viewport
+     breakpoints that know nothing about the sidebar rail. On a 1024pt tablet
+     in portrait that arithmetic collapsed: 1024 − 60 (rail) = 964 available,
+     `lg:` fired anyway, the list took 480 and the detail was left with 484 —
+     under every container tier the detail's own layout queries
+     (@[34rem] = 544, @[44rem] = 704), so a 1024px tablet rendered the PHONE
+     layout of the detail next to a half-empty list. With the rail expanded
+     (220) the detail dropped to 324. The md band was worse still: an 820pt
+     portrait tablet gave the detail 360px.
+
+     So the split is now driven by the pane host's measured width: side by
+     side only when there is room for BOTH a real list and a detail past its
+     first container tier (400 + 700), otherwise the panes stack — list full
+     width, detail full width over it, exactly the phone flow that already
+     works (`mobileShowDetail` + the always-visible back buttons).
+
+     Measured, not container-queried, on purpose: `container-type` implies
+     `contain: layout`, which would make this element the containing block for
+     every `position: fixed` descendant — the Aurora ground and the supplier
+     section modals (Media/Risk/Timeline/…) are fixed and would have been
+     trapped inside a pane. A layout effect corrects the first frame BEFORE
+     paint, so nothing shifts after the user sees it. */
+  const [paneHost, setPaneHost] = useState<HTMLDivElement | null>(null);
+  const paneHostRef = useCallback((node: HTMLDivElement | null) => setPaneHost(node), []);
+  const [appW, setAppW] = useState(0);
+  useLayoutEffect(() => {
+    if (!paneHost) return;
+    const read = () => setAppW(paneHost.getBoundingClientRect().width);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(paneHost);
+    return () => ro.disconnect();
+  }, [paneHost]);
+  /* 0 = not measured yet (first frame only). Stacked is the safe default:
+     it is the layout that works at ANY width. */
+  const splitView = appW >= 1100;
+  /* Stacked list is as wide as the app — one column of 12px avatars across
+     960px is the wasted viewport we came here to fix. */
+  const listTwoCol = !splitView && appW >= 700;
+  /* 400 is the working minimum for a row (avatar + name + badges + actions);
+     480 only once the detail still clears its 704px tier after paying for it. */
+  const listPaneW = appW >= 1280 ? 480 : 400;
+
   const [saveError, setSaveError] = useState<string | null>(null);
   // Set true after a blocked save attempt so required fields highlight in red.
   const [triedSave, setTriedSave] = useState(false);
@@ -6519,9 +6564,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Contact list */}
       <div className="flex-1 overflow-y-auto will-change-scroll">
-        {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
+        {/* Compact KPI strip — stacked mode only (in split view the full
+            dashboard is the right panel, so this would be a duplicate) */}
         {moduleKpis && filterType === "customer" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6540,9 +6586,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </div>
           </div>
         )}
-        {/* Compact KPI strip — mobile only (supplier variant) */}
+        {/* Compact KPI strip — stacked mode only (supplier variant) */}
         {supplierKpis && filterType === "supplier" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6562,9 +6608,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
-        {/* Compact KPI strip — mobile only (employee/company/people) */}
+        {/* Compact KPI strip — stacked mode only (employee/company/people) */}
         {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6595,6 +6641,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 backdrop-blur-sm">
                 {letter}
               </div>
+              {/* Stacked mode puts the list across the whole app width, where a
+                  single column of 48px avatars leaves ~700px of dead air per
+                  row. Two columns only there — in split view the pane is 400
+                  and a second column would shred the row. The rule is on the
+                  wrapper (not the row) so the divider lands on the first
+                  column in BOTH directions. */}
+              <div className={listTwoCol ? "grid grid-cols-2 [&>*:nth-child(odd)]:border-e [&>*:nth-child(odd)]:border-[var(--border-faint)]" : undefined}>
               {items.map(c => {
                 const isSelected = selectedId === c.id;
                 const tierInfo = c.contact_type === "customer" ? getTierInfo(c.customer_type) : null;
@@ -6775,6 +6828,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 );
               })}
+              </div>
             </div>
           ))
         )}
@@ -11814,18 +11868,27 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </div>
       )}
 
-      {/* Left panel -- contact list. A flush full-height panel, so it wears
-          the DRAWER glass (tile recipe, no lighting rim on the edges), not
-          .kx-glass. Filtering at element level is safe here: every overlay
-          in this app either portals to <body> (ScrollLockOverlay) or renders
-          as a SIBLING of these panes, so no fixed child can be trapped. */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} relative z-[1] kx-glass-drawer flex-col w-full md:w-[400px] lg:w-[480px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
-        {renderListPanel()}
-      </div>
+      {/* Pane host — the element whose width decides split vs stacked. It
+          wraps ONLY the two panes: the Aurora ground above stays a direct
+          child of the root so it keeps covering the viewport, and the modals
+          below stay siblings of this host. */}
+      <div ref={paneHostRef} className="relative z-[1] flex flex-1 min-w-0 h-full">
+        {/* Left panel -- contact list. A flush full-height panel, so it wears
+            the DRAWER glass (tile recipe, no lighting rim on the edges), not
+            .kx-glass. Filtering at element level is safe here: every overlay
+            in this app either portals to <body> (ScrollLockOverlay) or renders
+            as a SIBLING of these panes, so no fixed child can be trapped. */}
+        <div
+          className={`${mobileShowDetail && !splitView ? "hidden" : "flex"} relative z-[1] kx-glass-drawer flex-col ${splitView ? "border-e" : "w-full"} border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}
+          style={splitView ? { width: listPaneW } : undefined}
+        >
+          {renderListPanel()}
+        </div>
 
-      {/* Right panel -- detail / form */}
-      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} relative z-[1] flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
-        {view === "form" && !formModalOpen ? renderFormPanel() : renderDetailPanel()}
+        {/* Right panel -- detail / form */}
+        <div className={`${!mobileShowDetail && !splitView ? "hidden" : "flex"} relative z-[1] flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
+          {view === "form" && !formModalOpen ? renderFormPanel() : renderDetailPanel()}
+        </div>
       </div>
 
       {/* Type chooser modal */}
