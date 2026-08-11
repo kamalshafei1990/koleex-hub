@@ -72,6 +72,7 @@ function AppLink({
   app,
   compact,
   dk,
+  aurora,
   t,
   isActive,
   onNavigate,
@@ -79,6 +80,7 @@ function AppLink({
   app: AppDef;
   compact?: boolean;
   dk: boolean;
+  aurora: boolean;
   t: TFn;
   isActive: boolean;
   onNavigate: () => void;
@@ -95,19 +97,24 @@ function AppLink({
       app={app}
       aria-current={isActive ? "page" : undefined}
       onNavigate={onNavigate}
-      /* Active state: a soft rounded background + the 2px left-edge accent
-         rail + full-opacity ink, so the current row is easy to spot. */
+      /* Active state. Core: a soft white wash + the 2px left-edge accent
+         rail. Aurora: the system's ONE selection mark — kx-seg-on, a Hub
+         Blue outline around a quiet wash (the dock tabs the owner picked as
+         the reference). The edge rail is dropped there; an outline plus a
+         bar is two marks for one state. */
       className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
         compact ? "px-2.5 py-1.5" : "px-3 py-2"
       } ${
         isActive
-          ? dk
-            ? "bg-white/[0.055] text-white/95 font-medium"
-            : "bg-black/[0.045] text-black/95 font-medium"
+          ? aurora
+            ? `kx-seg-on font-medium ${dk ? "text-white" : "text-black/95"}`
+            : dk
+              ? "bg-white/[0.055] text-white/95 font-medium"
+              : "bg-black/[0.045] text-black/95 font-medium"
           : `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
       }`}
     >
-      {isActive && (
+      {isActive && !aurora && (
         <span
           aria-hidden
           className={`pointer-events-none absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`}
@@ -133,6 +140,7 @@ function ExpandedGroup({
   isOpen,
   isGroupActive,
   dk,
+  aurora,
   t,
   activeAppId,
   onToggleGroup,
@@ -143,6 +151,7 @@ function ExpandedGroup({
   isOpen: boolean;
   isGroupActive: boolean;
   dk: boolean;
+  aurora: boolean;
   t: TFn;
   activeAppId: string | null;
   onToggleGroup: (id: string) => void;
@@ -183,9 +192,18 @@ function ExpandedGroup({
             : `${dk ? "text-white/40" : "text-black/45"} ${hoverBg} hover:${dk ? "text-white/70" : "text-black/70"}`
         }`}
       >
+        {/* The group holding the current app is marked on its ICON, in Hub
+            Blue — the section heading is a label, not a target, so it must
+            not compete with the selected row's outline below it. */}
         <GroupIcon
           size={15}
-          className={isGroupActive ? (dk ? "text-white/70" : "text-black/70") : ""}
+          className={
+            isGroupActive
+              ? aurora
+                ? dk ? "text-[#8CB4DC]" : "text-[#3E6796]"
+                : dk ? "text-white/70" : "text-black/70"
+              : ""
+          }
         />
         <span className="flex-1 text-start truncate">{label}</span>
         <AngleRightIcon
@@ -207,6 +225,7 @@ function ExpandedGroup({
               key={app.id}
               app={app}
               dk={dk}
+              aurora={aurora}
               t={t}
               isActive={activeAppId === app.id}
               onNavigate={onNavigate}
@@ -224,6 +243,7 @@ function CollapsedGroup({
   apps,
   isGroupActive,
   dk,
+  aurora,
   t,
   activeAppId,
   onNavigate,
@@ -232,6 +252,7 @@ function CollapsedGroup({
   apps: AppDef[];
   isGroupActive: boolean;
   dk: boolean;
+  aurora: boolean;
   t: TFn;
   activeAppId: string | null;
   onNavigate: () => void;
@@ -257,13 +278,21 @@ function CollapsedGroup({
         }`}
         aria-label={label}
       >
+        {/* The rail has no room for an outline, so the edge mark stays —
+            recoloured to Hub Blue so "you are here" is the same signal in
+            both rail states. */}
         {(isGroupActive || hasActiveChild) && (
           <span
             aria-hidden
-            className={`pointer-events-none absolute top-2 bottom-2 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`}
+            className={`pointer-events-none absolute top-2 bottom-2 left-0 w-[2px] rounded-r ${
+              aurora ? "bg-[#8CB4DC]" : dk ? "bg-white/55" : "bg-black/60"
+            }`}
           />
         )}
-        <GroupIcon size={16} />
+        <GroupIcon
+          size={16}
+          className={aurora && (isGroupActive || hasActiveChild) ? (dk ? "text-[#8CB4DC]" : "text-[#3E6796]") : ""}
+        />
       </button>
 
       {/* Tooltip (group name on hover / keyboard focus) */}
@@ -291,6 +320,7 @@ function CollapsedGroup({
                 app={app}
                 compact
                 dk={dk}
+                aurora={aurora}
                 t={t}
                 isActive={activeAppId === app.id}
                 onNavigate={onNavigate}
@@ -306,12 +336,14 @@ function CollapsedGroup({
 /* ── Collapse toggle — curved pull tab tucked inside the rail seam ── */
 function EdgeToggle({
   dk,
+  aurora,
   expanded,
   onToggle,
   flyoutBg,
   flyoutBorder,
 }: {
   dk: boolean;
+  aurora: boolean;
   expanded: boolean;
   onToggle: () => void;
   flyoutBg: string;
@@ -323,14 +355,22 @@ function EdgeToggle({
         onClick={onToggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         className="relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
+        /* The tab used to paint itself from an inline style — solid #0E0E0E
+           against a rail that is now glass, and unreachable by any skin rule
+           (inline beats everything). Aurora gets the tile fill and a
+           hairline; Core keeps the exact solid it always had. */
         style={{
-          background: dk ? "#0E0E0E" : "#F4F4F4",
+          background: aurora
+            ? (dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)")
+            : (dk ? "#0E0E0E" : "#F4F4F4"),
           borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
           borderBottom: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
           borderInlineStart: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
           borderStartStartRadius: "999px",
           borderEndStartRadius: "999px",
-          boxShadow: dk ? "-3px 0 10px rgba(0,0,0,0.45)" : "-3px 0 10px rgba(0,0,0,0.08)",
+          boxShadow: aurora
+            ? (dk ? "-3px 0 10px rgba(0,0,0,0.30)" : "-3px 0 10px rgba(0,0,0,0.06)")
+            : (dk ? "-3px 0 10px rgba(0,0,0,0.45)" : "-3px 0 10px rgba(0,0,0,0.08)"),
         }}
       >
         <AngleRightIcon
@@ -495,6 +535,7 @@ function SidebarContent({
   mobile,
   expanded,
   dk,
+  aurora,
   t,
   groups,
   activeAppId,
@@ -504,6 +545,7 @@ function SidebarContent({
   mobile?: boolean;
   expanded: boolean;
   dk: boolean;
+  aurora: boolean;
   t: TFn;
   groups: GroupView[];
   activeAppId: string | null;
@@ -530,6 +572,7 @@ function SidebarContent({
               isOpen={isOpen}
               isGroupActive={isGroupActive}
               dk={dk}
+              aurora={aurora}
               t={t}
               activeAppId={activeAppId}
               onToggleGroup={onToggleGroup}
@@ -542,6 +585,7 @@ function SidebarContent({
               apps={apps}
               isGroupActive={isGroupActive}
               dk={dk}
+              aurora={aurora}
               t={t}
               activeAppId={activeAppId}
               onNavigate={onNavigate}
@@ -573,6 +617,7 @@ function SidebarContent({
 
 export default function Sidebar() {
   const dk = useTheme();
+  const aurora = useSkin() === "aurora";
   const pathname = usePathname();
   const { t } = useTranslation(hubT);
   const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
@@ -660,12 +705,20 @@ export default function Sidebar() {
       {/* ── Desktop sidebar (hidden on the home launcher) ── */}
       {!isHome && (
         <aside
-          className={`kx-below-header hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
+          /* Aurora: the rail is glass like every other surface, but it hosts
+             the collapsed groups' flyouts — glass panels that overflow it —
+             so the filter CANNOT sit on the aside itself (a filtered
+             ancestor starves a descendant's backdrop-filter). Pane pattern:
+             filterless host + a real layer inside, content above it. Core:
+             the solid ${bg} slab, untouched. */
+          className={`kx-below-header kx-rail kx-bar-host hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
           style={{ width: w }}
         >
+          <div aria-hidden className="kx-glass-bar kx-bar-panel" />
           <SidebarContent
             expanded={expanded}
             dk={dk}
+            aurora={aurora}
             t={t}
             groups={groups}
             activeAppId={activeAppId}
@@ -681,6 +734,7 @@ export default function Sidebar() {
           >
             <EdgeToggle
               dk={dk}
+              aurora={aurora}
               expanded={expanded}
               onToggle={toggle}
               flyoutBg={flyoutBg}
@@ -714,6 +768,7 @@ export default function Sidebar() {
           mobile
           expanded={expanded}
           dk={dk}
+          aurora={aurora}
           t={t}
           groups={groups}
           activeAppId={activeAppId}

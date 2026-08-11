@@ -1396,6 +1396,21 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-bar {
   background: rgba(250, 251, 253, 0.45);
 }
+/* Panel variant — the same layer at TILE density, for a full-height
+   surface (the desktop rail) rather than a strip. The rail cannot wear
+   `.kx-glass-drawer` the way the mobile drawer does: its collapsed groups
+   open glass flyouts that overflow the rail, and a filtered ancestor
+   starves a descendant's backdrop-filter. So the rail is a filterless host
+   with this layer inside — the pane pattern, at panel scale.
+   Declared BEFORE the low-power / @supports arms on purpose: those match at
+   the same specificity and, coming later, still win — which is exactly the
+   opaque fallback this variant wants. */
+[data-kx-skin="aurora"] .kx-glass-bar.kx-bar-panel {
+  background: rgba(11, 14, 20, 0.55);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-glass-bar.kx-bar-panel {
+  background: rgba(255, 255, 255, 0.62);
+}
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-bar {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1492,6 +1507,11 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"][data-theme="light"] .kx-tabstrip-ind {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
+
+/* The desktop rail is a FLUSH panel: no frame line against the page, the
+   same call the owner made on the AI sidebar ("remove the borders"). Core
+   keeps its hairline. */
+[data-kx-skin="aurora"] .kx-rail { border-inline-end-color: transparent; }
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
    it opens over the launcher and must read as the same material as the app
