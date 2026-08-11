@@ -1510,8 +1510,16 @@ input[type="number"]:not(.kx-spinner) {
 
 /* The desktop rail is a FLUSH panel: no frame line against the page, the
    same call the owner made on the AI sidebar ("remove the borders"). Core
-   keeps its hairline. */
-[data-kx-skin="aurora"] .kx-rail { border-inline-end-color: transparent; }
+   keeps its hairline.
+   The host must also go TRANSPARENT: it keeps its Core `bg-[#0A0A0A]` for
+   the flat skin, and with that solid still painting, the glass layer inside
+   frosts a black slab instead of the page — measured on prod, the rail came
+   back rgb(10,10,10) with a perfect blur over nothing. A pane-pattern host
+   always drops its own fill under Aurora. */
+[data-kx-skin="aurora"] .kx-rail {
+  background: transparent;
+  border-inline-end-color: transparent;
+}
 
 /* THE MOBILE DRAWER WEARS THE TILE GLASS — .kx-glass values, owner's call:
    it opens over the launcher and must read as the same material as the app
