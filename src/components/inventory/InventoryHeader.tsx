@@ -162,6 +162,3 @@ export default function InventoryHeader({
   );
 }
 
-/** Flat list of every inventory route — exported so other components
- *  (e.g. mobile nav, breadcrumbs) can compute active key with longest-prefix. */
-export const INVENTORY_NAV_KEYS: string[] = OVERFLOW_GROUPS.flatMap((g) => g.items.map((i) => i.key));

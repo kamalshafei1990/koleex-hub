@@ -91,12 +91,42 @@ function fmtMoney(n: number) {
   return Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/* ── Warm start ───────────────────────────────────────────────────────────
+   STANDING for every W3+ app in the revision programme: the main list paints
+   from a localStorage mirror on the first frame, so the screen is never a
+   skeleton on re-entry. The owner's network is ~1s per request; that second is
+   the whole perceived cost of opening an app.
+
+   TWO RULES THIS PATTERN LEARNED THE HARD WAY, both encoded below:
+   · Read it in the useState INITIALISER, never in an effect. A value seeded one
+     effect later lays the screen out twice — the "card jumps then jumps back".
+   · Persist INSIDE the loader, so every successful fetch refreshes the mirror.
+
+   ONLY THE DEFAULT VIEW IS MIRRORED. This list is filtered SERVER-side by
+   q/type/status, so snapshotting a filtered response would repaint a search
+   result as if it were the whole catalogue on next open. `kx_` prefix =
+   wiped on sign-out by session-caches.ts. */
+const INV_ITEMS_SNAP_KEY = "kx_inv_items_snap_v1";
+type ItemsSnap = { rows: ItemRow[]; types: ItemType[]; warehouses: Warehouse[] };
+
+function readItemsSnap(): ItemsSnap | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(INV_ITEMS_SNAP_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw) as ItemsSnap;
+    return Array.isArray(snap?.rows) ? snap : null;
+  } catch { return null; }
+}
+
 export default function InventoryItems() {
   const { t } = useTranslation(inventoryT);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [rows, setRows] = useState<ItemRow[]>([]);
-  const [types, setTypes] = useState<ItemType[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  /* Seeded synchronously from the mirror — first paint shows the real list. */
+  const snap0 = useRef<ItemsSnap | null>(readItemsSnap());
+  const [rows, setRows] = useState<ItemRow[]>(() => snap0.current?.rows ?? []);
+  const [types, setTypes] = useState<ItemType[]>(() => snap0.current?.types ?? []);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>(() => snap0.current?.warehouses ?? []);
 
   /* Search is local while the user types; we copy it into searchKey
      after a 250ms debounce — load() depends on searchKey, not search,
@@ -105,7 +135,13 @@ export default function InventoryItems() {
   const [searchKey, setSearchKey] = useState("");
   const [filterTypeId, setFilterTypeId] = useState("");
   const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "archived" | "">("active");
-  const [loading, setLoading] = useState(true);
+  /* Warm: there is already a list on screen, so no skeleton. */
+  const [loading, setLoading] = useState(() => !snap0.current);
+  /* A REF, not the state value: putting `rows` in load()'s dependency list
+     would rebuild the callback on every fetch and refire the effect that calls
+     it — the scopeCtx null→resolved double-load this programme has now hit
+     three times (/todo, /crm, and the CRM board). */
+  const rowsRef = useRef<ItemRow[]>(snap0.current?.rows ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -126,7 +162,8 @@ export default function InventoryItems() {
   }, [search]);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    /* Do not drop a warm list back to a skeleton on refresh. */
+    if (rowsRef.current.length === 0) setLoading(true);
     setError(null);
     try {
       const qs = new URLSearchParams();
@@ -142,9 +179,21 @@ export default function InventoryItems() {
       const tJ = await tRes.json();
       const wJ = await wRes.json();
       if (!iRes.ok) throw new Error(iJ.error ?? `Failed (${iRes.status})`);
-      setRows((iJ.items ?? []) as ItemRow[]);
-      setTypes((tJ.types ?? []) as ItemType[]);
-      setWarehouses((wJ.warehouses ?? []) as Warehouse[]);
+      const nextRows = (iJ.items ?? []) as ItemRow[];
+      const nextTypes = (tJ.types ?? []) as ItemType[];
+      const nextWh = (wJ.warehouses ?? []) as Warehouse[];
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      setTypes(nextTypes);
+      setWarehouses(nextWh);
+      /* Mirror the DEFAULT view only — see the note on the key. */
+      if (!searchKey && !filterTypeId && filterStatus === "active") {
+        try {
+          window.localStorage.setItem(INV_ITEMS_SNAP_KEY, JSON.stringify({
+            rows: nextRows.slice(0, 300), types: nextTypes, warehouses: nextWh,
+          } satisfies ItemsSnap));
+        } catch { /* quota — the mirror is best-effort */ }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
