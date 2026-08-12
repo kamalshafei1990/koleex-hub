@@ -1415,10 +1415,19 @@ input[type="number"]:not(.kx-spinner) {
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="range"]):focus,
+/* THE FOCUS SELECTOR MUST CARRY THE SAME `:not()` CHAIN AS THE RESTING ONE.
+   It didn't, and `:not()` takes the specificity of its argument — so the
+   resting rule scored (0,6,1) on its four type exclusions while focus scored
+   only (0,4,1). The resting rule won on every focused field: `:focus` matched,
+   and the ring never painted. Measured on a focused input — border stayed
+   rgba(255,255,255,0.08), box-shadow had the inset and no ring. Owner called
+   it as part of "the selected field UI issue".
+   Adding an exclusion to the resting rule without mirroring it here silently
+   turns the ring off again. */
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
 [data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
 [data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
-  border-color: rgba(86, 127, 178, 0.70);
+  border-color: rgba(86, 127, 178, 0.70) !important;
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
@@ -1428,11 +1437,57 @@ input[type="number"]:not(.kx-spinner) {
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="range"]):focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
-  border-color: rgba(62, 103, 150, 0.75);
+  border-color: rgba(62, 103, 150, 0.75) !important;
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
+}
+
+/* ── A CONTROL SHAPED LIKE A FIELD IS MADE OF FIELD ────────────────────
+   AURORA RULE (owner, pointing at the big Basics name input): "do them same
+   style as this and take it as a rule for aurora."
+
+   The rule above styles `input`/`textarea`/`select` by ELEMENT, which is right
+   until a form row is built from a <button> instead — a toggle, a picker, a
+   fake select. On the Supplier tab the Tax (VAT) control sits in the same grid
+   row as the "Cost includes" <select>, same height, same rounding, same label
+   above it — and it was the ONLY thing on the row still wearing its raw 5%
+   white tint while its neighbour wore the recessed well. Next to a well, a 5%
+   tint reads as a pale slab, which is the second half of "it become white".
+
+   So: style by what a thing IS, not what tag it happens to be. A control that
+   fills its row AND carries the faint inverted tint is a field surface, and
+   gets the field's material — same fill, same rim, same inset depth. Written
+   once here so every future button-shaped field follows without an edit.
+
+   Narrow on purpose: `w-full` keeps it to controls that occupy a form row, so
+   icon chips and inline pills carrying the same tint are untouched. The tint
+   `/` is required — a SOLID inverted fill is a primary button, not a field. */
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app)
+  :is(button, [role="button"], [role="combobox"])[class*="bg-[var(--bg-inverted)]/"][class*="w-full"]:not([data-kx-keep-hover]) {
+  background-color: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app)
+  :is(button, [role="button"], [role="combobox"])[class*="bg-[var(--bg-inverted)]/"][class*="w-full"]:not([data-kx-keep-hover]):hover {
+  /* Same feedback the app's other controls get — a Hub-Blue rim, never a
+     lighter fill. The inset depth is kept so the control does not "pop out"
+     of the row it belongs to. */
+  border-color: rgba(127, 169, 214, 0.55) !important;
+  background-color: rgba(3, 5, 9, 0.55) !important;
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app)
+  :is(button, [role="button"], [role="combobox"])[class*="bg-[var(--bg-inverted)]/"][class*="w-full"]:not([data-kx-keep-hover]) {
+  background-color: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app)
+  :is(button, [role="button"], [role="combobox"])[class*="bg-[var(--bg-inverted)]/"][class*="w-full"]:not([data-kx-keep-hover]):hover {
+  border-color: rgba(62, 103, 150, 0.6) !important;
+  background-color: rgba(255, 255, 255, 0.70) !important;
 }
 
 /* ── Aurora: converted-app scope (kx-app; kx-pd = Products/PD alias) ────
@@ -1989,7 +2044,15 @@ input[type="number"]:not(.kx-spinner) {
    Hub-Blue halo instead — the button gets brighter attention, never dimmer.
    Works in light theme too, where --bg-inverted is black: the fill is held at
    its own value rather than being lightened, and the same halo reads. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]):hover {
+/* THE SELECTOR MUST MATCH THE SOLID FILL ONLY.
+   `[class*="bg-[var(--bg-inverted)]"]` is a SUBSTRING match, so it also hit
+   `bg-[var(--bg-inverted)]/[0.05]` and `hover:bg-[var(--bg-inverted)]/[0.04]`
+   — the faint 4-6% tint that every field-shaped control in the Hub wears
+   (143 sites). Those controls were therefore being repainted `var(--bg-inverted)`
+   — SOLID WHITE in dark theme — the moment the pointer touched them. Owner, on
+   the Supplier tab: "fix the hover and selected field UI issues, it becomes
+   white." A tint is not a fill; `/` is what tells them apart. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
   /* NOTHING HERE MAY DARKEN THE BUTTON. Round one pinned the opacity but
      added `0 6px 18px -6px rgba(0,0,0,.45)` — a black drop shadow — and the
      owner said it was still dark, correctly: I had removed one way of dimming
@@ -2024,8 +2087,15 @@ input[type="number"]:not(.kx-spinner) {
      carries the accent; re-tinting it on hover is two marks for one state.
    · [data-kx-keep-hover] — an escape hatch for a control whose hover colour
      is meaningful (destructive, brand).
-   `translate: none` is declared ALONE (see the minifier note above). */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not([class*="bg-[var(--bg-inverted)]"]):hover {
+   `translate: none` is declared ALONE (see the minifier note above).
+
+   The primary-button exclusion is written as `:is(:not(SOLID), TINT)` for the
+   same reason as the rule above: the plain `:not([class*="…bg-inverted…"])`
+   was a substring test, so it also excluded every faintly-tinted field control
+   from the normal hover — which then fell through to the primary-button rule
+   and went solid white. A `/` in the token means a tint, and a tint hovers
+   like everything else. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -2052,7 +2122,7 @@ input[type="number"]:not(.kx-spinner) {
   background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not([class*="bg-[var(--bg-inverted)]"]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.03) !important;
 }
