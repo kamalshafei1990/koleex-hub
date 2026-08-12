@@ -1329,6 +1329,62 @@ input[type="number"]:not(.kx-spinner) {
    a dropdown lands over whatever the page is showing — a grid of tiles, a
    table — and 12px type at 55% over that is unreadable. 88% still reads as
    glass because the blur is doing the work, and the text stays solid. */
+/* ── THE ONE DROPDOWN SHELL (MN-5, owner-elected 2026-08-12) ──
+   Owner, on the Sales Rep picker: "any dropdown in Koleex Hub can be this
+   style… whatever its shape, use this design."
+
+   The recipe lives HERE, on the class every panel already wears, so a panel
+   only has to declare where it sits (w-full under a field, w-56 under an
+   icon button, bottom-full when there is no room below) — never how it
+   looks. `src/components/kds/MenuList.tsx` composes this same class, so the
+   component and the class can never drift apart.
+
+   SEPARATE FROM .kx-glass-pop ON PURPOSE. That class is the glass MATERIAL
+   and the confirm modals wear it too; putting the shell on it stole their
+   `rounded-2xl` (measured: 16px → 12px), because an unlayered rule DOES beat
+   a Tailwind utility here — the opposite of the failure documented further
+   down this file, which is why neither direction can be assumed. So:
+   .kx-glass-pop = the material, .kx-pop-panel = the dropdown shell.
+
+   No radius/border utilities are left on the panels; the duplicated
+   `rounded-lg` / `bg-*` / `shadow-*` were REMOVED from the call sites rather
+   than fought with !important. If a panel ever looks wrong, look for a stray
+   utility before touching this rule. Aurora overrides background + shadow
+   below; radius and border are skin-independent. */
+.kx-pop-panel {
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+  /* `hidden auto`, NEVER plain `hidden`. Owner: "i can't scroll this dropdown
+     menu." A flat `overflow: hidden` here beat the panels' own
+     `overflow-y-auto` utility (same precedence quirk that let this rule steal
+     the modals' radius), so the country list sat at 9000px of content inside
+     a 206px box with no way to reach it — 250 countries present, 5 reachable.
+     x stays hidden so rows are still clipped by the corner radius; y is auto,
+     which shows no scrollbar at all on the short panels. */
+  overflow: hidden auto;
+}
+
+/* ── A DROPDOWN MUST NEVER BE BURIED BY THE NEXT CARD ──
+   Every glass surface sets backdrop-filter, and backdrop-filter creates a
+   STACKING CONTEXT. So a panel inside a card is sealed into that card's
+   layer: the next sibling card paints over it whole, and no z-index on the
+   panel can escape — the number was never the problem, the seal was.
+
+   MEASURED (customer form, 2026-08-12): the Sales Rep panel spans y 517→824;
+   at 80% of its height document.elementFromPoint returned a label belonging
+   to the FOLLOWING form card. Lifting the panel's own card fixed it, and
+   exactly one card lifts because a panel only exists in the DOM while open.
+
+   Applies skin-independently: Core has no blur here, but a card that lifts
+   while its menu is open is correct in both skins, and z-index on a static
+   element is inert, so `position: relative` has to come with it. */
+.kx-glass:has(.kx-glass-pop) {
+  position: relative;
+  z-index: 40;
+}
+
 [data-kx-skin="aurora"] .kx-glass-pop {
   /* THE SIGN-IN CARD, COPIED TO THE VALUE — bg-[#0B0E14]/60,
      backdrop-blur-2xl (40px), saturate-150, the same inset highlight and the
@@ -1358,6 +1414,94 @@ input[type="number"]:not(.kx-spinner) {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   [data-kx-skin="aurora"] .kx-glass-pop { background: rgba(14, 17, 23, 0.98); }
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop { background: rgba(252, 253, 255, 0.99); }
+}
+
+/* ── A MENU IS DENSER GLASS THAN A MODAL (owner, 2026-08-12) ──
+   "too transparent… you can totally see clearly the item under it. keep it
+   glass, just increase the blur."
+
+   THE FILE ALREADY ARGUED THIS AND THEN LOST IT. The note above
+   .kx-glass-pop says: a dropdown lands over whatever the page is showing and
+   "12px type at 55% over that is unreadable. 88% still reads as glass
+   because the blur is doing the work." A later change copied the SIGN-IN
+   CARD's numbers onto this class — 0.6 — which is right for a card floating
+   over a photographic ground and wrong for a menu sitting 4px above a form
+   full of labels. The screenshot that prompted this had "Pricing &
+   Discounts" legible straight through the employee list.
+
+   Scoped to .kx-pop-panel, so only DROPDOWNS thicken: the confirm modals
+   wear .kx-glass-pop too, and they sit over a dim scrim where 0.6 is
+   already correct. This is exactly why the shell was split from the
+   material an hour earlier.
+
+   Blur goes up with the opacity, not instead of it — opacity alone is a
+   flat panel, blur alone leaves shapes readable underneath. Low-power and
+   no-backdrop-filter clients skip the blur entirely, so they take a near
+   solid surface instead. */
+/* 0.88 + 56px was measurably better and still not enough: the "Pricing &
+   Discounts" heading under the employee list was faint but READABLE. Light
+   text on a dark ground bleeds through far more than the 88% figure in the
+   old note assumed. 0.94 + 72px kills the shapes while the edge highlight,
+   the saturation lift and the ground's colour still come through — it reads
+   as glass, not as a solid tile. Dial `--kx-pop-tint` if the owner wants it
+   thinner; the blur should not go below ~56px or letterforms return. */
+[data-kx-skin="aurora"] .kx-pop-panel {
+  background: rgba(11, 14, 20, 0.94);
+  -webkit-backdrop-filter: blur(72px) saturate(170%);
+  backdrop-filter: blur(72px) saturate(170%);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-pop-panel {
+  background: rgba(252, 253, 255, 0.95);
+}
+
+/* ── ROW HOVER, LIFTED FOR THE DENSER PANEL (owner, 2026-08-12) ──
+   "make the hover color just a little bit lighter because it's too dark."
+
+   The rows ask for --bg-surface-hover (white 10%), which is tuned against
+   the app's ordinary surfaces. On a 94%-opaque near-black menu that 10%
+   barely separates from the panel, so the row you are pointing at reads as
+   unlit. 14% is the smallest step that registers while staying UNDER
+   --bg-surface-active (15%) — hover must not look like the selected row.
+
+   Scoped inside .kx-pop-panel so it cannot leak into ordinary buttons, and
+   written against the panel's own material (a translucent white lift, not a
+   token) so it holds whatever tint the panel ends up with.
+
+   WHY THIS NEEDED A SECOND EDIT: the global Aurora hover further down forces
+   3% white with !important at (0,8,0), so BOTH this rule and the rows' own
+   `hover:bg-[var(--bg-surface-hover)]` were dead — measured 0.03 on a hovered
+   row while this rule said 0.14. Rather than escalate !important or stamp
+   `data-kx-keep-hover` onto 25 call sites (a hatch that rule documents and
+   nothing in the repo had ever used), that selector now carries
+   `:not(.kx-pop-panel *)`. A menu row is not app chrome; the menu owns its
+   own hover. */
+/* AURORA'S OWN HOVER LANGUAGE, not a neutral grey (owner: "the hover color
+   can be inspired from aurora style"). Everywhere else in the skin, touching
+   a control brings up Hub Blue — `rgba(127,169,214,0.55)` on the border, with
+   a 3% white fill behind it. A menu row has no border to tint, so the blue
+   moves into the FILL: same hue, carried by the only surface the row owns.
+   0.16 is the strength that reads as "lit" on a 94%-opaque panel without
+   turning into a selection; --bg-surface-active (15% white) stays visually
+   above it because it is neutral and covers the full row.
+   Light theme uses the skin's light hover blue (62,103,150) at a lower alpha
+   — the same colour the light Aurora hover puts on borders. */
+.kx-pop-panel button:hover {
+  background-color: rgba(127, 169, 214, 0.16);
+}
+[data-theme="light"] .kx-pop-panel button:hover {
+  background-color: rgba(62, 103, 150, 0.1);
+}
+[data-kx-skin="aurora"][data-kx-lowpower] .kx-pop-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(14, 17, 23, 0.985);
+}
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-pop-panel {
+  background: rgba(252, 253, 255, 0.99);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-kx-skin="aurora"] .kx-pop-panel { background: rgba(14, 17, 23, 0.985); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-pop-panel { background: rgba(252, 253, 255, 0.99); }
 }
 
 /* ── Loading surface ─────────────────────────────────────────────────────
@@ -2095,7 +2239,7 @@ input[type="number"]:not(.kx-spinner) {
    from the normal hover — which then fell through to the primary-button rule
    and went solid white. A `/` in the token means a tint, and a tint hovers
    like everything else. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -2122,7 +2266,7 @@ input[type="number"]:not(.kx-spinner) {
   background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.03) !important;
 }

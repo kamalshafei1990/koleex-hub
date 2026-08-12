@@ -703,8 +703,15 @@ const LEAD_SOURCES = [
    or type their own — these just speed up common entries (trade shows the
    garment-machinery industry attends, campaign types, and channel specifics). */
 const SOURCE_DETAILS = [
-  // Major garment / textile / machinery trade shows
-  "ITMA", "ITMA Asia", "CISMA (Shanghai)", "Texworld", "Intertextile Shanghai",
+  /* Major garment / textile / machinery trade shows.
+     Editions are listed BESIDE the show, not instead of it: "CISMA (Shanghai)"
+     stays for records where only the show is known, and the dated entry is for
+     contacts collected at one specific edition — which is what makes them
+     filterable as a batch later. The field is a free-text combobox, so the
+     entry here is really about spelling every record the SAME way; a hand-typed
+     "Cisma25" would silently fall out of that batch. */
+  "ITMA", "ITMA Asia", "CISMA (Shanghai)", "CISMA 2025 (Shanghai)",
+  "Texworld", "Intertextile Shanghai",
   "Heimtextil", "Canton Fair", "Gartex Texprocess India", "Bharat Tex", "IGATEX Pakistan",
   "Apparel Textile Sourcing", "Colombiatex", "Febratex", "Techtextil", "Domotex",
   "GTE (Garment Technology Expo)", "Saigontex", "Dhaka Int'l Textile & Garment",
@@ -2302,7 +2309,7 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.map((opt, i) => (
             <button
               key={opt}
@@ -2484,7 +2491,7 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl overflow-hidden">
+        <div className="absolute z-30 mt-1 w-full kx-glass-pop kx-pop-panel overflow-hidden">
           <div className="p-2 border-b border-[var(--border-subtle)]">
             <div className="relative">
               <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]"><SearchIcon size={13} /></span>
@@ -2628,7 +2635,7 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
         <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>{value || "--:--"}</span>
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-full kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg p-2 flex gap-2">
+        <div className="absolute z-30 mt-1 w-full kx-glass-pop kx-pop-panel p-2 flex gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] mb-1 px-1">{"Hour"}</p>
             <div className="max-h-40 overflow-y-auto grid grid-cols-3 gap-1 pe-1">
@@ -2648,6 +2655,156 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
 });
 
 /* ── Form select input ── */
+/* ── Listbox — the MN-5 dropdown that replaced native <select> ──────────────
+   Owner, 2026-08-12: "you didn't change all the dropdown menus in customers
+   app." He was right, and the reason was not an oversight: those fields were
+   real `<select>` elements, whose option list is drawn by the OPERATING
+   SYSTEM. No stylesheet reaches it — not the glass, not the radius, not the
+   hover. The only way to put them on MN-5 is to stop being a <select>.
+
+   WHAT WE GAVE UP, DELIBERATELY: on a phone a native <select> opens the OS
+   picker — a full-width sheet with big targets. Owner chose one consistent
+   look over that ("تحويل كامل").
+
+   WHAT WE HAD TO REBUILD, because <select> gave it for free: roving keyboard
+   focus (arrows / Home / End), type-ahead, Enter and Escape, click-outside,
+   focus returning to the trigger on close, and listbox/option roles so a
+   screen reader still announces it as a select. Anything less would trade
+   accessibility for looks.
+
+   One component behind BOTH wrappers, so SelectInput and LabelSelect can
+   never drift; the 64 call sites keep their props untouched. */
+function Listbox({
+  value, onChange, options, renderLabel, placeholder, icon, triggerClassName,
+  panelWidthClassName = "w-full", wrapperClassName = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  renderLabel?: (o: string) => string;
+  /** When set, an extra leading row clears the value (native's empty option). */
+  placeholder?: string;
+  icon?: React.ReactNode;
+  triggerClassName: string;
+  panelWidthClassName?: string;
+  /** Layout for the anchor itself — LabelSelect sits inline in a flex row. */
+  wrapperClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const typed = useRef({ q: "", at: 0 });
+
+  /* The placeholder is row 0 when present, so every index below is over ONE
+     list — no off-by-one between what the arrow keys move and what renders. */
+  const rows = useMemo(
+    () => (placeholder !== undefined ? [{ v: "", text: placeholder }] : []).concat(
+      options.map((o) => ({ v: o, text: renderLabel ? renderLabel(o) : o })),
+    ),
+    [options, renderLabel, placeholder],
+  );
+  const selectedIdx = Math.max(0, rows.findIndex((r) => r.v === value));
+  const current = rows.find((r) => r.v === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  /* Open ON the current value, not at the top — a 30-row discount list that
+     always opened at "1%" would make the selected row impossible to find.
+     Set at the moment of opening rather than in an effect on `open`: an
+     effect would fire a second render every time the panel appears, and the
+     lint rule that flags synchronous setState in effects is right to. */
+  const openAt = () => { setActiveIdx(selectedIdx); setOpen(true); };
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.children[activeIdx] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [open, activeIdx]);
+
+  const commit = (i: number) => {
+    const row = rows[i];
+    if (!row) return;
+    onChange(row.v);
+    setOpen(false);
+    btnRef.current?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") { e.preventDefault(); openAt(); }
+      return;
+    }
+    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btnRef.current?.focus(); return; }
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); commit(activeIdx); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(rows.length - 1, i + 1)); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)); return; }
+    if (e.key === "Home") { e.preventDefault(); setActiveIdx(0); return; }
+    if (e.key === "End") { e.preventDefault(); setActiveIdx(rows.length - 1); return; }
+    /* Type-ahead: letters within 700ms build one query, exactly like a
+       native select. Without it a long list is only reachable by scrolling. */
+    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const now = Date.now();
+      typed.current.q = now - typed.current.at > 700 ? e.key : typed.current.q + e.key;
+      typed.current.at = now;
+      const q = typed.current.q.toLowerCase();
+      const hit = rows.findIndex((r) => r.text.toLowerCase().startsWith(q));
+      if (hit >= 0) setActiveIdx(hit);
+    }
+  };
+
+  return (
+    <div ref={wrapRef} className={`relative ${wrapperClassName}`}>
+      {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none z-[1]">{icon}</span>}
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => (open ? setOpen(false) : openAt())}
+        onKeyDown={onKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        data-kx-keep-hover
+        className={triggerClassName}
+      >
+        <span className={`block truncate text-start ${current && current.v !== "" ? "" : "text-[var(--text-ghost)]"}`}>
+          {current ? current.text : (placeholder ?? "")}
+        </span>
+      </button>
+      <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
+      {open && (
+        <div className={`absolute z-50 mt-1 ${panelWidthClassName} kx-glass-pop kx-pop-panel`}>
+          <div ref={listRef} role="listbox" tabIndex={-1} onKeyDown={onKeyDown} className="max-h-60 overflow-y-auto py-1">
+            {rows.map((r, i) => (
+              <button
+                key={r.v || "__placeholder"}
+                type="button"
+                role="option"
+                aria-selected={r.v === value}
+                onMouseEnter={() => setActiveIdx(i)}
+                onClick={() => commit(i)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-start text-sm transition-colors ${
+                  i === activeIdx ? "bg-[rgba(127,169,214,0.16)]" : ""
+                } ${r.v === value ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}
+              >
+                <span className="flex-1 min-w-0 truncate">{r.text}</span>
+                {r.v === value && <CheckIcon size={13} className="shrink-0 text-[var(--text-primary)]" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;
   renderLabel?: (o: string) => string; selectLabel?: string; tier?: FieldTier; help?: string;
@@ -2655,18 +2812,15 @@ const SelectInput = React.memo(function SelectInput({ label, value, onChange, op
   return (
     <div>
       <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
-      <div className="relative">
-        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors appearance-none cursor-pointer ${icon ? "ps-9 pe-3" : "px-3"}`}
-        >
-          <option value="" className="bg-[var(--bg-secondary)]">{selectLabel ?? "Select..."}</option>
-          {options.map(o => <option key={o} value={o} className="bg-[var(--bg-secondary)]">{renderLabel ? renderLabel(o) : o}</option>)}
-        </select>
-        <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
-      </div>
+      <Listbox
+        value={value}
+        onChange={onChange}
+        options={options}
+        renderLabel={renderLabel}
+        placeholder={selectLabel ?? "Select..."}
+        icon={icon}
+        triggerClassName={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer ${icon ? "ps-9 pe-8" : "ps-3 pe-8"}`}
+      />
     </div>
   );
 });
@@ -2758,15 +2912,21 @@ const TagInput = React.memo(function TagInput({
 });
 
 /* ── Inline label select ── */
+/* The phone/email "label" picker (mobile · work · home …). No placeholder row:
+   the native version had no empty option and one of the values is always set,
+   so offering "Select…" here would let the operator blank a required label.
+   The panel is wider than its 80px trigger — "work fax" must not truncate. */
 const LabelSelect = React.memo(function LabelSelect({ value, onChange, options, renderLabel }: { value: string; onChange: (v: string) => void; options: string[]; renderLabel?: (o: string) => string }) {
   return (
-    <select
+    <Listbox
       value={value}
-      onChange={e => onChange(e.target.value)}
-      className="h-10 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] font-medium outline-none cursor-pointer min-w-[80px]"
-    >
-      {options.map(o => <option key={o} value={o} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">{renderLabel ? renderLabel(o) : o}</option>)}
-    </select>
+      onChange={onChange}
+      options={options}
+      renderLabel={renderLabel}
+      wrapperClassName="shrink-0"
+      panelWidthClassName="min-w-[9rem]"
+      triggerClassName="h-10 ps-2 pe-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] font-medium outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer min-w-[80px]"
+    />
   );
 });
 
@@ -2792,7 +2952,7 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto kx-glass-pop kx-pop-panel">
           {options.map((o) => (
             <button
               key={o}
@@ -2875,7 +3035,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden kx-glass-pop kx-pop-panel">
           <div className="p-2 border-b border-[var(--border-faint)]">
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
           </div>
@@ -3438,9 +3598,17 @@ const CustomerActivityHub = React.memo(function CustomerActivityHub({ contactId,
         <div className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{t("activity.timeline", "Interaction Timeline")}</div>
         <div className="flex flex-wrap gap-2 mb-3">
           <input type="date" value={tDate} onChange={(e) => setTDate(e.target.value)} className={`${inputCls} w-[140px]`} />
-          <select value={tType} onChange={(e) => setTType(e.target.value)} className={`${inputCls} cursor-pointer`}>
-            {INTERACTION_TYPES.map((x) => <option key={x} value={x} className="bg-[var(--bg-secondary)]">{x}</option>)}
-          </select>
+          {/* No placeholder row: an interaction always HAS a type, and the
+              first one is the default — offering "Select…" would let a
+              timeline entry be saved untyped. */}
+          <Listbox
+            value={tType}
+            onChange={setTType}
+            options={INTERACTION_TYPES as unknown as string[]}
+            wrapperClassName="shrink-0"
+            panelWidthClassName="min-w-[11rem]"
+            triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+          />
           <input value={tNote} onChange={(e) => setTNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addInteraction(); } }} placeholder={t("activity.notePlaceholder", "What happened?")} className={`${inputCls} flex-1 min-w-[160px]`} />
           <button type="button" onClick={addInteraction} disabled={!tNote.trim()} className={addBtn}>{t("add.label", "Add")}</button>
         </div>
@@ -3632,7 +3800,7 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.map(opt => (
             <button key={opt} type="button" onClick={() => { addValue(opt); setDraft(""); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors">
               <CarrierLogo name={opt} />{opt}
@@ -3738,7 +3906,7 @@ const TagEditor = React.memo(function TagEditor({
         {suggestions && <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />}
       </div>
       {suggestions && open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.map(opt => (
             <button
               key={opt}
@@ -4143,7 +4311,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
           className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
         />
         {open && (
-          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden kx-glass-pop kx-pop-panel">
             <div className="p-2 border-b border-[var(--border-faint)]">
               <input
                 autoFocus
@@ -4434,7 +4602,7 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
       </button>
 
       {open && (
-        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-2xl`}>
+        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] kx-glass-pop kx-pop-panel p-3`}>
           {/* Header: month/year + nav */}
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => stepMonth(-1)} aria-label="Previous month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="left" /></button>
@@ -4514,7 +4682,7 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
         />
         <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
         {open && filtered.length > 0 && (
-          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-2xl">
+          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel p-1">
             {filtered.map((o, i) => (
               <button
                 key={i}
@@ -4710,7 +4878,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
@@ -4792,7 +4960,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
@@ -4886,7 +5054,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto kx-glass-pop rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
@@ -6403,7 +6571,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {/* Smart suggestions — each row names the supplier AND why it matched
               (brand, contact person, app ID, country…). Click opens that supplier. */}
           {searchFocused && debouncedSearch.trim() && suggestions.length > 0 && (
-            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto kx-glass-pop rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
               {suggestions.map(c => {
                 const reason = searchMatchReason(c, searchTerms);
                 const cn = (c as unknown as Record<string, unknown>).company_name_cn;
@@ -11083,10 +11251,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <select onChange={e => { const val = e.target.value; if (val && !form.certifications.includes(val)) setField("certifications", [...form.certifications, val]); e.target.value = ""; }} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none cursor-pointer">
-                      <option value="" className="bg-[var(--bg-secondary)]">{t("add.certification")}</option>
-                      {CERTIFICATIONS_LIST.filter(c => !form.certifications.includes(c)).map(c => <option key={c} value={c} className="bg-[var(--bg-secondary)]">{c}</option>)}
-                    </select>
+                    {/* An ADD control, not a value control: it never holds a
+                        selection — picking a row appends a chip and the
+                        trigger falls back to its prompt. Hence value="" and
+                        no placeholder row; the prompt IS the trigger label. */}
+                    <Listbox
+                      value=""
+                      onChange={(val) => { if (val && !form.certifications.includes(val)) setField("certifications", [...form.certifications, val]); }}
+                      options={CERTIFICATIONS_LIST.filter(c => !form.certifications.includes(c))}
+                      placeholder={t("add.certification")}
+                      wrapperClassName="flex-1"
+                      triggerClassName="w-full h-9 ps-3 pe-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer"
+                    />
                   </div>
                 </div>
                 <div>
@@ -11611,12 +11787,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.gender")}</label>
-                <select value={form.gender} onChange={e => setField("gender", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
-                  <option value="">{t("detail.select")}</option>
-                  <option value="male">{tOpt("male")}</option>
-                  <option value="female">{tOpt("female")}</option>
-                  <option value="other">{tOpt("Other")}</option>
-                </select>
+                {/* Values stay the stored English keys (male/female/other);
+                    only the row text is translated, exactly as the <option>
+                    did — so no saved record changes meaning. */}
+                <Listbox
+                  value={form.gender}
+                  onChange={(v) => setField("gender", v)}
+                  options={["male", "female", "other"]}
+                  renderLabel={(o) => (o === "other" ? tOpt("Other") : tOpt(o))}
+                  placeholder={t("detail.select")}
+                  triggerClassName="w-full h-10 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer"
+                />
               </div>
             </div>
           </div>
@@ -11730,13 +11911,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.maritalStatus")}</label>
-              <select value={form.marital_status} onChange={e => setField("marital_status", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
-                <option value="">{t("detail.select")}</option>
-                <option value="single">{tOpt("single")}</option>
-                <option value="married">{tOpt("married")}</option>
-                <option value="divorced">{tOpt("divorced")}</option>
-                <option value="widowed">{tOpt("widowed")}</option>
-              </select>
+              <Listbox
+                value={form.marital_status}
+                onChange={(v) => setField("marital_status", v)}
+                options={["single", "married", "divorced", "widowed"]}
+                renderLabel={tOpt}
+                placeholder={t("detail.select")}
+                triggerClassName="w-full h-10 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer"
+              />
             </div>
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.numberOfChildren")}</label>
@@ -11750,15 +11932,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.certificateLevel")}</label>
-              <select value={form.certificate_level} onChange={e => setField("certificate_level", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
-                <option value="">{t("detail.select")}</option>
-                <option value="high_school">{tOpt("high_school")}</option>
-                <option value="diploma">{tOpt("diploma")}</option>
-                <option value="bachelor">{tOpt("bachelor")}</option>
-                <option value="master">{tOpt("master")}</option>
-                <option value="doctorate">{tOpt("doctorate")}</option>
-                <option value="other">{tOpt("Other")}</option>
-              </select>
+              <Listbox
+                value={form.certificate_level}
+                onChange={(v) => setField("certificate_level", v)}
+                options={["high_school", "diploma", "bachelor", "master", "doctorate", "other"]}
+                renderLabel={(o) => (o === "other" ? tOpt("Other") : tOpt(o))}
+                placeholder={t("detail.select")}
+                triggerClassName="w-full h-10 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer"
+              />
             </div>
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.fieldOfStudy")}</label>
