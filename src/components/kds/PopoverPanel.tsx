@@ -83,6 +83,27 @@ export default function PopoverPanel({
 
   const place = useCallback(() => {
     const a = anchorRef.current;
+    /* THE ANCHOR CAN BE NULL ON THE FIRST PASS, AND THAT IS NOT AN ERROR.
+       This panel renders INSIDE the element `anchorRef` points at, and React
+       attaches host refs child-first during commit — so a child's layout
+       effect runs BEFORE its own ancestor's ref is assigned. Every other
+       dropdown in the Hub escapes this because its trigger was mounted in an
+       earlier commit and the ref has been set for ages. The notification bell
+       is the one that mounts ALREADY OPEN (the gate hands over with
+       `defaultOpen`), so its very first commit is also the commit that has to
+       attach the anchor — and measuring there found nothing.
+
+       Symptom when this is unhandled: the bell reports aria-expanded="true",
+       the scrim is up, and there is no panel anywhere in the document. Any
+       stray resize or scroll then makes it appear, which is what made it look
+       intermittent.
+
+       The recovery is the PASSIVE effect below, not a frame: passive effects
+       run after the whole commit, when every ref is attached. It must not be a
+       requestAnimationFrame — rAF does not fire in a background tab, so the
+       panel would stay missing until the tab came forward. Measured exactly
+       that: visibilityState "hidden", zero frames, two placement attempts and
+       no third. */
     if (!a) return;
     const r = a.getBoundingClientRect();
     /* SHEET MODE. On a phone a 380px card hanging off a 32px icon button in
@@ -186,6 +207,17 @@ export default function PopoverPanel({
       document.removeEventListener("mousedown", onDown);
     };
   }, [open, place, anchorRef]);
+
+  /* The second placement, and the one that makes the bell work at all.
+     Passive effects run after the ENTIRE commit, so `anchorRef.current` is
+     guaranteed attached here even when this panel is a descendant of its own
+     anchor and mounts already open. place() returns the previous rect object
+     unchanged when the box has not moved, so in the normal case — trigger
+     mounted long ago, layout effect already placed it — this costs one
+     comparison and no re-render. */
+  useEffect(() => {
+    if (open) place();
+  }, [open, place]);
 
   if (!open || !rect || typeof document === "undefined") return null;
 

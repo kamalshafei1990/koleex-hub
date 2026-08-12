@@ -54,8 +54,22 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
      microtask. */
   const handOver = async () => {
     setPending(true);
-    try { await import("./NotificationBell"); } catch { /* retry on next press */ }
-    setOpened(true);
+    /* Swap ONLY on a module that actually arrived. `dynamic()` renders
+       `loading: () => null`, so handing over before the chunk is there leaves
+       a HOLE where the bell was — observed directly: with the chunk fetch
+       failing the header lost its bell and never got it back, and the items
+       beside it slid across to fill the gap.
+
+       The timeout is an escape from the pressed state, NOT a licence to swap:
+       if the chunk never lands we go back to a normal, pressable button. A
+       second press costs nothing — import() de-dupes onto the same request —
+       and a bell that does nothing is still far better than no bell. */
+    const ok = await Promise.race([
+      import("./NotificationBell").then(() => true, () => false),
+      new Promise<boolean>((r) => window.setTimeout(() => r(false), 6000)),
+    ]);
+    setPending(false);
+    if (ok) setOpened(true);
   };
 
   /* Poll the two counts while the panel is closed. Once it is open the real
