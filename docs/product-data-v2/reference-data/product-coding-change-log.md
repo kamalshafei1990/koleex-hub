@@ -269,4 +269,15 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
   - **`XSH` and `XSS` are retired as CLASSIFICATION shelves but PERMANENTLY RESERVED as code prefixes.** They are never reissued and never rewritten on the 102 machines that carry them. When those products are entered they are classified by stitch type + attributes (`XSH-1212` = a lockstitch with `duty=heavy`) and **keep their printed codes**.
   - Only `XSD`, `XSM` and `XSPA` may have their rows removed outright.
   This is the governance rule working as designed — retired codes are never recycled — not an exception to it.
-- **Status:** **Signed off — NOT YET APPLIED.** No DB row has been created, renamed or removed. Implementation (subcategory rows, facet dictionary, Machine-Kind demotion, sibling categories, then the spec templates) is gated on a separate owner go-ahead, per the standing rule that plan approval is not start approval.
+- **APPLIED — 2026-08-12, in two steps.**
+  **1a · code first, on purpose.** The kind layer had to move before the rows could, or 59 kinds would have pointed at subcategories that no longer existed and the picker would have failed silently. `machine-kinds.ts`: 59 of 105 kinds re-pointed onto their real stitch type, with the old shelf's meaning moved into a new `attributes` map. **Slugs unchanged** — they are persisted in `product_sewing_specs.common_specs.machine_kind`. The resolver gained the second axis: HEAVY_DUTY / DOUBLE_NEEDLE / MULTI_NEEDLE / PATTERN_SEWING field sets now attach to the ATTRIBUTE instead of a shelf, so a lockstitch with `needle_count:2 + duty:heavy` collects **both** (61 fields) — something the old model could not express without filing one machine twice. 8 missing spec families added. Verified 105/105 slugs unique, 0 kinds orphaned, 0 resolving to null. Commit `dbc4433b`.
+  **The audit's duplication warning was literally true in the data:** `dn-heavy-duty` and `hd-dnls` are the same machine, filed under two different subcategories.
+  **1b · the rows.**
+  | Action | Rows |
+  |---|---|
+  | Renamed (code untouched, slug untouched) | `XSI` → **Coverstitch (Flatlock) Machines** · 绷缝机（覆盖缝） · ماكينات الغرزة المغطّية |
+  | Deleted | `XSD` `XSM` `XSPA`(pattern-sewing) — zero product codes anywhere |
+  | **Retired, not deleted** | `XSH` `XSS` — renamed to carry "(RETIRED)" in **all three languages**, with a description naming the reserved prefix |
+  | Minted | `XSBL` Blindstitch (暗缝机) · `XSZ` Zigzag (曲折缝纫机) · `XAPT` Programmable/CNC (电脑模板机) |
+  `XSPA` now resolves to exactly one meaning — **Attachments & Folders** under Spare Parts. The double-use flagged in CL-0001 and CL-0010 is closed.
+- **Status:** **Applied — live.** Remaining in this programme: the facet dictionary (`needle_count`, `duty`, `bed`, `feed`, `motor`), the sibling categories (Bonding / Fastening / Production Systems) that the four non-sewing kinds are waiting on, and only then the spec templates. Implementation (subcategory rows, facet dictionary, Machine-Kind demotion, sibling categories, then the spec templates) is gated on a separate owner go-ahead, per the standing rule that plan approval is not start approval.
