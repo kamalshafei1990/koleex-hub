@@ -184,9 +184,11 @@ export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
 export const LAST_USER_KEY = "koleex-last-user";
 
 
+/* `title`/`subtitle` used to be required props, but the gate stopped rendering
+   them when it moved to a tab-contextual heading (t("welcome") / t("join.title")
+   from signInT). Seven pages were still passing hardcoded English into props
+   that nothing read — removed rather than translated. */
 interface Props {
-  title: string;
-  subtitle: string;
   children: React.ReactNode;
 }
 
@@ -198,7 +200,7 @@ type Tab = "signin" | "join";
 /* Every icon comes from the Koleex library — src/components/icons/ui.
    Nothing on this screen is hand-drawn or borrowed from a third-party set. */
 
-export default function AdminAuth({ title, subtitle, children }: Props) {
+export default function AdminAuth({ children }: Props) {
   /* `authed === null` = still hydrating; render a spinner so we don't
      flash the form before we know the session state. */
   const [authed, setAuthed] = useState<boolean | null>(null);

@@ -64,6 +64,11 @@ type Tab = (typeof TABS)[number];
    HELPERS
    ═══════════════════════════════════════════════════ */
 
+
+/* Read once per page load: tenure is expressed in months, so a timestamp
+   taken at module init is exact, and it keeps render pure. */
+const PAGE_OPENED_AT = Date.now();
+
 function Avatar({ src, name, size = 64 }: { src?: string | null; name: string; size?: number }) {
   if (src) {
     return (
@@ -493,13 +498,18 @@ export default function EmployeeProfilePage({
     ? (employee.social_accounts as { platform: string; value: string }[]).filter((a) => a?.platform && a?.value)
     : [];
 
-  /* Tenure, computed once — the single fact a manager scans for that no
-     column in the table carries. */
+  /* Tenure — the single fact a manager scans for that no column in the table
+     carries. The comment used to say "computed once" while the IIFE actually
+     re-ran on every render, calling Date.now() mid-render: impure, and the
+     value could shift between two renders of the same paint. The clock is now
+     read ONCE per page load at module scope — a hook cannot go here, there is
+     an early return above this line (the same trap that crashed ProjectsApp),
+     and tenure is measured in months so a per-load timestamp is exact. */
   const tenure = (() => {
     if (!employee.hire_date) return null;
     const from = new Date(employee.hire_date);
     if (Number.isNaN(from.getTime())) return null;
-    const months = Math.max(0, Math.round((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+    const months = Math.max(0, Math.round((PAGE_OPENED_AT - from.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
     const y = Math.floor(months / 12);
     const m = months % 12;
     return y > 0 ? `${y}${t("unit.year")}${m ? ` ${m}${t("unit.month")}` : ""}` : `${m}${t("unit.month")}`;
@@ -769,15 +779,15 @@ export default function EmployeeProfilePage({
               </div>
             ) : (
               <div className="mx-4 md:mx-6 my-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                <ActivityCard title="CRM Opportunities" icon={UserIcon} bucket={activity.crmOpportunities} appHref="/crm" emptyHint="No opportunities owned yet" />
-                <ActivityCard title="Quotations" icon={DocumentIcon} bucket={activity.quotations} appHref="/quotations" emptyHint="No quotations created yet" />
-                <ActivityCard title="Invoices" icon={CreditCardIcon} bucket={activity.invoices} appHref="/invoices" emptyHint="No invoices created yet" />
-                <ActivityCard title="Projects Managed" icon={BriefcaseIcon} bucket={activity.projectsManaged} appHref="/projects" emptyHint="Not managing any projects" />
-                <ActivityCard title="Open Tasks" icon={CheckIcon} bucket={activity.tasksAssigned} appHref="/projects" emptyHint="No tasks assigned" />
-                <ActivityCard title="Todos" icon={CheckIcon} bucket={activity.todosAssigned} appHref="/todo" emptyHint="No open todos" />
-                <ActivityCard title="Leave Requests" icon={ShieldIcon} bucket={activity.leaveRequests} appHref="/hr" emptyHint="No leave history" />
-                <ActivityCard title="Calendar" icon={BriefcaseIcon} bucket={activity.calendarEvents} appHref="/calendar" emptyHint="No recent events" />
-                <ActivityCard title="Notes" icon={DocumentIcon} bucket={activity.notes} appHref="/notes" emptyHint="No notes yet" />
+                <ActivityCard title={t("act.crm", "CRM Opportunities")} icon={UserIcon} bucket={activity.crmOpportunities} appHref="/crm" emptyHint={t("act.crm.empty", "No opportunities owned yet")} />
+                <ActivityCard title={t("act.quot", "Quotations")} icon={DocumentIcon} bucket={activity.quotations} appHref="/quotations" emptyHint={t("act.quot.empty", "No quotations created yet")} />
+                <ActivityCard title={t("act.inv", "Invoices")} icon={CreditCardIcon} bucket={activity.invoices} appHref="/invoices" emptyHint={t("act.inv.empty", "No invoices created yet")} />
+                <ActivityCard title={t("act.projMgr", "Projects Managed")} icon={BriefcaseIcon} bucket={activity.projectsManaged} appHref="/projects" emptyHint={t("act.projMgr.empty", "Not managing any projects")} />
+                <ActivityCard title={t("act.tasks", "Open Tasks")} icon={CheckIcon} bucket={activity.tasksAssigned} appHref="/projects" emptyHint={t("act.tasks.empty", "No tasks assigned")} />
+                <ActivityCard title={t("act.todos", "Todos")} icon={CheckIcon} bucket={activity.todosAssigned} appHref="/todo" emptyHint={t("act.todos.empty", "No open todos")} />
+                <ActivityCard title={t("act.leave", "Leave Requests")} icon={ShieldIcon} bucket={activity.leaveRequests} appHref="/hr" emptyHint={t("act.leave.empty", "No leave history")} />
+                <ActivityCard title={t("act.cal", "Calendar")} icon={BriefcaseIcon} bucket={activity.calendarEvents} appHref="/calendar" emptyHint={t("act.cal.empty", "No recent events")} />
+                <ActivityCard title={t("act.notes", "Notes")} icon={DocumentIcon} bucket={activity.notes} appHref="/notes" emptyHint={t("act.notes.empty", "No notes yet")} />
               </div>
             )}
           </>

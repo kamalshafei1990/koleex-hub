@@ -12,7 +12,7 @@ const TranslatorApp = dynamic(() => import("@/components/translator/TranslatorAp
 
 export default function TranslatorPage() {
   return (
-    <AdminAuth title="Translator" subtitle="Sign in to use the translator">
+    <AdminAuth>
       <TranslatorApp />
     </AdminAuth>
   );

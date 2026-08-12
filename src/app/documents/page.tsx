@@ -17,7 +17,7 @@ const DocumentsApp = dynamic(() => import("@/components/documents/DocumentsApp")
 
 export default function DocumentsPage() {
   return (
-    <AdminAuth title="Documents" subtitle="Sign in to access document templates">
+    <AdminAuth>
       <PermissionGate module="Documents">
         <DocumentsApp />
       </PermissionGate>

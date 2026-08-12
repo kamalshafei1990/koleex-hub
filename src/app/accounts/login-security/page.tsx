@@ -21,7 +21,7 @@ import SecurityCenter from "@/components/security/SecurityCenter";
 
 export default function LoginSecurityPage() {
   return (
-    <AuthGate title="Login Security" subtitle="Observe-mode rate-limit analytics and enforcement readiness">
+    <AuthGate>
       <Suspense fallback={null}>
         <SecurityCenter />
       </Suspense>

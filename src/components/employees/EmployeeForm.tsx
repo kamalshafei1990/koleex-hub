@@ -1526,7 +1526,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
           <div className="flex items-center gap-3 shrink-0">
             <span
               className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-[var(--text-dim)] tabular-nums"
-              title="Profile completeness"
+              title={t("act.completeness", "Profile completeness")}
             >
               <span className="h-1.5 w-16 rounded-full bg-[var(--bg-surface)] overflow-hidden">
                 <span
@@ -1801,8 +1801,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                     folder="documents"
                     shape="square"
                     label={t("f.drop.qr")}
-                    hint="PNG / JPG"
-                    browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                    hint={t("u.hintImg", "PNG / JPG")}
+                    browseLabel="Browse" removeLabel="Remove" errorLabel={t("u.uploadFailed", "Upload failed")}
                   />
                 </div>
               </div>
@@ -1954,7 +1954,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                 options={managerOptions}
                 placeholder={managerOptions.length ? t("f.ph.select") : t("f.ph.noActiveEmp")}
                 searchPlaceholder="Search employees…"
-                emptyText="No employees match"
+                emptyText={t("l.noMatch", "No employees match")}
               />
               <DateInput name="contract_end_date" label={t("f.emp.contractEnd")} value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />
               <DateInput name="probation_end_date" label={t("f.emp.probationEnd")} value={form.probation_end_date} onChange={(v) => set("probation_end_date", v)} yearFrom={2024} yearTo={2030} error={errFor("probation_end_date")} />
@@ -2159,8 +2159,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
             <SubLabel>{t("f.docs.identification")}</SubLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3 mb-4">
               <TextInput label={t("f.docs.natId")} value={form.identification_id} onChange={(v) => set("identification_id", v)} placeholder={t("f.ph.idNumber")} />
-              <TextInput label={t("f.docs.passport")} value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder="Passport #" />
-              <TextInput label={t("f.docs.ssn")} value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder="SSN" />
+              <TextInput label={t("f.docs.passport")} value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder={t("p.passportNo", "Passport #")} />
+              <TextInput label={t("f.docs.ssn")} value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder={t("p.ssn", "SSN")} />
               <TextInput label={t("f.docs.tax")} value={form.tax_id} onChange={(v) => set("tax_id", v)} placeholder={t("f.docs.tax")} />
             </div>
 
@@ -2179,8 +2179,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   folder="documents"
                   shape="card"
                   label={t("f.drop.front")}
-                  hint="Image or PDF, up to 10 MB"
-                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                  hint={t("u.hintDoc", "Image or PDF, up to 10 MB")}
+                  browseLabel="Browse" removeLabel="Remove" errorLabel={t("u.uploadFailed", "Upload failed")}
                 />
               </div>
               <div>
@@ -2191,8 +2191,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   folder="documents"
                   shape="card"
                   label={t("f.drop.back")}
-                  hint="Image or PDF, up to 10 MB"
-                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                  hint={t("u.hintDoc", "Image or PDF, up to 10 MB")}
+                  browseLabel="Browse" removeLabel="Remove" errorLabel={t("u.uploadFailed", "Upload failed")}
                 />
               </div>
               <div>
@@ -2203,8 +2203,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                   folder="documents"
                   shape="card"
                   label={t("f.drop.passport")}
-                  hint="Image or PDF, up to 10 MB"
-                  browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                  hint={t("u.hintDoc", "Image or PDF, up to 10 MB")}
+                  browseLabel="Browse" removeLabel="Remove" errorLabel={t("u.uploadFailed", "Upload failed")}
                 />
               </div>
             </div>
@@ -2212,7 +2212,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               <div>
                 <SubLabel>{t("f.docs.visa")}</SubLabel>
                 <div className="grid grid-cols-2 gap-3 mt-3">
-                  <TextInput label={t("f.docs.visaNum")} value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder="Visa #" />
+                  <TextInput label={t("f.docs.visaNum")} value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder={t("p.visaNo", "Visa #")} />
                   <DateInput name="visa_expiry_date" label={t("f.docs.visaExp")} value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
                 </div>
                 <div className="mt-3">
@@ -2223,8 +2223,8 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
                     folder="documents"
                     shape="card"
                     label={t("f.drop.visa")}
-                    hint="Image or PDF, up to 10 MB"
-                    browseLabel="Browse" removeLabel="Remove" errorLabel="Upload failed"
+                    hint={t("u.hintDoc", "Image or PDF, up to 10 MB")}
+                    browseLabel="Browse" removeLabel="Remove" errorLabel={t("u.uploadFailed", "Upload failed")}
                   />
                 </div>
               </div>
@@ -2241,7 +2241,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
             <SubLabel>{t("f.docs.drivingLicense")}</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-              <TextInput label={t("f.docs.licenseNum")} value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
+              <TextInput label={t("f.docs.licenseNum")} value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder={t("p.licenseNo", "License #")} />
               <SelectInput label={t("f.docs.licenseType")} value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={tOpts(t, DRIVING_LICENSE_TYPE_OPTIONS)} />
               <DateInput name="driving_license_expiry" label={t("f.comp.expiry")} value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>

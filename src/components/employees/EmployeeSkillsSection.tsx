@@ -55,6 +55,14 @@ export interface AssessmentRow {
 }
 
 /* ═══ Score slider — accent-blue fill, white knob (Hub standing rule) ═══ */
+
+/* Declared at module scope on purpose: a component defined inside another
+   component is a NEW type on every render, so React unmounts and remounts
+   its whole subtree each time. It closes over nothing, so it lifts cleanly. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{children}</p>;
+}
+
 function SkillSlider({
   value, onChange, label,
 }: {
@@ -537,9 +545,6 @@ function SkillPicker({
         {catName(s.category_id)}
       </span>
     </button>
-  );
-  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{children}</p>
   );
 
   return (

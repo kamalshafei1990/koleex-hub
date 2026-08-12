@@ -8,6 +8,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { projectsT } from "@/lib/translations/projects";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -31,14 +33,16 @@ const card = "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subt
 const inputCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const btnCls = "h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg shrink-0 disabled:opacity-40";
 
-function relTime(iso: string): string {
+function relTime(iso: string, lang = "en"): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("en", { month: "short", day: "numeric" }) + " " +
-    d.toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
+  const loc = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-EG" : "en";
+  return d.toLocaleDateString(loc, { month: "short", day: "numeric" }) + " " +
+    d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 }
 
 /* ── Checklist ──────────────────────────────────────────────────────── */
 export function ChecklistPanel({ taskId }: { taskId: string }) {
+  const { t } = useTranslation(projectsT);
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
@@ -87,10 +91,10 @@ export function ChecklistPanel({ taskId }: { taskId: string }) {
             <button type="button" onClick={() => remove(it.id)} className="opacity-0 group-hover:opacity-100 h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center"><TrashIcon className="h-3 w-3" /></button>
           </div>
         ))}
-        {items.length === 0 && <Empty text="No checklist items yet." />}
+        {items.length === 0 && <Empty text={t("x.noChecklist", "No checklist items yet.")} />}
       </div>
       <div className="flex items-center gap-2">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Add an item…" className={`flex-1 ${inputCls}`} />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.addItem", "Add an item…")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} className={btnCls}><PlusIcon size={12} /></button>
       </div>
     </div>
@@ -99,6 +103,7 @@ export function ChecklistPanel({ taskId }: { taskId: string }) {
 
 /* ── Comments ───────────────────────────────────────────────────────── */
 export function CommentsPanel({ taskId }: { taskId: string }) {
+  const { t, lang } = useTranslation(projectsT);
   const [items, setItems] = useState<TaskComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState("");
@@ -124,18 +129,18 @@ export function CommentsPanel({ taskId }: { taskId: string }) {
             <div className="flex items-center justify-between mb-0.5">
               <span className="text-[11px] font-semibold text-[var(--text-muted)]">{c.author?.username ?? "—"}</span>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[var(--text-ghost)]">{relTime(c.created_at)}</span>
+                <span className="text-[10px] text-[var(--text-ghost)]">{relTime(c.created_at, lang)}</span>
                 <button type="button" onClick={async () => { await deleteComment(taskId, c.id); load(); }} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400"><TrashIcon className="h-3 w-3" /></button>
               </div>
             </div>
             <AutoTranslatedText block text={c.body} className="text-[12.5px] text-[var(--text-primary)] break-words" />
           </div>
         ))}
-        {items.length === 0 && <Empty text="No comments yet." />}
+        {items.length === 0 && <Empty text={t("x.noComments", "No comments yet.")} />}
       </div>
       <div className="flex items-end gap-2">
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Write a comment…" className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none" />
-        <button type="button" onClick={add} disabled={!body.trim()} className={btnCls}>Post</button>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder={t("x.writeComment", "Write a comment…")} className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none" />
+        <button type="button" onClick={add} disabled={!body.trim()} className={btnCls}>{t("x.post", "Post")}</button>
       </div>
     </div>
   );
@@ -143,6 +148,7 @@ export function CommentsPanel({ taskId }: { taskId: string }) {
 
 /* ── Time tracking ──────────────────────────────────────────────────── */
 export function TimePanel({ taskId }: { taskId: string }) {
+  const { t } = useTranslation(projectsT);
   const [items, setItems] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [hours, setHours] = useState("");
@@ -167,7 +173,7 @@ export function TimePanel({ taskId }: { taskId: string }) {
     <div className="space-y-3">
       <div className={`flex items-center gap-2 px-3 py-2 ${card}`}>
         <ClockIcon size={14} className="text-[var(--text-dim)]" />
-        <span className="text-[12px] text-[var(--text-muted)]">Total logged</span>
+        <span className="text-[12px] text-[var(--text-muted)]">{t("x.totalLogged", "Total logged")}</span>
         <span className="ml-auto text-[14px] font-bold tabular-nums">{(totalMin / 60).toFixed(2)}h</span>
       </div>
       <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
@@ -180,12 +186,12 @@ export function TimePanel({ taskId }: { taskId: string }) {
             <button type="button" onClick={async () => { await deleteTimeEntry(taskId, e.id); load(); }} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400"><TrashIcon className="h-3 w-3" /></button>
           </div>
         ))}
-        {items.length === 0 && <Empty text="No time logged yet." />}
+        {items.length === 0 && <Empty text={t("x.noTime", "No time logged yet.")} />}
       </div>
       <div className="flex items-center gap-2">
-        <input value={hours} onChange={(e) => setHours(e.target.value)} type="number" step="0.25" min="0" placeholder="Hours" className={`w-24 ${inputCls}`} />
-        <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Note (optional)" className={`flex-1 ${inputCls}`} />
-        <button type="button" onClick={add} className={btnCls}>Log</button>
+        <input value={hours} onChange={(e) => setHours(e.target.value)} type="number" step="0.25" min="0" placeholder={t("x.hours", "Hours")} className={`w-24 ${inputCls}`} />
+        <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.noteOptional", "Note (optional)")} className={`flex-1 ${inputCls}`} />
+        <button type="button" onClick={add} className={btnCls}>{t("x.log", "Log")}</button>
       </div>
     </div>
   );
@@ -193,6 +199,7 @@ export function TimePanel({ taskId }: { taskId: string }) {
 
 /* ── Attachments ────────────────────────────────────────────────────── */
 export function AttachmentsPanel({ taskId }: { taskId: string }) {
+  const { t } = useTranslation(projectsT);
   const [items, setItems] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -230,7 +237,7 @@ export function AttachmentsPanel({ taskId }: { taskId: string }) {
             <button type="button" onClick={async () => { await deleteAttachment(taskId, a.id); load(); }} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400"><TrashIcon className="h-3 w-3" /></button>
           </div>
         ))}
-        {items.length === 0 && <Empty text="No files attached." />}
+        {items.length === 0 && <Empty text={t("x.noFiles", "No files attached.")} />}
       </div>
       <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center gap-1.5 disabled:opacity-50">
@@ -243,6 +250,7 @@ export function AttachmentsPanel({ taskId }: { taskId: string }) {
 
 /* ── Subtasks (child tasks via parent_task_id) ──────────────────────── */
 export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId: string }) {
+  const { t } = useTranslation(projectsT);
   const [items, setItems] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
@@ -294,10 +302,10 @@ export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId
             <button type="button" onClick={() => remove(s.id)} className="opacity-0 group-hover:opacity-100 h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center"><TrashIcon className="h-3 w-3" /></button>
           </div>
         ))}
-        {items.length === 0 && <Empty text="No subtasks yet." />}
+        {items.length === 0 && <Empty text={t("x.noSubtasks", "No subtasks yet.")} />}
       </div>
       <div className="flex items-center gap-2">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Add a subtask…" className={`flex-1 ${inputCls}`} />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.addSubtask", "Add a subtask…")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} className={btnCls}><PlusIcon size={12} /></button>
       </div>
     </div>
@@ -306,6 +314,7 @@ export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId
 
 /* ── Milestones (project detail) ────────────────────────────────────── */
 export function MilestoneStrip({ projectId }: { projectId: string }) {
+  const { t } = useTranslation(projectsT);
   const [items, setItems] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -333,7 +342,7 @@ export function MilestoneStrip({ projectId }: { projectId: string }) {
     <div className={`p-3 ${card}`}>
       <div className="flex items-center gap-2 mb-2">
         <FlagIcon size={13} className="text-[var(--text-dim)]" />
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Milestones</h3>
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("x.milestones", "Milestones")}</h3>
         <button type="button" onClick={() => setAdding((v) => !v)} className="ml-auto h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"><PlusIcon size={13} /></button>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -345,13 +354,13 @@ export function MilestoneStrip({ projectId }: { projectId: string }) {
             <button type="button" onClick={async () => { await deleteMilestone(projectId, m.id); load(); }} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400 ml-0.5"><TrashIcon className="h-2.5 w-2.5" /></button>
           </div>
         ))}
-        {items.length === 0 && !adding && <span className="text-[11.5px] text-[var(--text-dim)]">No milestones yet.</span>}
+        {items.length === 0 && !adding && <span className="text-[11.5px] text-[var(--text-dim)]">{t("x.noMilestones", "No milestones yet.")}</span>}
       </div>
       {adding && (
         <div className="flex items-center gap-2 mt-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Milestone name" className={`flex-1 ${inputCls}`} />
+          <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.milestoneName", "Milestone name")} className={`flex-1 ${inputCls}`} />
           <input value={due} onChange={(e) => setDue(e.target.value)} type="date" className={inputCls} />
-          <button type="button" onClick={add} className={btnCls}>Add</button>
+          <button type="button" onClick={add} className={btnCls}>{t("x.add", "Add")}</button>
         </div>
       )}
     </div>

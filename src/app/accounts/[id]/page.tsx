@@ -9,10 +9,7 @@ export default function AccountDetailPage() {
   const id = params?.id;
 
   return (
-    <AuthGate
-      title="Accounts Manager"
-      subtitle="Super Admin access only"
-    >
+    <AuthGate>
       {id ? (
         <AccountDetail accountId={id} />
       ) : (

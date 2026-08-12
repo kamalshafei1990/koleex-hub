@@ -12,7 +12,7 @@ const ProjectsApp = dynamic(() => import("@/components/projects/ProjectsApp"), {
 
 export default function ProjectsPage() {
   return (
-    <AdminAuth title="Projects" subtitle="Sign in to access projects">
+    <AdminAuth>
       <PermissionGate module="Projects">
         <ProjectsApp />
       </PermissionGate>

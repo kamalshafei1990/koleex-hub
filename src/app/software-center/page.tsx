@@ -37,10 +37,7 @@ import AppIcon from "@/components/common/AppIcon";
 
 export default function SoftwareCenterPage() {
   return (
-    <AuthGate
-      title="Download Center"
-      subtitle="Download apps, updates, drivers and installers"
-    >
+    <AuthGate>
       <DownloadCenterView />
     </AuthGate>
   );

@@ -16,7 +16,7 @@ import MembershipRequests from "@/components/admin/accounts/MembershipRequests";
 
 export default function MembershipRequestsPage() {
   return (
-    <AuthGate title="Membership requests" subtitle="Koleex administrators">
+    <AuthGate>
       <MembershipRequests />
     </AuthGate>
   );

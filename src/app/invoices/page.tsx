@@ -15,7 +15,7 @@ const InvoicesDoc = dynamic(() => import("@/components/invoices-doc/InvoicesDoc"
 
 export default function InvoicesPage() {
   return (
-    <AdminAuth title="Invoices" subtitle="Sign in to access invoices">
+    <AdminAuth>
       <PermissionGate module="Invoices">
         <InvoicesDoc />
       </PermissionGate>

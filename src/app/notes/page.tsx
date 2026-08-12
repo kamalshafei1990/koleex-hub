@@ -15,7 +15,7 @@ const NotesApp = dynamic(() => import("@/components/notes/NotesApp"), {
 
 export default function NotesPage() {
   return (
-    <AdminAuth title="Notes" subtitle="Sign in to access your notes">
+    <AdminAuth>
       <PermissionGate module="Notes">
         <NotesApp />
       </PermissionGate>

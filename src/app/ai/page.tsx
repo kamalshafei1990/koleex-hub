@@ -17,7 +17,7 @@ const KoleexAiApp = dynamic(() => import("@/components/ai/KoleexAiApp"), {
 
 export default function AiPage() {
   return (
-    <AdminAuth title="Koleex AI" subtitle="Sign in to chat with Koleex AI">
+    <AdminAuth>
       <KoleexAiApp />
     </AdminAuth>
   );

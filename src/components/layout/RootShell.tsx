@@ -388,7 +388,7 @@ export default function RootShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthGate title="Koleex Hub" subtitle="Sign in to access the platform">
+    <AuthGate>
       <SidebarProvider>
         <ShellContent>{children}</ShellContent>
       </SidebarProvider>

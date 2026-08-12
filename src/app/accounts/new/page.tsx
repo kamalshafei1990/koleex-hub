@@ -6,10 +6,7 @@ import AccountForm from "@/components/admin/accounts/AccountForm";
 
 export default function NewAccountPage() {
   return (
-    <AuthGate
-      title="Accounts Manager"
-      subtitle="Super Admin access only"
-    >
+    <AuthGate>
       {/* Signpost — this is the LOW-LEVEL tool. Real onboarding flows create
           the account together with its person/employee or customer context,
           so records stay linked and nothing is entered twice. */}

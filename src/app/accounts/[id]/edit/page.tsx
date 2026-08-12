@@ -27,10 +27,7 @@ export default function EditAccountPage() {
   }, [id]);
 
   return (
-    <AuthGate
-      title="Accounts Manager"
-      subtitle="Super Admin access only"
-    >
+    <AuthGate>
       {loading ? (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
           <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-8">

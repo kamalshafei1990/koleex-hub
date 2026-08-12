@@ -51,10 +51,7 @@ const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"
 
 export default function CommercialPolicyPage() {
   return (
-    <AuthGate
-      title="Commercial Setup"
-      subtitle="Pricing policy, trade terms, and shipping configuration"
-    >
+    <AuthGate>
       <CommercialPolicyView />
     </AuthGate>
   );

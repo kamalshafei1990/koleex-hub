@@ -5,7 +5,17 @@
 
    Every function here hits the authenticated /api/planning/* routes so
    RLS bypass (service_role) stays server-side.
+
+   READS GO THROUGH cachedGet WITH TTL 0. That is deliberate and is NOT a
+   cache: cachedGet returns an already-in-flight promise before it ever looks
+   at the TTL, so ttl 0 buys request COALESCING with no stale-data risk — a
+   second identical read fired in the same tick joins the first instead of
+   opening its own connection. Measured on a prod build, /planning issued all
+   four of its opening reads TWICE, 1-3ms apart (items · resources · roles ·
+   leaves), the slowest pair costing 779ms each. Writes are untouched.
    --------------------------------------------------------------------------- */
+
+import { cachedGet } from "./client-cache";
 
 export type PlanningItemType =
   | "shift"
@@ -153,11 +163,9 @@ export async function fetchItems(params: {
       q.set(k, String(v));
     }
   });
-  const res = await fetch(`/api/planning/items?${q.toString()}`, {
-    credentials: "include",
-  });
-  if (!res.ok) return [];
-  const { items } = (await res.json()) as { items: PlanningItem[] };
+  const { items } = await cachedGet<{ items: PlanningItem[] }>(
+    `/api/planning/items?${q.toString()}`, 0,
+  ).catch(() => ({ items: [] as PlanningItem[] }));
   return items ?? [];
 }
 
@@ -221,9 +229,9 @@ export async function takeOpenShift(id: string): Promise<PlanningItem | null> {
 /* ── Roles ── */
 
 export async function fetchRoles(): Promise<PlanningRole[]> {
-  const res = await fetch("/api/planning/roles", { credentials: "include" });
-  if (!res.ok) return [];
-  const { roles } = (await res.json()) as { roles: PlanningRole[] };
+  const { roles } = await cachedGet<{ roles: PlanningRole[] }>(
+    "/api/planning/roles", 0,
+  ).catch(() => ({ roles: [] as PlanningRole[] }));
   return roles ?? [];
 }
 
@@ -276,11 +284,9 @@ export async function fetchResources(params: {
   const q = new URLSearchParams();
   if (params.type) q.set("type", params.type);
   if (params.includeInactive) q.set("include_inactive", "1");
-  const res = await fetch(`/api/planning/resources?${q.toString()}`, {
-    credentials: "include",
-  });
-  if (!res.ok) return [];
-  const { resources } = (await res.json()) as { resources: PlanningResource[] };
+  const { resources } = await cachedGet<{ resources: PlanningResource[] }>(
+    `/api/planning/resources?${q.toString()}`, 0,
+  ).catch(() => ({ resources: [] as PlanningResource[] }));
   return resources ?? [];
 }
 
@@ -430,8 +436,8 @@ export interface LeaveSpan {
   end_date: string;
 }
 export async function fetchLeaves(from: string, to: string): Promise<LeaveSpan[]> {
-  const res = await fetch(`/api/planning/leaves?from=${from}&to=${to}`, { credentials: "include" });
-  if (!res.ok) return [];
-  const { leaves } = (await res.json()) as { leaves: LeaveSpan[] };
+  const { leaves } = await cachedGet<{ leaves: LeaveSpan[] }>(
+    `/api/planning/leaves?from=${from}&to=${to}`, 0,
+  ).catch(() => ({ leaves: [] as LeaveSpan[] }));
   return leaves ?? [];
 }

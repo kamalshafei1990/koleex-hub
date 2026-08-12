@@ -19,6 +19,8 @@
    CSS-only animation, theme-aware webp pair, reduced-motion-safe. */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commonT } from "@/lib/translations/common";
 import { acquireNavBaseline, ensureLoadProgressPatch, releaseNavBaseline, snapshotLoadProgress, subscribeLoadProgress } from "@/lib/load-progress";
 
 /* Minimum requests before a percentage is worth showing (3 → 0/33/66/100).
@@ -36,15 +38,17 @@ const MEANINGFUL_REQUESTS = 3;
 const SURFACE = "kx-load-surface overflow-hidden";
 
 export default function BrandLoading({
-  label = "Loading…",
+  label,
   className = SURFACE,
 }: {
+  /** Screen-reader text. Omit to get the translated default. */
   label?: string;
   /** Sizing/positioning of the surface the loader centers in. Defaults to
    *  exactly the visible content area — pass your own only for embedded
    *  (non-full-page) gates. */
   className?: string;
 }) {
+  const { t } = useTranslation(commonT);
   const [pct, setPct] = useState<number | null>(null);
   const maxRef = useRef(0);
 
@@ -89,7 +93,7 @@ export default function BrandLoading({
 
   return (
     <div role="status" aria-busy="true" aria-live="polite" className={`relative w-full ${className}`}>
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t("ui.loading", "Loading\u2026")}</span>
       <div className="kx-brand-load" aria-hidden>
         {/* The orb. The lockup no longer breathes on its own — it sits inside
             the sphere and a highlight travels across it. The progress line

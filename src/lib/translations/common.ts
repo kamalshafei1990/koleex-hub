@@ -4,6 +4,7 @@ import type { Translations } from "@/lib/i18n";
    ProfileCompletenessBar. Import via `commonT` and pass to useTranslation. */
 
 export const commonT: Translations = {
+  "ui.loading": { en: "Loading\u2026", zh: "\u52a0\u8f7d\u4e2d\u2026", ar: "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0645\u064a\u0644\u2026" },
   "translate.showOriginal": { en: "show original", zh: "显示原文", ar: "عرض الأصل" },
   "translate.autoTranslated": { en: "auto-translated", zh: "自动翻译", ar: "ترجمة آلية" },
   "profile.tier.required": { en: "Required", zh: "必填", ar: "مطلوب" },

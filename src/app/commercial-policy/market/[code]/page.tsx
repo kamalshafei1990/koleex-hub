@@ -44,7 +44,7 @@ function fmtPct(n: number): string {
 
 export default function MarketProfilePage() {
   return (
-    <AuthGate title="Market Profile" subtitle="Country market identity and pricing context">
+    <AuthGate>
       <MarketProfileView />
     </AuthGate>
   );

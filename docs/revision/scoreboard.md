@@ -23,6 +23,10 @@ chunks came from browser cache; the file COUNT stays comparable).
 | /product-data | 173 | 19 | 46 | (cache) | 32 | 58 | classification-icons ×2 · taxonomy/all ×2 · me/bootstrap ×2 |
 | /catalogs (2026-08-13) | 88 | 10 | 8 | (cache) | — | — | none — `contacts ×2` / `storage/list ×2` differ by query string |
 | /landed-cost (2026-08-13) | 24 | 4 | 1 | (cache) | — | — | none |
+| /employees (2026-08-13) | 52 | 5 | 8 | (cache) | — | — | none |
+| /hr (2026-08-13) | 29 | 10 | 5 | (cache) | — | — | none — `hr/data ×5` = 5 DISTINCT POST bodies |
+| /planning (2026-08-13) | 25 | 10 → **8** | 4 | (cache) | — | — | items·resources·roles·leaves ×2 → **none** |
+| /projects (2026-08-13) | 24 | 10 → **8** | 5 | (cache) | — | — | `projects/tags ×2` → **none** |
 
 ## Systemic findings (cross-app — fix once, benefits everything)
 
@@ -32,6 +36,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | SYS-2 | P1 | Duplicate same-screen API calls everywhere (bootstrap ×2-4, inbox/feed ×3, discuss/read ×5, assignees ×4, avatars ×8…) — request coalescing (client-cache cachedGet) exists but many call sites bypass it. On a ~1s/request network each dup is a full second of user time | 🛠 pass 1 ✅ 2026-08-08: discuss.ts bootstrap → shared me-bootstrap; todos/assignees+todo-labels+me/work+taxonomy/all → cachedGet; avatars CHUNK 30→120. Measured: /home 18→14, /todo 21→14, /customers avatars ×8→×2. Remaining ×2s (bootstrap, visual-bindings, contacts) pattern-match module duplication → folded into SYS-4. discuss/read ×5 = invalidation churn → Discuss app session |
 | SYS-3 | P1 | /customers pulls 2.7 MB of route JS chunks (47 files) on first visit — heaviest screen measured | ✅ 2026-08-08: country-state-city's 8.2 MB city dataset (2.26 MB gzip) was welded onto the route (Turbopack doesn't tree-shake index re-exports; needed a deep lib/country import + form-gated lazy State/City). Cold open now ~0.45 MB (−83%); dataset loads on demand at form open. Details: apps/customers-sys3.md |
 | SYS-4 | P2→P1 | ROOT CAUSE FOUND 2026-08-08: Turbopack DUPLICATES small modules across chunks (visual-bindings code present in 3 chunk files) → module-level singleton caches split into independent copies → parallel duplicate fetches (vb ×2 @15ms apart, proven by timestamps). FIX: anchor singletons on globalThis — applied to visual-bindings + client-cache; verified vb ×2→×1. me-bootstrap single-copy today (left untouched — auth-critical, own session if it ever duplicates). RSC `_rsc`-variant prefetch churn = Next prefetch TTL behavior, accepted for now | 🛠 core fixed |
+| SYS-6 | **P0** | `useConfirm()` below `if (!open) return null;` in two permanently-mounted modals → React #310 on open, **whole /projects screen replaced by "This page couldn't load"**. Verified live on a prod build, not inferred | ✅ fixed 2026-08-13; Hub-wide `rules-of-hooks` sweep = **0 remaining violations** |
+| SYS-7 | P2 | `AdminAuth`/`AuthGate` took required `title`/`subtitle` props they stopped rendering long ago — **19 pages passing hardcoded English into dead props**. An F1 sweep would have translated 114 strings that never reach a screen | ✅ removed 2026-08-13 (both interfaces + all 19 call sites) |
 | SYS-5 | P2 | 28-58 images per screen (cached in this run) — cold-load behavior, sizing and placeholders to verify per wave | ⬜ |
 
 ## Apps × lenses
@@ -56,10 +62,10 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 16 | W3 | Purchases | /purchase | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | 17 | W3 | Landed Cost | /landed-cost | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 18 | W3 | Catalogs | /catalogs | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 19 | W4 | Employees | /employees | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 20 | W4 | HR | /hr | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 21 | W4 | Planning | /planning | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 22 | W4 | Projects | /projects | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 19 | W4 | Employees | /employees | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| 20 | W4 | HR | /hr | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| 21 | W4 | Planning | /planning | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| 22 | W4 | Projects | /projects | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
 | 23 | W5 | Finance | /finance | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 24 | W5 | Expenses | /expenses | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 25 | W5 | Price Calculator | /price-calculator | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

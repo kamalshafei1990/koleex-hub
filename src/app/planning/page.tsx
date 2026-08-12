@@ -12,7 +12,7 @@ const PlanningApp = dynamic(() => import("@/components/planning/PlanningApp"), {
 
 export default function PlanningPage() {
   return (
-    <AdminAuth title="Planning" subtitle="Sign in to access planning">
+    <AdminAuth>
       <PermissionGate module="Planning">
         <PlanningApp />
       </PermissionGate>

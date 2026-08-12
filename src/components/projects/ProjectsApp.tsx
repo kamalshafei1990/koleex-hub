@@ -1702,6 +1702,11 @@ function ProjectFormModal({
     setBudgetHours(tpl.budget_hours?.toString() ?? "");
   };
 
+  /* Hooks BEFORE the early return: this component stays mounted and `open`
+     merely toggles, so a hook below this line changes the hook count between
+     renders and React throws #310. */
+  const { askConfirm, confirmDialog } = useConfirm();
+
   if (!open) return null;
 
   const save = async () => {
@@ -1730,10 +1735,9 @@ function ProjectFormModal({
     onSaved();
   };
 
-  const { askConfirm, confirmDialog } = useConfirm();
   const remove = () => {
     if (!editing) return;
-    askConfirm("Delete this project and all its tasks?", async () => {
+    askConfirm(t("project.deleteConfirm", "Delete this project and all its tasks?"), async () => {
       await deleteProject(editing.id);
       onDeleted();
     }, { confirmLabel: "Delete" });
@@ -1960,6 +1964,11 @@ function TaskFormModal({
     }
   }, [open, editing, presetStageId, stages]);
 
+  /* Hooks BEFORE the early return: this component stays mounted and `open`
+     merely toggles, so a hook below this line changes the hook count between
+     renders and React throws #310. */
+  const { askConfirm, confirmDialog } = useConfirm();
+
   if (!open) return null;
 
   const save = async () => {
@@ -1990,7 +1999,6 @@ function TaskFormModal({
     onSaved();
   };
 
-  const { askConfirm, confirmDialog } = useConfirm();
   const remove = () => {
     if (!editing) return;
     askConfirm(t("task.deleteConfirm"), async () => {

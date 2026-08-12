@@ -73,10 +73,7 @@ type SectionDef = {
 
 export default function SettingsPage() {
   return (
-    <AuthGate
-      title="Settings"
-      subtitle="System configuration and your account"
-    >
+    <AuthGate>
       <SettingsContent />
     </AuthGate>
   );

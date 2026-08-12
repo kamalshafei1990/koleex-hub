@@ -32,21 +32,19 @@ const AUTHED_HINT_KEY = "koleex-authed";
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface Props {
-  title: string;
-  subtitle: string;
+  /* No title/subtitle: AdminAuth stopped rendering them when it moved to a
+     tab-contextual heading, and SupabaseGate never took them. */
   children: React.ReactNode;
 }
 
-export default function AuthGate({ title, subtitle, children }: Props) {
+export default function AuthGate({ children }: Props) {
   // Flag is read once at mount; env vars can't change at runtime anyway.
   const useSupabase = isSupabaseAuthEnabled();
 
   // Legacy path: identical behaviour to Phase 1.
   if (!useSupabase) {
     return (
-      <AdminAuth title={title} subtitle={subtitle}>
-        {children}
-      </AdminAuth>
+      <AdminAuth>{children}</AdminAuth>
     );
   }
 
