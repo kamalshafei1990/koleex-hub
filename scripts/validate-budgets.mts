@@ -336,6 +336,87 @@ console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
     : bad("state specificity", `${losers.length} rule(s) match but can never paint:\n       ${losers.join("\n       ")}`);
 }
 
+/* ── G. Product-schema templates are fully trilingual ─────────────────────
+   A NUMBER again: how many strings an operator can see that have no zh/ar.
+
+   This is here because the failure is INVISIBLE. A missing key does not throw
+   — `t()` falls back to English — so a Chinese or Arabic operator gets an
+   English word in the middle of a translated form and nobody upstream ever
+   finds out. Three separate variants of it were live at once on 2026-08-12:
+
+     · 13 group keys written against the group ID while the form looks up the
+       TITLE (`ts(\`g:${group.title}\`)`) — five shipped in the YILI batch
+     · 63 option translations written into SPEC_NAME_I18N, which the form
+       reads ONLY for `s:` keys, so none of them resolved
+     · shared-group strings (`f:safety_features`, "Rated total power
+       consumption.") missing once = English on all 28 templates at once
+
+   All three are the same mistake — a key that exists but is never consulted —
+   and reading the diff cannot catch any of them. Asserting against the live
+   registry can, in a second.
+
+   WHEN THIS FAILS: add the missing entry. Do NOT delete the description or
+   drop the option to make it pass. And check the key you are about to reuse
+   already MEANS what you think — `head_count` was frozen as "Detection Heads"
+   long before someone needed it for press heads. */
+console.log("\nG. Product-schema i18n (every operator-visible string)");
+{
+  /* Resolved at runtime, like the other validators that reach into src/:
+     a literal "…/x.ts" specifier fails `tsc` unless allowImportingTsExtensions
+     is on, and turning that on for one line is not worth it. */
+  const { listSchemas } = await import(
+    path.resolve(__dirname, "../src/lib/product-schema/index.ts")
+  ) as typeof import("../src/lib/product-schema/index.js");
+  const { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } = await import(
+    path.resolve(__dirname, "../src/lib/product-schema/spec-i18n.ts")
+  ) as typeof import("../src/lib/product-schema/spec-i18n.js");
+  const UI = SPEC_I18N as Record<string, Record<string, string> | undefined>;
+  const DESC = SPEC_DESC_I18N as Record<string, Record<string, string> | undefined>;
+  const NAME = SPEC_NAME_I18N as Record<string, Record<string, string> | undefined>;
+  const LANGS = ["en", "zh", "ar"] as const;
+
+  const gaps: string[] = [];
+  /* en is not required on SPEC_DESC_I18N — the English IS the key there. */
+  const need = (dict: typeof UI, key: string, langs: readonly string[]) => {
+    const e = dict[key];
+    if (!e) { gaps.push(key); return; }
+    for (const l of langs) if (!e[l]?.trim()) gaps.push(`${key} (${l} empty)`);
+  };
+
+  const schemas = listSchemas();
+  let strings = 0;
+  for (const s of schemas) {
+    need(NAME, `s:${s.id}`, LANGS); strings++;
+    for (const g of s.groups) {
+      /* by TITLE, not id — this is the lookup SchemaSpecsSection performs */
+      need(UI, `g:${g.title}`, LANGS); strings++;
+      for (const f of g.fields) {
+        need(UI, `f:${f.key}`, LANGS); strings++;
+        if (f.description) { need(DESC, f.description, ["zh", "ar"]); strings++; }
+        for (const o of f.options ?? []) { need(UI, `o:${o.value}`, LANGS); strings++; }
+      }
+    }
+  }
+  const unique = [...new Set(gaps)];
+  unique.length === 0
+    ? ok("every schema string has en/zh/ar", `${schemas.length} schemas, ${strings} strings`)
+    : bad("schema i18n", `${unique.length} untranslated:\n       ${unique.slice(0, 25).join("\n       ")}` +
+        (unique.length > 25 ? `\n       …and ${unique.length - 25} more` : ""));
+
+  /* One key must not carry two meanings. o:single is already both "Single
+     Phase" and "Single Head" in the two dictionaries; that is a known open
+     item, so this reports rather than fails — but a NEW collision inside
+     SPEC_I18N itself is a hard failure, because the last one loaded wins. */
+  const src = fs.readFileSync(path.join(ROOT, "src/lib/product-schema/spec-i18n.ts"), "utf8");
+  const mainBlock = src.slice(src.indexOf("export const SPEC_I18N"), src.indexOf("export const SPEC_NAME_I18N"));
+  const seen = new Map<string, number>();
+  for (const m of mainBlock.matchAll(/"((?:f|o|g):[^"]+)"\s*:/g)) seen.set(m[1]!, (seen.get(m[1]!) ?? 0) + 1);
+  const dupes = [...seen].filter(([, n]) => n > 1).map(([k]) => k);
+  dupes.length === 0
+    ? ok("no duplicate keys inside SPEC_I18N")
+    : bad("duplicate i18n keys", `${dupes.join(", ")} — the later entry silently wins`);
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +
