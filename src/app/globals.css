@@ -1474,15 +1474,38 @@ input[type="number"]:not(.kx-spinner) {
    0.72 fill, so nearly a third of the page still shows, with a blur wide
    enough that what shows is colour rather than words.
 
-   If text reads through again, raise the BLUR. The fill is the last resort —
-   reaching for it first is what produced a 94%-opaque "glass". */
+   AND ON A DARK GROUND, TRANSPARENCY ALONE IS NOT GLASS. Owner, after the
+   portal landed: "it's still solid color, have no glass effect." He was right
+   again, and this is a different cause from the last two. MEASURED behind the
+   open country panel: `rgba(0,0,0,0)` at two of three sample points and 2%
+   white at the third. The backdrop there is a transparent form over a near
+   black page — so the blur was working perfectly and had nothing to carry.
+   Blur of near-black is near-black, at any radius and any opacity.
+
+   What makes a dark-mode material read as glass is LIFTING the backdrop, not
+   revealing it: `brightness()` inside the filter raises those near-black
+   pixels until the shapes behind become visible, and the fill becomes a thin
+   white veil over that rather than a dark tile. Light theme goes the other
+   way — the ground is already bright, so it darkens slightly.
+
+   The three dials, in the order to reach for them: brightness makes the glass
+   VISIBLE, blur makes what shows unreadable, fill is last. Reaching for fill
+   first is what produced a 94%-opaque "glass" earlier today.
+
+   ⚠️ SIGNED OFF BY THE OWNER, 2026-08-12: "yes this is the glass effect of the
+   dropdown menu, save it and don't change it again to the solid one in any
+   place else." These four values are settled. If a panel ever looks wrong,
+   the cause is somewhere else — a filtered ancestor, a missing portal, a
+   backdrop with nothing in it — not these numbers. Do not raise the fill. */
 [data-kx-skin="aurora"] .kx-pop-panel {
-  background: rgba(11, 14, 20, 0.72);
-  -webkit-backdrop-filter: blur(64px) saturate(180%);
-  backdrop-filter: blur(64px) saturate(180%);
+  background: rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.5);
+  backdrop-filter: blur(40px) saturate(180%) brightness(1.5);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-pop-panel {
-  background: rgba(252, 253, 255, 0.78);
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(0.98);
+  backdrop-filter: blur(40px) saturate(180%) brightness(0.98);
 }
 
 /* ── ROW HOVER, LIFTED FOR THE DENSER PANEL (owner, 2026-08-12) ──
