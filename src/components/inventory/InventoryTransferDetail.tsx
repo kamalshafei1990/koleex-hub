@@ -329,8 +329,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
               </div>
             )}
             {transfer.void_reason && (
-              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">
-                Void reason: {transfer.void_reason}
+              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">{t("inv.common.void_reason", "Void reason:")}{transfer.void_reason}
               </div>
             )}
           </div>
@@ -436,7 +435,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-2 py-1.5 text-left">{t("inv.transfers.form.item")}</th>
-                      <th className="px-2 py-1.5 text-left">Out</th>
+                      <th className="px-2 py-1.5 text-left">{t("inv.common.out", "Out")}</th>
                       <th className="px-2 py-1.5 text-left">In</th>
                     </tr>
                   </thead>
@@ -488,9 +487,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
                   type="button"
                   onClick={() => setShowVoid(false)}
                   className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-                >
-                  Cancel
-                </button>
+                >{t("inv.common.cancel", "Cancel")}</button>
                 <button
                   type="button"
                   disabled={busy || voidReason.trim().length < 3}

@@ -401,8 +401,7 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
               </div>
             )}
             {ret.void_reason && (
-              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">
-                Void reason: {ret.void_reason}
+              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">{t("inv.common.void_reason", "Void reason:")}{ret.void_reason}
               </div>
             )}
           </div>
@@ -557,8 +556,8 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-2 py-1.5 text-left">{t("inv.returns.form.item")}</th>
-                      <th className="px-2 py-1.5 text-left">Movement</th>
-                      <th className="px-2 py-1.5 text-left">Warehouse</th>
+                      <th className="px-2 py-1.5 text-left">{t("inv.mv.movement", "Movement")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("inv.items.warehouse", "Warehouse")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -619,9 +618,7 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
                   type="button"
                   onClick={() => setShowVoid(false)}
                   className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-                >
-                  Cancel
-                </button>
+                >{t("inv.common.cancel", "Cancel")}</button>
                 <button
                   type="button"
                   disabled={busy || voidReason.trim().length < 3}

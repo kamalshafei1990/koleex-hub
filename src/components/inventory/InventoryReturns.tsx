@@ -305,11 +305,11 @@ export default function InventoryReturns() {
                           <dd className="font-mono text-[var(--text-secondary)]">{rr.return_no}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Raw status</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.mv.raw_status", "Raw status")}</dt>
                           <dd className="text-[var(--text-secondary)]">{rr.status} → {humanStatus(rr.status)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Raw type</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.mv.raw_type", "Raw type")}</dt>
                           <dd className="text-[var(--text-secondary)]">{rr.return_type}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
@@ -321,7 +321,7 @@ export default function InventoryReturns() {
                           <dd className="text-[var(--text-secondary)]">{new Date(rr.created_at).toLocaleString()}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Reason</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.common.reason", "Reason")}</dt>
                           <dd className="text-[var(--text-secondary)]">{rr.reason_code || "—"}</dd>
                         </div>
                       </dl>

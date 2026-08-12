@@ -1005,8 +1005,7 @@ function Step2({
                 disabled={!subcategory.trim()}
                 className={`inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold ${color.chipBg} ${color.chipText} disabled:opacity-40`}
               >
-                <RrIcon name="arrow-up-right" size={11} /> Next
-              </button>
+                <RrIcon name="arrow-up-right" size={11} />{t("inv.common.next", "Next")}</button>
             </div>
 
             {/* Hint row */}
@@ -1187,8 +1186,7 @@ function Step4Details({
           <span className="text-[var(--text-dim)]">
             {t("inv.int.opening.note")}
             {Number(unitCost) > 0 && (
-              <span className={`ml-1.5 font-semibold tabular-nums ${color.chipText}`}>
-                Stock value: {(Number(qty) * Number(unitCost)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+              <span className={`ml-1.5 font-semibold tabular-nums ${color.chipText}`}>{t("inv.common.stock_value_label", "Stock value:")}{(Number(qty) * Number(unitCost)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </span>
             )}
           </span>

@@ -176,8 +176,7 @@ export default function InventoryMovementDetail({
             {(sourceLink || transferLink || returnLink) && (
               <div className="flex flex-col gap-1">
                 {sourceLink && (
-                  <a href={sourceLink.href} className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline">
-                    Open {sourceLink.label} →
+                  <a href={sourceLink.href} className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline">{t("inv.common.open", "Open")}{sourceLink.label} →
                   </a>
                 )}
                 {transferLink && (

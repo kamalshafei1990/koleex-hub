@@ -299,22 +299,18 @@ export default function InventoryDashboard() {
         {/* ── 9. Manager-only deep links ───────────────────────────── */}
         {isManager && (
           <section data-testid="inv-home-manager-links">
-            <SectionEyebrow>Manager</SectionEyebrow>
+            <SectionEyebrow>{t("inv.role.manager", "Manager")}</SectionEyebrow>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Link
                 href="/inventory/balances"
                 className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]"
               >
-                <RrIcon name="badge-check" size={12} />
-                Balances
-              </Link>
+                <RrIcon name="badge-check" size={12} />{t("inv.nav.balances", "Balances")}</Link>
               <Link
                 href="/inventory/movements"
                 className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]"
               >
-                <RrIcon name="file-invoice" size={12} />
-                Movements ledger
-              </Link>
+                <RrIcon name="file-invoice" size={12} />{t("inv.nav.ledger", "Movements ledger")}</Link>
             </div>
           </section>
         )}

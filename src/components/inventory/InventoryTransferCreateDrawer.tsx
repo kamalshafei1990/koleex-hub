@@ -189,9 +189,7 @@ export default function InventoryTransferCreateDrawer({
             type="button"
             onClick={onClose}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-          >
-            Close
-          </button>
+          >{t("inv.shortcuts.close", "Close")}</button>
         </div>
 
         {error && (
@@ -320,9 +318,7 @@ export default function InventoryTransferCreateDrawer({
             type="button"
             onClick={onClose}
             className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-          >
-            Cancel
-          </button>
+          >{t("inv.common.cancel", "Cancel")}</button>
           <button
             type="button"
             onClick={submit}

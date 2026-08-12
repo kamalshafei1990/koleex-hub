@@ -641,8 +641,7 @@ export default function InventoryMovements() {
                     ))}
                   </datalist>
                   {internalItems.length === 0 && (
-                    <p className="mt-1 text-[10.5px] text-[var(--text-dim)]">
-                      No internal-use items yet. Create one from <Link href="/inventory/items" className="underline">Stock Profiles</Link>.
+                    <p className="mt-1 text-[10.5px] text-[var(--text-dim)]">{t("inv.items.empty_internal", "No internal-use items yet. Create one from")}<Link href="/inventory/items" className="underline">{t("inv.items.title", "Stock Profiles")}</Link>.
                     </p>
                   )}
                 </label>
@@ -666,9 +665,7 @@ export default function InventoryMovements() {
 
             {/* INV-H4A — Variant + Batch optional pickers. */}
             <label className="block">
-              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                Variant (optional)
-              </div>
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.movements.form.variant", "Variant (optional)")}</div>
               <select
                 value={variantId}
                 onChange={(e) => setVariantId(e.target.value)}
@@ -681,14 +678,12 @@ export default function InventoryMovements() {
                 ))}
               </select>
               {selectedProduct?.stock_profile && variantOptions.length === 0 && (
-                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">No variants for this item.</div>
+                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{t("inv.movements.form.no_variants", "No variants for this item.")}</div>
               )}
             </label>
 
             <label className="block">
-              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                Batch (optional)
-              </div>
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.movements.form.batch", "Batch (optional)")}</div>
               <select
                 value={batchId}
                 onChange={(e) => setBatchId(e.target.value)}
@@ -703,7 +698,7 @@ export default function InventoryMovements() {
                 ))}
               </select>
               {selectedProduct?.stock_profile && batchOptions.length === 0 && (
-                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">No batches match.</div>
+                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{t("inv.movements.form.no_batches", "No batches match.")}</div>
               )}
             </label>
 
@@ -805,9 +800,7 @@ export default function InventoryMovements() {
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-              >
-                Cancel
-              </button>
+              >{t("inv.common.cancel", "Cancel")}</button>
               <button
                 type="submit"
                 disabled={submitting}
@@ -953,11 +946,11 @@ export default function InventoryMovements() {
                           <dd className="text-[var(--text-secondary)]">{m.movement_type} → {operatorLabel(m.movement_type)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Date</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.common.date", "Date")}</dt>
                           <dd className="text-[var(--text-secondary)]">{m.movement_date}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Location</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.common.location", "Location")}</dt>
                           <dd className="text-[var(--text-secondary)]">
                             {wh ? (
                               <span className="inline-flex items-center gap-1.5">
@@ -969,7 +962,7 @@ export default function InventoryMovements() {
                         </div>
                         {product?.stock_profile?.item_code && (
                           <div className="flex justify-between gap-2">
-                            <dt className="text-[var(--text-dim)]">Item code</dt>
+                            <dt className="text-[var(--text-dim)]">{t("inv.common.item_code", "Item code")}</dt>
                             <dd className="font-mono text-[var(--text-secondary)]">
                               {product.sku ? `${product.sku} · ` : ""}{product.stock_profile.item_code}
                             </dd>
@@ -983,13 +976,13 @@ export default function InventoryMovements() {
                         )}
                         {m.reference && (
                           <div className="flex justify-between gap-2">
-                            <dt className="text-[var(--text-dim)]">Reference</dt>
+                            <dt className="text-[var(--text-dim)]">{t("inv.common.reference", "Reference")}</dt>
                             <dd className="text-[var(--text-secondary)]">{m.reference}</dd>
                           </div>
                         )}
                         {m.approval_status && m.approval_status !== "not_required" && (
                           <div className="flex justify-between gap-2">
-                            <dt className="text-[var(--text-dim)]">Approval</dt>
+                            <dt className="text-[var(--text-dim)]">{t("inv.mv.approval", "Approval")}</dt>
                             <dd className="text-[var(--text-secondary)]">{m.approval_status}</dd>
                           </div>
                         )}
@@ -1006,7 +999,7 @@ export default function InventoryMovements() {
                           </div>
                         )}
                         <div className="flex justify-between gap-2 sm:col-span-2">
-                          <dt className="text-[var(--text-dim)]">Raw status</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.mv.raw_status", "Raw status")}</dt>
                           <dd className="text-[var(--text-secondary)]">{m.status}</dd>
                         </div>
                       </dl>

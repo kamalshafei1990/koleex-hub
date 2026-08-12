@@ -344,7 +344,7 @@ export default function InventoryTransfers() {
                           <dd className="font-mono text-[var(--text-secondary)]">{tr.transfer_no}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-[var(--text-dim)]">Raw status</dt>
+                          <dt className="text-[var(--text-dim)]">{t("inv.mv.raw_status", "Raw status")}</dt>
                           <dd className="text-[var(--text-secondary)]">{tr.status} → {humanStatus(tr.status)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">

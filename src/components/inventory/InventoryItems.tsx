@@ -29,7 +29,8 @@ import {
 import RrIcon from "@/components/ui/RrIcon";
 import Button from "@/components/ui/Button";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useTranslation, type Translations } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 import Link from "next/link";
 /* INV-H5C — taxonomy hints for internal-use items. */
 import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
@@ -37,31 +38,7 @@ import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/intern
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 
-const INV_H1_T: Translations = {
-  /* the table-cell loading text; the app-wide dict carries the same key,
-     kept here so this file keeps exactly one dictionary */
-  "inv.loading": { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
-  "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
-  "inv.subtitle":          { en: "Stock-tracked products + internal-use items (catalogs, uniforms, office supplies).", zh: "按产品跟踪的库存以及内部使用物品（目录、工服、办公用品）。", ar: "المخزون المرتبط بالمنتجات بالإضافة إلى عناصر الاستخدام الداخلي (الكتالوجات، الزي، اللوازم المكتبية)." },
-  "inv.add_via_product":   { en: "Create Product with Stock Profile", zh: "创建产品并附库存档案", ar: "إنشاء منتج مع ملف مخزون" },
-  "inv.open_products":     { en: "Open Products",    zh: "打开产品库",     ar: "فتح المنتجات" },
-  "inv.create_for_existing": { en: "Create Stock Profile for Existing Product", zh: "为现有产品创建库存档案", ar: "إنشاء ملف مخزون لمنتج موجود" },
-  "inv.link_existing":     { en: "Link existing item (admin)", zh: "链接现有项目（管理员）", ar: "ربط عنصر موجود (مسؤول)" },
-  "inv.add_internal_use":  { en: "Add Internal-Use Stock", zh: "添加内部用品库存", ar: "إضافة مخزون استخدام داخلي" },
-  "inv.manage_types":      { en: "Manage Types",     zh: "管理类型",       ar: "إدارة الأنواع" },
-  "inv.add":               { en: "Add",              zh: "添加",           ar: "إضافة" },
-  /* INV-H5B */
-  "inv.badge_internal_use":  { en: "Internal Use",      zh: "内部使用",     ar: "استخدام داخلي" },
-  "inv.badge_product_linked":{ en: "Product-linked",    zh: "关联产品",     ar: "مرتبط بمنتج" },
-  "inv.usage_label":         { en: "Usage",             zh: "用途",         ar: "الاستخدام" },
-  "inv.usage_product":       { en: "Product-related",   zh: "产品相关",     ar: "مرتبط بالمنتجات" },
-  "inv.usage_internal":      { en: "Internal use",      zh: "内部使用",     ar: "استخدام داخلي" },
-  "inv.usage_product_hint":  { en: "Sellable goods, machines, parts, raw materials. Must link to a Product.", zh: "可销售商品、机器、零件、原材料。必须关联到产品。", ar: "البضائع القابلة للبيع، الآلات، القطع، المواد الخام. يجب الربط بمنتج." },
-  "inv.usage_internal_hint": { en: "Catalogs, uniforms, business cards, office supplies, packaging, exhibition materials. No product needed.", zh: "目录、工服、名片、办公用品、包装、展览材料。无需产品。", ar: "الكتالوجات، الزي، بطاقات العمل، اللوازم المكتبية، التغليف، مواد المعارض. لا حاجة لمنتج." },
-  "inv.internal_use_helper": { en: "Use this for catalogs, uniforms, business cards, office supplies, packaging, exhibition materials, and consumables.", zh: "用于目录、工服、名片、办公用品、包装、展览材料和消耗品。", ar: "استخدمه للكتالوجات، الزي، بطاقات العمل، اللوازم المكتبية، التغليف، مواد المعارض، والمستهلكات." },
-  "inv.product_linked_helper": { en: "This stock profile must be linked to a Product.", zh: "此库存档案必须关联到产品。", ar: "يجب ربط ملف المخزون هذا بمنتج." },
-  "inv.examples_label":      { en: "Examples",          zh: "示例",         ar: "أمثلة" },
-};
+
 
 interface ItemRow {
   id: string;
@@ -115,7 +92,7 @@ function fmtMoney(n: number) {
 }
 
 export default function InventoryItems() {
-  const { t } = useTranslation(INV_H1_T);
+  const { t } = useTranslation(inventoryT);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
@@ -274,15 +251,13 @@ export default function InventoryItems() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               aria-expanded={filtersOpen}
             >
-              Filters {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
+              {t("inv.common.filters", "Filters")} {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
             </button>
             {filterTypeId && (
               <button
                 onClick={() => setFilterTypeId("")}
                 className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-              >
-                Clear
-              </button>
+              >{t("inv.items.clear", "Clear")}</button>
             )}
             <div className="ml-auto text-[11px] text-[var(--text-dim)] tabular-nums">
               {loading ? "…" : `${rows.length} item${rows.length === 1 ? "" : "s"}`}
@@ -291,29 +266,29 @@ export default function InventoryItems() {
           {filtersOpen && (
             <div className="mt-2.5 flex flex-wrap items-end gap-3 border-t border-[var(--border-subtle)] pt-2.5">
               <label className="flex flex-col">
-                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Type</span>
+                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.common.type", "Type")}</span>
                 <select
                   value={filterTypeId}
                   onChange={(e) => setFilterTypeId(e.target.value)}
                   className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                 >
-                  <option value="">All types</option>
+                  <option value="">{t("inv.items.all_types", "All types")}</option>
                   {types.map((t) => (
                     <option key={t.id} value={t.id}>{t.type_name}{t.is_system ? "" : " · custom"}</option>
                   ))}
                 </select>
               </label>
               <label className="flex flex-col">
-                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Status</span>
+                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.status", "Status")}</span>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
                   className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="archived">Archived</option>
-                  <option value="">All</option>
+                  <option value="active">{t("inv.variants.status.active", "Active")}</option>
+                  <option value="inactive">{t("inv.variants.status.inactive", "Inactive")}</option>
+                  <option value="archived">{t("inv.items.archived", "Archived")}</option>
+                  <option value="">{t("inv.common.all", "All")}</option>
                 </select>
               </label>
             </div>
@@ -329,11 +304,11 @@ export default function InventoryItems() {
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                 <th className="px-3 py-2.5 text-left w-[48px]"></th>
-                <th className="px-3 py-2.5 text-left">Item</th>
-                <th className="px-3 py-2.5 text-left">Type</th>
-                <th className="px-3 py-2.5 text-left">UoM</th>
-                <th className="px-3 py-2.5 text-right">On hand</th>
-                <th className="px-3 py-2.5 text-left">Status</th>
+                <th className="px-3 py-2.5 text-left">{t("inv.common.item", "Item")}</th>
+                <th className="px-3 py-2.5 text-left">{t("inv.common.type", "Type")}</th>
+                <th className="px-3 py-2.5 text-left">{t("inv.items.uom", "UoM")}</th>
+                <th className="px-3 py-2.5 text-right">{t("inv.balances.col.on_hand", "On hand")}</th>
+                <th className="px-3 py-2.5 text-left">{t("inv.items.status", "Status")}</th>
                 <th className="px-3 py-2.5 text-right w-[32px]"></th>
               </tr>
             </thead>
@@ -477,7 +452,7 @@ function QuickAddDrawer({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const { t } = useTranslation(INV_H1_T);
+  const { t } = useTranslation(inventoryT);
   const [itemName, setItemName] = useState("");
   /* INV-H5B — default to office_supply (internal-use) so the drawer
      defaults to the "no product needed" flow; operator can switch. */
@@ -582,9 +557,7 @@ function QuickAddDrawer({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-            Cancel
-          </button>
+          <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("inv.common.cancel", "Cancel")}</button>
           <button
             onClick={submit}
             disabled={submitting}
@@ -661,8 +634,7 @@ function QuickAddDrawer({
             items where the taxonomy file has hints. Optional, free-text. */}
         {isInternalUse && subcategorySuggestions.length > 0 && (
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-              Subcategory <span className="text-[var(--text-dim)] normal-case tracking-normal">(optional)</span>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.subcategory", "Subcategory")}<span className="text-[var(--text-dim)] normal-case tracking-normal">(optional)</span>
             </div>
             <input
               list={`subcat-${selectedType?.type_key ?? "all"}`}
@@ -680,7 +652,7 @@ function QuickAddDrawer({
         )}
 
         <label className="block">
-          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Unit of Measure</div>
+          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.unit_of_measure", "Unit of Measure")}</div>
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
@@ -691,7 +663,7 @@ function QuickAddDrawer({
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Initial Qty (optional)</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.initial_qty", "Initial Qty (optional)")}</div>
             <input
               type="number"
               min="0"
@@ -703,7 +675,7 @@ function QuickAddDrawer({
             />
           </label>
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Warehouse</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.warehouse", "Warehouse")}</div>
             <select
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
@@ -845,7 +817,7 @@ function ItemDetailDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { t } = useTranslation(INV_H1_T);
+  const { t } = useTranslation(inventoryT);
   const [item, setItem] = useState<DetailItem | null>(null);
   const [stock, setStock] = useState<DetailStock | null>(null);
   const [valuation, setValuation] = useState<DetailValuation | null>(null);
@@ -926,17 +898,12 @@ function ItemDetailDrawer({
         item ? (
           <div className="flex justify-between gap-2">
             {item.status === "archived" ? (
-              <button onClick={restore} disabled={busy} className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">
-                Restore
-              </button>
+              <button onClick={restore} disabled={busy} className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">{t("inv.items.restore", "Restore")}</button>
             ) : (
               <button onClick={archive} disabled={busy} className="inline-flex items-center gap-1.5 h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50">
-                <RrIcon name="trash" size={12} /> Archive
-              </button>
+                <RrIcon name="trash" size={12} />{t("inv.items.archive", "Archive")}</button>
             )}
-            <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              Close
-            </button>
+            <button onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("inv.shortcuts.close", "Close")}</button>
           </div>
         ) : null
       }
@@ -953,25 +920,25 @@ function ItemDetailDrawer({
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {type && <TypeChip name={type.type_name} icon={type.icon} color={type.color} />}
               <StatusBadge status={item.status} />
-              {item.is_consumable && <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-amber-200">Consumable</span>}
-              {item.is_sellable && <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-emerald-200">Sellable</span>}
+              {item.is_consumable && <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-amber-200">{t("inv.items.consumable", "Consumable")}</span>}
+              {item.is_sellable && <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-emerald-200">{t("inv.items.sellable", "Sellable")}</span>}
             </div>
           </div>
 
           {/* Stock summary */}
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Stock</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">{t("inv.items.stock", "Stock")}</div>
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">On hand</div>
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.on_hand", "On hand")}</div>
                 <div className="mt-0.5 text-[16px] tabular-nums font-mono">{fmtQty(stock?.total_on_hand ?? 0)}</div>
               </div>
               <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Reserved</div>
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.reserved", "Reserved")}</div>
                 <div className="mt-0.5 text-[16px] tabular-nums font-mono text-[var(--text-muted)]">{fmtQty(stock?.total_reserved ?? 0)}</div>
               </div>
               <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Available</div>
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.available", "Available")}</div>
                 <div className="mt-0.5 text-[16px] tabular-nums font-mono">{fmtQty(stock?.total_available ?? 0)}</div>
               </div>
             </div>
@@ -980,9 +947,9 @@ function ItemDetailDrawer({
                 <table className="min-w-full text-[11.5px]">
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                      <th className="px-2 py-1.5 text-left">Location</th>
-                      <th className="px-2 py-1.5 text-right">On hand</th>
-                      <th className="px-2 py-1.5 text-right">Available</th>
+                      <th className="px-2 py-1.5 text-left">{t("inv.common.location", "Location")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("inv.balances.col.on_hand", "On hand")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("inv.balances.col.available", "Available")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1002,20 +969,20 @@ function ItemDetailDrawer({
           {/* Valuation — Phase O.5 */}
           {valuation && valuation.total_qty > 0 && (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Valuation</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">{t("inv.items.valuation", "Valuation")}</div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Avg cost</div>
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.avg_cost", "Avg cost")}</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono">{fmtMoney(valuation.weighted_avg_cost)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Stock value</div>
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.stock_value", "Stock value")}</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{fmtMoney(valuation.total_value)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Last in cost</div>
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.last_in_cost", "Last in cost")}</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono text-[var(--text-muted)]">
                     {valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
                   </div>
@@ -1027,10 +994,10 @@ function ItemDetailDrawer({
                   <table className="min-w-full text-[11.5px]">
                     <thead>
                       <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                        <th className="px-2 py-1.5 text-left">Location</th>
-                        <th className="px-2 py-1.5 text-right">Qty</th>
-                        <th className="px-2 py-1.5 text-right">Avg cost</th>
-                        <th className="px-2 py-1.5 text-right">Value</th>
+                        <th className="px-2 py-1.5 text-left">{t("inv.common.location", "Location")}</th>
+                        <th className="px-2 py-1.5 text-right">{t("inv.common.qty", "Qty")}</th>
+                        <th className="px-2 py-1.5 text-right">{t("inv.balances.col.avg_cost", "Avg cost")}</th>
+                        <th className="px-2 py-1.5 text-right">{t("inv.common.value", "Value")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1054,7 +1021,7 @@ function ItemDetailDrawer({
 
           {/* Details grid */}
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Details</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">{t("inv.items.details", "Details")}</div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px]">
               <DT label="Unit"        value={item.unit_of_measure} />
               <DT label="Brand"       value={item.brand ?? "—"} />
@@ -1071,7 +1038,7 @@ function ItemDetailDrawer({
 
           {(item.description || item.notes) && (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-1">Description</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-1">{t("inv.items.description", "Description")}</div>
               <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11.5px] text-[var(--text-muted)] whitespace-pre-wrap">
                 {item.description || item.notes}
               </div>
@@ -1101,7 +1068,7 @@ function TypesPanel({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { t } = useTranslation(INV_H1_T);
+  const { t } = useTranslation(inventoryT);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<IconName>("box");
   const [color, setColor] = useState<ColorToken>("slate");
@@ -1156,7 +1123,7 @@ function TypesPanel({
       <div className="space-y-4">
         <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">New custom type</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.new_custom_type", "New custom type")}</div>
             <TypeChip name={name || "Preview"} icon={icon} color={color} compact />
           </div>
           <input
@@ -1167,13 +1134,13 @@ function TypesPanel({
           />
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[11px]">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Icon</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.icon", "Icon")}</div>
               <select value={icon} onChange={(e) => setIcon(e.target.value as IconName)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                 {ALLOWED_ICONS.map((i) => <option key={i} value={i}>{i}</option>)}
               </select>
             </label>
             <label className="block text-[11px]">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Color</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.color", "Color")}</div>
               <select value={color} onChange={(e) => setColor(e.target.value as ColorToken)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                 {ALLOWED_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -1221,7 +1188,7 @@ function TypesPanel({
         </div>
 
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">All types ({sorted.length})</div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">{t("inv.items.all_types", "All types")} ({sorted.length})</div>
           <ul className="space-y-1">
             {sorted.map((tt) => (
               <li key={tt.id} className="flex items-center justify-between rounded-md border border-[var(--border-subtle)] px-2 py-1.5">
@@ -1236,7 +1203,7 @@ function TypesPanel({
                   </span>
                 </div>
                 {!tt.is_system && tt.is_active && (
-                  <button onClick={() => archive(tt.id)} className="shrink-0 text-[11px] text-rose-300 hover:text-rose-200">Archive</button>
+                  <button onClick={() => archive(tt.id)} className="shrink-0 text-[11px] text-rose-300 hover:text-rose-200">{t("inv.items.archive", "Archive")}</button>
                 )}
               </li>
             ))}
@@ -1259,7 +1226,7 @@ interface VariantDto {
 }
 
 function ItemVariantsSection({ itemId }: { itemId: string }) {
-  const { t } = useTranslation(INV_H1_T);
+  const { t } = useTranslation(inventoryT);
   const [variants, setVariants] = useState<VariantDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1343,15 +1310,13 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
     <div>
       {confirmDialog}
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Variants</div>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.items.variants", "Variants")}</div>
         <button
           type="button"
           onClick={() => setAddOpen((s) => !s)}
           className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
         >
-          <RrIcon name="plus" size={10} />
-          Add variant
-        </button>
+          <RrIcon name="plus" size={10} />{t("inv.items.add_variant", "Add variant")}</button>
       </div>
 
       {error && (
@@ -1364,7 +1329,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
         <div className="mb-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 dark:border-[var(--border-subtle)]">
           <div className="grid grid-cols-2 gap-2 text-[11.5px]">
             <label className="col-span-2 block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Name</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.common.name", "Name")}</div>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1373,7 +1338,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Color</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.color", "Color")}</div>
               <input
                 value={color}
                 onChange={(e) => setColorAttr(e.target.value)}
@@ -1381,7 +1346,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Voltage</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.voltage", "Voltage")}</div>
               <input
                 value={voltage}
                 onChange={(e) => setVoltage(e.target.value)}
@@ -1389,7 +1354,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="col-span-2 block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Size</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.size", "Size")}</div>
               <input
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
@@ -1421,10 +1386,10 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
           <table className="min-w-full text-[11.5px]">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                <th className="px-2 py-1.5 text-left">Name</th>
-                <th className="px-2 py-1.5 text-left">Attributes</th>
-                <th className="px-2 py-1.5 text-right">Cost</th>
-                <th className="px-2 py-1.5">Status</th>
+                <th className="px-2 py-1.5 text-left">{t("inv.common.name", "Name")}</th>
+                <th className="px-2 py-1.5 text-left">{t("inv.items.attributes", "Attributes")}</th>
+                <th className="px-2 py-1.5 text-right">{t("inv.items.cost", "Cost")}</th>
+                <th className="px-2 py-1.5">{t("inv.items.status", "Status")}</th>
                 <th className="px-2 py-1.5"></th>
               </tr>
             </thead>
@@ -1455,8 +1420,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
                         onClick={() => archive(v.id)}
                         className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-500/20 dark:text-rose-200"
                       >
-                        <RrIcon name="trash" size={10} /> Archive
-                      </button>
+                        <RrIcon name="trash" size={10} />{t("inv.items.archive", "Archive")}</button>
                     )}
                   </td>
                 </tr>
