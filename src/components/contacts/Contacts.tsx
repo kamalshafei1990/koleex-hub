@@ -2310,8 +2310,7 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
         />
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={ref} open={open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
           {filtered.map((opt, i) => (
             <button
               key={opt}
@@ -2325,8 +2324,7 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
               {opt}
             </button>
           ))}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -4783,8 +4781,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
@@ -4802,8 +4799,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
               </button>
             ))
           )}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
@@ -4865,8 +4861,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
@@ -4883,8 +4878,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
               </button>
             ))
           )}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
@@ -4959,8 +4953,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
@@ -4979,8 +4972,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
               </button>
             ))
           )}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
