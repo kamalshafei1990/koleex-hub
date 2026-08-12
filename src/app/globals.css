@@ -1975,37 +1975,24 @@ input[type="number"]:not(.kx-spinner) {
   background-color: rgba(0, 0, 0, 0.04);
 }
 
-/* ── THE PRIMARY BUTTON IS HUB BLUE, NOT A WHITE SLAB ──────────────────
-   Owner pointed at "Save Product": "have UI bug". Measured on that screen it
-   was the ONLY solid `rgb(255,255,255)` block left — everything else had gone
-   to glass, so the one flat white rectangle read as a hole punched in the
-   page. The canon already says it in the Settings log: "a solid inverted
-   square is the loudest flat shape left on glass".
+/* ── THE PRIMARY BUTTON STAYS WHITE. ONLY ITS HOVER WAS WRONG ──────────
+   Owner, after I turned it Hub Blue: "keep it white same as before but just
+   change the hover, don't make it black or dark."
 
-   Aurora has ONE accent, so the primary action wears Hub Blue — the same
-   family as kx-chip-on and the seg-on ring, just at full strength because a
-   CTA has to lead. White type on it, and the light rim that every Hub-Blue
-   surface carries.
+   The real defect was never the colour — it was `hover:opacity-90`. Fading a
+   WHITE button to 90% over a dark moving canvas lets the ground show through
+   it, so the button goes grey-and-dirty exactly when you touch it. That is
+   the "dark" he means, and it is a bug that only exists on a glass page: on
+   Core's flat surface, 90% of white over near-black is a barely-visible tint.
 
-   Targeted by the utility class itself, because `--bg-inverted` is how every
-   primary button in the Hub is written and there is no shared component to
-   patch. Scoped to converted apps only: unconverted ones keep the white
-   button exactly as it is. `[data-kx-keep-inverted]` opts a control out. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]) {
-  background-color: rgba(86, 127, 178, 0.92) !important;
-  color: #fff !important;
-  border-color: rgba(188, 216, 240, 0.55);
-}
+   So: pin the opacity, hold the fill at full white, and put the feedback in a
+   Hub-Blue halo instead — the button gets brighter attention, never dimmer.
+   Works in light theme too, where --bg-inverted is black: the fill is held at
+   its own value rather than being lightened, and the same halo reads. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]):hover {
-  background-color: rgba(86, 127, 178, 1) !important;
-}
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]) {
-  background-color: rgba(62, 103, 150, 0.95) !important;
-}
-/* The icon and label inside inherit — they are usually painted
-   `text-[var(--text-inverted)]`, which is black and would vanish on blue. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]) * {
-  color: inherit;
+  opacity: 1 !important;
+  background-color: var(--bg-inverted) !important;
+  box-shadow: 0 0 0 3px rgba(86, 127, 178, 0.30), 0 6px 18px -6px rgba(0, 0, 0, 0.45);
 }
 
 /* ── EVERY BORDERED CONTROL IN A CONVERTED APP HOVERS THE SAME WAY ──
