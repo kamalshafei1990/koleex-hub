@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import KdsSelect from "@/components/kds/Select";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import { useRouter, usePathname } from "next/navigation";
@@ -3636,15 +3637,12 @@ export default function ProductForm({ productId }: Props) {
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
                               {t("hero.nameOtherLang", "Other language")}
                             </span>
-                            <select
+                            <KdsSelect
                               value={adderLocale}
-                              onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
-                              className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
-                            >
-                              {LOCALES.filter((l) => !filledCodes.has(l.code)).map((l) => (
-                                <option key={l.code} value={l.code}>{localeDisplay(l.code)}</option>
-                              ))}
-                            </select>
+                              onChange={(v) => { setHeroNameLocale(v); setHeroNameMsg(null); }}
+                              options={LOCALES.filter((l) => !filledCodes.has(l.code)).map((l) => ({ value: l.code, label: localeDisplay(l.code) }))}
+                              triggerClassName={"h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" + " pe-7 text-start"}
+                            />
                             {canAuto && (
                               <button
                                 type="button"
@@ -4010,15 +4008,12 @@ export default function ProductForm({ productId }: Props) {
                               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
                                 {t("hero.nameOtherLang", "Other language")}
                               </span>
-                              <select
-                                value={heroExcerptLocale}
-                                onChange={(e) => { setHeroExcerptLocale(e.target.value); setHeroExcerptMsg(null); }}
-                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
-                              >
-                                {LOCALES.map((l) => (
-                                  <option key={l.code} value={l.code}>{l.name}</option>
-                                ))}
-                              </select>
+                              <KdsSelect
+                              value={heroExcerptLocale}
+                              onChange={(v) => { setHeroExcerptLocale(v); setHeroExcerptMsg(null); }}
+                              options={LOCALES.map((l) => ({ value: l.code, label: l.name }))}
+                              triggerClassName={"h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" + " pe-7 text-start"}
+                            />
                             </div>
                             <button
                               type="button"
@@ -4115,15 +4110,12 @@ export default function ProductForm({ productId }: Props) {
                               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
                                 {t("hero.nameOtherLang", "Other language")}
                               </span>
-                              <select
-                                value={heroTaglineLocale}
-                                onChange={(e) => { setHeroTaglineLocale(e.target.value); setHeroTaglineMsg(null); }}
-                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
-                              >
-                                {LOCALES.map((l) => (
-                                  <option key={l.code} value={l.code}>{l.name}</option>
-                                ))}
-                              </select>
+                              <KdsSelect
+                              value={heroTaglineLocale}
+                              onChange={(v) => { setHeroTaglineLocale(v); setHeroTaglineMsg(null); }}
+                              options={LOCALES.map((l) => ({ value: l.code, label: l.name }))}
+                              triggerClassName={"h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" + " pe-7 text-start"}
+                            />
                             </div>
                             <button
                               type="button"
@@ -4309,15 +4301,12 @@ export default function ProductForm({ productId }: Props) {
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
                           {t("hero.nameOtherLang", "Other language")}
                         </span>
-                        <select
-                          value={descLocale}
-                          onChange={(e) => { setDescLocale(e.target.value); setDescMsg(null); }}
-                          className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
-                        >
-                          {LOCALES.map((l) => (
-                            <option key={l.code} value={l.code}>{l.name}</option>
-                          ))}
-                        </select>
+                        <KdsSelect
+                              value={descLocale}
+                              onChange={(v) => { setDescLocale(v); setDescMsg(null); }}
+                              options={LOCALES.map((l) => ({ value: l.code, label: l.name }))}
+                              triggerClassName={"h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" + " pe-7 text-start"}
+                            />
                       </div>
                       <button
                         type="button"
@@ -5307,16 +5296,13 @@ export default function ProductForm({ productId }: Props) {
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><BoundIcon semanticKey="field.origin" className="h-3 w-3" fallback={<GlobeIcon className="h-3 w-3" />} /> {t("logistics.countryOfOrigin", "Country of Origin")}</span>
                   </label>
-                  <select
+                  <KdsSelect
                     value={product.country_of_origin}
-                    onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
-                    className={inp}
-                  >
-                    <option value="">—</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => updateProduct_({ country_of_origin: v })}
+                    options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
+                    placeholder="—"
+                    triggerClassName={inp + " pe-9 text-start"}
+                  />
                 </div>
                 {!schemaCoveredCols.has("hs_code") ? (
                   <div>
@@ -5469,21 +5455,15 @@ export default function ProductForm({ productId }: Props) {
                 </div>
                 <div>
                   <label className={lbl}><span className="inline-flex items-center gap-1.5"><ListIcon className="h-3 w-3" /> Warranty type</span></label>
-                  <select className={inp} value={product.warranty_type} onChange={(e) => updateProduct_({ warranty_type: e.target.value })}>
-                    <option value="">—</option>
-                    <option value="parts-only">Parts only</option>
-                    <option value="parts-and-labour">Parts & labour</option>
-                    <option value="on-site">On-site</option>
-                  </select>
+                  <KdsSelect value={product.warranty_type} onChange={(v) => updateProduct_({ warranty_type: v })}
+                    options={[{ value: "parts-only", label: "Parts only" }, { value: "parts-and-labour", label: "Parts & labour" }, { value: "on-site", label: "On-site" }]}
+                    placeholder="—" triggerClassName={inp + " pe-9 text-start"} />
                 </div>
                 <div>
                   <label className={lbl}><span className="inline-flex items-center gap-1.5"><CalendarRawIcon className="h-3 w-3" /> Starts from</span></label>
-                  <select className={inp} value={product.warranty_start_from} onChange={(e) => updateProduct_({ warranty_start_from: e.target.value })}>
-                    <option value="">—</option>
-                    <option value="shipment">Shipment</option>
-                    <option value="installation">Installation</option>
-                    <option value="invoice">Invoice date</option>
-                  </select>
+                  <KdsSelect value={product.warranty_start_from} onChange={(v) => updateProduct_({ warranty_start_from: v })}
+                    options={[{ value: "shipment", label: "Shipment" }, { value: "installation", label: "Installation" }, { value: "invoice", label: "Invoice date" }]}
+                    placeholder="—" triggerClassName={inp + " pe-9 text-start"} />
                 </div>
                 <div className="md:col-span-3">
                   <label className={lbl}><span className="inline-flex items-center gap-1.5"><ShieldIcon className="h-3 w-3" /> Coverage</span></label>
