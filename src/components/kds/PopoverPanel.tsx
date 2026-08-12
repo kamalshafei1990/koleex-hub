@@ -31,6 +31,8 @@ export default function PopoverPanel({
   className = "",
   matchAnchorWidth = true,
   align = "start",
+  mobileSheet = false,
+  maxHeight = 352,
   children,
 }: {
   anchorRef: RefObject<HTMLElement | null>;
@@ -44,12 +46,20 @@ export default function PopoverPanel({
   /** `end` right-aligns the panel to the trigger, for menus near the viewport
       edge that would otherwise overflow. */
   align?: "start" | "end";
+  /** Under 768px, drop the anchor and span the viewport under the header —
+      the notification panel is a sheet on a phone and a dropdown above it.
+      One panel, two positioning modes, because that is what it actually is. */
+  mobileSheet?: boolean;
+  /** Tallest the panel may grow when the room allows. 352 suits a select list;
+      a feed with its own header and filter chips needs more before its inner
+      scroller starts doing the work. Never a floor — the room still wins. */
+  maxHeight?: number;
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   /* One nudge per open — see the scroll note in place(). */
   const autoScrolled = useRef(false);
-  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number; flip: boolean; maxH: number } | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number; flip: boolean; maxH: number; sheet: boolean } | null>(null);
 
   /* onClose arrives as a fresh arrow on every parent render. Held in a ref so
      the effect below does not tear down and re-register on every render — it
@@ -66,6 +76,26 @@ export default function PopoverPanel({
     const a = anchorRef.current;
     if (!a) return;
     const r = a.getBoundingClientRect();
+    /* SHEET MODE. On a phone a 380px card hanging off a 32px icon button in
+       the corner is not a menu, it is a sliver. So under 768px an opted-in
+       panel stops being anchored: it spans the viewport under the header with
+       12px margins, exactly where the bell's hand-rolled `inset-x-3` put it
+       before this component existed. Anchor-independent, so no scroll nudge
+       and no width matching. */
+    if (mobileSheet && window.innerWidth < 768) {
+      const headerH =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--kx-header-h"),
+        ) || 56;
+      const top = headerH + 8;
+      const maxH = Math.max(0, window.innerHeight - top - 12);
+      setRect((prev) =>
+        prev && prev.sheet && prev.top === top && prev.maxH === maxH
+          ? prev
+          : { top, left: 12, right: 12, width: 0, flip: false, maxH, sheet: true },
+      );
+      return;
+    }
     /* DOWN IS THE DEFAULT AND STAYS THE DEFAULT. The first version flipped
        whenever a full-height panel would not fit below, which is the textbook
        rule and looked wrong immediately: a field low on the page threw a 352px
@@ -113,14 +143,14 @@ export default function PopoverPanel({
     const top = r.bottom + 4;
     /* No lower clamp: a floor of 120 over 108px of room overflowed the
        viewport by exactly the difference. The available space IS the limit. */
-    const maxH = Math.min(352, Math.max(0, below));
+    const maxH = Math.min(maxHeight, Math.max(0, below));
     setRect((prev) =>
-      prev && prev.top === top && prev.left === r.left && prev.width === r.width
+      prev && !prev.sheet && prev.top === top && prev.left === r.left && prev.width === r.width
         && prev.flip === flip && prev.maxH === maxH
         ? prev /* same box — return the SAME object so React bails out */
-        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip, maxH },
+        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip, maxH, sheet: false },
     );
-  }, [anchorRef]);
+  }, [anchorRef, mobileSheet, maxHeight]);
 
   useEffect(() => {
     if (!open) { autoScrolled.current = false; return; }
@@ -158,8 +188,12 @@ export default function PopoverPanel({
         /* When flipped, anchor by the BOTTOM edge so the panel grows upward
            from the field instead of downward off the screen. */
         ...(rect.flip ? { bottom: window.innerHeight - rect.top } : { top: rect.top }),
-        ...(align === "end" ? { right: rect.right } : { left: rect.left }),
-        ...(matchAnchorWidth ? { minWidth: rect.width } : null),
+        ...(rect.sheet
+          ? { left: rect.left, right: rect.right }
+          : align === "end"
+            ? { right: rect.right }
+            : { left: rect.left }),
+        ...(matchAnchorWidth && !rect.sheet ? { minWidth: rect.width } : null),
         maxHeight: rect.maxH,
         overflowY: "auto",
         zIndex: 200,

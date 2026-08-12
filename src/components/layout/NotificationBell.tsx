@@ -31,6 +31,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useRouter } from "next/navigation";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
@@ -741,16 +742,14 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             onClick={() => setOpen(false)}
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
-          {/* Mobile: a floating card dropping in right under the header —
-              side margins, fully rounded, never touching the screen edges.
-              Desktop (md+): the familiar dropdown anchored to the bell. */}
-          <div
-            role="menu"
-            /* Sheet on phones, dropdown from md up. .kx-pop-sheet carries the
-               softer phone corner: the MN-5 shell outranks a `rounded-2xl`
-               utility, and an inline variable cannot follow a breakpoint. */
-            className="kx-drop-in fixed inset-x-3 top-[calc(var(--kx-header-h)+8px)] w-auto md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] z-50 kx-glass-pop kx-pop-panel kx-pop-sheet"
-          >
+        </>
+      )}
+      {/* Portalled: the header pane's own backdrop-filter starved this
+          panel's glass. mobileSheet keeps the phone behaviour — full width
+          under the header — while md+ stays a dropdown anchored to the bell. */}
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end"
+        matchAnchorWidth={false} mobileSheet maxHeight={620}
+        className="kx-drop-in kx-pop-sheet w-auto md:w-[380px] md:max-w-[92vw]">
           {/* Header */}
           <div
             className={`flex items-center justify-between px-4 py-3 border-b ${
@@ -1100,9 +1099,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                 </div>
               )}
           </div>
-          </div>
-        </>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
