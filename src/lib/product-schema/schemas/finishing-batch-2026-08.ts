@@ -179,6 +179,11 @@ export const FUSING_MACHINE_SCHEMA: ProductSchemaDefinition = {
 
 /** Same token lives under Fabric Preparation too (CL-0016 open finding) —
  *  both homes must resolve the same fields. */
+/* CL-0021 removed the duplicate `fabric-preparation/fusing-machines` row —
+   XFFP now lives on exactly one shelf (finishing-equipment), where its 8 live
+   products already were. This binding is kept so a product saved against the
+   old fabric-preparation path still resolves a schema instead of falling
+   through to nothing; it no longer corresponds to a live subcategory row. */
 export const FUSING_MACHINE_FABRIC_PREP_SCHEMA: ProductSchemaDefinition = {
   ...FUSING_MACHINE_SCHEMA,
   id: "fusing-machine.fabric-prep.v1",
