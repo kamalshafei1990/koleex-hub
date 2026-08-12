@@ -18,6 +18,7 @@ import {
   IRONING_SYSTEMS_BINDINGS,
 } from "./schemas/finishing-batch-2026-08";
 import { YILI_BATCH_SCHEMAS } from "./schemas/yili-batch-2026-08-12";
+import { IRONING_HEATPRESS_BATCH_SCHEMAS } from "./schemas/ironing-heatpress-batch-2026-08-12";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -49,6 +50,17 @@ registerSchema(GARMENT_REVERSING_SCHEMA);
    Machines (catalog pp. 81–82) and XFTS Thread Sucking / Brushing (pp. 87–88).
    Every field is traceable to a printed column on those pages. */
 for (const schema of YILI_BATCH_SCHEMAS) registerSchema(schema);
+
+/* Ironing + Heat-Press batch (2026-08-12, owner-approved) — the four
+   subcategories that held live products and still had no template:
+   XFSI Steam Irons, XFCP Collar & Cuff Press (both Ironing Systems), and
+   XPDH Double Station + XPPH Pneumatic Heat Press (Printing & Heat Press).
+   Built from TWO registered sources per family, because they are
+   complementary: S-001 (Koleex 2025) prints one model per page in one
+   column, S-003 (supplier library) prints a model matrix and the fields
+   S-001 omits. On XFSI the union is 8 fields where each source alone is 6–7.
+   See docs/product-data-v2/reference-data/source-catalogs.md. */
+for (const schema of IRONING_HEATPRESS_BATCH_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
