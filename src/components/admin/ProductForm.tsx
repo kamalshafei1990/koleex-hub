@@ -396,8 +396,16 @@ function SectionTabs({
   activeIndex: number;
   onSelect: (i: number) => void;
 }) {
+  /* RAMP OVERHANG, TUNED. Without the two vars this bar took the 3rem
+     default, so its ramp hung 48px BELOW itself while `mb-6` only clears 24 —
+     the top half of whatever sits under the tabs (here the product title row
+     and its chips) was inside the 28px blur layer and stayed frosted
+     permanently, even with the page scrolled to the top. The ramp is for
+     content PASSING under a bar, not for content parked there. 1rem / 2.5rem
+     are the values ProductProfile and ProductList already use for this
+     identical bar; this was the one that was missed. */
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-ext:1rem] [--kx-ramp-fade:2.5rem]">
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"

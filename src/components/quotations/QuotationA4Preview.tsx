@@ -410,8 +410,11 @@ export default function QuotationA4Preview({
   const pinchHostRef = useRef<HTMLDivElement | null>(null);
   const pinchBoxRef = useRef<HTMLDivElement | null>(null);
   const [zoom, setZoom] = useState(1);
+  /* Mirrored in an effect, never assigned during render: a render-phase ref
+     mutation is unsafe under concurrent rendering (and the lint rule says so).
+     The gesture only reads this on touchstart, which is always after commit. */
   const zoomRef = useRef(1);
-  zoomRef.current = zoom;
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => {
     const host = pinchHostRef.current;
     if (!host) return;
