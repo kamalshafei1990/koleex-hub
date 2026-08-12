@@ -1,6 +1,7 @@
 "use client";
 
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import KdsSelect from "@/components/kds/Select";
 import dynamic from "next/dynamic";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -370,28 +371,22 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>{t("mv.status", "Status")}</label>
-                  <select
+                  <KdsSelect
                     value={model.status}
-                    onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
-                    className={inp}
-                  >
-                    <option value="active">{t("mv.stActive", "Active")}</option>
-                    <option value="discontinued">{t("mv.stDiscontinued", "Discontinued")}</option>
-                  </select>
+                    onChange={(v) => onUpdate({ status: v as "active" | "discontinued" })}
+                    options={[{ value: "active", label: t("mv.stActive", "Active") }, { value: "discontinued", label: t("mv.stDiscontinued", "Discontinued") }]}
+                    triggerClassName={inp + " pe-8 text-start"}
+                  />
                 </div>
                 <div>
                   <label className={lbl}>{t("mv.stockStatus", "Stock Status")}</label>
-                  <select
+                  <KdsSelect
                     value={model.stock_status}
-                    onChange={(e) => onUpdate({ stock_status: e.target.value })}
-                    className={inp}
-                  >
-                    <option value="">— Not specified —</option>
-                    <option value="in_stock">{t("mv.ssInStock", "In stock")}</option>
-                    <option value="made_to_order">{t("mv.ssMto", "Made to order")}</option>
-                    <option value="pre_order">{t("mv.ssPreOrder", "Pre-order")}</option>
-                    <option value="sold_out">{t("mv.ssSoldOut", "Sold out")}</option>
-                  </select>
+                    onChange={(v) => onUpdate({ stock_status: v })}
+                    options={[{ value: "in_stock", label: t("mv.ssInStock", "In stock") }, { value: "made_to_order", label: t("mv.ssMto", "Made to order") }, { value: "pre_order", label: t("mv.ssPreOrder", "Pre-order") }, { value: "sold_out", label: t("mv.ssSoldOut", "Sold out") }]}
+                    placeholder="— Not specified —"
+                    triggerClassName={inp + " pe-8 text-start"}
+                  />
                 </div>
               </div>
 
@@ -443,28 +438,22 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                 </div>
                 <div>
                   <label className={lbl}>{t("mv.status", "Status")}</label>
-                  <select
+                  <KdsSelect
                     value={model.status}
-                    onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
-                    className={inp}
-                  >
-                    <option value="active">{t("mv.stActive", "Active")}</option>
-                    <option value="discontinued">{t("mv.stDiscontinued", "Discontinued")}</option>
-                  </select>
+                    onChange={(v) => onUpdate({ status: v as "active" | "discontinued" })}
+                    options={[{ value: "active", label: t("mv.stActive", "Active") }, { value: "discontinued", label: t("mv.stDiscontinued", "Discontinued") }]}
+                    triggerClassName={inp + " pe-8 text-start"}
+                  />
                 </div>
                 <div>
                   <label className={lbl}>{t("mv.stockStatus", "Stock Status")}</label>
-                  <select
+                  <KdsSelect
                     value={model.stock_status}
-                    onChange={(e) => onUpdate({ stock_status: e.target.value })}
-                    className={inp}
-                  >
-                    <option value="">—</option>
-                    <option value="in_stock">{t("mv.ssInStock", "In stock")}</option>
-                    <option value="made_to_order">{t("mv.ssMto", "Made to order")}</option>
-                    <option value="pre_order">{t("mv.ssPreOrder", "Pre-order")}</option>
-                    <option value="sold_out">{t("mv.ssSoldOut", "Sold out")}</option>
-                  </select>
+                    onChange={(v) => onUpdate({ stock_status: v })}
+                    options={[{ value: "in_stock", label: t("mv.ssInStock", "In stock") }, { value: "made_to_order", label: t("mv.ssMto", "Made to order") }, { value: "pre_order", label: t("mv.ssPreOrder", "Pre-order") }, { value: "sold_out", label: t("mv.ssSoldOut", "Sold out") }]}
+                    placeholder="—"
+                    triggerClassName={inp + " pe-8 text-start"}
+                  />
                 </div>
               </div>
 
@@ -527,15 +516,12 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                   <div>
                     <label className={lbl}>{t("mv.pricingMode", "Pricing")}</label>
-                    <select
+                    <KdsSelect
                       value={model.pricing_mode || "fixed"}
-                      onChange={(e) => onUpdate({ pricing_mode: e.target.value as "fixed" | "from" | "on_request" })}
-                      className={inp}
-                    >
-                      <option value="fixed">{t("mv.pricingFixed", "Fixed price")}</option>
-                      <option value="from">{t("mv.pricingFrom", "From — base + options")}</option>
-                      <option value="on_request">{t("mv.pricingOnRequest", "Priced per configuration")}</option>
-                    </select>
+                      onChange={(v) => onUpdate({ pricing_mode: v as "fixed" | "from" | "on_request" })}
+                      options={[{ value: "fixed", label: t("mv.pricingFixed", "Fixed price") }, { value: "from", label: t("mv.pricingFrom", "From — base + options") }, { value: "on_request", label: t("mv.pricingOnRequest", "Priced per configuration") }]}
+                      triggerClassName={inp + " pe-8 text-start"}
+                    />
                   </div>
                   {model.pricing_mode && model.pricing_mode !== "fixed" && (
                     <div className="md:col-span-2">
@@ -647,26 +633,23 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                         </span>
                       </span>
                       {f && (f.fieldType === "select") && f.options.length > 0 ? (
-                        <select
+                        <KdsSelect
                           value={v}
-                          onChange={(e) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: e.target.value } })}
-                          className="h-8 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-                        >
-                          <option value="">—</option>
-                          {f.options.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
+                          onChange={(nv) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: nv } })}
+                          options={f.options.map((o) => ({ value: o.value, label: o.label }))}
+                          placeholder="—"
+                          wrapperClassName="flex-1"
+                          triggerClassName={"h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-2 pe-7 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] text-start"}
+                        />
                       ) : f && f.fieldType === "boolean" ? (
-                        <select
+                        <KdsSelect
                           value={v}
-                          onChange={(e) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: e.target.value } })}
-                          className="h-8 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-                        >
-                          <option value="">—</option>
-                          <option value="true">Yes</option>
-                          <option value="false">No</option>
-                        </select>
+                          onChange={(nv) => onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: nv } })}
+                          options={[{ value: "true", label: "Yes" }, { value: "false", label: "No" }]}
+                          placeholder="—"
+                          wrapperClassName="flex-1"
+                          triggerClassName={"h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-2 pe-7 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] text-start"}
+                        />
                       ) : (
                         <input
                           value={v}
@@ -690,24 +673,20 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                     </div>
                   );
                 })}
-                <select
+                {/* An ADD control: it holds no value, so picking a row appends an
+                    override and the trigger falls back to its prompt. */}
+                <KdsSelect
                   value=""
-                  onChange={(e) => {
-                    const k = e.target.value;
-                    if (!k) return;
-                    onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: "" } });
-                  }}
-                  className="h-8 w-full rounded-lg border border-dashed border-[var(--border-subtle)] bg-transparent px-2 text-[12px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)]"
-                >
-                  <option value="">+ Add a spec that differs on this model…</option>
-                  {specFields
+                  onChange={(k) => { if (k) onUpdate({ specs_overrides: { ...model.specs_overrides, [k]: "" } }); }}
+                  options={specFields
                     .filter((sf) => !(sf.key in (model.specs_overrides ?? {})))
-                    .map((sf) => (
-                      <option key={sf.key} value={sf.key}>
-                        {sf.label}{famVal(sf.key) !== "—" ? ` — ${t("models.familyValue", "Family")}: ${famVal(sf.key)}${sf.unit ? ` ${sf.unit}` : ""}` : ""}
-                      </option>
-                    ))}
-                </select>
+                    .map((sf) => ({
+                      value: sf.key,
+                      label: `${sf.label}${famVal(sf.key) !== "—" ? ` — ${t("models.familyValue", "Family")}: ${famVal(sf.key)}${sf.unit ? ` ${sf.unit}` : ""}` : ""}`,
+                    }))}
+                  placeholder="+ Add a spec that differs on this model…"
+                  triggerClassName="h-8 w-full rounded-lg border border-dashed border-[var(--border-subtle)] bg-transparent ps-2 pe-7 text-[12px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)] text-start"
+                />
                 <p className="text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
                   Everything not listed here is inherited from the product's Specifications tab.
                 </p>
