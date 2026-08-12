@@ -309,7 +309,10 @@ function CollapsedGroup({
 
       {/* Flyout with apps (hover or keyboard focus) */}
       <div className="hidden group-hover/fly:block group-focus-within/fly:block absolute top-0 start-full z-[60] ps-3">
-        <div className={`${flyoutBg} border ${flyoutBorder} rounded-xl shadow-2xl w-[200px] py-2 px-2`}>
+        {/* The collapsed-rail group MENU takes MN-5. The two tooltips in this
+            file keep flyoutBg/flyoutBorder on purpose — a label that names an
+            icon is not a menu, and giving it menu chrome would read as one. */}
+        <div className="kx-glass-pop kx-pop-panel w-[200px] py-2 px-2">
           <div className={`text-[10px] font-bold uppercase tracking-wider ${textGhost} px-2.5 py-1.5`}>
             {label}
           </div>

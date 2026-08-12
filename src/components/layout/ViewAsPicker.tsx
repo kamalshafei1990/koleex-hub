@@ -459,9 +459,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
         <div
-          className={`absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-1rem)] rounded-xl border shadow-2xl overflow-hidden ${
-            dk ? "kx-glass-pop bg-[#141414] border-white/10" : "kx-glass-pop bg-white border-black/10"
-          }`}
+          className="absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-1rem)] kx-glass-pop kx-pop-panel"
         >
           {/* Header label */}
           <div

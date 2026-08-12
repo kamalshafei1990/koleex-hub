@@ -746,11 +746,10 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               Desktop (md+): the familiar dropdown anchored to the bell. */}
           <div
             role="menu"
-            className={`kx-drop-in fixed inset-x-3 top-[calc(var(--kx-header-h)+8px)] w-auto rounded-2xl border md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] md:rounded-xl shadow-2xl overflow-hidden z-50 ${
-              dk
-                ? "border-white/[0.08] kx-glass-pop bg-[#0f0f0f]"
-                : "border-black/[0.08] kx-glass-pop bg-white"
-            }`}
+            /* Sheet on phones, dropdown from md up. .kx-pop-sheet carries the
+               softer phone corner: the MN-5 shell outranks a `rounded-2xl`
+               utility, and an inline variable cannot follow a breakpoint. */
+            className="kx-drop-in fixed inset-x-3 top-[calc(var(--kx-header-h)+8px)] w-auto md:absolute md:inset-x-auto md:top-full md:end-0 md:mt-2 md:w-[380px] md:max-w-[92vw] z-50 kx-glass-pop kx-pop-panel kx-pop-sheet"
           >
           {/* Header */}
           <div

@@ -334,11 +334,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
           />
         <div
           role="menu"
-          className={`kx-drop-in absolute top-full end-0 mt-2 w-64 rounded-xl border shadow-2xl overflow-hidden z-50 ${
-            dk
-              ? "border-white/[0.08] kx-glass-pop bg-[#0f0f0f]"
-              : "border-black/[0.08] kx-glass-pop bg-white"
-          }`}
+          /* MN-5: the shell owns radius, border, surface and shadow, so the
+             per-theme solids that used to live here are gone — one dropdown
+             look Hub-wide, and the theme is handled by the tokens. */
+          className="kx-drop-in absolute top-full end-0 mt-2 w-64 z-50 kx-glass-pop kx-pop-panel"
         >
           {/* Identity block */}
           <div className={`px-4 py-3.5 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>

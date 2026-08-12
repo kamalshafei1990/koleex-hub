@@ -1352,7 +1352,11 @@ input[type="number"]:not(.kx-spinner) {
    utility before touching this rule. Aurora overrides background + shadow
    below; radius and border are skin-independent. */
 .kx-pop-panel {
-  border-radius: 0.75rem; /* rounded-xl */
+  /* Through a variable, because this rule BEATS Tailwind utilities: without
+     it a panel that legitimately needs another radius (the notification sheet
+     is full-width with a softer corner on phones) has no way to say so — its
+     `rounded-2xl` would simply be ignored. Set --kx-pop-radius to override. */
+  border-radius: var(--kx-pop-radius, 0.75rem); /* rounded-xl */
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
@@ -1364,6 +1368,14 @@ input[type="number"]:not(.kx-spinner) {
      x stays hidden so rows are still clipped by the corner radius; y is auto,
      which shows no scrollbar at all on the short panels. */
   overflow: hidden auto;
+}
+
+/* A panel that becomes a full-width SHEET on phones wants the softer corner
+   there and the menu corner from md up. An inline --kx-pop-radius cannot say
+   "only on small screens", so it lives here instead: add .kx-pop-sheet
+   alongside .kx-pop-panel and the radius follows the breakpoint. */
+@media (max-width: 767px) {
+  .kx-pop-sheet { --kx-pop-radius: 1rem; }
 }
 
 /* ── A DROPDOWN MUST NEVER BE BURIED BY THE NEXT CARD ──

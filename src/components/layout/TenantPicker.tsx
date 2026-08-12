@@ -184,11 +184,10 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
         <div
-          className={`absolute right-0 top-11 z-50 min-w-[240px] rounded-xl border shadow-2xl overflow-hidden ${
-            dk
-              ? "kx-glass-pop bg-[#141414] border-white/10"
-              : "bg-white border-black/10"
-          }`}
+          /* MN-5 shell. Note the light theme was NOT glass here before — it
+             was a flat white card while dark got the glass, so the two themes
+             disagreed about what this control is. Both are glass now. */
+          className="absolute right-0 top-11 z-50 min-w-[240px] kx-glass-pop kx-pop-panel"
         >
           <div
             className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${
