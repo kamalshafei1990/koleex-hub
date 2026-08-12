@@ -13,6 +13,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
+/* A native <select> draws its list with the OS, so no stylesheet reaches
+   it — MN-5 starts by not being one. See components/kds/Select.tsx. */
+import KdsSelect from "@/components/kds/Select";
 import { qaT } from "@/lib/translations/qa";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -603,32 +606,52 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             );
           })()}
         </div>
-        <select value={fModule} onChange={(e) => setFModule(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allModules", "All modules")}</option>
-          {modules.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allStatus", "All status")}</option>
-          {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
-        </select>
-        <select value={fPriority} onChange={(e) => setFPriority(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allPriority", "All priority")}</option>
-          {PRIORITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.priority." + s.value, s.label)}</option>)}
-        </select>
-        <select value={fSeverity} onChange={(e) => setFSeverity(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allSeverity", "All severity")}</option>
-          {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.severity." + s.value, s.label)}</option>)}
-        </select>
-        <select value={fAssignee} onChange={(e) => setFAssignee(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allAssignees", "All assignees")}</option>
-          <option value="unassigned">{t("qa.filter.unassigned", "Unassigned")}</option>
-          {assigneeFacet.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <select value={fReporter} onChange={(e) => setFReporter(e.target.value)} className={selectCls}>
-          <option value="">{t("qa.filter.allReporters", "All reporters")}</option>
-          {myId && <option value={myId}>{t("qa.filter.myReports", "My reports")}</option>}
-          {reporterFacet.filter((r) => r.id !== myId).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
+        <KdsSelect
+          value={fModule}
+          onChange={setFModule}
+          options={modules.map((m) => ({ value: m, label: m }))}
+          placeholder={t("qa.filter.allModules", "All modules")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
+        <KdsSelect
+          value={fStatus}
+          onChange={setFStatus}
+          options={STATUSES.map((s) => ({ value: s.value, label: t("qa.status." + s.value, s.label) }))}
+          placeholder={t("qa.filter.allStatus", "All status")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
+        <KdsSelect
+          value={fPriority}
+          onChange={setFPriority}
+          options={PRIORITIES.map((s) => ({ value: s.value, label: t("qa.priority." + s.value, s.label) }))}
+          placeholder={t("qa.filter.allPriority", "All priority")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
+        <KdsSelect
+          value={fSeverity}
+          onChange={setFSeverity}
+          options={SEVERITIES.map((s) => ({ value: s.value, label: t("qa.severity." + s.value, s.label) }))}
+          placeholder={t("qa.filter.allSeverity", "All severity")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
+        <KdsSelect
+          value={fAssignee}
+          onChange={setFAssignee}
+          /* "Unassigned" is a real filter value, not the empty one — it stays a
+             row in the list while "" remains the placeholder. */
+          options={[{ value: "unassigned", label: t("qa.filter.unassigned", "Unassigned") },
+                    ...assigneeFacet.map((a) => ({ value: a.id, label: a.name }))]}
+          placeholder={t("qa.filter.allAssignees", "All assignees")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
+        <KdsSelect
+          value={fReporter}
+          onChange={setFReporter}
+          options={[...(myId ? [{ value: myId, label: t("qa.filter.myReports", "My reports") }] : []),
+                    ...reporterFacet.filter((r) => r.id !== myId).map((r) => ({ value: r.id, label: r.name }))]}
+          placeholder={t("qa.filter.allReporters", "All reporters")}
+          triggerClassName={`${selectCls} pe-7 cursor-pointer text-start`}
+        />
         <button
           type="button"
           onClick={() => setSortPriority((v) => !v)}
@@ -1006,10 +1029,12 @@ function ReportDetail({
 
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
   const box = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap break-words";
-  // min-h-[38px] enforces a consistent height floor so native <select>
-  // elements match the AssigneePicker button (which is taller because of its
-  // inner avatar pill). Without this, the Priority dropdown rendered visibly
-  // thinner than the Assigned-to picker beside it — issue 06ae2743.
+  // min-h-[38px] enforces a consistent height floor so the field controls
+  // match the AssigneePicker button (which is taller because of its inner
+  // avatar pill). Without this, the Priority dropdown rendered visibly
+  // thinner than the Assigned-to picker beside it — issue 06ae2743. The
+  // controls are KdsSelect buttons now rather than native <select>, but the
+  // floor still does the same job and is what keeps the pair aligned.
   const input = "w-full min-h-[38px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   const ready = isClaudeReady(report);
@@ -1148,18 +1173,17 @@ function ReportDetail({
         <div>
           <label className={label}>{t("qa.action.priority", "Priority")}</label>
           {/* Issue 06ae2743 (reopened): the priority control looked thinner
-              than the assignee control beside it. A native <select> with only
-              min-height renders shorter than the flex AssigneePicker button on
-              some browsers. Force the exact same box: explicit h-[38px], full
-              width, leading-normal so the two sit at identical height. */}
-          <select
+              than the assignee control beside it — a min-height alone does not
+              make two differently-built controls the same height. Keep forcing
+              the exact box: explicit h-[38px], full width, leading-normal, so
+              this and the flex AssigneePicker sit at identical height. */}
+          <KdsSelect
             value={report.priority}
             disabled={busy}
-            onChange={(e) => void patch({ priority: e.target.value as Priority })}
-            className={`${input} h-[38px] leading-normal`}
-          >
-            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t("qa.priority." + p.value, p.label)}</option>)}
-          </select>
+            onChange={(v) => void patch({ priority: v as Priority })}
+            options={PRIORITIES.map((p) => ({ value: p.value, label: t("qa.priority." + p.value, p.label) }))}
+            triggerClassName={`${input} h-[38px] leading-normal pe-7 cursor-pointer text-start`}
+          />
         </div>
         <div>
           <label className={label}>{t("qa.action.assignedTo", "Assigned to")}</label>
@@ -1209,9 +1233,12 @@ function ReportDetail({
         <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.triage.title", "Triage")}</div>
         <div>
           <label className={label}>{t("qa.triage.status", "Status")}</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as IssueStatus)} className={input}>
-            {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
-          </select>
+          <KdsSelect
+            value={status}
+            onChange={(v) => setStatus(v as IssueStatus)}
+            options={STATUSES.map((s) => ({ value: s.value, label: t("qa.status." + s.value, s.label) }))}
+            triggerClassName={`${input} pe-7 cursor-pointer text-start`}
+          />
         </div>
         <div>
           <label className={label}>{t("qa.triage.devNotes", "Developer notes")}</label>
@@ -1732,19 +1759,36 @@ function BulkBar({
   return (
     <div className="sticky top-2 z-30 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-2 shadow-md backdrop-blur-md">
       <span className="text-[12px] font-semibold text-[var(--text-primary)]">{count} {count === 1 ? t("qa.bulk.selected1", "selected") : t("qa.bulk.selectedN", "selected")}</span>
-      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value as IssueStatus; if (!v) return; onApply({ status: v }); e.target.value = ""; }}>
-        <option value="">{t("qa.bulk.setStatus", "Set status…")}</option>
-        {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
-      </select>
-      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value as Priority; if (!v) return; onApply({ priority: v }); e.target.value = ""; }}>
-        <option value="">{t("qa.bulk.setPriority", "Set priority…")}</option>
-        {PRIORITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.priority." + s.value, s.label)}</option>)}
-      </select>
-      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value; if (v === "") return; onApply({ assigned_to: v === "__null" ? null : v }); e.target.value = ""; }}>
-        <option value="">{t("qa.bulk.assign", "Assign to…")}</option>
-        <option value="__null">{t("qa.bulk.unassign", "Unassign")}</option>
-        {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-      </select>
+      {/* These three are ACTION menus wearing a select's clothes: they fire on
+          pick and snap straight back to their prompt, so nothing is ever
+          "selected". Holding value="" reproduces exactly that — the trigger
+          always reads "Set status…" — which is what the native version faked
+          with defaultValue="" plus resetting e.target.value after each pick. */}
+      <KdsSelect
+        value=""
+        disabled={busy}
+        onChange={(v) => { if (v) onApply({ status: v as IssueStatus }); }}
+        options={STATUSES.map((s) => ({ value: s.value, label: t("qa.status." + s.value, s.label) }))}
+        placeholder={t("qa.bulk.setStatus", "Set status…")}
+        triggerClassName={`${cls} pe-7 cursor-pointer text-start`}
+      />
+      <KdsSelect
+        value=""
+        disabled={busy}
+        onChange={(v) => { if (v) onApply({ priority: v as Priority }); }}
+        options={PRIORITIES.map((s) => ({ value: s.value, label: t("qa.priority." + s.value, s.label) }))}
+        placeholder={t("qa.bulk.setPriority", "Set priority…")}
+        triggerClassName={`${cls} pe-7 cursor-pointer text-start`}
+      />
+      <KdsSelect
+        value=""
+        disabled={busy}
+        onChange={(v) => { if (v) onApply({ assigned_to: v === "__null" ? null : v }); }}
+        options={[{ value: "__null", label: t("qa.bulk.unassign", "Unassign") },
+                  ...assignees.map((a) => ({ value: a.id, label: a.name }))]}
+        placeholder={t("qa.bulk.assign", "Assign to…")}
+        triggerClassName={`${cls} pe-7 cursor-pointer text-start`}
+      />
       <button type="button" onClick={onClear} disabled={busy} className="ms-auto h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">{t("qa.bulk.clear", "Clear selection")}</button>
     </div>
   );
