@@ -60,16 +60,23 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
        failing the header lost its bell and never got it back, and the items
        beside it slid across to fill the gap.
 
-       The timeout is an escape from the pressed state, NOT a licence to swap:
-       if the chunk never lands we go back to a normal, pressable button. A
-       second press costs nothing — import() de-dupes onto the same request —
-       and a bell that does nothing is still far better than no bell. */
-    const ok = await Promise.race([
-      import("./NotificationBell").then(() => true, () => false),
-      new Promise<boolean>((r) => window.setTimeout(() => r(false), 6000)),
-    ]);
-    setPending(false);
-    if (ok) setOpened(true);
+       NEVER ABANDON THE SWAP. The first version raced the import against a
+       timeout and dropped the hand-over when the timeout won — so a chunk that
+       took longer than the timeout produced a press that did NOTHING, silently.
+       From the outside that is precisely "I press the bell and nothing
+       happens." Waiting is acceptable; giving up is not. The timer now only
+       releases the pressed LOOK so the button never appears frozen, while the
+       import still lands whenever it lands and opens the panel then. Pressing
+       again in the meantime is free — import() de-dupes onto one request. */
+    const settle = window.setTimeout(() => setPending(false), 4000);
+    try {
+      await import("./NotificationBell");
+      setOpened(true);
+    } catch {
+      setPending(false); /* genuinely failed — leave a normal, pressable bell */
+    } finally {
+      window.clearTimeout(settle);
+    }
   };
 
   /* Poll the two counts while the panel is closed. Once it is open the real
@@ -130,6 +137,10 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
       /* pointerenter: start the download the moment the cursor arrives, so the
          panel is usually already there by the time the click lands. */
       onPointerEnter={() => { void import("./NotificationBell"); }}
+      /* A phone has no hover, so the prefetch above never fires there and the
+         first press pays the whole download. touchstart fires before the click
+         does — not much of a head start, but it is the only one a finger gets. */
+      onTouchStart={() => { void import("./NotificationBell"); }}
       onClick={() => { void handOver(); }}
       /* Pressed styling while the chunk is in flight — the same look the real
          bell wears when open, so a slow network reads as "opening", not as a
