@@ -696,6 +696,10 @@ export const SPEC_I18N: Translations = {
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
+  "s:steam-iron.v1": { en: "Steam Iron / Boiler-Iron Set", zh: "蒸汽熨斗 / 锅炉熨斗组", ar: "مكواة بخار / طقم غلاية ومكواة" },
+  "s:collar-cuff-press.v1": { en: "Collar & Cuff Press Machine", zh: "领与袖口压烫机", ar: "مكبس الياقات والأساور" },
+  "s:double-station-heat-press.v1": { en: "Double Station Heat Press Machine", zh: "双工位烫画机", ar: "مكبس حراري بمحطتين" },
+  "s:pneumatic-heat-press.v1": { en: "Pneumatic Heat Press Machine", zh: "气动烫画机", ar: "مكبس حراري هوائي" },
   "s:lockstitch.standard-single-needle.v1": { en: "Lockstitch Machine", zh: "平缝机", ar: "ماكينة الغرزة المقفلة" },
   "s:spreading-machines.fully-automatic.v1": { en: "Fully Automatic Fabric Spreader", zh: "全自动铺布机", ar: "ماكينة فرد قماش أوتوماتيكية" },
   "s:fabric-relaxing.v1": { en: "Fabric Relaxing Machine", zh: "松布机", ar: "ماكينة إرخاء القماش" },
@@ -715,6 +719,53 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* Shared: electricalGroup gives this description to every schema in the
+     registry, so it was English on all 28 at once. */
+  "Rated total power consumption.": { zh: "额定总功率消耗。", ar: "إجمالي استهلاك القدرة المقنّن." },
+  /* ── Ironing + Heat-Press batch (2026-08-12) ──
+     Descriptions are helper text under the field, so they need zh/ar like
+     every label does — the standing trilingual rule does not stop at labels.
+     They cite the printed column they came from, on purpose: an operator
+     filling a value should be able to see which page it is meant to match. */
+  "Printed alongside the air pressure — 56 L/min. This is the number that sizes the workshop compressor, and no other source prints it.": { zh: "与气压并列印出——56 L/min。这是决定车间空压机选型的数值，其他资料均未标注。", ar: "مطبوع بجوار ضغط الهواء — 56 لتر/دقيقة. هذا هو الرقم الذي يحدّد مقاس كمبروسور الورشة، ولا يطبعه أي مصدر آخر." },
+  "Printed column '空气压力 / Air Pressure (Mpa)'. Text, not a number: the page prints a working RANGE (0.3–0.5).": { zh: "印刷栏「空气压力 / Air Pressure (Mpa)」。用文本而非数字：页面标注的是工作范围（0.3–0.5）。", ar: "عمود مطبوع «空气压力 / Air Pressure (Mpa)». نص لا رقم: الصفحة تطبع نطاق تشغيل (0.3–0.5)." },
+  "Printed row '气压 / Air pressure' — 0.5 MPa. Text because pages print either a value or a working range.": { zh: "印刷行「气压 / Air pressure」——0.5 MPa。用文本，因为各页有时给单值、有时给范围。", ar: "صف مطبوع «气压 / Air pressure» — 0.5 ميجاباسكال. نص لأن الصفحات تطبع أحيانًا قيمة وأحيانًا نطاقًا." },
+  "Printed row '适用材质 / Application' — 'Knitted fabric and woven fabric'.": { zh: "印刷行「适用材质 / Application」——针织面料与梭织面料。", ar: "صف مطبوع «适用材质 / Application» — أقمشة تريكو ومنسوجة." },
+  "Printed as the machine's automation chain: 'AUTO LABEL SUCTION, HEAT PRESSING, FILM PEELING, MATERIAL COLLECTION'.": { zh: "按机器的自动化流程印出：自动吸标、压烫、撕膜、收料。", ar: "مطبوع كسلسلة أتمتة الماكينة: شفط الليبل، الكبس الحراري، نزع الفيلم، تجميع المنتج." },
+  "S-001 calls this 'Water volume', S-003 'Boiler capacity' — same measurement, printed 2.0–7 L.": { zh: "S-001 称之为「水容量」，S-003 称之为「锅炉容量」——同一项，标注 2.0–7 L。", ar: "يسمّيه S-001 «حجم الماء» ويسمّيه S-003 «سعة الغلاية» — نفس القياس، مطبوع 2.0–7 لتر." },
+  "How the boiler is filled. The generator page prints: by pump from a built-in tank, or connected directly to the mains supply.": { zh: "锅炉的供水方式。发生器页面标注：由水泵从内置水箱供水，或直接连接自来水管。", ar: "طريقة تعبئة الغلاية. صفحة المولّد تطبع: بمضخة من خزان داخلي، أو بالتوصيل المباشر بشبكة المياه." },
+  "Printed in both sources. S-001 prints ranges (6–9 kW); S-003 prints single values (1250 W, 1500 W, 2250 W).": { zh: "两个来源都有。S-001 标注区间（6–9 kW）；S-003 标注单值（1250 W、1500 W、2250 W）。", ar: "مطبوع في المصدرين. S-001 يطبع نطاقات (6–9 كيلوواط)؛ S-003 يطبع قيمًا مفردة (1250 و1500 و2250 واط)." },
+  "S-003 only. How long one water fill lasts — printed 3, 7 and 8 hours depending on model.": { zh: "仅 S-003 提供。单次加水可用时长——按机型标注 3、7、8 小时。", ar: "من S-003 فقط. مدة تشغيل التعبئة الواحدة — مطبوع 3 و7 و8 ساعات حسب الموديل." },
+  "Every model on the page is captioned 'Computer …', i.e. programmable control rather than a timer.": { zh: "页面上每个机型的标题都以「Computer…」开头，即可编程控制而非定时器。", ar: "كل موديل في الصفحة معنون بـ «Computer …»، أي تحكّم قابل للبرمجة وليس مؤقّتًا." },
+  "Printed in the caption of every model: hydraulic (液压), pneumatic (气动), electric/servo (电动) or manual (手动).": { zh: "每个机型标题中标注：液压、气动、电动/伺服或手动。", ar: "مطبوع في عنوان كل موديل: هيدروليك (液压)، هوائي (气动)، كهربائي/سيرفو (电动)، أو يدوي (手动)." },
+  "Printed column '电热功率 / Electric heating power (KW/V)' — 1.6, 3.2 and 4.8 kW across the printed models.": { zh: "印刷栏「电热功率 / Electric heating power (KW/V)」——各机型为 1.6、3.2、4.8 kW。", ar: "عمود مطبوع «电热功率 / Electric heating power (KW/V)» — 1.6 و3.2 و4.8 كيلوواط عبر الموديلات." },
+  "Printed model captions: gantry-type (龙门式) and up-sliding (上滑式) are the two double-station frames; the rotary/carousel frames are the multi-station siblings.": { zh: "机型标题标注：龙门式与上滑式是两种双工位机架；转盘式属于多工位系列。", ar: "عناوين الموديلات المطبوعة: البوابي (龙门式) والانزلاق العلوي (上滑式) هما هيكلا المحطتين؛ أما القرص الدوّار فهو لعائلة المحطات المتعددة." },
+  "Feature bullets printed on the heat-press pages. Every option is quoted; do not extend without a printed line.": { zh: "烫画机页面印出的功能条目。每个选项都有出处；没有印刷依据不要新增。", ar: "بنود المزايا المطبوعة في صفحات المكابس الحرارية. كل خيار منقول عن مصدر؛ لا تُضِف بندًا بلا سطر مطبوع." },
+  "Printed as a selling point — 'single hot upper mold with double lower molds saves power', so plate count and station count are NOT the same number.": { zh: "作为卖点印出——「单热上模配双下模可省电」，因此发热板数量与工位数并不相同。", ar: "مطبوع كميزة بيعية — «قالب علوي ساخن واحد مع قالبين سفليين يوفّر الطاقة»، لذا عدد الألواح ليس هو عدد المحطات." },
+  "Printed column '加热板尺寸 (cm/inch)' — the same table the rest of the family uses.": { zh: "印刷栏「加热板尺寸 (cm/inch)」——与本系列其他机型同一张表。", ar: "عمود مطبوع «加热板尺寸 (cm/inch)» — نفس الجدول الذي تستخدمه بقية العائلة." },
+  "Printed column '加热板尺寸 (cm/inch)'. Text because the page prints both units in one cell (e.g. 80x100 / 32x40).": { zh: "印刷栏「加热板尺寸 (cm/inch)」。用文本，因为同一单元格同时给出两种单位（如 80x100 / 32x40）。", ar: "عمود مطبوع «加热板尺寸 (cm/inch)». نص لأن الصفحة تطبع الوحدتين في خانة واحدة (مثل 80x100 / 32x40)." },
+  "The second half of the same printed cell (KW/V): 220 V on most models, 380 V on the 3.2 kW one.": { zh: "同一单元格（KW/V）的后半部分：多数机型 220 V，3.2 kW 机型为 380 V。", ar: "النصف الثاني من نفس الخانة المطبوعة (KW/V): 220 فولت في أغلب الموديلات، و380 فولت في موديل 3.2 كيلوواط." },
+  "Printed as a distinct model variant: the stainless-steel housing is sold alongside the painted one.": { zh: "作为独立机型印出：不锈钢外壳与喷涂外壳并列销售。", ar: "مطبوع كموديل مستقل: الهيكل الستانلس يُباع بجانب الهيكل المدهون." },
+  "Feature bullets printed on the page. Every option below is quoted from a source; do not extend this list without one.": { zh: "页面印出的功能条目。以下每个选项均引自来源；没有依据不要扩充。", ar: "بنود المزايا المطبوعة في الصفحة. كل خيار أدناه منقول عن مصدر؛ لا توسّع القائمة بلا مصدر." },
+  "The iron head alone, separate from the boiler. Printed 800–900 W across both sources.": { zh: "仅熨斗本体，不含锅炉。两个来源均标注 800–900 W。", ar: "رأس المكواة وحده، منفصلًا عن الغلاية. مطبوع 800–900 واط في المصدرين." },
+  "S-001 prints an 'Iron type' column with two values: electrically heated (电加热) and all-steam (全蒸汽).": { zh: "S-001 有「Iron type」一栏，两个取值：电加热与全蒸汽。", ar: "يطبع S-001 عمود «Iron type» بقيمتين: تسخين كهربائي (电加热) وبخار كامل (全蒸汽)." },
+  "How many irons one boiler can feed — printed as 'Can feed 1 or 2 steam irons'.": { zh: "一台锅炉可供几把熨斗——原文为「可为 1 或 2 把蒸汽熨斗供汽」。", ar: "كم مكواة تغذّيها غلاية واحدة — مطبوع «تغذّي مكواة أو مكواتين بخار»." },
+  "Printed row '最大标尺寸 / Maximum label size' — 150x150 mm.": { zh: "印刷行「最大标尺寸 / Maximum label size」——150x150 mm。", ar: "صف مطبوع «最大标尺寸 / Maximum label size» — 150×150 مم." },
+  "Printed only on the hydraulic models: 'pressure of up to 35 kg/cm², suitable for hot-fix crystals and composite materials'.": { zh: "仅液压机型标注：「压力可达 35 kg/cm²，适合烫钻与复合材料」。", ar: "مطبوع على الموديلات الهيدروليكية فقط: «ضغط حتى 35 كجم/سم²، مناسب للفصوص الحرارية والمواد المركّبة»." },
+  "Printed row '最小标尺寸 / Minimum label size' — 16x16 mm.": { zh: "印刷行「最小标尺寸 / Minimum label size」——16x16 mm。", ar: "صف مطبوع «最小标尺寸 / Minimum label size» — 16×16 مم." },
+  "Printed captions: 'pneumatic SINGLE-head' and 'pneumatic DOUBLE-head automatic label heat press'.": { zh: "标题印出：气动单头与气动双头自动烫标机。", ar: "عناوين مطبوعة: «هوائي أحادي الرأس» و«هوائي مزدوج الرأس لكبس الليبل الأوتوماتيكي»." },
+  "The five presses printed under the one series heading. Each caption is one option — this is what separates the models, and it is the field to fill first.": { zh: "同一系列标题下印出的五种压烫机。每个标题即一个选项——这是区分机型的关键，应最先填写。", ar: "المكابس الخمسة المطبوعة تحت عنوان السلسلة الواحدة. كل عنوان خيار — وهو ما يفرّق بين الموديلات، وأول حقل يُملأ." },
+  "Lower stations served by the heating plate. Two for this subcategory; the catalogue also prints four-, five- and six-station siblings.": { zh: "发热板所服务的下工位数量。本子类为两个；样册中还有四、五、六工位机型。", ar: "عدد المحطات السفلية التي يخدمها لوح التسخين. اثنتان لهذه الفئة؛ والكتالوج يطبع أيضًا موديلات بأربع وخمس وست محطات." },
+  "Printed in captions from single up to a five-station automatic label press.": { zh: "标题中从单工位到五工位全自动烫标机均有标注。", ar: "مطبوع في العناوين من محطة واحدة حتى مكبس ليبل أوتوماتيكي بخمس محطات." },
+  "Printed column '蒸汽消耗量 / Steam wastage (kg/h)' — 10 kg/h across all five printed models.": { zh: "印刷栏「蒸汽消耗量 / Steam wastage (kg/h)」——五个机型均为 10 kg/h。", ar: "عمود مطبوع «蒸汽消耗量 / Steam wastage (kg/h)» — 10 كجم/ساعة في الموديلات الخمسة." },
+  "S-003 only — S-001 omits it. Printed 4 bar on every model of the specialist range.": { zh: "仅 S-003 提供，S-001 未列。专业系列每个机型均标注 4 bar。", ar: "من S-003 فقط — يغفله S-001. مطبوع 4 بار في كل موديل من السلسلة المتخصصة." },
+  "A press with a printed steam-consumption figure has to be fed from somewhere — external boiler or a built-in generator.": { zh: "既然标注了蒸汽消耗量，就必须有汽源——外接锅炉或内置蒸汽发生器。", ar: "ما دام للمكبس رقم استهلاك بخار مطبوع، فلا بد له من مصدر — غلاية خارجية أو مولّد مدمج." },
+  "Only when mains-connected: 'a minimum pressure of 4 bar is required'.": { zh: "仅在直连自来水时适用：「需至少 4 bar 压力」。", ar: "فقط عند التوصيل بالشبكة: «يلزم ضغط لا يقل عن 4 بار»." },
+  "Printed column '温度范围 (℃)' — 0–299 on every model in the table.": { zh: "印刷栏「温度范围 (℃)」——表中每个机型均为 0–299。", ar: "عمود مطبوع «温度范围 (℃)» — 0–299 في كل موديل بالجدول." },
+  "Printed column '温度范围 (℃)' — 0–299.": { zh: "印刷栏「温度范围 (℃)」——0–299。", ar: "عمود مطبوع «温度范围 (℃)» — 0–299." },
+  "Printed column '时间范围 (s)' — 0–999 on every model in the table.": { zh: "印刷栏「时间范围 (s)」——表中每个机型均为 0–999。", ar: "عمود مطبوع «时间范围 (s)» — 0–999 في كل موديل بالجدول." },
+  "Printed column '时间范围 (s)' — 0–999.": { zh: "印刷栏「时间范围 (s)」——0–999。", ar: "عمود مطبوع «时间范围 (s)» — 0–999." },
+  "Printed row '工作方式 / Way of working' — the automatic label press prints 'Automatic rotating'.": { zh: "印刷行「工作方式 / Way of working」——全自动烫标机标注为「全自动旋转式」。", ar: "صف مطبوع «工作方式 / Way of working» — مكبس الليبل الأوتوماتيكي يطبع «دوران أوتوماتيكي»." },
   "Add-on devices available for this machine.": { zh: "该机可选的附加装置。", ar: "أجهزة إضافية متاحة لهذه الماكينة." },
   "Ambient temperature range for normal operation.": { zh: "正常运行的环境温度范围。", ar: "مدى حرارة المحيط للتشغيل الطبيعي." },
   "Automatic cloth-spreading machines that lay fabric in even, tension-free plies onto a cutting table ahead of cutting — for knit and woven, roll and folded fabric.": { zh: "在裁剪前将面料无张力、均匀地铺放到裁床上的自动铺布机 — 适用针织与梭织、卷装与折叠面料。", ar: "مكائن فرد أوتوماتيكية تفرش القماش طبقات متساوية بلا شد على طاولة القص قبل القص — للتريكو والمنسوج، رولاً ومطوياً." },

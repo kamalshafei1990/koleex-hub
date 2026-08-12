@@ -595,8 +595,8 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
       {elecVisible && (
       <SubCard
         number={1}
-        title="Electrical"
-        subtitle="Voltage, frequency, motor power, phase, and the plug types this product ships with"
+        title={t("tech.secElectrical", "Electrical")}
+        subtitle={t("tech.secElectricalSub", "Voltage, frequency, motor power, phase, and the plug types this product ships with")}
         accent={electricalAccent}
         icon={<ZapIcon className="h-4 w-4" />}
       >
@@ -704,8 +704,8 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
       {physVisible && (
       <SubCard
         number={2}
-        title="Physical (Bare Machine)"
-        subtitle="Footprint and weight of the machine itself — packed shipment data lives on the Models step"
+        title={t("tech.secPhysical", "Physical (Bare Machine)")}
+        subtitle={t("tech.secPhysicalSub", "Footprint and weight of the machine itself — packed shipment data lives on the Models step")}
         accent={physicalAccent}
         icon={<RulerIcon className="h-4 w-4" />}
       >
@@ -750,8 +750,8 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
       {compVisible && (
       <SubCard
         number={3}
-        title="Compliance & Customs"
-        subtitle="Certifications, HS classification, environmental ratings, and visual attributes"
+        title={t("tech.secCompliance", "Compliance & Customs")}
+        subtitle={t("tech.secComplianceSub", "Certifications, HS classification, environmental ratings, and visual attributes")}
         accent={complianceAccent}
         icon={<ShieldCheckIcon className="h-4 w-4" />}
       >

@@ -1194,6 +1194,17 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
   /* ── legacy Technical Details block ── */
   "tech.voltage": { en: "Voltage Options", zh: "电压选项", ar: "خيارات الجهد" },
+
+  /* The three SubCard headers of the Technical section were hard-coded English
+     while every field inside them already went through t(). With the schema
+     templates now fully translated, a Chinese operator saw Chinese labels
+     sitting under an English heading. */
+  "tech.secElectrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
+  "tech.secElectricalSub": { en: "Voltage, frequency, motor power, phase, and the plug types this product ships with", zh: "电压、频率、电机功率、相数，以及本产品随附的插头类型", ar: "الجهد والتردد وقدرة المحرك والأطوار وأنواع القوابس المرفقة بالمنتج" },
+  "tech.secPhysical": { en: "Physical (Bare Machine)", zh: "物理参数（裸机）", ar: "القياسات الفعلية (الماكينة وحدها)" },
+  "tech.secPhysicalSub": { en: "Footprint and weight of the machine itself — packed shipment data lives on the Models step", zh: "机器本体的占地与重量——装箱运输数据在“型号”步骤中填写", ar: "مساحة ووزن الماكينة نفسها — بيانات التغليف والشحن مكانها خطوة الموديلات" },
+  "tech.secCompliance": { en: "Compliance & Customs", zh: "合规与海关", ar: "المطابقة والجمارك" },
+  "tech.secComplianceSub": { en: "Certifications, HS classification, environmental ratings, and visual attributes", zh: "认证、HS 编码归类、环保等级与外观属性", ar: "الشهادات وتصنيف HS والتقييمات البيئية والخصائص المرئية" },
   "tech.frequency": { en: "Frequency (Hz)", zh: "频率（Hz）", ar: "التردد (Hz)" },
   "tech.motorPower": { en: "Motor Power", zh: "电机功率", ar: "قدرة الموتور" },
   "tech.powerConsumption": { en: "Power Consumption", zh: "功耗", ar: "استهلاك القدرة" },
