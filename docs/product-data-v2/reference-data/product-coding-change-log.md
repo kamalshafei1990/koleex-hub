@@ -222,3 +222,35 @@ Authoritative, append-only log of every Source-of-Truth coding change (see `codi
 - **THEY ARE NOT DUPLICATES — checked before deleting anything.** They were reported as a likely accidental double (created five minutes apart, identical names). A field-by-field diff showed the excerpts carry **XFWM-YL-YZT-A** and **XFWM-YL-YZT-B**: two real variants. Nothing was deleted. Open question left with the owner: under the family standard (*family = product, members = models*) these are probably ONE product with two models — both currently hold a single model row named `XFWM-Y`, and their codes still carry the old XFWM token.
 - **Conflict scan:** `XFSP` = 0 prior rows in live `subcategories`; slug `spotting-machines` unique; order 13 free (1–6 + 10 + 12 taken by Ironing, 7–9 + 11 by Finishing — the two categories share one sequence).
 - **Status:** **Applied — live.** DB + master list (▲→✅) + approval matrix + this log.
+
+### CL-0020 · 2026-08-12 · SEWING TAXONOMY SIGNED OFF — the two-axis model is adopted (CL-0010 unblocked)
+- **Approved by:** Kamal ("i agree" — 2026-08-12), answering the direct question: adopt the two-axis model (stitch class = the identity that carries the prefix; bed / feed / needle count / duty / motor = shared attribute facets), or leave the nine XS subcategories as they are. He adopted the model. This lifts the 🔴 **DO NOT FREEZE** verdict that has blocked the Industrial Sewing family since CL-0010.
+- **Why this was safe to decide now, and why it will not be later.** All 28 sewing subcategories across four categories hold **ZERO products** — Industrial (9), Automatic (10), Domestic (4), Leather & Footwear (5). Nothing to migrate, no product code to break, no operator to retrain. The audit's warning is about *non-recyclable codes*: the moment the first sewing product is entered, every one of these tokens is permanent. **The window for this change is open only while the count is zero.**
+
+**THE DECISION — what survives as a Product Type**
+
+| Token | Verdict | Reason |
+|---|---|---|
+| `XSL` Lockstitch · `XSO` Overlock · `XSC` Chainstitch | ✅ **freeze as-is** | Distinct ISO stitch mechanisms; not reachable by configuring anything else. |
+| `XSI` Interlock | ✅ **keep code, RENAME label → Coverstitch (Flatlock)** | "Interlock" is a *knit fabric*, not a stitch — the machine forms ISO 602/406/407. The token is the identity and does not move (CL-0018 rule); only the label changes. |
+| `XSD` Double Needle · `XSM` Multi-Needle | ❌ **downgrade to attribute** `needle_count` | A double-needle machine is still a lockstitch. Needle count is a configuration, not an identity. |
+| `XSH` Heavy Duty | ❌ **downgrade to attribute** `duty` / `fabric_weight_class` | The audit's worst offender: a duty class, not a stitch. Every XSH machine already exists under its real stitch type — guaranteed duplication. |
+| `XSS` Special Machines | ❌ **explode** | Not a classification — an unclassified pile holding three different things (real types, lockstitch applications, and machines that are not sewing machines at all). |
+| `XSPA` Pattern Sewing | ❌ **vacated** — already resolved to `XAPT` in CL-0012 | Programmable/CNC Sewing lives under **Automatic Sewing Systems** as `XAPT`. `XSPA` reverts to its other meaning (Attachments & Folders) and the double-use ends. |
+
+**⚠️ TOKEN CORRECTION TO THE AUDIT — three of its five proposed prefixes are REJECTED.**
+OUTPUT 7 proposes minting `XSBH` / `XSBT` / `XSBA` / `XSBL` / `XSZ` when "Special" is exploded. A live scan says three of those already exist under **Automatic Sewing Systems**, with 0 products each:
+
+| Audit proposes | Already live | Ruling |
+|---|---|---|
+| `XSBH` Buttonhole | **`XABH` Buttonhole Machines** | ❌ **REJECT XSBH — reuse XABH** |
+| `XSBT` Bartack | **`XABT` Bartacking Machines** | ❌ **REJECT XSBT — reuse XABT** |
+| `XSBA` Button-Attach | **`XABA` Button Attaching Machines** | ❌ **REJECT XSBA — reuse XABA** |
+| `XSBL` Blindstitch | — nothing | ➕ **mint** (0 hits in live DB, `docs/`, `src/`) |
+| `XSZ` Zigzag | — nothing | ➕ **mint** (0 hits in live DB, `docs/`, `src/`) |
+
+This follows the precedent set twice already: **CL-0014** rejected `XPRC` in favour of frozen `XCT`, **CL-0015** rejected `XFTP` in favour of `XFTT`. *The coding system takes precedence over app-level naming convenience.* Minting `XSBH` beside a live `XABH` would have created the exact duplication this whole audit exists to prevent — the audit was written against the Product-Type registry and did not check the live `subcategories` table.
+- **Where the exploded "Special" machines go:** buttonhole / bartack / button-attach stay where they already are (Automatic Sewing Systems); blindstitch and zigzag become types under Industrial Sewing; ultrasonic and heat-seam machines → **Bonding / Seam-Sealing** (`XFSS`, already carried in the matrix from CL-0012); snap and rivet setters → **Fastening**; robotic cells → **Production Systems**. The last two categories do not exist yet and are part of the implementation, not of this sign-off.
+- **Machine Kinds (105) are demoted to a derived overlay** — a Kind is `Type × attribute values` (e.g. *Walking-Foot Lockstitch* = `type:lockstitch + feed:walking-foot + bed:flat`), generated for search / SEO / sales / AI. They stop being a structural level, which is what removes the combinatorial duplication (*"Cylinder-Bed" currently appears as a Kind under six different subcategories*). **Spec templates attach to types only; Kinds get marketing visuals, never their own data shape.**
+- **Conflict scan:** `XSBL`, `XSZ`, `XAPT` = **0** rows in live `subcategories`, 0 non-proposal hits in `docs/` and `src/`. `XABH`/`XABT`/`XABA` = live, 0 products, reused not re-minted. `XSPA` double-use closes with this entry; the three remaining CL-0001 duplicates (`XCL`, `XFFP`, `XPRH`) are **untouched and still open**.
+- **Status:** **Signed off — NOT YET APPLIED.** No DB row has been created, renamed or removed. Implementation (subcategory rows, facet dictionary, Machine-Kind demotion, sibling categories, then the spec templates) is gated on a separate owner go-ahead, per the standing rule that plan approval is not start approval.

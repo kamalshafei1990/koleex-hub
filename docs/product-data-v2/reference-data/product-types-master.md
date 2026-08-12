@@ -3,7 +3,11 @@
 > **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Every Product Type must define its visual identity — `icon_key` (+ `icon_style`), default `presentation_group` ordering, and a diagram/placeholder plan — before approval. Visuals are part of "done".
 
 Reference dataset for Product Data V2. **Documentation only.**
-> ⚠️ **Pre-freeze review (CL-0010):** the Industrial Sewing section below is **under taxonomy audit** — see [`industrial-sewing-taxonomy-audit.md`](./industrial-sewing-taxonomy-audit.md). The audit recommends **NOT freezing as-is**: downgrade `XSH`/`XSD`/`XSM` to attributes, explode `XSS` (Special), recode `XSPA`, rename `XSI`→Coverstitch, and adopt a **two-axis model** (stitch-class Product Types × shared attribute facets; Machine Kinds = derived overlay). Do not treat the current XS subcategory list as final until that audit is signed off.
+> ✅ **SIGNED OFF (CL-0020, 2026-08-12) — the two-axis model is adopted.** The CL-0010 audit's 🔴 *do-not-freeze* verdict is lifted. **Product Type = stitch class only** (carries the prefix); **bed / feed / needle count / duty / motor = shared attribute facets**; **Machine Kinds = a derived overlay** (`Type × attribute values`), never a structural level.
+> What this changes in the Industrial Sewing section below, so read it with these in mind:
+> `XSL` `XSO` `XSC` freeze as-is · `XSI` keeps its code but is relabelled **Coverstitch (Flatlock)** · `XSD` `XSM` → attribute `needle_count` · `XSH` → attribute `duty` · `XSS` explodes · `XSPA` is vacated (Programmable/CNC Sewing = `XAPT`, CL-0012).
+> ⚠️ **The audit's proposed `XSBH` / `XSBT` / `XSBA` are REJECTED** — `XABH` / `XABT` / `XABA` already exist live under Automatic Sewing Systems. Only `XSBL` (Blindstitch) and `XSZ` (Zigzag) are new. See CL-0020.
+> **Signed off ≠ applied.** No DB row has changed yet; implementation is separately gated.
 
 Legend for **Code Prefix**: ✅ = live KOLEEX code in production today · ▲ = *proposed*, needs governance sign-off (see gap analysis).
 Facets reference `facet-dictionary-master.md`; devices reference `device-dictionary-master.md`.

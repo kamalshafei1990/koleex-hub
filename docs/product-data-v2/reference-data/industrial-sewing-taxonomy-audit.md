@@ -2,6 +2,11 @@
 
 **Mission.** Challenge the current Industrial Sewing classification **before** we freeze Product Types, prefixes, dictionaries, codes, and product population. Not a coding/schema/migration/UI task — a **taxonomy + knowledge-architecture audit.** **Documentation only.** Governs the [Product Type registry](./product-types-master.md); informs the prefix-freeze decision (CL-0001). Change-log: **CL-0010**.
 
+> ## ✅ SIGNED OFF — CL-0020, 2026-08-12
+> Kamal adopted the two-axis model ("i agree"). The 🔴 do-not-freeze verdict below is **satisfied, not overruled** — read this document as the rationale for a decision that has been taken, not as an open recommendation.
+> **One correction found at sign-off:** OUTPUT 7 proposes minting `XSBH` / `XSBT` / `XSBA`. Those are **rejected** — `XABH` / `XABT` / `XABA` already exist live under Automatic Sewing Systems (0 products each). This audit was written against the Product-Type registry and did not scan the live `subcategories` table. Only `XSBL` and `XSZ` are genuinely new. See CL-0020.
+> **Not yet applied.** Zero DB rows changed; implementation is separately gated.
+
 > **One-line verdict:** the current structure **classifies the same thing in three places** and mixes four different *kinds of facts* into one ladder. **Do NOT freeze as-is.** It is fixable with a clean principle and ~1 week of taxonomy work; freezing it now would bake permanent technical debt into non-recyclable codes.
 
 ---
