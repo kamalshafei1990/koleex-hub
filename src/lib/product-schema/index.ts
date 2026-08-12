@@ -19,6 +19,7 @@ import {
 } from "./schemas/finishing-batch-2026-08";
 import { YILI_BATCH_SCHEMAS } from "./schemas/yili-batch-2026-08-12";
 import { IRONING_HEATPRESS_BATCH_SCHEMAS } from "./schemas/ironing-heatpress-batch-2026-08-12";
+import { SEWING_STITCH_TYPE_SCHEMAS } from "./schemas/sewing-stitch-types-2026-08-12";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -61,6 +62,13 @@ for (const schema of YILI_BATCH_SCHEMAS) registerSchema(schema);
    S-001 omits. On XFSI the union is 8 fields where each source alone is 6–7.
    See docs/product-data-v2/reference-data/source-catalogs.md. */
 for (const schema of IRONING_HEATPRESS_BATCH_SCHEMAS) registerSchema(schema);
+
+/* CL-0020 step 4 — the three stitch types that survived the audit next to XSL,
+   which already had a template: XSO Overlock, XSI Coverstitch (renamed from
+   "Interlock"), XSC Chainstitch. Bed / feed / needle count / duty are NOT in
+   these schemas — they live on the facet axis and reach the form through the
+   Machine-Kind attributes, which is the whole point of the two-axis model. */
+for (const schema of SEWING_STITCH_TYPE_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */

@@ -189,6 +189,42 @@ export const SPEC_I18N: Translations = {
   "f:sectioned_vacuum":          { en: "Sectioned Vacuum",         zh: "分段吸风",       ar: "شفط مقسّم" },
   "f:section_length":            { en: "Section Length",           zh: "分段长度",       ar: "طول القطاع" },
 
+  /* ── CL-0020 step 4 · sewing stitch types (XSO · XSI · XSC) ──
+     Read off the printed spec bars of the Koleex 2025 catalogue: the overlock
+     bar (p060) has nine columns, the coverstitch bar (p067) eleven. Shared
+     vocabulary (max_sewing_speed, needle_system, presser_foot_lift, bed_type…)
+     is reused from the lockstitch template rather than re-minted, so a buyer
+     can compare an overlock and a lockstitch on one quote. */
+  "g:Overlock Stitch Configuration": { en: "Overlock Stitch Configuration", zh: "包缝线迹配置", ar: "إعداد غرزة الأوفرلوك" },
+  "g:Coverstitch Configuration":     { en: "Coverstitch Configuration",     zh: "绷缝配置",     ar: "إعداد الغرزة المغطّية" },
+  "g:Chainstitch Configuration":     { en: "Chainstitch Configuration",     zh: "链缝配置",     ar: "إعداد الغرزة السلسلية" },
+  "g:Stitch & Speed":                { en: "Stitch & Speed",               zh: "线迹与速度",   ar: "الغرزة والسرعة" },
+
+  "f:needle_count":            { en: "Needles",                zh: "针数",         ar: "عدد الإبر" },
+  "f:thread_count":            { en: "Threads",                zh: "线数",         ar: "عدد الخيوط" },
+  "f:needle_gauge":            { en: "Needle Gauge",           zh: "针距",         ar: "المسافة بين الإبر" },
+  "f:overedging_width":        { en: "Overedging Width",       zh: "包缝宽度",     ar: "عرض التغطية على الحافة" },
+  "f:differential_feed_ratio": { en: "Differential Feed Ratio", zh: "差动送布比",  ar: "نسبة التغذية التفاضلية" },
+  "f:edge_trimmer":            { en: "Edge Trimmer",           zh: "切边刀",       ar: "سكينة قص الحافة" },
+  "f:coverstitch_type":        { en: "Cover Type",             zh: "覆盖形式",     ar: "نوع التغطية" },
+  "f:elastic_band_range":      { en: "Elastic Band Range",     zh: "松紧带适用范围", ar: "نطاق الأستك" },
+  "f:puller_device":           { en: "Puller Device",          zh: "拖轮装置",     ar: "جهاز السحب" },
+  "f:thread_wiper":            { en: "Thread Wiper",           zh: "拨线装置",     ar: "ماسح الخيط" },
+  "f:stitch_class":            { en: "ISO Stitch Class",       zh: "ISO 线迹类别", ar: "فئة الغرزة ISO" },
+  "f:looper_type":             { en: "Looper Type",            zh: "弯针形式",     ar: "نوع اللوبر" },
+
+  "o:direct-drive":   { en: "Direct Drive",                    zh: "直驱",         ar: "دفع مباشر" },
+  "o:dry_head":       { en: "Dry Head (Oil-Free)",             zh: "无油机头",     ar: "رأس جاف (بدون زيت)" },
+  "o:extra-heavy":    { en: "Extra Heavy",                     zh: "特厚料",       ar: "ثقيل جدًا" },
+  "o:bottom_cover":   { en: "Bottom Cover",                    zh: "底面覆盖",     ar: "تغطية سفلية" },
+  "o:top_and_bottom": { en: "Top and Bottom (Flatlock)",       zh: "上下覆盖（绷缝）", ar: "علوية وسفلية (فلاتلوك)" },
+  "o:top_cover_only": { en: "Top Cover Only",                  zh: "仅上覆盖",     ar: "تغطية علوية فقط" },
+  "o:101":            { en: "101 — Single Thread Chainstitch", zh: "101 单线链缝", ar: "101 — سلسلية بخيط واحد" },
+  "o:401":            { en: "401 — Double-Locked Chainstitch", zh: "401 双线链缝", ar: "401 — سلسلية مزدوجة القفل" },
+  "o:single_looper":  { en: "Single Looper",                   zh: "单弯针",       ar: "لوبر مفرد" },
+  "o:double_locked":  { en: "Double-Locked Looper",            zh: "双锁弯针",     ar: "لوبر مزدوج القفل" },
+  "o:spreader":       { en: "Looper with Spreader",            zh: "带扩展器弯针", ar: "لوبر مع موزّع" },
+
   "f:iron_type":                 { en: "Iron Type",                zh: "熨斗类型",       ar: "نوع المكواة" },
   "f:boiler_feed_mode":          { en: "Water Feed",               zh: "供水方式",       ar: "طريقة التغذية بالماء" },
   "f:housing_material":          { en: "Housing",                  zh: "外壳材质",       ar: "الهيكل الخارجي" },
@@ -716,6 +752,9 @@ export const SPEC_NAME_I18N: Translations = {
   "s:garment-reversing.v1": { en: "Garment Reversing Machine", zh: "翻衣机", ar: "ماكينة قلب الملابس" },
   "s:spotting-machine.v1": { en: "Spotting / Stain Removal Machine", zh: "去渍机", ar: "ماكينة إزالة البقع" },
   "s:thread-sucking.v1": { en: "Thread Sucking / Brushing Machine", zh: "吸线头 / 刷毛机", ar: "ماكينة شفط وفرش الخيوط" },
+  "s:overlock.v1": { en: "Overlock Machine", zh: "包缝机", ar: "ماكينة أوفرلوك" },
+  "s:coverstitch.v1": { en: "Coverstitch (Flatlock) Machine", zh: "绷缝机（覆盖缝）", ar: "ماكينة الغرزة المغطّية (فلاتلوك)" },
+  "s:chainstitch.v1": { en: "Chainstitch Machine", zh: "链缝机", ar: "ماكينة الغرزة السلسلية" },
   "s:steam-iron.v1": { en: "Steam Iron / Boiler-Iron Set", zh: "蒸汽熨斗 / 锅炉熨斗组", ar: "مكواة بخار / طقم غلاية ومكواة" },
   "s:collar-cuff-press.v1": { en: "Collar & Cuff Press Machine", zh: "领与袖口压烫机", ar: "مكبس الياقات والأساور" },
   "s:double-station-heat-press.v1": { en: "Double Station Heat Press Machine", zh: "双工位烫画机", ar: "مكبس حراري بمحطتين" },
@@ -843,6 +882,38 @@ export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
   /* Shared: electricalGroup gives this description to every schema in the
      registry, so it was English on all 28 at once. */
   "Rated total power consumption.": { zh: "额定总功率消耗。", ar: "إجمالي استهلاك القدرة المقنّن." },
+  /* CL-0020 step 4 — sewing stitch types. */
+  "Rated maximum stitches per minute, as printed on the spec bar.": { zh: "规格条上标注的额定最高转速（针/分钟）。", ar: "أقصى عدد غرز في الدقيقة كما هو مطبوع على شريط المواصفات." },
+  "Low end of the printed stitch-length range.": { zh: "标注针距范围的下限。", ar: "الحدّ الأدنى لنطاق طول الغرزة المطبوع." },
+  "High end of the printed stitch-length range.": { zh: "标注针距范围的上限。", ar: "الحدّ الأعلى لنطاق طول الغرزة المطبوع." },
+  "Printed as a single value or a range (5.5, or 5–12), so it is text.": { zh: "有时标单值有时标范围（5.5 或 5–12），故用文本。", ar: "يُطبع أحيانًا كقيمة وأحيانًا كنطاق (5.5 أو 5–12)، لذا فهو نص." },
+  "The needle class the machine takes — DCx27, UY128GAS, DPx5. Printed with the size on the same column.": { zh: "机器适用的机针型号——DCx27、UY128GAS、DPx5。与针号印在同一栏。", ar: "نظام الإبرة الذي تستخدمه الماكينة — DCx27 أو UY128GAS أو DPx5. مطبوع مع المقاس في نفس العمود." },
+  "Needle sizes the machine is rated for (e.g. 11#, 8#–18#).": { zh: "机器适用的针号范围（如 11#、8#–18#）。", ar: "مقاسات الإبر المعتمدة للماكينة (مثل 11# و8#–18#)." },
+  "Printed in the model caption: mechanical (clutch), direct-drive, or a stepper/servo intelligent head.": { zh: "机型标题中标注：机械（离合）、直驱，或步进/伺服智能机头。", ar: "مطبوع في عنوان الموديل: ميكانيكي (كلتش)، أو دفع مباشر، أو رأس ذكي ستيبر/سيرفو." },
+  "Automatic, semi-dry or dry head — decides what the machine may sew without staining.": { zh: "全自动、半干或无油机头——决定机器能缝什么而不沾油。", ar: "تزييت تلقائي أو نصف جاف أو رأس جاف — يحدّد ما يمكن خياطته دون تلويث." },
+  "Fabric weight classes the head is built for. This is the FACET the retired XSH shelf used to be.": { zh: "机头适用的面料厚度等级。这正是已停用的 XSH 分类所表达的属性。", ar: "فئات وزن القماش التي بُني الرأس لها. هذه هي الخاصية التي كان يمثّلها رف XSH المتقاعد." },
+  "Fabric families the catalogue names for this machine.": { zh: "样册为本机指明的面料类别。", ar: "عائلات الأقمشة التي يذكرها الكتالوج لهذه الماكينة." },
+  "First column of the printed bar. 1 or 2 on an overlock — with the thread count it is what names the machine (2-thread, 4-thread, 5-thread safety).": { zh: "规格条第一栏。包缝机为 1 或 2 针——与线数一起决定机器的叫法（二线、四线、五线安全缝）。", ar: "العمود الأول في الشريط المطبوع. 1 أو 2 في الأوفرلوك — ومع عدد الخيوط يحدّد اسم الماكينة (2 خيط، 4 خيط، 5 خيط أمان)." },
+  "Second column of the printed bar — 2 to 6. The number buyers actually ask for.": { zh: "规格条第二栏——2 至 6。客户真正会问的数字。", ar: "العمود الثاني في الشريط — من 2 إلى 6. وهو الرقم الذي يسأل عنه المشتري فعلًا." },
+  "Distance between needles. Printed as '–' on single-needle models, which is why this is text and not a number.": { zh: "针与针之间的距离。单针机型标为「–」，故用文本而非数字。", ar: "المسافة بين الإبر. تُطبع «–» في الموديلات أحادية الإبرة، لذا فهو نص لا رقم." },
+  "How wide a bite the stitch takes over the edge — printed as a range (0.6–4.2).": { zh: "线迹包住布边的宽度——标注为范围（0.6–4.2）。", ar: "عرض ما تلتقطه الغرزة على الحافة — مطبوع كنطاق (0.6–4.2)." },
+  "Printed as a range (0.7–1.7). Below 1 gathers, above 1 stretches — the control that makes knits sew flat.": { zh: "标注为范围（0.7–1.7）。小于 1 缩缝，大于 1 拉伸——针织物平整缝制靠它。", ar: "مطبوع كنطاق (0.7–1.7). أقل من 1 يكرمش، وأكثر من 1 يشدّ — وهو ما يجعل التريكو يُخاط مستويًا." },
+  "The knife that trims the seam allowance ahead of the loopers. Standard on overlock; called out because it is what the class is defined by.": { zh: "在弯针前修剪缝份的切刀。包缝机标配；单列出来是因为它正是该类别的定义特征。", ar: "السكينة التي تقصّ زيادة الدرزة أمام اللوبرات. قياسية في الأوفرلوك، وذُكرت لأنها ما يعرّف الفئة." },
+  "Automatic chain cutting at the end of a seam — printed in the caption as 'UT' on the model code.": { zh: "缝末自动剪线——机型代码中以「UT」标注。", ar: "قصّ تلقائي للسلسلة في نهاية الدرزة — مطبوع في كود الموديل بحرفَي «UT»." },
+  "Which faces of the fabric the cover thread lands on. Top-and-bottom is what the trade calls flatlock, and it is a different machine to buy.": { zh: "覆盖线落在面料的哪一面。上下同时覆盖即行业所称的绷缝（flatlock），是另一种机器。", ar: "على أي وجه من القماش يقع خيط التغطية. العلوية والسفلية معًا هي ما تسمّيه السوق فلاتلوك، وهي ماكينة أخرى عند الشراء." },
+  "Printed on the bar — 2, 3 or 4. Sets how many cover rows the stitch lays.": { zh: "规格条标注——2、3 或 4，决定覆盖线的行数。", ar: "مطبوع على الشريط — 2 أو 3 أو 4. يحدّد عدد صفوف التغطية." },
+  "Printed on the bar — 4, 5 or 6.": { zh: "规格条标注——4、5 或 6。", ar: "مطبوع على الشريط — 4 أو 5 أو 6." },
+  "Printed as a pair on multi-needle heads (5.6/6.4) — the spacing between adjacent needles.": { zh: "多针机头标注为一对数值（5.6/6.4）——相邻针之间的距离。", ar: "يُطبع كزوج على الرؤوس متعددة الإبر (5.6/6.4) — المسافة بين كل إبرتين متجاورتين." },
+  "Printed in the model description where the machine attaches elastic — 'application range: 14–37mm'.": { zh: "在上松紧带机型的描述中标注——「适用范围 14–37mm」。", ar: "مطبوع في وصف الموديل الذي يركّب الأستك — «نطاق الاستخدام: 14–37 مم»." },
+  "Rear puller that keeps long knit seams feeding straight. Printed in the caption as 'with puller'.": { zh: "后拖轮，使长针织缝线送布平直。标题中标注「附拖轮」。", ar: "بكرة سحب خلفية تُبقي درزات التريكو الطويلة مستقيمة أثناء التغذية. مطبوع في العنوان «مع سحّاب»." },
+  "Printed in the caption as 'with thread wiper' — clears the tail after trimming.": { zh: "标题中标注「附拨线」——剪线后清理线尾。", ar: "مطبوع في العنوان «مع ماسح خيط» — ينظّف طرف الخيط بعد القص." },
+  "Printed in the caption as 'with thread trimming'.": { zh: "标题中标注「附自动剪线」。", ar: "مطبوع في العنوان «مع قصّ خيط»." },
+  "101 unravels when pulled from the right end — which is exactly why bag-closing machines use it. 401 does not. Getting this wrong sells the wrong machine.": { zh: "101 从正确一端拉扯即可整条拆开——正因如此缝包机才用它；401 不会。选错就是卖错机器。", ar: "الغرزة 101 تنحلّ بالكامل عند شدّها من الطرف الصحيح — ولهذا تستخدمها ماكينات غلق الشكائر؛ أما 401 فلا. الخطأ هنا يعني بيع ماكينة خاطئة." },
+  "1 on a bag closer, up to 12 on a multi-needle elastic or smocking head.": { zh: "缝包机为 1 针；多针松紧或抽褶机头可达 12 针。", ar: "إبرة واحدة في ماكينة غلق الشكائر، وحتى 12 في رأس الأستك أو الكرمشة متعدد الإبر." },
+  "1 for class 101; 2 per needle for class 401.": { zh: "101 类为 1 线；401 类每针 2 线。", ar: "خيط واحد للفئة 101؛ وخيطان لكل إبرة في الفئة 401." },
+  "Spacing between needles on multi-needle heads.": { zh: "多针机头的针距。", ar: "المسافة بين الإبر في الرؤوس متعددة الإبر." },
+  "A chainstitch has no bobbin — the looper is what forms the stitch, so it is the mechanism to record.": { zh: "链缝机没有梭芯——弯针才是成缝机构，所以要记录的是它。", ar: "الغرزة السلسلية بلا بوبينة — اللوبر هو ما يكوّن الغرزة، فهو الآلية التي تُسجَّل." },
+  "Chain cutting at the end of a seam.": { zh: "缝末剪断线链。", ar: "قصّ السلسلة في نهاية الدرزة." },
   /* ── Ironing + Heat-Press batch (2026-08-12) ──
      Descriptions are helper text under the field, so they need zh/ar like
      every label does — the standing trilingual rule does not stop at labels.
