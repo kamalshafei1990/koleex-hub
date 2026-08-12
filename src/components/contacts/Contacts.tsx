@@ -14,6 +14,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import SquareLogoCropper from "@/components/contacts/SquareLogoCropper";
+import KdsSelect from "@/components/kds/Select";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
@@ -2702,155 +2703,10 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
 });
 
 /* ── Form select input ── */
-/* ── Listbox — the MN-5 dropdown that replaced native <select> ──────────────
-   Owner, 2026-08-12: "you didn't change all the dropdown menus in customers
-   app." He was right, and the reason was not an oversight: those fields were
-   real `<select>` elements, whose option list is drawn by the OPERATING
-   SYSTEM. No stylesheet reaches it — not the glass, not the radius, not the
-   hover. The only way to put them on MN-5 is to stop being a <select>.
-
-   WHAT WE GAVE UP, DELIBERATELY: on a phone a native <select> opens the OS
-   picker — a full-width sheet with big targets. Owner chose one consistent
-   look over that ("تحويل كامل").
-
-   WHAT WE HAD TO REBUILD, because <select> gave it for free: roving keyboard
-   focus (arrows / Home / End), type-ahead, Enter and Escape, click-outside,
-   focus returning to the trigger on close, and listbox/option roles so a
-   screen reader still announces it as a select. Anything less would trade
-   accessibility for looks.
-
-   One component behind BOTH wrappers, so SelectInput and LabelSelect can
-   never drift; the 64 call sites keep their props untouched. */
-function Listbox({
-  value, onChange, options, renderLabel, placeholder, icon, triggerClassName,
-  panelWidthClassName = "w-full", wrapperClassName = "",
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  renderLabel?: (o: string) => string;
-  /** When set, an extra leading row clears the value (native's empty option). */
-  placeholder?: string;
-  icon?: React.ReactNode;
-  triggerClassName: string;
-  panelWidthClassName?: string;
-  /** Layout for the anchor itself — LabelSelect sits inline in a flex row. */
-  wrapperClassName?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const typed = useRef({ q: "", at: 0 });
-
-  /* The placeholder is row 0 when present, so every index below is over ONE
-     list — no off-by-one between what the arrow keys move and what renders. */
-  const rows = useMemo(
-    () => (placeholder !== undefined ? [{ v: "", text: placeholder }] : []).concat(
-      options.map((o) => ({ v: o, text: renderLabel ? renderLabel(o) : o })),
-    ),
-    [options, renderLabel, placeholder],
-  );
-  const selectedIdx = Math.max(0, rows.findIndex((r) => r.v === value));
-  const current = rows.find((r) => r.v === value);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  /* Open ON the current value, not at the top — a 30-row discount list that
-     always opened at "1%" would make the selected row impossible to find.
-     Set at the moment of opening rather than in an effect on `open`: an
-     effect would fire a second render every time the panel appears, and the
-     lint rule that flags synchronous setState in effects is right to. */
-  const openAt = () => { setActiveIdx(selectedIdx); setOpen(true); };
-
-  useEffect(() => {
-    if (!open || !listRef.current) return;
-    const el = listRef.current.children[activeIdx] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: "nearest" });
-  }, [open, activeIdx]);
-
-  const commit = (i: number) => {
-    const row = rows[i];
-    if (!row) return;
-    onChange(row.v);
-    setOpen(false);
-    btnRef.current?.focus();
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!open) {
-      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") { e.preventDefault(); openAt(); }
-      return;
-    }
-    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btnRef.current?.focus(); return; }
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); commit(activeIdx); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(rows.length - 1, i + 1)); return; }
-    if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)); return; }
-    if (e.key === "Home") { e.preventDefault(); setActiveIdx(0); return; }
-    if (e.key === "End") { e.preventDefault(); setActiveIdx(rows.length - 1); return; }
-    /* Type-ahead: letters within 700ms build one query, exactly like a
-       native select. Without it a long list is only reachable by scrolling. */
-    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      const now = Date.now();
-      typed.current.q = now - typed.current.at > 700 ? e.key : typed.current.q + e.key;
-      typed.current.at = now;
-      const q = typed.current.q.toLowerCase();
-      const hit = rows.findIndex((r) => r.text.toLowerCase().startsWith(q));
-      if (hit >= 0) setActiveIdx(hit);
-    }
-  };
-
-  return (
-    <div ref={wrapRef} className={`relative ${wrapperClassName}`}>
-      {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none z-[1]">{icon}</span>}
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => (open ? setOpen(false) : openAt())}
-        onKeyDown={onKeyDown}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        data-kx-keep-hover
-        className={triggerClassName}
-      >
-        <span className={`block truncate text-start ${current && current.v !== "" ? "" : "text-[var(--text-ghost)]"}`}>
-          {current ? current.text : (placeholder ?? "")}
-        </span>
-      </button>
-      <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
-      {open && (
-        <div className={`absolute z-50 mt-1 ${panelWidthClassName} kx-glass-pop kx-pop-panel`}>
-          <div ref={listRef} role="listbox" tabIndex={-1} onKeyDown={onKeyDown} className="max-h-60 overflow-y-auto py-1">
-            {rows.map((r, i) => (
-              <button
-                key={r.v || "__placeholder"}
-                type="button"
-                role="option"
-                aria-selected={r.v === value}
-                onMouseEnter={() => setActiveIdx(i)}
-                onClick={() => commit(i)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-start text-sm transition-colors ${
-                  i === activeIdx ? "bg-[rgba(127,169,214,0.16)]" : ""
-                } ${r.v === value ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}
-              >
-                <span className="flex-1 min-w-0 truncate">{r.text}</span>
-                {r.v === value && <CheckIcon size={13} className="shrink-0 text-[var(--text-primary)]" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+/* Listbox moved to kds/Select — see that file for why a native <select>
+   could never take this design. Aliased so the 70+ call sites below keep
+   reading as they did; new code should import Select directly. */
+const Listbox = KdsSelect;
 
 const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;

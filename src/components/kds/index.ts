@@ -19,6 +19,7 @@ export { default as Toast } from "./Toast";
 export { default as Avatar } from "./Avatar";
 export { default as Table, Th, Td, ROW } from "./Table";
 export { default as MenuList, MenuItem, MenuItemAvatar, MenuSearch, MenuBody } from "./MenuList";
+export { default as Select } from "./Select";
 export { default as FilterChip } from "./FilterChip";
 export { default as Pagination } from "./Pagination";
 export { default as Spinner } from "./Spinner";

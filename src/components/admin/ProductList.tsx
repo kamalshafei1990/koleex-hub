@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import KdsSelect from "@/components/kds/Select";
 import TabStrip from "@/components/ui/TabStrip";
 
 /* Aurora ground — the Hub canvas, client-only, mounted only under the skin.
@@ -2277,74 +2278,59 @@ export default function ProductList() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
-                  <select value={filterDiv} onChange={(e) => { setFilterDiv(e.target.value); setFilterCat(""); setFilterSub(""); }} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    {orderedDivisions.map(d => <option key={d.slug} value={d.slug}>{localizedName(d, lang)}</option>)}
-                  </select>
+                  <KdsSelect value={filterDiv} onChange={(v) => { setFilterDiv(v); setFilterCat(""); setFilterSub(""); }}
+                    options={orderedDivisions.map(d => ({ value: d.slug, label: localizedName(d, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.category")}</label>
-                  <select value={filterCat} onChange={(e) => { setFilterCat(e.target.value); setFilterSub(""); }} className={selectClass + " w-full"} disabled={!filterDiv}>
-                    <option value="">{t("list.allOption")}</option>
-                    {filteredCats.map(c => <option key={c.slug} value={c.slug}>{localizedName(c, lang)}</option>)}
-                  </select>
+                  <KdsSelect value={filterCat} onChange={(v) => { setFilterCat(v); setFilterSub(""); }} disabled={!filterDiv}
+                    options={filteredCats.map(c => ({ value: c.slug, label: localizedName(c, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.subcategory")}</label>
-                  <select value={filterSub} onChange={(e) => setFilterSub(e.target.value)} className={selectClass + " w-full"} disabled={!filterCat}>
-                    <option value="">{t("list.allOption")}</option>
-                    {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{localizedName(s, lang)}</option>)}
-                  </select>
+                  <KdsSelect value={filterSub} onChange={setFilterSub} disabled={!filterCat}
+                    options={filteredSubs.map(s => ({ value: s.slug, label: localizedName(s, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 {/* Supplier filter is an internal concept — hide on
                     the public /products catalog. */}
                 {isInternal && (
                   <div>
                     <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.supplier")}</label>
-                    <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} className={selectClass + " w-full"}>
-                      <option value="">{t("list.allOption")}</option>
-                      {allSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <KdsSelect value={filterSupplier} onChange={setFilterSupplier} options={allSuppliers}
+                      placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                   </div>
                 )}
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.brand")}</label>
-                  <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    {allBrands.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
+                  <KdsSelect value={filterBrand} onChange={setFilterBrand} options={allBrands}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.level")}</label>
-                  <select value={filterLevel} onChange={(e) => setFilterLevel(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    {allLevels.map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
-                  </select>
+                  <KdsSelect value={filterLevel} onChange={setFilterLevel}
+                    options={allLevels.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.visibility")}</label>
-                  <select value={filterVisible} onChange={(e) => setFilterVisible(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    <option value="visible">{t("filter.visible")}</option>
-                    <option value="hidden">{t("filter.hidden")}</option>
-                  </select>
+                  <KdsSelect value={filterVisible} onChange={setFilterVisible}
+                    options={[{ value: "visible", label: t("filter.visible") }, { value: "hidden", label: t("filter.hidden") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.status")}</label>
-                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    <option value="draft">{t("status.draft")}</option>
-                    <option value="active">{t("status.active")}</option>
-                    <option value="archived">{t("status.archived")}</option>
-                  </select>
+                  <KdsSelect value={filterStatus} onChange={setFilterStatus}
+                    options={[{ value: "draft", label: t("status.draft") }, { value: "active", label: t("status.active") }, { value: "archived", label: t("status.archived") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.featured")}</label>
-                  <select value={filterFeatured} onChange={(e) => setFilterFeatured(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">{t("list.allOption")}</option>
-                    <option value="yes">{t("filter.isFeatured")}</option>
-                    <option value="no">{t("filter.notFeatured")}</option>
-                  </select>
+                  <KdsSelect value={filterFeatured} onChange={setFilterFeatured}
+                    options={[{ value: "yes", label: t("filter.isFeatured") }, { value: "no", label: t("filter.notFeatured") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
               </div>
             </div>
