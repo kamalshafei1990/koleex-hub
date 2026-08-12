@@ -20,6 +20,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/kds/FormModal";
+/* Native <select> draws its list with the OS, so no stylesheet reaches it —
+   MN-5 starts by not being one. See components/kds/Select.tsx. */
+import KdsSelect from "@/components/kds/Select";
 import { dialog } from "@/lib/ui-dialog";
 
 /* RLS-4: every read/write in this file goes through the gated Purchase API
@@ -267,23 +270,24 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
           </div>
           <div>
             <label className={labelCls}>Requesting department</label>
-            <select value={department} onChange={(e) => setDepartment(e.target.value)} className={inputCls}>
-              <option value="">Select department…</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.name}>{d.name}</option>
-              ))}
-            </select>
+            <KdsSelect
+              value={department}
+              onChange={setDepartment}
+              options={departments.map((d) => ({ value: d.name, label: d.name }))}
+              placeholder="Select department…"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className={inputCls}>
-              <option value="0">Low</option>
-              <option value="1">Normal</option>
-              <option value="2">High</option>
-              <option value="3">Urgent</option>
-            </select>
+            <KdsSelect
+              value={priority}
+              onChange={setPriority}
+              options={[{ value: "0", label: "Low" }, { value: "1", label: "Normal" }, { value: "2", label: "High" }, { value: "3", label: "Urgent" }]}
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
           <div>
             <label className={labelCls}>Needed by</label>
@@ -305,17 +309,23 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Category</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
-                <option value="">— Choose category —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <KdsSelect
+                value={categoryId}
+                onChange={setCategoryId}
+                options={categories.map((c) => ({ value: c.id, label: c.label }))}
+                placeholder="— Choose category —"
+                triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+              />
             </div>
             <div>
               <label className={labelCls}>Catalog product (optional)</label>
-              <select value={productId} onChange={(e) => setProductId(e.target.value)} className={inputCls}>
-                <option value="">— Free-text item —</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
+              <KdsSelect
+                value={productId}
+                onChange={setProductId}
+                options={products.map((p) => ({ value: p.id, label: p.label }))}
+                placeholder="— Free-text item —"
+                triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -432,10 +442,13 @@ export function NewPurchaseOrderDialog({ open, onClose, onCreated }: DialogProps
           </div>
           <div>
             <label className={labelCls}>Supplier</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
-              <option value="">— Choose supplier —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            <KdsSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder="— Choose supplier —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -477,17 +490,23 @@ export function NewPurchaseOrderDialog({ open, onClose, onCreated }: DialogProps
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Category</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
-                <option value="">— Optional —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <KdsSelect
+                value={categoryId}
+                onChange={setCategoryId}
+                options={categories.map((c) => ({ value: c.id, label: c.label }))}
+                placeholder="— Optional —"
+                triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+              />
             </div>
             <div>
               <label className={labelCls}>Catalog product (optional)</label>
-              <select value={productId} onChange={(e) => setProductId(e.target.value)} className={inputCls}>
-                <option value="">— Free-text item —</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
+              <KdsSelect
+                value={productId}
+                onChange={setProductId}
+                options={products.map((p) => ({ value: p.id, label: p.label }))}
+                placeholder="— Free-text item —"
+                triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -609,28 +628,34 @@ export function NewReceiptDialog({ open, onClose, onCreated }: DialogProps) {
           </div>
           <div>
             <label className={labelCls}>Status</label>
-            <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className={inputCls}>
-              <option value="complete">Complete</option>
-              <option value="partial">Partial</option>
-              <option value="draft">Draft</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <KdsSelect
+              value={statusValue}
+              onChange={setStatusValue}
+              options={[{ value: "complete", label: "Complete" }, { value: "partial", label: "Partial" }, { value: "draft", label: "Draft" }, { value: "cancelled", label: "Cancelled" }]}
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Linked PO</label>
-            <select value={poId} onChange={(e) => setPoId(e.target.value)} className={inputCls}>
-              <option value="">— None / direct —</option>
-              {poList.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
+            <KdsSelect
+              value={poId}
+              onChange={setPoId}
+              options={poList.map((p) => ({ value: p.id, label: p.label }))}
+              placeholder="— None / direct —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
           <div>
             <label className={labelCls}>Supplier</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
-              <option value="">— Choose supplier —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            <KdsSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder="— Choose supplier —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -777,17 +802,23 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Supplier</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
-              <option value="">— Choose supplier —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            <KdsSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder="— Choose supplier —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
           <div>
             <label className={labelCls}>Linked PO</label>
-            <select value={poId} onChange={(e) => setPoId(e.target.value)} className={inputCls}>
-              <option value="">— None / direct —</option>
-              {poList.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
+            <KdsSelect
+              value={poId}
+              onChange={setPoId}
+              options={poList.map((p) => ({ value: p.id, label: p.label }))}
+              placeholder="— None / direct —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -818,10 +849,13 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Category</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
-                <option value="">— Optional —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <KdsSelect
+                value={categoryId}
+                onChange={setCategoryId}
+                options={categories.map((c) => ({ value: c.id, label: c.label }))}
+                placeholder="— Optional —"
+                triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+              />
             </div>
             <div>
               <label className={labelCls}>Unit</label>
@@ -948,17 +982,23 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Bill (optional)</label>
-            <select value={billId} onChange={(e) => setBillId(e.target.value)} className={inputCls}>
-              <option value="">— None / on-account —</option>
-              {bills.map((b) => <option key={b.id} value={b.id}>{b.label}{b.balance != null ? ` · open ${b.balance}` : ""}</option>)}
-            </select>
+            <KdsSelect
+              value={billId}
+              onChange={setBillId}
+              options={bills.map((b) => ({ value: b.id, label: `${b.label}${b.balance != null ? ` · open ${b.balance}` : ""}` }))}
+              placeholder="— None / on-account —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
           <div>
             <label className={labelCls}>Supplier</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
-              <option value="">— Choose supplier —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            <KdsSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder="— Choose supplier —"
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -972,14 +1012,12 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
           </div>
           <div>
             <label className={labelCls}>Method</label>
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="wire">Wire</option>
-              <option value="check">Check</option>
-              <option value="card">Card</option>
-              <option value="cash">Cash</option>
-              <option value="other">Other</option>
-            </select>
+            <KdsSelect
+              value={method}
+              onChange={setMethod}
+              options={[{ value: "bank_transfer", label: "Bank transfer" }, { value: "wire", label: "Wire" }, { value: "check", label: "Check" }, { value: "card", label: "Card" }, { value: "cash", label: "Cash" }, { value: "other", label: "Other" }]}
+              triggerClassName={`${inputCls} pe-7 cursor-pointer text-start`}
+            />
           </div>
         </div>
         <div>

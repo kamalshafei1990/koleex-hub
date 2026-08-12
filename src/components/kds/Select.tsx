@@ -154,7 +154,13 @@ export default function Select({
       if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") { e.preventDefault(); openAt(); }
       return;
     }
-    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btnRef.current?.focus(); return; }
+    /* stopPropagation, not just preventDefault: FormModal listens for Escape
+       on `document`, so without this one press closes the dropdown AND the
+       dialog behind it — the user loses a half-filled form for wanting to
+       back out of a list. A native <select> never had this problem because
+       the OS picker swallows the key before the page ever sees it. React
+       roots below <body>, so stopping here keeps it off document. */
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); btnRef.current?.focus(); return; }
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); commit(activeIdx); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(rows.length - 1, i + 1)); return; }
     if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)); return; }
