@@ -56,7 +56,9 @@ export default function PopoverPanel({
      rect from some earlier layout. Measured: anchored 14px right and 8px above
      the field it belongs to, and a forced resize did not correct it. */
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  /* Assigned in an effect, not during render: writing a ref while rendering is
+     unsafe under concurrent rendering, and the lint rule says so. */
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
   const place = useCallback(() => {
     const a = anchorRef.current;
