@@ -241,6 +241,101 @@ console.log("\nE. Warm-start seeding (no double layout)");
     : bad("card placeholder", "ProductCard contains animate-pulse — reserve the height, draw nothing");
 }
 
+/* ── F. Aurora CSS: a state rule its own resting rule can outrank ──────────
+   A NUMBER, like the rest of this file — the number is specificity.
+
+   `:not()` contributes the specificity of its ARGUMENT. The Aurora field rule
+   carried four type exclusions and scored (0,8,1); its `:focus` twin carried
+   one and scored (0,6,1). `:focus` matched on every focused field in every
+   converted app and the Hub-Blue ring never painted, because the resting rule
+   won the cascade. Nothing was broken-looking enough to notice — the field
+   simply had no focus state, for months.
+
+   That is the whole class of defect: add an exclusion to a resting rule and
+   its hover/focus/active twin silently stops applying. Impossible to catch by
+   reading, trivial to catch by counting.
+
+   The check pairs every state rule with resting rules that target the same
+   thing (same scope root, same final element tag) and fails when the state
+   rule cannot win. Validated against the real regression before shipping: it
+   flags (0,6,1)-vs-(0,8,1) and clears the fixed (0,9,1).
+
+   WHEN THIS FAILS: do not delete the resting rule's exclusions. Copy them onto
+   the state selector so both sides score the same, then re-measure the state
+   in a browser — matching a selector is not the same as painting. */
+console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
+{
+  const css = fs.readFileSync(path.join(ROOT, "src/app/globals.css"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const STATES = [":focus-within", ":focus-visible", ":focus", ":hover", ":active", ":checked"];
+  const TAGS = "input|textarea|select|button|a|summary|label";
+
+  /** Selectors-4 specificity, with :is()/:not()/:where() folded in by counting
+   *  their contents inline — :where() is 0 in the spec, but we do not use it
+   *  in a way that matters here and over-counting it would only be stricter. */
+  const spec = (s: string): [number, number, number] => [
+    (s.match(/#[\w-]+/g) ?? []).length,
+    (s.match(/\.[\w-]+/g) ?? []).length +
+      (s.match(/\[[^\]]+\]/g) ?? []).length +
+      (s.match(/:(?!:)(?!not\b)(?!is\b)(?!where\b)[a-z-]+/g) ?? []).length,
+    (s.match(new RegExp(`(?<![\\w.\\-#\\[:])\\b(${TAGS})\\b`, "g")) ?? []).length,
+  ];
+  const wins = (a: [number, number, number], b: [number, number, number]) =>
+    a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] > b[2];
+
+  /* Split on TOP-LEVEL commas only. `:is(.kx-ai-form, .kx-pd, .kx-app)` is a
+     comma list inside parentheses, and a naive `.split(",")` tears every scoped
+     selector in the file into fragments — which then get their specificity
+     counted on half a selector. The first version of this check did exactly
+     that; it still caught the regression, but only because both sides happened
+     to be torn the same way. */
+  const splitTop = (group: string): string[] => {
+    const out: string[] = [];
+    let depth = 0, buf = "";
+    for (const ch of group) {
+      if (ch === "(" || ch === "[") depth++;
+      else if (ch === ")" || ch === "]") depth--;
+      if (ch === "," && depth === 0) { out.push(buf); buf = ""; continue; }
+      buf += ch;
+    }
+    out.push(buf);
+    return out;
+  };
+  const selectors: string[] = [];
+  for (const [, group] of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    for (const raw of splitTop(group!)) {
+      const s = raw.trim().replace(/\s+/g, " ");
+      if (s && !s.startsWith("@")) selectors.push(s);
+    }
+  }
+  /* Two rules can collide only if they can match the same element. Approximate
+     that with (scope root, final target tag) — narrow enough that the guard
+     does not cry wolf, which is the failure mode that gets a check ignored. */
+  const key = (s: string) => {
+    const parts = s.split(" ");
+    const tag = new RegExp(`^(${TAGS})\\b`).exec(parts[parts.length - 1]!);
+    return tag ? `${parts[0]}|${tag[1]}` : null;
+  };
+  const resting = selectors.filter((s) => !STATES.some((st) => s.includes(st)));
+  const stated = selectors.filter((s) => STATES.some((st) => s.includes(st)));
+
+  const losers: string[] = [];
+  for (const s of stated) {
+    const k = key(s);
+    if (!k) continue;
+    for (const r of resting) {
+      if (key(r) !== k) continue;
+      if (!wins(spec(s), spec(r))) {
+        losers.push(`${s}\n         is outranked by  ${r}`);
+        break;
+      }
+    }
+  }
+  losers.length === 0
+    ? ok("no state rule is outranked by its own resting rule", `${stated.length} state selectors`)
+    : bad("state specificity", `${losers.length} rule(s) match but can never paint:\n       ${losers.join("\n       ")}`);
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +
