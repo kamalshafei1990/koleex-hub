@@ -215,6 +215,7 @@ export const CATEGORIES: Category[] = [
       { code: "XFFF", label: "Form Finishing Machines" },
       { code: "XFCP", label: "Collar & Cuff Press Machines" },
       { code: "XFTT", label: "Trouser Pressing Machines" },
+      { code: "XFSP", label: "Spotting Machines" },
     ],
   },
   {

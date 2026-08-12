@@ -93,7 +93,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Trouser Topper/Legger | XFTT | **Confirmed** | type, throughput, station_count | leg_clamps, robot_handling | trousers | live (app name: Trouser Pressing Machines) |
 | Steam Tunnel | XFST | Proposed | throughput, zones | multi_zone | knitwear | new |
 | Thread Sucking/Trimming | XFTS | **Confirmed** | format, suction | blow_gun | all | live |
-| Spotting/Stain Removal | XFSP | Proposed | gun_types, vacuum_table | heated_table | all | new |
+| Spotting/Stain Removal | XFSP | Confirmed | gun_types, vacuum_table | heated_table | all | new |
 | Garment Reversing/Turning | XFGR | **Confirmed** | garment_type, suction_pressure | electric_eye_sensor | tops, trousers, pillowcases | live (CL-0016) |
 | Seam Sealing / Bonding | XFSS | Proposed (CL-0012) | process_type, working_width / +tape_feed | hot_air, hot_cold_press, ultrasonic | waterproof/seamless, PPE | new — Hank/中性款/Dison; ultrasonic stitch head = XSUS |
 
@@ -271,7 +271,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Trouser Topper/Legger | — | XFTT | Approve | No |
 | Steam Tunnel | — | XFST | Approve | No |
 | Thread Sucking/Trimming | XFTS | XFTS | Freeze | No |
-| Spotting/Stain Removal | — | XFSP | Approve | No |
+| Spotting/Stain Removal | XFSP | XFSP | Approved (CL-0019) | No |
 | Single-Head Embroidery | XES | XES | Freeze | No |
 | Multi-Head Embroidery | XEM | XEM | Freeze | No |
 | Chenille/Chain Embroidery | XEB | XEB | Decide reuse vs new | **Yes** |
