@@ -2683,8 +2683,7 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
         <ClockIcon size={14} className="text-[var(--text-ghost)]" />
         <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>{value || "--:--"}</span>
       </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full kx-glass-pop kx-pop-panel p-2 flex gap-2">
+      <PopoverPanel anchorRef={ref} open={open} onClose={() => setOpen(false)} className="p-2 flex gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] mb-1 px-1">{"Hour"}</p>
             <div className="max-h-40 overflow-y-auto grid grid-cols-3 gap-1 pe-1">
@@ -2697,8 +2696,7 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
               {mins.map(m => <button key={m} type="button" onClick={() => set(hh || "00", m)} className={cell(m === mm)}>{m}</button>)}
             </div>
           </div>
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -2855,8 +2853,7 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
         <span className="truncate flex-1 text-start">{value}</span>
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="w-56 max-h-60 overflow-y-auto">
           {options.map((o) => (
             <button
               key={o}
@@ -2868,8 +2865,7 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
               <span className="truncate">{o}</span>
             </button>
           ))}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -2938,8 +2934,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
         <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>{selected?.label || value || placeholder}</span>
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="max-h-72 overflow-hidden">
           <div className="p-2 border-b border-[var(--border-faint)]">
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
           </div>
@@ -2969,8 +2964,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
               <PlusIcon size={14} /> {createLabel || "Create new"}
             </button>
           </div>
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -3703,8 +3697,7 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
         />
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={ref} open={open} onClose={() => setOpen(false)} className="max-h-60 overflow-y-auto">
           {filtered.map(opt => (
             <button key={opt} type="button" onClick={() => { addValue(opt); setDraft(""); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors">
               <CarrierLogo name={opt} />{opt}
@@ -3728,8 +3721,7 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
               </div>
             </div>
           )}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -3809,8 +3801,7 @@ const TagEditor = React.memo(function TagEditor({
         />
         {suggestions && <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />}
       </div>
-      {suggestions && open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+      <PopoverPanel anchorRef={ref} open={!!suggestions && open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
           {filtered.map(opt => (
             <button
               key={opt}
@@ -3822,8 +3813,7 @@ const TagEditor = React.memo(function TagEditor({
               {opt}
             </button>
           ))}
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -4214,8 +4204,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
           placeholder={placeholder || label || "Phone number"}
           className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
         />
-        {open && (
-          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden kx-glass-pop kx-pop-panel">
+        <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="w-64 max-h-60 overflow-hidden">
             <div className="p-2 border-b border-[var(--border-faint)]">
               <input
                 autoFocus
@@ -4241,8 +4230,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
                 </button>
               ))}
             </div>
-          </div>
-        )}
+        </PopoverPanel>
       </div>
     </div>
   );
@@ -4505,8 +4493,10 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
         <CalendarRawIcon size={15} />
       </button>
 
-      {open && (
-        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] kx-glass-pop kx-pop-panel p-3`}>
+      {/* The old `openUp` class flip is gone: a portalled panel is positioned
+          from a measured rect, so PopoverPanel flips it above the field itself
+          when there is no room below. */}
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="w-[17rem] p-3">
           {/* Header: month/year + nav */}
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => stepMonth(-1)} aria-label="Previous month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="left" /></button>
@@ -4543,8 +4533,7 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
             <button type="button" onClick={() => { onChange(""); setText(""); setOpen(false); }} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
             <button type="button" onClick={() => { const t = new Date(); const iso = `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`; onChange(iso); setText(isoToDisplay(iso)); setOpen(false); }} className="text-xs font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Today</button>
           </div>
-        </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });
@@ -4585,8 +4574,7 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
           className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer ${icon ? "ps-9 pe-9" : "ps-3 pe-9"}`}
         />
         <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
-        {open && filtered.length > 0 && (
-          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel p-1">
+        <PopoverPanel anchorRef={wrapRef} open={open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto p-1">
             {filtered.map((o, i) => (
               <button
                 key={i}
@@ -4597,8 +4585,7 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
                 {o}
               </button>
             ))}
-          </div>
-        )}
+        </PopoverPanel>
       </div>
     </div>
   );
@@ -5061,6 +5048,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);   // controls the suggestions dropdown
+  /* Anchor for the portalled suggestions panel — the field it hangs off. */
+  const searchWrapRef = useRef<HTMLDivElement>(null);
   /* Super-admin gate for sensitive edits (internal score).
 
      Read from the shell batch, NOT a dedicated /api/me call. This used to
@@ -6448,7 +6437,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </div>
 
         {/* Search */}
-        <div className="relative">
+        <div ref={searchWrapRef} className="relative">
           <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
@@ -6468,8 +6457,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
           {/* Smart suggestions — each row names the supplier AND why it matched
               (brand, contact person, app ID, country…). Click opens that supplier. */}
-          {searchFocused && debouncedSearch.trim() && suggestions.length > 0 && (
-            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto kx-glass-pop kx-pop-panel">
+          <PopoverPanel anchorRef={searchWrapRef} open={searchFocused && !!debouncedSearch.trim() && suggestions.length > 0} onClose={() => setSearchFocused(false)} className="max-h-[22rem] overflow-y-auto">
               {suggestions.map(c => {
                 const reason = searchMatchReason(c, searchTerms);
                 const cn = (c as unknown as Record<string, unknown>).company_name_cn;
@@ -6496,8 +6484,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </button>
                 );
               })}
-            </div>
-          )}
+          </PopoverPanel>
         </div>
 
         {/* Status filter (All / Active / Not Active) — suppliers + customers.

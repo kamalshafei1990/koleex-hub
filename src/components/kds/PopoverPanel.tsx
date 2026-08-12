@@ -47,7 +47,7 @@ export default function PopoverPanel({
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number } | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number; flip: boolean } | null>(null);
 
   /* onClose arrives as a fresh arrow on every parent render. Held in a ref so
      the effect below does not tear down and re-register on every render — it
@@ -64,10 +64,18 @@ export default function PopoverPanel({
     const a = anchorRef.current;
     if (!a) return;
     const r = a.getBoundingClientRect();
+    /* Flip above the anchor when there is not room below. A panel used to do
+       this with a `bottom-full` class; a portalled one is positioned from a
+       measured rect, so the decision belongs here — otherwise a field near the
+       bottom of the screen opens a list that runs off it. The threshold is the
+       panel's own max height (22rem) plus its gap. */
+    const need = 352 + 8;
+    const flip = r.bottom + need > window.innerHeight && r.top > need;
+    const top = flip ? r.top - 4 : r.bottom + 4;
     setRect((prev) =>
-      prev && prev.top === r.bottom + 4 && prev.left === r.left && prev.width === r.width
+      prev && prev.top === top && prev.left === r.left && prev.width === r.width && prev.flip === flip
         ? prev /* same box — return the SAME object so React bails out */
-        : { top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right, width: r.width },
+        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip },
     );
   }, [anchorRef]);
 
@@ -104,7 +112,9 @@ export default function PopoverPanel({
       ref={panelRef}
       style={{
         position: "fixed",
-        top: rect.top,
+        /* When flipped, anchor by the BOTTOM edge so the panel grows upward
+           from the field instead of downward off the screen. */
+        ...(rect.flip ? { bottom: window.innerHeight - rect.top } : { top: rect.top }),
         ...(align === "end" ? { right: rect.right } : { left: rect.left }),
         ...(matchAnchorWidth ? { minWidth: rect.width } : null),
         zIndex: 200,
