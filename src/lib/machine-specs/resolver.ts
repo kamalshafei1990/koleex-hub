@@ -604,7 +604,7 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
    stitch, which is the defect the audit named. The fields themselves were
    never wrong, so nothing is thrown away: they now attach to the ATTRIBUTE
    that actually justifies them, and a lockstitch carrying
-   `{needle_count:"2", duty:"heavy"}` collects both — which the old model
+   `{needle_count:"2", fabric_weight_class:"heavy"}` collects both — which the old model
    could not express without filing one machine under two subcategories. */
 const ATTRIBUTE_CARDS: Array<{
   match: (a: Record<string, string>) => boolean;
@@ -613,7 +613,7 @@ const ATTRIBUTE_CARDS: Array<{
   fields: SpecField[];
 }> = [
   {
-    match: (a) => a.duty === "heavy" || a.duty === "extra-heavy",
+    match: (a) => a.fabric_weight_class === "heavy" || a.fabric_weight_class === "extra-heavy",
     title: "Heavy-Duty Capability",
     subtitle: "Material capacity, frame reinforcement + cooling for heavy-duty heads.",
     fields: HEAVY_DUTY_FAMILY_FIELDS,
@@ -631,7 +631,7 @@ const ATTRIBUTE_CARDS: Array<{
     fields: MULTI_NEEDLE_FAMILY_FIELDS,
   },
   {
-    match: (a) => Boolean(a.working_field || a.template_based || a.vision_guided),
+    match: (a) => Boolean(a.working_field_class || a.template_recognition || a.vision_guided),
     title: "Programmable / CNC Sewing",
     subtitle: "Programmable XY pattern stitchers — work area + programming + drive specs.",
     fields: PATTERN_SEWING_FAMILY_FIELDS,

@@ -417,6 +417,64 @@ console.log("\nG. Product-schema i18n (every operator-visible string)");
     : bad("duplicate i18n keys", `${dupes.join(", ")} — the later entry silently wins`);
 }
 
+/* ── H. Machine-Kind facets speak the governed vocabulary ─────────────────
+   CL-0020 moved bed / feed / needle-count / duty off the subcategory shelf and
+   onto `MachineKind.attributes`. That field is a free-form Record<string,string>,
+   which is a fourth home for a vocabulary that already had three too many — and
+   a free-form map does not fail on `bed` vs `bed_type`, or `heavy` vs `Heavy`.
+   It just quietly stops matching, and the spec card it was supposed to trigger
+   never appears.
+
+   So the registry in src/lib/product-facets.ts is the only spelling allowed,
+   and it mirrors facet-dictionary-master.md rather than inventing a parallel
+   list. This asserts every kind against it.
+
+   WHEN THIS FAILS: fix the spelling to match the dictionary. Add a facet only
+   when a catalogue genuinely prints a distinction nothing else can carry — and
+   mark it `proposed: true` until a CL entry confirms it. */
+console.log("\nH. Machine-Kind facet vocabulary");
+{
+  const { MACHINE_KINDS } = await import(
+    path.resolve(__dirname, "../src/lib/machine-kinds.ts")
+  ) as typeof import("../src/lib/machine-kinds.js");
+  const { FACETS, isValidFacet, FACET_I18N } = await import(
+    path.resolve(__dirname, "../src/lib/product-facets.ts")
+  ) as typeof import("../src/lib/product-facets.js");
+  const I18N = FACET_I18N as Record<string, Record<string, string> | undefined>;
+
+  const badKeys: string[] = [], badValues: string[] = [], untranslated: string[] = [];
+  let pairs = 0;
+  for (const k of MACHINE_KINDS) {
+    for (const [key, value] of Object.entries(k.attributes ?? {})) {
+      pairs++;
+      if (!(key in FACETS)) { badKeys.push(`${k.slug}: ${key}`); continue; }
+      if (!isValidFacet(key, value)) badValues.push(`${k.slug}: ${key}="${value}"`);
+      if (!I18N[`fk:${key}`]) untranslated.push(`fk:${key}`);
+      /* open-vocabulary facets (application) are not enumerated, so their
+         values are not expected to carry a label here */
+      if (FACETS[key]!.values && !I18N[`fv:${value}`]) untranslated.push(`fv:${value}`);
+    }
+  }
+  badKeys.length === 0
+    ? ok("every facet key is in the registry", `${MACHINE_KINDS.length} kinds, ${pairs} facet pairs`)
+    : bad("unknown facet key", [...new Set(badKeys)].join(", "));
+  badValues.length === 0
+    ? ok("every facet value is allowed")
+    : bad("value not in the facet's list", [...new Set(badValues)].join(", "));
+  const u = [...new Set(untranslated)];
+  u.length === 0
+    ? ok("every facet key and value has en/zh/ar")
+    : bad("facet i18n", u.join(", "));
+
+  /* A kind must be a preset of a stitch type, not of a configuration. If a
+     doomed shelf ever reappears as someone's `subcategory`, catch it here. */
+  const RETIRED = ["double-needle-machines", "multi-needle-machines", "heavy-duty-machines", "pattern-sewing-machines"];
+  const relapsed = MACHINE_KINDS.filter((k) => RETIRED.includes(k.subcategory)).map((k) => k.slug);
+  relapsed.length === 0
+    ? ok("no kind filed under a retired configuration shelf")
+    : bad("retired shelf", `${relapsed.join(", ")} — these describe a configuration, not a stitch (CL-0020)`);
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +

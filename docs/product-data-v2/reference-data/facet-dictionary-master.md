@@ -160,3 +160,25 @@ Promoted from the [Lockstitch Master Spec Dictionary v1.1](./dictionaries/lockst
 > **Improvements applied to existing facets:** `needle_system` list expanded (§3) · `gauge`/`needle_gauge` now mm **or** inch · `stitch_type` carries `iso_stitch_class` (301) · `table_surface_type` may pair with `table_mount_type` ball-bearing.
 
 > **Governance:** `automation_level`, `bed_type`, `needle_count`, `thread_count`, `gauge`, `drive_type`, `heating_method`, `steam_source`, `detection_coverage`, `working_width`, `working_field` recur across many categories — defined once here and reused. Voltage/plug are **options/facets**, not SKU-creators by default (see `sku-strategy.md`). The §8 facets are reusable cross-type (sewing family) — never re-defined per category.
+
+---
+
+## 9. Sewing-family facets promoted by CL-0020 (▲ proposed)
+
+CL-0020 moved bed type / feed type / needle count / duty off the subcategory shelf and onto the second axis. Most of that vocabulary already existed above and is **reused unchanged** — `bed_type`, `feed_type`, `needle_count`, `drive_type`, `automation_level`, `working_field`, `application`, `template_recognition`, and `fabric_weight_class` (§8d), which is the governed home for what the retired `XSH` shelf used to say.
+
+Six distinctions had no facet. Each is printed in a real catalogue and none is invented to round out a set. They are **▲ proposed** until a CL entry confirms them.
+
+| Facet | Type | Allowed Values | Why it needs to exist |
+|---|---|---|---|
+| `working_field_class` | single_select | Small · Medium · Large · XXL | `working_field` is a numeric mm × mm pair. A **Kind is a preset, not a model**, so it carries the size band the catalogue advertises ("Small-Area Pattern Sewer"); the number stays on the product. |
+| `needle_bar_type` | single_select | Fixed · Split | Split-bar lets one needle disengage to turn a corner. A real buying decision on twin-needle machines, and nothing else in the dictionary carries it. |
+| `buttonhole_type` | single_select | Straight · Eyelet-Keyhole | Shirt vs jacket/denim buttonholers are different machines commercially, identical in stitch class — exactly the case the two-axis model exists for. |
+| `welt_count` | single_select | Single · Double | The pocket-welting split. |
+| `flap_handling` | boolean | true / false | Whether the welter also sets the flap. |
+| `vision_guided` | boolean | true / false | **Named explicitly in the audit's OUTPUT 8** as an attribute, so vision never becomes a "Vision-X" type under every stitch class. |
+
+### Enforcement
+The registry lives in `src/lib/product-facets.ts` and **mirrors this document** — it does not maintain a parallel list. `validate:budgets` **section H** fails the build when a Machine Kind uses a key that is not in the registry, a value that is not in the facet's list, or a key/value with no en/zh/ar label. It also fails if any kind is ever filed back under a retired configuration shelf.
+
+Current: **105 kinds · 77 facet pairs · 0 violations.**
