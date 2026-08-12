@@ -392,6 +392,78 @@ export default function QuotationA4Preview({
      only the incoming clipboard is stripped. One capturing listener covers
      every editable cell (and InvoicesDoc, which reuses this component). */
   const stackRef = useRef<HTMLDivElement | null>(null);
+
+  /* ── Pinch to inspect (touch only) ───────────────────────────────────────
+     The A4 sheet is 210mm and gets scaled down to fit a phone, which makes it
+     honest but small. This lets two fingers magnify the RENDERED sheet so the
+     operator can read a line — it is a VIEWING transform and nothing else:
+     no layout is re-measured, no font is re-sized, the document keeps its
+     210 × 270mm geometry, and print / PDF export are untouched (export runs
+     /quotations/[id]/print in its own iframe; browser print resets these two
+     wrappers to `transform: none` in each app's PRINT_AND_DOC_STYLES).
+
+     Lives here, not in either app, because BOTH the quotation editor and
+     InvoicesDoc render this component — one implementation, both A4 screens.
+
+     Single-finger scrolling is left entirely to the browser (`touch-action:
+     pan-x pan-y`); we only claim the gesture once a SECOND finger lands. */
+  const pinchHostRef = useRef<HTMLDivElement | null>(null);
+  const pinchBoxRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
+  useEffect(() => {
+    const host = pinchHostRef.current;
+    if (!host) return;
+    const MIN = 1, MAX = 4;
+    const spread = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    let active = false, startSpread = 0, startZoom = 1, anchorX = 0, contentX = 0;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      active = true;
+      startSpread = spread(e.touches) || 1;
+      startZoom = zoomRef.current;
+      /* Anchor the midpoint between the fingers so the sheet magnifies around
+         what the operator is looking at instead of jumping to its top-left. */
+      const box = host.getBoundingClientRect();
+      anchorX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - box.left;
+      contentX = (host.scrollLeft + anchorX) / startZoom;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!active || e.touches.length !== 2) return;
+      e.preventDefault(); // stop the page panning while the pinch is running
+      const next = Math.min(MAX, Math.max(MIN, (startZoom * spread(e.touches)) / startSpread));
+      setZoom(next);
+      host.scrollLeft = contentX * next - anchorX;
+    };
+    const onEnd = (e: TouchEvent) => { if (e.touches.length < 2) active = false; };
+
+    host.addEventListener("touchstart", onStart, { passive: true });
+    host.addEventListener("touchmove", onMove, { passive: false });
+    host.addEventListener("touchend", onEnd);
+    host.addEventListener("touchcancel", onEnd);
+    return () => {
+      host.removeEventListener("touchstart", onStart);
+      host.removeEventListener("touchmove", onMove);
+      host.removeEventListener("touchend", onEnd);
+      host.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
+  /* A transform doesn't grow the layout box, so without this the magnified
+     sheet would sit in a hole the size of the unmagnified one. */
+  const [pinchH, setPinchH] = useState(0);
+  useEffect(() => {
+    const box = pinchBoxRef.current;
+    if (!box) return;
+    const read = () => setPinchH(box.offsetHeight);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     const root = stackRef.current;
     if (!root) return;
@@ -589,6 +661,20 @@ export default function QuotationA4Preview({
   }, [current.items]);
 
   return (
+    <div ref={pinchHostRef} className="quot-pinch-host">
+    <div
+      ref={pinchBoxRef}
+      className="quot-pinch-box"
+      style={
+        zoom > 1
+          ? {
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+              marginBottom: pinchH ? pinchH * (zoom - 1) : undefined,
+            }
+          : undefined
+      }
+    >
     <div ref={stackRef} className={"quot-a4-stack" + (hidePanels ? " gutters-hidden" : "")}>
     {pages.map((page, pageIdx) => {
       const isFirstPage  = pageIdx === 0;
@@ -2484,6 +2570,8 @@ export default function QuotationA4Preview({
         </div>
       </div>
     )}
+    </div>
+    </div>
     </div>
   );
 }

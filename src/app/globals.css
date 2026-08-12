@@ -1998,11 +1998,21 @@ input[type="number"]:not(.kx-spinner) {
      is meaningful (destructive, brand).
    `translate: none` is declared ALONE (see the minifier note above). */
 [data-kx-skin="aurora"] .kx-app :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
-  border-color: rgba(127, 169, 214, 0.55);
+  /* !important, and it is earned. Measured on prod with per-recipe clones:
+     without it exactly the buttons carrying Tailwind's own
+     `hover:border-[var(--border-color)]` kept the Core colour, while buttons
+     with no hover utility took the Aurora blue — 3 of 7 recipes converted,
+     and the ones the owner pointed at ("Add Internal Item") were in the
+     failing half. Specificity says this rule should win (0,7,1 vs 0,2,0) and
+     it is unlayered, so it should also beat @layer utilities; it did not, and
+     chasing why costs more than it is worth. `!important` is the documented
+     way to override a utility framework, and the selector is narrow: one app
+     scope, hover only, selected states excluded. */
+  border-color: rgba(127, 169, 214, 0.55) !important;
   translate: none;
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-app :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
-  border-color: rgba(62, 103, 150, 0.6);
+  border-color: rgba(62, 103, 150, 0.6) !important;
 }
 
 /* CHROME CONTROLS: BORDER COLOUR ONLY, AND NEVER A LIFT.

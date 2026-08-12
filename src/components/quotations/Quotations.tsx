@@ -726,6 +726,14 @@ export const PRINT_AND_DOC_STYLES = `
    export (separate iframe, separate document). */
 .quot-fit-host { overflow-x: auto; overflow-y: hidden; }
 
+/* Pinch-to-inspect host (rendered by QuotationA4Preview, so this rule serves
+   the invoice editor too via its own copy). pan-x pan-y keeps one-finger
+   scrolling native — the component only claims the gesture on a second
+   finger. A transform contributes to scrollable overflow on the right/bottom,
+   which is what lets a magnified sheet be panned inside this box instead of
+   dragging the app. NOTE: this block is a template literal — no backticks. */
+.quot-pinch-host { overflow-x: auto; touch-action: pan-x pan-y; }
+
 /* Focus view — the header toggle hides every editor-only gutter card
    (Cost Price + Internal notes share .pq-row-note; Document Settings +
    Cost Price share .pq-gutter-card) so only the A4 document shows. */
@@ -994,7 +1002,8 @@ export const PRINT_AND_DOC_STYLES = `
   /* The screen-only fit box: drop the scale, the reclaiming negative margin
      and the clipping, so print gets the document at its true 210mm. Inline
      styles carry the transform, so these need !important to win. */
-  .quot-fit-host, .quot-fit-box {
+  .quot-fit-host, .quot-fit-box,
+  .quot-pinch-host, .quot-pinch-box {
     overflow: visible !important;
     width: auto !important;
     height: auto !important;

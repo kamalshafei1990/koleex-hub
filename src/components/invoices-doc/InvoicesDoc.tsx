@@ -663,6 +663,13 @@ const PRINT_AND_DOC_STYLES = `
 }
 .quot-img-cell.has-img { border: none; background: transparent; }
 
+/* Pinch-to-inspect host — the wrapper QuotationA4Preview renders around the
+   sheet (this editor reuses that component, so it needs the same rule as the
+   quotation editor). pan-x pan-y leaves one-finger scrolling to the browser;
+   the component only claims the gesture once a second finger lands.
+   NOTE: this block is a template literal — no backticks in comments. */
+.quot-pinch-host { overflow-x: auto; touch-action: pan-x pan-y; }
+
 /* The row-action cluster (.quot-row-del-btn) is now positioned and
    styled inline by QuotationA4Preview — no screen styles here. The
    print rule below still hides it on the printed page; the screen
@@ -759,6 +766,17 @@ const PRINT_AND_DOC_STYLES = `
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
+  }
+
+  /* The pinch-to-inspect wrappers are a SCREEN affordance only — print gets
+     the sheet at its true 210mm. Inline styles carry the transform, so these
+     need !important to win. */
+  .quot-pinch-host, .quot-pinch-box {
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    transform: none !important;
   }
   [class~="pt-14"] { padding-top: 0 !important; }
   .shell-content-offset { padding: 0 !important; }
