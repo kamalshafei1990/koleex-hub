@@ -448,19 +448,6 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         <AngleDownIcon size={11} className="shrink-0 opacity-60 hidden sm:block" />
       </button>
 
-      {open && (
-        <>
-          {/* Same scrim the bell already has — the owner's standing rule is
-              dim + backdrop-blur-sm behind every popup, and once the bell's
-              came back to life (the backdrop-root fix) the menus without one
-              looked broken by comparison. Clicking it closes. */}
-          <div
-            aria-hidden
-            onClick={() => setOpen(false)}
-            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
-          />
-      </>
-    )}
       {/* Portalled — inside the header pane the glass was starved. */}
       <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="w-[360px] max-w-[calc(100vw-1rem)]">
           {/* Header label */}

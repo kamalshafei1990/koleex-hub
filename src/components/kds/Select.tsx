@@ -198,6 +198,22 @@ export default function Select({
       </button>
       <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       {open && rect && typeof document !== "undefined" && createPortal(
+        <>
+          {/* THE SCRIM IS WHAT MAKES THE GLASS READABLE. The material itself is
+              signed off and must not be thickened — but glass only works when
+              there is something soft behind it. Over a dense list the page text
+              was reading straight THROUGH an open menu: issue titles cutting
+              across "In Progress" / "Verified" on /issues. The bell never had
+              this problem because it always dimmed the page behind itself; the
+              selects simply never got one. Same geometry as the shell menus,
+              which is the look already approved: below the header, so the
+              header stays crisp and usable. */}
+          <div
+            aria-hidden
+            onMouseDown={() => setOpen(false)}
+            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm"
+            style={{ zIndex: 199 }}
+          />
         <div
           ref={panelRef}
           style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
@@ -221,7 +237,8 @@ export default function Select({
               </button>
             ))}
           </div>
-        </div>,
+        </div>
+        </>,
         document.body,
       )}
     </div>

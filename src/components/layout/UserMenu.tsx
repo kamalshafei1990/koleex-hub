@@ -322,19 +322,6 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         )}
       </button>
 
-      {open && (
-        <>
-          {/* Same scrim the bell already has — the owner's standing rule is
-              dim + backdrop-blur-sm behind every popup, and once the bell's
-              came back to life (the backdrop-root fix) the menus without one
-              looked broken by comparison. Clicking it closes. */}
-          <div
-            aria-hidden
-            onClick={() => setOpen(false)}
-            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
-          />
-        </>
-      )}
       {/* Portalled: inside the header pane its backdrop-filter was starved,
           so the glass never rendered. See kds/PopoverPanel. */}
       <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in w-64">

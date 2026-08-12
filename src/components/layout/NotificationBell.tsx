@@ -732,18 +732,6 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         )}
       </button>
 
-      {open && (
-        <>
-          {/* Dim + blur backdrop (standing rule: every floating surface blurs
-              what's behind it) — starting BELOW the header, which stays crisp
-              and usable. Clicking it closes the panel. */}
-          <div
-            aria-hidden
-            onClick={() => setOpen(false)}
-            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
-          />
-        </>
-      )}
       {/* Portalled: the header pane's own backdrop-filter starved this
           panel's glass. mobileSheet keeps the phone behaviour — full width
           under the header — while md+ stays a dropdown anchored to the bell. */}

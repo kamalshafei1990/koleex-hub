@@ -222,6 +222,20 @@ export default function PopoverPanel({
   if (!open || !rect || typeof document === "undefined") return null;
 
   return createPortal(
+    <>
+      {/* One scrim, owned here, for every panel. The four shell menus each
+          hand-rolled this exact div; the selects had none at all, which is why
+          page text read straight through an open menu over a dense list. The
+          material is signed off and unchanged — the scrim is what gives it
+          something soft to be glass AGAINST. Below the header by design: the
+          header stays crisp and usable while a menu is open, which is the
+          behaviour already approved on the bell. */}
+      <div
+        aria-hidden
+        onMouseDown={() => closeRef.current()}
+        className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm"
+        style={{ zIndex: 199 }}
+      />
     <div
       ref={panelRef}
       style={{
@@ -242,7 +256,8 @@ export default function PopoverPanel({
       className={`kx-glass-pop kx-pop-panel ${className}`}
     >
       {children}
-    </div>,
+    </div>
+    </>,
     document.body,
   );
 }
