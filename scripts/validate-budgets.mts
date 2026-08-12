@@ -81,7 +81,6 @@ const FLOOR_MAX_KB = 520;   // measured 2026-08-09: 6 files / 445 KB
    does. They were first written as GUESSES and two of them failed on the
    first run; measured beats guessed, always. */
 const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
-  "home": { chunks: 10, kbytes: 560 },
   "accounts": { chunks: 12, kbytes: 880 },
   "ai": { chunks: 10, kbytes: 508 },
   "calendar": { chunks: 12, kbytes: 824 },
@@ -180,7 +179,7 @@ console.log("\nC. Coverage");
    needs no server, no session and no browser. */
 const BOOT_DOC_MAX_FILES = 22;
 const BOOT_DOC_MAX_KB = 1750;   // measured 2026-08-09: worst is hr at 19 / 1569
-const BOOT_DOC_HOME_MAX_KB = 1160;  // measured: home 15 files / 1055 KB
+const BOOT_DOC_ENTRY_MAX_KB = 1160;  // measured 2026-08-13: index 14 files / 1048 KB
 console.log("\nD. Boot document (script tags in the server HTML)");
 {
   const appDir = path.join(NEXT, "server/app");
@@ -198,13 +197,20 @@ console.log("\nD. Boot document (script tags in the server HTML)");
   over.length === 0
     ? ok("every boot document within budget", `≤ ${BOOT_DOC_MAX_FILES} files / ${BOOT_DOC_MAX_KB} KB`)
     : bad("boot documents over budget", over.map((r) => `${r.route} ${r.files}/${r.kb}KB`).join(", "));
-  /* Home is the entry every single user pays, every session — it gets its own
-     tighter line so it cannot drift up under cover of the global ceiling. */
-  const home = rows.find((r) => r.route === "home");
-  if (!home) bad("home document", "no prerendered home.html — did the route move?");
-  else home.kb <= BOOT_DOC_HOME_MAX_KB
-    ? ok("home boot document", `${home.files} files / ${home.kb} KB ≤ ${BOOT_DOC_HOME_MAX_KB} KB`)
-    : bad("home boot document", `${home.files} files / ${home.kb} KB > ${BOOT_DOC_HOME_MAX_KB} KB — every session pays this`);
+  /* The entry document every single user pays, every session, gets its own
+     tighter line so it cannot drift up under cover of the global ceiling.
+
+     This guard used to watch "home" — i.e. /home, the role dashboard. That
+     screen had no entry point anywhere in the Hub and was removed; the route
+     users actually land on is `/`, which Next prerenders as index.html. So the
+     guard was protecting a screen nobody could reach while the real entry went
+     unwatched. Same budget: index measured 14 files / 1048 KB against home's
+     15 / 1055. */
+  const entry = rows.find((r) => r.route === "index");
+  if (!entry) bad("entry document", "no prerendered index.html — did the root route move?");
+  else entry.kb <= BOOT_DOC_ENTRY_MAX_KB
+    ? ok("entry boot document (/)", `${entry.files} files / ${entry.kb} KB ≤ ${BOOT_DOC_ENTRY_MAX_KB} KB`)
+    : bad("entry boot document (/)", `${entry.files} files / ${entry.kb} KB > ${BOOT_DOC_ENTRY_MAX_KB} KB — every session pays this`);
 }
 
 /* ── E. The warm-start rule, as a guard ────────────────────────────────────

@@ -15,7 +15,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { homeT } from "@/lib/translations/home";
+import { commonT } from "@/lib/translations/common";
 import RrIcon from "@/components/ui/RrIcon";
 
 const STORAGE_KEY = "koleex.focus-mode";
@@ -55,7 +55,7 @@ export function useFocusMode(): [boolean, (next: boolean) => void] {
 
 export function FocusToggle() {
   const [focused, setFocused] = useFocusMode();
-  const { t } = useTranslation(homeT);
+  const { t } = useTranslation(commonT);
   return (
     <button type="button" onClick={() => setFocused(!focused)}
             className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors ${

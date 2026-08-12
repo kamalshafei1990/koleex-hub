@@ -381,7 +381,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "fileCount": 1,
     "kitFiles": 1,
     "components": [
-      "RoleHome"
     ]
   },
   {

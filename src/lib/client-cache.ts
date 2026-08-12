@@ -92,16 +92,9 @@ const CATALOG_SECTION: Record<string, string> = {
 const cg = globalThis as typeof globalThis & { __kxCatalogBatch?: ShellState };
 const catalogState: ShellState = cg.__kxCatalogBatch ?? (cg.__kxCatalogBatch = { inflight: null });
 
-/* Home asks for three more on mount — and RoleHome already requests them
-   together in one Promise.all, so they collapse into one trip cleanly. Kept
-   out of the shell batch because no other screen reads them. */
-const HOME_SECTION: Record<string, string> = {
-  "/api/me/preferences": "preferences",
-  "/api/workflows/status": "workflows",
-  "/api/finance/setup/status": "financeSetup",
-};
-const hg = globalThis as typeof globalThis & { __kxHomeBatch?: ShellState };
-const homeState: ShellState = hg.__kxHomeBatch ?? (hg.__kxHomeBatch = { inflight: null });
+/* The Home batch (/api/home-refs) is gone with the /home role dashboard that
+   was its only caller. Its three members are still normal endpoints; they just
+   no longer collapse into one trip, because nothing requests them together. */
 
 /** The shared shell batch. Exported so non-cachedGet consumers (visual
  *  bindings) join the SAME request instead of opening a second one. */
@@ -145,7 +138,6 @@ async function fetchShell(): Promise<Record<string, unknown> | null> {
 const BATCHES = [
   { url: "/api/shell",        state: shellState,   map: SHELL_SECTION },
   { url: "/api/catalog-refs", state: catalogState, map: CATALOG_SECTION },
-  { url: "/api/home-refs",    state: homeState,    map: HOME_SECTION },
 ] as const;
 
 function pickBatch(url: string) {

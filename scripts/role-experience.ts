@@ -10,16 +10,15 @@
      04  inferDashboardRole — purchasing → "purchasing"
      05  inferDashboardRole — marketing → "marketing"
      06  inferDashboardRole — HR → "hr"
-     07  Explicit preferences.dashboard_role beats department inference
+     07  SECURITY: a self-set preferences.dashboard_role is IGNORED
      08  Super-admin bypass on every visibility flag
      09  Cost / bank / profit visibility rules per role
-     10  updateUserPreferences persists and round-trips
+     10  SECURITY: an unmatched department falls back to "staff", not "ceo"
    ========================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
 import {
   getUserExperience,
-  updateUserPreferences,
   canSeeCostData,
   canSeeBankBalances,
   canSeeProfit,
@@ -156,17 +155,28 @@ async function main() {
     ok(`${c.n}  ${c.dept} → ${c.expect}`, exp.dashboard_role === c.expect, `got ${exp.dashboard_role}`);
   }
 
-  /* 07 — Explicit override wins over department keyword. */
+  /* 07 — SECURITY. This assertion is INVERTED from what it used to be, and the
+     inversion is the point. dashboard_role gates cost / bank / profit, and it
+     used to be read straight out of accounts.preferences — which the user
+     wrote themselves via PATCH /api/me/preferences with no permission check at
+     all. A warehouse employee could hand themselves "accountant".
+
+     Here the stored preference asks for "accountant" (cost+bank+profit) while
+     the department says warehouse (none). The department must win and the
+     preference must be ignored outright. */
   const explicitAcc = await makeAccount({
     username: "exp-explicit",
-    department: "Sales Team",
-    preferences: { dashboard_role: "marketing", ui_mode: "advanced" },
+    department: "Warehouse Team",
+    preferences: { dashboard_role: "accountant", ui_mode: "advanced" },
   });
   const explicitExp = await getUserExperience(await ctx(explicitAcc));
   ok(
-    "07  explicit preferences.dashboard_role beats inference",
-    explicitExp.dashboard_role === "marketing" && explicitExp.ui_mode === "advanced",
-    `role=${explicitExp.dashboard_role} mode=${explicitExp.ui_mode}`,
+    "07  self-set preferences.dashboard_role is IGNORED (privilege escalation)",
+    explicitExp.dashboard_role === "warehouse"
+      && !explicitExp.can_see_cost_data
+      && !explicitExp.can_see_bank_balances
+      && !explicitExp.can_see_profit,
+    `role=${explicitExp.dashboard_role} cost=${explicitExp.can_see_cost_data} bank=${explicitExp.can_see_bank_balances} profit=${explicitExp.can_see_profit}`,
   );
 
   /* 08 — Super-admin bypass on every visibility helper. */
@@ -194,6 +204,7 @@ async function main() {
     ["warehouse",  false, false, false],
     ["marketing",  false, false, false],
     ["hr",         false, false, false],
+    ["staff",      false, false, false],
   ];
   let matrixOk = true;
   const detail: string[] = [];
@@ -208,25 +219,20 @@ async function main() {
   }
   ok("09  cost / bank / profit visibility matrix matches spec", matrixOk, detail.join(", "));
 
-  /* 10 — updateUserPreferences persists + round-trips. */
-  const upd = await makeAccount({ username: "exp-update", department: "Sales Team" });
-  const before = await getUserExperience(await ctx(upd));
-  const patch = await updateUserPreferences(upd.account_id, {
-    dashboard_role: "purchasing",
-    ui_mode: "advanced",
-    favorite_apps: ["inventory", "purchases", "finance"],
-    pinned_workflows: ["procurement", "finance"],
-  });
-  const after = await getUserExperience(await ctx(upd));
+  /* 10 — SECURITY. The old default for an unmatched department was "ceo",
+     commented "safe high-level default". It was the opposite of safe: "ceo" is
+     the role that sees cost, bank balances AND profit, so every employee whose
+     department string missed the keyword list was silently granted full
+     financial visibility. It must fail closed. */
+  const unmatched = await makeAccount({ username: "exp-unmatched", department: "Facilities" });
+  const unmatchedExp = await getUserExperience(await ctx(unmatched));
   ok(
-    "10  updateUserPreferences round-trips dashboard_role + favorites + pins",
-    patch.ok
-      && before.dashboard_role === "sales"
-      && after.dashboard_role === "purchasing"
-      && after.ui_mode === "advanced"
-      && after.favorite_apps.length === 3
-      && after.pinned_workflows.length === 2,
-    `before=${before.dashboard_role} after=${after.dashboard_role} favs=${after.favorite_apps.length} pins=${after.pinned_workflows.length}`,
+    `10  unmatched department falls back to "staff" with no visibility`,
+    unmatchedExp.dashboard_role === "staff"
+      && !unmatchedExp.can_see_cost_data
+      && !unmatchedExp.can_see_bank_balances
+      && !unmatchedExp.can_see_profit,
+    `role=${unmatchedExp.dashboard_role} cost=${unmatchedExp.can_see_cost_data} bank=${unmatchedExp.can_see_bank_balances} profit=${unmatchedExp.can_see_profit}`,
   );
 
   await cleanup();
