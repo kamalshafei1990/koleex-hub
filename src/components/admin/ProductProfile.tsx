@@ -632,7 +632,7 @@ export default function ProductProfile() {
           </Link>
         ) : null}
         <Link href={editHref}
-          className="h-8 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shrink-0">
+          className="h-8 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 transition-all shrink-0">
           <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
         </Link>
       </div>

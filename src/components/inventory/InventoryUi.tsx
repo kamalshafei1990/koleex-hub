@@ -590,7 +590,7 @@ export function PrimaryButton({
   disabled?: boolean;
 }) {
   const cls =
-    "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50";
+    "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50";
   const inner = (
     <>
       {icon && <RrIcon name={icon} size={12} />}

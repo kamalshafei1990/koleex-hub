@@ -66,7 +66,7 @@ export default function PasswordTab(_props: { account: AccountWithLinks }) {
             type="button"
             onClick={submit}
             disabled={!canSubmit}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
             {busy ? <SpinnerIcon className="h-4 w-4" /> : null}
             {busy ? t("pwd.updating") : t("pwd.update")}

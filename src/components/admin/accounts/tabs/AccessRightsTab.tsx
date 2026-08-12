@@ -624,7 +624,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
               type="button"
               onClick={saveAsNewTemplate}
               disabled={applyingTemplate}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50 flex items-center gap-1.5"
               title="Save the current access-rights grid as a new role template. Other admins can pick it from this dropdown. Renaming happens in Roles & Permissions."
             >
               + Save as new template

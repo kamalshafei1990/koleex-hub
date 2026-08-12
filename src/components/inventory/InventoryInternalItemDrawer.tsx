@@ -670,7 +670,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
                 onClick={submit}
                 disabled={submitting || !name.trim()}
                 data-testid="inv-internal-save"
-                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50"
               >
                 {!submitting && <RrIcon name="check" size={12} />}
                 {submitting ? t("inv.int.saving") : t("inv.int.save")}

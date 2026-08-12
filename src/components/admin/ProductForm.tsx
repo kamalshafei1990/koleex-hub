@@ -2257,7 +2257,7 @@ export default function ProductForm({ productId }: Props) {
     product.status === "active"
       ? "bg-emerald-600 text-white hover:bg-emerald-500"
       : product.status === "archived"
-        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90"
+        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
         : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]";
 
   /* ── Classification-gated lock ──
@@ -3043,7 +3043,7 @@ export default function ProductForm({ productId }: Props) {
             <button
               onClick={save}
               disabled={saving}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shrink-0"
             >
               {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
               <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
@@ -3094,7 +3094,7 @@ export default function ProductForm({ productId }: Props) {
                 <button
                   type="button"
                   onClick={restoreDraft}
-                  className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all hover:opacity-90 shadow-lg"
+                  className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"
                 >
                   {t("draft.restore", "Restore draft")}
                 </button>
@@ -6152,7 +6152,7 @@ export default function ProductForm({ productId }: Props) {
           {currentStep < steps.length - 1 ? (
             <button
               onClick={handleNext}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all flex items-center gap-2 shadow-lg"
             >
               {t("action.next", "Next")} <ArrowRightIcon className="h-4 w-4" />
             </button>
@@ -6528,7 +6528,7 @@ function HighlightsEditor({
             type="button"
             onClick={add}
             disabled={!input.trim()}
-            className="h-11 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all shadow-lg"
+            className="h-11 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
           >
             <PlusIcon className="h-3.5 w-3.5" /> {t("hero.add", "Add")}
           </button>

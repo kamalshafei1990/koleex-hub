@@ -408,7 +408,7 @@ export default function AccountsList() {
             >
               <TrashIcon className="h-3.5 w-3.5" /> {t("acc.bin.title")}
             </button>
-            <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+            <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg">
               <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
             </Link>
           </div>
@@ -444,7 +444,7 @@ export default function AccountsList() {
                         type="button"
                         onClick={() => restoreBin(b.id)}
                         disabled={binBusy === b.id}
-                        className="h-8 px-3.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 disabled:opacity-50 transition-all shrink-0"
+                        className="h-8 px-3.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold disabled:opacity-50 transition-all shrink-0"
                       >
                         {binBusy === b.id ? "…" : t("acc.bin.restore")}
                       </button>
@@ -485,7 +485,7 @@ export default function AccountsList() {
             <div className="flex gap-2">
               <button
                 onClick={copyTempPw}
-                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg flex items-center gap-1.5"
               >
                 <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
               </button>
@@ -678,7 +678,7 @@ export default function AccountsList() {
             {accounts.length === 0 && (
               <Link
                 href="/accounts/new"
-                className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
+                className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all"
               >
                 <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
               </Link>

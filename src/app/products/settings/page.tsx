@@ -254,7 +254,7 @@ function AttributeModal({
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
+          <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4" />}
             {saving ? "Saving..." : editValue ? "Save" : "Create"}
           </button>
@@ -358,7 +358,7 @@ function ClassificationModal({
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
+          <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
           </button>
         </div>
@@ -836,7 +836,7 @@ function BrandsTab({ brands, brandLogos, onAdd, onEdit, onDelete }: {
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands…" className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : "No brands yet."}</p></div>
@@ -876,7 +876,7 @@ function PlugTypesTab({ items, counts, onAdd, onEdit, onDelete }: {
         <div className="flex gap-3">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">plug types</span></div>
         </div>
-        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add plug type</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add plug type</button>
       </div>
       {items.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">No plug types yet.</p></div>
@@ -1018,7 +1018,7 @@ function VisualValueTab({ type, items, counts, onAdd, onEdit, onDelete }: {
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">{label}s</span></div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{totalUsages}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
         </div>
-        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {items.length > 4 && (
         <div className="relative max-w-sm mb-4"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
@@ -1069,7 +1069,7 @@ function SimpleTab({ type, items, counts, tagColors, onAdd, onEdit, onDelete }: 
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
+        <button onClick={onAdd} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : `No ${label}s yet.`}</p></div>

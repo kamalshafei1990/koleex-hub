@@ -972,7 +972,7 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
         </div>
         <button
           onClick={addModel}
-          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg"
         >
           <PlusIcon className="h-3.5 w-3.5" /> Add Variant
         </button>

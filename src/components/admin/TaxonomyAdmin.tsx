@@ -222,7 +222,7 @@ export default function TaxonomyAdmin({
           action={
             <button
               onClick={openCreate}
-              className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
+              className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg"
             >
               <PlusIcon className="h-3 w-3" />
               <span className="hidden sm:inline">Add {singular}</span>

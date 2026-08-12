@@ -741,7 +741,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
             <button
               type="button"
               onClick={saveEdit}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg"
             >
               {t("action.save", "Save")}
             </button>

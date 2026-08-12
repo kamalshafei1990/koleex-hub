@@ -93,7 +93,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
               <button
                 type="button"
                 onClick={handleCopy}
-                className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all"
+                className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 transition-all"
               >
                 {copied ? (
                   <>
@@ -130,7 +130,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
             type="button"
             onClick={onClose}
             disabled={!acknowledged}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t("acc.apiModal.done")}
           </button>

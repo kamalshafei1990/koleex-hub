@@ -1974,7 +1974,7 @@ export default function ProductList() {
                     Database app (Database › Visual Library › Specs & Attributes;
                     /product-data/visual-mapping already redirects there), so a
                     duplicate entry point here was just header clutter. */}
-                <Link href={`${baseRoute}/new`} className="h-10 px-5 max-sm:flex-1 max-sm:justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+                <Link href={`${baseRoute}/new`} className="h-10 px-5 max-sm:flex-1 max-sm:justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg">
                   <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
                 </Link>
               </>
@@ -2507,7 +2507,7 @@ export default function ProductList() {
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
-              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
+              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg"
             >
               {t("action.signInAgain", "Sign in again")}
             </a>
@@ -2527,7 +2527,7 @@ export default function ProductList() {
             <button
               type="button"
               onClick={() => setRetryKey((k) => k + 1)}
-              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
+              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg"
             >
               {t("action.retry")}
             </button>
@@ -2569,7 +2569,7 @@ export default function ProductList() {
               {products.length === 0 ? t("list.noProductsYetHint") : t("list.noResultsHint")}
             </p>
             {products.length === 0 && isInternal && (
-              <Link href={`${baseRoute}/new`} className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all">
+              <Link href={`${baseRoute}/new`} className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all">
                 <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
               </Link>
             )}

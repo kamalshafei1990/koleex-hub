@@ -2058,7 +2058,7 @@ export default function LegacyProductView() {
                         <button
                           type="button"
                           onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                          className="inline-flex items-center justify-center gap-1.5 h-9 px-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium hover:opacity-90 transition-opacity"
+                          className="inline-flex items-center justify-center gap-1.5 h-9 px-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium transition-opacity"
                         >
                           Request Quote
                           <AngleRightIcon className="h-4 w-4" />
@@ -2271,7 +2271,7 @@ export default function LegacyProductView() {
             <button
               type="button"
               onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-              className="inline-flex items-center h-12 px-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[15px] font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center h-12 px-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[15px] font-medium transition-opacity"
             >
               Request Quote
             </button>

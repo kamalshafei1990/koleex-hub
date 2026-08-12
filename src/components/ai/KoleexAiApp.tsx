@@ -1762,7 +1762,7 @@ export default function KoleexAiApp() {
           </Link>
           <button
             onClick={startNewChat}
-            className="flex-1 h-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:opacity-90"
+            className="flex-1 h-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center justify-center gap-1.5"
           >
             <PlusIcon size={14} />
             {copy.newChat}
@@ -2050,7 +2050,7 @@ export default function KoleexAiApp() {
           <button
             type="button"
             onClick={startNewChat}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center"
             aria-label={copy.newChat}
             title={copy.newChat}
           >
@@ -2094,7 +2094,7 @@ export default function KoleexAiApp() {
             <button
               type="button"
               onClick={startNewChat}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 transition-opacity"
               title={copy.newChat}
             >
               <PlusIcon size={14} />
@@ -2383,7 +2383,7 @@ export default function KoleexAiApp() {
                       <button
                         type="button"
                         onClick={handleStop}
-                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center shrink-0 transition-opacity"
                         aria-label="Stop generating"
                         title="Stop generating"
                       >
@@ -2393,7 +2393,7 @@ export default function KoleexAiApp() {
                       <button
                         type="submit"
                         disabled={!input.trim() && attachments.length === 0}
-                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center disabled:opacity-30 shrink-0 transition-opacity"
                         aria-label="Send"
                       >
                         <PaperPlaneIcon className="h-4 w-4" />
@@ -2564,7 +2564,7 @@ function ProjectDialog({
             type="button"
             onClick={onSave}
             disabled={!canSave}
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] disabled:opacity-40 hover:opacity-90"
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] disabled:opacity-40"
           >
             {copy.save}
           </button>
@@ -2625,7 +2625,7 @@ function DraftCard({ payload }: { payload: QuotationDraftPayload }) {
       </div>
       <Link
         href={payload.review_url}
-        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold"
       >
         Review in Quotations →
       </Link>
@@ -2852,7 +2852,7 @@ function Bubble({
                 <button
                   type="button"
                   onClick={submitEdit}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
                   aria-label="Save and retry"
                 >
                   Save & retry

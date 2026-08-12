@@ -736,7 +736,7 @@ export default function AccountForm({ mode, account }: Props) {
                           }
                         }}
                         disabled={pwResetBusy || form.temporary_password.trim().length < 8}
-                        className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
+                        className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
                       >
                         {pwResetBusy ? "Applying…" : "Apply password"}
                       </button>
@@ -1207,7 +1207,7 @@ export default function AccountForm({ mode, account }: Props) {
             <button
               type="submit"
               disabled={saving}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-60"
             >
               <DiskIcon className="h-4 w-4" />
               {saving ? t("acc.btn.saving") : mode === "create" ? t("acc.btn.createAccount") : t("acc.btn.save")}
@@ -1398,7 +1398,7 @@ function InlineCompanyPanel({
           type="button"
           onClick={save}
           disabled={saving}
-          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? t("acc.btn.saving") : t("acc.inline.addCompany")}
@@ -1533,7 +1533,7 @@ function InlinePersonPanel({
           type="button"
           onClick={save}
           disabled={saving}
-          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
+          className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? t("acc.btn.saving") : t("acc.inline.addContact")}

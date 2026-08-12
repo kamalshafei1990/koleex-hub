@@ -104,7 +104,7 @@ function PushEnableCard() {
             {busy ? "…" : t("notif.push.turnOff")}
           </button>
         ) : (
-          <button type="button" onClick={enable} disabled={busy || !supported} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 shrink-0">
+          <button type="button" onClick={enable} disabled={busy || !supported} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50 shrink-0">
             {busy ? t("notif.push.enabling") : t("notif.push.enable")}
           </button>
         )}

@@ -425,7 +425,7 @@ export default function CalendarApp() {
               <button
                 onClick={() => openNewEvent()}
                 disabled={!activeAccountId}
-                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-50"
               >
                 <PlusIcon className="h-4 w-4" /> {t("newEvent")}
               </button>

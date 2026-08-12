@@ -469,7 +469,7 @@ export default function AccountDetail({ accountId }: Props) {
             </button>
             <Link
               href={`/accounts/${data.id}/edit`}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg"
             >
               <PencilIcon className="h-4 w-4" /> {t("acc.action.edit")}
             </Link>
@@ -520,7 +520,7 @@ export default function AccountDetail({ accountId }: Props) {
                 type="button"
                 onClick={handleSetCustomPassword}
                 disabled={working || customPw.trim().length < 8}
-                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {working ? "Applying…" : "Apply"}
               </button>
@@ -554,7 +554,7 @@ export default function AccountDetail({ accountId }: Props) {
             </div>
             <button
               onClick={copyNewPw}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg flex items-center gap-1.5"
             >
               <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
             </button>

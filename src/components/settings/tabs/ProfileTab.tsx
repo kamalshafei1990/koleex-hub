@@ -380,7 +380,7 @@ export default function ProfileTab({
             type="button"
             onClick={save}
             disabled={!dirty || saving}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
+            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
           >
             {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
             {saving ? t("prof.saving") : t("prof.save")}
