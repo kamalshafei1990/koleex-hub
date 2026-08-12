@@ -1928,30 +1928,30 @@ input[type="number"]:not(.kx-spinner) {
    Content scrolling past now passes BESIDE the strip rather than under a
    frosted band, which is what glass is supposed to look like. Zero stacked
    filters: the band has no filter to stack with. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-band {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-band {
   background: transparent;
 }
-[data-kx-skin="aurora"] .kx-app .kx-ph-tabs {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs {
   background: rgba(11, 14, 20, 0.55);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs {
   background: rgba(255, 255, 255, 0.62);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-[data-kx-skin="aurora"][data-kx-lowpower] .kx-app .kx-ph-tabs {
+[data-kx-skin="aurora"][data-kx-lowpower] :is(.kx-pd, .kx-app) .kx-ph-tabs {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(12, 14, 18, 0.92);
 }
-[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] .kx-app .kx-ph-tabs {
+[data-kx-skin="aurora"][data-kx-lowpower][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs {
   background: rgba(250, 251, 253, 0.94);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-kx-skin="aurora"] .kx-app .kx-ph-tabs { background: rgba(12, 14, 18, 0.92); }
-  [data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs { background: rgba(250, 251, 253, 0.94); }
+  [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs { background: rgba(12, 14, 18, 0.92); }
+  [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs { background: rgba(250, 251, 253, 0.94); }
 }
 /* THE SELECTED TAB IS THE SEG-ON RING, NOT A SOLID PILL.
    PageHeader fills the active tab with `--bg-inverted` — a white block, which
@@ -1959,19 +1959,19 @@ input[type="number"]:not(.kx-spinner) {
    Aurora the selected state is the Hub-Blue inset ring over a 10% fill, the
    same as every other segmented control in the Hub (canon D). Bound to
    .kx-app so the twenty-two apps still on Core keep their white pill. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-tabs [aria-selected="true"] {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
   background-color: rgba(86, 127, 178, 0.10);
   box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
   color: var(--text-primary);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs [aria-selected="true"] {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
 /* Hover on an unselected tab: the border/tint whisper, not a filled block. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-tabs [aria-selected="false"]:hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
   background-color: rgba(255, 255, 255, 0.04);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-tabs [aria-selected="false"]:hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
 
@@ -1997,7 +1997,7 @@ input[type="number"]:not(.kx-spinner) {
    · [data-kx-keep-hover] — an escape hatch for a control whose hover colour
      is meaningful (destructive, brand).
    `translate: none` is declared ALONE (see the minifier note above). */
-[data-kx-skin="aurora"] .kx-app :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -2011,7 +2011,7 @@ input[type="number"]:not(.kx-spinner) {
   border-color: rgba(127, 169, 214, 0.55) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
 }
 
@@ -2021,11 +2021,11 @@ input[type="number"]:not(.kx-spinner) {
    browser re-samples its backdrop at the new position and the frost smears.
    PageHeader's back arrow ships `sm:hover:-translate-y-0.5`, which is exactly
    that lift. Neutralised inside converted apps only. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-chrome {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-chrome {
   transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
               background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-[data-kx-skin="aurora"] .kx-app .kx-ph-chrome:hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-chrome:hover {
   border-color: rgba(127, 169, 214, 0.55);
   background-color: rgba(255, 255, 255, 0.03);
   /* `translate`, NOT `transform`, and ONLY it. Two findings, both measured
@@ -2041,7 +2041,7 @@ input[type="number"]:not(.kx-spinner) {
   translate: none;
   box-shadow: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-chrome:hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-chrome:hover {
   border-color: rgba(62, 103, 150, 0.6);
   background-color: rgba(0, 0, 0, 0.03);
 }
@@ -2049,16 +2049,16 @@ input[type="number"]:not(.kx-spinner) {
 /* The search box is a WELL, matching the input rules above — same fill, same
    inset, same Hub-Blue focus ring, so the box and the field inside it read as
    one control. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-search {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search {
   background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-[data-kx-skin="aurora"] .kx-app .kx-ph-search:focus-within {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search:focus-within {
   border-color: rgba(86, 127, 178, 0.70);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
-[data-kx-skin="aurora"][data-theme="light"] .kx-app .kx-ph-search {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-search {
   background-color: rgba(255, 255, 255, 0.70);
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
@@ -2066,7 +2066,7 @@ input[type="number"]:not(.kx-spinner) {
 /* The input INSIDE that well must not draw a second well on top of it —
    two nested recesses read as a box in a box. It goes transparent and lets
    the wrapper be the field. */
-[data-kx-skin="aurora"] .kx-app .kx-ph-search input {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search input {
   background-color: transparent;
   border-color: transparent;
   box-shadow: none;
