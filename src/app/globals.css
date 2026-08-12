@@ -2009,10 +2009,16 @@ input[type="number"]:not(.kx-spinner) {
      way to override a utility framework, and the selector is narrow: one app
      scope, hover only, selected states excluded. */
   border-color: rgba(127, 169, 214, 0.55) !important;
+  /* The fill too. 17 sites across the converted apps still write
+     `hover:bg-[var(--bg-surface-hover)]` (10% white) — heavier than Aurora's
+     3% and the visible half of "old style" on a control with a faint border.
+     Same exclusions, so primary buttons and selected states are untouched. */
+  background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
 }
 
 /* CHROME CONTROLS: BORDER COLOUR ONLY, AND NEVER A LIFT.
