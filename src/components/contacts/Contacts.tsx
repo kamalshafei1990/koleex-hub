@@ -2402,6 +2402,7 @@ const TeamAvatar = React.memo(function TeamAvatar({ m, size = 24 }: { m: TeamMem
 const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChange, placeholder, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string; tier?: FieldTier; help?: string;
 }) {
+  const { t } = useTranslation(contactsT);
   const [open, setOpen] = React.useState(false);
   const [members, setMembers] = React.useState<TeamMember[]>(_teamCache ?? []);
   const [loading, setLoading] = React.useState(!_teamCache);
@@ -2441,6 +2442,33 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
   }, [members, q]);
 
   const pick = (m: TeamMember) => { onChange(memberLabel(m)); setOpen(false); setQ(""); };
+
+  /* ── Names that are not on the team ─────────────────────────────────────
+     Owner, 2026-08-12: customer records were collected at CISMA 2025 by three
+     people — Alex, Winny, Shally — who have since left the company and are NOT
+     in `people`, `koleex_employees` or `accounts`. The picker reads
+     /api/contacts/team-members, which is `accounts` filtered to
+     status = active, so they can never appear in it.
+
+     They do not need to. This field has ALWAYS stored the plain NAME, not an
+     id (see `pick` above), and the trigger already falls back to rendering a
+     stored name that matches no active account — so a departed colleague's
+     name survives on the record for good. The only thing missing was a way to
+     PUT one there.
+
+     Hence: type a name the list doesn't have and commit it as text. Chosen
+     over hard-coding the three names because the fourth one costs a deploy
+     otherwise, and over re-creating them as employee records, which would
+     have polluted the roster, headcount and permissions to satisfy one field.
+
+     NOTE for whoever reassigns accounts later: a name typed into Sales Rep is
+     ownership and WILL be overwritten on reassignment. Acquisition belongs in
+     Referred By or Source Details until a dedicated field exists. */
+  const typedName = q.trim();
+  const canUseTyped =
+    typedName.length > 1 &&
+    !filtered.some((m) => memberLabel(m).toLowerCase() === typedName.toLowerCase());
+  const useTyped = () => { onChange(typedName); setOpen(false); setQ(""); };
 
   return (
     <div ref={ref} className="relative">
@@ -2507,7 +2535,7 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
           <div className="max-h-64 overflow-y-auto py-1">
             {loading ? (
               <div className="px-3 py-6 text-center text-xs text-[var(--text-ghost)]">Loading…</div>
-            ) : filtered.length === 0 ? (
+            ) : filtered.length === 0 && !canUseTyped ? (
               <div className="px-3 py-6 text-center text-xs text-[var(--text-ghost)]">No team members found</div>
             ) : (
               filtered.map((m) => {
@@ -2529,6 +2557,25 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
                   </button>
                 );
               })
+            )}
+            {/* Sits UNDER the matches, never instead of them: a real colleague
+                must always win over a name being typed. */}
+            {!loading && canUseTyped && (
+              <button
+                type="button"
+                onClick={useTyped}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-start transition-colors border-t border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)]"
+              >
+                <span className="w-[30px] h-[30px] shrink-0 rounded-full border border-dashed border-[var(--border-color)] flex items-center justify-center text-[var(--text-ghost)]">
+                  <PlusIcon size={13} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate text-sm text-[var(--text-primary)]">{typedName}</span>
+                  <span className="block truncate text-[11px] text-[var(--text-dim)]">
+                    {t("field.useTypedName", "Not on the team — save as text")}
+                  </span>
+                </span>
+              </button>
             )}
           </div>
         </div>

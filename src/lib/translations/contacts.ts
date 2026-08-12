@@ -562,6 +562,9 @@ export const contactsT: Translations = {
   /* ── Related Person Fields ── */
   "field.name":                 { en: "Name",                      zh: "姓名",                 ar: "الاسم" },
   "field.selectEmployee":       { en: "Select an employee…",       zh: "选择员工…",             ar: "اختر موظفًا…" },
+  /* Shown under a name typed into the team picker that matches nobody on the
+     team — e.g. a colleague who has left and is no longer in the system. */
+  "field.useTypedName":         { en: "Not on the team — save as text", zh: "不在团队中 — 保存为文本", ar: "ليس ضمن الفريق — احفظه كنص" },
   "field.relationship":         { en: "Relationship",              zh: "关系",                 ar: "العلاقة" },
   "field.notes":                { en: "Notes",                     zh: "备注",                 ar: "ملاحظات" },
   "field.email":                { en: "Email",                     zh: "邮箱",                 ar: "البريد الإلكتروني" },
