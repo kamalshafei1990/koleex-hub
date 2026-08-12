@@ -578,7 +578,18 @@ function GroupCard({
   const locField = (f: SpecField): SpecField => ({
     ...f,
     label: ts(`f:${f.key}`, f.label),
-    options: f.options?.map((o) => ({ ...o, label: ts(`o:${o.value}`, o.label) })),
+    /* FIELD-SCOPED FIRST, then the shared key. `o:<value>` alone cannot work:
+       two different fields legitimately offer the same value and mean different
+       things. Live proof — a needle detector's `head_count: "single"` was
+       rendering as 单相 / "طور واحد" (single PHASE, from the lockstitch power
+       field), and a fusing machine's `fusing_type: "rotary"` as 旋梭 (rotary
+       HOOK, a lockstitch part). English was fine because the schema's own label
+       is the fallback, so this only ever broke zh/ar — invisible to whoever
+       wrote it. Scoping the key fixes the class, and changes no stored value. */
+    options: f.options?.map((o) => ({
+      ...o,
+      label: ts(`o:${f.key}.${o.value}`, ts(`o:${o.value}`, o.label)),
+    })),
   });
 
   const [open, setOpen] = useState(true);

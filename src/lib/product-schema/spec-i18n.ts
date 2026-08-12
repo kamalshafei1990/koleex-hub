@@ -184,6 +184,35 @@ export const SPEC_I18N: Translations = {
   /* The last four untranslated keys in the whole registry. `f:safety_features`
      is the one every schema carries via safetyComplianceGroup, so it was
      showing in English on all 28 templates at once. */
+  /* FIELD-SCOPED OPTION LABELS — read before `o:<value>` by SchemaSpecsSection.
+     These four are the collisions that a value-only key cannot express: the
+     same word means a different thing on a different field. They lived in
+     SPEC_NAME_I18N, which the form never reads for `o:` keys, so zh/ar showed
+     the OTHER field's meaning while English quietly looked correct.
+     The four pure duplicates that sat beside them (jeans, shirts, dresses,
+     trousers — identical in both dictionaries) were simply deleted. */
+  /* The same five values, each meaning something different depending on the
+     field it sits on. Found by asserting the whole registry rather than by
+     noticing — English looked right on all of them because the schema's own
+     label is the fallback; only zh/ar took the other field's meaning. */
+  "o:automation_level.automatic":   { en: "Automatic",                     zh: "全自动",       ar: "أوتوماتيكي" },
+  "o:boiler_feed_mode.automatic":   { en: "Automatic Water Supply",        zh: "自动供水",     ar: "تغذية ماء تلقائية" },
+  "o:lubrication_system.automatic": { en: "Automatic Lubrication",         zh: "自动润滑",     ar: "تزييت تلقائي" },
+  "o:needle_positioning.both":      { en: "Up + Down",                     zh: "上下停针",     ar: "أعلى + أسفل" },
+  "o:discharge_method.both":        { en: "Roll + Plait",                  zh: "卷取+折叠",    ar: "لفّ + طيّ" },
+  "o:feeding_method.both":          { en: "Roll + Plait",                  zh: "卷取+折叠",    ar: "لفّ + طيّ" },
+  "o:discharge_method.conveyor":    { en: "Conveyor Out-feed",             zh: "输送带出料",   ar: "إخراج بسير ناقل" },
+  "o:surface_type.conveyor":        { en: "Conveyor Top",                  zh: "输送带台面",   ar: "سطح بسير ناقل" },
+  "o:light_source.adjustable":      { en: "Adjustable Intensity",          zh: "亮度可调",     ar: "شدّة قابلة للضبط" },
+  "o:speed_control.adjustable":     { en: "Speed Adjustable",              zh: "速度可调",     ar: "سرعة قابلة للضبط" },
+  "o:relaxing_method.combined":     { en: "Combined (Steam + Mechanical)", zh: "蒸汽+机械组合", ar: "مركّب (بخار + ميكانيكي)" },
+  "o:machine_variant.combined":     { en: "Combined Sucking & Brushing",   zh: "吸线+刷毛一体", ar: "شفط وفرش معًا" },
+
+  "o:hook_looper_type.rotary": { en: "Rotary", zh: "旋梭", ar: "دوّار" },
+  "o:fusing_type.rotary":      { en: "Rotary Drum", zh: "滚筒式", ar: "أسطواني دوّار" },
+  "o:phase.single":            { en: "Single Phase", zh: "单相", ar: "طور واحد" },
+  "o:head_count.single":       { en: "Single Head", zh: "单探头", ar: "رأس واحد" },
+
   "f:safety_features":           { en: "Safety Features",          zh: "安全装置",       ar: "وسائل الأمان" },
   "f:rohs_compliant":            { en: "RoHS Compliant",           zh: "符合 RoHS",      ar: "مطابق لـ RoHS" },
   "f:sectioned_vacuum":          { en: "Sectioned Vacuum",         zh: "分段吸风",       ar: "شفط مقسّم" },
@@ -768,12 +797,6 @@ export const SPEC_NAME_I18N: Translations = {
   "s:fabric-preshrink.v1": { en: "Fabric Pre-shrinking Machine", zh: "面料预缩定型机", ar: "ماكينة تكميش الأقمشة" },
 
   /* ── Finishing batch 2026-08 options ── */
-  "o:rotary": { en: "Rotary Drum", zh: "滚筒式", ar: "أسطواني دوّار" },
-  "o:jeans": { en: "Jeans", zh: "牛仔裤", ar: "جينز" },
-  "o:shirts": { en: "Shirts", zh: "衬衫", ar: "قمصان" },
-  "o:dresses": { en: "Dresses", zh: "连衣裙", ar: "فساتين" },
-  "o:single": { en: "Single Head", zh: "单探头", ar: "رأس واحد" },
-  "o:trousers": { en: "Trousers", zh: "裤子", ar: "بناطيل" },
 };
 
 /* ── Field descriptions, keyed by the exact English sentence ── */

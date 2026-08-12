@@ -475,6 +475,72 @@ console.log("\nH. Machine-Kind facet vocabulary");
     : bad("retired shelf", `${relapsed.join(", ")} — these describe a configuration, not a stitch (CL-0020)`);
 }
 
+/* ── I. One option value must not mean two things ─────────────────────────
+   `SchemaSpecsSection` localises an option with `o:<value>`, so the key is the
+   VALUE alone. Two different fields legitimately offer the same value — and
+   when they mean different things, one of them renders the other's meaning.
+
+   ENGLISH NEVER SHOWS IT. The schema's own `label` is the fallback, so the
+   form looks correct in English while zh and ar carry the wrong word. Live
+   examples found by this check, not by reading: a needle detector's
+   `head_count: "single"` rendered as 单相 / "طور واحد" — single PHASE, borrowed
+   from the lockstitch power field; a fusing machine's `fusing_type: "rotary"`
+   as 旋梭 — rotary HOOK, a lockstitch part.
+
+   The fix is a field-scoped key `o:<fieldKey>.<value>`, which the form reads
+   first. It changes no stored value.
+
+   A GATE THAT CRIES WOLF GETS IGNORED, so a collision passes if EITHER it is
+   scoped, OR it is listed below as a case where the shared word is genuinely
+   right for both fields ("Servo" vs "Servo Motor" is the same thing said twice,
+   not two meanings). A NEW collision is in neither list and fails until someone
+   decides which it is. */
+console.log("\nI. Option-value collisions");
+{
+  const { listSchemas } = await import(
+    path.resolve(__dirname, "../src/lib/product-schema/index.ts")
+  ) as typeof import("../src/lib/product-schema/index.js");
+  const { SPEC_I18N } = await import(
+    path.resolve(__dirname, "../src/lib/product-schema/spec-i18n.ts")
+  ) as typeof import("../src/lib/product-schema/spec-i18n.js");
+  const D = SPEC_I18N as Record<string, unknown>;
+
+  /* Same concept, wordier on one field. The shared translation is correct for
+     every owner, so scoping them would add keys and change nothing. */
+  const SHARED_OK = new Set([
+    "servo", "clutch", "manual", "semi_dry", "heavy", "denim", "wool", "standard",
+    "large", "tubular", "woven", "mechanical", "anti_collision", "emergency_stop",
+    "steam", "plaiter", "length_counter", "technical", "electric", "plc_touchscreen",
+    "safety_valve", "delicate",
+  ]);
+
+  const labels = new Map<string, Set<string>>();
+  const owners = new Map<string, Set<string>>();
+  for (const s of listSchemas()) for (const g of s.groups) for (const f of g.fields) {
+    for (const o of f.options ?? []) {
+      if (!labels.has(o.value)) { labels.set(o.value, new Set()); owners.set(o.value, new Set()); }
+      labels.get(o.value)!.add(o.label);
+      owners.get(o.value)!.add(f.key);
+    }
+  }
+  const unclassified: string[] = [];
+  let collisions = 0, scoped = 0;
+  for (const [value, ls] of labels) {
+    if (ls.size < 2) continue;
+    collisions++;
+    if (SHARED_OK.has(value)) continue;
+    /* every owning field must have its own key once the word means two things */
+    const missing = [...owners.get(value)!].filter((fk) => !D[`o:${fk}.${value}`]);
+    if (missing.length === 0) { scoped++; continue; }
+    unclassified.push(`"${value}" (${[...ls].join(" | ")}) — no o:<field>.${value} for: ${missing.join(", ")}`);
+  }
+  unclassified.length === 0
+    ? ok("every colliding value is scoped or declared shared",
+         `${collisions} collisions: ${scoped} scoped, ${collisions - scoped} shared-by-design`)
+    : bad("unclassified option collision",
+          `${unclassified.length} value(s) mean two things with no field-scoped key:\n       ${unclassified.join("\n       ")}`);
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +
