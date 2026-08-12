@@ -17,6 +17,7 @@ import {
   GARMENT_REVERSING_SCHEMA,
   IRONING_SYSTEMS_BINDINGS,
 } from "./schemas/finishing-batch-2026-08";
+import { YILI_BATCH_SCHEMAS } from "./schemas/yili-batch-2026-08-12";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -42,6 +43,12 @@ registerSchema(STEAM_GENERATOR_SCHEMA);
 registerSchema(FORM_FINISHING_SCHEMA);
 registerSchema(NEEDLE_DETECTOR_SCHEMA);
 registerSchema(GARMENT_REVERSING_SCHEMA);
+
+/* YILI catalog batch (2026-08-12, owner-approved) — the two subcategories
+   that hold live YILI products and still had no spec template: XFSP Spotting
+   Machines (catalog pp. 81–82) and XFTS Thread Sucking / Brushing (pp. 87–88).
+   Every field is traceable to a printed column on those pages. */
+for (const schema of YILI_BATCH_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
