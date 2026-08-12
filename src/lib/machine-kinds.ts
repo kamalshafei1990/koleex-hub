@@ -82,9 +82,10 @@ export interface MachineKind {
    *  the old `double-needle-machines` + `heavy-duty-machines` split used to
    *  say, without giving one machine two identities. */
   attributes?: Record<string, string>;
-  /** Set on the machines that are NOT sewing machines. They keep the retired
-   *  `special-machines` shelf until Bonding / Fastening / Production Systems
-   *  exist, rather than being forced into a wrong stitch type. */
+  /** Was set on the four machines that form no stitch while they waited for a
+   *  home. CL-0020 created Seam Sealing & Bonding, Fastening & Press and
+   *  Production Systems, so nothing carries it any more — kept as a documented
+   *  escape hatch for the next machine that arrives before its category does. */
   pendingHome?: string;
   templateSlug: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -979,8 +980,7 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-snap-rivet",
     name: "Snap / Rivet / Eyelet Setter",
     description: "Pneumatic setter for snap buttons, rivets, grommets.",
-    subcategory: "special-machines",
-    pendingHome: "fastening",
+    subcategory: "snap-rivet-eyelet-setters",
     templateSlug: "button-attach",
     icon: ButtonAttachIcon,
   },
@@ -1051,8 +1051,7 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-ultrasonic-bonding",
     name: "Ultrasonic Bonding Machine",
     description: "Seamless bonding — sportswear, PPE, lingerie.",
-    subcategory: "special-machines",
-    pendingHome: "bonding-seam-sealing",
+    subcategory: "seam-sealing-bonding",
     templateSlug: "single-needle-lockstitch",
     icon: SpecialMachineIcon,
   },
@@ -1060,8 +1059,7 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-heat-seam-seal",
     name: "Heat-Seam Sealing Machine",
     description: "Seals seams waterproof — outerwear, drysuits.",
-    subcategory: "special-machines",
-    pendingHome: "bonding-seam-sealing",
+    subcategory: "seam-sealing-bonding",
     templateSlug: "single-needle-lockstitch",
     icon: SpecialMachineIcon,
   },
@@ -1069,8 +1067,7 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-robotic-cell",
     name: "Robotic / Automated Sewing Cell",
     description: "Multi-station robotic sewing — lights-out production.",
-    subcategory: "special-machines",
-    pendingHome: "production-systems",
+    subcategory: "robotic-sewing-cells",
     templateSlug: "bartacking",
     icon: AutomaticMachineIcon,
   },

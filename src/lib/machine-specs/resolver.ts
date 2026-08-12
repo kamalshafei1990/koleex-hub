@@ -151,6 +151,26 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Material capacity, frame reinforcement + cooling for heavy-duty heads.",
     fields: HEAVY_DUTY_FAMILY_FIELDS,
   },
+  /* CL-0020 — the three homes for machines that form NO STITCH. They left
+     Industrial Sewing entirely: two join with heat or ultrasound, one sets
+     mechanical fasteners, one composes other machines. The old "Special"
+     family fields are the closest honest starting point; each will get its own
+     template when the first real product arrives. */
+  "seam-sealing-bonding": {
+    title: "Seam Sealing & Bonding Basics",
+    subtitle: "Stitchless joining — process type, tape feed, working width, temperature.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "snap-rivet-eyelet-setters": {
+    title: "Fastener Setting Basics",
+    subtitle: "Die set, fastener size range, actuation and cycle rate.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "robotic-sewing-cells": {
+    title: "Production Cell Basics",
+    subtitle: "Cell footprint, stations, robot reach and throughput.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
   /* CL-0020 — Automatic Sewing Systems shelves that never had a spec family.
      They did not need one while buttonhole / bartack / button-attach / pocket
      welting kinds were all parked under `special-machines` and
