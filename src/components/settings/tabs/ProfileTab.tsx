@@ -15,6 +15,7 @@
    Work identity (role, department, employee no., dates) is always read-only. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { ProfilePrefs } from "@/lib/access-control";
@@ -452,14 +453,13 @@ function Select({ label, icon, value, onChange, options, disabled }: {
   return (
     <div>
       <Label icon={icon}>{label}</Label>
-      <select
+      <KdsSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         disabled={disabled}
-        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </select>
+        options={options.map((o) => ({ value: o.v, label: o.l }))}
+        triggerClassName="w-full h-10 ps-3 pe-9 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-start"
+      />
     </div>
   );
 }

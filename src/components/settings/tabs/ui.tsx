@@ -6,6 +6,7 @@
    keeps the original inverted pill. */
 
 import type { ReactNode } from "react";
+import KdsSelect from "@/components/kds/Select";
 import { useSkin } from "@/lib/appearance";
 
 /** The ONE disclosure chevron for the Settings app — the master list, the
@@ -140,18 +141,19 @@ export function SelectControl<T extends string | number>({ value, onChange, opti
   value: T; onChange: (v: T) => void; options: { value: T; label: string }[];
 }) {
   return (
-    <select
+    /* The generic survives the swap: KdsSelect speaks strings, so the raw
+       value is mapped back to the typed option exactly as the native one
+       did — a number-valued setting still calls onChange with a number. */
+    <KdsSelect
       value={String(value)}
-      onChange={(e) => {
-        const raw = e.target.value;
+      onChange={(raw) => {
         const match = options.find((o) => String(o.value) === raw);
         if (match) onChange(match.value);
       }}
-      className="h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)]"
-    >
-      {options.map((o) => (
-        <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
-      ))}
-    </select>
+      options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+      wrapperClassName="shrink-0"
+      panelWidthClassName="min-w-[11rem]"
+      triggerClassName="h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] ps-2.5 pe-7 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] text-start"
+    />
   );
 }
