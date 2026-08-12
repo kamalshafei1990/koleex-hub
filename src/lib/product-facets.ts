@@ -17,8 +17,9 @@
    `docs/product-data-v2/reference-data/facet-dictionary-master.md`. The audit's
    OUTPUT 9 item 7 says exactly this — *"align to the dictionary that's already
    right"*. So this file MIRRORS that document rather than inventing anything:
-   every key and every value below is quoted from it, and the few that are not
-   are marked `▲ proposed` and carry a reason.
+   every key and every value below is quoted from it. Six were not, and were
+   carried as `▲ proposed` with a reason until CL-0022 confirmed them into a
+   new dictionary §9 — the flag is how you tell "governed" from "my idea".
 
    THE RULE: a facet key that is not in this registry, or a value that is not in
    its `values` list, is a typo — `validate:budgets` section H fails the build
@@ -39,7 +40,10 @@ export interface FacetDefinition {
   unit?: string;
   /** Which dictionary section this came from — so a reader can go check. */
   source: string;
-  /** ▲ = not yet in the master dictionary; needs a CL entry to be confirmed. */
+  /** ▲ = not yet in the master dictionary; needs a CL entry to be confirmed.
+   *  Nothing carries it today — CL-0022 confirmed the last six. Kept because
+   *  the next facet will be proposed before it is governed, and marking that
+   *  state is what stopped these six from being mistaken for governed. */
   proposed?: boolean;
   note?: string;
 }
@@ -99,35 +103,39 @@ export const FACETS: Record<string, FacetDefinition> = {
     note: "Open vocabulary — governed by application-dictionary-master.md, not by a closed list here.",
   },
 
-  /* ── ▲ PROPOSED — used by a real Machine Kind, not yet in the master doc.
-     Each one is a distinction a catalogue actually prints; none is invented to
-     round out a set. They need a CL entry before they can be called governed. */
+  /* ── ✅ CONFIRMED by CL-0022 (2026-08-12). Each was checked against the whole
+     dictionary before sign-off: none duplicates an existing facet, and each is
+     used by at least one real Machine Kind. Two names sit close to older
+     facets and are deliberately NOT the same thing —
+       `needle_bar_type` (fixed | split)  vs  §8a `needle_bar_stroke` (mm travel)
+       `vision_guided` (a sewing head)    vs  §2 `inspection_method: Vision/AI`
+     Confusing either pair would put a value in the wrong column. */
   working_field_class: {
-    key: "working_field_class", type: "single_select", source: "▲ proposed (CL-0020)",
-    values: ["small", "medium", "large", "xxl"], proposed: true,
+    key: "working_field_class", type: "single_select", source: "§9 · confirmed CL-0022",
+    values: ["small", "medium", "large", "xxl"],
     note: "`working_field` is a numeric mm × mm pair. A KIND is a preset, not a model, so it carries the size BAND the catalogue advertises ('Small-Area Pattern Sewer'). The number stays on the product.",
   },
   needle_bar_type: {
-    key: "needle_bar_type", type: "single_select", source: "▲ proposed (CL-0020)",
-    values: ["fixed", "split"], proposed: true,
+    key: "needle_bar_type", type: "single_select", source: "§9 · confirmed CL-0022",
+    values: ["fixed", "split"],
     note: "Split-bar lets one needle disengage to turn corners. A real, printed, buying-relevant split on twin-needle machines.",
   },
   buttonhole_type: {
-    key: "buttonhole_type", type: "single_select", source: "▲ proposed (CL-0020)",
-    values: ["straight", "eyelet-keyhole"], proposed: true,
+    key: "buttonhole_type", type: "single_select", source: "§9 · confirmed CL-0022",
+    values: ["straight", "eyelet-keyhole"],
     note: "Straight (shirt) vs eyelet/keyhole (jacket, denim) are different machines commercially, same stitch class.",
   },
   welt_count: {
-    key: "welt_count", type: "single_select", source: "▲ proposed (CL-0020)",
-    values: ["single", "double"], proposed: true,
+    key: "welt_count", type: "single_select", source: "§9 · confirmed CL-0022",
+    values: ["single", "double"],
   },
   flap_handling: {
-    key: "flap_handling", type: "boolean", source: "▲ proposed (CL-0020)",
-    values: ["true", "false"], proposed: true,
+    key: "flap_handling", type: "boolean", source: "§9 · confirmed CL-0022",
+    values: ["true", "false"],
   },
   vision_guided: {
-    key: "vision_guided", type: "boolean", source: "▲ proposed (CL-0020)",
-    values: ["true", "false"], proposed: true,
+    key: "vision_guided", type: "boolean", source: "§9 · confirmed CL-0022",
+    values: ["true", "false"],
     note: "The audit's OUTPUT 8 names vision-guidance explicitly as an ATTRIBUTE, so that it never becomes a 'Vision-X' type under every stitch class.",
   },
 };

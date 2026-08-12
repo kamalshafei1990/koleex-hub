@@ -163,11 +163,13 @@ Promoted from the [Lockstitch Master Spec Dictionary v1.1](./dictionaries/lockst
 
 ---
 
-## 9. Sewing-family facets promoted by CL-0020 (▲ proposed)
+## 9. Sewing-family facets promoted by CL-0020 (✅ confirmed by CL-0022)
 
 CL-0020 moved bed type / feed type / needle count / duty off the subcategory shelf and onto the second axis. Most of that vocabulary already existed above and is **reused unchanged** — `bed_type`, `feed_type`, `needle_count`, `drive_type`, `automation_level`, `working_field`, `application`, `template_recognition`, and `fabric_weight_class` (§8d), which is the governed home for what the retired `XSH` shelf used to say.
 
-Six distinctions had no facet. Each is printed in a real catalogue and none is invented to round out a set. They are **▲ proposed** until a CL entry confirms them.
+Six distinctions had no facet. Each is printed in a real catalogue and none is invented to round out a set. **Confirmed by CL-0022** after a full-dictionary check: none duplicates an existing facet, and each is used by at least one live Machine Kind.
+
+> ⚠️ **Two names sit close to older facets and are NOT the same thing.** `needle_bar_type` (fixed | split) is not §8a `needle_bar_stroke` (mm of travel); `vision_guided` (a sewing head) is not §2 `inspection_method: Vision/AI` (fabric inspection). Confusing either pair puts a value in the wrong column.
 
 | Facet | Type | Allowed Values | Why it needs to exist |
 |---|---|---|---|

@@ -313,3 +313,16 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **⚠️ THE VERIFICATION SCAN FOUND TWO MORE, outside the brief.** Checking for duplicate codes, the same query was pointed at slugs — and `heat-press-machines` and `maintenance-tools` each sat on two rows across two divisions. **`products.subcategory_slug` stores a SLUG, not an id**, so a duplicate slug means a product filed on either shelf is indistinguishable from one filed on the other. Both sides were empty, which is the only reason this was cheap. Re-slugged to `industrial-heat-press-machines` and `vehicle-maintenance-tools`.
 - **Conflict scan:** live `subcategories` now has **0 duplicate codes and 0 duplicate slugs**, across every division — not just garment machinery. No `src/` file referenced any of the four removed or renamed slugs.
 - **Status:** **Applied — live.** CL-0001's duplicate-code finding is closed. Still open: the six `▲ proposed` facets from CL-0020 step 2 need a confirming entry.
+
+### CL-0022 · 2026-08-12 · The six sewing facets are confirmed — CL-0020 fully closed
+- **Approved by:** Kamal ("start" — 2026-08-12), on the last open item from CL-0020 step 2.
+- **What was outstanding.** CL-0020 re-keyed the Machine-Kind attributes onto `facet-dictionary-master.md`, but six distinctions had no facet anywhere and were carried as **▲ proposed** rather than quietly written in as if governed. This entry confirms them.
+- **They were checked, not rubber-stamped.** Two tests before sign-off:
+  1. **Does it duplicate an existing facet?** The whole dictionary was scanned for each. Two near-misses were found and are deliberately **NOT** the same thing:
+     · `needle_bar_type` (fixed | split) vs **§8a `needle_bar_stroke`** — a measurement in mm of travel.
+     · `vision_guided` (a sewing head) vs **§2 `inspection_method: Vision/AI`** — fabric inspection, a different machine entirely.
+     Confusing either pair would put a value in the wrong column, so both are called out in §9 rather than left to be discovered.
+  2. **Is it actually used?** Every one is used by at least one live Machine Kind — `working_field_class` 4 · `needle_bar_type` 2 · `buttonhole_type` 2 · `welt_count` 2 · `flap_handling` 1 · `vision_guided` 1. A facet nobody uses is a guess, and would have been removed rather than confirmed.
+- **Change:** dictionary §9 heading ▲ → ✅; `src/lib/product-facets.ts` sources re-pointed to `§9 · confirmed CL-0022` and all six `proposed: true` flags cleared. **The `proposed` field itself is kept** even though nothing carries it — the next facet will be proposed before it is governed, and that flag is exactly what stopped these six from being mistaken for governed vocabulary in the meantime.
+- **Conflict scan:** 0 duplicate facet keys; `validate:budgets` section H green — 105 kinds, 77 facet pairs, every key and value in the registry and translated en/zh/ar.
+- **Status:** **Applied.** With this, **CL-0020 is fully closed** — taxonomy, facet registry, sibling categories, spec templates, and now the facet governance. CL-0021 closed the duplicate codes. The Industrial Sewing family has no open coding items.
