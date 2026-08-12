@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
@@ -161,14 +162,15 @@ export default function PricingIntelligenceCard({
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1">Market</label>
-          <select
+          <KdsSelect
             value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            className="h-9 px-2.5 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] min-w-[160px]"
-          >
-            {markets.length === 0 && <option value="EG">🇪🇬 Egypt</option>}
-            {markets.map((m) => <option key={m.code} value={m.code}>{flagOf(m.code)} {m.name}</option>)}
-          </select>
+            onChange={setCountry}
+            options={markets.length === 0
+              ? [{ value: "EG", label: "🇪🇬 Egypt" }]
+              : markets.map((m) => ({ value: m.code, label: `${flagOf(m.code)} ${m.name}` }))}
+            wrapperClassName="shrink-0" panelWidthClassName="min-w-[12rem]"
+            triggerClassName="h-9 ps-2.5 pe-8 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] min-w-[160px] text-start"
+          />
         </div>
         {data?.fxCnyPerUsd && (() => {
           const buffer = Number(data.fxSafetyBufferPercent ?? 0);

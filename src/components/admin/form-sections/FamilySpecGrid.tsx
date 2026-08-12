@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import BoundIcon from "@/components/common/BoundIcon";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
@@ -122,19 +123,18 @@ export default function FamilySpecGrid({
         : "border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)]");
     if (f.fieldType === "select" && f.options.length > 0) {
       return (
-        <select value={value} onChange={(e) => onSet(e.target.value)} className={`${base} appearance-none`}>
-          <option value="">{placeholder ? `↳ ${placeholder}` : "—"}</option>
-          {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <KdsSelect value={value} onChange={onSet}
+          options={f.options.map((o) => ({ value: o.value, label: o.label }))}
+          placeholder={placeholder ? `↳ ${placeholder}` : "—"}
+          triggerClassName={`${base} pe-7 text-start`} />
       );
     }
     if (f.fieldType === "boolean") {
       return (
-        <select value={value} onChange={(e) => onSet(e.target.value)} className={`${base} appearance-none`}>
-          <option value="">{placeholder ? `↳ ${placeholder}` : "—"}</option>
-          <option value="true">{t("pp.yes", "Yes")}</option>
-          <option value="false">{t("pp.no", "No")}</option>
-        </select>
+        <KdsSelect value={value} onChange={onSet}
+          options={[{ value: "true", label: t("pp.yes", "Yes") }, { value: "false", label: t("pp.no", "No") }]}
+          placeholder={placeholder ? `↳ ${placeholder}` : "—"}
+          triggerClassName={`${base} pe-7 text-start`} />
       );
     }
     return (

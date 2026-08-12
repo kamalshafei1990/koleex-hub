@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import ShirtIcon from "@/components/icons/ui/ShirtIcon";
 import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
@@ -216,18 +217,13 @@ function FieldRenderer({
       return (
         <div>
           {renderLabel(false)}
-          <select
+          <KdsSelect
             value={(value as string) || ""}
-            onChange={(e) => onChange(e.target.value)}
-            className={inp}
-          >
-            <option value="">Select...</option>
-            {field.options?.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={onChange}
+            options={(field.options ?? []).map((opt) => ({ value: opt.value, label: opt.label }))}
+            placeholder="Select..."
+            triggerClassName={inp + " pe-8 text-start"}
+          />
           {field.helpText && (
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 flex items-center gap-1">
               <InfoIcon className="h-2.5 w-2.5 shrink-0" /> {field.helpText}
@@ -476,18 +472,13 @@ function SpecRowControl({
 
     case "select":
       return (
-        <select
+        <KdsSelect
           value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          className={inp}
-        >
-          <option value="">Select…</option>
-          {field.options?.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={onChange}
+          options={(field.options ?? []).map((opt) => ({ value: opt.value, label: opt.label }))}
+          placeholder="Select…"
+          triggerClassName={inp + " pe-8 text-start"}
+        />
       );
 
     case "multi-select": {

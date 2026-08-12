@@ -91,7 +91,7 @@ export default function SelectWithCreate({
 
       {/* Dropdown */}
       {open && (
-        <div className="kx-glass-pop absolute z-50 top-full left-0 right-0 mt-1.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl shadow-black/30 overflow-hidden">
+        <div className="kx-glass-pop kx-pop-panel absolute z-50 top-full left-0 right-0 mt-1.5">
           {/* Search */}
           {options.length > 5 && (
             <div className="p-2 border-b border-[var(--border-subtle)]">

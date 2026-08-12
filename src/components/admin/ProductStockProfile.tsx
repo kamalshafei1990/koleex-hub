@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
@@ -213,23 +214,21 @@ export default function ProductStockProfile({ productId }: { productId: string }
       ) : track ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label={t("stock.uom")}>
-            <select
+            <KdsSelect
               value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1.5 text-[12.5px] text-[var(--text-primary)]"
-            >
-              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
+              onChange={setUnit}
+              options={UNITS}
+              triggerClassName="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-2 pe-7 py-1.5 text-[12.5px] text-[var(--text-primary)] text-start"
+            />
           </Field>
           <Field label={t("stock.default_warehouse")}>
-            <select
+            <KdsSelect
               value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1.5 text-[12.5px] text-[var(--text-primary)]"
-            >
-              <option value="">{t("stock.no_warehouse")}</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
-            </select>
+              onChange={setWarehouseId}
+              options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.name}` }))}
+              placeholder={t("stock.no_warehouse")}
+              triggerClassName="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-2 pe-7 py-1.5 text-[12.5px] text-[var(--text-primary)] text-start"
+            />
           </Field>
           <Field label={t("stock.cost_price")}>
             <input
@@ -239,13 +238,12 @@ export default function ProductStockProfile({ productId }: { productId: string }
             />
           </Field>
           <Field label={t("stock.currency")}>
-            <select
+            <KdsSelect
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1.5 text-[12.5px] text-[var(--text-primary)]"
-            >
-              {["CNY","USD","EUR","GBP","AED","SAR","EGP"].map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+              onChange={setCurrency}
+              options={["CNY","USD","EUR","GBP","AED","SAR","EGP"]}
+              triggerClassName="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-2 pe-7 py-1.5 text-[12.5px] text-[var(--text-primary)] text-start"
+            />
           </Field>
           <Field label={t("stock.reorder_point")}>
             <input

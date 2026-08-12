@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
@@ -98,13 +99,13 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
                 <span className="truncate">{r.related_name}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <select
+                <KdsSelect
                   value={r.relation_type || "related"}
-                  onChange={(e) => setType(r.related_id, e.target.value)}
-                  className="h-7 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]"
-                >
-                  {REL_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                  onChange={(v) => setType(r.related_id, v)}
+                  options={REL_TYPES.map(([value, label]) => ({ value, label }))}
+                  wrapperClassName="shrink-0" panelWidthClassName="min-w-[10rem]"
+                  triggerClassName="h-7 ps-2 pe-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)] text-start"
+                />
                 <button onClick={() => remove(r.related_id)} aria-label="Remove related product" className="text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] transition-colors">
                   <CrossIcon className="h-3.5 w-3.5" />
                 </button>

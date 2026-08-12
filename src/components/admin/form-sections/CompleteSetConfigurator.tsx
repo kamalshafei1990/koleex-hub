@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -107,10 +108,9 @@ function AccessorySide({ label, products, country, applied, applyNonce, onChange
           {fob != null ? `+${usd(fob)}` : (product?.baseCostCny == null ? "cost —" : "—")}
         </span>
       </div>
-      <select className={`${ctl} w-full`} value={productId ?? ""} onChange={(e) => setProductId(e.target.value || null)}>
-        <option value="">— none —</option>
-        {products.map((p) => <option key={p.productId} value={p.productId}>{p.name}</option>)}
-      </select>
+      <KdsSelect value={productId ?? ""} onChange={(v) => setProductId(v || null)}
+        options={products.map((p) => ({ value: p.productId, label: p.name }))}
+        placeholder="— none —" triggerClassName={`${ctl} w-full pe-7 text-start`} />
       {axes.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
           {axes.map(({ axis, values }) => (
@@ -118,11 +118,9 @@ function AccessorySide({ label, products, country, applied, applyNonce, onChange
               <span className="block text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-0.5">
                 {axis.replace("_", " ")}{values.some((v) => v.affectsPrice) ? " 💰" : ""}
               </span>
-              <select className={`${ctl} w-full`} value={sel[axis] ?? ""} onChange={(e) => setSel((s) => ({ ...s, [axis]: e.target.value }))}>
-                {values.map((v) => (
-                  <option key={v.value} value={v.value}>{v.value}{v.affectsPrice && v.priceDelta ? ` (+¥${v.priceDelta})` : ""}</option>
-                ))}
-              </select>
+              <KdsSelect value={sel[axis] ?? ""} onChange={(nv) => setSel((s) => ({ ...s, [axis]: nv }))}
+                options={values.map((v) => ({ value: v.value, label: `${v.value}${v.affectsPrice && v.priceDelta ? ` (+¥${v.priceDelta})` : ""}` }))}
+                triggerClassName={`${ctl} w-full pe-7 text-start`} />
             </label>
           ))}
         </div>
@@ -255,12 +253,10 @@ export default function CompleteSetConfigurator({ country, headFobUsd, machineSu
             <div className="flex items-center gap-1.5">
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Save this as a set (e.g. Standard)"
                 className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11.5px] outline-none focus:border-[var(--border-focus)]" />
-              <select value={newTier} onChange={(e) => setNewTier(e.target.value)}
-                className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]">
-                <option value="economy">economy</option>
-                <option value="standard">standard</option>
-                <option value="premium">premium</option>
-              </select>
+              <KdsSelect value={newTier} onChange={setNewTier}
+                options={["economy", "standard", "premium"]}
+                wrapperClassName="shrink-0" panelWidthClassName="min-w-[8rem]"
+                triggerClassName="h-7 ps-1.5 pe-6 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px] text-start" />
               <button type="button" onClick={saveCurrentAsTemplate} disabled={savingTpl || !newName.trim()}
                 className="text-[10.5px] px-2 py-1 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40">
                 Save set

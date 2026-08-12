@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
@@ -86,9 +87,9 @@ export default function ProductDocumentsSection({ documents, onChange }: Props) 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className={lbl}>Type</label>
-                  <select className={inp} value={d.doc_type} onChange={(e) => update(d._tempId, { doc_type: e.target.value })}>
-                    {DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  <KdsSelect value={d.doc_type} onChange={(v) => update(d._tempId, { doc_type: v })}
+                    options={DOC_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                    triggerClassName={inp + " pe-8 text-start"} />
                 </div>
                 <div className="md:col-span-2">
                   <label className={lbl}>Title</label>
@@ -102,9 +103,9 @@ export default function ProductDocumentsSection({ documents, onChange }: Props) 
                 </div>
                 <div>
                   <label className={lbl}>Language</label>
-                  <select className={inp} value={d.language} onChange={(e) => update(d._tempId, { language: e.target.value })}>
-                    {LANGS.map((l) => <option key={l} value={l}>{l ? l.toUpperCase() : "—"}</option>)}
-                  </select>
+                  <KdsSelect value={d.language} onChange={(v) => update(d._tempId, { language: v })}
+                    options={LANGS.map((l) => ({ value: l, label: l ? l.toUpperCase() : "—" }))}
+                    triggerClassName={inp + " pe-8 text-start"} />
                 </div>
                 <div className="md:col-span-3">
                   <label className={lbl}>File</label>

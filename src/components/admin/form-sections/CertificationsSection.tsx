@@ -8,6 +8,7 @@
    --------------------------------------------------------------------------- */
 
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import KdsSelect from "@/components/kds/Select";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import type { ProductCertificationFormState } from "@/types/product-form";
@@ -60,9 +61,8 @@ export default function CertificationsSection({ certifications, onChange }: Prop
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <label className={lbl}>Type</label>
-                  <select className={inp} value={c.cert_type} onChange={(e) => update(c._tempId, { cert_type: e.target.value })}>
-                    {CERT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <KdsSelect value={c.cert_type} onChange={(v) => update(c._tempId, { cert_type: v })}
+                    options={CERT_TYPES} triggerClassName={inp + " pe-8 text-start"} />
                 </div>
                 <div>
                   <label className={lbl}>Standard</label>
@@ -101,9 +101,8 @@ export default function CertificationsSection({ certifications, onChange }: Prop
                 </div>
                 <div>
                   <label className={lbl}>Status</label>
-                  <select className={inp} value={c.status} onChange={(e) => update(c._tempId, { status: e.target.value })}>
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <KdsSelect value={c.status} onChange={(v) => update(c._tempId, { status: v })}
+                    options={STATUSES} triggerClassName={inp + " pe-8 text-start"} />
                 </div>
                 <div className="md:col-span-2">
                   <label className={lbl}>Certificate file URL</label>

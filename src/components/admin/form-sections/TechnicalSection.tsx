@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/lib/i18n";
+import KdsSelect from "@/components/kds/Select";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -648,15 +649,13 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
           {!hidden("phase") && (
           <div>
             <FieldLabel icon={<LayersIcon className="h-3.5 w-3.5" />}>{t("tech.phase", "Phase")}</FieldLabel>
-            <select
+            <KdsSelect
               value={data.phase}
-              onChange={(e) => onChange({ phase: e.target.value })}
-              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors"
-            >
-              <option value="">Select…</option>
-              <option value="single">{t("tech.singlePhase", "Single phase")}</option>
-              <option value="three">{t("tech.threePhase", "Three phase")}</option>
-            </select>
+              onChange={(v) => onChange({ phase: v })}
+              options={[{ value: "single", label: t("tech.singlePhase", "Single phase") }, { value: "three", label: t("tech.threePhase", "Three phase") }]}
+              placeholder="Select…"
+              triggerClassName="w-full h-10 ps-4 pe-9 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors text-start"
+            />
             <p className="text-[10px] text-[var(--text-ghost)] mt-1">
               Three phase typical for 380V industrial machines.
             </p>

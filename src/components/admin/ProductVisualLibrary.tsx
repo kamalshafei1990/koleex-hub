@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import KdsSelect from "@/components/kds/Select";
 import VisualAssetPicker, { type PickedAsset } from "@/components/admin/VisualAssetPicker";
 import {
   fetchAttributeConfig, saveAttributeConfig, uploadAttributeImage,
@@ -460,9 +461,10 @@ function SpecsTab() {
       <div className="flex items-center justify-between gap-3">
         <p className="text-[12px] text-[var(--text-dim)]">{introPre}<span className="text-[var(--text-muted)] font-medium">{t("vl.specs.special", "special")}</span>{introPost}</p>
         {templates.length > 0 && (
-          <select value={slug} onChange={(e) => setSlug(e.target.value)} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] outline-none">
-            {templates.map((t) => <option key={t.id} value={t.slug}>{t.name}</option>)}
-          </select>
+          <KdsSelect value={slug} onChange={setSlug}
+            options={templates.map((t) => ({ value: t.slug, label: t.name }))}
+            wrapperClassName="shrink-0" panelWidthClassName="min-w-[12rem]"
+            triggerClassName="h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] outline-none text-start" />
         )}
       </div>
 
