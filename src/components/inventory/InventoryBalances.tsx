@@ -10,6 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import {
   InventoryEmpty,
@@ -59,6 +61,7 @@ function fmtQty(n: number) {
 }
 
 export default function InventoryBalances() {
+  const { t } = useTranslation(inventoryT);
   const [rows, setRows] = useState<Balance[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [filterWh, setFilterWh] = useState("");
@@ -170,7 +173,7 @@ export default function InventoryBalances() {
         <Panel className="px-3 py-2.5">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Search item</span>
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.balances.search", "Search item")}</span>
               <span className="relative">
                 <span aria-hidden className="pointer-events-none absolute inset-y-0 start-2 flex items-center text-[var(--text-dim)]">
                   <RrIcon name="search" size={12} />
@@ -178,35 +181,33 @@ export default function InventoryBalances() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Code or item name…"
+                  placeholder={t("inv.balances.ph.search", "Code or item name…")}
                   className="w-[220px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 ps-7 pe-2 text-[12px]"
                 />
               </span>
             </label>
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Location</span>
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.common.location", "Location")}</span>
               <select value={filterWh} onChange={(e) => setFilterWh(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
-                <option value="">All locations</option>
+                <option value="">{t("inv.balances.all_locations", "All locations")}</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
                 ))}
               </select>
             </label>
             <label className="flex items-end gap-2 text-[11.5px] text-[var(--text-muted)] pb-1.5">
-              <input type="checkbox" checked={onlyPositive} onChange={(e) => setOnlyPositive(e.target.checked)} />
-              Hide zero on-hand
-            </label>
+              <input type="checkbox" checked={onlyPositive} onChange={(e) => setOnlyPositive(e.target.checked)} />{t("inv.balances.hide_zero", "Hide zero on-hand")}</label>
             {/* INV-H4A — Group-by */}
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Group by</span>
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.balances.group_by", "Group by")}</span>
               <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as GroupBy)}
                 className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               >
-                <option value="item">Item</option>
-                <option value="variant">Item + Variant</option>
-                <option value="batch">Item + Variant + Batch</option>
+                <option value="item">{t("inv.common.item", "Item")}</option>
+                <option value="variant">{t("inv.balances.group_by.variant", "Item + Variant")}</option>
+                <option value="batch">{t("inv.balances.group_by.batch", "Item + Variant + Batch")}</option>
               </select>
             </label>
             <div className="ml-auto flex items-end gap-4 self-end text-[10.5px] text-[var(--text-dim)] tabular-nums">
@@ -222,18 +223,18 @@ export default function InventoryBalances() {
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                  <th className="px-4 py-2 text-left">Item</th>
-                  <th className="px-4 py-2 text-left">Variant</th>
-                  {groupBy === "batch" && <th className="px-4 py-2 text-left">Batch</th>}
-                  <th className="px-4 py-2 text-left">Location</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-right">Avg cost</th>
-                  <th className="px-4 py-2 text-right">Value</th>
+                  <th className="px-4 py-2 text-left">{t("inv.common.item", "Item")}</th>
+                  <th className="px-4 py-2 text-left">{t("inv.common.variant", "Variant")}</th>
+                  {groupBy === "batch" && <th className="px-4 py-2 text-left">{t("inv.common.batch", "Batch")}</th>}
+                  <th className="px-4 py-2 text-left">{t("inv.common.location", "Location")}</th>
+                  <th className="px-4 py-2 text-right">{t("inv.common.qty", "Qty")}</th>
+                  <th className="px-4 py-2 text-right">{t("inv.balances.col.avg_cost", "Avg cost")}</th>
+                  <th className="px-4 py-2 text-right">{t("inv.common.value", "Value")}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && drilled.length === 0 ? (
-                  <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
+                  <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</td></tr>
                 ) : drilled.length === 0 ? (
                   <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-0 py-0">
                     <InventoryEmpty icon="badge-check" title="No balances yet" hint="Drilled balances appear when posted movements carry variants or batches." />
@@ -297,19 +298,19 @@ export default function InventoryBalances() {
           <table className="min-w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                <th className="px-4 py-2 text-left">Code</th>
-                <th className="px-4 py-2 text-left">Item</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-left">Location</th>
-                <th className="px-4 py-2 text-right">On hand</th>
-                <th className="px-4 py-2 text-right">Reserved</th>
-                <th className="px-4 py-2 text-right">Available</th>
-                <th className="px-4 py-2 text-left">Last movement</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.code", "Code")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.item", "Item")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.type", "Type")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.location", "Location")}</th>
+                <th className="px-4 py-2 text-right">{t("inv.balances.col.on_hand", "On hand")}</th>
+                <th className="px-4 py-2 text-right">{t("inv.balances.col.reserved", "Reserved")}</th>
+                <th className="px-4 py-2 text-right">{t("inv.balances.col.available", "Available")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.balances.col.last_move", "Last movement")}</th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</td></tr>
               ) : filteredRows.length === 0 ? (
                 <tr><td colSpan={8} className="px-0 py-0">
                   <InventoryEmpty

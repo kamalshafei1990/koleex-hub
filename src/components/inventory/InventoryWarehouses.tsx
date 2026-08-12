@@ -12,6 +12,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import {
   InventoryEmpty,
@@ -39,6 +41,7 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
 };
 
 export default function InventoryWarehouses() {
+  const { t } = useTranslation(inventoryT);
   const [rows, setRows] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export default function InventoryWarehouses() {
             className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
           >
             <RrIcon name="plus" size={12} />
-            New Location
+            {t("inv.warehouses.new", "New Location")}
           </button>
         </div>
 
@@ -102,7 +105,7 @@ export default function InventoryWarehouses() {
             onClick={() => setFilterType("")}
             className={`rounded-md border px-2.5 py-1 ${filterType === "" ? "border-[var(--border-color)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
           >
-            All <span className="text-[var(--text-dim)] tabular-nums ml-1">{rows.length}</span>
+            {t("inv.common.all", "All")} <span className="text-[var(--text-dim)] tabular-nums ml-1">{rows.length}</span>
           </button>
           {ALLOWED_LOCATION_TYPES.map((t) => {
             const c = counts.get(t) ?? 0;
@@ -124,17 +127,17 @@ export default function InventoryWarehouses() {
           <table className="min-w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                <th className="px-4 py-2 text-left">Code</th>
-                <th className="px-4 py-2 text-left">Name</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-left">Contact</th>
-                <th className="px-4 py-2 text-left">Address</th>
-                <th className="px-4 py-2 text-left">Flags</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.code", "Code")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.name", "Name")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.common.type", "Type")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.warehouses.col.contact", "Contact")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.warehouses.col.address", "Address")}</th>
+                <th className="px-4 py-2 text-left">{t("inv.warehouses.col.flags", "Flags")}</th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</td></tr>
               ) : visible.length === 0 ? (
                 <tr><td colSpan={6} className="px-0 py-0">
                   <InventoryEmpty
@@ -147,7 +150,7 @@ export default function InventoryWarehouses() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-1 text-[11.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                       >
                         <RrIcon name="plus" size={11} />
-                        New Location
+                        {t("inv.warehouses.new", "New Location")}
                       </button>
                     }
                   />
@@ -171,9 +174,9 @@ export default function InventoryWarehouses() {
                     <td className="px-4 py-2 text-[11.5px] text-[var(--text-muted)] truncate max-w-[260px]">{w.address ?? w.location ?? "—"}</td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {w.is_default && <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-emerald-200">Default</span>}
-                        {w.is_virtual && <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-violet-200">Virtual</span>}
-                        {!w.is_active && <span className="rounded-full border border-gray-500/30 bg-gray-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-muted)]">Inactive</span>}
+                        {w.is_default && <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-emerald-200">{t("inv.warehouses.flag.default", "Default")}</span>}
+                        {w.is_virtual && <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-violet-200">{t("inv.warehouses.flag.virtual", "Virtual")}</span>}
+                        {!w.is_active && <span className="rounded-full border border-gray-500/30 bg-gray-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-muted)]">{t("inv.variants.status.inactive", "Inactive")}</span>}
                       </div>
                     </td>
                   </tr>
@@ -198,6 +201,7 @@ export default function InventoryWarehouses() {
 function NewLocationDrawer({
   onClose, onSuccess,
 }: { onClose: () => void; onSuccess: () => void }) {
+  const { t } = useTranslation(inventoryT);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [locationType, setLocationType] = useState<LocationType>("warehouse");
@@ -251,8 +255,8 @@ function NewLocationDrawer({
         className="kx-glass-drawer flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-s-[1px] border-[var(--border-color)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
-          <h2 className="text-[14px] font-semibold">New Location</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
+          <h2 className="text-[14px] font-semibold">{t("inv.warehouses.new", "New Location")}</h2>
+          <button type="button" onClick={onClose} aria-label={t("inv.shortcuts.close", "Close")} className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -262,7 +266,7 @@ function NewLocationDrawer({
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="WH-MAIN"
+                placeholder={t("inv.warehouses.ph.code", "WH-MAIN")}
                 className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] font-mono"
               />
             </label>
@@ -271,7 +275,7 @@ function NewLocationDrawer({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Main Warehouse"
+                placeholder={t("inv.warehouses.ph.name", "Main Warehouse")}
                 className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
             </label>
@@ -279,7 +283,7 @@ function NewLocationDrawer({
 
           <label className="block">
             <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-              <span>Type</span>
+              <span>{t("inv.common.type", "Type")}</span>
               <LocationTypeChip type={locationType} />
             </div>
             <select
@@ -299,32 +303,32 @@ function NewLocationDrawer({
           {canBeDefault && (
             <label className="flex items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
               <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
-              Set as default warehouse for movements
+              {t("inv.warehouses.form.default", "Set as default warehouse for movements")}
             </label>
           )}
 
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Address</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.warehouses.col.address", "Address")}</div>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Street, city, country"
+              placeholder={t("inv.warehouses.ph.address", "Street, city, country")}
               className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             />
           </label>
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Contact person</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.warehouses.form.person", "Contact person")}</div>
               <input
                 value={contactPerson}
                 onChange={(e) => setContactPerson(e.target.value)}
-                placeholder="Warehouse manager / agent"
+                placeholder={t("inv.warehouses.form.person", "Warehouse manager / agent")}
                 className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
             </label>
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Contact phone</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.warehouses.form.phone", "Contact phone")}</div>
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
@@ -335,7 +339,7 @@ function NewLocationDrawer({
           </div>
 
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Notes</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.common.notes", "Notes")}</div>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -351,7 +355,7 @@ function NewLocationDrawer({
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-            Cancel
+            {t("inv.common.cancel", "Cancel")}
           </button>
           <button
             type="submit"

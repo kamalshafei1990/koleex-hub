@@ -476,4 +476,54 @@ export const inventoryT: Translations = {
 
   /* ── Shortcuts hint ────────────────────────────────────────── */
   "inv.shortcuts.hint":              { en: "Shortcuts: R receive · S ship · T transfer · A adjust · F find", zh: "快捷键：R 入库·S 发货·T 调拨·A 调整·F 搜索", ar: "اختصارات: R استلام · S شحن · T تحويل · A تعديل · F بحث" },
+
+  /* ── W3 revision · the three screens that had ZERO useTranslation ──────
+     InventoryWarehouses, InventoryBalances and InventoryMovementDetail were
+     shipped entirely in English. `inv.common.*` holds the words that genuinely
+     recur across inventory screens, so the next screen reuses them instead of
+     minting a fourth "Cancel". */
+  "inv.common.all":              { en: "All",               zh: "全部",         ar: "الكل" },
+  "inv.common.cancel":           { en: "Cancel",            zh: "取消",         ar: "إلغاء" },
+  "inv.common.code":             { en: "Code",              zh: "编码",         ar: "الكود" },
+  "inv.common.name":             { en: "Name",              zh: "名称",         ar: "الاسم" },
+  "inv.common.type":             { en: "Type",              zh: "类型",         ar: "النوع" },
+  "inv.common.notes":            { en: "Notes",             zh: "备注",         ar: "ملاحظات" },
+  "inv.common.item":             { en: "Item",              zh: "物料",         ar: "الصنف" },
+  "inv.common.variant":          { en: "Variant",           zh: "款式",         ar: "المتغيّر" },
+  "inv.common.batch":            { en: "Batch",             zh: "批次",         ar: "الدفعة" },
+  "inv.common.qty":              { en: "Qty",               zh: "数量",         ar: "الكمية" },
+  "inv.common.value":            { en: "Value",             zh: "金额",         ar: "القيمة" },
+  "inv.common.location":         { en: "Location",          zh: "库位",         ar: "الموقع" },
+
+  /* Warehouses */
+  "inv.warehouses.new":          { en: "New Location",      zh: "新建库位",     ar: "موقع جديد" },
+  "inv.warehouses.col.contact":  { en: "Contact",           zh: "联系人",       ar: "جهة الاتصال" },
+  "inv.warehouses.col.address":  { en: "Address",           zh: "地址",         ar: "العنوان" },
+  "inv.warehouses.col.flags":    { en: "Flags",             zh: "标记",         ar: "الوسوم" },
+  "inv.warehouses.flag.default": { en: "Default",           zh: "默认",         ar: "افتراضي" },
+  "inv.warehouses.flag.virtual": { en: "Virtual",           zh: "虚拟",         ar: "افتراضي (غير فعلي)" },
+  "inv.warehouses.form.default": { en: "Set as default warehouse for movements", zh: "设为出入库默认库位", ar: "اجعله الموقع الافتراضي للحركات" },
+  "inv.warehouses.form.person":  { en: "Contact person",    zh: "联系人",       ar: "مسؤول الموقع" },
+  "inv.warehouses.form.phone":   { en: "Contact phone",     zh: "联系电话",     ar: "هاتف التواصل" },
+  "inv.warehouses.ph.code":      { en: "WH-MAIN",           zh: "WH-MAIN",      ar: "WH-MAIN" },
+  "inv.warehouses.ph.name":      { en: "Main Warehouse",    zh: "主仓库",       ar: "المخزن الرئيسي" },
+  "inv.warehouses.ph.address":   { en: "Street, city, country", zh: "街道、城市、国家", ar: "الشارع، المدينة، الدولة" },
+  "inv.warehouses.ph.person":    { en: "Warehouse manager / agent", zh: "仓库负责人 / 代理", ar: "مدير المخزن / الوكيل" },
+
+  /* Balances */
+  "inv.balances.search":         { en: "Search item",       zh: "搜索物料",     ar: "ابحث عن صنف" },
+  "inv.balances.ph.search":      { en: "Code or item name…", zh: "编码或物料名称…", ar: "الكود أو اسم الصنف…" },
+  "inv.balances.all_locations":  { en: "All locations",     zh: "全部库位",     ar: "كل المواقع" },
+  "inv.balances.hide_zero":      { en: "Hide zero on-hand", zh: "隐藏零库存",   ar: "إخفاء الرصيد الصفري" },
+  "inv.balances.col.avg_cost":   { en: "Avg cost",          zh: "平均成本",     ar: "متوسط التكلفة" },
+  "inv.balances.col.on_hand":    { en: "On hand",           zh: "现存量",       ar: "المتاح فعليًا" },
+  "inv.balances.col.reserved":   { en: "Reserved",          zh: "已预留",       ar: "محجوز" },
+  "inv.balances.col.available":  { en: "Available",         zh: "可用量",       ar: "قابل للصرف" },
+  "inv.balances.col.last_move":  { en: "Last movement",     zh: "最近变动",     ar: "آخر حركة" },
+  "inv.balances.empty":          { en: "No balances yet",   zh: "暂无库存记录", ar: "لا توجد أرصدة بعد" },
+
+  /* Movement detail */
+  "inv.movement.detail.title":   { en: "Movement detail",   zh: "出入库明细",   ar: "تفاصيل الحركة" },
+  "inv.movement.detail.audit":   { en: "Audit log",         zh: "审计日志",     ar: "سجل التدقيق" },
+  "inv.movement.detail.no_audit":{ en: "No audit entries.", zh: "暂无审计记录。", ar: "لا توجد قيود تدقيق." },
 };

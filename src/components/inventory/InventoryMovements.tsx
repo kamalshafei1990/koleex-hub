@@ -827,7 +827,7 @@ export default function InventoryMovements() {
             behind "View details". */}
         <Panel>
           {loading && filtered.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</div>
+            <div className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</div>
           ) : filtered.length === 0 ? (
             <InventoryEmpty title={`No ${tab} movements`} hint="Try a different tab." />
           ) : (

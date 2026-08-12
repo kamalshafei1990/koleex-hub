@@ -38,6 +38,9 @@ import InventoryInternalItemDrawer from "@/components/inventory/InventoryInterna
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 const INV_H1_T: Translations = {
+  /* the table-cell loading text; the app-wide dict carries the same key,
+     kept here so this file keeps exactly one dictionary */
+  "inv.loading": { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
   "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
   "inv.subtitle":          { en: "Stock-tracked products + internal-use items (catalogs, uniforms, office supplies).", zh: "按产品跟踪的库存以及内部使用物品（目录、工服、办公用品）。", ar: "المخزون المرتبط بالمنتجات بالإضافة إلى عناصر الاستخدام الداخلي (الكتالوجات، الزي، اللوازم المكتبية)." },
   "inv.add_via_product":   { en: "Create Product with Stock Profile", zh: "创建产品并附库存档案", ar: "إنشاء منتج مع ملف مخزون" },
@@ -336,7 +339,7 @@ export default function InventoryItems() {
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
@@ -842,6 +845,7 @@ function ItemDetailDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation(INV_H1_T);
   const [item, setItem] = useState<DetailItem | null>(null);
   const [stock, setStock] = useState<DetailStock | null>(null);
   const [valuation, setValuation] = useState<DetailValuation | null>(null);
@@ -939,7 +943,7 @@ function ItemDetailDrawer({
     >
       {confirmDialog}
       {toastElement}
-      {loading && <div className="text-[12px] text-[var(--text-dim)]">Loading…</div>}
+      {loading && <div className="text-[12px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</div>}
       {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
       {item && (
         <div className="space-y-4">
@@ -1255,6 +1259,7 @@ interface VariantDto {
 }
 
 function ItemVariantsSection({ itemId }: { itemId: string }) {
+  const { t } = useTranslation(INV_H1_T);
   const [variants, setVariants] = useState<VariantDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1406,7 +1411,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
       )}
 
       {loading ? (
-        <div className="text-[11px] text-[var(--text-dim)]">Loading…</div>
+        <div className="text-[11px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</div>
       ) : variants.length === 0 ? (
         <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-3 text-[11.5px] text-[var(--text-dim)]">
           No variants yet. Add a variant when this item exists in multiple flavours (color, voltage, size).

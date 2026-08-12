@@ -13,6 +13,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { movementLabel } from "./InventoryUi";
 import { DetailsAccordion, HumanStatusPill, humanStatus, operatorLabel } from "./InventoryUx";
@@ -62,6 +64,7 @@ export default function InventoryMovementDetail({
   movementId: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(inventoryT);
   const [movement, setMovement] = useState<MovementDetail | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [transferLink, setTransferLink] = useState<{ transfer_id: string; transfer_no: string } | null>(null);
@@ -140,26 +143,22 @@ export default function InventoryMovementDetail({
         type="button"
         onClick={onClose}
         className="flex-1 bg-black/40 backdrop-blur-sm"
-        aria-label="Close"
+        aria-label={t("inv.shortcuts.close", "Close")}
       />
       <div className="kx-glass-drawer w-full max-w-md overflow-y-auto border-s-[1px] border-[var(--border-color)] bg-[var(--bg-primary)] p-5 text-[var(--text-primary)]">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-              Movement detail
-            </div>
+            <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.movement.detail.title", "Movement detail")}</div>
             <div className="mt-0.5 font-mono text-[13px]">{m?.movement_no ?? "—"}</div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-          >
-            Close
-          </button>
+          >{t("inv.shortcuts.close", "Close")}</button>
         </div>
 
-        {loading && <div className="text-[12px] text-[var(--text-dim)]">Loading…</div>}
+        {loading && <div className="text-[12px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</div>}
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11.5px] text-rose-300">
             {error}
@@ -214,8 +213,8 @@ export default function InventoryMovementDetail({
                 {accountingEntryId && <Row label="Journal entry" value={<span className="font-mono">{accountingEntryId}</span>} />}
 
                 <div>
-                  <div className="mb-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Audit log</div>
-                  {audit.length === 0 && <div className="text-[11px] text-[var(--text-dim)]">No audit entries.</div>}
+                  <div className="mb-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.movement.detail.audit", "Audit log")}</div>
+                  {audit.length === 0 && <div className="text-[11px] text-[var(--text-dim)]">{t("inv.movement.detail.no_audit", "No audit entries.")}</div>}
                   <ul className="space-y-1.5">
                     {audit.map((a) => (
                       <li key={a.id} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5">
@@ -242,6 +241,7 @@ export default function InventoryMovementDetail({
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  const { t } = useTranslation(inventoryT);
   return (
     <div className="grid grid-cols-[120px,1fr] items-baseline gap-3">
       <div className="text-[10.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
