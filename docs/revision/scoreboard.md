@@ -50,8 +50,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 12 | W2 | Invoices | /invoices | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 13 | W3 | Suppliers | /suppliers | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 14 | W3 | Contacts | /contacts | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 15 | W3 | Inventory | /inventory | ⬜ | ✅ | ⬜ | ⬜ | ⚠️ | ⬜ |
-| 16 | W3 | Purchases | /purchase | ⬜ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 15 | W3 | Inventory | /inventory | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| 16 | W3 | Purchases | /purchase | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | 17 | W3 | Landed Cost | /landed-cost | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 18 | W3 | Catalogs | /catalogs | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 19 | W4 | Employees | /employees | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
