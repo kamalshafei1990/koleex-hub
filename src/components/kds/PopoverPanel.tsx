@@ -21,8 +21,17 @@
    outside-click test that has to know about BOTH the anchor and the panel,
    since they are no longer in the same subtree. */
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+
+/* The panel renders null until it has measured itself, so measuring in a plain
+   useEffect costs one painted frame with the scrim up and NO menu under it —
+   a visible blink on every open, and worst on the notification bell, which
+   mounts already-open and so blinks on the very first press. useLayoutEffect
+   runs before paint, so the first frame the user sees already has the panel.
+   Aliased because useLayoutEffect warns during SSR; this component renders
+   nothing on the server anyway. */
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export default function PopoverPanel({
   anchorRef,
@@ -152,7 +161,7 @@ export default function PopoverPanel({
     );
   }, [anchorRef, mobileSheet, maxHeight]);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     if (!open) { autoScrolled.current = false; return; }
     place();
     /* One more pass after paint: the anchor can still be moving when the panel

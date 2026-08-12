@@ -40,7 +40,23 @@ interface Channels { data?: { unread_count?: number }[] }
 
 export default function NotificationBellGate({ dk }: { dk: boolean }) {
   const [opened, setOpened] = useState(false);
+  const [pending, setPending] = useState(false);
   const [count, setCount] = useState(0);
+
+  /* WAIT for the chunk before handing over. `loading: () => null` plus an
+     immediate swap meant that on a cold click — no hover to prefetch, which is
+     EVERY touch device — this button unmounted and rendered nothing until the
+     module landed: the bell disappeared from the header, the items beside it
+     slid across, and the panel opened late. The comment above claimed the stub
+     "stays on screen underneath"; it could not, because `opened` returns early.
+     Awaiting the import keeps this button mounted until the real one can
+     replace it in the same commit. Cached (the usual case) this is one
+     microtask. */
+  const handOver = async () => {
+    setPending(true);
+    try { await import("./NotificationBell"); } catch { /* retry on next press */ }
+    setOpened(true);
+  };
 
   /* Poll the two counts while the panel is closed. Once it is open the real
      bell owns the numbers (and its own realtime), so this steps aside rather
@@ -100,12 +116,15 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
       /* pointerenter: start the download the moment the cursor arrives, so the
          panel is usually already there by the time the click lands. */
       onPointerEnter={() => { void import("./NotificationBell"); }}
-      onClick={() => setOpened(true)}
+      onClick={() => { void handOver(); }}
+      /* Pressed styling while the chunk is in flight — the same look the real
+         bell wears when open, so a slow network reads as "opening", not as a
+         dead button the user presses twice. */
       className={`relative flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg border transition-all ${
         dk
           ? "kx-hover-glow border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
           : "kx-hover-glow border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
-      }`}
+      } ${pending ? (dk ? "text-white bg-white/[0.06]" : "text-black bg-black/[0.06]") : ""}`}
     >
       <BellIcon size={15} className="md:w-4 md:h-4" />
       {count > 0 && (
