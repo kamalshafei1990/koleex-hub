@@ -64,7 +64,7 @@ import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import type { CatalogEntry } from "@/lib/catalogs-admin";
 import {
-  fetchDivisions, fetchCategories,
+  fetchTaxonomyAll,
   fetchDivisionLogos, fetchCategoryLogos,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow } from "@/types/supabase";
@@ -73,6 +73,22 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── i18n — full catalog app translation (en / zh / ar) ── */
 const T: Translations = {
+  /* W3 revision — the last nine bare strings in this file were all ATTRIBUTES
+     (title / aria-label / placeholder), so they never showed up in a scan of
+     visible text. A tooltip and a screen-reader label are user-facing too. */
+  "cat.backHome":        { en: "Back to home",     zh: "返回首页",     ar: "العودة للرئيسية" },
+  "cat.fullAddress":     { en: "Full address",     zh: "详细地址",     ar: "العنوان بالكامل" },
+  "cat.officialAccount": { en: "Official account", zh: "公众号",       ar: "الحساب الرسمي" },
+  "cat.qqNumber":        { en: "QQ number",        zh: "QQ 号",        ar: "رقم QQ" },
+  "cat.phCompany": { en: "e.g. Delta Engineering Ltd", zh: "例如：达美工程有限公司", ar: "مثال: دلتا للهندسة" },
+  "cat.phIndustry": { en: "e.g. Industrial Sewing Machines", zh: "例如：工业缝纫机", ar: "مثال: ماكينات خياطة صناعية" },
+  "cat.phCountry": { en: "e.g. China", zh: "例如：中国", ar: "مثال: الصين" },
+  "cat.phRole": { en: "e.g. Sales Manager", zh: "例如：销售经理", ar: "مثال: مدير مبيعات" },
+  "cat.phDept": { en: "e.g. Sales", zh: "例如：销售部", ar: "مثال: المبيعات" },
+  "cat.phLineId": { en: "line id", zh: "Line ID", ar: "معرّف Line" },
+  "cat.removeQr":        { en: "Remove QR",        zh: "移除二维码",   ar: "إزالة الكود" },
+  "cat.removeTag":       { en: "Remove tag",       zh: "移除标签",     ar: "إزالة الوسم" },
+  "cat.select":          { en: "Select",           zh: "选择",         ar: "اختيار" },
   "cat.title":            { en: "Catalogs", zh: "产品目录", ar: "الكتالوجات" },
   "cat.subtitle":         { en: "Manage supplier and company catalogs", zh: "管理供应商和公司目录", ar: "إدارة كتالوجات الموردين والشركات" },
   "cat.stat.catalogs":    { en: "catalogs", zh: "目录", ar: "كتالوج" },
@@ -312,16 +328,43 @@ type ContactOption = {
 /* ── PDF first-page thumbnail generator ── */
 const PDFJS_CDN = "/vendor/pdfjs/3.11.174"; // self-hosted (China R1) — was cdnjs.cloudflare.com
 
+/** Minimal structural types for the self-hosted pdf.js UMD build (ships no @types). */
+type PdfViewport = { width: number; height: number };
+type PdfPageLike = {
+  getViewport: (o: { scale: number; rotation?: number }) => PdfViewport;
+  render: (o: { canvasContext: CanvasRenderingContext2D; viewport: PdfViewport }) => { promise: Promise<void>; cancel?: () => void };
+};
+type PdfDocLike = { numPages: number; getPage: (n: number) => Promise<PdfPageLike>; destroy?: () => void };
+type PdfRangeTransport = {
+  requestDataRange: (begin: number, end: number) => void;
+  onDataRange: (begin: number, chunk: Uint8Array) => void;
+  abort: () => void;
+};
+type PdfJsLib = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (src: Record<string, unknown>) => { promise: Promise<PdfDocLike>; destroy?: () => void };
+  PDFDataRangeTransport?: new (length: number, initialData: Uint8Array) => PdfRangeTransport;
+};
+function pdfjs(): PdfJsLib | undefined {
+  return (window as unknown as { pdfjsLib?: PdfJsLib }).pdfjsLib;
+}
+/** Only valid after `await ensurePdfJs()` — which rejects if the script never loaded. */
+function requirePdfjs(): PdfJsLib {
+  const lib = pdfjs();
+  if (!lib) throw new Error("pdf.js not loaded");
+  return lib;
+}
+
 let pdfjsLoaded = false;
 function ensurePdfJs(): Promise<void> {
-  if (pdfjsLoaded && (window as any).pdfjsLib) return Promise.resolve();
+  if (pdfjsLoaded && pdfjs()) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const existing = (window as any).pdfjsLib;
+    const existing = pdfjs();
     if (existing) { pdfjsLoaded = true; resolve(); return; }
     const script = document.createElement("script");
     script.src = `${PDFJS_CDN}/pdf.min.js`;
     script.onload = () => {
-      const lib = (window as any).pdfjsLib;
+      const lib = pdfjs();
       if (!lib) { reject(new Error("pdfjsLib not on window")); return; }
       lib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}/pdf.worker.min.js`;
       pdfjsLoaded = true;
@@ -360,11 +403,9 @@ const catalogFileUrl = (id: string) => `/api/files/catalog/${id}`;
 const PDF_RANGE_CHUNK = 524288; // 512KB
 const PDF_RANGE_MIN_SIZE = 4 * 1024 * 1024; // small files: plain load is fine
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function openPdfDocument(url: string, fileSize?: number | null): Promise<any> {
+async function openPdfDocument(url: string, fileSize?: number | null): Promise<PdfDocLike> {
   await ensurePdfJs();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lib = (window as any).pdfjsLib;
+  const lib = requirePdfjs();
 
   if (fileSize && fileSize > PDF_RANGE_MIN_SIZE && typeof lib.PDFDataRangeTransport === "function") {
     try {
@@ -412,7 +453,7 @@ async function generatePdfThumbnail(file: File): Promise<Blob | null> {
     try {
       await ensurePdfJs();
       /* eslint-disable @typescript-eslint/no-explicit-any */
-      const pdfjsLib = (window as any).pdfjsLib;
+      const pdfjsLib = requirePdfjs();
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
       const pdf = await loadingTask.promise;
@@ -580,12 +621,13 @@ function PhoneField({ code, number, onCode, onNumber, placeholder }: {
 
 /* QR-code uploader — compresses the chosen image to a base64 thumbnail. */
 function QrUpload({ value, onChange, hint }: { value: string; onChange: (v: string) => void; hint: string }) {
+  const { t } = useTranslation(T);
   const ref = useRef<HTMLInputElement>(null);
   if (value) {
     return (
       <div className="relative h-[72px] w-[72px] shrink-0">
         <img src={value} alt="QR" className="h-full w-full rounded-lg border border-[var(--border-subtle)] object-cover bg-white" />
-        <button type="button" onClick={() => onChange("")} aria-label="Remove QR"
+        <button type="button" onClick={() => onChange("")} aria-label={t("cat.removeQr", "Remove QR")}
           className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center shadow">
           <CrossIcon className="h-3 w-3" />
         </button>
@@ -782,7 +824,7 @@ function QuickAddContactModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={lbl}>{t("quick.nameEn")} <span className="text-red-400">*</span></label>
-                <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
+                <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder={t("cat.phCompany", "e.g. Delta Engineering Ltd")} className={inp} autoFocus />
               </div>
               <div>
                 <label className={lbl}>{t("quick.nameCn")}</label>
@@ -813,7 +855,7 @@ function QuickAddContactModal({
             </div>
             <div>
               <label className={lbl}>{t("quick.industry")}</label>
-              <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Industrial Sewing Machines" className={inp} />
+              <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder={t("cat.phIndustry", "e.g. Industrial Sewing Machines")} className={inp} />
             </div>
           </div>
 
@@ -826,8 +868,8 @@ function QuickAddContactModal({
             <div><label className={lbl}>{t("quick.mobile")}</label><PhoneField code={mobileCode} number={mobile} onCode={setMobileCode} onNumber={setMobile} placeholder="138 0000 0000" /></div>
             <div><label className={lbl}>{t("quick.email")}</label><IconInput icon={<AtSignIcon className="h-3.5 w-3.5" />} type="email" value={email} onChange={setEmail} placeholder="sales@company.com" /></div>
             <div><label className={lbl}>{t("quick.website")}</label><IconInput icon={<GlobeIcon className="h-3.5 w-3.5" />} value={website} onChange={setWebsite} placeholder="https://…" /></div>
-            <div><label className={lbl}>{t("quick.country")}</label><IconInput icon={<MapPinIcon className="h-3.5 w-3.5" />} value={country} onChange={setCountry} placeholder="e.g. China" /></div>
-            <div><label className={lbl}>{t("quick.address")}</label><IconInput icon={<MapPinnedIcon className="h-3.5 w-3.5" />} value={address} onChange={setAddress} placeholder="Full address" /></div>
+            <div><label className={lbl}>{t("quick.country")}</label><IconInput icon={<MapPinIcon className="h-3.5 w-3.5" />} value={country} onChange={setCountry} placeholder={t("cat.phCountry", "e.g. China")} /></div>
+            <div><label className={lbl}>{t("quick.address")}</label><IconInput icon={<MapPinnedIcon className="h-3.5 w-3.5" />} value={address} onChange={setAddress} placeholder={t("cat.fullAddress", "Full address")} /></div>
           </div>
 
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
@@ -852,8 +894,8 @@ function QuickAddContactModal({
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div><label className={lbl}>{t("quick.name")}</label><IconInput icon={<UserIcon className="h-3.5 w-3.5" />} value={p.name} onChange={(v) => updatePerson(i, "name", v)} placeholder={t("quick.fullName")} /></div>
-                      <div><label className={lbl}>{t("quick.position")}</label><IconInput icon={<BriefcaseIcon className="h-3.5 w-3.5" />} value={p.position} onChange={(v) => updatePerson(i, "position", v)} placeholder="e.g. Sales Manager" /></div>
-                      <div><label className={lbl}>{t("quick.department")}</label><IconInput icon={<TagsIcon className="h-3.5 w-3.5" />} value={p.department} onChange={(v) => updatePerson(i, "department", v)} placeholder="e.g. Sales" /></div>
+                      <div><label className={lbl}>{t("quick.position")}</label><IconInput icon={<BriefcaseIcon className="h-3.5 w-3.5" />} value={p.position} onChange={(v) => updatePerson(i, "position", v)} placeholder={t("cat.phRole", "e.g. Sales Manager")} /></div>
+                      <div><label className={lbl}>{t("quick.department")}</label><IconInput icon={<TagsIcon className="h-3.5 w-3.5" />} value={p.department} onChange={(v) => updatePerson(i, "department", v)} placeholder={t("cat.phDept", "e.g. Sales")} /></div>
                       <div><label className={lbl}>{t("quick.email")}</label><IconInput icon={<AtSignIcon className="h-3.5 w-3.5" />} type="email" value={p.email} onChange={(v) => updatePerson(i, "email", v)} placeholder="name@company.com" /></div>
                       <div><label className={lbl}>{t("quick.telephone")}</label><PhoneField code={p.phoneCode} number={p.phone} onCode={(v) => updatePerson(i, "phoneCode", v)} onNumber={(v) => updatePerson(i, "phone", v)} placeholder="755 0000 0000" /></div>
                       <div><label className={lbl}>{t("quick.mobile")}</label><PhoneField code={p.mobileCode} number={p.mobile} onCode={(v) => updatePerson(i, "mobileCode", v)} onNumber={(v) => updatePerson(i, "mobile", v)} placeholder="138 0000 0000" /></div>
@@ -889,10 +931,10 @@ function QuickAddContactModal({
             </div>
             {/* Remaining IDs */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div><label className={lbl}>{t("quick.wechatOfficial")}</label><IconInput icon={<BrandGlyph name="wechat" size={15} />} value={wechatOfficial} onChange={setWechatOfficial} placeholder="Official account" /></div>
+              <div><label className={lbl}>{t("quick.wechatOfficial")}</label><IconInput icon={<BrandGlyph name="wechat" size={15} />} value={wechatOfficial} onChange={setWechatOfficial} placeholder={t("cat.officialAccount", "Official account")} /></div>
               <div><label className={lbl}>{t("quick.telegram")}</label><IconInput icon={<BrandGlyph name="telegram" size={15} />} value={telegram} onChange={setTelegram} placeholder="@handle" /></div>
-              <div><label className={lbl}>{t("quick.line")}</label><IconInput icon={<BrandGlyph name="line" size={15} />} value={lineId} onChange={setLineId} placeholder="line id" /></div>
-              <div><label className={lbl}>{t("quick.qq")}</label><IconInput icon={<BrandGlyph name="qq" size={15} />} value={qqId} onChange={setQqId} placeholder="QQ number" /></div>
+              <div><label className={lbl}>{t("quick.line")}</label><IconInput icon={<BrandGlyph name="line" size={15} />} value={lineId} onChange={setLineId} placeholder={t("cat.phLineId", "line id")} /></div>
+              <div><label className={lbl}>{t("quick.qq")}</label><IconInput icon={<BrandGlyph name="qq" size={15} />} value={qqId} onChange={setQqId} placeholder={t("cat.qqNumber", "QQ number")} /></div>
             </div>
           </div>
         </div>
@@ -1686,7 +1728,7 @@ function CatalogModal({
               {tags.map((tg, i) => (
                 <span key={`${tg}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-active)] px-2 py-0.5 text-[12px] text-[var(--text-secondary)]">
                   {tg}
-                  <button type="button" aria-label="Remove tag"
+                  <button type="button" aria-label={t("cat.removeTag", "Remove tag")}
                     onClick={(e) => { e.stopPropagation(); setTags((prev) => prev.filter((_, idx) => idx !== i)); }}
                     className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">×</button>
                 </span>
@@ -1949,7 +1991,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
       className={`group relative flex h-full flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}
     >
       {/* Selection checkbox */}
-      <button onClick={onToggleSelect} aria-label="Select"
+      <button onClick={onToggleSelect} aria-label={t("cat.select", "Select")}
         className={`absolute top-2.5 left-2.5 z-10 h-6 w-6 rounded-md border flex items-center justify-center transition-all ${selected ? "bg-blue-500 border-blue-500 text-white opacity-100" : "bg-black/40 backdrop-blur-md border-white/40 text-transparent opacity-0 group-hover:opacity-100"}`}>
         <CheckIcon className="h-3.5 w-3.5" />
       </button>
@@ -2176,7 +2218,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 
   return (
     <div {...kxInspectAttrs({ component: "CatalogRow", module: "Catalogs", section: "Main List", recordId: catalog.id })} className={`group flex items-center gap-4 px-4 py-3.5 rounded-xl bg-[var(--bg-surface)] border transition-all ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
-      <button onClick={onToggleSelect} aria-label="Select"
+      <button onClick={onToggleSelect} aria-label={t("cat.select", "Select")}
         className={`shrink-0 h-5 w-5 rounded border flex items-center justify-center transition-colors ${selected ? "bg-blue-500 border-blue-500 text-white" : "border-[var(--border-subtle)] text-transparent hover:border-[var(--text-dim)]"}`}>
         <CheckIcon className="h-3 w-3" />
       </button>
@@ -2262,7 +2304,6 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
    render lazily as they enter view (HTTP range requests keep big PDFs light),
    each render is cancellable, and the doc is destroyed on close. Falls back to
    Open/Download if the file can't be loaded. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PdfDoc = any;
 
 const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quality, rotation, onActive }: {
@@ -2270,7 +2311,6 @@ const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quali
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const taskRef = useRef<any>(null);
   const [visible, setVisible] = useState(pageNumber <= 2);
   /* `visible` latches once (the canvas stays mounted with its last bitmap);
@@ -2343,7 +2383,6 @@ function PdfThumb({ pdf, pageNumber, active, onClick }: { pdf: PdfDoc; pageNumbe
   useEffect(() => {
     if (!visible || !pdf) return;
     let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let task: any = null;
     (async () => {
       try {
@@ -2642,7 +2681,10 @@ function PdfViewer({ url, fileSize, onDownload }: { url: string; fileSize?: numb
 function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry | null; onClose: () => void; onDownload: (id: string) => void }) {
   const [zoom, setZoom] = useState(1);
   const { t } = useTranslation(T);
-  useEffect(() => { setZoom(1); }, [catalog?.id]);
+  // Reset zoom when a different catalog is previewed. Adjusting during render
+  // instead of in an effect avoids a second render pass on every open.
+  const [zoomFor, setZoomFor] = useState(catalog?.id);
+  if (zoomFor !== catalog?.id) { setZoomFor(catalog?.id); setZoom(1); }
   useEffect(() => {
     if (!catalog) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -2681,7 +2723,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
           </div>
         )}
         <button onClick={download} title={t("card.download")} className="h-9 w-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 transition-colors"><DownloadIcon className="h-4 w-4" /></button>
-        <button onClick={onClose} aria-label="Close" title={t("common.cancel")} className="h-9 px-3 rounded-lg bg-white/15 border border-white/20 flex items-center gap-1.5 text-[12px] font-medium hover:bg-red-500/30 hover:border-red-500/40 transition-colors"><CrossIcon className="h-4 w-4" /> {t("common.close")}</button>
+        <button onClick={onClose} aria-label={t("common.close", "Close")} title={t("common.cancel")} className="h-9 px-3 rounded-lg bg-white/15 border border-white/20 flex items-center gap-1.5 text-[12px] font-medium hover:bg-red-500/30 hover:border-red-500/40 transition-colors"><CrossIcon className="h-4 w-4" /> {t("common.close")}</button>
       </div>
       <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {isPdf ? (
@@ -2808,13 +2850,21 @@ function CatalogsApp() {
 
      // 2️⃣ Load ancillary data (non‑critical)
      if (process.env.NODE_ENV === "development") console.time("fetchOtherData");
-     const [conts, divs, catgs, dLogos, cLogos] = await Promise.all([
+     /* Divisions + categories come from fetchTaxonomyAll, NOT from
+        fetchDivisions()+fetchCategories(). Two reasons, and the second is the
+        one that shows: it is ONE request instead of two (a request costs
+        ~1-2s of latency on the operators' connection regardless of size), and
+        it has an aged-mirror path — it returns the last-known lists
+        synchronously and refreshes behind, where the per-list fetchers only
+        ever return fresh-or-wait. Same cache keys, so nothing double-fetches. */
+     const [conts, taxo, dLogos, cLogos] = await Promise.all([
        fetchCatalogContacts().catch(() => [] as ContactOption[]),
-       fetchDivisions().catch(() => [] as DivisionRow[]),
-       fetchCategories().catch(() => [] as CategoryRow[]),
+       fetchTaxonomyAll().catch(() => ({ divisions: [], categories: [], subcategories: [] })),
        fetchDivisionLogos().catch(() => ({}) as Record<string, string>),
        fetchCategoryLogos().catch(() => ({}) as Record<string, string>),
      ]);
+     const divs = taxo.divisions as DivisionRow[];
+     const catgs = taxo.categories as CategoryRow[];
      if (process.env.NODE_ENV === "development") console.timeEnd("fetchOtherData");
      setContacts(conts);
      setDivisions(divs);
@@ -2826,7 +2876,9 @@ function CatalogsApp() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // Reset how many cards are shown when the filter/sort context changes.
-  useEffect(() => { setVisibleCount(24); }, [search, filterSupplier, filterDivision, filterType, filterYear, filterTag, sortBy]);
+  const pageKey = `${search}|${filterSupplier}|${filterDivision}|${filterType}|${filterYear}|${filterTag}|${sortBy}`;
+  const [pagedFor, setPagedFor] = useState(pageKey);
+  if (pagedFor !== pageKey) { setPagedFor(pageKey); setVisibleCount(24); }
 
   const filtered = useMemo(() => {
     let result = [...catalogs];
@@ -3083,7 +3135,7 @@ function CatalogsApp() {
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label="Back to home">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("cat.backHome", "Back to home")}>
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -3229,7 +3281,7 @@ function CatalogsApp() {
               placeholder={t("cat.search")} role="combobox" aria-expanded={searchFocused} aria-autocomplete="list"
               className="w-full h-9 pl-9 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
             {search && (
-              <button onClick={() => { setSearch(""); setSugIndex(-1); }} aria-label="Clear"
+              <button onClick={() => { setSearch(""); setSugIndex(-1); }} aria-label={t("cat.clearSel", "Clear")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-[var(--text-primary)]">
                 <CrossIcon className="h-3 w-3" />
               </button>

@@ -21,6 +21,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | /products | 137 | 21 | 43 | 254 | 17 | 37 | me/bootstrap ×4 · fx/cny-usd ×2 · visual-bindings ×2 |
 | /quotations | 118 | 12 | 37 | (cache) | 22 | 28 | inbox/feed ×3 |
 | /product-data | 173 | 19 | 46 | (cache) | 32 | 58 | classification-icons ×2 · taxonomy/all ×2 · me/bootstrap ×2 |
+| /catalogs (2026-08-13) | 88 | 10 | 8 | (cache) | — | — | none — `contacts ×2` / `storage/list ×2` differ by query string |
+| /landed-cost (2026-08-13) | 24 | 4 | 1 | (cache) | — | — | none |
 
 ## Systemic findings (cross-app — fix once, benefits everything)
 
@@ -52,8 +54,8 @@ chunks came from browser cache; the file COUNT stays comparable).
 | 14 | W3 | Contacts | /contacts | 🔍 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 15 | W3 | Inventory | /inventory | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
 | 16 | W3 | Purchases | /purchase | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
-| 17 | W3 | Landed Cost | /landed-cost | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 18 | W3 | Catalogs | /catalogs | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 17 | W3 | Landed Cost | /landed-cost | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 18 | W3 | Catalogs | /catalogs | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 19 | W4 | Employees | /employees | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 20 | W4 | HR | /hr | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 21 | W4 | Planning | /planning | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

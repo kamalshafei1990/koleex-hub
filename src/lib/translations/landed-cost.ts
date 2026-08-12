@@ -437,4 +437,56 @@ export const landedCostT: Translations = {
   "costJourney":            { en: "Cost Journey",                 zh: "成本旅程",                     ar: "رحلة التكلفة" },
   "costJourneySub":         { en: "How product cost builds up to landed cost, then to selling price", zh: "产品成本如何累积到到岸成本，再到销售价格", ar: "كيف تتراكم تكلفة المنتج إلى تكلفة الوصول ثم سعر البيع" },
   "jStart":                 { en: "Product",                      zh: "产品",                         ar: "المنتج" },
+
+  /* ── W3 revision · the printed report ────────────────────────────────
+     The simulation FORM is translated 300 times over; the report it prints
+     was not translated at all. An operator filled the form in Arabic and got
+     an English document out. 16 of its 22 labels already existed here with
+     zh/ar and simply were not used — these six were the only genuinely new
+     ones. */
+  "list.draftsCount":    { en: "drafts", zh: "草稿", ar: "مسودّة" },
+  "list.completedCount": { en: "completed", zh: "已完成", ar: "مكتملة" },
+  "print.reportTitle":   { en: "Landed Cost Report", zh: "到岸成本报告", ar: "تقرير التكلفة الواصلة" },
+  "print.generated":     { en: "Generated", zh: "生成于", ar: "صدر في" },
+  "print.localCurrency": { en: "Local currency", zh: "本币", ar: "بالعملة المحلية" },
+  "print.footerLine":    { en: "Koleex Hub \u00b7 Landed Cost Simulation Report", zh: "Koleex Hub \u00b7 到岸成本模拟报告", ar: "Koleex Hub \u00b7 تقرير محاكاة التكلفة الواصلة" },
+  "print.idLabel":       { en: "ID", zh: "编号", ar: "المعرّف" },
+  "print.executiveSummary": { en: "Executive Summary", zh: "执行摘要", ar: "الملخّص التنفيذي" },
+  "print.detailedBreakdown": { en: "Detailed Cost Breakdown", zh: "成本明细", ar: "تفصيل التكاليف" },
+  "print.costDistribution": { en: "Cost Distribution", zh: "成本分布", ar: "توزيع التكاليف" },
+  "print.modelSku": { en: "Model / SKU", zh: "型号 / SKU", ar: "الموديل / SKU" },
+  "print.countryCity": { en: "Country / City", zh: "国家 / 城市", ar: "الدولة / المدينة" },
+  "print.notFound": { en: "Simulation not found", zh: "未找到该模拟", ar: "لم يتم العثور على المحاكاة" },
+
+  /* The printed report's cost lines. 36 of its 64 rows already had keys
+     here with zh/ar and were simply not used; these are the rest. */
+  "print.productCost": { en: "Product Cost", zh: "货品成本", ar: "تكلفة البضاعة" },
+  "print.exportSide": { en: "Export Side Costs", zh: "出口端费用", ar: "تكاليف جهة التصدير" },
+  "print.factoryToPort": { en: "Factory to Port", zh: "工厂到港口", ar: "من المصنع إلى الميناء" },
+  "print.exportAgentFee": { en: "Export Agent Fee", zh: "出口代理费", ar: "أتعاب وكيل التصدير" },
+  "print.certOfOrigin": { en: "Certificate of Origin", zh: "原产地证", ar: "شهادة المنشأ" },
+  "print.totalExport": { en: "Total Export Costs", zh: "出口费用合计", ar: "إجمالي تكاليف التصدير" },
+  "print.shippingCosts": { en: "Shipping Costs", zh: "运输费用", ar: "تكاليف الشحن" },
+  "print.insurance": { en: "Insurance", zh: "保险", ar: "التأمين" },
+  "print.baf": { en: "BAF", zh: "燃油附加费 BAF", ar: "BAF رسوم الوقود" },
+  "print.caf": { en: "CAF", zh: "货币贬值附加费 CAF", ar: "CAF فرق العملة" },
+  "print.gri": { en: "GRI", zh: "综合费率上调 GRI", ar: "GRI زيادة عامة" },
+  "print.amsEnsIsf": { en: "AMS/ENS/ISF", zh: "舱单申报 AMS/ENS/ISF", ar: "إقرارات AMS/ENS/ISF" },
+  "print.blAwbFee": { en: "BL/AWB Fee", zh: "提单/空运单费", ar: "رسوم بوليصة الشحن" },
+  "print.telexRelease": { en: "Telex Release", zh: "电放费", ar: "الإفراج التلكسي" },
+  "print.portSecurity": { en: "Port Security", zh: "港口安保费", ar: "رسوم أمن الميناء" },
+  "print.totalShipping": { en: "Total Shipping Costs", zh: "运输费用合计", ar: "إجمالي تكاليف الشحن" },
+  "print.importCosts": { en: "Import Costs", zh: "进口费用", ar: "تكاليف الاستيراد" },
+  "print.customsClearance": { en: "Customs Clearance", zh: "清关费", ar: "التخليص الجمركي" },
+  "print.customsBroker": { en: "Customs Broker", zh: "报关行费", ar: "المخلّص الجمركي" },
+  "print.certVerification": { en: "Certificate Verification", zh: "证书认证费", ar: "تصديق الشهادات" },
+  "print.municipalityFee": { en: "Municipality Fee", zh: "市政费", ar: "رسوم البلدية" },
+  "print.totalImport": { en: "Total Import Costs", zh: "进口费用合计", ar: "إجمالي تكاليف الاستيراد" },
+  "print.lastMileHandling": { en: "Last Mile Handling", zh: "末端搬运", ar: "المناولة النهائية" },
+  "print.craneForklift": { en: "Crane / Forklift", zh: "吊车 / 叉车", ar: "ونش / رافعة شوكية" },
+  "print.appointmentDelivery": { en: "Appointment Delivery", zh: "预约送货", ar: "تسليم بموعد" },
+  "print.nightDelivery": { en: "Night Delivery", zh: "夜间送货", ar: "تسليم ليلي" },
+  "print.totalInland": { en: "Total Inland Delivery", zh: "内陆运输合计", ar: "إجمالي النقل الداخلي" },
+  "print.financialCommercial": { en: "Financial & Commercial", zh: "财务与商务", ar: "مالية وتجارية" },
+  "print.totalFinancial": { en: "Total Financial", zh: "财务费用合计", ar: "إجمالي التكاليف المالية" },
 };

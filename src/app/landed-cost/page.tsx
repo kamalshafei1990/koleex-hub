@@ -106,14 +106,14 @@ export default function LandedCostListPage() {
               {t("list.title")}
             </h1>
           </div>
-          <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
+          <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0 max-sm:basis-full">
             <PlusIcon className="h-4 w-4" /> {t("list.newSimulation")}
           </Link>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
           {simulations.length} {simulations.length !== 1 ? t("list.simulationsPlural") : t("list.simulations")}
-          {draftCount > 0 && <span className="ml-2 text-amber-400">· {draftCount} drafts</span>}
-          {completedCount > 0 && <span className="ml-2 text-emerald-400">· {completedCount} completed</span>}
+          {draftCount > 0 && <span className="ms-2 text-amber-400">· {draftCount} {t("list.draftsCount", "drafts")}</span>}
+          {completedCount > 0 && <span className="ms-2 text-emerald-400">· {completedCount} {t("list.completedCount", "completed")}</span>}
         </p>
       </div>
 

@@ -11,9 +11,28 @@ import type { SimulationRow } from "./landed-cost-types";
 
 const BASE = "/api/landed-cost";
 
+/* Write-then-read invalidation.
+
+   GET /api/landed-cost answers with `private, max-age=10, stale-while-revalidate=60`,
+   which is deliberate — it makes the list paint instantly on ordinary navigation.
+   But it also means a read issued SECONDS after a write is served by the browser
+   cache and shows the pre-write list: duplicate a simulation and the copy is
+   missing, save an edit and go back and the row is stale. Measured on a prod
+   build: the immediate second GET returned in 3ms with deliveryType "cache",
+   against 280ms for the network read.
+
+   So every mutation here raises a flag, and the next list read spends one
+   uncached request to clear it. Ordinary navigation is untouched. */
+let listDirty = false;
+function markListDirty(): void { listDirty = true; }
+
 export async function fetchSimulations(): Promise<SimulationRow[]> {
   try {
-    const res = await fetch(BASE, { credentials: "include" });
+    const res = await fetch(BASE, {
+      credentials: "include",
+      ...(listDirty ? { cache: "no-store" as const } : {}),
+    });
+    listDirty = false;
     if (!res.ok) { console.error("[LCS] Fetch:", res.status); return []; }
     const json = (await res.json()) as { simulations?: SimulationRow[] };
     return json.simulations ?? [];
@@ -37,6 +56,7 @@ export async function createSimulation(sim: Partial<SimulationRow>): Promise<str
       body: JSON.stringify(sim),
     });
     if (!res.ok) { console.error("[LCS] Create:", res.status); return null; }
+    markListDirty();
     const json = (await res.json()) as { id?: string };
     return json.id ?? null;
   } catch (e) { console.error("[LCS] Create:", e); return null; }
@@ -50,6 +70,7 @@ export async function updateSimulation(id: string, sim: Partial<SimulationRow>):
       body: JSON.stringify(sim),
     });
     if (!res.ok) { console.error("[LCS] Update:", res.status); return false; }
+    markListDirty();
     return true;
   } catch (e) { console.error("[LCS] Update:", e); return false; }
 }
@@ -58,6 +79,7 @@ export async function deleteSimulation(id: string): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
     if (!res.ok) { console.error("[LCS] Delete:", res.status); return false; }
+    markListDirty();
     return true;
   } catch (e) { console.error("[LCS] Delete:", e); return false; }
 }
