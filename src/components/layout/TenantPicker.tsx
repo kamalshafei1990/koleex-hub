@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -183,12 +184,10 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
             onClick={() => setOpen(false)}
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
-        <div
-          /* MN-5 shell. Note the light theme was NOT glass here before — it
-             was a flat white card while dark got the glass, so the two themes
-             disagreed about what this control is. Both are glass now. */
-          className="absolute right-0 top-11 z-50 min-w-[240px] kx-glass-pop kx-pop-panel"
-        >
+      </>
+    )}
+      {/* Portalled — inside the header pane the glass was starved. */}
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="min-w-[240px]">
           <div
             className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${
               dk ? "text-white/50" : "text-black/50"
@@ -242,9 +241,7 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
               )}
             </button>
           ))}
-        </div>
-        </>
-      )}
+      </PopoverPanel>
     </div>
   );
 }

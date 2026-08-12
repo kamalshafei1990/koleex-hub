@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { clearSessionScopedCaches } from "@/lib/session-caches";
@@ -332,13 +333,11 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             onClick={() => setOpen(false)}
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
-        <div
-          role="menu"
-          /* MN-5: the shell owns radius, border, surface and shadow, so the
-             per-theme solids that used to live here are gone — one dropdown
-             look Hub-wide, and the theme is handled by the tokens. */
-          className="kx-drop-in absolute top-full end-0 mt-2 w-64 z-50 kx-glass-pop kx-pop-panel"
-        >
+        </>
+      )}
+      {/* Portalled: inside the header pane its backdrop-filter was starved,
+          so the glass never rendered. See kds/PopoverPanel. */}
+      <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in w-64">
           {/* Identity block */}
           <div className={`px-4 py-3.5 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>
             <div className="flex items-center gap-3">
@@ -527,9 +526,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
               </>
             )}
           </div>
-        </div>
-        </>
-      )}
+      </PopoverPanel>
     </div>
   );
 }

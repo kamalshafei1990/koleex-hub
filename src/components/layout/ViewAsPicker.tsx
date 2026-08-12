@@ -25,6 +25,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useToast } from "@/components/kds/useToast";
 import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
@@ -458,9 +459,10 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
             onClick={() => setOpen(false)}
             className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] z-40 bg-black/30 backdrop-blur-sm"
           />
-        <div
-          className="absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-1rem)] kx-glass-pop kx-pop-panel"
-        >
+      </>
+    )}
+      {/* Portalled — inside the header pane the glass was starved. */}
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="w-[360px] max-w-[calc(100vw-1rem)]">
           {/* Header label */}
           <div
             className={`px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider ${
@@ -704,9 +706,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
               ))
             )}
           </div>
-        </div>
-        </>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
