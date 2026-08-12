@@ -21,6 +21,7 @@
 
 import type { SpecCard, SpecField, ResolvedSpecs } from "./types";
 import { COMMON_FIELDS } from "./common";
+import { getKindBySlug } from "@/lib/machine-kinds";
 
 // Families (Tier 2)
 import { LOCKSTITCH_FAMILY_FIELDS } from "./families/lockstitch";
@@ -150,6 +151,56 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Material capacity, frame reinforcement + cooling for heavy-duty heads.",
     fields: HEAVY_DUTY_FAMILY_FIELDS,
   },
+  /* CL-0020 — Automatic Sewing Systems shelves that never had a spec family.
+     They did not need one while buttonhole / bartack / button-attach / pocket
+     welting kinds were all parked under `special-machines` and
+     `pattern-sewing-machines`. Now that each kind sits on its own real token,
+     the family has to exist or `resolveSpecs` returns null and the spec form
+     renders nothing at all. */
+  "buttonhole-machines": {
+    title: "Buttonhole Basics",
+    subtitle: "Buttonhole geometry, cutting sequence and pattern storage.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "button-attaching-machines": {
+    title: "Button Attaching Basics",
+    subtitle: "Button size range, hole pattern and clamp specs.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "bartacking-machines": {
+    title: "Bartacking Basics",
+    subtitle: "Tack size range, stitch count and pattern storage.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "pocket-welting-machines": {
+    title: "Pocket Welting Basics",
+    subtitle: "Welt geometry, flap handling and corner-knife configuration.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
+  "sleeve-setting-machines": {
+    title: "Sleeve Setting Basics",
+    subtitle: "Armhole handling, easing control and stacker configuration.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
+  /* CL-0020 — the new stitch-type homes. Zigzag and blindstitch are real
+     stitch types promoted out of the "Special" pile; programmable/CNC is the
+     automation-class type (XAPT) that pattern sewing became. Without a family
+     entry `resolveSpecs` returns null and the spec form renders nothing. */
+  "zigzag-machines": {
+    title: "Zig-Zag Basics",
+    subtitle: "Swing width, pattern selection and bight control for zigzag heads.",
+    fields: ZIGZAG_FIELDS,
+  },
+  "blindstitch-machines": {
+    title: "Blindstitch Basics",
+    subtitle: "Curved-needle blind hemming — skip stitch, bite depth, bed geometry.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
+  "programmable-cnc-sewing": {
+    title: "Programmable / CNC Sewing Basics",
+    subtitle: "Programmable XY pattern stitchers — work area + programming + drive specs.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
   "special-machines": {
     title: "Special Machine Basics",
     subtitle: "Thin shared identity for cycle heads, sub-stations + decorative specialty heads.",
@@ -208,11 +259,9 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Knife type + cutting width for the integrated edge trimmer.",
     fields: EDGE_TRIMMER_FIELDS,
   },
-  // (No `lockstitch-heavy-duty` kind exists in machine-kinds.ts —
-  //  heavy-duty lockstitch is filed under the `heavy-duty-machines`
-  //  subcategory as `hd-snls`. The HEAVY_DUTY_FIELDS extras are
-  //  reused by other subcategories' heavy-duty kinds via the
-  //  resolver, not by a phantom lockstitch kind.)
+  // (CL-0020: `hd-snls` is now a LOCKSTITCH carrying `duty: "heavy"`. Its
+  //  heavy-duty fields arrive through ATTRIBUTE_CARDS above, not through a
+  //  subcategory — which is why it no longer needs a shelf of its own.)
 
   // ── Overlock ──────────────────────────────────────────────
   "overlock-rolled-hem": {
@@ -548,6 +597,47 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
 /** Look up the composed spec cards for a given subcategory + kind.
  *  Returns null if the subcategory has no registered family — the
  *  caller should then fall back to the legacy template system. */
+/* ── CL-0020: the second axis ──────────────────────────────────────────────
+   These field sets used to be reached through a SUBCATEGORY —
+   `heavy-duty-machines`, `double-needle-machines`, `multi-needle-machines`,
+   `pattern-sewing-machines`. Those shelves described a configuration, not a
+   stitch, which is the defect the audit named. The fields themselves were
+   never wrong, so nothing is thrown away: they now attach to the ATTRIBUTE
+   that actually justifies them, and a lockstitch carrying
+   `{needle_count:"2", duty:"heavy"}` collects both — which the old model
+   could not express without filing one machine under two subcategories. */
+const ATTRIBUTE_CARDS: Array<{
+  match: (a: Record<string, string>) => boolean;
+  title: string;
+  subtitle: string;
+  fields: SpecField[];
+}> = [
+  {
+    match: (a) => a.duty === "heavy" || a.duty === "extra-heavy",
+    title: "Heavy-Duty Capability",
+    subtitle: "Material capacity, frame reinforcement + cooling for heavy-duty heads.",
+    fields: HEAVY_DUTY_FAMILY_FIELDS,
+  },
+  {
+    match: (a) => a.needle_count === "2",
+    title: "Twin-Needle Configuration",
+    subtitle: "Twin-needle specs — gauge, needle bar, and split-bar behaviour.",
+    fields: DOUBLE_NEEDLE_FAMILY_FIELDS,
+  },
+  {
+    match: (a) => ["3", "4", "multi"].includes(a.needle_count ?? ""),
+    title: "Multi-Needle Configuration",
+    subtitle: "Specs shared across 3+ needle heads (chainstitch / coverstitch / quilting).",
+    fields: MULTI_NEEDLE_FAMILY_FIELDS,
+  },
+  {
+    match: (a) => Boolean(a.working_field || a.template_based || a.vision_guided),
+    title: "Programmable / CNC Sewing",
+    subtitle: "Programmable XY pattern stitchers — work area + programming + drive specs.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
+];
+
 export function resolveSpecs(
   subcategorySlug: string | null | undefined,
   kindSlug: string | null | undefined,
@@ -570,6 +660,20 @@ export function resolveSpecs(
       fields: family.fields,
     },
   ];
+
+  /* Second axis, between family and kind: what the machine IS configured as. */
+  const attrs = kindSlug ? (getKindBySlug(kindSlug)?.attributes ?? null) : null;
+  if (attrs) {
+    for (const card of ATTRIBUTE_CARDS) {
+      if (!card.match(attrs)) continue;
+      cards.push({
+        title: card.title,
+        subtitle: card.subtitle,
+        source: "family",
+        fields: card.fields,
+      });
+    }
+  }
 
   const extras = kindSlug ? KIND_EXTRAS[kindSlug] : null;
   if (extras) {

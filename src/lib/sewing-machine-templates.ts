@@ -1184,6 +1184,16 @@ const SUBCATEGORY_TO_TEMPLATE: Record<string, string> = {
   "cylinder-arm": "feed-of-the-arm",
   "cylinder-bed": "feed-of-the-arm",
 
+
+  /* CL-0020 — the three new stitch-type homes. The retired slugs above
+     (double-needle-machines, multi-needle-machines, heavy-duty-machines,
+     pattern-sewing-machines) are KEPT as legacy aliases on purpose: a saved
+     product or an old link must still resolve after the subcategory row is
+     gone. They are aliases now, not classifications. */
+  "zigzag-machines": "single-needle-lockstitch",
+  "blindstitch-machines": "single-needle-lockstitch",
+  "programmable-cnc-sewing": "single-needle-lockstitch",
+
   // Pattern / Special / Heavy duty — map to single needle as closest
   "pattern-sewing-machines": "single-needle-lockstitch",
   "special-machines": "single-needle-lockstitch",

@@ -36,6 +36,16 @@ const SUBCATEGORY_TO_FAMILY: Record<string, string> = {
   "pattern-sewing-machines": "automatic",
   "heavy-duty-machines": "heavy-duty",
   "special-machines": "generic",
+
+  /* CL-0020 — the three new stitch-type homes. The retired slugs above
+     (double-needle-machines, multi-needle-machines, heavy-duty-machines,
+     pattern-sewing-machines) are KEPT as legacy aliases on purpose: a saved
+     product or an old link must still resolve after the subcategory row is
+     gone. They are aliases now, not classifications. */
+  "zigzag-machines": "generic",
+  "blindstitch-machines": "generic",
+  "programmable-cnc-sewing": "automatic",
+
   // Automatic Sewing Systems category subcategories
   "bartacking-machines": "bartacking",
   "buttonhole-machines": "buttonhole",
