@@ -18,6 +18,8 @@ import {
   useCallback,
   useMemo,
 } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { fpAvatar } from "@/lib/cdn";
@@ -101,6 +103,7 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
    ═══════════════════════════════════════════════════ */
 
 export default function FloatingPanel() {
+  const { t } = useTranslation(hubT);
   const pathname = usePathname();
   const dk = useTheme();
   /* Aurora restyles the dock's three surfaces; Core keeps every value below
@@ -831,7 +834,7 @@ export default function FloatingPanel() {
                   }`}
                 >
                   <DiscussIcon size={13} />
-                  Discuss
+                  {t("app.discuss", "Discuss")}
                   {totalUnread > 0 && (
                     <span
                       className="min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center"
@@ -871,7 +874,10 @@ export default function FloatingPanel() {
                     {messages.map((msg) => {
                       const isMe = msg.author_account_id === accountId;
                       const authorName = msg.author
-                        ? (Array.isArray(msg.author) ? null : (msg.author as any)?.full_name || (msg.author as any)?.username)
+                        ? (Array.isArray(msg.author)
+                            ? null
+                            : (msg.author as { full_name?: string | null; username?: string | null }).full_name
+                              || (msg.author as { full_name?: string | null; username?: string | null }).username)
                         : null;
                       if (msg.deleted_at) return null;
                       return (
@@ -905,8 +911,8 @@ export default function FloatingPanel() {
                   {sortedChannels.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
                       <DiscussIcon size={24} className={textG} />
-                      <p className={`text-[12px] font-medium mt-3 ${textM}`}>No conversations yet</p>
-                      <p className={`text-[11px] mt-1 ${textG}`}>Messages from Discuss will appear here</p>
+                      <p className={`text-[12px] font-medium mt-3 ${textM}`}>{t("panel.noConversations", "No conversations yet")}</p>
+                      <p className={`text-[11px] mt-1 ${textG}`}>{t("panel.messagesHint", "Messages from Discuss will appear here")}</p>
                     </div>
                   ) : (
                     sortedChannels.map((ch) => {
@@ -963,13 +969,13 @@ export default function FloatingPanel() {
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
                       <KoleexOrb state={aiSending ? "loading" : "idle"} size={72} />
-                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Operator briefing</p>
-                      <p className={`text-[11px] mt-1 ${textG}`}>Embedded finance intelligence</p>
+                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>{t("panel.operatorBriefing", "Operator briefing")}</p>
+                      <p className={`text-[11px] mt-1 ${textG}`}>{t("panel.financeIntel", "Embedded finance intelligence")}</p>
 
                       {copilotHints.length > 0 && (
                         <div className="mt-5 w-full max-w-[320px] text-left">
                           <div className={`text-[9px] font-semibold uppercase tracking-[0.18em] mb-2 ${dk ? "text-white/35" : "text-black/40"}`}>
-                            Operational read
+                            {t("panel.operationalRead", "Operational read")}
                           </div>
                           <ul className="space-y-1.5">
                             {copilotHints.map((h) => {
@@ -1467,7 +1473,7 @@ export default function FloatingPanel() {
                     style={{ pointerEvents: showDiscuss ? "auto" : "none" }}
                   >
                     <DiscussIcon size={14} />
-                    <span className="hidden md:inline text-[11px] font-semibold tracking-wide">Discuss</span>
+                    <span className="hidden md:inline text-[11px] font-semibold tracking-wide">{t("app.discuss", "Discuss")}</span>
                   </button>
                 </div>
               </div>

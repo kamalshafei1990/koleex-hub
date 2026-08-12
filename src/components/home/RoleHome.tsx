@@ -14,6 +14,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { homeT } from "@/lib/translations/home";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpKpi, ErpPage,
@@ -56,6 +58,7 @@ interface WorkflowStatus {
 }
 
 export default function RoleHome() {
+  const { t } = useTranslation(homeT);
   const [exp, setExp] = useState<Experience | null>(null);
   const [status, setStatus] = useState<WorkflowStatus | null>(null);
   const [setupCompletion, setSetupCompletion] = useState<number>(0);
@@ -83,8 +86,12 @@ export default function RoleHome() {
 
   return (
     <ErpPage
-      title="Home"
-      subtitle={exp ? `${ROLE_LABEL[exp.dashboard_role]} dashboard · ${exp.ui_mode === "simple" ? "Simple" : "Advanced"} mode` : "Loading…"}
+      title={t("home", "Home")}
+      subtitle={exp
+        ? t("subtitle", "{role} dashboard · {mode} mode")
+            .replace("{role}", t(`role.${exp.dashboard_role}`, ROLE_LABEL[exp.dashboard_role]))
+            .replace("{mode}", t(exp.ui_mode === "simple" ? "mode.simple" : "mode.advanced", exp.ui_mode === "simple" ? "Simple" : "Advanced"))
+        : t("loading", "Loading…")}
       icon="home"
       action={
         /* flex-wrap: on 375px the four actions overflowed and "Personalize"
@@ -96,12 +103,10 @@ export default function RoleHome() {
           <button
             type="button" onClick={() => openSmartCreate()}
             className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
-            aria-label="Open Smart Create drawer (shortcut: c)"
-            title="Create (c)"
+            aria-label={t("createAria", "Open Smart Create drawer (shortcut: c)")}
+            title={t("createTitle", "Create (c)")}
           >
-            <RrIcon name="plus" size={12} />
-            Create
-          </button>
+            <RrIcon name="plus" size={12} />{t("create", "Create")}</button>
           {/* "Data Entry" — answer to "how do I put data in manually". */}
           {/* prefetch={false}: an App Router Link warms its route's client
               chunks on viewport, and this one points into /finance — see the
@@ -111,20 +116,16 @@ export default function RoleHome() {
             prefetch={false}
             href="/finance/data-entry"
             className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-            title="Where to put finance data manually"
+            title={t("dataEntryTitle", "Where to put finance data manually")}
           >
-            <RrIcon name="pencil" size={12} />
-            Data Entry
-          </Link>
+            <RrIcon name="pencil" size={12} />{t("dataEntry", "Data Entry")}</Link>
           <NotificationBell />
           <FocusToggle />
           <button
             onClick={() => setDrawerOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
           >
-            <RrIcon name="tools" size={12} />
-            Personalize
-          </button>
+            <RrIcon name="tools" size={12} />{t("personalize", "Personalize")}</button>
         </div>
       }
     >
@@ -160,24 +161,24 @@ export default function RoleHome() {
           <section className="space-y-4">
             {exp.pinned_workflows.length > 0 && (
               <div>
-                <ErpEyebrow>Pinned workflows</ErpEyebrow>
+                <ErpEyebrow>{t("drawer.pinned", "Pinned workflows")}</ErpEyebrow>
                 <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {exp.pinned_workflows.map((w) => (
-                    <ErpQuickAction key={w} href={`/workflows/${w}`} icon="contract" label={`${w[0].toUpperCase()}${w.slice(1)} workflow`} hint="Open timeline" />
+                    <ErpQuickAction key={w} href={`/workflows/${w}`} icon="contract" label={`${w[0].toUpperCase()}${w.slice(1)} workflow`} hint={t("hint.openTimeline", "Open timeline")} />
                   ))}
                 </div>
               </div>
             )}
             {exp.favorite_apps.length > 0 && (
               <div>
-                <ErpEyebrow>Favorite apps</ErpEyebrow>
+                <ErpEyebrow>{t("drawer.favorites", "Favorite apps")}</ErpEyebrow>
                 <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {exp.favorite_apps.map((id) => {
                     /* Show the app's REAL registry name and route — the raw
                        slug ("product-data") used to leak into the card. */
                     const reg = APP_REGISTRY.find((a) => a.id === id);
                     return (
-                      <ErpQuickAction key={id} href={reg?.route ?? `/${id}`} icon="box-open" label={reg?.name ?? id} hint="Pinned" />
+                      <ErpQuickAction key={id} href={reg?.route ?? `/${id}`} icon="box-open" label={reg?.name ?? id} hint={t("hint.pinned", "Pinned")} />
                     );
                   })}
                 </div>
@@ -194,12 +195,12 @@ export default function RoleHome() {
       {/* Sticky mobile quick actions — desktop unchanged. */}
       <MobileActionBar
         actions={[
-          { label: "Home",    icon: "home",          href: "/" },
+          { label: t("home", "Home"),           icon: "home",          href: "/" },
           /* Mobile Create opens the SmartCreateDrawer instead of
              routing — keeps the operator in the current workflow. */
-          { label: "Create",  icon: "plus",          onClick: () => openSmartCreate(), tone: "primary" },
-          { label: "Ops",     icon: "signal-stream", href: "/operations" },
-          { label: "Finance", icon: "bank",          href: "/finance/workspace" },
+          { label: t("create", "Create"),       icon: "plus",          onClick: () => openSmartCreate(), tone: "primary" },
+          { label: t("nav.ops", "Ops"),         icon: "signal-stream", href: "/operations" },
+          { label: t("nav.finance", "Finance"), icon: "bank",          href: "/finance/workspace" },
         ]}
       />
     </ErpPage>
@@ -213,6 +214,7 @@ export default function RoleHome() {
 function kpiStatus(n: number): ErpStatus { return n > 0 ? "started" : "empty"; }
 
 function CeoDashboard({ exp, status }: { exp: Experience; status: WorkflowStatus | null }) {
+  const { t } = useTranslation(homeT);
   const p = status?.procurement ?? {};
   const s = status?.sales ?? {};
   const f = status?.finance ?? {};
@@ -220,138 +222,146 @@ function CeoDashboard({ exp, status }: { exp: Experience; status: WorkflowStatus
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ErpKpi label="Active sales orders" value={String((s.so_confirmed ?? 0) + (s.so_partial ?? 0))} hint="Confirmed + partial" tone="positive" />
-        <ErpKpi label="Active POs"          value={String((p.po_confirmed ?? 0) + (p.po_partial ?? 0))} hint="Confirmed + partial" tone="info" />
-        <ErpKpi label="Draft journals"      value={String(f.journals_draft ?? 0)}                       hint="Awaiting review"     tone="warning" />
-        <ErpKpi label="Inventory items"     value={String(i.items ?? 0)}                                hint="Universal master" />
+        <ErpKpi label={t("kpi.activeSO", "Active sales orders")} value={String((s.so_confirmed ?? 0) + (s.so_partial ?? 0))} hint={t("hint.confirmedPartial", "Confirmed + partial")} tone="positive" />
+        <ErpKpi label={t("kpi.activePO", "Active POs")}          value={String((p.po_confirmed ?? 0) + (p.po_partial ?? 0))} hint={t("hint.confirmedPartial", "Confirmed + partial")} tone="info" />
+        <ErpKpi label={t("kpi.draftJournals", "Draft journals")}      value={String(f.journals_draft ?? 0)}                       hint={t("hint.awaitingReview", "Awaiting review")}     tone="warning" />
+        <ErpKpi label={t("kpi.inventoryItems", "Inventory items")}     value={String(i.items ?? 0)}                                hint={t("hint.universalMaster", "Universal master")} />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label="Statements"       hint="Income · Balance · Cash flow" />
-        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label="Accounting queue" hint="Approve drafts" />
-        <ErpQuickAction href="/workflows"                 icon="contract"           label="Workflows"        hint="End-to-end timelines" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label={t("qa.statements", "Statements")}       hint={t("hint.statements", "Income · Balance · Cash flow")} />
+        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label={t("qa.accountingQueue", "Accounting queue")} hint={t("hint.approveDrafts", "Approve drafts")} />
+        <ErpQuickAction href="/workflows"                 icon="contract"           label={t("qa.workflows", "Workflows")}        hint={t("hint.endToEndPlural", "End-to-end timelines")} />
       </Quicks>
     </div>
   );
 }
 
 function AccountantDashboard({ exp, status }: { exp: Experience; status: WorkflowStatus | null }) {
+  const { t } = useTranslation(homeT);
   void exp;
   const f = status?.finance ?? {};
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ErpKpi label="Draft journals"   value={String(f.journals_draft ?? 0)} hint="Awaiting post" tone="warning" />
-        <ErpKpi label="COGS drafts"      value={String(f.cogs_draft ?? 0)}     hint="From shipments" tone="info" />
-        <ErpKpi label="Pending expenses" value={String(f.expenses_submitted ?? 0)} hint="Submitted, not approved" tone="warning" />
-        <ErpKpi label="Posted expenses"  value={String(f.expenses_posted ?? 0)} hint="In the GL" tone="positive" />
+        <ErpKpi label={t("kpi.draftJournals", "Draft journals")}   value={String(f.journals_draft ?? 0)} hint={t("hint.awaitingPost", "Awaiting post")} tone="warning" />
+        <ErpKpi label={t("kpi.cogsDrafts", "COGS drafts")}      value={String(f.cogs_draft ?? 0)}     hint={t("hint.fromShipments", "From shipments")} tone="info" />
+        <ErpKpi label={t("kpi.pendingExp", "Pending expenses")} value={String(f.expenses_submitted ?? 0)} hint={t("hint.submittedNotApproved", "Submitted, not approved")} tone="warning" />
+        <ErpKpi label={t("kpi.postedExp", "Posted expenses")}  value={String(f.expenses_posted ?? 0)} hint={t("hint.inTheGL", "In the GL")} tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label="Accounting queue" hint="Draft / post / void" />
-        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label="Statements"       hint="Income · Balance · Cash flow" />
-        <ErpQuickAction href="/finance/workspace"         icon="bank"               label="Workspace"        hint="Approvals · banks · activity" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label={t("qa.accountingQueue", "Accounting queue")} hint={t("hint.draftPostVoid", "Draft / post / void")} />
+        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label={t("qa.statements", "Statements")}       hint={t("hint.statements", "Income · Balance · Cash flow")} />
+        <ErpQuickAction href="/finance/workspace"         icon="bank"               label={t("qa.workspace", "Workspace")}        hint={t("hint.approvalsBanks", "Approvals · banks · activity")} />
       </Quicks>
     </div>
   );
 }
 
 function SalesDashboard({ status }: { status: WorkflowStatus | null }) {
+  const { t } = useTranslation(homeT);
   const s = status?.sales ?? {};
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ErpKpi label="Active SOs"       value={String((s.so_confirmed ?? 0) + (s.so_partial ?? 0))} tone="positive" hint="Confirmed + partial" />
-        <ErpKpi label="Shipments"        value={String(s.shipments_posted ?? 0)} hint="Posted" />
-        <ErpKpi label="Invoices issued"  value={String(s.invoices_issued ?? 0)}  tone="info" />
-        <ErpKpi label="Payments received" value={String(s.payments_in ?? 0)}     tone="positive" />
+        <ErpKpi label={t("kpi.activeSOShort", "Active SOs")}       value={String((s.so_confirmed ?? 0) + (s.so_partial ?? 0))} tone="positive" hint={t("hint.confirmedPartial", "Confirmed + partial")} />
+        <ErpKpi label={t("kpi.shipments", "Shipments")}        value={String(s.shipments_posted ?? 0)} hint="Posted" />
+        <ErpKpi label={t("kpi.invoicesIssued", "Invoices issued")}  value={String(s.invoices_issued ?? 0)}  tone="info" />
+        <ErpKpi label={t("kpi.paymentsRecv", "Payments received")} value={String(s.payments_in ?? 0)}     tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/sales/orders"      icon="contract"            label="Sales orders"   hint="Create · ship · track" />
-        <ErpQuickAction href="/invoices"          icon="file-invoice-dollar" label="Invoices"       hint="Issue + collect" />
-        <ErpQuickAction href="/workflows/sales"   icon="contract"            label="Sales workflow" hint="Quote → SO → ship → invoice → pay" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/sales/orders"      icon="contract"            label={t("kpi.salesOrders", "Sales orders")}   hint={t("hint.createShipTrack", "Create · ship · track")} />
+        <ErpQuickAction href="/invoices"          icon="file-invoice-dollar" label={t("kpi.invoices", "Invoices")}       hint={t("hint.issueCollect", "Issue + collect")} />
+        <ErpQuickAction href="/workflows/sales"   icon="contract"            label={t("wf.sales", "Sales workflow")} hint={t("wf.salesDesc", "Quote → SO → ship → invoice → pay")} />
       </Quicks>
     </div>
   );
 }
 
 function WarehouseDashboard({ status }: { status: WorkflowStatus | null }) {
+  const { t } = useTranslation(homeT);
   const i = status?.inventory ?? {};
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ErpKpi label="Items"          value={String(i.items ?? 0)}     hint="Universal master" />
-        <ErpKpi label="Movements"      value={String(i.movements ?? 0)} hint="Posted IN/OUT" tone="info" />
-        <ErpKpi label="Stock balances" value={String(i.balances ?? 0)}   hint="Per item × location" />
-        <ErpKpi label="Warehouses"     value={String(i.warehouses ?? 0)} hint="Storage locations" />
+        <ErpKpi label={t("kpi.items", "Items")}          value={String(i.items ?? 0)}     hint={t("hint.universalMaster", "Universal master")} />
+        <ErpKpi label={t("kpi.movements", "Movements")}      value={String(i.movements ?? 0)} hint={t("hint.postedInOut", "Posted IN/OUT")} tone="info" />
+        <ErpKpi label={t("kpi.stockBalances", "Stock balances")} value={String(i.balances ?? 0)}   hint={t("hint.perItemLocation", "Per item × location")} />
+        <ErpKpi label={t("kpi.warehouses", "Warehouses")}     value={String(i.warehouses ?? 0)} hint={t("hint.storageLocations", "Storage locations")} />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/inventory/items"       icon="box-open"        label="Items"             hint="Master · classify · archive" />
-        <ErpQuickAction href="/inventory/movements"   icon="file-invoice"    label="Movements"         hint="Append-only ledger" />
-        <ErpQuickAction href="/workflows/inventory"   icon="box-open"        label="Inventory workflow" hint="End-to-end timeline" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/inventory/items"       icon="box-open"        label={t("kpi.items", "Items")}             hint={t("hint.masterClassify", "Master · classify · archive")} />
+        <ErpQuickAction href="/inventory/movements"   icon="file-invoice"    label={t("kpi.movements", "Movements")}         hint={t("hint.appendOnlyLedger", "Append-only ledger")} />
+        <ErpQuickAction href="/workflows/inventory"   icon="box-open"        label={t("wf.inventory", "Inventory workflow")} hint={t("hint.endToEnd", "End-to-end timeline")} />
       </Quicks>
     </div>
   );
 }
 
 function PurchasingDashboard({ status }: { status: WorkflowStatus | null }) {
+  const { t } = useTranslation(homeT);
   const p = status?.procurement ?? {};
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ErpKpi label="Draft POs"        value={String(p.po_draft ?? 0)}        tone="warning" />
-        <ErpKpi label="Active POs"       value={String((p.po_confirmed ?? 0) + (p.po_partial ?? 0))} tone="info" />
-        <ErpKpi label="Posted receipts"  value={String(p.receipts_posted ?? 0)} tone="positive" />
-        <ErpKpi label="Bills posted"     value={String(p.bills_posted ?? 0)}    tone="positive" />
+        <ErpKpi label={t("kpi.draftPO", "Draft POs")}        value={String(p.po_draft ?? 0)}        tone="warning" />
+        <ErpKpi label={t("kpi.activePO", "Active POs")}       value={String((p.po_confirmed ?? 0) + (p.po_partial ?? 0))} tone="info" />
+        <ErpKpi label={t("kpi.postedReceipts", "Posted receipts")}  value={String(p.receipts_posted ?? 0)} tone="positive" />
+        <ErpKpi label={t("kpi.billsPosted", "Bills posted")}     value={String(p.bills_posted ?? 0)}    tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/purchase"                 icon="contract"         label="Purchase orders"      hint="Draft · confirm · receive" />
-        <ErpQuickAction href="/suppliers"                icon="arrow-up-right"   label="Suppliers"            hint="Master + balances" />
-        <ErpQuickAction href="/workflows/procurement"    icon="box-circle-check" label="Procurement workflow" hint="Supplier → PO → receipt → bill → pay" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/purchase"                 icon="contract"         label={t("kpi.purchaseOrders", "Purchase orders")}      hint={t("hint.draftConfirmReceive", "Draft · confirm · receive")} />
+        <ErpQuickAction href="/suppliers"                icon="arrow-up-right"   label={t("kpi.suppliers", "Suppliers")}            hint={t("hint.masterBalances", "Master + balances")} />
+        <ErpQuickAction href="/workflows/procurement"    icon="box-circle-check" label={t("wf.procurement", "Procurement workflow")} hint={t("wf.procurementDesc", "Supplier → PO → receipt → bill → pay")} />
       </Quicks>
     </div>
   );
 }
 
 function MarketingDashboard() {
+  const { t } = useTranslation(homeT);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <ErpKpi label="Website" value="—" hint="Edit content + pages" />
-        <ErpKpi label="Catalogs" value="—" hint="Public catalog" />
-        <ErpKpi label="Events" value="—" hint="Exhibition planning" />
+        <ErpKpi label={t("qa.website", "Website")} value="—" hint={t("hint.editContentPages", "Edit content + pages")} />
+        <ErpKpi label={t("kpi.catalogs", "Catalogs")} value="—" hint={t("hint.publicCatalog", "Public catalog")} />
+        <ErpKpi label={t("kpi.events", "Events")} value="—" hint={t("hint.exhibitionPlanning", "Exhibition planning")} />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/website"   icon="megaphone" label="Website"   hint="Pages + content" />
-        <ErpQuickAction href="/catalogs"  icon="books"     label="Catalogs"  hint="Public catalog management" />
-        <ErpQuickAction href="/products"  icon="box-open"  label="Products"  hint="Customer-facing catalog" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/website"   icon="megaphone" label={t("qa.website", "Website")}   hint={t("hint.pagesContent", "Pages + content")} />
+        <ErpQuickAction href="/catalogs"  icon="books"     label={t("kpi.catalogs", "Catalogs")}  hint={t("hint.publicCatalogMgmt", "Public catalog management")} />
+        <ErpQuickAction href="/products"  icon="box-open"  label={t("kpi.products", "Products")}  hint={t("hint.customerFacing", "Customer-facing catalog")} />
       </Quicks>
     </div>
   );
 }
 
 function HrDashboard() {
+  const { t } = useTranslation(homeT);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <ErpKpi label="Employees"    value="—" hint="Active roster" />
-        <ErpKpi label="Departments"  value="—" hint="Org structure" />
-        <ErpKpi label="HR docs"      value="—" hint="Contracts + IDs" />
+        <ErpKpi label={t("kpi.employees", "Employees")}    value="—" hint={t("hint.activeRoster", "Active roster")} />
+        <ErpKpi label={t("kpi.departments", "Departments")}  value="—" hint={t("hint.orgStructure", "Org structure")} />
+        <ErpKpi label={t("kpi.hrDocs", "HR docs")}      value="—" hint={t("hint.contractsIds", "Contracts + IDs")} />
       </div>
       <ErpHairline />
-      <Quicks heading="Top actions">
-        <ErpQuickAction href="/employees"   icon="id-badge"        label="Employees" hint="Personnel records" />
-        <ErpQuickAction href="/hr"          icon="graduation-cap"  label="HR Hub"    hint="Org + leave + appraisals" />
-        <ErpQuickAction href="/management"  icon="briefcase"       label="Management" hint="Department structure" />
+      <Quicks heading={t("qa.topActions", "Top actions")}>
+        <ErpQuickAction href="/employees"   icon="id-badge"        label={t("kpi.employees", "Employees")} hint={t("hint.personnelRecords", "Personnel records")} />
+        <ErpQuickAction href="/hr"          icon="graduation-cap"  label={t("qa.hrHub", "HR Hub")}    hint={t("hint.orgLeaveAppraisals", "Org + leave + appraisals")} />
+        <ErpQuickAction href="/management"  icon="briefcase"       label={t("qa.management", "Management")} hint={t("hint.deptStructure", "Department structure")} />
       </Quicks>
     </div>
   );
 }
 
+/* No hook here on purpose: `heading` arrives already translated from the
+   dashboard that renders it. */
 function Quicks({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <section>
@@ -398,6 +408,7 @@ const APP_OPTIONS = [
 ] as const;
 
 function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose: () => void; onSaved: (e: Experience) => void }) {
+  const { t } = useTranslation(homeT);
   const [role, setRole] = useState<DashboardRole>(exp.dashboard_role);
   const [mode, setMode] = useState<UiMode>(exp.ui_mode);
   const [favorites, setFavorites] = useState<string[]>(exp.favorite_apps);
@@ -434,14 +445,14 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
       <div onClick={(e) => e.stopPropagation()} className="kx-slide-in-end flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
-            <h2 className="text-[14px] font-semibold">Personalize</h2>
-            <p className="text-[11px] text-[var(--text-tertiary)]">Choose how the home screen behaves for you.</p>
+            <h2 className="text-[14px] font-semibold">{t("personalize", "Personalize")}</h2>
+            <p className="text-[11px] text-[var(--text-tertiary)]">{t("drawer.desc", "Choose how the home screen behaves for you.")}</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
+          <button onClick={onClose} aria-label={t("close", "Close")} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Dashboard role</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">{t("drawer.role", "Dashboard role")}</div>
             <div className="grid grid-cols-2 gap-2">
               {ROLES.map((r) => {
                 const active = role === r;
@@ -462,7 +473,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Mode</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">{t("drawer.mode", "Mode")}</div>
             <div className="flex gap-2 text-[11.5px]">
               {(["simple","advanced"] as UiMode[]).map((m) => (
                 <button
@@ -473,17 +484,17 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
                     mode === m ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  <div className="font-medium">{m === "simple" ? "Simple" : "Advanced"}</div>
+                  <div className="font-medium">{t(m === "simple" ? "mode.simple" : "mode.advanced", m === "simple" ? "Simple" : "Advanced")}</div>
                   <div className="text-[10.5px] text-[var(--text-tertiary)]">{m === "simple"
-                    ? "Operational actions, fewer accounting details."
-                    : "Accounting, journals, reconciliation, adjustments."}
+                    ? t("mode.simpleDesc", "Operational actions, fewer accounting details.")
+                    : t("mode.advancedDesc", "Accounting, journals, reconciliation, adjustments.")}
                   </div>
                 </button>
               ))}
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Pinned workflows</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">{t("drawer.pinned", "Pinned workflows")}</div>
             <div className="flex flex-wrap gap-1.5 text-[11.5px]">
               {WORKFLOW_OPTIONS.map((w) => {
                 const active = pinned.includes(w.id);
@@ -503,7 +514,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
             </div>
           </section>
           <section>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">Favorite apps</div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-tertiary)]">{t("drawer.favorites", "Favorite apps")}</div>
             <div className="flex flex-wrap gap-1.5 text-[11.5px]">
               {APP_OPTIONS.map((a) => {
                 const active = favorites.includes(a.id);
@@ -525,7 +536,7 @@ function PersonalizeDrawer({ exp, onClose, onSaved }: { exp: Experience; onClose
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
-          <button onClick={onClose} className="rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Cancel</button>
+          <button onClick={onClose} className="rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{t("cancel", "Cancel")}</button>
           <button onClick={save} disabled={saving} className="rounded-md border border-[var(--border-strong)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)] disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
         </div>
       </div>

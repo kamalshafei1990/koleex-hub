@@ -25,6 +25,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useToast } from "@/components/kds/useToast";
 import { useRouter } from "next/navigation";
@@ -212,6 +214,7 @@ async function fetchRoles(): Promise<FetchResult<RoleRow[]>> {
 }
 
 export default function ViewAsPicker({ dk }: { dk: boolean }) {
+  const { t } = useTranslation(hubT);
   const { showToast, toastElement } = useToast();
 
   const router = useRouter();
@@ -441,10 +444,10 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
             ? "kx-hover-glow bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
             : "kx-hover-glow bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"
         }`}
-        title="Super Admin — view the system as another user or role"
+        title={t("viewAs.tooltip", "Super Admin — view the system as another user or role")}
       >
         <UsersIcon size={14} className="shrink-0" />
-        <span className="max-w-[120px] truncate hidden sm:inline">View as</span>
+        <span className="max-w-[120px] truncate hidden sm:inline">{t("viewAs.label", "View as")}</span>
         <AngleDownIcon size={11} className="shrink-0 opacity-60 hidden sm:block" />
       </button>
 
@@ -456,7 +459,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
               dk ? "text-white/50" : "text-black/50"
             }`}
           >
-            View as
+            {t("viewAs.label", "View as")}
           </div>
 
           {/* Mode tabs — segmented pill, equal width. */}

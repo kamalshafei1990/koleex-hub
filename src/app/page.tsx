@@ -80,7 +80,15 @@ const APP_DATA_PREFETCH: Record<string, string> = {
    Apple-flavoured: light-weight tabular numerals, monochrome, a softly
    blinking colon and quiet meta. Date above, timezone below. No skeuomorphism
    so it sits in the same material language as the rest of the launcher. */
+/* One place decides the date locale. ar-SA and ar-EG render identically for the
+   Gregorian fields we show, so ar-SA is kept as it was. */
+function dateLocaleFor(lang: string): string {
+  return lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : "en-US";
+}
+
 function ClockWidget({ dk = true }: { dk?: boolean }) {
+  /* Aliased: `t` is already this component's clock state. */
+  const { t: tr, lang } = useTranslation(hubT);
   const [t, setT] = useState<{ h12: string; mm: string; pm: boolean; blink: boolean }>({
     h12: "",
     mm: "",
@@ -90,6 +98,11 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   const [tzLabel, setTzLabel] = useState("");
   const [dateLabel, setDateLabel] = useState("");
 
+  /* The clock, the date and the timezone label are all seeded in an EFFECT, not
+     in the useState initialisers, and that is deliberate despite what the
+     "setState in an effect" rule says: `/` is a STATIC prerender, so an
+     initialiser would run at build time on the build server and hydrate against
+     a different clock and timezone. Do not "fix" this into an initialiser. */
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -103,8 +116,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
         pm,
         blink: now.getSeconds() % 2 === 0, // colon flashes each second
       });
+      /* `undefined` here meant "the BROWSER's locale", so the date stayed
+         English while the rest of the Hub was in Arabic or Chinese. */
       setDateLabel(
-        now.toLocaleDateString(undefined, {
+        now.toLocaleDateString(dateLocaleFor(lang), {
           weekday: "long",
           month: "long",
           day: "numeric",
@@ -141,7 +156,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onClockVis);
     };
-  }, []);
+  }, [lang]);
 
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
@@ -170,7 +185,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
         <span
           className={`mb-1 text-[13px] font-medium tracking-wide ${dk ? "text-white/40" : "text-black/40"}`}
         >
-          {t.pm ? "PM" : "AM"}
+          {t.pm ? tr("clock.pm", "PM") : tr("clock.am", "AM")}
         </span>
       </div>
 
@@ -780,7 +795,7 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
-  const dateLocale = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : "en-US";
+  const dateLocale = dateLocaleFor(lang);
   const today = new Date().toLocaleDateString(dateLocale, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
@@ -1226,6 +1241,10 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
           {/* Elected primary (R-2) — the old emerald chip predated the
               element election and matched nothing in the system. */}
           {isAuth ? (
+            /* eslint-disable-next-line @next/next/no-html-link-for-pages --
+               A FULL page load is the point. The session just failed, so the
+               client state is the thing we are trying to discard; <Link> would
+               soft-navigate and carry it straight back. */
             <a
               /* The root IS the sign-in screen: AdminAuth renders the username
                  + password form in place when there is no session. This used to

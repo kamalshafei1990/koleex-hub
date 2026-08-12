@@ -1,6 +1,15 @@
 import type { Translations } from "@/lib/i18n";
 
 export const hubT: Translations = {
+  "viewAs.label":    { en: "View as", zh: "\u4ee5\u2026\u8eab\u4efd\u67e5\u770b", ar: "\u0627\u0644\u0639\u0631\u0636 \u0628\u0635\u0641\u0629" },
+  "viewAs.tooltip":  { en: "Super Admin \u2014 view the system as another user or role", zh: "\u8d85\u7ea7\u7ba1\u7406\u5458 \u2014 \u4ee5\u5176\u4ed6\u7528\u6237\u6216\u89d2\u8272\u7684\u8eab\u4efd\u67e5\u770b\u7cfb\u7edf", ar: "\u0645\u0634\u0631\u0641 \u0639\u0627\u0645 \u2014 \u0627\u0639\u0631\u0636 \u0627\u0644\u0646\u0638\u0627\u0645 \u0628\u0635\u0641\u0629 \u0645\u0633\u062a\u062e\u062f\u0645 \u0623\u0648 \u062f\u0648\u0631 \u0622\u062e\u0631" },
+  "panel.noConversations": { en: "No conversations yet", zh: "\u6682\u65e0\u4f1a\u8bdd", ar: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u062d\u0627\u062f\u062b\u0627\u062a \u0628\u0639\u062f" },
+  "panel.messagesHint":    { en: "Messages from Discuss will appear here", zh: "\u6765\u81ea\u8ba8\u8bba\u7684\u6d88\u606f\u5c06\u663e\u793a\u5728\u8fd9\u91cc", ar: "\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0645\u0646\u0627\u0642\u0634\u0627\u062a \u062a\u0638\u0647\u0631 \u0647\u0646\u0627" },
+  "panel.operatorBriefing":{ en: "Operator briefing", zh: "\u8fd0\u8425\u7b80\u62a5", ar: "\u0625\u062d\u0627\u0637\u0629 \u0627\u0644\u0645\u0634\u063a\u0651\u0644" },
+  "panel.financeIntel":    { en: "Embedded finance intelligence", zh: "\u5185\u5d4c\u5f0f\u8d22\u52a1\u667a\u80fd", ar: "\u0630\u0643\u0627\u0621 \u0645\u0627\u0644\u064a \u0645\u062f\u0645\u062c" },
+  "panel.operationalRead": { en: "Operational read", zh: "\u8fd0\u8425\u89e3\u8bfb", ar: "\u0642\u0631\u0627\u0621\u0629 \u062a\u0634\u063a\u064a\u0644\u064a\u0629" },
+  "clock.am": { en: "AM", zh: "\u4e0a\u5348", ar: "\u0635" },
+  "clock.pm": { en: "PM", zh: "\u4e0b\u5348", ar: "\u0645" },
   /* ── Page ── */
   "title":            { en: "Koleex Hub",       zh: "Koleex 中心",       ar: "مركز Koleex" },
   "applications":     { en: "Applications",     zh: "应用程序",           ar: "التطبيقات" },

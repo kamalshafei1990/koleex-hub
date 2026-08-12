@@ -14,6 +14,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { homeT } from "@/lib/translations/home";
 import RrIcon from "@/components/ui/RrIcon";
 
 const STORAGE_KEY = "koleex.focus-mode";
@@ -53,6 +55,7 @@ export function useFocusMode(): [boolean, (next: boolean) => void] {
 
 export function FocusToggle() {
   const [focused, setFocused] = useFocusMode();
+  const { t } = useTranslation(homeT);
   return (
     <button type="button" onClick={() => setFocused(!focused)}
             className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors ${
@@ -61,9 +64,9 @@ export function FocusToggle() {
                 : "border-white/[0.10] bg-white/[0.04] text-gray-300 hover:bg-white/[0.06]"
             }`}
             aria-pressed={focused}
-            title={focused ? "Exit focus mode" : "Hide secondary chrome while you work"}>
+            title={focused ? t("focus.exitTitle", "Exit focus mode") : t("focus.enterTitle", "Hide secondary chrome while you work")}>
       <RrIcon name={focused ? "eye" : "eye"} size={11} />
-      {focused ? "Focus on" : "Focus"}
+      {focused ? t("focus.on", "Focus on") : t("focus.off", "Focus")}
     </button>
   );
 }
