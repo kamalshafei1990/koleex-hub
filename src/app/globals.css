@@ -2025,7 +2025,7 @@ input[type="number"]:not(.kx-spinner) {
    · [data-kx-keep-hover] — an escape hatch for a control whose hover colour
      is meaningful (destructive, brand).
    `translate: none` is declared ALONE (see the minifier note above). */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not([class*="bg-[var(--bg-inverted)]"]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -2037,14 +2037,22 @@ input[type="number"]:not(.kx-spinner) {
      way to override a utility framework, and the selector is narrow: one app
      scope, hover only, selected states excluded. */
   border-color: rgba(127, 169, 214, 0.55) !important;
-  /* The fill too. 17 sites across the converted apps still write
+  /* PRIMARY BUTTONS ARE EXCLUDED — this rule is what kept dimming the Save
+     button through four attempted fixes. A 3% white fill is a lift on a dark
+     control and a HOLE in a white one: the ground shows through and the button
+     goes grey exactly when you touch it. This selector outranks the
+     primary-button rule (0,8,0 vs 0,5,0), so its !important won and every fix
+     aimed at the other rule did nothing. Each round I measured with a cloned
+     element, which does not reproduce two of my own rules competing, so the
+     probe kept reporting success.
+     The fill too. 17 sites across the converted apps still write
      `hover:bg-[var(--bg-surface-hover)]` (10% white) — heavier than Aurora's
      3% and the visible half of "old style" on a control with a faint border.
      Same exclusions, so primary buttons and selected states are untouched. */
   background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not([class*="bg-[var(--bg-inverted)]"]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.03) !important;
 }
