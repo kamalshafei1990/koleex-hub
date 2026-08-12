@@ -1990,9 +1990,17 @@ input[type="number"]:not(.kx-spinner) {
    Works in light theme too, where --bg-inverted is black: the fill is held at
    its own value rather than being lightened, and the same halo reads. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([data-kx-keep-inverted]):hover {
+  /* NOTHING HERE MAY DARKEN THE BUTTON. Round one pinned the opacity but
+     added `0 6px 18px -6px rgba(0,0,0,.45)` — a black drop shadow — and the
+     owner said it was still dark, correctly: I had removed one way of dimming
+     it and introduced another. The only hover feedback now is a Hub-Blue ring
+     OUTSIDE the button; the button's own pixels do not change at all.
+     `filter: none` guards against a brightness/greyscale utility being added
+     to a call site later and quietly reintroducing the same complaint. */
   opacity: 1 !important;
   background-color: var(--bg-inverted) !important;
-  box-shadow: 0 0 0 3px rgba(86, 127, 178, 0.30), 0 6px 18px -6px rgba(0, 0, 0, 0.45);
+  filter: none !important;
+  box-shadow: 0 0 0 3px rgba(86, 127, 178, 0.35) !important;
 }
 
 /* ── EVERY BORDERED CONTROL IN A CONVERTED APP HOVERS THE SAME WAY ──
