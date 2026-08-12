@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import KdsSelect from "@/components/kds/Select";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -611,10 +612,8 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Supplier Type</label>
-                <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
-                  <option value="">Select type...</option>
-                  {SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <KdsSelect value={supplierType} onChange={setSupplierType} options={SUPPLIER_TYPES}
+                  placeholder="Select type..." triggerClassName={inp + " pe-8 text-start"} />
               </div>
               <div>
                 <label className={lbl}>Industry</label>
@@ -622,10 +621,8 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
               </div>
               <div>
                 <label className={lbl}>Source</label>
-                <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
-                  <option value="">Select source...</option>
-                  {SUPPLIER_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <KdsSelect value={source} onChange={setSource} options={SUPPLIER_SOURCES}
+                  placeholder="Select source..." triggerClassName={inp + " pe-8 text-start"} />
               </div>
             </div>
           </div>
@@ -775,16 +772,13 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Payment Terms</label>
-                <select value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className={inp}>
-                  <option value="">Select terms...</option>
-                  {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <KdsSelect value={paymentTerms} onChange={setPaymentTerms} options={PAYMENT_TERMS}
+                  placeholder="Select terms..." triggerClassName={inp + " pe-8 text-start"} />
               </div>
               <div>
                 <label className={lbl}>Currency</label>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inp}>
-                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <KdsSelect value={currency} onChange={setCurrency} options={CURRENCIES}
+                  triggerClassName={inp + " pe-8 text-start"} />
               </div>
               <div>
                 <label className={lbl}>MOQ</label>
@@ -833,10 +827,8 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
               </div>
               <div>
                 <label className={lbl}>Sample Status</label>
-                <select value={sampleStatus} onChange={(e) => setSampleStatus(e.target.value)} className={inp}>
-                  <option value="">Select status...</option>
-                  {SAMPLE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <KdsSelect value={sampleStatus} onChange={setSampleStatus} options={SAMPLE_STATUSES}
+                  placeholder="Select status..." triggerClassName={inp + " pe-8 text-start"} />
               </div>
             </div>
             <div>

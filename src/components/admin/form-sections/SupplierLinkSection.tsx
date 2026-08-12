@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { LOCALES } from "@/types/product-form";
+import KdsSelect from "@/components/kds/Select";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -403,18 +404,17 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                         return (
                           <div className="mt-2 space-y-1.5">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <select
+                              <KdsSelect
                                 value={loc}
-                                onChange={(e) => {
-                                  setNameLocale((m) => ({ ...m, [l._tempId]: e.target.value }));
+                                onChange={(v) => {
+                                  setNameLocale((m) => ({ ...m, [l._tempId]: v }));
                                   setNameTrMsg((m) => ({ ...m, [l._tempId]: undefined as never }));
                                 }}
-                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-                              >
-                                {LOCALES.map((x) => (
-                                  <option key={x.code} value={x.code}>{x.name}</option>
-                                ))}
-                              </select>
+                                options={LOCALES.map((x) => ({ value: x.code, label: x.name }))}
+                                wrapperClassName="shrink-0"
+                                panelWidthClassName="min-w-[9rem]"
+                                triggerClassName="h-8 ps-2.5 pe-7 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] text-start"
+                              />
                               <button
                                 type="button"
                                 onClick={() => autoTranslateName(l._tempId, l.supplier_product_name, loc)}
@@ -547,11 +547,11 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                                   </div>
                                   {open && (
                                     <div className="mt-1.5 ms-[42px] flex items-center gap-1.5">
-                                      <select value={loc}
-                                        onChange={(e) => setExtraLocale((m) => ({ ...m, [rkey]: e.target.value }))}
-                                        className="h-8 px-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] shrink-0">
-                                        {LOCALES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-                                      </select>
+                                      <KdsSelect value={loc}
+                                        onChange={(v) => setExtraLocale((m) => ({ ...m, [rkey]: v }))}
+                                        options={LOCALES.map((x) => ({ value: x.code, label: x.name }))}
+                                        wrapperClassName="shrink-0" panelWidthClassName="min-w-[9rem]"
+                                        triggerClassName="h-8 ps-2 pe-7 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] text-start" />
                                       <input dir={rtl ? "rtl" : "ltr"} value={i18n[loc] ?? ""}
                                         onChange={(e) => setI18n({ ...i18n, [loc]: e.target.value })}
                                         placeholder={t("sup.noteInLang", "Price note in {lang}").replace("{lang}", LOCALES.find((x) => x.code === loc)?.name ?? loc)}
@@ -620,12 +620,10 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><BoxIcon className="h-3 w-3" /> {t("sup.costIncludes", "Cost includes")}</span><FieldHelp {...H.costIncludes} /></label>
-                      <select className={inp} value={l.cost_basis}
-                        onChange={(e) => update(l._tempId, { cost_basis: e.target.value as ProductSupplierFormState["cost_basis"] })}>
-                        <option value="delivered">{t("sup.costDelivered", "Delivered to Koleex (full landed)")}</option>
-                        <option value="packing">{t("sup.costPacking", "+ Packing (no delivery)")}</option>
-                        <option value="factory_only">{t("sup.costFactory", "Factory only (ex-works)")}</option>
-                      </select>
+                      <KdsSelect value={l.cost_basis}
+                        onChange={(v) => update(l._tempId, { cost_basis: v as ProductSupplierFormState["cost_basis"] })}
+                        options={[{ value: "delivered", label: t("sup.costDelivered", "Delivered to Koleex (full landed)") }, { value: "packing", label: t("sup.costPacking", "+ Packing (no delivery)") }, { value: "factory_only", label: t("sup.costFactory", "Factory only (ex-works)") }]}
+                        triggerClassName={inp + " pe-8 text-start"} />
                     </div>
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><PercentIcon className="h-3 w-3" /> {t("sup.taxVat", "Tax (VAT)")}</span><FieldHelp {...H.taxVat} /></label>
@@ -797,10 +795,9 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><ActivityIcon className="h-3 w-3" /> {t("sup.sourcingStatus", "Sourcing status")}</span><FieldHelp {...H.sourcingStatus} /></label>
-                      <select className={inp} value={l.sourcing_status} onChange={(e) => update(l._tempId, { sourcing_status: e.target.value })}>
-                        <option value="">—</option>
-                        {SOURCING_STATUS.map((s) => <option key={s.value} value={s.value}>{t(`sup.st.${s.value}`, s.label)}</option>)}
-                      </select>
+                      <KdsSelect value={l.sourcing_status} onChange={(v) => update(l._tempId, { sourcing_status: v })}
+                        options={SOURCING_STATUS.map((s) => ({ value: s.value, label: t(`sup.st.${s.value}`, s.label) }))}
+                        placeholder="—" triggerClassName={inp + " pe-8 text-start"} />
                     </div>
                     <div className="md:col-span-2">
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> {t("sup.whyThisSupplier", "Why this supplier")}</span><FieldHelp {...H.whyThisSupplier} /></label>
@@ -819,10 +816,9 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                     </div>
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><WrenchIcon className="h-3 w-3" /> {t("sup.toolingOwner", "Tooling / mold owner")}</span><FieldHelp {...H.toolingOwner} /></label>
-                      <select className={inp} value={l.tooling_owner} onChange={(e) => update(l._tempId, { tooling_owner: e.target.value })}>
-                        <option value="">—</option>
-                        {TOOLING_OWNERS.map((o) => <option key={o.value} value={o.value}>{t(`sup.to.${o.value}`, o.label)}</option>)}
-                      </select>
+                      <KdsSelect value={l.tooling_owner} onChange={(v) => update(l._tempId, { tooling_owner: v })}
+                        options={TOOLING_OWNERS.map((o) => ({ value: o.value, label: t(`sup.to.${o.value}`, o.label) }))}
+                        placeholder="—" triggerClassName={inp + " pe-8 text-start"} />
                     </div>
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><HandCoinsIcon className="h-3 w-3" /> {t("sup.toolingCost", "Tooling / mold cost")}</span><FieldHelp {...H.toolingCost} /></label>
