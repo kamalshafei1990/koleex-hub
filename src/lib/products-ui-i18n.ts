@@ -1199,6 +1199,8 @@ export const PRODUCTS_UI_I18N: Translations = {
      while every field inside them already went through t(). With the schema
      templates now fully translated, a Chinese operator saw Chinese labels
      sitting under an English heading. */
+  "tech.ipRatingHint": { en: "Ingress protection (dust + water).", zh: "防尘防水等级。", ar: "درجة الحماية من الغبار والماء." },
+  "tech.operatingTempHint": { en: "Recommended operating range.", zh: "建议工作温度范围。", ar: "نطاق التشغيل الموصى به." },
   "tech.secElectrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
   "tech.secElectricalSub": { en: "Voltage, frequency, motor power, phase, and the plug types this product ships with", zh: "电压、频率、电机功率、相数，以及本产品随附的插头类型", ar: "الجهد والتردد وقدرة المحرك والأطوار وأنواع القوابس المرفقة بالمنتج" },
   "tech.secPhysical": { en: "Physical (Bare Machine)", zh: "物理参数（裸机）", ar: "القياسات الفعلية (الماكينة وحدها)" },

@@ -768,7 +768,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
               className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
             />
             <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              Harmonized System tariff code.
+              {t("logistics.hsHint", "Harmonized System tariff code.")}
             </p>
           </div>
           )}
@@ -783,7 +783,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
               className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
             />
             <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              Ingress protection (dust + water).
+              {t("tech.ipRatingHint", "Ingress protection (dust + water).")}
             </p>
           </div>
           )}
@@ -798,7 +798,7 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
               className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
             />
             <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              Recommended operating range.
+              {t("tech.operatingTempHint", "Recommended operating range.")}
             </p>
           </div>
           )}
