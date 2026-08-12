@@ -31,6 +31,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { cachedGet } from "@/lib/client-cache";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 
@@ -72,9 +73,18 @@ export function useInventoryViewMode(): {
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/me", { credentials: "include", cache: "no-store" });
-        if (!r.ok) return;
-        const j = await r.json().catch(() => ({}));
+        /* cachedGet, not a raw fetch: this hook is mounted TWICE on the same
+           screen — InventoryUx's own switcher and InventoryDashboard — so a
+           no-store fetch fired /api/me twice in parallel, measured 1ms apart
+           on /inventory. cachedGet coalesces the in-flight promise and is
+           globalThis-anchored, so it still holds when Turbopack duplicates the
+           module across chunks (the SYS-4 trap).
+           60s TTL: whether you are an admin does not change mid-session. */
+        const j = await cachedGet<{
+          is_super_admin?: boolean;
+          can_view_private?: boolean;
+          account?: { is_super_admin?: boolean };
+        }>("/api/me", 60_000);
         if (cancelled) return;
         const isAdmin =
           j?.is_super_admin === true ||
