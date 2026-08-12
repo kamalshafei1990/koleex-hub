@@ -1450,20 +1450,39 @@ input[type="number"]:not(.kx-spinner) {
    flat panel, blur alone leaves shapes readable underneath. Low-power and
    no-backdrop-filter clients skip the blur entirely, so they take a near
    solid surface instead. */
-/* 0.88 + 56px was measurably better and still not enough: the "Pricing &
-   Discounts" heading under the employee list was faint but READABLE. Light
-   text on a dark ground bleeds through far more than the 88% figure in the
-   old note assumed. 0.94 + 72px kills the shapes while the edge highlight,
-   the saturation lift and the ground's colour still come through — it reads
-   as glass, not as a solid tile. Dial `--kx-pop-tint` if the owner wants it
-   thinner; the blur should not go below ~56px or letterforms return. */
+/* THE FILL IS NOT THE TOOL HERE — THE BLUR IS. Owner, twice: "increase the
+   blur", then "I don't feel any glass effect… it's ok to be transparent but I
+   said increase the blur, not make it look as a solid color."
+
+   He was right and the first correction was wrong. Reading "you can see the
+   item under it" I reached for opacity — 0.60 → 0.88 → 0.94 — which does stop
+   the bleed-through, by ceasing to be glass. At 0.94 only 6% of the backdrop
+   survives, so the 72px blur was operating on almost nothing.
+
+   Opacity and blur solve the same problem differently: opacity HIDES the
+   backdrop, blur DESTROYS its detail. Only the second leaves a glass. Past
+   roughly 100px the letterforms behind stop being letters and become fields
+   of colour, so legibility is gone while the colour still moves behind the
+   panel — which is the effect that reads as glass.
+
+   AND THE BLUR ONLY STARTED WORKING WHEN THE PANEL LEFT THE CARD. A
+   backdrop-filter ancestor starves its descendants' backdrop-filter — every
+   form card is `.kx-glass` (blur 16px), so a panel inside one sampled that
+   already-filtered layer instead of the page and its own blur did nothing,
+   at any radius. kds/Select now portals its panel to <body>. These numbers
+   are therefore the first ones on this rule that are actually rendered:
+   0.72 fill, so nearly a third of the page still shows, with a blur wide
+   enough that what shows is colour rather than words.
+
+   If text reads through again, raise the BLUR. The fill is the last resort —
+   reaching for it first is what produced a 94%-opaque "glass". */
 [data-kx-skin="aurora"] .kx-pop-panel {
-  background: rgba(11, 14, 20, 0.94);
-  -webkit-backdrop-filter: blur(72px) saturate(170%);
-  backdrop-filter: blur(72px) saturate(170%);
+  background: rgba(11, 14, 20, 0.72);
+  -webkit-backdrop-filter: blur(64px) saturate(180%);
+  backdrop-filter: blur(64px) saturate(180%);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-pop-panel {
-  background: rgba(252, 253, 255, 0.95);
+  background: rgba(252, 253, 255, 0.78);
 }
 
 /* ── ROW HOVER, LIFTED FOR THE DENSER PANEL (owner, 2026-08-12) ──

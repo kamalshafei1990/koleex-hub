@@ -15,6 +15,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import SquareLogoCropper from "@/components/contacts/SquareLogoCropper";
 import KdsSelect from "@/components/kds/Select";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
@@ -2519,8 +2520,10 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
         )}
       </button>
 
-      {open && (
-        <div className="absolute z-30 mt-1 w-full kx-glass-pop kx-pop-panel overflow-hidden">
+      {/* Portalled: inside the form card its backdrop-filter was starved by
+          the card's own, so the glass never rendered. See kds/PopoverPanel. */}
+      <PopoverPanel anchorRef={ref} open={open} onClose={() => setOpen(false)} className="overflow-hidden">
+        <div className="contents">
           <div className="p-2 border-b border-[var(--border-subtle)]">
             <div className="relative">
               <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]"><SearchIcon size={13} /></span>
@@ -2580,7 +2583,7 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
             )}
           </div>
         </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 });

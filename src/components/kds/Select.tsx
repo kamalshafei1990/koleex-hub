@@ -28,6 +28,7 @@
    80px inline label picker and a flex-1 add-control. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 
@@ -61,6 +62,7 @@ export default function Select({
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const typed = useRef({ q: "", at: 0 });
 
   /* The placeholder is row 0 when present, so every index below is over ONE
@@ -78,14 +80,53 @@ export default function Select({
   const selectedIdx = Math.max(0, rows.findIndex((r) => r.v === value));
   const current = rows.find((r) => r.v === value);
 
+  /* ── The panel lives on <body>, not next to the trigger ──────────────────
+     A `backdrop-filter` ancestor STARVES a descendant's own backdrop-filter:
+     the child samples the parent's already-filtered layer instead of the page,
+     so its blur has almost nothing left to work on. Every form card in the Hub
+     is `.kx-glass` (blur 16px), so a panel rendered inside one had NO working
+     glass — measured: the panel asked for blur(140px) and the text behind it
+     stayed sharp. Every "fix" before this raised the FILL instead, until the
+     panel was 94% opaque and the blur was decorative.
+
+     Portalling to <body> takes the panel out from under that filter, so the
+     blur samples the real page. It also removes two problems that were being
+     worked around separately: the panel can no longer be clipped by a card's
+     overflow, and it can no longer be buried by a later sibling card, because
+     it is not inside a card at all.
+
+     The cost is that position must be computed rather than inherited — hence
+     the rect below, refreshed on scroll and resize. */
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const place = useCallback(() => {
+    const b = btnRef.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+    place();
+    /* Capture phase: the Hub scrolls in #main-scroll-container, not on
+       window, so a bubbling listener would never hear it. */
+    const onScroll = () => place();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      /* The panel is no longer inside wrapRef, so it needs its own test —
+         without this, clicking an option would count as an outside click. */
+      if (wrapRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [open, place]);
 
   /* Open ON the current value, not at the top — a 30-row discount list that
      always opened at "1%" would make the selected row impossible to find.
@@ -150,8 +191,12 @@ export default function Select({
         </span>
       </button>
       <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
-      {open && (
-        <div className={`absolute z-50 mt-1 ${panelWidthClassName} kx-glass-pop kx-pop-panel`}>
+      {open && rect && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
+          className={`kx-glass-pop kx-pop-panel ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
+        >
           <div ref={listRef} role="listbox" tabIndex={-1} onKeyDown={onKeyDown} className="max-h-60 overflow-y-auto py-1">
             {rows.map((r, i) => (
               <button
@@ -170,7 +215,8 @@ export default function Select({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
