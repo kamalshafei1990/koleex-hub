@@ -68,6 +68,32 @@ steam wastage (kg/h) · air pressure (MPa) · electric heating power (kW/V) · p
 
 ---
 
+## S-003 — Supplier catalogue library
+
+| | |
+|---|---|
+| **Location** | Google Drive → `Supplier Catalogs/` inside the S-001 folder |
+| **Registered** | 2026-08-12 |
+| **Scope** | **75 catalogues · 1,843 pages**, 2018–2026, plus `Suppliers data/` (50 supplier folders) and `Stand and tables/` |
+| **Status** | Authoritative per supplier for the machines that supplier makes |
+| **Inventory** | **[`source-catalog-inventory.md`](./source-catalog-inventory.md)** — which catalogue covers which subcategory, and whether it is machine-readable |
+
+**24 of the 75 carry a real text layer**, so their spec tables extract directly —
+S-001 has none at all. The other 50 were OCR'd (`chi_sim+eng`).
+
+Two things this library gives that S-001 cannot:
+1. **Model matrices** — five models × seven fields in one table, which is what
+   tells you whether a field belongs on the family or on the model override.
+2. **Family-specific measured fields** S-001 omits (steam pressure, boiler
+   capacity, heating-plate size, temperature/time range, air consumption,
+   throughput per hour).
+
+Neither source replaces the other — on `XFSI` the two overlap on 5 fields and each
+adds its own; the union is 8. **Read both before writing a template.**
+
+`Suppliers data/<supplier>/Company Info.txt` is a structured record (company EN/CN,
+brand, address EN/CN, tel, email, website) that maps 1:1 onto the Suppliers app.
+
 ## S-002 — YILI catalogue
 
 | | |
