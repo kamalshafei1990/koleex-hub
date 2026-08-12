@@ -47,7 +47,9 @@ export default function PopoverPanel({
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number; flip: boolean } | null>(null);
+  /* One nudge per open — see the scroll note in place(). */
+  const autoScrolled = useRef(false);
+  const [rect, setRect] = useState<{ top: number; left: number; right: number; width: number; flip: boolean; maxH: number } | null>(null);
 
   /* onClose arrives as a fresh arrow on every parent render. Held in a ref so
      the effect below does not tear down and re-register on every render — it
@@ -64,23 +66,64 @@ export default function PopoverPanel({
     const a = anchorRef.current;
     if (!a) return;
     const r = a.getBoundingClientRect();
-    /* Flip above the anchor when there is not room below. A panel used to do
-       this with a `bottom-full` class; a portalled one is positioned from a
-       measured rect, so the decision belongs here — otherwise a field near the
-       bottom of the screen opens a list that runs off it. The threshold is the
-       panel's own max height (22rem) plus its gap. */
-    const need = 352 + 8;
-    const flip = r.bottom + need > window.innerHeight && r.top > need;
-    const top = flip ? r.top - 4 : r.bottom + 4;
+    /* DOWN IS THE DEFAULT AND STAYS THE DEFAULT. The first version flipped
+       whenever a full-height panel would not fit below, which is the textbook
+       rule and looked wrong immediately: a field low on the page threw a 352px
+       list upward across the header. Owner: "the dropdown menu open to up not
+       down."
+
+       So: open downward and SHRINK to the room available — the panel scrolls
+       already, and a short list that starts where you are beats a tall one
+       that jumps somewhere else. Flip only when down is genuinely unusable
+       (under 200px) and up is roomier, which is the case a phone keyboard
+       creates. maxHeight is inline so it beats the caller's max-h class. */
+    const below = window.innerHeight - r.bottom - 12;
+    const above = r.top - 12;
+    /* DOWN, ALWAYS. Owner: "the dropdown menu open to up not down." A textbook
+       flip is not what he wants — a list that jumps above the field reads as a
+       different control, and at its worst it covered the header. So when the
+       room below is too small we do not move the PANEL, we move the PAGE: nudge
+       the field's own scroller up so the list has somewhere to go. Once per
+       open (autoScrolled), or the scroll listener would re-enter this and walk
+       the page. Flip survives only for a field with no scroller under it and
+       genuinely nowhere to go. */
+    const WANT = 240;
+    if (below < WANT && !autoScrolled.current) {
+      let sc: HTMLElement | null = a.parentElement;
+      while (sc) {
+        const cs = getComputedStyle(sc);
+        if (/auto|scroll/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 4) break;
+        sc = sc.parentElement;
+      }
+      if (sc && sc.scrollTop + (WANT - below) <= sc.scrollHeight - sc.clientHeight) {
+        autoScrolled.current = true;
+        sc.scrollTop += WANT - below;
+        requestAnimationFrame(place);
+        return;
+      }
+    }
+    /* No flip at all. The nudge above handles the common case; when the
+       scroller is already at its end there is nothing to nudge, and the honest
+       answer is a shorter list that still starts at the field — not one that
+       jumps above it. It scrolls internally, so three rows visible is a
+       cramped list, never a lost one. `above` stays measured for the day a
+       real reason to flip turns up. */
+    void above;
+    const flip = false;
+    const top = r.bottom + 4;
+    /* No lower clamp: a floor of 120 over 108px of room overflowed the
+       viewport by exactly the difference. The available space IS the limit. */
+    const maxH = Math.min(352, Math.max(0, below));
     setRect((prev) =>
-      prev && prev.top === top && prev.left === r.left && prev.width === r.width && prev.flip === flip
+      prev && prev.top === top && prev.left === r.left && prev.width === r.width
+        && prev.flip === flip && prev.maxH === maxH
         ? prev /* same box — return the SAME object so React bails out */
-        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip },
+        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip, maxH },
     );
   }, [anchorRef]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { autoScrolled.current = false; return; }
     place();
     /* One more pass after paint: the anchor can still be moving when the panel
        opens — a section expanding, a font landing, the list above it growing. */
@@ -117,6 +160,8 @@ export default function PopoverPanel({
         ...(rect.flip ? { bottom: window.innerHeight - rect.top } : { top: rect.top }),
         ...(align === "end" ? { right: rect.right } : { left: rect.left }),
         ...(matchAnchorWidth ? { minWidth: rect.width } : null),
+        maxHeight: rect.maxH,
+        overflowY: "auto",
         zIndex: 200,
       }}
       className={`kx-glass-pop kx-pop-panel ${className}`}

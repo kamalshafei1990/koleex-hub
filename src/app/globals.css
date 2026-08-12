@@ -1497,13 +1497,31 @@ input[type="number"]:not(.kx-spinner) {
    place else." These four values are settled. If a panel ever looks wrong,
    the cause is somewhere else — a filtered ancestor, a missing portal, a
    backdrop with nothing in it — not these numbers. Do not raise the fill. */
+/* THE SHEEN — the one idea worth taking from websiteglass.com's lens (owner
+   sent it, 2026-08-12). Their headline trick is an SVG displacement map run
+   through `backdrop-filter: url()` so the page physically bends behind the
+   panel; by their own docs that is Chromium-only and falls back to a plain
+   frosted blur on Safari and Firefox — i.e. on the iPad and iPhone this Hub is
+   used from, it would render exactly like what we already have. And it would
+   not have fixed our bug either: a lens over a near-black backdrop bends
+   nothing visible. brightness() was the fix, not refraction.
+
+   What DOES carry across every browser is the sheen: a soft highlight raked
+   across the surface, so light appears to slide over the glass instead of
+   sitting on one hard edge. It is a gradient layer over the SAME signed-off
+   fill and filter below — those two values are unchanged. (Their portalled
+   dialog, incidentally, is the same conclusion we reached by measurement.) */
 [data-kx-skin="aurora"] .kx-pop-panel {
-  background: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0) 62%),
+    rgba(255, 255, 255, 0.05);
   -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.5);
   backdrop-filter: blur(40px) saturate(180%) brightness(1.5);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-pop-panel {
-  background: rgba(255, 255, 255, 0.55);
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 62%),
+    rgba(255, 255, 255, 0.55);
   -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(0.98);
   backdrop-filter: blur(40px) saturate(180%) brightness(0.98);
 }
