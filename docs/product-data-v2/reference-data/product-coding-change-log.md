@@ -253,4 +253,20 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **Where the exploded "Special" machines go:** buttonhole / bartack / button-attach stay where they already are (Automatic Sewing Systems); blindstitch and zigzag become types under Industrial Sewing; ultrasonic and heat-seam machines → **Bonding / Seam-Sealing** (`XFSS`, already carried in the matrix from CL-0012); snap and rivet setters → **Fastening**; robotic cells → **Production Systems**. The last two categories do not exist yet and are part of the implementation, not of this sign-off.
 - **Machine Kinds (105) are demoted to a derived overlay** — a Kind is `Type × attribute values` (e.g. *Walking-Foot Lockstitch* = `type:lockstitch + feed:walking-foot + bed:flat`), generated for search / SEO / sales / AI. They stop being a structural level, which is what removes the combinatorial duplication (*"Cylinder-Bed" currently appears as a Kind under six different subcategories*). **Spec templates attach to types only; Kinds get marketing visuals, never their own data shape.**
 - **Conflict scan:** `XSBL`, `XSZ`, `XAPT` = **0** rows in live `subcategories`, 0 non-proposal hits in `docs/` and `src/`. `XABH`/`XABT`/`XABA` = live, 0 products, reused not re-minted. `XSPA` double-use closes with this entry; the three remaining CL-0001 duplicates (`XCL`, `XFFP`, `XPRH`) are **untouched and still open**.
+- **⚠️ AMENDMENT (same day, before any implementation) — "zero products" was TRUE but INCOMPLETE, and it changes what may be deleted.**
+  The sign-off argument above rests on all 28 sewing subcategories holding zero rows in `products`. That is accurate. It is **not** the same as "these tokens are unused", and the difference was found by scanning `src/` for real code strings rather than counting DB rows:
+
+  | Token | Distinct real product codes already in the repo | Where | Consequence |
+  |---|---|---|---|
+  | `XSS` | **82** (`XSS-9820`, `XSS-1790B`, `XSS-781SSR`, …) | customer preorder dataset + AI catalog knowledge | ❌ **cannot be deleted** |
+  | `XSH` | **20** (`XSH-1212`, `XSH-2100AT`, `XSH-320`, …) | AI catalog knowledge | ❌ **cannot be deleted** |
+  | `XSI` | 37 | preorder + coding knowledge | ✅ safe — rename touches the label, never the token |
+  | `XSD` `XSM` `XSPA` | **0** | — | ✅ fully clean to retire |
+
+  `src/app/quotations/preorder/data.ts` is transcribed from **"PREORDER COLEEX.xlsx" — a real customer order** with four sub-buyers. Those codes have left the building.
+
+  **The model is unaffected; the demolition is.** Under CL-0018 (*the category is a shelf; the token is the identity*) a machine's code never has to match its subcategory — precedent: the XFSP products still carry `XFWM-…` codes and that was accepted in CL-0019. So:
+  - **`XSH` and `XSS` are retired as CLASSIFICATION shelves but PERMANENTLY RESERVED as code prefixes.** They are never reissued and never rewritten on the 102 machines that carry them. When those products are entered they are classified by stitch type + attributes (`XSH-1212` = a lockstitch with `duty=heavy`) and **keep their printed codes**.
+  - Only `XSD`, `XSM` and `XSPA` may have their rows removed outright.
+  This is the governance rule working as designed — retired codes are never recycled — not an exception to it.
 - **Status:** **Signed off — NOT YET APPLIED.** No DB row has been created, renamed or removed. Implementation (subcategory rows, facet dictionary, Machine-Kind demotion, sibling categories, then the spec templates) is gated on a separate owner go-ahead, per the standing rule that plan approval is not start approval.
