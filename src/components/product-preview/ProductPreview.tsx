@@ -1060,7 +1060,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                   <div key={f.key} className="flex flex-1 flex-col items-center text-center gap-2.5">
                     <span className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)]">
                       <VisualGlyph token="automation" className="h-8 w-8" />
-                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--text-primary)] text-[9px] font-bold text-[var(--bg-primary)]">
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--text-primary)] text-[9px] font-bold text-[var(--text-inverted)]">
                         {i + 1}
                       </span>
                     </span>

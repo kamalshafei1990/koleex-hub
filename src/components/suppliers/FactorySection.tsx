@@ -344,7 +344,7 @@ export default function FactorySection({
               const on = d[k] as boolean;
               return (
                 <button key={k} type="button" onClick={() => set(k, !on)}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${on ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${on ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
                   {label}
                 </button>
               );

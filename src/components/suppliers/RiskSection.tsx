@@ -221,7 +221,7 @@ export default function RiskSection({
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => set("backup_supplier_exists", !(d.backup_supplier_exists as boolean))} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${d.backup_supplier_exists ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{t("rs.backupSupplierAvailable", "Backup supplier available")}</button>
+            <button type="button" onClick={() => set("backup_supplier_exists", !(d.backup_supplier_exists as boolean))} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${d.backup_supplier_exists ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{t("rs.backupSupplierAvailable", "Backup supplier available")}</button>
           </div>
           <Field label={t("rs.assessmentNotes", "Assessment notes")}><textarea className={`${inputCls} min-h-[60px]`} value={d.assessment_notes as string} onChange={(e) => set("assessment_notes", e.target.value)} /></Field>
           {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}

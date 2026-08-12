@@ -260,12 +260,12 @@ export default function TimelineSection({
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => setCat("all")}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === "all" ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === "all" ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
             {t("ts.all", "All")} {timeline.length ? <span className="opacity-60">{timeline.length}</span> : null}
           </button>
           {TIMELINE_CATEGORY_ORDER.filter((c) => counts[c]).map((c) => (
             <button key={c} type="button" onClick={() => setCat(c)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === c ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === c ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
               {TIMELINE_CATEGORY_LABELS[c]} <span className="opacity-60">{counts[c]}</span>
             </button>
           ))}

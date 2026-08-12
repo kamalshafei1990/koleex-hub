@@ -370,7 +370,7 @@ function FieldInput({
               onClick={() => onSet(o.val)}
               className={`h-9 px-3 text-[12px] font-semibold transition-colors ${
                 active
-                  ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                  ? "kx-chip-on bg-[var(--text-primary)] text-[var(--text-inverted)]"
                   : "bg-[var(--bg-surface-subtle)]/60 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
               }`}
             >
@@ -407,7 +407,7 @@ function FieldInput({
               onClick={() => toggle(o.value)}
               className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full border text-[12px] font-medium transition-colors ${
                 on
-                  ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                  ? "kx-chip-on border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--text-inverted)]"
                   : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
               }`}
             >

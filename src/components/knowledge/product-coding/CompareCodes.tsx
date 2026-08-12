@@ -112,7 +112,7 @@ export default function CompareCodes() {
                   onClick={() => switchDef(d.id)}
                   className={`h-7 px-2.5 rounded-md text-[11.5px] font-semibold transition-colors flex items-center gap-2 ${
                     isActive
-                      ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                      ? "bg-[var(--text-primary)] text-[var(--text-inverted)]"
                       : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
                   }`}
                 >

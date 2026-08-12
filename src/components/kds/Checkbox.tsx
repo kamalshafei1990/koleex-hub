@@ -31,7 +31,7 @@ export default function Checkbox({
       <span
         className={`h-4 w-4 rounded-[5px] border flex items-center justify-center shrink-0 transition-colors ${
           checked
-            ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--bg-primary)]"
+            ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--text-inverted)]"
             : "border-[var(--border-strong)] text-transparent"
         }`}
       >

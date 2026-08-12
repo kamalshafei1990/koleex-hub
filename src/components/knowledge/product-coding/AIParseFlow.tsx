@@ -69,7 +69,7 @@ export default function AIParseFlow() {
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
                 <div
-                  className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none"
+                  className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[10px] font-bold leading-none"
                   dir="ltr"
                 >
                   {f.axis}

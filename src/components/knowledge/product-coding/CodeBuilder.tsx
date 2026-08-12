@@ -126,7 +126,7 @@ export default function CodeBuilder() {
               >
                 <div className="flex items-center gap-2.5 mb-2">
                   <div
-                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none"
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[10px] font-bold leading-none"
                     dir="ltr"
                   >
                     {seg.index}
@@ -150,7 +150,7 @@ export default function CodeBuilder() {
                         }
                         className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition-colors ${
                           isActive
-                            ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)]"
+                            ? "bg-[var(--text-primary)] text-[var(--text-inverted)] border-[var(--text-primary)]"
                             : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
                         }`}
                         title={tl(o.label)}

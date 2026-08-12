@@ -1370,7 +1370,7 @@ export default function LegacyProductView() {
                 </p>
                 <Link
                   href={`/product-data/${product.id}/edit`}
-                  className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity"
+                  className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--text-primary)] text-[var(--text-inverted)] hover:opacity-90 transition-opacity"
                 >
                   Connect products
                 </Link>

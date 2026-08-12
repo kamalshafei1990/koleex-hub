@@ -84,7 +84,7 @@ function FormulaCell({
   if (prefix) {
     return (
       <div className="flex flex-col items-center gap-2 shrink-0">
-        <div className="flex items-center justify-center min-w-[54px] h-11 px-3 rounded-lg border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[14px] font-bold tracking-wider font-mono">
+        <div className="flex items-center justify-center min-w-[54px] h-11 px-3 rounded-lg border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--text-inverted)] text-[14px] font-bold tracking-wider font-mono">
           {value}
         </div>
         <div className="h-5" aria-hidden />
@@ -107,7 +107,7 @@ function FormulaCell({
           empty
             ? "border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] bg-[var(--bg-surface)]"
             : active
-              ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
+              ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--text-inverted)]"
               : "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
         } ${dimmed ? "opacity-40" : ""}`}
       >
@@ -115,7 +115,7 @@ function FormulaCell({
       </div>
       {typeof index === "number" && (
         <div
-          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold leading-none bg-[var(--text-primary)] text-[var(--bg-primary)] ${
+          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold leading-none bg-[var(--text-primary)] text-[var(--text-inverted)] ${
             dimmed ? "opacity-40" : ""
           }`}
         >
@@ -389,7 +389,7 @@ export default function BreakdownCard({
                 {/* Header — Hub grammar: subtle bg, numbered circle + uppercase label */}
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--bg-surface-subtle)] border-b border-[var(--border-faint)]">
                   <div
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[10px] font-bold leading-none"
                     dir="ltr"
                   >
                     {table.segmentNumber}
@@ -411,7 +411,7 @@ export default function BreakdownCard({
                           aria-pressed={isSelected}
                           className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors ${
                             isSelected
-                              ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                              ? "bg-[var(--text-primary)] text-[var(--text-inverted)]"
                               : "hover:bg-[var(--bg-surface-subtle)]"
                           }`}
                         >

@@ -3841,7 +3841,7 @@ export default function ProductForm({ productId }: Props) {
                               updateCodeModel({ coding_status: "approved" });
                             }}
                             disabled={!canApprove}
-                            className="h-12 px-3.5 rounded-xl border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                            className="h-12 px-3.5 rounded-xl border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
                             title={status === "approved" ? t("hero.alreadyApproved", "Already approved") : status === "locked" ? t("hero.statusLocked", "Locked") : t("hero.markApproved", "Mark as approved")}
                           >
                             <span aria-hidden>✓</span>

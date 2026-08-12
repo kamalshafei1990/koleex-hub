@@ -175,7 +175,7 @@ export default function ProductVisualLibrary({ embedded = false }: { embedded?: 
             onClick={() => setTab(tt.id)}
             className={`h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors ${
               tab === tt.id
-                ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                ? "bg-[var(--text-primary)] text-[var(--text-inverted)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
             }`}
           >
@@ -318,7 +318,7 @@ function CommercialTab() {
                               onClick={() => setVisual(g.key, value, img || "", m.id)}
                               className={`px-2 h-6 text-[10px] font-medium border-r border-[var(--border-subtle)] last:border-r-0 transition-colors ${
                                 mode === m.id
-                                  ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                                  ? "bg-[var(--text-primary)] text-[var(--text-inverted)]"
                                   : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                               }`}
                             >

@@ -275,7 +275,7 @@ function Checkboxes() {
       </Variant>
       <Variant vid="CB-3" apps="To-do · Calendar pickers" count="custom square, inverted mono fill" elected>
         <button onClick={() => setC1(!c1)} className="inline-flex items-center gap-2 text-[13px] text-[var(--text-primary)]">
-          <span className={`h-4 w-4 rounded-[5px] border flex items-center justify-center shrink-0 ${c1 ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--bg-primary)]" : "border-[var(--border-strong)] text-transparent"}`}><CheckIcon className="h-3 w-3" /></span>
+          <span className={`h-4 w-4 rounded-[5px] border flex items-center justify-center shrink-0 ${c1 ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border-[var(--border-strong)] text-transparent"}`}><CheckIcon className="h-3 w-3" /></span>
           Assign to me
         </button>
       </Variant>

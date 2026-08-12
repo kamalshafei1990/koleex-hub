@@ -247,7 +247,7 @@ export default function NegotiationSection({
             <div className="flex flex-wrap gap-1.5">
               {([["exclusivity_discussed", t("neg.exclusivityDiscussed", "Exclusivity discussed")], ["territory_discussed", t("neg.territoryDiscussed", "Territory discussed")]] as const).map(([k, label]) => {
                 const on = d[k] as boolean;
-                return <button key={k} type="button" onClick={() => set(k, !on)} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${on ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{label}</button>;
+                return <button key={k} type="button" onClick={() => set(k, !on)} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${on ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{label}</button>;
               })}
             </div>
             <Field label={t("neg.fieldLeverageNotes", "Leverage points")}><textarea className={`${inputCls} min-h-[48px]`} value={d.leverage_notes} onChange={(e) => set("leverage_notes", e.target.value)} placeholder={t("neg.phLeverageNotes", "We are 60% of their export volume…")} /></Field>

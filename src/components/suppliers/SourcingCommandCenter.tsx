@@ -305,7 +305,7 @@ export default function SourcingCommandCenter() {
           title={t("scc.rankingBoardTitle", "Supplier ranking board")}
           sub={t("scc.rankingBoardSub", "Sort, filter, and compare suppliers across sourcing signals")}
           right={
-            <button onClick={() => { setCompareMode((v) => !v); setSelected([]); }} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium ${compareMode ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)]"}`}><ScaleIcon className="h-3.5 w-3.5" />{compareMode ? t("scc.comparing", "Comparing") : t("scc.compare", "Compare")}</button>
+            <button onClick={() => { setCompareMode((v) => !v); setSelected([]); }} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium ${compareMode ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--text-inverted)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)]"}`}><ScaleIcon className="h-3.5 w-3.5" />{compareMode ? t("scc.comparing", "Comparing") : t("scc.compare", "Compare")}</button>
           }
         />
         {/* controls */}
@@ -320,7 +320,7 @@ export default function SourcingCommandCenter() {
           <label className="inline-flex cursor-pointer items-center gap-1.5 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)]"><input type="checkbox" checked={preferredOnly} onChange={(e) => setPreferredOnly(e.target.checked)} className="accent-[var(--text-primary)]" />{t("scc.preferredOnly", "Preferred only")}</label>
           <div className="flex items-center gap-1 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5">
             {SORTS.map((s) => (
-              <button key={s.key} onClick={() => setSortKey(s.key)} className={`rounded-md px-2.5 py-1 text-[12px] font-medium ${sortKey === s.key ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{t("scc." + s.key, s.label)}</button>
+              <button key={s.key} onClick={() => setSortKey(s.key)} className={`rounded-md px-2.5 py-1 text-[12px] font-medium ${sortKey === s.key ? "bg-[var(--text-primary)] text-[var(--text-inverted)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{t("scc." + s.key, s.label)}</button>
             ))}
           </div>
         </div>

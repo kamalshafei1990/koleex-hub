@@ -50,7 +50,7 @@ const roleCls: Record<string, string> = {
   blocked: "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35",
 };
 const bandCls: Record<string, string> = {
-  strong: "bg-[var(--text-primary)] text-[var(--bg-primary)]",
+  strong: "bg-[var(--text-primary)] text-[var(--text-inverted)]",
   viable: "bg-[var(--bg-surface)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]",
   weak: "bg-amber-500/15 text-amber-300",
   none: "bg-[var(--bg-surface)] text-[var(--text-faint)] ring-1 ring-[var(--border-subtle)]",

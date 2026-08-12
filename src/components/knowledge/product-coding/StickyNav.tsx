@@ -85,7 +85,7 @@ export default function StickyNav() {
                   aria-current={isActive ? "true" : undefined}
                   className={`h-7 px-2.5 rounded-md text-[10.5px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                     isActive
-                      ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                      ? "bg-[var(--text-primary)] text-[var(--text-inverted)]"
                       : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
                   }`}
                 >

@@ -584,7 +584,7 @@ export function MobileFab() {
         type="button"
         aria-label={t("inv.mobile.create")}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--accent-primary,#fff)] text-[var(--bg-primary)] shadow-lg"
+        className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--accent-primary,#fff)] text-[var(--text-inverted)] shadow-lg"
       >
         <RrIcon name={open ? "cross" : "plus"} size={16} />
       </button>
