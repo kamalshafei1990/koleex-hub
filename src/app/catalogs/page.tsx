@@ -23,6 +23,9 @@ import PenToolIcon from "@/components/icons/ui/PenToolIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+/* A native <select> draws its list with the OS, so no stylesheet reaches it —
+   MN-5 starts by not being one. See components/kds/Select.tsx. */
+import KdsSelect from "@/components/kds/Select";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -609,10 +612,10 @@ function PhoneField({ code, number, onCode, onNumber, placeholder }: {
 }) {
   return (
     <div className="flex gap-1.5">
-      <select value={code} onChange={(e) => onCode(e.target.value)}
-        className="h-10 w-[78px] shrink-0 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] px-1.5 outline-none focus:border-blue-500/50 appearance-none cursor-pointer">
-        {DIAL_CODES.map((d) => <option key={d.c} value={d.c} title={d.n}>{d.f} {d.c}</option>)}
-      </select>
+      <KdsSelect value={code} onChange={onCode}
+        options={DIAL_CODES.map((d) => ({ value: d.c, label: `${d.f} ${d.c}` }))}
+        wrapperClassName="shrink-0"
+        triggerClassName="h-10 w-[78px] rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] ps-1.5 pe-6 outline-none focus:border-blue-500/50 cursor-pointer text-start" />
       <input type="tel" inputMode="tel" value={number} onChange={(e) => onNumber(phoneClean(e.target.value))} placeholder={placeholder}
         className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all" />
     </div>
@@ -834,23 +837,13 @@ function QuickAddContactModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={lbl}>{t("quick.type")}</label>
-                <div className="relative">
-                  <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp + " pr-9 cursor-pointer"}>
-                    <option value="">{t("quick.selectType")}</option>
-                    {QA_SUPPLIER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
-                </div>
+                <KdsSelect value={supplierType} onChange={setSupplierType} options={QA_SUPPLIER_TYPES.map(o => ({ value: o, label: o }))}
+                  placeholder={t("quick.selectType")} triggerClassName={inp + " pe-9 cursor-pointer text-start"} />
               </div>
               <div>
                 <label className={lbl}>{t("quick.source")}</label>
-                <div className="relative">
-                  <select value={source} onChange={(e) => setSource(e.target.value)} className={inp + " pr-9 cursor-pointer"}>
-                    <option value="">{t("quick.selectSource")}</option>
-                    {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
-                </div>
+                <KdsSelect value={source} onChange={setSource} options={QA_SOURCES.map(s => ({ value: s, label: s }))}
+                  placeholder={t("quick.selectSource")} triggerClassName={inp + " pe-9 cursor-pointer text-start"} />
               </div>
             </div>
             <div>
@@ -3340,68 +3333,59 @@ function CatalogsApp() {
           <div className={`${showFilters ? "flex" : "hidden"} md:contents w-full flex-wrap items-center gap-3`}>
           {catalogSuppliers.length > 0 && (
             <div className="relative">
-              <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}
-                className="h-9 min-w-0 max-w-[calc(100vw-2rem)] pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">{t("cat.allSuppliers")}</option>
-                {catalogSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              {/* "all" is a REAL filter value, never a placeholder: a placeholder
+                  row commits "" and would blank the filter instead of clearing it. */}
+              <KdsSelect value={filterSupplier} onChange={setFilterSupplier}
+                options={[{ value: "all", label: t("cat.allSuppliers") }, ...catalogSuppliers.map(s => ({ value: s.id, label: s.name }))]}
+                triggerClassName={"h-9 min-w-0 max-w-[calc(100vw-2rem)] ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start"} />
             </div>
           )}
 
           {catalogDivisions.length > 0 && (
             <div className="relative">
-              <select value={filterDivision} onChange={(e) => setFilterDivision(e.target.value)}
-                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">{t("cat.allDivisions")}</option>
-                {catalogDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
-              </select>
-              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              {/* "all" is a REAL filter value, never a placeholder: a placeholder
+                  row commits "" and would blank the filter instead of clearing it. */}
+              <KdsSelect value={filterDivision} onChange={setFilterDivision}
+                options={[{ value: "all", label: t("cat.allDivisions") }, ...catalogDivisions.map(d => ({ value: d.slug, label: d.name }))]}
+                triggerClassName={"h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start"} />
             </div>
           )}
 
           {catalogTypes.length > 1 && (
             <div className="relative">
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">{t("cat.allTypes")}</option>
-                {catalogTypes.map(t => <option key={t} value={t}>{(FILE_TYPE_CONFIG[t]?.label || t).toUpperCase()}</option>)}
-              </select>
-              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              {/* "all" is a REAL filter value, never a placeholder: a placeholder
+                  row commits "" and would blank the filter instead of clearing it. */}
+              <KdsSelect value={filterType} onChange={setFilterType}
+                options={[{ value: "all", label: t("cat.allTypes") }, ...catalogTypes.map(ct => ({ value: ct, label: (FILE_TYPE_CONFIG[ct]?.label || ct).toUpperCase() }))]}
+                triggerClassName={"h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start"} />
             </div>
           )}
 
           {catalogYears.length > 0 && (
             <div className="relative">
-              <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
-                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">{t("cat.allYears")}</option>
-                {catalogYears.map(y => <option key={y} value={String(y)}>{y}</option>)}
-              </select>
-              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              {/* "all" is a REAL filter value, never a placeholder: a placeholder
+                  row commits "" and would blank the filter instead of clearing it. */}
+              <KdsSelect value={filterYear} onChange={setFilterYear}
+                options={[{ value: "all", label: t("cat.allYears") }, ...catalogYears.map(y => ({ value: String(y), label: String(y) }))]}
+                triggerClassName={"h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start"} />
             </div>
           )}
 
           {catalogTags.length > 0 && (
             <div className="relative">
-              <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}
-                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">{t("cat.allTags")}</option>
-                {catalogTags.map(tg => <option key={tg} value={tg}>{tg}</option>)}
-              </select>
-              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              {/* "all" is a REAL filter value, never a placeholder: a placeholder
+                  row commits "" and would blank the filter instead of clearing it. */}
+              <KdsSelect value={filterTag} onChange={setFilterTag}
+                options={[{ value: "all", label: t("cat.allTags") }, ...catalogTags.map(tg => ({ value: tg, label: tg }))]}
+                triggerClassName={"h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start"} />
             </div>
           )}
 
           <div className="relative">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-              <option value="newest">{t("cat.sortNewest")}</option>
-              <option value="name">{t("cat.sortName")}</option>
-              <option value="size">{t("cat.sortSize")}</option>
-              <option value="year">{t("cat.sortYear")}</option>
-            </select>
-            <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+            <KdsSelect value={sortBy} onChange={(v) => setSortBy(v as typeof sortBy)}
+              options={[{ value: "newest", label: t("cat.sortNewest") }, { value: "name", label: t("cat.sortName") },
+                        { value: "size", label: t("cat.sortSize") }, { value: "year", label: t("cat.sortYear") }]}
+              triggerClassName="h-9 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] cursor-pointer outline-none focus:border-blue-500/50 text-start" />
           </div>
           </div>
 

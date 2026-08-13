@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+/* A native <select> draws its list with the OS, so no stylesheet reaches it —
+   MN-5 starts by not being one. See components/kds/Select.tsx. */
+import KdsSelect from "@/components/kds/Select";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
@@ -739,14 +742,17 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                 <BriefcaseIcon size={11} className="inline mr-1 -mt-0.5" /> {t("f.project", "Related project")}{" "}
                 <span className="font-normal normal-case">{t("common.optional")}</span>
               </label>
-              <select value={extras.project?.id ?? ""} onChange={(e) => setRelatedProject(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all">
-                <option value="">{t("f.noProject", "None")}</option>
-                {extras.project && !projects.some((p) => p.id === extras.project?.id) && (
-                  <option value={extras.project.id}>{extras.project.name}</option>
-                )}
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              {/* A project already linked to this task but no longer in the list
+                  keeps its own row — otherwise opening the task would silently
+                  show "None" over a link that is still there. */}
+              <KdsSelect value={extras.project?.id ?? ""} onChange={setRelatedProject}
+                options={[
+                  ...(extras.project && !projects.some((p) => p.id === extras.project?.id)
+                    ? [{ value: extras.project.id, label: extras.project.name }] : []),
+                  ...projects.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                placeholder={t("f.noProject", "None")}
+                triggerClassName="w-full h-10 ps-3 pe-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all cursor-pointer text-start" />
             </div>
           )}
 
@@ -2062,21 +2068,23 @@ export default function TodoPage() {
               <>
                 <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
                 {/* SA audience lens — whose tasks am I looking at? */}
-                <select value={saView} onChange={(e) => setSaView(e.target.value)}
-                  className={`h-7 ps-2.5 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer appearance-none bg-no-repeat bg-[right_0.5rem_center] ${
+                {/* The inline SVG chevron background went with the <select>:
+                    KdsSelect draws its own and the two would overlap. */}
+                <KdsSelect value={saView} onChange={setSaView}
+                  options={[
+                    { value: "own", label: t("sa.viewOwn") },
+                    { value: "all", label: t("sa.viewAll") },
+                    ...employees.filter((e) => e.account_id !== accountId).map((e) => ({
+                      value: e.account_id,
+                      label: (e.full_name || e.username) + (e.name_alt ? ` · ${e.name_alt}` : ""),
+                    })),
+                  ]}
+                  panelWidthClassName="min-w-[12rem]"
+                  triggerClassName={`h-7 ps-2.5 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer text-start ${
                     saView === "own"
                       ? "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)]"
                       : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
-                  }`}
-                  style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>\")" }}>
-                  <option value="own">{t("sa.viewOwn")}</option>
-                  <option value="all">{t("sa.viewAll")}</option>
-                  {employees.filter((e) => e.account_id !== accountId).map((e) => (
-                    <option key={e.account_id} value={e.account_id}>
-                      {(e.full_name || e.username) + (e.name_alt ? ` · ${e.name_alt}` : "")}
-                    </option>
-                  ))}
-                </select>
+                  }`} />
               </>
             )}
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
@@ -2124,13 +2132,10 @@ export default function TodoPage() {
               ))}
             </div>
             {/* Sort */}
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none">
-              <option value="smart">{t("sort.smart")}</option>
-              <option value="due">{t("sort.due")}</option>
-              <option value="priority">{t("sort.priority")}</option>
-              <option value="created">{t("sort.created")}</option>
-            </select>
+            <KdsSelect value={sortBy} onChange={(v) => setSortBy(v as typeof sortBy)}
+              options={[{ value: "smart", label: t("sort.smart") }, { value: "due", label: t("sort.due") },
+                        { value: "priority", label: t("sort.priority") }, { value: "created", label: t("sort.created") }]}
+              triggerClassName="h-8 ps-2 pe-7 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none cursor-pointer text-start" />
             {/* Select mode */}
             <button onClick={() => { setSelectMode((v) => !v); setSelectedIds(new Set()); }}
               className={`h-8 px-3 rounded-lg border text-[11px] font-semibold transition-colors ${
@@ -2151,17 +2156,17 @@ export default function TodoPage() {
                 className="h-8 px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-[11px] font-semibold flex items-center gap-1.5">
                 <CheckCircleIcon size={13} /> {t("bulk.markDone")}
               </button>
-              <select onChange={(e) => { if (e.target.value) { bulkStatus(e.target.value as TodoStatus); e.target.value = ""; } }} defaultValue=""
-                className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none">
-                <option value="" disabled>{t("bulk.setStatus")}</option>
-                {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("st." + s.value)}</option>)}
-              </select>
+              {/* Action menus, not fields: they fire on pick and snap back to
+                  their prompt, which value="" reproduces exactly. */}
+              <KdsSelect value="" onChange={(v) => { if (v) bulkStatus(v as TodoStatus); }}
+                options={STATUSES.map((s) => ({ value: s.value, label: t("st." + s.value) }))}
+                placeholder={t("bulk.setStatus")}
+                triggerClassName="h-8 ps-2 pe-7 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none cursor-pointer text-start" />
               {employees.length > 0 && (
-                <select onChange={(e) => { if (e.target.value) { bulkReassign(e.target.value); e.target.value = ""; } }} defaultValue=""
-                  className="h-8 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none max-w-[160px]">
-                  <option value="" disabled>{t("bulk.reassign")}</option>
-                  {employees.map((emp) => <option key={emp.account_id} value={emp.account_id}>{emp.full_name || emp.username}</option>)}
-                </select>
+                <KdsSelect value="" onChange={(v) => { if (v) bulkReassign(v); }}
+                  options={employees.map((emp) => ({ value: emp.account_id, label: emp.full_name || emp.username }))}
+                  placeholder={t("bulk.reassign")}
+                  triggerClassName="h-8 ps-2 pe-7 max-w-[160px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none cursor-pointer text-start" />
               )}
               <button onClick={bulkDelete}
                 className="h-8 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-semibold flex items-center gap-1.5">
@@ -2175,34 +2180,21 @@ export default function TodoPage() {
             <div className="pb-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
                 {/* Status filter */}
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">{t("filters.allStatuses")}</option>
-                  {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("st." + s.value)}</option>)}
-                </select>
+                <KdsSelect value={statusFilter} onChange={setStatusFilter} options={STATUSES.map((s) => ({ value: s.value, label: t("st." + s.value) }))}
+                  placeholder={t("filters.allStatuses")} triggerClassName={"h-8 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start"} />
 
                 {/* Department filter */}
-                <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">{t("filters.allDepts")}</option>
-                  {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <KdsSelect value={deptFilter} onChange={setDeptFilter} options={departments.map((d) => ({ value: d, label: d }))}
+                  placeholder={t("filters.allDepts")} triggerClassName={"h-8 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start"} />
 
                 {/* Assignee filter */}
-                <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">{t("filters.allAssignees")}</option>
-                  {uniqueAssignees.map((a) => (
-                    <option key={a.account_id} value={a.account_id}>{a.full_name || a.username}</option>
-                  ))}
-                </select>
+                <KdsSelect value={assigneeFilter} onChange={setAssigneeFilter}
+                  options={uniqueAssignees.map((a) => ({ value: a.account_id, label: a.full_name || a.username }))}
+                  placeholder={t("filters.allAssignees")} triggerClassName="h-8 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start" />
 
                 {/* Label filter */}
-                <select value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
-                  <option value="">{t("filters.allLabels")}</option>
-                  {usedLabels.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
+                <KdsSelect value={labelFilter} onChange={setLabelFilter} options={usedLabels.map((l) => ({ value: l, label: l }))}
+                  placeholder={t("filters.allLabels")} triggerClassName={"h-8 ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start"} />
 
                 {/* Date range filter */}
                 <div className="flex items-center gap-1.5">
