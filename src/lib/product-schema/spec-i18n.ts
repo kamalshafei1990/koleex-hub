@@ -836,10 +836,46 @@ export const SPEC_I18N: Translations = {
   "o:large_2_0x": { en: "2.0\u00d7 Large Hook", zh: "2.0倍大旋梭", ar: "مكوك كبير 2.0\u00d7" },
   "o:small_and_large": { en: "Small & Large Hook", zh: "大小旋梭可选", ar: "مكوك صغير وكبير" },
   "o:motor_rotary": { en: "Motor-Driven Rotary Cutter", zh: "电动旋转剪线", ar: "قاطع دوّار بمحرّك" },
+
+  /* ── XAPW Pocket Welting + XAPP Placket Units (2026-08-13) — S-FDK/S-JOOKE.
+       Second and third templates in Automatic Sewing Systems. ── */
+  "g:Pocket Work Envelope": { en: "Pocket Work Envelope", zh: "开袋作业范围", ar: "نطاق تشغيل الجيب" },
+  "g:Laser Cutting": { en: "Laser Cutting", zh: "激光切割", ar: "القطع بالليزر" },
+  "g:Sewing Head & Stitch": { en: "Sewing Head & Stitch", zh: "机头与线迹", ar: "رأس الخياطة والغرزة" },
+  "g:Control & Programming": { en: "Control & Programming", zh: "控制与编程", ar: "التحكّم والبرمجة" },
+  "g:Placket Work Envelope": { en: "Placket Work Envelope", zh: "门襟作业范围", ar: "نطاق تشغيل المريلة" },
+  "g:Handling & Pneumatics": { en: "Handling & Pneumatics", zh: "送料与气动", ar: "المناولة والهواء المضغوط" },
+
+  "f:pocket_sewing_range": { en: "Pocket Sewing Range", zh: "开袋缝制范围", ar: "نطاق خياطة الجيب" },
+  "f:welt_type_support": { en: "Welt Types Supported", zh: "支持袋型", ar: "أنواع الجيوب المدعومة" },
+  "f:pocket_folding_method": { en: "Pocket Folding Method", zh: "折袋方式", ar: "طريقة طيّ الجيب" },
+  "f:cycle_time_per_piece": { en: "Cycle Time per Pocket", zh: "单个口袋耗时", ar: "زمن الدورة للجيب" },
+  "f:laser_power_w": { en: "Laser Power", zh: "激光功率", ar: "قدرة الليزر" },
+  "f:laser_cutting_range": { en: "Laser Cutting Range", zh: "激光切割范围", ar: "نطاق القطع بالليزر" },
+  "f:laser_head_type": { en: "Laser Head Type", zh: "激光头形式", ar: "نوع رأس الليزر" },
+  "f:sewing_head_model": { en: "Sewing Head", zh: "配套机头", ar: "رأس الخياطة" },
+  "f:hook_type": { en: "Hook / Shuttle Type", zh: "旋梭/摆梭类型", ar: "نوع المكوك" },
+  "f:middle_presser_foot_travel": { en: "Middle Presser Foot Travel", zh: "中压脚行程", ar: "شوط القدم الضاغطة الوسطى" },
+  "f:control_system_brand": { en: "Control System", zh: "操作系统品牌", ar: "نظام التحكّم" },
+  "f:drive_motor_type": { en: "Drive Motor", zh: "驱动电机", ar: "موتور الحركة" },
+  "f:emergency_stop": { en: "Emergency Stop", zh: "急停开关", ar: "إيقاف طوارئ" },
+  "f:sewing_range": { en: "Sewing Range", zh: "缝制范围", ar: "نطاق الخياطة" },
+  "f:placket_type_support": { en: "Placket Types Supported", zh: "支持门襟类型", ar: "أنواع المرايل المدعومة" },
+  "f:applicable_fabric": { en: "Applicable Fabric", zh: "适用面料", ar: "الأقمشة المناسبة" },
+  "f:production_capacity": { en: "Production Capacity", zh: "产能效率", ar: "الطاقة الإنتاجية" },
+  "f:air_suction_motor_power": { en: "Suction Motor Power", zh: "吸风电机功率", ar: "قدرة موتور الشفط" },
+
+  "o:laser_head_fixed": { en: "Fixed", zh: "固定式", ar: "ثابت" },
+  "o:moving": { en: "Moving / Galvo", zh: "移动式/振镜", ar: "متحرّك / جالفو" },
+  "o:fitted": { en: "Fitted", zh: "配备", ar: "مركّب" },
+  "o:not_fitted": { en: "Not Fitted", zh: "未配备", ar: "غير مركّب" },
 };
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
+  /* XAPW + XAPP (2026-08-13). */
+  "s:pocket-welting.v1": { en: "Pocket Welting Machine", zh: "自动开袋机", ar: "ماكينة فتح جيوب" },
+  "s:placket-unit.v1": { en: "Placket Sewing Unit", zh: "自动门襟缝纫单元", ar: "وحدة خياطة مرايل" },
   /* XAPT — first template in Automatic Sewing Systems (2026-08-13). */
   "s:programmable-cnc.v1": { en: "Programmable / CNC Sewing Machine", zh: "电脑程控花样缝纫机", ar: "ماكينة خياطة مبرمجة / CNC" },
   /* Backfill: 17 schema ids had no display name, so the form showed the
@@ -883,6 +919,37 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* XAPW Pocket Welting + XAPP Placket Units (2026-08-13) — S-FDK / S-JOOKE. */
+  "Printed as X × Y (X:300 Y:200 mm on the MS-688B-9; X:210 Y:30 mm in the narrow standard configuration). Kept as the printed pair: on a welting machine this is the largest pocket the unit can make, which is the buying decision.": { zh: "印为 X × Y（MS-688B-9 为 X:300 Y:200 mm；窄幅标配为 X:210 Y:30 mm）。保留所印的成对数值：在开袋机上这就是设备能做的最大口袋，也正是采购决策本身。", ar: "مطبوع كـ X × Y (على MS-688B-9: X:300 Y:200 مم؛ وفي التكوين الضيّق القياسي X:210 Y:30 مم). سِبناه كالزوج المطبوع: في ماكينة فتح الجيوب ده أكبر جيب الماكينة تقدر تعمله، وهو قرار الشراء نفسه." },
+  "Single lip, double lip, line/jetted, zipper and flap pockets — the catalogue lists them per machine. Free text because the list is a capability set that differs machine by machine, and a closed option list would be reopened by every new source.": { zh: "单唇、双唇、一字袋、拉链袋、袋盖袋——目录按机型逐一列出。采用自由文本，因为这是逐机不同的能力集合，封闭选项每遇到新来源就得重开。", ar: "جيب بشفة واحدة أو شفتين، جيب مستقيم، جيب سوسته، جيب بغطا — الكتالوج بيعدّدهم لكل ماكينة. نص حر لأن دي مجموعة قدرات بتختلف من ماكينة للتانية، وأي قائمة مقفولة هتحتاج تتفتح مع كل مصدر جديد." },
+  "\"Double opening, 4-direction synchronised pneumatic folding\". This is what removes the ironing and marking steps, and it is the distinguishing mechanism between welting units.": { zh: "“双开，4 方向双气缸同步折袋”。正是这一机构省去了熨烫与画位工序，也是各开袋机之间的区别所在。", ar: "«فتح مزدوج، طيّ متزامن بأربع اتجاهات بأسطوانات هوائية». الآلية دي هي اللي بتلغي خطوتي الكيّ والتعليم، وهي الفرق الحقيقي بين ماكينات فتح الجيوب." },
+  "13–26 seconds per pocket. Text because the sheet prints a range, and the range is the honest figure — the low end assumes a simple pocket.": { zh: "每个口袋 13–26 秒。采用文本，因为页面给出的是区间，而区间才是诚实的数字——下限假定的是简单口袋。", ar: "من ١٣ لـ٢٦ ثانية للجيب الواحد. نص لأن الصفحة بتدّي مدى، والمدى هو الرقم الصادق — الحد الأدنى بيفترض جيب بسيط." },
+  "80 W or 120 W, printed as an option on the MS-03 series and fixed at 120 W on the MS-688B-9. The laser replaces manual notching, so its absence is a materially different machine — leave blank on non-laser welting units rather than entering 0.": { zh: "MS-03 系列印为 80W 或 120W 可选，MS-688B-9 固定 120W。激光取代了人工剪口，因此没有激光就是另一类机器——非激光开袋机此项请留空，不要填 0。", ar: "٨٠ أو ١٢٠ وات، مطبوعة كاختيار في سلسلة MS-03 وثابتة ١٢٠ وات في MS-688B-9. الليزر بيحلّ محل القص اليدوي، فغيابه معناه ماكينة مختلفة تمامًا — سيب الخانة فاضية في الماكينات من غير ليزر، ما تحطّش صفر." },
+  "Printed separately from the sewing range and SMALLER than it (250×200 vs 350×200 mm on the MS-03-HF2). Recording only one of the two would overstate what the machine can cut.": { zh: "与缝制范围分开印出，且小于缝制范围（MS-03-HF2 为 250×200 对 350×200 mm）。只记录其中之一会高估设备的切割能力。", ar: "مطبوع منفصل عن نطاق الخياطة و**أصغر** منه (في MS-03-HF2: 250×200 مقابل 350×200 مم). لو سجّلنا واحد بس هنبالغ في قدرة الماكينة على القطع." },
+  "\"固定式 Fixed type\" on the MS-03 series. A fixed head cuts within the frame; a moving head follows the pattern.": { zh: "MS-03 系列印为“固定式 Fixed type”。固定头在框内切割，移动头则沿花样运动。", ar: "«固定式 Fixed type» في سلسلة MS-03. الرأس الثابت بيقطع جوّه الإطار، والرأس المتحرّك بيتبع النمط." },
+  "The bought-in head the unit is built around (\"brother 7300A / JUKI DDL-8000A\", \"688B-9\", \"342 AF pattern head\"). On a dedicated automation unit this decides stitch quality, the spare-parts channel and a large share of the price — it is not a footnote, and two units with the same frame and different heads are not the same machine.": { zh: "设备所配套的外购机头（“brother 7300A / JUKI DDL-8000A”“688B-9”“342 AF 花样机头”）。在专机上，机头决定线迹质量、备件渠道以及很大一部分价格——它不是脚注；同一机架配不同机头就不是同一台机器。", ar: "الرأس المشترى اللي الوحدة مبنية حواليه («brother 7300A / JUKI DDL-8000A» و«688B-9» و«رأس نمطي 342 AF»). في وحدة أتمتة مخصّصة، الرأس بيحدّد جودة الغرزة وقناة قطع الغيار وجزء كبير من السعر — مش هامش؛ ووحدتين بنفس الهيكل ورأس مختلف مش نفس الماكينة." },
+  "2700–3000 rpm across the range. Reused from the shared sewing vocabulary.": { zh: "全系列 2700–3000 rpm。沿用缝纫机共享词汇。", ar: "من ٢٧٠٠ لـ٣٠٠٠ لفة/دقيقة عبر المدى. مُعاد استخدامه من مفردات الخياطة المشتركة." },
+  "Upper bound of the printed range — 12.7 mm on pattern-head units, 2.7 mm on the MS-688B-9. Record the maximum.": { zh: "所印区间的上限——花样机头机型为 12.7 mm，MS-688B-9 为 2.7 mm。记录最大值。", ar: "الحد الأعلى للمدى المطبوع — 12.7 مم في الموديلات برأس نمطي، و2.7 مم في MS-688B-9. سجّل الأقصى." },
+  "20,000 on the MS-03 series — an order of magnitude below the 100,000 of a CNC template machine, which is the honest difference between a dedicated unit and a programmable one.": { zh: "MS-03 系列为 20,000——比 CNC 模板机的 100,000 低一个数量级，这正是专用单机与可编程机之间诚实的差别。", ar: "٢٠٬٠٠٠ في سلسلة MS-03 — أقل بمرتبة كاملة من الـ١٠٠٬٠٠٠ في ماكينة القوالب CNC، وده الفرق الصادق بين وحدة مخصّصة وماكينة مبرمجة." },
+  "DP×17, quoted with its size range (11#–18#). Text because the sheet gives system and sizes together.": { zh: "DP×17，并与其号数范围一同给出（11#–18#）。采用文本，因为页面把针系与针号一并印出。", ar: "DP×17 مع مدى المقاس (11#–18#). نص لأن الصفحة بتطبع النظام والمقاسات مع بعض." },
+  "\"双倍大摆梭 Double large oscillating shuttle\", \"双倍大旋梭 double large rotary hook\". Text rather than a select: the catalogues distinguish oscillating from rotary AND their size multiplier in one printed phrase.": { zh: "“双倍大摆梭 Double large oscillating shuttle”“双倍大旋梭 double large rotary hook”。采用文本而非下拉：目录在同一句印文里同时区分了摆梭/旋梭与其倍数规格。", ar: "«双倍大摆梭 مكوك متأرجح كبير مضاعف» و«双倍大旋梭 مكوك دوّار كبير مضاعف». نص مش قائمة: الكتالوجات بتفرّق بين المتأرجح والدوّار **ومضاعف المقاس** في عبارة مطبوعة واحدة." },
+  "23 mm on the MS-03-B326, 28 mm on the MS-688B-9. How much bulk the machine will clear.": { zh: "MS-03-B326 为 23 mm，MS-688B-9 为 28 mm。即设备能越过的厚度。", ar: "٢٣ مم في MS-03-B326 و٢٨ مم في MS-688B-9. يعني قد إيه الماكينة تعدّي سماكة." },
+  "Printed as a range (4–10 mm). Text because it is a span.": { zh: "印为区间（4–10 mm）。采用文本，因为它是一个跨度。", ar: "مطبوع كمدى (4–10 مم). نص لأنه مدى." },
+  "\"大豪或上亿 DAHAO / SYSTEMTOP\". The control brand determines which pattern files and spare boards fit, so it is quoted on the sheet and belongs on the record.": { zh: "“大豪或上亿 DAHAO / SYSTEMTOP”。控制系统品牌决定了可用的花样文件格式与备用电路板，因此页面印出它，记录中也应保留。", ar: "«大豪或上亿 DAHAO / SYSTEMTOP». ماركة التحكّم بتحدّد أنهي ملفات أنماط وأنهي بوردات غيار بتركّب، وعشان كده مطبوعة في الصفحة ولازم تتسجّل." },
+  "\"999 + USB memory\". Record 999 — the USB extension is unbounded and belongs in the input method, not the count.": { zh: "“999 + USB memory”。记录 999——USB 扩展是无上限的，应归入输入方式而非容量计数。", ar: "«999 + ذاكرة USB». سجّل ٩٩٩ — امتداد الـUSB بلا حد وبيتبع طريقة الإدخال مش العدّ." },
+  "\"台达伺服电机 Delta servo motor\" — the brand is printed, and on these units it is a serviceability fact, not marketing.": { zh: "“台达伺服电机 Delta servo motor”——品牌是印出的，在这类设备上这是可维修性事实，而非营销说辞。", ar: "«台达伺服电机 موتور سيرفو Delta» — الماركة مطبوعة، وفي الوحدات دي دي حقيقة تخصّ الصيانة مش كلام تسويق." },
+  "\"> 0.4 MPa\" / \"> 0.5 MPa\", quoted with air consumption where the sheet gives it. Kept as the printed phrase because it is a MINIMUM, and recording it as a bare number loses the \"greater than\".": { zh: "印为“> 0.4 MPa”“> 0.5 MPa”，并在页面给出时附带耗气量。保留所印的表述，因为这是一个最小值，记成纯数字会丢掉“大于”。", ar: "مطبوع «> 0.4 ميجاباسكال» أو «> 0.5»، ومعاه استهلاك الهواء لما الصفحة تدّيه. سِبناه كالعبارة المطبوعة لأنه **حد أدنى**، ولو سجّلناه رقم مجرّد هنفقد علامة «أكبر من»." },
+  "Printed \"有 Have\". Recorded because on a laser machine it is a safety fact, and blank must mean UNKNOWN rather than absent.": { zh: "印为“有 Have”。之所以记录，是因为在激光设备上这是安全事实；留空必须表示“未知”，而不是“没有”。", ar: "مطبوع «有 موجود». بنسجّله لأنه في ماكينة ليزر دي حقيقة أمان، والفاضي لازم يعني **مش معروف** مش «مش موجود»." },
+  "Printed either as a single axis limit (\"X:≤850 mm\", \"X:≤700 mm\") or as a pair (\"30×190 mm W×L\"). Text because the catalogues genuinely print two different shapes of the same fact, and normalising them would invent precision the sheet does not give.": { zh: "有的印为单轴上限（“X:≤850 mm”“X:≤700 mm”），有的印为成对数值（“30×190 mm W×L”）。采用文本，因为两本目录确实以两种形态印出同一事实，强行统一等于凭空制造页面并未给出的精度。", ar: "مطبوع مرة كحدّ لمحور واحد («X:≤850 مم» و«X:≤700 مم») ومرة كزوج («30×190 مم عرض×طول»). نص لأن الكتالوجين فعلاً بيطبعوا نفس الحقيقة بشكلين، ولو وحّدناهم هنخترع دقة الصفحة ماداهاش." },
+  "Single and double placket, front placket (门襟), under-placket (里襟), sleeve placket (袖衩). These are distinct garment operations and a unit usually does one or two — this is the field that says which.": { zh: "单门襟与双门襟、前门襟、里襟、袖衩。这些是不同的成衣工序，一台单机通常只做其中一两种——本字段正是用来说明是哪一种。", ar: "مريلة مفردة ومزدوجة، ومريلة أمامية (门襟)، ومريلة داخلية (里襟)، ومريلة كُم (袖衩). دي عمليات تصنيع مختلفة والوحدة غالبًا بتعمل واحدة أو اتنين — والحقل ده هو اللي بيقول أنهي واحدة." },
+  "\"Men's shirt, women's chiffon, knitwear\" — printed per unit. A placket unit is folded and clamped around a specific cloth weight, so this is a fitment fact rather than a marketing line.": { zh: "“衬衣料、女装雪纺、针织”——逐机印出。门襟单机是围绕特定克重的面料折叠与压紧的，因此这是配置事实，而非营销用语。", ar: "«قماش قمصان رجالي، شيفون حريمي، تريكو» — مطبوع لكل وحدة. وحدة المريلة بتتطوى وتتمسك حوالين وزن قماش معيّن، فدي حقيقة تجهيز مش سطر تسويقي." },
+  "Quoted per hour or per shift and with its own basis — \"3000 pcs/12h\", \"720~1100 (6 buttonholes per piece / 8 hours)\", \"240~360 fronts/h\". Kept as the printed phrase INCLUDING the basis: a bare number here would compare a 6-buttonhole piece against a plain front and be silently wrong.": { zh: "按小时或按班次给出，并附带各自的计算口径——“3000 pcs/12h”“720~1100（6 眼 / 片 /8 小时）”“240~360 前片 / 小时”。保留包含口径在内的所印表述：此处若只留数字，就会把“每片 6 个扣眼”与“一片素前襟”放在一起比较，并悄然出错。", ar: "مذكورة بالساعة أو بالوردية ومعاها أساس الحساب — «3000 قطعة/12 ساعة»، «720~1100 (٦ عراوي للقطعة / ٨ ساعات)»، «240~360 قطعة أمامية/ساعة». سِبناها بالعبارة المطبوعة **بأساسها**: رقم مجرّد هنا هيقارن قطعة فيها ٦ عراوي بقطعة أمامية سادة ويطلع غلط من غير ما حد ياخد باله." },
+  "2700–3500 rpm across the range. Note the sheets print it as \"work speed (MAX)\" on some units — the same fact.": { zh: "全系列 2700–3500 rpm。注意部分页面印作“work speed (MAX)”——是同一个事实。", ar: "من ٢٧٠٠ لـ٣٥٠٠ لفة/دقيقة. خد بالك إن بعض الصفحات بتكتبها «work speed (MAX)» — نفس الحقيقة." },
+  "Upper bound of the printed range — 3 mm on the sleeve-placket unit, 5 mm on the polo placket unit.": { zh: "所印区间的上限——袖衩机为 3 mm，POLO 门襟机为 5 mm。", ar: "الحد الأعلى للمدى المطبوع — ٣ مم في وحدة مريلة الكُم، و٥ مم في وحدة مريلة البولو." },
+  "DB×1 on lockstitch-head units, DP×17 (11#–14#) on pattern-head units.": { zh: "平缝机头机型为 DB×1，花样机头机型为 DP×17（11#–14#）。", ar: "DB×1 في الوحدات برأس دبل ستيتش، وDP×17 (11#–14#) في الوحدات برأس نمطي." },
+  "10 L/min on the buttonholing placket unit against 180 L/min on the under-placket unit — an eighteenfold spread that decides whether the customer's compressor can run it. Some sheets quote it per piece (\"1 L/pcs\") instead, which is why this is the printed phrase and not a number.": { zh: "锁眼门襟机为 10 L/min，而里襟机为 180 L/min——十八倍的差距，直接决定客户的空压机能否带动。部分页面改按件给出（“1 L/pcs”），因此本字段保留所印表述而非数字。", ar: "١٠ لتر/دقيقة في وحدة عراوي المريلة مقابل ١٨٠ لتر/دقيقة في وحدة المريلة الداخلية — فرق تمنتاشر ضعف بيحدّد لو كمبروسور العميل يقدر يشغّلها. وبعض الصفحات بتذكرها للقطعة («1 لتر/قطعة»)، وعشان كده الحقل ده عبارة مطبوعة مش رقم." },
+  "750 W on the MS-23. Vacuum holds the placket flat while it is folded; where a unit prints this, it has powered suction rather than clamps alone.": { zh: "MS-23 为 750W。真空在折叠过程中把门襟吸平；凡印出此项的机型，即配有动力吸风而不仅是夹具。", ar: "٧٥٠ وات في MS-23. الشفط بيمسك المريلة مفرودة وهي بتتطوى؛ والوحدة اللي بتطبع الرقم ده عندها شفط بمحرّك مش مجرّد مشابك." },
+  "820–830 mm where printed. An ergonomics and line-integration fact — a unit that does not match the line's table height needs a platform.": { zh: "凡印出者为 820–830 mm。这是人机工程与产线衔接事实——台面高度与产线不匹配的设备需要加垫台。", ar: "٨٢٠–٨٣٠ مم حيثما طُبع. دي حقيقة تخصّ راحة العامل وربط الوحدة بخط الإنتاج — أي وحدة ارتفاعها مش مطابق للخط هتحتاج قاعدة." },
   /* XAPT Programmable / CNC Sewing (2026-08-13) — S-JOOKE. */
   "Printed as X×Y in cm (80×45 … 250×150) — 7 of 14 machines. Kept as text because the page gives one paired string, and because the pair IS the buying decision on this machine class: it is the size of template the machine can run.": { zh: "目录印为 X×Y（厘米，80×45 … 250×150），14 台机器中有 7 台标注。保留为文本，因为版面给出的是一个成对字符串；而且这一对数值正是该机型的采购决策依据——它决定机器能运行多大的模板。", ar: "مطبوع كـ X×Y بالسنتيمتر (80×45 … 250×150) — في ٧ ماكينات من ١٤. سِبناه نص لأن الصفحة بتدّي سلسلة واحدة مزدوجة، ولأن الزوج ده هو قرار الشراء في فئة الماكينات دي: هو مقاس القالب اللي الماكينة تقدر تشغّله." },
   "Printed \"Max. Sewing Speed (r/min)\" — 2800 to 3500 across the range (9 of 14). Reused from the shared sewing vocabulary.": { zh: "目录标注为“Max. Sewing Speed (r/min)”，全系列 2800 至 3500（14 台中 9 台）。沿用缝纫机共享词汇。", ar: "مطبوع «Max. Sewing Speed (r/min)» — من ٢٨٠٠ لـ٣٥٠٠ عبر المدى (٩ من ١٤). مُعاد استخدامه من مفردات الخياطة المشتركة." },

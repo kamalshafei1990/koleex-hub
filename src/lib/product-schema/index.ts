@@ -22,6 +22,7 @@ import { IRONING_HEATPRESS_BATCH_SCHEMAS } from "./schemas/ironing-heatpress-bat
 import { SEWING_STITCH_TYPE_SCHEMAS } from "./schemas/sewing-stitch-types-2026-08-12";
 import { ZIGZAG_SCHEMAS } from "./schemas/zigzag-2026-08-13";
 import { PROGRAMMABLE_CNC_SCHEMAS } from "./schemas/programmable-cnc-2026-08-13";
+import { AUTOMATION_UNIT_SCHEMAS } from "./schemas/automation-units-2026-08-13";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -82,6 +83,11 @@ for (const schema of ZIGZAG_SCHEMAS) registerSchema(schema);
    automation machine rendered an empty form. Built 2026-08-13 off the S-JOOKE
    printed parameter table (14 machines, one consistent column set). */
 for (const schema of PROGRAMMABLE_CNC_SCHEMAS) registerSchema(schema);
+
+/* XAPW Pocket Welting + XAPP Placket Sewing Units — the second and third
+   templates in Automatic Sewing Systems. Cross-read from the S-FDK and
+   S-JOOKE printed parameter tables so no field rests on a single sheet. */
+for (const schema of AUTOMATION_UNIT_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
