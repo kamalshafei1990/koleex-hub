@@ -25,6 +25,7 @@ import { PROGRAMMABLE_CNC_SCHEMAS } from "./schemas/programmable-cnc-2026-08-13"
 import { AUTOMATION_UNIT_SCHEMAS } from "./schemas/automation-units-2026-08-13";
 import { BUTTONHOLE_BARTACK_SCHEMAS } from "./schemas/buttonhole-bartack-2026-08-13";
 import { BUTTON_ATTACHING_SCHEMAS } from "./schemas/button-attaching-2026-08-13";
+import { HEMMING_SCHEMAS } from "./schemas/hemming-2026-08-13";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -98,6 +99,11 @@ for (const schema of BUTTONHOLE_BARTACK_SCHEMAS) registerSchema(schema);
 
 /* XABA Button Attaching — S-GEMSY SG 1903B, same image-table caveat. */
 for (const schema of BUTTON_ATTACHING_SCHEMAS) registerSchema(schema);
+
+/* XAHM Hemming — S-JOOKE. The LAST subcategory in Automatic Sewing Systems the
+   current catalogue library can support: XACL, XASL and XASS have no source
+   with a printed spec table and stay empty rather than invented. */
+for (const schema of HEMMING_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
