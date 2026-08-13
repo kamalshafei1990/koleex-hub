@@ -19,6 +19,15 @@ import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 
 const pub = DEFAULT_PUBLIC_VISIBILITY;
 
+/** Standard / Optional, printed literally in every automation catalogue read
+ *  so far. Shared so the option VALUES stay identical across templates — a
+ *  filter for "machines with a standard thread trimmer" must not miss rows
+ *  because one template spelled the value differently. */
+export const FITMENT_OPTIONS = [
+  { value: "standard", label: "Standard" },
+  { value: "optional", label: "Optional" },
+];
+
 export function electricalGroup(order: number, opts?: { motorLabel?: string }): SpecGroup {
   return {
     id: "electrical",

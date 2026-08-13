@@ -47,12 +47,11 @@
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
-import {
-  electricalGroup,
-  packingShippingGroup,
-  physicalGroup,
-  safetyComplianceGroup,
-} from "./_shared-machine-groups";
+/* The four shared groups were imported here and never used — this template
+   spells out its own Weight & Packing group instead, because the catalogue
+   prints net/gross as one pair and a carton size in cm, which the shared
+   packing group does not model. The dead imports are removed; the template's
+   shape is deliberately left as built. */
 
 const pub = DEFAULT_PUBLIC_VISIBILITY;
 

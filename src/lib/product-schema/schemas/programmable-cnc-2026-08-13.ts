@@ -58,17 +58,10 @@ import {
   packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
+  FITMENT_OPTIONS,
 } from "./_shared-machine-groups";
 
 const pub = DEFAULT_PUBLIC_VISIBILITY;
-
-/** Standard / Optional, printed literally in the table. Shared by six fields,
- *  so the option VALUES stay identical and a filter over "machines with a
- *  standard thread trimmer" cannot miss rows through a spelling difference. */
-const FITMENT_OPTIONS = [
-  { value: "standard", label: "Standard" },
-  { value: "optional", label: "Optional" },
-];
 
 export const PROGRAMMABLE_CNC_SCHEMA: ProductSchemaDefinition = {
   id: "programmable-cnc.v1",

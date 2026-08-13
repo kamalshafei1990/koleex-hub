@@ -1,8 +1,9 @@
 /**
- * XAPW · Pocket Welting  and  XAPP · Placket Sewing Units — spec templates.
+ * XAPW · Pocket Welting, XAPP · Placket Sewing Units and XAPS · Pocket Setters
+ * — spec templates.
  *
- * The second and third templates in `Automatic Sewing Systems`, after XAPT.
- * Before these, both subcategories rendered a form with no fields at all.
+ * Templates two, three and four in `Automatic Sewing Systems`, after XAPT.
+ * Before these, all three subcategories rendered a form with no fields at all.
  *
  * SOURCES — two catalogues, cross-read so no field rests on a single sheet:
  *   · S-FDK, 90-page bilingual automation catalogue. Prints a real
@@ -12,6 +13,12 @@
  *   · S-JOOKE, the 62-page catalogue inventoried in
  *     docs/product-data-v2/reference-data/jooke-2026-07-catalog-inventory.md
  *       pocket welting  pp.23–24    placket units  pp.17, 20, 26
+ *       pocket setters  p.25 — JKT-05-AL and JKT-01-AL, the two richest
+ *                       tables of the three classes (17 and 22 rows)
+ *   · S-LANSE, a 9-page catalogue for ONE pocket-setter series (LS-V311).
+ *     Small, but a dedicated sheet: it is where the mould-change time and the
+ *     easing / padding functions come from, none of which the general
+ *     automation catalogues print.
  *
  * ⚠️ A KEYWORD COUNT IS NOT A SOURCE COUNT, and this file nearly proved it the
  * expensive way. Scanning 75 catalogues by keyword reported 8 catalogues for
@@ -31,6 +38,16 @@
  *   placket  sewing range X ≤ 700–850 mm, 30×190 mm · speed 2700–3500 rpm
  *            stitch 0.1–5 mm · needle DB×1, DP×17 (11#–14#)
  *            air 10 / 180 L/min · output 240–1100 pieces per shift
+ *   setter   range 280×260 to 480×300 mm, floor 40×40 · speed 2800–3000 rpm
+ *            stitch 0.05–12.7 mm · needle DP×17 (9#–23#) · foot lift 20–22 mm
+ *            mould change 90 s · output 120–300 pockets/hour
+ *            air 0.5 MPa at 1.8 L/min AND 5 bar at 230 L/min
+ *
+ * ⚠️ ONE PRINTED ERROR CARRIED THROUGH DELIBERATELY. The FDK sheet labels two
+ * pocket-setter rows "Max sewing speed" and "Min sewing speed" and prints AREAS
+ * against them (280×280 and 40×40 mm). The labels are wrong and the values are
+ * ranges; they are recorded as max/min sewing RANGE, and the misprint is noted
+ * on the field so nobody "corrects" it back.
  *
  * WHAT IS DELIBERATELY NOT HERE — machine_dimensions, machine_weight_kg,
  * net/gross weight, packing and voltage. Those are the shared groups appended
@@ -45,6 +62,7 @@ import {
   packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
+  FITMENT_OPTIONS,
 } from "./_shared-machine-groups";
 
 const pub = DEFAULT_PUBLIC_VISIBILITY;
@@ -60,6 +78,47 @@ const sewingHeadField = {
   description: "The bought-in head the unit is built around (\"brother 7300A / JUKI DDL-8000A\", \"688B-9\", \"342 AF pattern head\"). On a dedicated automation unit this decides stitch quality, the spare-parts channel and a large share of the price — it is not a footnote, and two units with the same frame and different heads are not the same machine.",
   ...pub, visualRenderType: "spec_card" as const,
 };
+
+/* Laser cutting appears on welting units AND on pocket setters, so the group
+   is defined ONCE. It began inline on XAPW; XAPS then turned up a THIRD head
+   type ("Lifting Type" on the JKT-01-AL) that the inline copy did not have,
+   which is precisely how two subcategories start disagreeing about the same
+   field. Shared definition, one option list, no drift. */
+function laserCuttingGroup(order: number) {
+  return {
+    id: "laser-cutting",
+    title: "Laser Cutting",
+    order,
+    fields: [
+      {
+        id: "laser_power_w", key: "laser_power_w", label: "Laser Power", order: 10,
+        fieldType: "unit_number" as const, dataType: "number" as const, unit: "W", required: false,
+        description: "80, 100 or 120 W — printed as an option on the MS-03 series, fixed at 120 W on the MS-688B-9 and 100 W on the JKT-01-AL. The laser replaces manual notching, so its absence is a materially different machine: leave this BLANK on a non-laser unit rather than entering 0.",
+        ...pub, visualRenderType: "spec_card" as const,
+      },
+      {
+        id: "laser_cutting_range", key: "laser_cutting_range", label: "Laser Cutting Range", order: 20,
+        fieldType: "text" as const, dataType: "string" as const, required: false,
+        description: "Printed separately from the sewing range and SMALLER than it — 250×200 vs 350×200 mm on the MS-03-HF2, 300×200 vs 400×200 mm on the JKT-01-AL. Recording only one of the two would overstate what the machine can cut.",
+        ...pub, visualRenderType: "spec_card" as const,
+      },
+      {
+        id: "laser_head_type", key: "laser_head_type", label: "Laser Head Type", order: 30,
+        fieldType: "select" as const, dataType: "string" as const, required: false,
+        options: [
+          /* NOT the bare value "fixed": that already means "Fixed Speed" on
+             speed_control, and one value meaning two things is what gate C
+             refuses — the same collision that produced `needle_fixed`. */
+          { value: "laser_head_fixed", label: "Fixed" },
+          { value: "moving", label: "Moving / Galvo" },
+          { value: "lifting", label: "Lifting" },
+        ],
+        description: "\"固定式 Fixed type\" on the MS-03 series, \"Lifting Type\" on the JKT-01-AL. A fixed head cuts within the frame, a moving head follows the pattern, and a lifting head raises clear so the frame can pass beneath it.",
+        ...pub, visualRenderType: "spec_card" as const,
+      },
+    ],
+  };
+}
 
 export const POCKET_WELTING_SCHEMA: ProductSchemaDefinition = {
   id: "pocket-welting.v1",
@@ -100,38 +159,7 @@ export const POCKET_WELTING_SCHEMA: ProductSchemaDefinition = {
         },
       ],
     },
-    {
-      id: "welt-laser",
-      title: "Laser Cutting",
-      order: 20,
-      fields: [
-        {
-          id: "laser_power_w", key: "laser_power_w", label: "Laser Power", order: 10,
-          fieldType: "unit_number" as const, dataType: "number" as const, unit: "W", required: false,
-          description: "80 W or 120 W, printed as an option on the MS-03 series and fixed at 120 W on the MS-688B-9. The laser replaces manual notching, so its absence is a materially different machine — leave blank on non-laser welting units rather than entering 0.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-        {
-          id: "laser_cutting_range", key: "laser_cutting_range", label: "Laser Cutting Range", order: 20,
-          fieldType: "text" as const, dataType: "string" as const, required: false,
-          description: "Printed separately from the sewing range and SMALLER than it (250×200 vs 350×200 mm on the MS-03-HF2). Recording only one of the two would overstate what the machine can cut.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-        {
-          id: "laser_head_type", key: "laser_head_type", label: "Laser Head Type", order: 30,
-          fieldType: "select" as const, dataType: "string" as const, required: false,
-          options: [
-            /* NOT the bare value "fixed": that already means "Fixed Speed" on
-               speed_control, and one value meaning two things is what gate C
-               refuses — the same collision that produced `needle_fixed`. */
-            { value: "laser_head_fixed", label: "Fixed" },
-            { value: "moving", label: "Moving / Galvo" },
-          ],
-          description: "\"固定式 Fixed type\" on the MS-03 series. A fixed head cuts within the frame; a moving head follows the pattern.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-      ],
-    },
+    laserCuttingGroup(20),
     {
       id: "welt-sewing-head",
       title: "Sewing Head & Stitch",
@@ -327,7 +355,200 @@ export const PLACKET_UNIT_SCHEMA: ProductSchemaDefinition = {
   ],
 };
 
+export const POCKET_SETTER_SCHEMA: ProductSchemaDefinition = {
+  id: "pocket-setter.v1",
+  name: "Pocket Setter",
+  divisionCode: "garment-machinery",
+  categoryCode: "automatic-sewing-systems",
+  subcategoryCode: "XAPS",
+  version: "1",
+  groups: [
+    {
+      id: "setter-work",
+      title: "Pocket Work Envelope",
+      order: 10,
+      fields: [
+        {
+          id: "max_sewing_range", key: "max_sewing_range", label: "Max Sewing Range", order: 10,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "480×300 mm (JKT-05-AL) · 400×200 (JKT-01-AL) · 280×260 (LS-V311) · 280×280 (MS-36-430). On a setter this is the largest patch pocket the frame will take, and it is the first thing a buyer checks against their garment.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "min_sewing_range", key: "min_sewing_range", label: "Min Sewing Range", order: 20,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "40×40 mm where printed. A setter has a FLOOR as well as a ceiling — below it the frame cannot clamp — and only pocket setters print this, which is why the field exists here and not on the welting template. ⚠️ The FDK sheet labels this row \"Min sewing speed\" and prints an AREA against it; the label is a misprint, the value is a range.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "pocket_applications", key: "pocket_applications", label: "Pocket Applications", order: 30,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "Kangaroo/hoodie, military bellows, apron front panel, luggage inner lining, automotive seat back, jeans and back patches. A setter is bought for a garment operation, so this is what the buyer matches first.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "mould_change_time", key: "mould_change_time", label: "Mould Change Time", order: 40,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "\"90-second quick mould change\" on the LS-V311. THE defining economics of a pocket setter: the machine is fast per pocket but each pocket shape needs its own mould, so changeover time is what decides whether it suits short runs. No other automation unit in this category prints it.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "sewing_output", key: "sewing_output", label: "Sewing Output", order: 50,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "Quoted WITH its basis and the two sources disagree by design: \"120 pcs/hour (260 stitches)\" against \"5–6 pockets per minute, ~300 per hour\". Kept as the printed phrase including the stitch count — a bare number would compare a 260-stitch pocket against an unstated one.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+      ],
+    },
+    {
+      id: "setter-head",
+      title: "Sewing Head & Stitch",
+      order: 20,
+      fields: [
+        sewingHeadField,
+        {
+          id: "max_sewing_speed", key: "max_sewing_speed", label: "Max Sewing Speed", order: 20,
+          fieldType: "unit_number" as const, dataType: "number" as const, unit: "rpm", required: false,
+          description: "2800–3000 rpm across all four sources. The JKT-01-AL prints the full band (200~2800 rpm); record the maximum.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "stitch_length_max", key: "stitch_length_max", label: "Max Stitch Length", order: 30,
+          fieldType: "unit_number" as const, dataType: "number" as const, unit: "mm", required: false,
+          description: "12.7 mm throughout (printed as 0.05~12.7 or 0.1~12.7).",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "max_stitches_per_pattern", key: "max_stitches_per_pattern", label: "Max Stitches per Pattern", order: 40,
+          fieldType: "unit_number" as const, dataType: "number" as const, unit: "stitches", required: false,
+          description: "20,000 on the JKT-01-AL — the dedicated-unit figure, an order of magnitude below a CNC template machine.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "needle_system", key: "needle_system", label: "Needle System", order: 50,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "DP×17, quoted with its size range (9#~23# on the JKT-05-AL, #18 on the LS-V311).",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "hook_type", key: "hook_type", label: "Hook / Shuttle Type", order: 60,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "\"Double Capacity Rotary Hook\" on the JOOKE units, \"摆梭 oscillating shuttle\" on the FDK ones — a real mechanical difference between setters, not a wording difference.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "presser_foot_lift", key: "presser_foot_lift", label: "Presser Foot Lift", order: 70,
+          fieldType: "unit_number" as const, dataType: "number" as const, unit: "mm", required: false,
+          description: "20 mm (synchronous foot, JKT-05-AL) to 22 mm (inner foot, JKT-01-AL).",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "inner_presser_foot_stroke", key: "inner_presser_foot_stroke", label: "Inner Presser Foot Stroke", order: 80,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "\"0~10 mm Adjustable\". Text because the adjustability is the point — a fixed stroke and an adjustable one over the same span are not the same machine.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+      ],
+    },
+    {
+      id: "setter-handling",
+      title: "Material Handling & Automation",
+      order: 30,
+      fields: [
+        {
+          id: "feeding_mode", key: "feeding_mode", label: "Feeding & Receiving Mode", order: 10,
+          fieldType: "select" as const, dataType: "string" as const, required: false,
+          options: [
+            /* NOT the bare "automatic": it already means Automatic Water Supply
+               and Automatic Lubrication elsewhere. Gate I refuses one value
+               meaning three things — same resolution as `laser_head_fixed`. */
+            { value: "feed_automatic", label: "Automatic" },
+            { value: "intermittent", label: "Intermittent" },
+            { value: "manual_feed", label: "Manual" },
+          ],
+          description: "\"Automatic\" feeding AND receiving on the JKT-05-AL against \"Intermittent Feeding\" on the JKT-01-AL. Automatic receiving is what lets one operator run two machines, so this is a labour-cost field, not a mechanism note.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "fabric_easing_function", key: "fabric_easing_function", label: "Fabric Easing / Pre-Shrink", order: 20,
+          fieldType: "select" as const, dataType: "string" as const, required: false,
+          options: FITMENT_OPTIONS,
+          description: "\"自动容位（预缩水功能）\" — the machine eases fullness into the pocket so it does not pucker after washing. Specific to setters, absent from every other automation unit read.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "padding_feed_function", key: "padding_feed_function", label: "Automatic Padding / Interlining Feed", order: 30,
+          fieldType: "select" as const, dataType: "string" as const, required: false,
+          options: FITMENT_OPTIONS,
+          description: "\"全自动加棉垫、垫布功能\" — feeds wadding or backing cloth so the pocket mouth survives washing. A finished-garment durability feature, printed as a headline on the LS-V311.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "positioning_laser", key: "positioning_laser", label: "Positioning Laser", order: 40,
+          fieldType: "select" as const, dataType: "string" as const, required: false,
+          options: FITMENT_OPTIONS,
+          description: "A guide light for placing the pocket, printed \"Optional\" on the JKT-05-AL. NOT the cutting laser — that is in the Laser Cutting group, and confusing the two would put a 100 W cutter where a pointer belongs.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "lubrication_system", key: "lubrication_system", label: "Lubrication", order: 50,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "\"Automatic Micro-oil Lubrication\". Micro-oil matters on pocket work because oil marks on a visible outer panel are a reject.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+      ],
+    },
+    laserCuttingGroup(40),
+    {
+      id: "setter-control",
+      title: "Control & Safety",
+      order: 50,
+      fields: [
+        {
+          id: "pattern_storage_capacity", key: "pattern_storage_capacity", label: "Pattern Storage", order: 10,
+          fieldType: "unit_number" as const, dataType: "number" as const, unit: "patterns", required: false,
+          description: "\"Built-in storage for 999 sets, expandable via USB\". Record 999.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "control_system_brand", key: "control_system_brand", label: "Control System", order: 20,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "DAHAO (大豪) on the LS-V311, plus a \"Special Control System for Laser Pocket Opening\" on the JKT-01-AL. Determines which pattern files and spare boards fit.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "working_air_pressure", key: "working_air_pressure", label: "Working Air Pressure", order: 30,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "\"0.5 MPa 1.8 L/min\" on the JKT-05-AL against \"5 Bar, 230 L/min\" on the MS-36 series — the same pressure and a HUNDRED AND TWENTY times the air. Kept as the printed phrase for that reason.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "emergency_stop", key: "emergency_stop", label: "Emergency Stop", order: 40,
+          fieldType: "select" as const, dataType: "string" as const, required: false,
+          options: [
+            { value: "fitted", label: "Fitted" },
+            { value: "not_fitted", label: "Not Fitted" },
+          ],
+          description: "Printed \"Yes\" on the JKT-01-AL. Blank must mean UNKNOWN, never absent.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+        {
+          id: "protection_features", key: "protection_features", label: "Protection Features", order: 50,
+          fieldType: "text" as const, dataType: "string" as const, required: false,
+          description: "Thread-break detection, fixture safety protection and air-pressure protection are printed as three separate \"Yes\" rows on the JKT-01-AL. Held as one text field rather than three booleans because the sheets differ on which they list, and three fields mostly blank reads as three absences.",
+          ...pub, visualRenderType: "spec_card" as const,
+        },
+      ],
+    },
+    electricalGroup(60),
+    physicalGroup(70),
+    packingShippingGroup(80),
+    safetyComplianceGroup(90),
+  ],
+};
+
 export const AUTOMATION_UNIT_SCHEMAS: ProductSchemaDefinition[] = [
   POCKET_WELTING_SCHEMA,
   PLACKET_UNIT_SCHEMA,
+  POCKET_SETTER_SCHEMA,
 ];
