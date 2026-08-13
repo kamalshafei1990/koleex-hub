@@ -576,16 +576,10 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   }, [open, loadInbox, recountDiscuss]);
 
 
-  /* Close on outside click. */
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never reached the row. PopoverPanel
+     owns this and tests the panel as well as the anchor. */
 
   function handleDiscussRowClick(channelId: string) {
     setOpen(false);

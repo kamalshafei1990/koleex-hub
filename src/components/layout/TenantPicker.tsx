@@ -114,16 +114,10 @@ export default function TenantPicker({ dk }: { dk: boolean }) {
     })();
   }, [open, tenantsLoaded, isSuperAdmin]);
 
-  /* ── Close on outside click ── */
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never reached the row. PopoverPanel
+     owns this and tests the panel as well as the anchor. */
 
   /* ── Handle tenant switch ── */
   function handlePick(tenantId: string) {

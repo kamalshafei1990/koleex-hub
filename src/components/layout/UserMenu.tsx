@@ -189,16 +189,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     };
   }, []);
 
-  /* Close the dropdown when clicking outside. */
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never reached the row. PopoverPanel
+     owns this and tests the panel as well as the anchor. */
 
   const handleSignIn = useCallback(() => {
     setOpen(false);
