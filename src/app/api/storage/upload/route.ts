@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { normaliseUploadPath } from "@/lib/server/storage-tenant";
 import { checkDiscussUpload, mb } from "@/lib/discuss-upload-policy";
+import { checkSupplierUpload, supplierMb } from "@/lib/suppliers/upload-policy";
 
 /* POST /api/storage/upload
    Phase S.2 — tenant isolation hardening.
@@ -83,6 +84,24 @@ export async function POST(req: Request) {
           : `File is too large (max ${mb(verdict.max)}MB)`;
       // 415/413 are the honest statuses; the body carries a reason code the
       // client maps to a localized string. Never echo the filename back.
+      return NextResponse.json(
+        { error: message, reason: verdict.reason },
+        { status: verdict.reason === "type" ? 415 : 413 },
+      );
+    }
+  }
+
+  /* Same doctrine for supplier evidence on the private bucket: the modal's
+     `accept` is UX only. Reject here with an honest status instead of letting
+     the object store answer with a raw InvalidMimeType the caller renders as
+     "save failed". `finance-documents` is reached only by that flow today. */
+  if (bucket === "finance-documents") {
+    const verdict = checkSupplierUpload(true, { size: file.size, type: contentType ?? file.type });
+    if (!verdict.ok) {
+      const message =
+        verdict.reason === "type"
+          ? `File type not supported for private storage`
+          : `File is too large (max ${supplierMb(verdict.max)}MB)`;
       return NextResponse.json(
         { error: message, reason: verdict.reason },
         { status: verdict.reason === "type" ? 415 : 413 },

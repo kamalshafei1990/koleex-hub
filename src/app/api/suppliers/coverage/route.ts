@@ -20,6 +20,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { isPrivateObjectUri } from "@/lib/server/storage-tenant";
 import { COVERAGE_ROLES, type CoverageRole, type CoverageRow, type CoverageSupplier } from "@/lib/suppliers/coverage";
 
 interface CoverageDbRow {
@@ -69,7 +70,11 @@ async function enrichSuppliers(tid: string, supplierIds: string[]): Promise<Map<
   // First (most recent / primary) catalog wins — query is already ordered.
   const catalogBy = new Map<string, { url: string; name: string }>();
   for (const r of (catalogRes.data ?? []) as Array<{ supplier_id: string; title: string | null; file_name: string | null; file_url: string | null }>) {
-    if (!r.file_url || catalogBy.has(r.supplier_id)) continue;
+    /* Catalogs are non-sensitive BY CATEGORY, but visibility finance/management
+       still routes them to the private bucket — and a private row's file_url is
+       an internal reference, not a link. Skip those instead of emitting an
+       href a browser cannot follow. */
+    if (!r.file_url || isPrivateObjectUri(r.file_url) || catalogBy.has(r.supplier_id)) continue;
     catalogBy.set(r.supplier_id, { url: r.file_url, name: (r.title || r.file_name || "Catalog").trim() });
   }
 

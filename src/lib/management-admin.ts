@@ -55,6 +55,10 @@ export async function uploadManagementIcon(
     cacheControl: "3600",
   });
   if (!result.ok) return { url: "", error: result.error };
+  /* BUCKET is public; a null URL would mean it was repointed at a private one. */
+  if (result.data.publicUrl === null) {
+    return { url: "", error: "Storage bucket has no public URL." };
+  }
   return { url: result.data.publicUrl, error: null };
 }
 

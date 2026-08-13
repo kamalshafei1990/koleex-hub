@@ -18,6 +18,7 @@ import {
 } from "@/lib/suppliers/media-fields";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 import { docCategoryLabel } from "@/lib/suppliers/intelligence";
+import { PRIVATE_BUCKETS, privateObjectUri } from "@/lib/server/storage-tenant";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -35,8 +36,29 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const fileUrl = typeof body.file_url === "string" ? body.file_url.trim() : "";
-  if (!fileUrl) return NextResponse.json({ error: "file_url is required" }, { status: 400 });
+  /* A SENSITIVE asset (contract, NDA, audit, licence, or anything with
+     finance/management visibility) is uploaded to the private
+     `finance-documents` bucket, and a private bucket has no public URL —
+     /api/storage/upload returns `publicUrl: null` by design. This route used
+     to demand a non-empty file_url unconditionally, so every sensitive
+     document failed to save with "file_url is required" AFTER the file had
+     already been written to storage. Public assets are unaffected, which is
+     why photos and catalogs always worked and contracts never did.
+
+     The stored object is identified by bucket + path; file_url carries the
+     internal reference for it (see privateObjectUri) because the column is
+     NOT NULL. The Supplier 360 GET replaces it with a signed URL on read. */
+  const rawBucket = typeof body.storage_bucket === "string" ? body.storage_bucket : null;
+  const rawPath = typeof body.storage_path === "string" ? body.storage_path : null;
+  const isPrivateObject = !!rawBucket && !!rawPath && PRIVATE_BUCKETS.has(rawBucket);
+
+  let fileUrl = typeof body.file_url === "string" ? body.file_url.trim() : "";
+  if (!fileUrl) {
+    if (!isPrivateObject) {
+      return NextResponse.json({ error: "file_url is required" }, { status: 400 });
+    }
+    fileUrl = privateObjectUri(rawBucket, rawPath);
+  }
   const category = typeof body.category === "string" ? body.category : "";
   if (!MEDIA_CATEGORIES.has(category)) {
     return NextResponse.json({ error: "Invalid or missing category" }, { status: 400 });
@@ -85,10 +107,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       description: meta.description ?? null,
       visibility: typeof body.visibility === "string" && body.visibility ? body.visibility : "internal",
       lifecycle_status: typeof body.lifecycle_status === "string" && body.lifecycle_status ? body.lifecycle_status : "active",
-      storage_bucket: typeof body.storage_bucket === "string" ? body.storage_bucket : null,
-      storage_path: typeof body.storage_path === "string" ? body.storage_path : null,
+      storage_bucket: rawBucket,
+      storage_path: rawPath,
       file_url: fileUrl,
-      preview_url: typeof body.preview_url === "string" ? body.preview_url : null,
+      /* A private object has no public preview either — the GET signs it from
+         storage_path. Storing a client-supplied preview here would bake in a
+         URL nobody can fetch. */
+      preview_url: isPrivateObject
+        ? null
+        : (typeof body.preview_url === "string" ? body.preview_url : null),
       file_name: typeof body.file_name === "string" ? body.file_name : null,
       mime_type: typeof body.mime_type === "string" ? body.mime_type : null,
       file_size: typeof body.file_size === "number" ? body.file_size : null,

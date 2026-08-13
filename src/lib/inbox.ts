@@ -384,6 +384,13 @@ export async function uploadInboxAttachment(
     console.error("[Inbox] Attachment upload:", result.error);
     return null;
   }
+  /* `media` is a public bucket, so this is unreachable today — but an
+     attachment with no URL is not an attachment, so refuse it rather than
+     persist a null. */
+  if (result.data.publicUrl === null) {
+    console.error("[Inbox] Attachment upload: bucket has no public URL");
+    return null;
+  }
   return {
     name: file.name,
     url: result.data.publicUrl,

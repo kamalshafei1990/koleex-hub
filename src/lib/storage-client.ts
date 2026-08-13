@@ -21,7 +21,13 @@ export interface UploadOptions {
 
 export interface UploadResult {
   path: string;
-  publicUrl: string;
+  /** NULL for private buckets (finance-documents, hr-documents, discuss-*) —
+      they have no public URL and the route returns null by design. This was
+      typed `string` and the lie cost a working feature: callers assigned it
+      straight into a NOT NULL column and the insert failed at runtime with no
+      type error anywhere. Identify a private object by `path` + bucket and
+      have the server sign it on read. */
+  publicUrl: string | null;
 }
 
 /** Upload a file to a bucket via /api/storage/upload. */

@@ -801,6 +801,12 @@ async function compressAndUploadPhoto(
     contentType: "image/jpeg",
   });
   if (!up.ok) throw new Error(up.error);
+  /* publicUrl is null only for private buckets. STORAGE_BUCKET is public, so
+     this cannot fire today — it exists so repointing it at a private bucket
+     fails here, loudly, instead of writing a null into a NOT NULL column. */
+  if (up.data.publicUrl === null) {
+    throw new Error(`Storage bucket '${STORAGE_BUCKET}' has no public URL`);
+  }
   return up.data.publicUrl;
 }
 

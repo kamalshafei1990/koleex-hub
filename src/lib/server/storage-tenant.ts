@@ -39,6 +39,34 @@ export function isTenantScoped(bucket: string): boolean {
   return TENANT_SCOPED_BUCKETS.has(bucket);
 }
 
+/* ---------------------------------------------------------------------------
+   Private objects have NO public URL — /api/storage/upload deliberately
+   returns `publicUrl: null` for them. But rows that reference a stored object
+   still need a non-empty `file_url` (the column is NOT NULL), so a private
+   object is recorded by this internal URI instead:
+
+       storage://finance-documents/<tenant>/suppliers/<id>/docs/<uuid>.pdf
+
+   It is a REFERENCE, never a link. Read paths that can sign (the Supplier 360
+   GET) replace it with a short-lived signed URL built from storage_path; read
+   paths that cannot must treat it as "no link" via isPrivateObjectUri() rather
+   than handing it to an <a href>. The scheme is chosen so a leak is inert and
+   obvious — a browser cannot follow it, and it can never be mistaken for the
+   dead-but-plausible public URL that getPublicUrl() would have produced.
+   --------------------------------------------------------------------------- */
+
+export const PRIVATE_OBJECT_URI_SCHEME = "storage://";
+
+export function privateObjectUri(bucket: string, path: string): string {
+  return `${PRIVATE_OBJECT_URI_SCHEME}${bucket}/${path.replace(/^\/+/, "")}`;
+}
+
+/** True for the internal reference above — i.e. "this row points at a private
+ *  object and the caller has not signed it". Never renderable. */
+export function isPrivateObjectUri(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.startsWith(PRIVATE_OBJECT_URI_SCHEME);
+}
+
 /** Returns true when `path` is rooted under the given tenant prefix.
  *  Comparison is exact on the leading segment — `t1234abc.../...` will
  *  NOT match tenant `t1234`. */

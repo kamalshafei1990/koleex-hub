@@ -375,6 +375,11 @@ export async function uploadProductFile(file: File): Promise<{ url: string; file
   const filePath = `products/${Date.now()}_${safeName}`;
   const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600" });
   if (!result.ok) { console.error("[Media] Upload error:", result.error); return null; }
+  /* BUCKET is public; a null URL would mean it was repointed at a private one. */
+  if (result.data.publicUrl === null) {
+    console.error("[Media] Upload error: bucket has no public URL");
+    return null;
+  }
   return { url: result.data.publicUrl, file_path: result.data.path };
 }
 export async function createProductMedia(media: Record<string, unknown>): Promise<ProductMediaRow | null> {

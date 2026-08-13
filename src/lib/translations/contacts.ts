@@ -1704,6 +1704,12 @@ export const contactsT: Translations = {
   "ms.pending": { en: "Pending", zh: "待处理", ar: "قيد الانتظار" },
   "ms.verified": { en: "Verified", zh: "已验证", ar: "تم التحقق" },
   "ms.chooseFileFirst": { en: "Choose a file first", zh: "请先选择文件", ar: "اختر ملفًا أولاً" },
+  /* Upload preflight — these replace a bare "save failed" with the actual
+     reason. {max} is substituted with a whole number of megabytes. */
+  "ms.fieldFilePrivate": { en: "File (PDF or image — stored privately)", zh: "文件（PDF 或图片 — 私密存储）", ar: "الملف (PDF أو صورة — تخزين خاص)" },
+  "ms.rejectType": { en: "Sensitive documents (contracts, NDAs, audits, licences) are stored privately and accept PDF or image files only. Convert this file to PDF, or file it under a non-sensitive category.", zh: "敏感文件（合同、保密协议、审核报告、许可证）采用私密存储，仅支持 PDF 或图片。请将文件转换为 PDF，或归入非敏感类别。", ar: "المستندات الحسّاسة (العقود واتفاقيات السرّية وتقارير التدقيق والتراخيص) بتتخزّن بشكل خاص وبتقبل PDF أو صور بس. حوّل الملف لـPDF، أو صنّفه تحت فئة غير حسّاسة." },
+  "ms.rejectTransport": { en: "File is too large to upload (max {max}MB).", zh: "文件过大，无法上传（上限 {max}MB）。", ar: "الملف أكبر من إنه يترفع (الحد {max} ميجابايت)." },
+  "ms.rejectSize": { en: "File is too large for private storage (max {max}MB).", zh: "文件超出私密存储上限（{max}MB）。", ar: "الملف أكبر من حد التخزين الخاص (الحد {max} ميجابايت)." },
   "ms.removeAssetConfirm": { en: "Remove this asset? It will be archived (recoverable).", zh: "移除此资产？它将被归档（可恢复）。", ar: "إزالة هذا الأصل؟ سيتم أرشفته (قابل للاسترجاع)." },
   "ms.title": { en: "Evidence & Documents", zh: "证据与文件", ar: "الأدلة والمستندات" },
   "ms.addAsset": { en: "Add asset", zh: "添加资产", ar: "إضافة أصل" },

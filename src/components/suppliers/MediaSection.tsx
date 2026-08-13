@@ -19,7 +19,8 @@ import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { uploadToStorage } from "@/lib/storage-client";
+import { uploadToStorage, removeFromStorage } from "@/lib/storage-client";
+import { checkSupplierUpload, supplierMb, SUPPLIER_PRIVATE_ACCEPT_ATTR } from "@/lib/suppliers/upload-policy";
 import {
   DOC_CATEGORY_GROUPS, docCategoryLabel,
   CERT_TYPE_LABELS, CERT_TYPE_ORDER, certTypeLabel,
@@ -181,13 +182,40 @@ export default function MediaSection({
     setBusy(true); setUpErr(null);
     try {
       const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const bucket = isSensitiveAsset(category, visibility) ? "finance-documents" : "media";
+      const isPrivate = isSensitiveAsset(category, visibility);
+      const bucket = isPrivate ? "finance-documents" : "media";
+
+      /* PREFLIGHT — say WHY before spending the upload. Each of these limits
+         previously surfaced as an unexplained "save failed" only after the
+         file had travelled, and two of them are invisible to the user: the
+         private bucket's format list, and the transport ceiling that applies
+         to every upload regardless of destination. */
+      const verdict = checkSupplierUpload(isPrivate, { size: file.size, type: file.type });
+      if (!verdict.ok) {
+        setUpErr(
+          verdict.reason === "type"
+            ? t("ms.rejectType", "Sensitive documents (contracts, NDAs, audits, licences) are stored privately and accept PDF or image files only. Convert this file to PDF, or file it under a non-sensitive category.")
+            : verdict.reason === "transport"
+              ? t("ms.rejectTransport", "File is too large to upload (max {max}MB).").replace("{max}", supplierMb(verdict.max))
+              : t("ms.rejectSize", "File is too large for private storage (max {max}MB).").replace("{max}", supplierMb(verdict.max)),
+        );
+        setBusy(false);
+        return;
+      }
+
       const path = `suppliers/${supplierId}/docs/${crypto.randomUUID()}.${ext}`;
       const up = await uploadToStorage(bucket, path, file, { contentType: file.type || undefined });
       if (!up.ok) throw new Error(humanizeError(up.error));
+      /* A sensitive asset lands in the private bucket, which has no public URL
+         (publicUrl === null). The row is then identified by bucket + path and
+         the server signs it on read — so send null rather than inventing a
+         link. The `Record<string, unknown>` below is why TypeScript never
+         flagged this: `unknown` swallows the null, and the failure only
+         surfaced as a save error against the NOT NULL column. */
+      const publicUrl = up.data.publicUrl;
       const body: Record<string, unknown> = {
-        file_url: up.data.publicUrl,
-        preview_url: file.type.startsWith("image/") ? up.data.publicUrl : null,
+        file_url: publicUrl,
+        preview_url: publicUrl && file.type.startsWith("image/") ? publicUrl : null,
         storage_bucket: bucket,
         storage_path: up.data.path,
         file_name: file.name,
@@ -214,6 +242,12 @@ export default function MediaSection({
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
+        /* The object is already in storage at this point. Without this the
+           file lingers forever with no row pointing at it — invisible, still
+           billed, and for a sensitive document still readable by anyone who
+           can sign that bucket. Every failed save used to leak one. Best
+           effort: a failed cleanup must not mask the real error below. */
+        void removeFromStorage(bucket, [up.data.path]).catch(() => {});
         throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       }
       setOpen(false);
@@ -454,8 +488,20 @@ export default function MediaSection({
               <UploadIcon className="h-4 w-4 text-[var(--text-secondary)]" />
               <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("ms.addAssetTitle", "Add evidence asset")}</span>
             </div>
-            <Field label={t("ms.fieldFile", "File (image, PDF, video, document)")}>
-              <input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            {/* The picker must advertise what the DESTINATION accepts, and the
+                destination follows the classification: a sensitive asset goes
+                to the private bucket, which takes PDF and images only. This
+                offered .doc/.docx/.xls/.xlsx unconditionally, so choosing
+                "Contract" and then a Word file was an invitation to a failure
+                the object store made three steps later. */}
+            <Field label={isSensitiveAsset(category, visibility)
+              ? t("ms.fieldFilePrivate", "File (PDF or image — stored privately)")
+              : t("ms.fieldFile", "File (image, PDF, video, document)")}>
+              <input type="file"
+                accept={isSensitiveAsset(category, visibility)
+                  ? SUPPLIER_PRIVATE_ACCEPT_ATTR
+                  : "image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"}
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-[12px] text-[var(--text-secondary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--bg-surface-subtle)] file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-[var(--text-primary)]" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
