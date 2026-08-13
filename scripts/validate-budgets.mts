@@ -342,6 +342,9 @@ console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
     : bad("state specificity", `${losers.length} rule(s) match but can never paint:\n       ${losers.join("\n       ")}`);
 }
 
+/** Filled by section G while the schema registry is in scope; read by K. */
+const SCHEMA_SUBCATEGORY_CODES = new Set<string>();
+
 /* ── G. Product-schema templates are fully trilingual ─────────────────────
    A NUMBER again: how many strings an operator can see that have no zh/ar.
 
@@ -390,6 +393,12 @@ console.log("\nG. Product-schema i18n (every operator-visible string)");
   };
 
   const schemas = listSchemas();
+  /* Section K runs after this block closes and cannot reach listSchemas, so the
+     bound subcategory codes are captured here while they are in scope. */
+  for (const sc of schemas) {
+    const code = (sc as { subcategoryCode?: string }).subcategoryCode;
+    if (code) SCHEMA_SUBCATEGORY_CODES.add(code);
+  }
   let strings = 0;
   for (const s of schemas) {
     need(NAME, `s:${s.id}`, LANGS); strings++;
@@ -593,6 +602,56 @@ console.log("\nJ. Authorization inputs");
     ? ok("every AI tool declares requiredModule", `${toolCount} tools, ${TOOL_NO_MODULE_OK.size} documented exception`)
     : bad("AI tool runs ungated",
           `tool-registry only calls checkModule() when requiredModule is set:\n       ${undeclared.join("\n       ")}`);
+}
+
+/* ── K. The Knowledge coding system mirrors the live taxonomy ──────────────
+   OWNER RULE (2026-08-13): "any new code has to be added to the coding system
+   in the Knowledge app also — this is a rule."
+
+   It was already broken when the rule was stated: NINE subcategory codes were
+   live in the taxonomy and absent from Knowledge (XSZ, XSBL, XAPT, XFAS, XFSS,
+   XPHR, XPSC, XAS, XAT), three whole categories were missing, and two dead
+   codes were still being taught — XSD/XSM, which CL-0020 turned into the
+   needle_count attribute, plus XPRH, which CL-0021 recoded to XPHR and which
+   appeared TWICE in the page with two different meanings.
+
+   This gate compares the codes rendered by the Knowledge page against the ones
+   the schema registry and facet layer know about. It cannot read the database
+   (no network in the build), so it uses the shipped taxonomy constants as the
+   reference — which is exactly the set a developer edits when they mint a code.
+   A code that exists in one and not the other fails the build. */
+console.log("\nK. Knowledge coding system vs the taxonomy");
+{
+  const kbPath = path.join(ROOT, "src/components/knowledge/product-coding/data.ts");
+  const kb = fs.readFileSync(kbPath, "utf8");
+  const kbCodes = new Set([...kb.matchAll(/\{ code: "(X[A-Z]{2,4})", label:/g)].map((m) => m[1]));
+
+  /* Every subcategoryCode a schema binds to must be teachable. */
+  const schemaCodes = SCHEMA_SUBCATEGORY_CODES;
+  const untaught = [...schemaCodes].filter((c) => !kbCodes.has(c));
+  untaught.length === 0
+    ? ok("every code with a spec template is in the Knowledge coding system", `${schemaCodes.size} codes`)
+    : bad("code has a spec template but is not taught in Knowledge",
+          `${untaught.join(", ")} — add it to src/components/knowledge/product-coding/data.ts (owner rule)`);
+
+  /* Retired shelves must not be taught as if they were still types. */
+  /* XSD/XSM/XPRH were DELETED or recoded — they must not appear at all.
+     XSH/XSS still exist as rows because their tokens hold live product codes
+     (KOLEEX codes are never recycled), so they may be taught ONLY while the
+     label says so — otherwise someone files a new machine under a dead shelf. */
+  const GONE = ["XSD", "XSM", "XPRH"];
+  const RETIRED_MUST_SAY_SO = ["XSH", "XSS"];
+  const zombies = [
+    ...GONE.filter((c) => kbCodes.has(c)),
+    ...RETIRED_MUST_SAY_SO.filter((c) => {
+      const row = kb.match(new RegExp(`\\{ code: "${c}", label: "([^"]*)"`));
+      return kbCodes.has(c) && !/retired/i.test(row?.[1] ?? "");
+    }),
+  ];
+  zombies.length === 0
+    ? ok("no retired code is taught as live", `${GONE.length + RETIRED_MUST_SAY_SO.length} checked`)
+    : bad("retired code still in the Knowledge coding system",
+          `${zombies.join(", ")} — these were removed or recoded by CL-0020/CL-0021`);
 }
 
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);

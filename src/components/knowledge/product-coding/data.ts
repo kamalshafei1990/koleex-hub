@@ -93,7 +93,6 @@ export const CATEGORIES: Category[] = [
       { code: "XPRI", label: "Fabric Inspection Machines" },
       { code: "XPRL", label: "Fabric Rolling Machines" },
       { code: "XPRT", label: "Fabric Cutting Tables" },
-      { code: "XPRH", label: "Fabric Handling Systems" },
       { code: "XPRP", label: "Fabric Shrinking Machines" },
       { code: "XFFP", label: "Fusing Machines" },
     ],
@@ -129,11 +128,21 @@ export const CATEGORIES: Category[] = [
       { code: "XSO", label: "Overlock Machines" },
       { code: "XSI", label: "Interlock Machines" },
       { code: "XSC", label: "Chainstitch Machines" },
-      { code: "XSD", label: "Double Needle Machines" },
-      { code: "XSM", label: "Multi-Needle Machines" },
+      /* XSD "Double Needle" and XSM "Multi-Needle" were REMOVED by CL-0020 and
+         must not come back as shelves. Needle count is an ATTRIBUTE on the
+         two-axis model: a lockstitch with needle_count 2 is a lockstitch, not a
+         separate class. Filing it as a type is what made one machine appear
+         under two shelves (dn-heavy-duty vs hd-dnls). */
       { code: "XSPA", label: "Pattern Sewing Machines" },
-      { code: "XSH", label: "Heavy Duty Machines" },
-      { code: "XSS", label: "Special Machines" },
+      /* Still rows in the taxonomy, but RETIRED as types by CL-0020 — kept only
+         because their tokens carry real product codes (XSS 82, XSH 20) and
+         KOLEEX codes are never recycled. They are labelled so nobody files a
+         new machine under them: duty is the fabric_weight_class attribute, and
+         "special" was never a class at all. */
+      { code: "XSH", label: "Heavy Duty Machines (retired — use duty attribute)" },
+      { code: "XSS", label: "Special Machines (retired — code reservation only)" },
+      { code: "XSZ", label: "Zigzag Machines" },
+      { code: "XSBL", label: "Blindstitch Machines" },
     ],
   },
   {
@@ -154,6 +163,7 @@ export const CATEGORIES: Category[] = [
       { code: "XABT", label: "Bartacking Machines" },
       { code: "XABA", label: "Button Attaching Machines" },
       { code: "XABH", label: "Buttonhole Machines" },
+      { code: "XAPT", label: "Programmable / CNC Sewing" },
     ],
   },
   {
@@ -168,6 +178,7 @@ export const CATEGORIES: Category[] = [
       { code: "XSEL", label: "Leather Sewing Machines" },
       { code: "XSEE", label: "Edge Binding Machines" },
       { code: "XSET", label: "Tape Attaching Machines" },
+      { code: "XSEK", label: "Skiving & Edge Trimming Machines" },
     ],
   },
   {
@@ -184,6 +195,41 @@ export const CATEGORIES: Category[] = [
       { code: "XEB", label: "Cording / Beading Machines" },
     ],
   },
+  /* Three categories added 2026-08-13. They existed in the taxonomy tables but
+     had never been mirrored here — the gap the "every new code goes into the
+     Knowledge coding system" rule is meant to prevent. XFAS/XPSC came from
+     CL-0020 step 3; XAS/XAT predate it. */
+  {
+    code: "XAST",
+    label: "Stands & Tables",
+    blurb: "Machine stands and work tables — the frame a head is mounted on, bought separately from it.",
+    slug: "stands-tables",
+    anchor: "cat-xast",
+    subcategories: [
+      { code: "XAS", label: "Stands" },
+      { code: "XAT", label: "Tables" },
+    ],
+  },
+  {
+    code: "XFA",
+    label: "Fastening & Press",
+    blurb: "Mechanical fastening — snaps, rivets and eyelets set under press, not sewn.",
+    slug: "fastening-press",
+    anchor: "cat-xfa",
+    subcategories: [
+      { code: "XFAS", label: "Snap, Rivet & Eyelet Setters" },
+    ],
+  },
+  {
+    code: "XPS",
+    label: "Production Systems",
+    blurb: "Cell-level automation that composes several machines into one production step.",
+    slug: "production-systems",
+    anchor: "cat-xps",
+    subcategories: [
+      { code: "XPSC", label: "Robotic Sewing Cells" },
+    ],
+  },
   {
     code: "XP",
     label: "Printing & Heat Press Equipment",
@@ -192,7 +238,7 @@ export const CATEGORIES: Category[] = [
     anchor: "cat-xp",
     subcategories: [
       { code: "XPH", label: "Heat Press Machines" },
-      { code: "XPRH", label: "Rotary Heat Press Machines" },
+      { code: "XPHR", label: "Rotary Heat Press Machines" },
       { code: "XPPH", label: "Pneumatic Heat Press Machines" },
       { code: "XPDH", label: "Double Station Heat Press Machines" },
       { code: "XPSP", label: "Screen Printing Machines" },
@@ -225,6 +271,7 @@ export const CATEGORIES: Category[] = [
     slug: "finishing-equipment",
     anchor: "cat-xf",
     subcategories: [
+      { code: "XFSS", label: "Seam Sealing & Bonding" },
       { code: "XFTS", label: "Thread Sucking Machines" },
       { code: "XFFP", label: "Fusing Press Machines" },
       { code: "XFGR", label: "Garment Reversing Machines" },
