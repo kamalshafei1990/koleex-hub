@@ -140,6 +140,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useSkin } from "@/lib/appearance";
 import nextDynamic from "next/dynamic";
 import AppIcon from "@/components/common/AppIcon";
+import { uploadToStorage } from "@/lib/storage-client";
 
 /* Aurora ground — mounted only under the skin, so Core never pays for it. */
 const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -1535,11 +1536,14 @@ async function compressImage(file: File, maxWidth = 800, quality = 0.7): Promise
     inline base64 if the upload fails, so the feature never silently breaks. */
 /** Upload a Blob/File to the media bucket; returns its public URL + storage path
     (or null on failure). Used for both the catalogue file and its cover. */
-/** 4MB — the TRANSPORT ceiling. An upload travels through /api/storage/upload,
- *  a serverless function whose request-body hard cap is 4.5MB. Past that the
- *  platform kills the request, and every caller below used to read that as a
- *  generic failure. Refusing up front, by name, is the only honest option. */
-const MEDIA_TRANSPORT_MAX_BYTES = 4 * 1024 * 1024;
+/** 500MB — the public `media` bucket's own file_size_limit, and now the ONLY
+ *  ceiling here. A 4MB TRANSPORT limit used to sit at this line because every
+ *  upload crossed /api/storage/upload, a serverless function whose request body
+ *  the platform hard-caps at 4.5MB. uploadToStorage() now sends anything near
+ *  that cap DIRECT to Supabase Storage via a signed URL, so a supplier price
+ *  list or a scanned contract is no longer refused for the shape of our
+ *  plumbing. Do not put a transport-shaped number back here. */
+const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
 
 type MediaUpload =
   | { ok: true; url: string; path: string }
@@ -1549,30 +1553,20 @@ type MediaUpload =
    rejection, an auth failure and a network drop were indistinguishable, and
    the callers turned all three into a silent base64 fallback. */
 async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier-catalogues"): Promise<MediaUpload> {
-  if (blob.size > MEDIA_TRANSPORT_MAX_BYTES) {
-    return { ok: false, error: `File is too large to upload (max ${Math.round(MEDIA_TRANSPORT_MAX_BYTES / 1048576)}MB).` };
+  if (blob.size > MEDIA_MAX_BYTES) {
+    return { ok: false, error: `File is too large to upload (max ${Math.round(MEDIA_MAX_BYTES / 1048576)}MB).` };
   }
-  try {
-    const safe = (name || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(0, 80);
-    const fd = new FormData();
-    fd.append("file", blob, safe);
-    fd.append("bucket", "media");
-    fd.append("path", `${prefix}/${Date.now()}_${safe}`);
-    const ct = (blob as File).type || "application/octet-stream";
-    fd.append("contentType", ct);
-    const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
-    if (!res.ok) {
-      /* The body may not be JSON at all — a platform-level rejection returns
-         HTML. Never let that surface as an empty reason. */
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: j.error || `Upload failed (HTTP ${res.status}).` };
-    }
-    const json = (await res.json()) as { publicUrl?: string; path?: string };
-    if (!json.publicUrl || !json.path) return { ok: false, error: "Upload returned no file location." };
-    return { ok: true, url: json.publicUrl, path: json.path };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Upload failed." };
-  }
+  const safe = (name || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(0, 80);
+  /* Goes through the shared client, which routes anything near the platform's
+     request-body cap direct to Storage. Hand-rolling the fetch here is what
+     kept this path stuck behind that cap while the rest of the Hub moved on. */
+  const up = await uploadToStorage("media", `${prefix}/${Date.now()}_${safe}`, blob, {
+    cacheControl: "3600",
+    contentType: (blob as File).type || "application/octet-stream",
+  });
+  if (!up.ok) return { ok: false, error: up.error };
+  if (!up.data.publicUrl) return { ok: false, error: "Upload returned no file location." };
+  return { ok: true, url: up.data.publicUrl, path: up.data.path };
 }
 
 /**

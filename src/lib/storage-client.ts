@@ -30,13 +30,105 @@ export interface UploadResult {
   publicUrl: string | null;
 }
 
-/** Upload a file to a bucket via /api/storage/upload. */
+/** Bodies at or above this go DIRECT to Storage instead of through our own
+ *  function, whose request body the platform hard-caps at 4.5MB. Set below the
+ *  cap, not at it: multipart framing adds overhead, so a 4.4MB file is already
+ *  over the wire limit. */
+const DIRECT_UPLOAD_THRESHOLD = 3.5 * 1024 * 1024;
+
+/**
+ * Upload a large file by having the SERVER mint a one-shot signed URL and the
+ * BROWSER write the bytes straight to Supabase Storage.
+ *
+ * This is the only way past the 4.5MB transport ceiling. Authorization is
+ * unchanged — /api/storage/signed-upload applies the same session check,
+ * bucket allowlist and tenant-prefix normalisation before it will sign
+ * anything, and the token it returns is scoped to that ONE path.
+ */
+async function uploadDirectToStorage(
+  bucket: string,
+  path: string,
+  file: Blob | File,
+  options: UploadOptions,
+): Promise<{ ok: true; data: UploadResult } | { ok: false; error: string }> {
+  let signRes: Response;
+  try {
+    signRes = await fetch("/api/storage/signed-upload", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bucket, path }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    return { ok: false, error: "Network error preparing upload" };
+  }
+  if (!signRes.ok) {
+    const j = (await signRes.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: j.error ?? `Could not prepare upload (HTTP ${signRes.status})` };
+  }
+  const signed = (await signRes.json()) as {
+    bucket: string; path: string; signedUrl: string; token: string;
+  };
+
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
+  if (!base) return { ok: false, error: "Storage is not configured" };
+  /* signedUrl is a path relative to the storage API root. */
+  const target = `${base}/storage/v1${signed.signedUrl}`;
+
+  let putRes: Response;
+  try {
+    putRes = await fetch(target, {
+      method: "PUT",
+      headers: {
+        ...(options.contentType ? { "Content-Type": options.contentType } : {}),
+        ...(options.cacheControl ? { "cache-control": options.cacheControl } : {}),
+        ...(options.upsert ? { "x-upsert": "true" } : {}),
+      },
+      body: file,
+      /* No timeout: the whole point is files big enough that a fixed deadline
+         would kill a legitimate slow upload. The browser still surfaces a
+         genuine network failure through the catch below. */
+    });
+  } catch {
+    return { ok: false, error: "Network error during upload" };
+  }
+  if (!putRes.ok) {
+    const j = (await putRes.json().catch(() => ({}))) as { message?: string; error?: string };
+    return { ok: false, error: j.message ?? j.error ?? `Upload failed (HTTP ${putRes.status})` };
+  }
+
+  /* Mirror /api/storage/upload's contract exactly, including publicUrl: null
+     for private buckets — callers must not have to know which route ran. */
+  const isPrivate = bucket === "finance-documents" || bucket === "hr-documents"
+    || bucket === "discuss-media" || bucket === "discuss-voice";
+  return {
+    ok: true,
+    data: {
+      path: signed.path,
+      publicUrl: isPrivate ? null : `${base}/storage/v1/object/public/${bucket}/${signed.path}`,
+    },
+  };
+}
+
+/**
+ * Upload a file to a bucket.
+ *
+ * Small files go through /api/storage/upload; anything near the platform's
+ * 4.5MB request-body cap is routed DIRECT to Storage instead, because that cap
+ * used to kill large uploads mid-flight with a non-JSON response that callers
+ * could only report as a generic failure. Both paths return the same shape.
+ */
 export async function uploadToStorage(
   bucket: string,
   path: string,
   file: Blob | File,
   options: UploadOptions = {},
 ): Promise<{ ok: true; data: UploadResult } | { ok: false; error: string }> {
+  if (file.size >= DIRECT_UPLOAD_THRESHOLD) {
+    return uploadDirectToStorage(bucket, path, file, options);
+  }
+
   const form = new FormData();
   form.append("file", file);
   form.append("bucket", bucket);

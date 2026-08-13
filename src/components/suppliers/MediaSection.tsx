@@ -187,18 +187,15 @@ export default function MediaSection({
 
       /* PREFLIGHT — say WHY before spending the upload. Each of these limits
          previously surfaced as an unexplained "save failed" only after the
-         file had travelled, and two of them are invisible to the user: the
-         private bucket's format list, and the transport ceiling that applies
-         to every upload regardless of destination. */
+         file had travelled, and the remaining one is invisible to the user:
+         the private bucket's format list. */
       const mime = resolveUploadMime(file.name, file.type);
       const verdict = checkSupplierUpload(isPrivate, { size: file.size, type: mime });
       if (!verdict.ok) {
         setUpErr(
           verdict.reason === "type"
-            ? t("ms.rejectType", "Sensitive documents (contracts, NDAs, audits, licences) are stored privately and accept PDF or image files only. Convert this file to PDF, or file it under a non-sensitive category.")
-            : verdict.reason === "transport"
-              ? t("ms.rejectTransport", "File is too large to upload (max {max}MB).").replace("{max}", supplierMb(verdict.max))
-              : t("ms.rejectSize", "File is too large for private storage (max {max}MB).").replace("{max}", supplierMb(verdict.max)),
+            ? t("ms.rejectType", "Sensitive documents are stored privately and accept PDF, Word, Excel, PowerPoint, text or image files. Web pages and other formats are not accepted.")
+            : t("ms.rejectSize", "File is too large (max {max}MB).").replace("{max}", supplierMb(verdict.max)),
         );
         setBusy(false);
         return;

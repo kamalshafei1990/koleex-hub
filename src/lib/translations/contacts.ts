@@ -1712,8 +1712,7 @@ export const contactsT: Translations = {
      reason. {max} is substituted with a whole number of megabytes. */
   "ms.fieldFilePrivate": { en: "File (PDF, Office document or image — stored privately)", zh: "文件（PDF、Office 文档或图片 — 私密存储）", ar: "الملف (PDF أو مستند أوفيس أو صورة — تخزين خاص)" },
   "ms.rejectType": { en: "Sensitive documents are stored privately and accept PDF, Word, Excel, PowerPoint, text or image files. Web pages and other formats are not accepted.", zh: "敏感文件采用私密存储，支持 PDF、Word、Excel、PowerPoint、文本或图片。不接受网页及其他格式。", ar: "المستندات الحسّاسة بتتخزّن بشكل خاص وبتقبل PDF أو Word أو Excel أو PowerPoint أو نص أو صور. صفحات الويب وباقي الصيغ مش مقبولة." },
-  "ms.rejectTransport": { en: "File is too large to upload (max {max}MB).", zh: "文件过大，无法上传（上限 {max}MB）。", ar: "الملف أكبر من إنه يترفع (الحد {max} ميجابايت)." },
-  "ms.rejectSize": { en: "File is too large for private storage (max {max}MB).", zh: "文件超出私密存储上限（{max}MB）。", ar: "الملف أكبر من حد التخزين الخاص (الحد {max} ميجابايت)." },
+  "ms.rejectSize": { en: "File is too large (max {max}MB).", zh: "文件过大（上限 {max}MB）。", ar: "الملف أكبر من الحد المسموح ({max} ميجابايت)." },
   "ms.removeAssetConfirm": { en: "Remove this asset? It will be archived (recoverable).", zh: "移除此资产？它将被归档（可恢复）。", ar: "إزالة هذا الأصل؟ سيتم أرشفته (قابل للاسترجاع)." },
   "ms.title": { en: "Evidence & Documents", zh: "证据与文件", ar: "الأدلة والمستندات" },
   "ms.addAsset": { en: "Add asset", zh: "添加资产", ar: "إضافة أصل" },

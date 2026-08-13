@@ -68,11 +68,16 @@ export const SUPPLIER_PRIVATE_MIME: readonly string[] = [
 /** 20MB — the `finance-documents` bucket's file_size_limit. */
 export const SUPPLIER_PRIVATE_MAX_BYTES = 20 * 1024 * 1024;
 
-/** 4MB — the TRANSPORT ceiling, and it applies to BOTH buckets because both
- *  travel through /api/storage/upload. Vercel's body cap is 4.5MB; refusing at
- *  4MB immediately is far kinder than a minutes-long upload the platform then
- *  kills. This is a property of the route, not of the destination. */
-export const SUPPLIER_TRANSPORT_MAX_BYTES = 4 * 1024 * 1024;
+/** 500MB — the public `media` bucket's file_size_limit.
+ *
+ *  THE TRANSPORT CEILING IS GONE. A 4MB limit used to sit here because every
+ *  upload crossed /api/storage/upload, a serverless function whose request
+ *  body the platform hard-caps at 4.5MB. uploadToStorage() now routes anything
+ *  near that cap DIRECT to Supabase Storage via a signed URL, so the file
+ *  never crosses a function at all. What remains are the buckets' own limits —
+ *  real policy, not an accident of the plumbing. Do not reintroduce a
+ *  transport-shaped number here. */
+export const SUPPLIER_PUBLIC_MAX_BYTES = 500 * 1024 * 1024;
 
 /** `accept` for the file input when the chosen classification is sensitive.
  *  UX only — never the authority. */
@@ -119,8 +124,7 @@ export function resolveUploadMime(fileName: string, reported: string | null | un
 export type SupplierUploadVerdict =
   | { ok: true }
   | { ok: false; reason: "type"; mime: string }
-  | { ok: false; reason: "size"; max: number; actual: number }
-  | { ok: false; reason: "transport"; max: number; actual: number };
+  | { ok: false; reason: "size"; max: number; actual: number };
 
 /**
  * Validate one file against the bucket it is actually headed for. Pure and
@@ -133,12 +137,14 @@ export function checkSupplierUpload(
   isPrivate: boolean,
   file: { size: number; type?: string | null },
 ): SupplierUploadVerdict {
-  /* Transport is checked FIRST: it is the lowest ceiling and the one whose
-     failure is least legible, so it should never be reached by accident. */
-  if (file.size > SUPPLIER_TRANSPORT_MAX_BYTES) {
-    return { ok: false, reason: "transport", max: SUPPLIER_TRANSPORT_MAX_BYTES, actual: file.size };
+  /* One size ceiling, and it is the DESTINATION BUCKET's — not a single
+     number for both, which would either refuse legitimate public media or
+     promise more than the private bucket accepts. */
+  if (!isPrivate) {
+    return file.size > SUPPLIER_PUBLIC_MAX_BYTES
+      ? { ok: false, reason: "size", max: SUPPLIER_PUBLIC_MAX_BYTES, actual: file.size }
+      : { ok: true };
   }
-  if (!isPrivate) return { ok: true };
 
   const mime = normalizeMime(file.type);
   if (!SUPPLIER_PRIVATE_MIME.includes(mime)) return { ok: false, reason: "type", mime };
