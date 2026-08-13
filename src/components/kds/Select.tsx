@@ -146,10 +146,20 @@ export default function Select({
         }
       }
     }
-    /* No lower clamp: when there is genuinely nowhere to scroll, a short list
-       that still starts at the field beats a tall one hanging off-screen. It
-       scrolls internally, so few rows visible is cramped, never lost. */
-    setRect({ top: box.bottom + 4, left: box.left, width: box.width, maxH: Math.min(WANT, Math.max(0, below)) });
+    /* A list that shrinks to nothing is a broken control, not a cramped one:
+       with no room below and nothing left to scroll, `below` reaches zero and
+       the panel renders 0px tall — in the DOM, invisible, eating the click.
+       So keep a usable minimum and park it against the bottom edge instead.
+       Shift, never overflow: an earlier floor elsewhere pushed the panel off
+       the viewport by exactly the shortfall. */
+    let top = box.bottom + 4;
+    let maxH = Math.min(WANT, Math.max(0, below));
+    const MIN = 120;
+    if (maxH < MIN) {
+      maxH = Math.min(WANT, MIN, Math.max(0, window.innerHeight - 24));
+      top = Math.max(12, window.innerHeight - 12 - maxH);
+    }
+    setRect({ top, left: box.left, width: box.width, maxH });
   }, []);
 
   useEffect(() => {

@@ -137,7 +137,8 @@ export default function PopoverPanel({
        that jumps somewhere else. Flip only when down is genuinely unusable
        (under 200px) and up is roomier, which is the case a phone keyboard
        creates. maxHeight is inline so it beats the caller's max-h class. */
-    const below = window.innerHeight - r.bottom - 12;
+    let below = window.innerHeight - r.bottom - 12;
+    let box = r;
     const above = r.top - 12;
     /* DOWN, ALWAYS. Owner: "the dropdown menu open to up not down." A textbook
        flip is not what he wants — a list that jumps above the field reads as a
@@ -155,11 +156,22 @@ export default function PopoverPanel({
         if (/auto|scroll/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 4) break;
         sc = sc.parentElement;
       }
-      if (sc && sc.scrollTop + (WANT - below) <= sc.scrollHeight - sc.clientHeight) {
-        autoScrolled.current = true;
-        sc.scrollTop += WANT - below;
-        requestAnimationFrame(place);
-        return;
+      if (sc) {
+        const room = sc.scrollHeight - sc.clientHeight - sc.scrollTop; /* left to give */
+        const by = Math.min(WANT - below, Math.max(0, room));
+        if (by > 0) {
+          autoScrolled.current = true;
+          sc.scrollTop += by;
+          /* RE-MEASURE HERE, never `requestAnimationFrame(place); return;`.
+             Setting scrollTop reflows synchronously, so the new rect is
+             readable on the very next line. Waiting for a frame meant that
+             when the frame never came — rAF does not fire in a background tab
+             — place() had already returned WITHOUT setting a rect, and the
+             panel never entered the DOM. Same dead end that was removed from
+             kds/Select; both had it. */
+          box = a.getBoundingClientRect();
+          below = window.innerHeight - box.bottom - 12;
+        }
       }
     }
     /* No flip at all. The nudge above handles the common case; when the
@@ -170,15 +182,30 @@ export default function PopoverPanel({
        real reason to flip turns up. */
     void above;
     const flip = false;
-    const top = r.bottom + 4;
-    /* No lower clamp: a floor of 120 over 108px of room overflowed the
-       viewport by exactly the difference. The available space IS the limit. */
-    const maxH = Math.min(maxHeight, Math.max(0, below));
+    let top = box.bottom + 4;
+    let maxH = Math.min(maxHeight, Math.max(0, below));
+    /* A PANEL THAT SHRINKS TO NOTHING IS A BROKEN CONTROL. With no room below
+       and nothing left to scroll, `below` goes to zero or negative and this
+       used to render a 0px-tall box: present in the DOM, invisible on screen,
+       swallowing the click. Reported as "I choose from the dropdown and
+       nothing responds, nothing fills the field" — nothing was wrong with the
+       choosing, there was simply no list to choose from.
+
+       An earlier attempt at a floor let the panel overflow the viewport by
+       exactly the shortfall, which is why the floor was removed. The fix is
+       not to overflow but to SHIFT: keep a usable height and park the panel
+       against the bottom edge. It still hangs off the field in the normal
+       case — this only engages when the alternative is nothing at all. */
+    const MIN = 120;
+    if (maxH < MIN) {
+      maxH = Math.min(maxHeight, MIN, Math.max(0, window.innerHeight - 24));
+      top = Math.max(12, window.innerHeight - 12 - maxH);
+    }
     setRect((prev) =>
-      prev && !prev.sheet && prev.top === top && prev.left === r.left && prev.width === r.width
+      prev && !prev.sheet && prev.top === top && prev.left === box.left && prev.width === box.width
         && prev.flip === flip && prev.maxH === maxH
         ? prev /* same box — return the SAME object so React bails out */
-        : { top, left: r.left, right: window.innerWidth - r.right, width: r.width, flip, maxH, sheet: false },
+        : { top, left: box.left, right: window.innerWidth - box.right, width: box.width, flip, maxH, sheet: false },
     );
   }, [anchorRef, mobileSheet, maxHeight]);
 
