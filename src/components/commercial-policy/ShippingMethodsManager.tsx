@@ -27,35 +27,35 @@ import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./Catal
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const METHOD_FIELDS: CatalogField[] = [
-  { key: "code", label: "Code", type: "text", required: true, placeholder: "sea_fcl" },
-  { key: "name", label: "Name", type: "text", required: true, placeholder: "Sea — FCL" },
-  { key: "short_name", label: "Short name", type: "text" },
-  { key: "mode", label: "Mode", type: "select", required: true, options: [
-    { value: "sea", label: "Sea" }, { value: "air", label: "Air" }, { value: "road", label: "Road" }, { value: "rail", label: "Rail" },
-    { value: "multimodal", label: "Multimodal" }, { value: "courier", label: "Courier" }, { value: "other", label: "Other" },
+  { key: "code", label: "Code", labelKey: "f.code", type: "text", required: true, placeholder: "sea_fcl" },
+  { key: "name", label: "Name", labelKey: "f.name", type: "text", required: true, placeholder: "Sea — FCL" },
+  { key: "short_name", label: "Short name", labelKey: "f.shortName", type: "text" },
+  { key: "mode", label: "Mode", labelKey: "f.mode", type: "select", required: true, options: [
+    { value: "sea", label: "Sea", labelKey: "f.sea" }, { value: "air", label: "Air", labelKey: "f.air" }, { value: "road", label: "Road", labelKey: "f.road" }, { value: "rail", label: "Rail", labelKey: "f.rail" },
+    { value: "multimodal", label: "Multimodal", labelKey: "f.multimodal" }, { value: "courier", label: "Courier", labelKey: "f.courier" }, { value: "other", label: "Other", labelKey: "f.other" },
   ] },
-  { key: "sub_type", label: "Sub-type", type: "text", placeholder: "FCL / LCL / RoRo" },
-  { key: "typical_transit_days_min", label: "Transit days (min)", type: "number" },
-  { key: "typical_transit_days_max", label: "Transit days (max)", type: "number" },
-  { key: "cost_tier", label: "Cost tier", type: "select", options: [
-    { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" }, { value: "very_high", label: "Very high" },
+  { key: "sub_type", label: "Sub-type", labelKey: "f.subType", type: "text", placeholder: "FCL / LCL / RoRo" },
+  { key: "typical_transit_days_min", label: "Transit days (min)", labelKey: "f.transitDaysMin", type: "number" },
+  { key: "typical_transit_days_max", label: "Transit days (max)", labelKey: "f.transitDaysMax", type: "number" },
+  { key: "cost_tier", label: "Cost tier", labelKey: "f.costTier", type: "select", options: [
+    { value: "low", label: "Low", labelKey: "f.low" }, { value: "medium", label: "Medium", labelKey: "f.medium" }, { value: "high", label: "High", labelKey: "f.high" }, { value: "very_high", label: "Very high", labelKey: "f.veryHigh" },
   ] },
-  { key: "speed_tier", label: "Speed tier", type: "select", options: [
-    { value: "slow", label: "Slow" }, { value: "medium", label: "Medium" }, { value: "fast", label: "Fast" }, { value: "express", label: "Express" },
+  { key: "speed_tier", label: "Speed tier", labelKey: "f.speedTier", type: "select", options: [
+    { value: "slow", label: "Slow", labelKey: "f.slow" }, { value: "medium", label: "Medium", labelKey: "f.medium" }, { value: "fast", label: "Fast", labelKey: "f.fast" }, { value: "express", label: "Express", labelKey: "f.express" },
   ] },
-  { key: "has_tracking", label: "Has tracking", type: "toggle" },
-  { key: "tracking_url_template", label: "Tracking URL template", type: "text", full: true, placeholder: "https://track.example.com/{number}" },
-  { key: "supports_dangerous_goods", label: "Dangerous goods", type: "toggle" },
-  { key: "supports_refrigerated", label: "Refrigerated", type: "toggle" },
-  { key: "supports_oversized", label: "Oversized", type: "toggle" },
-  { key: "supports_hazmat", label: "Hazmat", type: "toggle" },
-  { key: "documents", label: "Documents", type: "chips", full: true, placeholder: "B/L, packing list (comma-separated)" },
-  { key: "common_carriers", label: "Common carriers", type: "chips", full: true, placeholder: "Maersk, MSC, DHL" },
-  { key: "common_lanes", label: "Common lanes", type: "chips", full: true, placeholder: "CN→EG, CN→US" },
-  { key: "is_default", label: "Default", type: "toggle" },
-  { key: "is_active", label: "Active", type: "toggle" },
-  { key: "sort_order", label: "Sort order", type: "number" },
-  { key: "notes", label: "Notes", type: "textarea" },
+  { key: "has_tracking", label: "Has tracking", labelKey: "f.hasTracking", type: "toggle" },
+  { key: "tracking_url_template", label: "Tracking URL template", labelKey: "f.trackingUrl", type: "text", full: true, placeholder: "https://track.example.com/{number}" },
+  { key: "supports_dangerous_goods", label: "Dangerous goods", labelKey: "f.dangerousGoods", type: "toggle" },
+  { key: "supports_refrigerated", label: "Refrigerated", labelKey: "f.refrigeratedField", type: "toggle" },
+  { key: "supports_oversized", label: "Oversized", labelKey: "f.oversizedField", type: "toggle" },
+  { key: "supports_hazmat", label: "Hazmat", labelKey: "f.hazmat", type: "toggle" },
+  { key: "documents", label: "Documents", labelKey: "f.documents", type: "chips", full: true, placeholder: "B/L, packing list (comma-separated)" },
+  { key: "common_carriers", label: "Common carriers", labelKey: "f.commonCarriers", type: "chips", full: true, placeholder: "Maersk, MSC, DHL" },
+  { key: "common_lanes", label: "Common lanes", labelKey: "f.commonLanes", type: "chips", full: true, placeholder: "CN→EG, CN→US" },
+  { key: "is_default", label: "Default", labelKey: "f.default", type: "toggle" },
+  { key: "is_active", label: "Active", labelKey: "f.active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", labelKey: "f.sortOrder", type: "number" },
+  { key: "notes", label: "Notes", labelKey: "f.notes", type: "textarea" },
 ];
 
 interface ShippingMethodRow {
@@ -86,14 +86,14 @@ interface ShippingMethodRow {
   is_default: boolean;
 }
 
-const MODE_META: Record<ShippingMethodRow["mode"], { label: string; chip: string }> = {
-  sea:        { label: "Sea",        chip: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  air:        { label: "Air",        chip: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
-  road:       { label: "Road",       chip: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  rail:       { label: "Rail",       chip: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
-  multimodal: { label: "Multimodal", chip: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-  courier:    { label: "Courier",    chip: "bg-pink-500/15 text-pink-400 border-pink-500/30" },
-  other:      { label: "Other",      chip: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
+const MODE_META: Record<ShippingMethodRow["mode"], { label: string; labelKey?: string; chip: string }> = {
+  sea:        { label: "Sea", labelKey: "f.sea",        chip: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  air:        { label: "Air", labelKey: "f.air",        chip: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
+  road:       { label: "Road", labelKey: "f.road",       chip: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  rail:       { label: "Rail", labelKey: "f.rail",       chip: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  multimodal: { label: "Multimodal", labelKey: "f.multimodal", chip: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  courier:    { label: "Courier", labelKey: "f.courier",    chip: "bg-pink-500/15 text-pink-400 border-pink-500/30" },
+  other:      { label: "Other", labelKey: "f.other",      chip: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
 };
 
 const COST_LABEL: Record<NonNullable<ShippingMethodRow["cost_tier"]>, string> = {
@@ -101,6 +101,12 @@ const COST_LABEL: Record<NonNullable<ShippingMethodRow["cost_tier"]>, string> = 
   medium: "$$ Medium cost",
   high: "$$$ High cost",
   very_high: "$$$$ Very high",
+};
+const COST_KEY: Record<NonNullable<ShippingMethodRow["cost_tier"]>, string> = {
+  low: "tier.lowCost", medium: "tier.mediumCost", high: "tier.highCost", very_high: "tier.veryHigh",
+};
+const SPEED_KEY: Record<NonNullable<ShippingMethodRow["speed_tier"]>, string> = {
+  slow: "tier.slow", medium: "tier.mediumSpeed", fast: "tier.fast", express: "tier.express",
 };
 const SPEED_LABEL: Record<NonNullable<ShippingMethodRow["speed_tier"]>, string> = {
   slow: "Slow",
@@ -228,7 +234,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
                 : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]"
             }`}
           >
-            {MODE_META[m].label} ({totals.byMode[m]})
+            {t(MODE_META[m].labelKey ?? "", MODE_META[m].label)} ({totals.byMode[m]})
           </button>
         ))}
       </div>
@@ -298,7 +304,7 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
         {/* Mode badge */}
         <div className={`shrink-0 w-14 h-14 flex flex-col items-center justify-center rounded-lg border ${MODE_META[row.mode].chip}`}>
           <div className="text-[10px] font-bold uppercase tracking-wider">
-            {MODE_META[row.mode].label}
+            {t(MODE_META[row.mode].labelKey ?? "", MODE_META[row.mode].label)}
           </div>
           {row.sub_type && (
             <div className="text-[8px] uppercase tracking-wider opacity-70">
@@ -334,12 +340,12 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
             )}
             {row.speed_tier && (
               <span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-400">
-                {SPEED_LABEL[row.speed_tier]}
+                {t(SPEED_KEY[row.speed_tier], SPEED_LABEL[row.speed_tier])}
               </span>
             )}
             {row.cost_tier && (
               <span className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-                {COST_LABEL[row.cost_tier]}
+                {t(COST_KEY[row.cost_tier], COST_LABEL[row.cost_tier])}
               </span>
             )}
             {row.has_tracking && (

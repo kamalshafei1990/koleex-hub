@@ -23,27 +23,27 @@ import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./Catal
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const DOC_FIELDS: CatalogField[] = [
-  { key: "code", label: "Code", type: "text", required: true, placeholder: "bill_of_lading" },
-  { key: "name", label: "Name", type: "text", required: true, placeholder: "Bill of Lading" },
-  { key: "short_name", label: "Short code", type: "text", placeholder: "B/L" },
-  { key: "category", label: "Category", type: "select", required: true, options: [
-    { value: "transport", label: "Transport" }, { value: "commercial", label: "Commercial" },
-    { value: "customs", label: "Customs" }, { value: "quality", label: "Quality" },
-    { value: "special", label: "Special" }, { value: "financial", label: "Financial" }, { value: "other", label: "Other" },
+  { key: "code", label: "Code", labelKey: "f.code", type: "text", required: true, placeholder: "bill_of_lading" },
+  { key: "name", label: "Name", labelKey: "f.name", type: "text", required: true, placeholder: "Bill of Lading" },
+  { key: "short_name", label: "Short code", labelKey: "f.shortCode", type: "text", placeholder: "B/L" },
+  { key: "category", label: "Category", labelKey: "f.category", type: "select", required: true, options: [
+    { value: "transport", label: "Transport", labelKey: "f.transport" }, { value: "commercial", label: "Commercial", labelKey: "f.commercial" },
+    { value: "customs", label: "Customs", labelKey: "f.customs" }, { value: "quality", label: "Quality", labelKey: "f.quality" },
+    { value: "special", label: "Special", labelKey: "f.special" }, { value: "financial", label: "Financial", labelKey: "f.financial" }, { value: "other", label: "Other", labelKey: "f.other" },
   ] },
-  { key: "issued_by", label: "Issued by", type: "select", options: [
-    { value: "seller", label: "Seller" }, { value: "buyer", label: "Buyer" }, { value: "third_party", label: "Third party" },
-    { value: "bank", label: "Bank" }, { value: "customs", label: "Customs" }, { value: "any", label: "Any" },
+  { key: "issued_by", label: "Issued by", labelKey: "f.issuedBy", type: "select", options: [
+    { value: "seller", label: "Seller", labelKey: "f.seller" }, { value: "buyer", label: "Buyer", labelKey: "f.buyer" }, { value: "third_party", label: "Third party", labelKey: "f.thirdParty" },
+    { value: "bank", label: "Bank", labelKey: "f.bank" }, { value: "customs", label: "Customs", labelKey: "f.customs" }, { value: "any", label: "Any", labelKey: "f.any" },
   ] },
-  { key: "applies_to_modes", label: "Applies to modes", type: "chips", full: true, placeholder: "sea, air, road (comma-separated)" },
-  { key: "is_mandatory_export", label: "Mandatory for export", type: "toggle" },
-  { key: "is_lc_required", label: "L/C required", type: "toggle" },
-  { key: "is_customs_required", label: "Customs required", type: "toggle" },
-  { key: "is_default", label: "Default", type: "toggle" },
-  { key: "is_active", label: "Active", type: "toggle" },
-  { key: "sort_order", label: "Sort order", type: "number" },
-  { key: "description", label: "Description", type: "textarea" },
-  { key: "notes", label: "Notes", type: "textarea" },
+  { key: "applies_to_modes", label: "Applies to modes", labelKey: "f.appliesToModes", type: "chips", full: true, placeholder: "sea, air, road (comma-separated)" },
+  { key: "is_mandatory_export", label: "Mandatory for export", labelKey: "f.mandatoryForExport", type: "toggle" },
+  { key: "is_lc_required", label: "L/C required", labelKey: "f.lcRequiredField", type: "toggle" },
+  { key: "is_customs_required", label: "Customs required", labelKey: "f.customsRequiredField", type: "toggle" },
+  { key: "is_default", label: "Default", labelKey: "f.default", type: "toggle" },
+  { key: "is_active", label: "Active", labelKey: "f.active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", labelKey: "f.sortOrder", type: "number" },
+  { key: "description", label: "Description", labelKey: "f.description", type: "textarea" },
+  { key: "notes", label: "Notes", labelKey: "f.notes", type: "textarea" },
 ];
 
 interface DocRow {
@@ -66,14 +66,14 @@ interface DocRow {
   is_default: boolean;
 }
 
-const CATEGORY_META: Record<DocRow["category"], { label: string; chip: string }> = {
-  transport:  { label: "Transport",  chip: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
-  commercial: { label: "Commercial", chip: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-  customs:    { label: "Customs",    chip: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  quality:    { label: "Quality",    chip: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
-  special:    { label: "Special",    chip: "bg-pink-500/15 text-pink-400 border-pink-500/30" },
-  financial:  { label: "Financial",  chip: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  other:      { label: "Other",      chip: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
+const CATEGORY_META: Record<DocRow["category"], { label: string; labelKey?: string; chip: string }> = {
+  transport:  { label: "Transport", labelKey: "f.transport",  chip: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
+  commercial: { label: "Commercial", labelKey: "f.commercial", chip: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  customs:    { label: "Customs", labelKey: "f.customs",    chip: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  quality:    { label: "Quality", labelKey: "f.quality",    chip: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  special:    { label: "Special", labelKey: "f.special",    chip: "bg-pink-500/15 text-pink-400 border-pink-500/30" },
+  financial:  { label: "Financial", labelKey: "f.financial",  chip: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  other:      { label: "Other", labelKey: "f.other",      chip: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
 };
 
 export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmin: boolean }) {
@@ -192,7 +192,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
                 : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]"
             }`}
           >
-            {CATEGORY_META[c].label} ({totals.byCat[c] ?? 0})
+            {t(CATEGORY_META[c].labelKey ?? "", CATEGORY_META[c].label)} ({totals.byCat[c] ?? 0})
           </button>
         ))}
       </div>
@@ -254,7 +254,7 @@ function DocCard({ row, canEdit, onEdit, onDelete }: { row: DocRow; canEdit: boo
           <div className="flex flex-wrap items-center gap-1.5 mb-1">
             <span className="text-[13px] font-semibold text-[var(--text-primary)]">{row.name}</span>
             <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${CATEGORY_META[row.category].chip}`}>
-              {CATEGORY_META[row.category].label}
+              {t(CATEGORY_META[row.category].labelKey ?? "", CATEGORY_META[row.category].label)}
             </span>
             {row.is_system && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-bold tracking-wide">

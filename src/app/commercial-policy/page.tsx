@@ -263,7 +263,7 @@ function PolicyNav() {
             onClick={() => jump(sec.id)}
             className="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-secondary)] transition-colors"
           >
-            {sec.label}
+            {t(`sec.${sec.id}`, sec.label)}
           </button>
         ))}
       </nav>

@@ -26,24 +26,24 @@ import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./Catal
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const INCOTERM_FIELDS: CatalogField[] = [
-  { key: "code", label: "Code", type: "text", required: true, placeholder: "FOB" },
-  { key: "name", label: "Name", type: "text", required: true, placeholder: "Free On Board" },
-  { key: "short_name", label: "Short name", type: "text" },
-  { key: "transport_mode", label: "Transport mode", type: "select", options: [{ value: "any", label: "Any mode" }, { value: "sea", label: "Sea only" }] },
-  { key: "standing", label: "Standing", type: "select", options: [{ value: "icc_2020", label: "ICC 2020" }, { value: "icc_2010", label: "ICC 2010" }, { value: "variant", label: "Variant" }, { value: "custom", label: "Custom" }] },
-  { key: "includes_export_clearance", label: "Seller: export clearance", type: "toggle" },
-  { key: "includes_main_carriage", label: "Seller: main carriage", type: "toggle" },
-  { key: "includes_insurance", label: "Seller: insurance", type: "toggle" },
-  { key: "includes_import_clearance", label: "Seller: import clearance", type: "toggle" },
-  { key: "includes_import_duty", label: "Seller: import duty", type: "toggle" },
-  { key: "includes_unloading_at_dest", label: "Seller: unload at destination", type: "toggle" },
-  { key: "risk_transfer_point", label: "Risk transfer point", type: "text", full: true, placeholder: "On board the vessel at the named port" },
-  { key: "named_location_required", label: "Named location required", type: "toggle" },
-  { key: "is_obsolete", label: "Obsolete", type: "toggle" },
-  { key: "is_default", label: "Default", type: "toggle" },
-  { key: "is_active", label: "Active", type: "toggle" },
-  { key: "sort_order", label: "Sort order", type: "number" },
-  { key: "notes", label: "Notes", type: "textarea" },
+  { key: "code", label: "Code", labelKey: "f.code", type: "text", required: true, placeholder: "FOB" },
+  { key: "name", label: "Name", labelKey: "f.name", type: "text", required: true, placeholder: "Free On Board" },
+  { key: "short_name", label: "Short name", labelKey: "f.shortName", type: "text" },
+  { key: "transport_mode", label: "Transport mode", labelKey: "f.transportMode", type: "select", options: [{ value: "any", label: "Any mode", labelKey: "f.anyMode" }, { value: "sea", label: "Sea only", labelKey: "f.seaOnly" }] },
+  { key: "standing", label: "Standing", labelKey: "f.standing", type: "select", options: [{ value: "icc_2020", label: "ICC 2020", labelKey: "f.icc2020" }, { value: "icc_2010", label: "ICC 2010", labelKey: "f.icc2010" }, { value: "variant", label: "Variant", labelKey: "f.variant" }, { value: "custom", label: "Custom", labelKey: "f.custom" }] },
+  { key: "includes_export_clearance", label: "Seller: export clearance", labelKey: "f.sellerExportClearance", type: "toggle" },
+  { key: "includes_main_carriage", label: "Seller: main carriage", labelKey: "f.sellerMainCarriage", type: "toggle" },
+  { key: "includes_insurance", label: "Seller: insurance", labelKey: "f.sellerInsurance", type: "toggle" },
+  { key: "includes_import_clearance", label: "Seller: import clearance", labelKey: "f.sellerImportClearance", type: "toggle" },
+  { key: "includes_import_duty", label: "Seller: import duty", labelKey: "f.sellerImportDuty", type: "toggle" },
+  { key: "includes_unloading_at_dest", label: "Seller: unload at destination", labelKey: "f.sellerUnloadAtDestination", type: "toggle" },
+  { key: "risk_transfer_point", label: "Risk transfer point", labelKey: "f.riskTransferPoint", type: "text", full: true, placeholder: "On board the vessel at the named port" },
+  { key: "named_location_required", label: "Named location required", labelKey: "f.namedLocationRequired", type: "toggle" },
+  { key: "is_obsolete", label: "Obsolete", labelKey: "f.obsoleteField", type: "toggle" },
+  { key: "is_default", label: "Default", labelKey: "f.default", type: "toggle" },
+  { key: "is_active", label: "Active", labelKey: "f.active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", labelKey: "f.sortOrder", type: "number" },
+  { key: "notes", label: "Notes", labelKey: "f.notes", type: "textarea" },
 ];
 
 interface IncotermRow {
@@ -81,13 +81,14 @@ const RESPONSIBILITY_AXIS: {
     | "includes_import_duty"
     | "includes_unloading_at_dest">;
   label: string;
+  labelKey: string;
 }[] = [
-  { field: "includes_export_clearance",   label: "Export clearance" },
-  { field: "includes_main_carriage",      label: "Main carriage" },
-  { field: "includes_insurance",          label: "Insurance" },
-  { field: "includes_import_clearance",   label: "Import clearance" },
-  { field: "includes_import_duty",        label: "Import duty" },
-  { field: "includes_unloading_at_dest",  label: "Unload at destination" },
+  { field: "includes_export_clearance",   label: "Export clearance", labelKey: "axis.exportClearance" },
+  { field: "includes_main_carriage",      label: "Main carriage", labelKey: "axis.mainCarriage" },
+  { field: "includes_insurance",          label: "Insurance", labelKey: "axis.insurance" },
+  { field: "includes_import_clearance",   label: "Import clearance", labelKey: "axis.importClearance" },
+  { field: "includes_import_duty",        label: "Import duty", labelKey: "axis.importDuty" },
+  { field: "includes_unloading_at_dest",  label: "Unload at destination", labelKey: "axis.unloadAtDest" },
 ];
 
 export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boolean }) {
@@ -309,7 +310,7 @@ function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; ca
                   }`}
                   title={sellerPays ? t("sellerPays", "Seller pays") : t("buyerPays", "Buyer pays")}
                 >
-                  {sellerPays ? "✓" : "○"} {axis.label}
+                  {sellerPays ? "✓" : "○"} {t(axis.labelKey, axis.label)}
                 </span>
               );
             })}

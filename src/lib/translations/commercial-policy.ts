@@ -131,6 +131,22 @@ export const commercialPolicyT: Translations = {
   "nav.settings": { en: "Settings", zh: "设置", ar: "الإعدادات" },
   "nav.access-control": { en: "Access Control", zh: "访问控制", ar: "التحكّم في الوصول" },
 
+  /* Sticky section nav on the Commercial Setup page — keyed off each
+     section's own id, same shape as the policy manual tree. */
+  "sec.cp-settings": { en: "Settings", zh: "设置", ar: "الإعدادات" },
+  "sec.cp-levels": { en: "Levels", zh: "层级", ar: "المستويات" },
+  "sec.cp-tiers": { en: "Tiers", zh: "阶梯", ar: "الشرائح" },
+  "sec.cp-markets": { en: "Markets", zh: "市场", ar: "الأسواق" },
+  "sec.cp-channels": { en: "Channels", zh: "渠道", ar: "القنوات" },
+  "sec.cp-volume": { en: "Volume", zh: "数量", ar: "الكمية" },
+  "sec.cp-discounts": { en: "Discounts", zh: "折扣", ar: "الخصومات" },
+  "sec.cp-commission": { en: "Commission", zh: "佣金", ar: "العمولة" },
+  "sec.cp-approvals": { en: "Approvals", zh: "审批", ar: "الاعتمادات" },
+  "sec.cp-payment-terms": { en: "Payment Terms", zh: "付款条款", ar: "شروط الدفع" },
+  "sec.cp-incoterms": { en: "Incoterms", zh: "贸易术语", ar: "شروط التسليم" },
+  "sec.cp-shipping": { en: "Shipping", zh: "运输", ar: "الشحن" },
+  "sec.cp-documents": { en: "Documents", zh: "单证", ar: "المستندات" },
+
   /* ── Add / manage actions ── */
   "addBand":           { en: "Add band",    zh: "添加档位", ar: "أضف نطاق" },
   "addChannel":        { en: "Add channel", zh: "添加渠道", ar: "أضف قناة" },
@@ -252,6 +268,44 @@ export const commercialPolicyT: Translations = {
   "f.buyerRisk": { en: "Buyer risk", zh: "买方风险", ar: "مخاطر المشتري" },
   "f.suitableFor": { en: "Suitable for", zh: "适用于", ar: "مناسب لـ" },
   "f.defaultForCategory": { en: "Default for category", zh: "该类别默认", ar: "افتراضي الفئة" },
+
+  /* Cost/speed tier labels. These maps hold PLAIN STRINGS, not objects, so
+     they get a parallel key map in the component rather than a `labelKey`
+     sibling. */
+  "tier.lowCost":    { en: "$ Low cost",      zh: "$ \u4f4e\u6210\u672c",     ar: "$ \u062a\u0643\u0644\u0641\u0629 \u0645\u0646\u062e\u0641\u0636\u0629" },
+  "tier.mediumCost": { en: "$$ Medium cost",  zh: "$$ \u4e2d\u7b49\u6210\u672c", ar: "$$ \u062a\u0643\u0644\u0641\u0629 \u0645\u062a\u0648\u0633\u0637\u0629" },
+  "tier.highCost":   { en: "$$$ High cost",   zh: "$$$ \u9ad8\u6210\u672c",   ar: "$$$ \u062a\u0643\u0644\u0641\u0629 \u0645\u0631\u062a\u0641\u0639\u0629" },
+  "tier.veryHigh":   { en: "$$$$ Very high",  zh: "$$$$ \u5f88\u9ad8",        ar: "$$$$ \u0645\u0631\u062a\u0641\u0639\u0629 \u062c\u062f\u064b\u0627" },
+  "tier.slow":       { en: "Slow",            zh: "\u6162",                   ar: "\u0628\u0637\u064a\u0621" },
+  "tier.mediumSpeed":{ en: "Medium speed",    zh: "\u4e2d\u7b49\u901f\u5ea6", ar: "\u0633\u0631\u0639\u0629 \u0645\u062a\u0648\u0633\u0637\u0629" },
+  "tier.fast":       { en: "Fast",            zh: "\u5feb",                   ar: "\u0633\u0631\u064a\u0639" },
+  "tier.express":    { en: "Express",         zh: "\u7279\u5feb",             ar: "\u0633\u0631\u064a\u0639 \u062c\u062f\u064b\u0627" },
+
+  /* Incoterm responsibility axis (RESPONSIBILITY_AXIS). */
+  "axis.exportClearance": { en: "Export clearance", zh: "\u51fa\u53e3\u6e05\u5173", ar: "\u0627\u0644\u062a\u062e\u0644\u064a\u0635 \u0644\u0644\u062a\u0635\u062f\u064a\u0631" },
+  "axis.mainCarriage":    { en: "Main carriage", zh: "\u4e3b\u8fd0\u8f93", ar: "\u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0631\u0626\u064a\u0633\u064a" },
+  "axis.insurance":       { en: "Insurance", zh: "\u4fdd\u9669", ar: "\u0627\u0644\u062a\u0623\u0645\u064a\u0646" },
+  "axis.importClearance": { en: "Import clearance", zh: "\u8fdb\u53e3\u6e05\u5173", ar: "\u0627\u0644\u062a\u062e\u0644\u064a\u0635 \u0644\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f" },
+  "axis.importDuty":      { en: "Import duty", zh: "\u8fdb\u53e3\u5173\u7a0e", ar: "\u0631\u0633\u0648\u0645 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f" },
+  "axis.unloadAtDest":    { en: "Unload at destination", zh: "\u76ee\u7684\u5730\u5378\u8d27", ar: "\u0627\u0644\u062a\u0641\u0631\u064a\u063a \u0641\u064a \u0627\u0644\u0648\u062c\u0647\u0629" },
+
+  /* Remaining catalogue field labels. */
+  "f.commonCarriers": { en: "Common carriers", zh: "常用承运商", ar: "الناقلون الشائعون" },
+  "f.commonLanes": { en: "Common lanes", zh: "常用航线", ar: "المسارات الشائعة" },
+  "f.customsRequiredField": { en: "Customs required", zh: "需清关", ar: "يتطلّب تخليص جمركي" },
+  "f.dangerousGoods": { en: "Dangerous goods", zh: "危险品", ar: "بضائع خطرة" },
+  "f.description": { en: "Description", zh: "说明", ar: "الوصف" },
+  "f.documents": { en: "Documents", zh: "单证", ar: "المستندات" },
+  "f.express": { en: "Express", zh: "特快", ar: "سريع جدًا" },
+  "f.hasTracking": { en: "Has tracking", zh: "支持追踪", ar: "يدعم التتبّع" },
+  "f.hazmat": { en: "Hazmat", zh: "危险品", ar: "مواد خطرة" },
+  "f.icc2010": { en: "ICC 2010", zh: "ICC 2010", ar: "ICC 2010" },
+  "f.icc2020": { en: "ICC 2020", zh: "ICC 2020", ar: "ICC 2020" },
+  "f.lcRequiredField": { en: "L/C required", zh: "需信用证", ar: "يتطلّب اعتماد مستندي" },
+  "f.obsoleteField": { en: "Obsolete", zh: "已停用", ar: "متوقّف" },
+  "f.oversizedField": { en: "Oversized", zh: "超尺寸", ar: "أحجام كبيرة" },
+  "f.refrigeratedField": { en: "Refrigerated", zh: "冷藏", ar: "مبرّدة" },
+  "f.trackingUrl": { en: "Tracking URL template", zh: "追踪链接模板", ar: "قالب رابط التتبّع" },
 
   /* ── Incoterms / payment / shipping attributes ── */
   "icc2010":           { en: "ICC 2010", zh: "ICC 2010", ar: "ICC 2010" },

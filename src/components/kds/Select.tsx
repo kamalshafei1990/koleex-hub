@@ -97,16 +97,49 @@ export default function Select({
 
      The cost is that position must be computed rather than inherited — hence
      the rect below, refreshed on scroll and resize. */
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
+  /* One nudge per open — see the note in place(). */
+  const autoScrolled = useRef(false);
   const place = useCallback(() => {
     const b = btnRef.current;
     if (!b) return;
     const r = b.getBoundingClientRect();
-    setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+    /* THE PANEL MUST FIT ON SCREEN, and this is where it used to not.
+       `top: r.bottom + 4` with no clamp put the list wherever the trigger
+       happened to be — so a field low in a long form opened its menu BELOW the
+       fold, as a position:fixed element nothing can scroll to. From the user's
+       seat that reads as "I pick something and nothing lands in the field":
+       the menu was never where they were looking, so they never picked at all.
+       Reproduced in the customer form — the same dropdown worked at the top of
+       the pane and opened into nothing further down.
+
+       DOWN ALWAYS, never a flip (owner's rule). When the room below is too
+       small we move the PAGE, not the panel: nudge the field's own scroller
+       once per open, and the scroll listener below re-places from there. No
+       requestAnimationFrame — it does not fire in a background tab. */
+    const below = window.innerHeight - r.bottom - 12;
+    const WANT = 240; /* max-h-60 on the list — the height it wants to be */
+    if (below < WANT && !autoScrolled.current) {
+      let sc: HTMLElement | null = b.parentElement;
+      while (sc) {
+        const cs = getComputedStyle(sc);
+        if (/auto|scroll/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 4) break;
+        sc = sc.parentElement;
+      }
+      if (sc && sc.scrollTop + (WANT - below) <= sc.scrollHeight - sc.clientHeight) {
+        autoScrolled.current = true;
+        sc.scrollTop += WANT - below;
+        return; /* the scroll event re-enters place() with the new geometry */
+      }
+    }
+    /* No lower clamp: when there is genuinely nowhere to scroll, a short list
+       that still starts at the field beats a tall one hanging off-screen. It
+       scrolls internally, so few rows visible is cramped, never lost. */
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width, maxH: Math.min(WANT, Math.max(0, below)) });
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { autoScrolled.current = false; return; }
     place();
     /* Capture phase: the Hub scrolls in #main-scroll-container, not on
        window, so a bubbling listener would never hear it. */
@@ -219,7 +252,10 @@ export default function Select({
           style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
           className={`kx-glass-pop kx-pop-panel ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
         >
-          <div ref={listRef} role="listbox" tabIndex={-1} onKeyDown={onKeyDown} className="max-h-60 overflow-y-auto py-1">
+          {/* maxHeight inline so it BEATS max-h-60: the class is the height the
+              list wants, this is the height the viewport actually allows. */}
+          <div ref={listRef} role="listbox" tabIndex={-1} onKeyDown={onKeyDown}
+            style={{ maxHeight: rect.maxH }} className="max-h-60 overflow-y-auto py-1">
             {rows.map((r, i) => (
               <button
                 key={r.v || "__placeholder"}

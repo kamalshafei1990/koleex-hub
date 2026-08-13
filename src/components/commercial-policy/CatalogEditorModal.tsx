@@ -15,11 +15,16 @@ import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
+/* `key` here is the DATABASE COLUMN, not a translation key — the four catalogue
+   managers build these arrays at module scope where t() cannot be called, so
+   each field carries an optional `labelKey` and THIS component translates at
+   render with `label` as the fallback. Same for a select's options. */
+type FieldBase = { key: string; label: string; labelKey?: string; help?: string; full?: boolean };
 export type CatalogField =
-  | { key: string; label: string; type: "text" | "textarea" | "number"; required?: boolean; placeholder?: string; help?: string; full?: boolean }
-  | { key: string; label: string; type: "select"; options: { value: string; label: string }[]; required?: boolean; help?: string; full?: boolean }
-  | { key: string; label: string; type: "toggle"; help?: string; full?: boolean }
-  | { key: string; label: string; type: "chips"; placeholder?: string; help?: string; full?: boolean };
+  | (FieldBase & { type: "text" | "textarea" | "number"; required?: boolean; placeholder?: string })
+  | (FieldBase & { type: "select"; options: { value: string; label: string; labelKey?: string }[]; required?: boolean })
+  | (FieldBase & { type: "toggle" })
+  | (FieldBase & { type: "chips"; placeholder?: string });
 
 /** text[] columns are edited as a comma-separated string and split on save. */
 function toEditable(field: CatalogField, raw: unknown): unknown {
@@ -62,7 +67,7 @@ export function CatalogEditorModal({
     /* Required-field guard. */
     for (const f of fields) {
       if ((f as { required?: boolean }).required && !String(form[f.key] ?? "").trim()) {
-        setError(`${f.label} is required.`);
+        setError(`${f.labelKey ? t(f.labelKey, f.label) : f.label} is required.`);
         return;
       }
     }
@@ -110,14 +115,14 @@ export function CatalogEditorModal({
           {fields.map((f) => (
             <div key={f.key} className={f.full || f.type === "textarea" ? "sm:col-span-2" : ""}>
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1">
-                {f.label}{(f as { required?: boolean }).required ? " *" : ""}
+                {f.labelKey ? t(f.labelKey, f.label) : f.label}{(f as { required?: boolean }).required ? " *" : ""}
               </label>
               {f.type === "textarea" ? (
                 <textarea rows={2} value={String(form[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} className={inputCls.replace("h-9", "") + " py-2 resize-y"} />
               ) : f.type === "select" ? (
                 <select value={String(form[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)} className={inputCls}>
                   <option value="">—</option>
-                  {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {f.options.map((o) => <option key={o.value} value={o.value}>{o.labelKey ? t(o.labelKey, o.label) : o.label}</option>)}
                 </select>
               ) : f.type === "toggle" ? (
                 <label className="flex items-center gap-2 h-9 cursor-pointer select-none">
