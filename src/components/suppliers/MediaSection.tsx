@@ -20,7 +20,7 @@ import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage, removeFromStorage } from "@/lib/storage-client";
-import { checkSupplierUpload, supplierMb, SUPPLIER_PRIVATE_ACCEPT_ATTR } from "@/lib/suppliers/upload-policy";
+import { checkSupplierUpload, supplierMb, resolveUploadMime, SUPPLIER_PRIVATE_ACCEPT_ATTR } from "@/lib/suppliers/upload-policy";
 import {
   DOC_CATEGORY_GROUPS, docCategoryLabel,
   CERT_TYPE_LABELS, CERT_TYPE_ORDER, certTypeLabel,
@@ -190,7 +190,8 @@ export default function MediaSection({
          file had travelled, and two of them are invisible to the user: the
          private bucket's format list, and the transport ceiling that applies
          to every upload regardless of destination. */
-      const verdict = checkSupplierUpload(isPrivate, { size: file.size, type: file.type });
+      const mime = resolveUploadMime(file.name, file.type);
+      const verdict = checkSupplierUpload(isPrivate, { size: file.size, type: mime });
       if (!verdict.ok) {
         setUpErr(
           verdict.reason === "type"
@@ -204,7 +205,10 @@ export default function MediaSection({
       }
 
       const path = `suppliers/${supplierId}/docs/${crypto.randomUUID()}.${ext}`;
-      const up = await uploadToStorage(bucket, path, file, { contentType: file.type || undefined });
+      /* Send the RESOLVED mime, not file.type: approving a .docx in the
+         preflight and then uploading it as octet-stream would have the store
+         refuse the exact file we just accepted. */
+      const up = await uploadToStorage(bucket, path, file, { contentType: mime || undefined });
       if (!up.ok) throw new Error(humanizeError(up.error));
       /* A sensitive asset lands in the private bucket, which has no public URL
          (publicUrl === null). The row is then identified by bucket + path and
@@ -215,14 +219,14 @@ export default function MediaSection({
       const publicUrl = up.data.publicUrl;
       const body: Record<string, unknown> = {
         file_url: publicUrl,
-        preview_url: publicUrl && file.type.startsWith("image/") ? publicUrl : null,
+        preview_url: publicUrl && mime.startsWith("image/") ? publicUrl : null,
         storage_bucket: bucket,
         storage_path: up.data.path,
         file_name: file.name,
-        mime_type: file.type || null,
+        mime_type: mime || null,
         file_size: file.size,
         file_ext: ext,
-        media_class: mediaClassFromMime(file.type || ""),
+        media_class: mediaClassFromMime(mime),
         category,
         visibility,
         title: title.trim() || null,
