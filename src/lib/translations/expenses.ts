@@ -13,6 +13,11 @@ import type { Translations } from "@/lib/i18n";
    ========================================================================== */
 
 export const expensesT: Translations = {
+  /* Tab labels (pattern 8). */
+  "tab.analytics": { en: "Analytics", zh: "分析", ar: "التحليلات" },
+  "tab.approvals": { en: "Approvals", zh: "审批", ar: "الاعتمادات" },
+  "tab.categories": { en: "Categories", zh: "类别", ar: "الفئات" },
+  "tab.newExpense": { en: "New Expense", zh: "新建费用", ar: "مصروف جديد" },
   /* ── App-level ──────────────────────────────────────────────────── */
   "app.title":             { en: "Expenses",                          zh: "费用",                  ar: "المصروفات" },
   "app.subtitle":          { en: "Track operational spend — categories, payment status, approvals.",

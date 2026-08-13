@@ -580,27 +580,11 @@ function RecentImports({
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   Style maps
-   ──────────────────────────────────────────────────────────────────────── */
+/* THREE module-scope chip maps used to live here — DUP_CHIP, ROW_STATUS_CHIP
+   and IMPORT_STATUS_CHIP — and none of them had a reader. RecentImports builds
+   DUP_CHIP_LOCAL / ROW_STATUS_CHIP_LOCAL inside itself and uses those instead.
+   All three surfaced only because wiring translations made me look for who
+   renders the label; the answer was nobody. Deleted, not translated. */
 
-const DUP_CHIP: Record<BankStatementRowDuplicateStatus, { label: string; cls: string }> = {
-  new:                { label: "New",       cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" },
-  possible_duplicate: { label: "Possible dup", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-300" },
-  duplicate:          { label: "Duplicate", cls: "bg-rose-500/15 text-rose-600 dark:text-rose-300" },
-};
 
-const ROW_STATUS_CHIP: Record<BankStatementRowImportStatus, { label: string; cls: string }> = {
-  ready:    { label: "Ready",    cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" },
-  skipped:  { label: "Skipped",  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
-  imported: { label: "Imported", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-300" },
-  error:    { label: "Error",    cls: "bg-rose-500/15 text-rose-600 dark:text-rose-300" },
-};
 
-const IMPORT_STATUS_CHIP: Record<string, { label: string; cls: string }> = {
-  uploaded:  { label: "Uploaded",  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
-  parsed:    { label: "Parsed",    cls: "bg-amber-500/15 text-amber-600 dark:text-amber-300" },
-  confirmed: { label: "Confirmed", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" },
-  failed:    { label: "Failed",    cls: "bg-rose-500/15 text-rose-600 dark:text-rose-300" },
-  cancelled: { label: "Cancelled", cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
-};

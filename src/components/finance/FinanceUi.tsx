@@ -21,6 +21,8 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commonT } from "@/lib/translations/common";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 
@@ -103,6 +105,7 @@ export function KpiCard({
   /* Optional small sparkline drawn on the right side of the value row */
   sparkline?: number[];
 }) {
+  const { t } = useTranslation(commonT);
   const numericValue = typeof value === "number" ? value : null;
   const display =
     typeof value === "string"
@@ -168,6 +171,7 @@ const CHART_GAIN_INLINE = "rgba(134,239,172,0.70)";
 const CHART_LOSS_INLINE = "rgba(253,164,175,0.70)";
 
 function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
+  const { t } = useTranslation(commonT);
   const W = 64;
   const H = 22;
   const min = Math.min(...data);
@@ -205,13 +209,16 @@ const PILL_SUCCESS = "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35";
 const PILL_WARNING = "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
 const PILL_ERROR   = "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35";
 
-const STATUS_PALETTE: Record<string, { cls: string; label?: string }> = {
+/* `labelKey` rather than a translated string: this map is module scope, so it
+   cannot call t(). StatusBadge translates at render, falling back to `label`.
+   (Pattern 8 — a string as an object property in a config map.) */
+const STATUS_PALETTE: Record<string, { cls: string; label?: string; labelKey?: string }> = {
   paid:           { cls: PILL_SUCCESS },
   partial:        { cls: PILL_WARNING },
   unpaid:         { cls: PILL_NEUTRAL },
   overdue:        { cls: PILL_ERROR },
   open:           { cls: PILL_BRAND },
-  in_production:  { cls: PILL_BRAND, label: "In production" },
+  in_production:  { cls: PILL_BRAND, labelKey: "status.inProduction", label: "In production" },
   shipped:        { cls: PILL_BRAND },
   delivered:      { cls: PILL_SUCCESS },
   closed:         { cls: PILL_NEUTRAL },
@@ -227,13 +234,14 @@ const STATUS_PALETTE: Record<string, { cls: string; label?: string }> = {
   completed:      { cls: PILL_SUCCESS },
   pending:        { cls: PILL_WARNING },
   bounced:        { cls: PILL_ERROR },
-  collect:        { cls: PILL_SUCCESS, label: "Money to collect" },
-  pay:            { cls: PILL_ERROR, label: "Money to pay" },
+  collect:        { cls: PILL_SUCCESS, labelKey: "status.moneyToCollect", label: "Money to collect" },
+  pay:            { cls: PILL_ERROR, labelKey: "status.moneyToPay", label: "Money to pay" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation(commonT);
   const p = STATUS_PALETTE[status] ?? { cls: PILL_NEUTRAL };
-  const label = p.label ?? status.replace(/_/g, " ");
+  const label = p.labelKey ? t(p.labelKey, p.label ?? status) : (p.label ?? status.replace(/_/g, " "));
   return (
     <span
       className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${p.cls}`}

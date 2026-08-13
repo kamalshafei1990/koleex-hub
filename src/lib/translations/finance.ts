@@ -19,6 +19,21 @@ import type { Translations } from "@/lib/i18n";
    ========================================================================== */
 
 export const financeT: Translations = {
+  "imp.uploaded": { en: "Uploaded", zh: "已上传", ar: "تم الرفع" },
+  "imp.parsed": { en: "Parsed", zh: "已解析", ar: "تم التحليل" },
+  "imp.confirmed": { en: "Confirmed", zh: "已确认", ar: "مؤكّد" },
+  "imp.failed": { en: "Failed", zh: "失败", ar: "فشل" },
+  "imp.cancelled": { en: "Cancelled", zh: "已取消", ar: "ملغي" },
+  "sev.sameDay": { en: "Same day", zh: "当天", ar: "نفس اليوم" },
+  "sev.normal":   { en: "Normal",   zh: "\u666e\u901a", ar: "\u0639\u0627\u062f\u064a" },
+  "sev.warning":  { en: "Warning",  zh: "\u8b66\u544a", ar: "\u062a\u062d\u0630\u064a\u0631" },
+  "sev.urgent":   { en: "Urgent",   zh: "\u7d27\u6025", ar: "\u0639\u0627\u062c\u0644" },
+  "sev.critical": { en: "Critical", zh: "\u4e25\u91cd", ar: "\u062d\u0631\u062c" },
+  /* Config-array labels (pattern 8: `label: "Xxx"`, not `label="Xxx"`). */
+  "cfg.sameDay": { en: "Same day", zh: "当天", ar: "نفس اليوم" },
+  "cfg.inProduction": { en: "In production", zh: "生产中", ar: "قيد الإنتاج" },
+  "cfg.moneyToCollect": { en: "Money to collect", zh: "应收款", ar: "مبالغ للتحصيل" },
+  "cfg.moneyToPay": { en: "Money to pay", zh: "应付款", ar: "مبالغ للسداد" },
   /* ── App-level ──────────────────────────────────────────────────── */
   "app.title":            { en: "Finance",                                zh: "财务",                                ar: "المالية" },
   "app.subtitle":         { en: "Add data, read data, run the books — every path one click away.",

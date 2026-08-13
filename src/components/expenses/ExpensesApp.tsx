@@ -224,14 +224,14 @@ export default function ExpensesApp() {
         <div className="mt-5">
           <AppHomeMenu
             navItems={[
-              { key: "all",       onClick: () => setTab("all"),     icon: "document",       label: "All",         count: counts.all,     active: tab === "all"     },
-              { key: "unpaid",    onClick: () => setTab("unpaid"),  icon: "clock",          label: "Unpaid",      count: counts.unpaid,  active: tab === "unpaid"  },
-              { key: "paid",      onClick: () => setTab("paid"),    icon: "check",          label: "Paid",        count: counts.paid,    active: tab === "paid"    },
-              { key: "overdue",   onClick: () => setTab("overdue"), icon: "info",           label: "Overdue",     count: counts.overdue, active: tab === "overdue" },
-              { key: "new",       onClick: startNew,                 icon: "plus",          label: "New Expense"  },
-              { key: "categories",href: "/categories",               icon: "books",         label: "Categories"   },
-              { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: "Approvals"  },
-              { key: "analytics", href: "/finance/expenses",         icon: "signal-stream", label: "Analytics"    },
+              { key: "all",       onClick: () => setTab("all"),     icon: "document",       label: t("tabs.all", "All"),         count: counts.all,     active: tab === "all"     },
+              { key: "unpaid",    onClick: () => setTab("unpaid"),  icon: "clock",          label: t("tabs.unpaid", "Unpaid"),      count: counts.unpaid,  active: tab === "unpaid"  },
+              { key: "paid",      onClick: () => setTab("paid"),    icon: "check",          label: t("tabs.paid", "Paid"),        count: counts.paid,    active: tab === "paid"    },
+              { key: "overdue",   onClick: () => setTab("overdue"), icon: "info",           label: t("tabs.overdue", "Overdue"),     count: counts.overdue, active: tab === "overdue" },
+              { key: "new",       onClick: startNew,                 icon: "plus",          label: t("tab.newExpense", "New Expense")  },
+              { key: "categories",href: "/categories",               icon: "books",         label: t("tab.categories", "Categories")   },
+              { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: t("tab.approvals", "Approvals")  },
+              { key: "analytics", href: "/finance/expenses",         icon: "signal-stream", label: t("tab.analytics", "Analytics")    },
             ] as AppHomeNavItem[]}
             searchPlaceholder={searchPlaceholder}
             onSearchSubmit={(term) => setSearch(term)}

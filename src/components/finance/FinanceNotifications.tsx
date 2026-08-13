@@ -36,15 +36,18 @@ function severityOf(due: string): Severity {
   return "normal";
 }
 
-const SEVERITY_STYLE: Record<Severity, { ring: string; chip: string; label: string }> = {
-  normal:   { ring: "border-[var(--border-subtle)]",       chip: "bg-gray-500/15 text-[var(--text-highlight)]",   label: "Normal" },
-  warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-600 dark:text-amber-300", label: "Warning" },
-  urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-600 dark:text-rose-300",   label: "Urgent" },
-  critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-700 dark:text-rose-200", label: "Critical" },
+/* `labelKey` alongside `label`: this map is module scope so it cannot call t().
+   The renderer translates, using `label` as the fallback — the same shape
+   FinanceTrialBalance already uses for its TYPE_GROUPS. */
+const SEVERITY_STYLE: Record<Severity, { ring: string; chip: string; label: string; labelKey: string }> = {
+  normal:   { ring: "border-[var(--border-subtle)]",       chip: "bg-gray-500/15 text-[var(--text-highlight)]",   label: "Normal", labelKey: "sev.normal" },
+  warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-600 dark:text-amber-300", label: "Warning", labelKey: "sev.warning" },
+  urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-600 dark:text-rose-300",   label: "Urgent", labelKey: "sev.urgent" },
+  critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-700 dark:text-rose-200", label: "Critical", labelKey: "sev.critical" },
 };
 
 const OFFSET_OPTIONS = [
-  { value: 0, label: "Same day" },
+  { value: 0, label: "Same day", labelKey: "sev.sameDay" },
   { value: 1, label: "1 day before" },
   { value: 3, label: "3 days before" },
   { value: 7, label: "7 days before" },
@@ -126,7 +129,7 @@ export default function FinanceNotifications() {
             return (
               <div key={sev} className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 ${style.ring}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.chip}`}>{style.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.chip}`}>{t(style.labelKey, style.label)}</span>
                   <span className="text-xs text-[var(--text-dim)]">{items.length}</span>
                 </div>
                 <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(total, baseCurrency, { compact: true })}</div>

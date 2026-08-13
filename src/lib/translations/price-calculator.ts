@@ -106,6 +106,23 @@ export const priceCalcT: Translations = {
   "fx.fetching":     { en: "Fetching\u2026", zh: "\u83b7\u53d6\u4e2d\u2026", ar: "\u062c\u0627\u0631\u064d \u0627\u0644\u062c\u0644\u0628\u2026" },
   "includeTaxRefund":{ en: "Include Tax Refund ({pct}%)", zh: "\u5305\u542b\u9000\u7a0e\uff08{pct}%\uff09", ar: "\u0634\u0627\u0645\u0644 \u0631\u062f \u0627\u0644\u0636\u0631\u064a\u0628\u0629 ({pct}%)" },
 
+  /* Section titles held in a config array (pattern 8). */
+  "set.secUiVisibility":  { en: "UI Visibility", zh: "\u754c\u9762\u663e\u793a", ar: "\u0625\u0638\u0647\u0627\u0631 \u0627\u0644\u0648\u0627\u062c\u0647\u0629" },
+  "set.secLimits":        { en: "Limits & Defaults", zh: "\u9650\u5236\u4e0e\u9ed8\u8ba4\u503c", ar: "\u0627\u0644\u062d\u062f\u0648\u062f \u0648\u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a\u0627\u062a" },
+  "set.secChannels":      { en: "Customer Channels", zh: "\u5ba2\u6237\u6e20\u9053", ar: "\u0642\u0646\u0648\u0627\u062a \u0627\u0644\u0639\u0645\u0644\u0627\u0621" },
+  "set.secCountries":     { en: "Countries & Bands", zh: "\u56fd\u5bb6\u4e0e\u6863\u4f4d", ar: "\u0627\u0644\u062f\u0648\u0644 \u0648\u0627\u0644\u0646\u0637\u0627\u0642\u0627\u062a" },
+  "set.secCategories":    { en: "Product Categories", zh: "\u4ea7\u54c1\u7c7b\u522b", ar: "\u0641\u0626\u0627\u062a \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a" },
+  "act.copy":             { en: "Copy", zh: "\u590d\u5236", ar: "\u0646\u0633\u062e" },
+  "act.exportPdf":        { en: "Export PDF", zh: "\u5bfc\u51fa PDF", ar: "\u062a\u0635\u062f\u064a\u0631 PDF" },
+  "act.print":            { en: "Print", zh: "\u6253\u5370", ar: "\u0637\u0628\u0627\u0639\u0629" },
+  "act.share":            { en: "Share", zh: "\u5206\u4eab", ar: "\u0645\u0634\u0627\u0631\u0643\u0629" },
+  "ch.agent":             { en: "Agent", zh: "\u4ee3\u7406", ar: "\u0648\u0643\u064a\u0644" },
+  "ch.distributor":       { en: "Distributor", zh: "\u7ecf\u9500\u5546", ar: "\u0645\u0648\u0632\u0651\u0639" },
+  "ch.dealer":            { en: "Dealer", zh: "\u7ecf\u9500\u5546\uff08\u96f6\u552e\uff09", ar: "\u062a\u0627\u062c\u0631" },
+  "ch.endUser":           { en: "End-User", zh: "\u6700\u7ec8\u7528\u6237", ar: "\u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645 \u0627\u0644\u0646\u0647\u0627\u0626\u064a" },
+  "ch.basePrice":         { en: "Base Price", zh: "\u57fa\u7840\u4ef7", ar: "\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0623\u0633\u0627\u0633\u064a" },
+  "ch.baseFob":           { en: "Base FOB", zh: "\u57fa\u7840 FOB", ar: "\u0623\u0633\u0627\u0633 FOB" },
+
   /* ── Shared vocabulary (repeated from other dictionaries on purpose) ── */
   "add":              { en: "Add",           zh: "添加",   ar: "إضافة" },
   "reset":            { en: "Reset",         zh: "重置",   ar: "إعادة تعيين" },
