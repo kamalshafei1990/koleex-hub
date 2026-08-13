@@ -794,10 +794,54 @@ export const SPEC_I18N: Translations = {
   "o:water_shortage_alarm": { en: "Water-Shortage Alarm", zh: "缺水报警", ar: "إنذار نقص الماء" },
   "o:width_expansion": { en: "Auto Width Expansion", zh: "自动扩幅定型", ar: "توسيع عرض تلقائي" },
   "o:yoga_pants": { en: "Yoga Pants", zh: "瑜伽裤", ar: "بناطيل يوغا" },
+
+  /* ── XAPT Programmable / CNC Sewing (2026-08-13) — S-JOOKE parameter table.
+       The FIRST template in Automatic Sewing Systems, so none of this
+       vocabulary existed in any language yet. ── */
+  "g:Sewing Field & Speed": { en: "Sewing Field & Speed", zh: "缝制范围与速度", ar: "مساحة الخياطة والسرعة" },
+  "g:Pattern & Template Control": { en: "Pattern & Template Control", zh: "花样与模板控制", ar: "التحكّم في الأنماط والقوالب" },
+  "g:Axis Drive & Transmission": { en: "Axis Drive & Transmission", zh: "轴驱动与传动", ar: "محرّكات المحاور ونقل الحركة" },
+  "g:Sewing Head & Presser": { en: "Sewing Head & Presser", zh: "机头与压脚", ar: "رأس الخياطة والقدم الضاغطة" },
+  "g:Thread Handling & Detection": { en: "Thread Handling & Detection", zh: "线迹处理与检测", ar: "التعامل مع الخيط والكشف" },
+  "g:Pneumatics & Environment": { en: "Pneumatics & Environment", zh: "气动与环境", ar: "الهواء المضغوط وبيئة التشغيل" },
+
+  "f:sewing_area": { en: "Sewing Area", zh: "缝制范围", ar: "مساحة الخياطة" },
+  "f:max_stitches_per_pattern": { en: "Max Stitches per Pattern", zh: "单个花样最大针数", ar: "أقصى عدد غرز للنمط" },
+  "f:pattern_input_method": { en: "Pattern Input", zh: "花样输入方式", ar: "إدخال النمط" },
+  "f:pattern_storage_capacity": { en: "Pattern Storage", zh: "花样存储量", ar: "سعة تخزين الأنماط" },
+  "f:template_switching_mode": { en: "Template Switching", zh: "模板切换方式", ar: "تبديل القالب" },
+  "f:operation_interface": { en: "Operation Interface", zh: "操作界面", ar: "واجهة التشغيل" },
+  "f:x_axis_drive_type": { en: "X-Axis Drive", zh: "X轴驱动方式", ar: "محرّك المحور X" },
+  "f:y_axis_drive_type": { en: "Y-Axis Drive", zh: "Y轴驱动方式", ar: "محرّك المحور Y" },
+  "f:table_drive_configuration": { en: "Table Drive Configuration", zh: "台板驱动结构", ar: "تكوين حركة الطاولة" },
+  "f:outer_presser_foot_stroke": { en: "Outer Presser Foot Stroke", zh: "外压脚行程", ar: "شوط القدم الضاغطة الخارجية" },
+  "f:middle_presser_foot_height": { en: "Middle Presser Foot Height", zh: "中压脚高度", ar: "ارتفاع القدم الضاغطة الوسطى" },
+  "f:presser_foot_follow_stroke": { en: "Presser Foot Follow-up Stroke", zh: "压脚跟随行程", ar: "شوط تتبّع القدم الضاغطة" },
+  "f:motor_driven_middle_foot": { en: "Motor-Driven Middle Presser Foot", zh: "电动中压脚", ar: "قدم ضاغطة وسطى بمحرّك" },
+  "f:electronic_thread_tensioner": { en: "Electronic Thread Tensioner", zh: "电子夹线器", ar: "شادّ خيط إلكتروني" },
+  "f:thread_break_detection": { en: "Thread Break Detection", zh: "断线检测", ar: "كشف قطع الخيط" },
+  "f:bobbin_thread_counter": { en: "Bobbin Thread Counter", zh: "底线计数", ar: "عدّاد خيط المكوك" },
+  "f:air_blow_presser_foot": { en: "Air-Blow Presser Foot", zh: "吹气压脚", ar: "قدم ضاغطة بنفخ هواء" },
+  "f:working_air_pressure": { en: "Working Air Pressure", zh: "工作气压", ar: "ضغط الهواء التشغيلي" },
+
+  "o:optional": { en: "Optional", zh: "选配", ar: "اختياري" },
+  "o:rfid_card": { en: "RFID Card (automatic)", zh: "RFID卡智能切换", ar: "بطاقة RFID (تلقائي)" },
+  "o:manual_select": { en: "Manual Selection", zh: "手动选择", ar: "اختيار يدوي" },
+  "o:timing_belt": { en: "Timing Belt", zh: "同步带", ar: "سير توقيت" },
+  "o:lead_screw": { en: "Lead Screw", zh: "丝杆", ar: "عمود لولبي" },
+  "o:servo_motor": { en: "Servo Motor", zh: "伺服电机", ar: "موتور سيرفو" },
+  "o:stepper_motor": { en: "Stepper Motor", zh: "步进电机", ar: "موتور ستيبر" },
+  "o:closed_loop_stepper": { en: "Closed-Loop Stepper", zh: "闭环步进电机", ar: "ستيبر بحلقة مغلقة" },
+  "o:small_1_6x": { en: "1.6\u00d7 Small Hook", zh: "1.6倍小旋梭", ar: "مكوك صغير 1.6\u00d7" },
+  "o:large_2_0x": { en: "2.0\u00d7 Large Hook", zh: "2.0倍大旋梭", ar: "مكوك كبير 2.0\u00d7" },
+  "o:small_and_large": { en: "Small & Large Hook", zh: "大小旋梭可选", ar: "مكوك صغير وكبير" },
+  "o:motor_rotary": { en: "Motor-Driven Rotary Cutter", zh: "电动旋转剪线", ar: "قاطع دوّار بمحرّك" },
 };
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
+  /* XAPT — first template in Automatic Sewing Systems (2026-08-13). */
+  "s:programmable-cnc.v1": { en: "Programmable / CNC Sewing Machine", zh: "电脑程控花样缝纫机", ar: "ماكينة خياطة مبرمجة / CNC" },
   /* Backfill: 17 schema ids had no display name, so the form showed the
      English schema title above translated fields. Nine distinct machines —
      the duplicates are the same machine bound to a second category shelf. */
@@ -839,6 +883,32 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* XAPT Programmable / CNC Sewing (2026-08-13) — S-JOOKE. */
+  "Printed as X×Y in cm (80×45 … 250×150) — 7 of 14 machines. Kept as text because the page gives one paired string, and because the pair IS the buying decision on this machine class: it is the size of template the machine can run.": { zh: "目录印为 X×Y（厘米，80×45 … 250×150），14 台机器中有 7 台标注。保留为文本，因为版面给出的是一个成对字符串；而且这一对数值正是该机型的采购决策依据——它决定机器能运行多大的模板。", ar: "مطبوع كـ X×Y بالسنتيمتر (80×45 … 250×150) — في ٧ ماكينات من ١٤. سِبناه نص لأن الصفحة بتدّي سلسلة واحدة مزدوجة، ولأن الزوج ده هو قرار الشراء في فئة الماكينات دي: هو مقاس القالب اللي الماكينة تقدر تشغّله." },
+  "Printed \"Max. Sewing Speed (r/min)\" — 2800 to 3500 across the range (9 of 14). Reused from the shared sewing vocabulary.": { zh: "目录标注为“Max. Sewing Speed (r/min)”，全系列 2800 至 3500（14 台中 9 台）。沿用缝纫机共享词汇。", ar: "مطبوع «Max. Sewing Speed (r/min)» — من ٢٨٠٠ لـ٣٥٠٠ عبر المدى (٩ من ١٤). مُعاد استخدامه من مفردات الخياطة المشتركة." },
+  "The upper bound of the printed range (0.05–12.7 mm, older sheets 0.1~12.7) — 12 of 14. Record the maximum; the lower bound is 0.05 throughout.": { zh: "所印区间的上限（0.05–12.7 mm，旧版页面印为 0.1~12.7），14 台中 12 台标注。记录最大值；下限全系列均为 0.05。", ar: "الحد الأعلى للمدى المطبوع (0.05–12.7 مم، وفي الصفحات الأقدم 0.1~12.7) — ١٢ من ١٤. سجّل الأقصى؛ الحد الأدنى 0.05 في كل الموديلات." },
+  "100,000 on every machine that prints it (14 of 14 — the single most consistent column). Printed variously as \"stitches\" or \"needles\"; the number is the same.": { zh: "凡标注此项的机器均为 100,000（14 台全部标注——最一致的一列）。页面有时印作“stitches”、有时印作“needles”，数值相同。", ar: "١٠٠٬٠٠٠ في كل ماكينة بتطبعه (١٤ من ١٤ — أثبت عمود في الجدول). مطبوع مرة «stitches» ومرة «needles»، والرقم واحد." },
+  "How a pattern reaches the machine — \"USB Flash Drive, PC USB Cable\" throughout (9 of 14). Text rather than a select: this list grows with network and IoT transfer, and a closed option set would have to be reopened for each.": { zh: "花样如何传入机器——全系列为“USB Flash Drive, PC USB Cable”（14 台中 9 台）。采用文本而非下拉：该列表会随网络与物联网传输方式增加，封闭选项集每次都得重开。", ar: "إزاي النمط بيوصل للماكينة — «USB Flash Drive, PC USB Cable» في كل الموديلات (٩ من ١٤). نص مش قائمة: القائمة دي بتكبر مع النقل الشبكي وإنترنت الأشياء، وأي مجموعة خيارات مقفولة هتحتاج تتفتح كل مرة." },
+  "\"≥999 Patterns\" on the touch screen (8 of 14). Record 999 — the printed value is a floor, not a measured ceiling.": { zh: "触摸屏内“≥999 Patterns”（14 台中 8 台）。记录 999——所印数值是下限，不是实测上限。", ar: "«≥999 Patterns» على الشاشة (٨ من ١٤). سجّل ٩٩٩ — القيمة المطبوعة حد أدنى مش سقف مقيس." },
+  "\"RFID Card Intelligent Switching\" on 8 of 14 — the machine reads the template's tag and loads its pattern with no operator input. This is the headline feature of the class and the reason it is a group of its own, not a line in a features list.": { zh: "14 台中 8 台标注“RFID Card Intelligent Switching”——机器读取模板上的标签并自动调用对应花样，无需操作工介入。这是该机型的核心卖点，因此单列一组，而不是features 列表里的一行。", ar: "«RFID Card Intelligent Switching» في ٨ من ١٤ — الماكينة بتقرا تاج القالب وبتحمّل نمطه من غير أي تدخّل من العامل. دي الميزة الرئيسية في الفئة دي وعشان كده ليها مجموعة لوحدها مش سطر في قايمة مميزات." },
+  "\"7\\\" Color Touch Screen + Keypad\" throughout (10 of 14). Text because the screen size varies by generation and the keypad is not always present.": { zh: "全系列为“7\\\" Color Touch Screen + Keypad”（14 台中 10 台）。采用文本，因为屏幕尺寸随代次变化，且键盘并非始终配备。", ar: "«7\\\" Color Touch Screen + Keypad» في كل الموديلات (١٠ من ١٤). نص لأن مقاس الشاشة بيتغيّر حسب الجيل ولوحة المفاتيح مش موجودة دايمًا." },
+  "The catalogue distinguishes belt from screw drive per axis and sells on it: NS1 uses a belt X-axis with a screw-rod Y, the DS series uses screw rods on both. Screw rods hold accuracy on large fields; belts are faster and cheaper.": { zh: "目录按轴区分同步带与丝杆驱动，并以此作为卖点：NS1 采用 X 轴同步带配 Y 轴丝杆，DS 系列两轴均为丝杆。丝杆在大幅面上保持精度，同步带更快也更便宜。", ar: "الكتالوج بيفرّق بين السير واللولب لكل محور وبيبيع على الفرق ده: NS1 بيستخدم سير على X ولولب على Y، وسلسلة DS لولب على الاتنين. اللولب بيحافظ على الدقة في المساحات الكبيرة، والسير أسرع وأرخص." },
+  "Printed \"Y Axis Drive Type\" on 8 of 14 — closed-loop stepper, servo or stepper. The Y axis carries the table, so this is the axis that limits speed on a large machine.": { zh: "目录标注为“Y Axis Drive Type”（14 台中 8 台）——闭环步进、伺服或步进。Y 轴承载台板，因此在大型机上正是它限制了速度。", ar: "مطبوع «Y Axis Drive Type» في ٨ من ١٤ — ستيبر بحلقة مغلقة أو سيرفو أو ستيبر. محور Y بيشيل الطاولة، فهو المحور اللي بيحدّد السرعة في الماكينة الكبيرة." },
+  "\"Dual Y + Single X\", \"X&Y-axis Lead Screws\", \"three screw rods\". Free text on purpose: this is a mechanical layout the catalogue describes in prose, and forcing it into options would lose the distinction the three-screw-rod models are sold on.": { zh: "如“Dual Y + Single X”“X&Y-axis Lead Screws”“三丝杆”。刻意保留自由文本：这是目录用叙述方式描述的机械结构，强行归入选项会丢失三丝杆机型赖以销售的差异。", ar: "زي «Dual Y + Single X» و«X&Y-axis Lead Screws» و«ثلاث أعمدة لولبية». نص حر بقصد: ده تكوين ميكانيكي الكتالوج بيوصفه بالكلام، ولو حصرناه في خيارات هنفقد الفرق اللي موديلات الثلاث أعمدة بتتباع عليه." },
+  "\"DPx5 (7#–22#)\", often with DPx17 alongside (11 of 14). Text because the sheet gives system AND size range together, and machines list two systems.": { zh: "“DPx5 (7#–22#)”，常与 DPx17 并列（14 台中 11 台）。采用文本，因为页面把针系与针号范围一并给出，且部分机器列出两种针系。", ar: "«DPx5 (7#–22#)» وغالبًا معاها DPx17 (١١ من ١٤). نص لأن الصفحة بتدّي النظام ومدى المقاس مع بعض، وفيه ماكينات بتذكر نظامين." },
+  "10 of 14. A larger hook holds more bobbin thread, so it decides how long the machine runs between bobbin changes — on an automatic machine that is throughput, not a detail. Some sheets print it as \"(2.0× Large Hook Optional)\": record the fitted hook and set the fitment note on the model.": { zh: "14 台中 10 台标注。旋梭越大，底线容量越多，因此它决定机器换底线的间隔——在自动机上这就是产能，而非细节。部分页面印作“(2.0× Large Hook Optional)”：记录实际装配的旋梭，并在型号上标注选配说明。", ar: "١٠ من ١٤. المكوك الأكبر بيشيل خيط أكتر، يعني بيحدّد الماكينة بتشتغل قد إيه قبل تغيير المكوك — وده في ماكينة أوتوماتيك إنتاجية مش تفصيلة. بعض الصفحات بتطبعها «(2.0× Large Hook Optional)»: سجّل المكوك المركّب وحُط ملاحظة التجهيز على الموديل." },
+  "15 mm on every machine that prints it (10 of 14). The height the outer frame lifts to clear the template.": { zh: "凡标注此项的机器均为 15 mm（14 台中 10 台）。即外压框抬起以越过模板的高度。", ar: "١٥ مم في كل ماكينة بتطبعه (١٠ من ١٤). ده الارتفاع اللي الإطار الخارجي بيرفعه عشان يعدّي القالب." },
+  "20 mm where printed. Distinct from the outer frame above — this is the foot that holds the fabric at the needle.": { zh: "凡标注处均为 20 mm。与上方的外压框不同——这是在机针处压住面料的压脚。", ar: "٢٠ مم حيثما طُبع. مختلف عن الإطار الخارجي فوق — دي القدم اللي بتمسك القماش عند الإبرة." },
+  "Printed as a range (0–12 mm). Text because it is a span, and the useful fact is the span, not either end alone.": { zh: "印为区间（0–12 mm）。采用文本，因为它是一个跨度，而有用的信息正是这个跨度本身，而非任一端点。", ar: "مطبوع كمدى (0–12 مم). نص لأنه مدى، والمعلومة المفيدة هي المدى نفسه مش أي طرف لوحده." },
+  "Standard or Optional (7 of 14). A motor-driven middle foot changes height under program control, which is what lets one template run material of varying thickness.": { zh: "标配或选配（14 台中 7 台）。电动中压脚可在程序控制下改变高度，这正是同一模板能缝制不同厚度材料的原因。", ar: "قياسي أو اختياري (٧ من ١٤). القدم الوسطى بالمحرّك بتغيّر ارتفاعها بالبرنامج، وده اللي بيخلّي قالب واحد يشتغل على خامات بسماكات مختلفة." },
+  "Printed \"Motor-driven Rotary Cutter\" on the higher models and \"(Motor-driven Trimming Optional)\" on others. Reused key from the shared vocabulary, but as a SELECT here rather than a boolean because the catalogue distinguishes the mechanism, not merely its presence.": { zh: "高配机型印为“Motor-driven Rotary Cutter”，其余印为“(Motor-driven Trimming Optional)”。沿用共享词汇的字段键，但此处为下拉而非布尔值，因为目录区分的是机构形式，而不仅仅是有无。", ar: "مطبوع «Motor-driven Rotary Cutter» في الموديلات الأعلى و«(Motor-driven Trimming Optional)» في غيرها. مفتاح معاد استخدامه من المفردات المشتركة، لكنه هنا قائمة مش نعم/لأ لأن الكتالوج بيفرّق في الآلية نفسها مش في وجودها بس." },
+  "13 of 14 — the second most consistent column after max stitches. Tension set per pattern segment instead of by hand, which is what makes an unattended run repeatable.": { zh: "14 台中 13 台——仅次于最大针数的第二一致列。张力按花样分段设定而非手工调节，这正是无人值守运行可重复的前提。", ar: "١٣ من ١٤ — تاني أثبت عمود بعد أقصى عدد الغرز. الشدّ بيتضبط لكل مقطع في النمط بدل ما يتظبط باليد، وده اللي بيخلّي التشغيل من غير عامل قابل للتكرار." },
+  "10 of 14. On an unattended machine this is the difference between a stopped machine and a whole template sewn without thread.": { zh: "14 台中 10 台。在无人值守的机器上，这决定了是机器停下，还是整块模板被空针缝完。", ar: "١٠ من ١٤. في ماكينة بتشتغل من غير عامل، ده الفرق بين إن الماكينة تقف وبين إن قالب كامل يتخيّط من غير خيط." },
+  "10 of 14, printed \"Standard\" or \"Standard configuration\". Warns before the bobbin runs out rather than after.": { zh: "14 台中 10 台，印为“Standard”或“Standard configuration”。在底线用完之前预警，而不是之后。", ar: "١٠ من ١٤، مطبوع «Standard» أو «Standard configuration». بينبّه قبل ما خيط المكوك يخلص، مش بعده." },
+  "8 of 14.": { zh: "14 台中 8 台。", ar: "٨ من ١٤." },
+  "6 of 14. Air lifts and releases the work so it does not stick to the foot on light material.": { zh: "14 台中 6 台。吹气抬起并释放工件，避免轻薄面料粘附在压脚上。", ar: "٦ من ١٤. الهواء بيرفع الشغل ويسيبه عشان الخامة الخفيفة ماتلزقش في القدم." },
+  "0.4–0.6 MPa throughout, but the AIR VOLUME beside it ranges 1.7 to 50 L/min — a fiftyfold difference that decides whether the customer's existing compressor can run the machine. Kept as the printed pair for exactly that reason; splitting out pressure alone would drop the number that matters.": { zh: "全系列均为 0.4–0.6 MPa，但旁边的耗气量从 1.7 到 50 L/min——五十倍的差距，直接决定客户现有空压机能否带动这台机器。正因如此保留为所印的成对数值；只拆出压力会丢掉真正重要的那个数。", ar: "0.4–0.6 ميجاباسكال في كل الموديلات، لكن كمية الهواء جنبها بتتراوح من 1.7 لـ50 لتر/دقيقة — فرق خمسين ضعف بيحدّد لو كمبروسور العميل الحالي يقدر يشغّل الماكينة أصلاً. سِبناه كالزوج المطبوع عشان كده بالظبط؛ لو فصلنا الضغط لوحده هنفقد الرقم اللي بيفرق." },
+  "Printed as a range (9 of 14). Text because it is a span.": { zh: "印为区间（14 台中 9 台）。采用文本，因为它是一个跨度。", ar: "مطبوع كمدى (٩ من ١٤). نص لأنه مدى." },
   /* XSZ Zigzag (2026-08-13) — Yuegong/SEASTAR. */
   "The sideways swing of the needle — the column printed as a range (0-5 … 0-12). This is what makes the machine a zigzag; it is NOT the stitch width of a straight seam.": { zh: "针杆的横向摆动量——目录中以区间形式印出（0-5 … 0-12）。这是曲折缝机的定义特征，不是直线缝的针距宽度。", ar: "اتساع تأرجح الإبرة جانبيًا — العمود المطبوع كمدى (0-5 … 0-12). ده اللي بيخلّي الماكينة زيجزاج، ومش عرض غرزة الخياطة المستقيمة." },
   "Printed as 一步两点 / 二步三点 / 三步四点. It separates models inside one series (GG20U457A vs 457B vs 457D), which is why it lives on the model and not on the Machine Kind.": { zh: "目录印为一步两点 / 二步三点 / 三步四点。它区分同一系列内的不同型号（GG20U457A / 457B / 457D），因此属于型号属性而非机型属性。", ar: "مطبوع كـ一步两点 / 二步三点 / 三步四点. بيفرّق بين موديلات في نفس السلسلة (GG20U457A و457B و457D)، وعشان كده هو خاصية موديل مش خاصية نوع ماكينة." },

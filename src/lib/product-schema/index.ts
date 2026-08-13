@@ -21,6 +21,7 @@ import { YILI_BATCH_SCHEMAS } from "./schemas/yili-batch-2026-08-12";
 import { IRONING_HEATPRESS_BATCH_SCHEMAS } from "./schemas/ironing-heatpress-batch-2026-08-12";
 import { SEWING_STITCH_TYPE_SCHEMAS } from "./schemas/sewing-stitch-types-2026-08-12";
 import { ZIGZAG_SCHEMAS } from "./schemas/zigzag-2026-08-13";
+import { PROGRAMMABLE_CNC_SCHEMAS } from "./schemas/programmable-cnc-2026-08-13";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -75,6 +76,12 @@ for (const schema of SEWING_STITCH_TYPE_SCHEMAS) registerSchema(schema);
    rendered zero fields for every zigzag model. Built 2026-08-13 off the
    Yuegong/SEASTAR printed spec table. */
 for (const schema of ZIGZAG_SCHEMAS) registerSchema(schema);
+
+/* XAPT Programmable / CNC Sewing — the FIRST template in Automatic Sewing
+   Systems, a category of eleven subcategories that had none, so every
+   automation machine rendered an empty form. Built 2026-08-13 off the S-JOOKE
+   printed parameter table (14 machines, one consistent column set). */
+for (const schema of PROGRAMMABLE_CNC_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
