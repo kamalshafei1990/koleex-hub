@@ -912,10 +912,19 @@ export const SPEC_I18N: Translations = {
   "o:eyelet": { en: "Eyelet (keyhole)", zh: "圆头(凤眼)锁眼", ar: "عروة بعين (ثقب المفتاح)" },
   "o:standard_hook": { en: "Standard Hook", zh: "标准旋梭", ar: "مكوك قياسي" },
   "o:large_hook": { en: "Large Hook", zh: "大旋梭", ar: "مكوك كبير" },
+
+  /* ── XABA Button Attaching (2026-08-13) — S-GEMSY SG 1903B. ── */
+  "g:Button Capability": { en: "Button Capability", zh: "钉扣能力", ar: "قدرة تثبيت الأزرار" },
+  "f:flat_button_diameter_range": { en: "Flat Button Diameter", zh: "平扣直径范围", ar: "قطر الزرار المسطّح" },
+  "f:shank_button_diameter_range": { en: "Shank Button Diameter", zh: "柄扣直径范围", ar: "قطر الزرار ذي العنق" },
+  "f:button_feeding_mode": { en: "Button Feeding", zh: "送扣方式", ar: "تغذية الأزرار" },
+  "o:manual_button_place": { en: "Manual Placement", zh: "人工放扣", ar: "وضع يدوي" },
+  "o:auto_button_feed": { en: "Automatic Feeding", zh: "自动送扣", ar: "تغذية تلقائية" },
 };
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
+  "s:button-attaching.v1": { en: "Button Attaching Machine", zh: "电脑钉扣机", ar: "ماكينة تثبيت أزرار" },
   "s:buttonhole.v1": { en: "Buttonhole Machine", zh: "电脑锁眼机", ar: "ماكينة عمل عراوي" },
   "s:bartack.v1": { en: "Bartacking Machine", zh: "电脑套结机", ar: "ماكينة تقوية (بارتاك)" },
   "s:pocket-setter.v1": { en: "Pocket Setter", zh: "全自动贴袋机", ar: "ماكينة تركيب جيوب" },
@@ -965,6 +974,17 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* XABA Button Attaching (2026-08-13) — S-GEMSY. */
+  "⌀8–⌀20 mm, printed as a range for sew-through (flat) buttons. Text because the pair IS the specification — a machine that takes only ⌀8–⌀12 is a different machine, and a single number cannot say that.": { zh: "⌀8–⌀20 mm，针对平扣（穿孔扣）以区间形式印出。采用文本，因为这一对数值本身就是规格——只吃 ⌀8–⌀12 的机器是另一台机器，单个数字说不出这一点。", ar: "⌀8–⌀20 مم، مطبوع كمدى للأزرار المسطّحة (اللي بتتخيّط من خرومها). نص لأن الزوج نفسه **هو** المواصفة — ماكينة بتاخد ⌀8–⌀12 بس دي ماكينة تانية، والرقم الواحد مايقدرش يقول كده." },
+  "⌀10–⌀20 mm on the SG1903B-K, and a DASH on the auto-feeding -997S — that model does not take shank buttons at all. Kept as its own field for exactly that reason: folded into the flat-button range it would silently promise a capability the auto-feed machine lacks. Blank means UNKNOWN; a dash on the sheet means NOT SUPPORTED and belongs in the model's notes.": { zh: "SG1903B-K 为 ⌀10–⌀20 mm，而自动送扣的 -997S 此格印的是一道横杠——该机型根本不接受柄扣。正因如此单列为字段：若并入平扣区间，就会悄悄承诺自动送扣机并不具备的能力。留空表示“未知”；页面上的横杠表示“不支持”，应记入该型号备注。", ar: "⌀10–⌀20 مم في SG1903B-K، وفي الموديل ذاتي التغذية ‎-997S الخانة دي فيها **شرطة** — الموديل ده مابياخدش أزرار بعنق أصلاً. وعشان كده هو حقل لوحده: لو دمجناه في مدى الأزرار المسطّحة هنوعد بقدرة الماكينة ذاتية التغذية مش عندها. الفاضي معناه **مش معروف**؛ والشرطة في الصفحة معناها **مش مدعوم** ومكانها ملاحظات الموديل." },
+  "The -K suffix is manual placement; -997S is automatic feeding. This single choice is what separates a 56 kg bench machine from a 175 kg one, and it is the field that decides operator count per machine — one operator can tend several auto-feeders and only one manual machine.": { zh: "‑K 后缀为人工放扣，‑997S 为自动送扣。仅此一项选择，就把一台 56 公斤的台式机变成 175 公斤的设备，也正是它决定每台机器所需的操作工数量——一名工人可以看管数台自动送扣机，却只能盯住一台人工机。", ar: "لاحقة ‎-K معناها وضع الزرار باليد، و‎-997S تغذية تلقائية. الاختيار ده لوحده هو اللي بيحوّل ماكينة ٥٦ كيلو لماكينة ١٧٥ كيلو، وهو اللي بيحدّد عدد العمال لكل ماكينة — عامل واحد يقدر يتابع كذا ماكينة تغذية تلقائية، لكن ماكينة يدوية واحدة بس." },
+  "2500 rpm on both models — the slowest of the three GEMSY special machines (bartack 3200, buttonhole 4200), because the needle must find a hole in a rigid button rather than a point on cloth.": { zh: "两款机型均为 2500 rpm——是这三台 GEMSY 特种机中最慢的（套结 3200，锁眼 4200），因为机针必须找准硬质纽扣上的孔，而不是布面上的一个点。", ar: "٢٥٠٠ لفة/دقيقة في الموديلين — الأبطأ بين تلات ماكينات GEMSY الخاصة (تقوية ٣٢٠٠، عراوي ٤٢٠٠)، لأن الإبرة لازم تصيب **خرم** في زرار صلب مش نقطة على قماش." },
+  "41.2 mm — the same stroke as the SG 1900B bartacker, which is expected: the two share a head casting.": { zh: "41.2 mm——与 SG 1900B 套结机相同，这在意料之中：两者共用同一机头铸件。", ar: "41.2 مم — نفس شوط ماكينة التقوية SG 1900B، وده متوقّع: الاتنين بيشتركوا في نفس صبّة الرأس." },
+  "Printed as a 0.1–10 mm range; record the maximum. On this machine the setting is really the hole spacing of the button.": { zh: "印为 0.1–10 mm 区间；记录最大值。在这台机器上，该设定实际对应的是纽扣的孔距。", ar: "مطبوع كمدى 0.1–10 مم؛ سجّل الأقصى. في الماكينة دي الإعداد ده في الحقيقة هو **المسافة بين خروم الزرار**." },
+  "DBX17 #14 on both models.": { zh: "两款机型均为 DBX17 #14。", ar: "DBX17 #14 في الموديلين." },
+  "14 mm, the same as the rest of the series.": { zh: "14 mm，与该系列其余机型相同。", ar: "١٤ مم، زي باقي السلسلة." },
+  "Marked ★ (standard) on both models.": { zh: "两款机型均标注 ★（标配）。", ar: "معلّم ★ (قياسي) في الموديلين." },
+  "Listed as a distinct feature from the trimmer. On a button it matters more than elsewhere: a long tail under a button shows through the garment face.": { zh: "作为区别于剪线器的独立功能列出。在钉扣上，它比在别处更重要：纽扣下方过长的线尾会从成衣正面透出来。", ar: "مذكور كميزة منفصلة عن قاطع الخيط. وفي الأزرار دي أهم من أي مكان تاني: ذيل خيط طويل تحت الزرار بيبان من وش القطعة." },
   /* XABH Buttonhole + XABT Bartacking (2026-08-13) — S-GEMSY. */
   "25 mm (SG1790), 70 mm (SG1791) or 120 mm (SG1795) — the ONLY number that separates the three models in the series, and the one a buyer matches to their garment. A 120 mm machine buttonholes a coat front; a 25 mm machine does not.": { zh: "25 mm（SG1790）、70 mm（SG1791）或 120 mm（SG1795）——这是该系列三款机型之间唯一的差别，也是买家用来对应自家款式的数据。120 mm 的机器能锁大衣门襟的扣眼，25 mm 的不能。", ar: "٢٥ مم (SG1790) أو ٧٠ (SG1791) أو ١٢٠ (SG1795) — الرقم الوحيد اللي بيفرّق بين تلات موديلات السلسلة، وهو اللي المشتري بيطابقه على المنتج بتاعه. ماكينة ١٢٠ مم بتعمل عروة بالطو، وماكينة ٢٥ مم لأ." },
   "Encoded in the model number itself: 0 = under 70 mm, 1 = 70 mm, 5 = 120 mm. It tracks the buttonhole length because the foot must span the hole, so recording both is not duplication — a mismatched foot is the commonest wrong-part order on this machine.": { zh: "直接编码在型号中：0 = 小于 70 mm，1 = 70 mm，5 = 120 mm。它与锁眼长度对应，因为压脚必须覆盖整个扣眼，所以两者都记录并非重复——压脚不匹配是这类机器最常见的订错件。", ar: "مكوّد في رقم الموديل نفسه: 0 = أقل من ٧٠ مم، 1 = ٧٠، 5 = ١٢٠. بيتبع طول العروة لأن القدم لازم تغطّي العروة كلها، فتسجيل الاتنين مش تكرار — القدم الغلط هي أكتر قطعة بتتطلب غلط في الماكينة دي." },

@@ -24,6 +24,7 @@ import { ZIGZAG_SCHEMAS } from "./schemas/zigzag-2026-08-13";
 import { PROGRAMMABLE_CNC_SCHEMAS } from "./schemas/programmable-cnc-2026-08-13";
 import { AUTOMATION_UNIT_SCHEMAS } from "./schemas/automation-units-2026-08-13";
 import { BUTTONHOLE_BARTACK_SCHEMAS } from "./schemas/buttonhole-bartack-2026-08-13";
+import { BUTTON_ATTACHING_SCHEMAS } from "./schemas/button-attaching-2026-08-13";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -94,6 +95,9 @@ for (const schema of AUTOMATION_UNIT_SCHEMAS) registerSchema(schema);
    IMAGES with pictogram headers — a text-only read finds no numbers at all.
    See the file header before extending either. */
 for (const schema of BUTTONHOLE_BARTACK_SCHEMAS) registerSchema(schema);
+
+/* XABA Button Attaching — S-GEMSY SG 1903B, same image-table caveat. */
+for (const schema of BUTTON_ATTACHING_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
