@@ -4029,14 +4029,43 @@ const BirthdayPicker = React.memo(function BirthdayPicker({ value, onChange, day
   value: string; onChange: (v: string) => void;
   dayLabel?: string; monthLabel?: string; yearLabel?: string; renderMonth?: (m: string) => string;
 }) {
-  const parts = value ? value.split("-") : ["", "", ""];
-  const year = parts[0] || "";
-  const month = parts[1] || "";
-  const day = parts[2] || "";
+  /* THE THREE PARTS NEED A HOME OF THEIR OWN. Reading them straight back out
+     of `value` looks tidy but cannot work: a date string only exists once all
+     three are chosen, so the FIRST pick had nowhere to be stored. The old
+     update() fired onChange only when all three were set, or when all three
+     were empty — pick a day on a blank field and neither branch ran, the
+     parent value stayed "", and the select re-rendered empty. The pick
+     vanished, every time, so a complete date was unreachable. Owner: "this
+     not work."
+
+     So the draft lives here, and the parent only ever hears a whole date (or
+     "" when it stops being one). */
+  const split = (v: string) => {
+    const p = v ? v.split("-") : [];
+    return { y: p[0] ?? "", m: p[1] ?? "", d: p[2] ?? "" };
+  };
+  const [draft, setDraft] = useState(() => split(value));
+  /* Follow the parent when IT changes the date (loading a record, a reset) —
+     never on our own emissions, which already match. Adjusted during render
+     rather than in an effect: this is React's own pattern for deriving state
+     from a changed prop, and it re-renders before paint instead of after. */
+  const [seenValue, setSeenValue] = useState(value);
+  if (value !== seenValue) {
+    setSeenValue(value);
+    setDraft(split(value));
+  }
+
+  const { y: year, m: month, d: day } = draft;
 
   const update = (d: string, m: string, y: string) => {
-    if (d && m && y) onChange(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
-    else if (!d && !m && !y) onChange("");
+    setDraft({ d, m, y });
+    const whole = d && m && y ? `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` : "";
+    /* Keep `seenValue` in step so our own emission is not mistaken for an
+       outside change and does not wipe the half-filled draft back out. */
+    setSeenValue(whole);
+    /* An incomplete draft is not a date: clear it upstream rather than leave a
+       stale one behind, but keep the parts on screen so the user can finish. */
+    if (whole !== value) onChange(whole);
   };
 
   const currentYear = new Date().getFullYear();
@@ -4715,7 +4744,6 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
   /* No outside-click listener here: the panel is PORTALLED to <body>, so it
@@ -4741,23 +4769,23 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   return (
     <div ref={wrapperRef} className="relative">
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "Country"}</label>
-      <div
-        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-      >
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm flex items-center gap-2 outline-none hover:border-[var(--border-focus)] focus:border-[var(--border-focus)] transition-colors">
         {selectedFlag && <span className="text-base">{selectedFlag}</span>}
-        <input
-          ref={inputRef}
-          type="text"
-          value={open ? query : (value ? countryNameLocalized(value, lang, displayValue) : displayValue)}
-          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={placeholder ?? "Search country..."}
-          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
-        />
+        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>
+          {value ? countryNameLocalized(value, lang, displayValue) : (displayValue || "Select…")}
+        </span>
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
-      </div>
+      </button>
       <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
+          {/* The search lives INSIDE the panel, like every other searchable
+              picker here. As the trigger it made this field read as a search
+              box rather than a value: it showed the query while typing, and
+              the chosen country only after closing. Owner: "this field not
+              same design as others." */}
+          <div className="p-2 border-b border-[var(--border-faint)]">
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={placeholder ?? "Search country…"}
+              className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+          </div>
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
@@ -4792,7 +4820,6 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const geoReady = useStateCity();
   const states = useMemo(() => {
@@ -4817,22 +4844,22 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   return (
     <div ref={wrapperRef} className="relative">
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "Province / State"}</label>
-      <div
-        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          value={open ? query : (value ? provinceNameLocalized(countryCode, value, lang, displayValue) : displayValue)}
-          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={placeholder ?? "Search province..."}
-          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
-        />
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm flex items-center gap-2 outline-none hover:border-[var(--border-focus)] focus:border-[var(--border-focus)] transition-colors">
+        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>
+          {value ? provinceNameLocalized(countryCode, value, lang, displayValue) : (displayValue || "Select…")}
+        </span>
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
-      </div>
+      </button>
       <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
+          {/* The search lives INSIDE the panel, like every other searchable
+              picker here. As the trigger it made this field read as a search
+              box rather than a value: it showed the query while typing, and
+              the chosen country only after closing. Owner: "this field not
+              same design as others." */}
+          <div className="p-2 border-b border-[var(--border-faint)]">
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={placeholder ?? "Search province…"}
+              className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+          </div>
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
@@ -4866,7 +4893,6 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const geoReady = useStateCity();
   const cities = useMemo(() => {
@@ -4904,22 +4930,22 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   return (
     <div ref={wrapperRef} className="relative">
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "City"}</label>
-      <div
-        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          value={open ? query : cityNameLocalized(countryCode, value, lang)}
-          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={placeholder ?? "Search city..."}
-          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
-        />
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm flex items-center gap-2 outline-none hover:border-[var(--border-focus)] focus:border-[var(--border-focus)] transition-colors">
+        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>
+          {value ? cityNameLocalized(countryCode, value, lang) : "Select…"}
+        </span>
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
-      </div>
+      </button>
       <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
+          {/* The search lives INSIDE the panel, like every other searchable
+              picker here. As the trigger it made this field read as a search
+              box rather than a value: it showed the query while typing, and
+              the chosen country only after closing. Owner: "this field not
+              same design as others." */}
+          <div className="p-2 border-b border-[var(--border-faint)]">
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={placeholder ?? "Search city…"}
+              className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+          </div>
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
@@ -9568,7 +9594,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
               <div className="flex items-center gap-2 mb-3">
                 <RemoveBtn onClick={() => removeSocial(i)} />
-                <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} renderLabel={tOpt} />
+                {/* PlatformSelect, not LabelSelect: a platform row without its
+                    brand glyph is just a word, and the messaging/social section
+                    further down already shows them. Brand names are not passed
+                    through tOpt — "WhatsApp" is "WhatsApp" in every language. */}
+                <div className="w-44">
+                  <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} />
+                </div>
               </div>
               <div className="space-y-2 ms-8">
                 <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder={t("field.username")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
