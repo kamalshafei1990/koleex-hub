@@ -850,6 +850,13 @@ const HEAVY_DUTY_KINDS: MachineKind[] = [
     description: "Sails, safety gear, reinforced seams.",
     subcategory: "zigzag-machines",
     attributes: { fabric_weight_class: "heavy" },
+    /* templateSlug points at the LEGACY SEWING_MACHINE_TEMPLATES list (10
+       entries), which has no zigzag member. It is back-compat only: the form
+       resolves its spec schema from the SUBCATEGORY (XSZ -> zigzag.v1), not
+       from here — see ProductForm's resolveSchema call, which passes no
+       machineKindId at all. What this kind actually contributes is
+       fabric_weight_class:"heavy", which ATTRIBUTE_CARDS turns into the
+       heavy-duty spec card. */
     templateSlug: "single-needle-lockstitch",
     icon: ZigzagMachineIcon,
   },
@@ -940,14 +947,6 @@ const SPECIAL_KINDS: MachineKind[] = [
     attributes: { application: "felling" },
     templateSlug: "single-needle-lockstitch",
     icon: BlindstitchIcon,
-  },
-  {
-    slug: "sp-zigzag",
-    name: "Zig-Zag Machine",
-    description: "Plain / 3-step / multi-point zigzag stitching.",
-    subcategory: "zigzag-machines",
-    templateSlug: "single-needle-lockstitch",
-    icon: ZigzagMachineIcon,
   },
   {
     slug: "sp-smocking",
