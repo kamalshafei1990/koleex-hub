@@ -117,8 +117,9 @@ export default function Select({
        small we move the PAGE, not the panel: nudge the field's own scroller
        once per open, and the scroll listener below re-places from there. No
        requestAnimationFrame — it does not fire in a background tab. */
-    const below = window.innerHeight - r.bottom - 12;
     const WANT = 240; /* max-h-60 on the list — the height it wants to be */
+    let below = window.innerHeight - r.bottom - 12;
+    let box = r;
     if (below < WANT && !autoScrolled.current) {
       let sc: HTMLElement | null = b.parentElement;
       while (sc) {
@@ -126,16 +127,29 @@ export default function Select({
         if (/auto|scroll/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 4) break;
         sc = sc.parentElement;
       }
-      if (sc && sc.scrollTop + (WANT - below) <= sc.scrollHeight - sc.clientHeight) {
-        autoScrolled.current = true;
-        sc.scrollTop += WANT - below;
-        return; /* the scroll event re-enters place() with the new geometry */
+      if (sc) {
+        const room = sc.scrollHeight - sc.clientHeight - sc.scrollTop; /* left to give */
+        const by = Math.min(WANT - below, Math.max(0, room));
+        if (by > 0) {
+          autoScrolled.current = true;
+          sc.scrollTop += by;
+          /* RE-MEASURE HERE, do not wait for the scroll event. Setting
+             scrollTop reflows synchronously, so the new rect is readable on
+             the very next line — whereas leaning on the event meant that if it
+             did not arrive (listener not yet attached, smooth-scroll, a
+             container that swallows it) place() had returned without ever
+             setting a rect, and the panel simply never rendered. Measured
+             exactly that: trigger at the viewport bottom, panel never in the
+             DOM at all. */
+          box = b.getBoundingClientRect();
+          below = window.innerHeight - box.bottom - 12;
+        }
       }
     }
     /* No lower clamp: when there is genuinely nowhere to scroll, a short list
        that still starts at the field beats a tall one hanging off-screen. It
        scrolls internally, so few rows visible is cramped, never lost. */
-    setRect({ top: r.bottom + 4, left: r.left, width: r.width, maxH: Math.min(WANT, Math.max(0, below)) });
+    setRect({ top: box.bottom + 4, left: box.left, width: box.width, maxH: Math.min(WANT, Math.max(0, below)) });
   }, []);
 
   useEffect(() => {
