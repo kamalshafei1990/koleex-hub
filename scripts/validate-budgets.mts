@@ -547,6 +547,54 @@ console.log("\nI. Option-value collisions");
           `${unclassified.length} value(s) mean two things with no field-scoped key:\n       ${unclassified.join("\n       ")}`);
 }
 
+/* ── J. Authorization inputs ───────────────────────────────────────────────
+   Added 2026-08-13 after `dashboard_role` turned out to gate cost prices,
+   bank balances and profit while being read from `accounts.preferences` — a
+   value the user wrote themselves through an unchecked PATCH. The audit that
+   followed found no second instance, and these two rules are what keep it
+   that way. Neither is a style rule; both encode a hole that was live.
+
+   J1. Nothing may make an authorization decision from accounts.preferences.
+       The fix had to land on the READ, not the write: there are two writers
+       (/api/me/preferences, since removed, and /api/accounts/[id]/preferences,
+       which legitimately merges Settings slices), so closing one writer would
+       have left the hole open through the other.
+
+   J2. Every AI tool must declare requiredModule. tool-registry only calls
+       checkModule() when the tool declares one — a tool without it runs
+       ungated. 41 of 42 declare one; getUserPermissions is the documented
+       exception because it returns the CALLER'S OWN permission grid. */
+console.log("\nJ. Authorization inputs");
+{
+  const expSrc = fs.readFileSync(path.join(ROOT, "src/lib/experience/index.ts"), "utf8");
+  const readsPrefs = /\bprefs\b|preferences\s*\./.test(
+    expSrc.slice(expSrc.indexOf("export async function getUserExperience")));
+  readsPrefs
+    ? bad("getUserExperience reads preferences",
+          "dashboard_role gates cost/bank/profit — it must derive from HR department + is_super_admin only")
+    : ok("no authorization decision reads accounts.preferences", "role derives from HR department");
+
+  const toolsDir = path.join(ROOT, "src/lib/server/ai-agent/tools");
+  const TOOL_NO_MODULE_OK = new Set(["getUserPermissions"]);
+  const undeclared: string[] = [];
+  let toolCount = 0;
+  for (const file of fs.readdirSync(toolsDir).filter((f) => f.endsWith(".ts"))) {
+    const src = fs.readFileSync(path.join(toolsDir, file), "utf8");
+    const names = [...src.matchAll(/^\s*name:\s*"([^"]+)"/gm)].map((m) => m[1]);
+    const declared = (src.match(/^\s*requiredModule:/gm) ?? []).length;
+    toolCount += names.length;
+    const gap = names.length - declared;
+    if (gap > 0) {
+      const unexplained = names.filter((n) => !TOOL_NO_MODULE_OK.has(n));
+      if (unexplained.length >= gap) undeclared.push(`${file}: ${unexplained.slice(0, gap).join(", ")}`);
+    }
+  }
+  undeclared.length === 0
+    ? ok("every AI tool declares requiredModule", `${toolCount} tools, ${TOOL_NO_MODULE_OK.size} documented exception`)
+    : bad("AI tool runs ungated",
+          `tool-registry only calls checkModule() when requiredModule is set:\n       ${undeclared.join("\n       ")}`);
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +
