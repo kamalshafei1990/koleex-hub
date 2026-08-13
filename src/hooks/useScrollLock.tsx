@@ -43,8 +43,29 @@ export function ScrollLockOverlay({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
+
+  /* THE BLUR MOVES OFF THIS DIV AND ONTO A SIBLING OF THE CHILDREN.
+     A `backdrop-filter` ANCESTOR starves its descendants: the child samples
+     the parent's already-filtered layer instead of the page, so its own glass
+     has nothing left to work on. Callers pass `backdrop-blur-md` here and then
+     wrap a `.kx-glass-pop` card inside — measured on the New Contact dialog:
+     the card asked for blur(40px) saturate(1.5) and rendered as a flat panel,
+     which is why it still read as the pre-Aurora design.
+
+     Dropdown panels never had this because their scrim is a SIBLING, not an
+     ancestor. Same shape here: strip the blur token off the container and
+     paint it on an inset layer behind the children. The dim stays on the
+     container, so nothing about the look changes except that the glass now
+     has a real backdrop to sample. */
+  const cls = rest.className ?? "";
+  const blurTokens = cls.match(/(?:^|\s)backdrop-blur-[\w[\]/.-]+/g) ?? [];
+  const containerCls = blurTokens.length ? cls.replace(/(?:^|\s)backdrop-blur-[\w[\]/.-]+/g, " ").replace(/\s+/g, " ").trim() : cls;
+
   return createPortal(
-    <div {...rest} style={{ zIndex: 110, ...(rest.style ?? {}) }}>
+    <div {...rest} className={containerCls} style={{ zIndex: 110, ...(rest.style ?? {}) }}>
+      {blurTokens.length > 0 && (
+        <div aria-hidden className={`absolute inset-0 ${blurTokens.join(" ").trim()}`} style={{ zIndex: -1 }} />
+      )}
       {children}
     </div>,
     document.body,
