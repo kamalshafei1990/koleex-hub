@@ -401,12 +401,24 @@ export async function createContact(obj: Record<string, unknown>): Promise<{ dat
     if (res.status === 401 || res.status === 403) {
       return { data: null, error: "Not authorized" };
     }
-    const err = await res.json().catch(() => ({ error: "Failed" }));
-    return { data: null, error: (err as { error?: string }).error ?? "Failed" };
+    const err = await res.json().catch(() => ({}));
+    return { data: null, error: (err as { error?: string }).error ?? httpReason(res.status) };
   } catch (e) {
     console.error("[Contacts] createContact failed:", e);
     return { data: null, error: e instanceof Error ? e.message : "Failed" };
   }
+}
+
+/* A response the server could not describe. 413 is by far the commonest here:
+   the platform rejects an oversized request body before our route runs, so
+   there is no JSON error to read — and returning a bare "Failed" sent the
+   operator hunting through the form instead of at the file they just
+   attached. Name the condition. */
+function httpReason(status: number): string {
+  if (status === 413) return "The record is too large to send. A file attached to it was not uploaded to storage.";
+  if (status === 504 || status === 408) return "The server took too long to respond. Please try again.";
+  if (status >= 500) return `Server error (HTTP ${status}).`;
+  return `Request failed (HTTP ${status}).`;
 }
 
 export async function updateContact(id: string, obj: Record<string, unknown>): Promise<{ ok: boolean; error: string | null }> {
@@ -421,8 +433,8 @@ export async function updateContact(id: string, obj: Record<string, unknown>): P
     if (res.status === 401 || res.status === 403 || res.status === 404) {
       return { ok: false, error: "Not authorized" };
     }
-    const err = await res.json().catch(() => ({ error: "Failed" }));
-    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+    const err = await res.json().catch(() => ({}));
+    return { ok: false, error: (err as { error?: string }).error ?? httpReason(res.status) };
   } catch (e) {
     console.error("[Contacts] updateContact failed:", e);
     return { ok: false, error: e instanceof Error ? e.message : "Failed" };
@@ -439,8 +451,8 @@ export async function deleteContact(id: string): Promise<{ ok: boolean; error: s
     if (res.status === 401 || res.status === 403 || res.status === 404) {
       return { ok: false, error: "Not authorized" };
     }
-    const err = await res.json().catch(() => ({ error: "Failed" }));
-    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+    const err = await res.json().catch(() => ({}));
+    return { ok: false, error: (err as { error?: string }).error ?? httpReason(res.status) };
   } catch (e) {
     console.error("[Contacts] deleteContact failed:", e);
     return { ok: false, error: e instanceof Error ? e.message : "Failed" };

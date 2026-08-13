@@ -1520,14 +1520,12 @@ async function compressImage(file: File, maxWidth = 800, quality = 0.7): Promise
   });
 }
 
-/** Read any file as a base64 data URL (for PDFs and non-image files) */
-async function readFileAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.readAsDataURL(file);
-  });
-}
+/* readFileAsDataURL() lived here: it turned any file into a base64 data URL,
+   and existed ONLY as the fallback for a failed upload. Deleted with those
+   fallbacks — keeping it would have re-invited the same bug, since the whole
+   problem was that inlining a document is always available and always wrong.
+   Images take a different route (compressImage → persistImageDataUrl), which
+   is compressed first and small enough to inline safely. */
 
 /** Upload a file (PDF / large document) to Supabase Storage and return its
     public URL. Storing big files inline as base64 in a JSONB column bloated
@@ -1537,7 +1535,23 @@ async function readFileAsDataURL(file: File): Promise<string> {
     inline base64 if the upload fails, so the feature never silently breaks. */
 /** Upload a Blob/File to the media bucket; returns its public URL + storage path
     (or null on failure). Used for both the catalogue file and its cover. */
-async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier-catalogues"): Promise<{ url: string; path: string } | null> {
+/** 4MB — the TRANSPORT ceiling. An upload travels through /api/storage/upload,
+ *  a serverless function whose request-body hard cap is 4.5MB. Past that the
+ *  platform kills the request, and every caller below used to read that as a
+ *  generic failure. Refusing up front, by name, is the only honest option. */
+const MEDIA_TRANSPORT_MAX_BYTES = 4 * 1024 * 1024;
+
+type MediaUpload =
+  | { ok: true; url: string; path: string }
+  | { ok: false; error: string };
+
+/* Returns WHY it failed. It used to return null for everything — a size
+   rejection, an auth failure and a network drop were indistinguishable, and
+   the callers turned all three into a silent base64 fallback. */
+async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier-catalogues"): Promise<MediaUpload> {
+  if (blob.size > MEDIA_TRANSPORT_MAX_BYTES) {
+    return { ok: false, error: `File is too large to upload (max ${Math.round(MEDIA_TRANSPORT_MAX_BYTES / 1048576)}MB).` };
+  }
   try {
     const safe = (name || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(0, 80);
     const fd = new FormData();
@@ -1547,15 +1561,38 @@ async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier
     const ct = (blob as File).type || "application/octet-stream";
     fd.append("contentType", ct);
     const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      /* The body may not be JSON at all — a platform-level rejection returns
+         HTML. Never let that surface as an empty reason. */
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: j.error || `Upload failed (HTTP ${res.status}).` };
+    }
     const json = (await res.json()) as { publicUrl?: string; path?: string };
-    return json.publicUrl && json.path ? { url: json.publicUrl, path: json.path } : null;
-  } catch { return null; }
+    if (!json.publicUrl || !json.path) return { ok: false, error: "Upload returned no file location." };
+    return { ok: true, url: json.publicUrl, path: json.path };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Upload failed." };
+  }
 }
 
-async function uploadFileToStorage(file: File): Promise<string> {
+/**
+ * Upload a DOCUMENT and return its URL, or null with the reason.
+ *
+ * ⚠️ THIS MUST NEVER FALL BACK TO base64, and that is the whole point of the
+ * function. It used to return `readFileAsDataURL(file)` when the upload
+ * failed, which turned a legible upload error into an illegible save error:
+ * the PDF became a multi-megabyte data: URL inside form.documents, rode along
+ * in the contact PATCH body, and the oversized request came back as a non-JSON
+ * platform error — which the caller rendered as a bare "Failed". The document
+ * even looked fine on screen (a data: URL previews and downloads), so the only
+ * visible symptom was that saving the supplier stopped working, with no
+ * connection to the file that caused it.
+ *
+ * A file that cannot be uploaded must be reported, not smuggled into the row.
+ */
+async function uploadFileToStorage(file: File): Promise<{ url: string } | { error: string }> {
   const up = await uploadToMediaStorage(file, file.name);
-  return up ? up.url : readFileAsDataURL(file);
+  return up.ok ? { url: up.url } : { error: up.error };
 }
 
 /** Upload an already-compressed data-URL image to Storage at PICK time and
@@ -1571,7 +1608,7 @@ async function persistImageDataUrl(dataUrl: string, name: string): Promise<strin
   try {
     const blob = await (await fetch(dataUrl)).blob();
     const up = await uploadToMediaStorage(blob, name || "image.jpg", "contact-images");
-    return up ? up.url : dataUrl;
+    return up.ok ? up.url : dataUrl;
   } catch {
     return dataUrl;
   }
@@ -5266,6 +5303,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [triedSave, setTriedSave] = useState(false);
   // Distinguishes "fill required fields" (validation) from a real server error.
   const [saveErrorIsValidation, setSaveErrorIsValidation] = useState(false);
+  /* Upload failures are their own banner, NOT saveError: nothing was saved, so
+     titling them "Save Failed" would send the operator looking in the wrong
+     place. Kept separate rather than folded into saveError's title logic so
+     neither can silently clear the other. */
+  const [uploadError, setUploadError] = useState<string | null>(null);
   // True while the full record (images/docs) is being fetched for an edit —
   // Save is blocked until it loads so we never overwrite unloaded images.
   const [formHydrating, setFormHydrating] = useState(false);
@@ -5889,6 +5931,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       setSaveError(t("error.specialPricingNeedsExpiry", "A Special Pricing Agreement needs a Contract Expiry date."));
       return;
     }
+    /* SAFETY NET: no document or catalogue may leave here as a data: URL.
+       A multi-megabyte base64 blob in the payload is rejected by the platform
+       before our route ever runs, so the response is not JSON and the failure
+       reaches the operator as a bare "Failed" with no hint which file caused
+       it. The uploaders above no longer produce these; this refuses the save
+       by NAME if any other path ever does. */
+    const inlineFile =
+      form.documents.find((d) => typeof d.url === "string" && d.url.startsWith("data:"))?.doc_name
+      ?? form.documents.find((d) => typeof d.url === "string" && d.url.startsWith("data:"))?.name
+      ?? form.catalogues.find((c) => typeof c.url === "string" && c.url.startsWith("data:"))?.name;
+    if (inlineFile) {
+      setTriedSave(true);
+      setSaveErrorIsValidation(true);
+      setSaveError(
+        t("error.fileNotUploaded", "\"{name}\" was never uploaded to storage. Remove it and attach it again.")
+          .replace("{name}", inlineFile),
+      );
+      return;
+    }
+
     setTriedSave(false);
     setSaveErrorIsValidation(false);
     setSaving(true);
@@ -9071,6 +9133,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         </div>
 
+        {/* Upload error banner — a file never reached Storage. Distinct from
+            the save banner below: this one means the RECORD is untouched. */}
+        {uploadError && (
+          <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <div className="flex items-start gap-2">
+              <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-400 font-medium">{t("error.uploadFailed", "Upload failed")}</p>
+                <p className="text-xs text-red-400/70 mt-0.5 whitespace-pre-line">{uploadError}</p>
+              </div>
+              <button onClick={() => setUploadError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
+                <CrossIcon size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Save error banner */}
         {saveError && (
           <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
@@ -9969,18 +10048,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadDocument")}</span>
               <input type="file" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  const isImage = file.type.startsWith("image/");
-                  const handler = isImage ? compressImageToStorage(file, 1200, 0.8) : uploadFileToStorage(file);
-                  handler.then(url => {
-                    setField("attachments", [...form.attachments, {
-                      name: file.name,
-                      url,
-                      type: file.type.split("/").pop()?.toUpperCase() || "FILE",
-                      uploaded_at: new Date().toISOString(),
-                    }]);
-                  });
-                }
+                if (!file) return;
+                const isImage = file.type.startsWith("image/");
+                setUploadError(null);
+                void (async () => {
+                  let url: string;
+                  if (isImage) { url = await compressImageToStorage(file, 1200, 0.8); }
+                  else {
+                    const up = await uploadFileToStorage(file);
+                    if ("error" in up) { setUploadError(up.error); return; }
+                    url = up.url;
+                  }
+                  setField("attachments", [...form.attachments, {
+                    name: file.name,
+                    url,
+                    type: file.type.split("/").pop()?.toUpperCase() || "FILE",
+                    uploaded_at: new Date().toISOString(),
+                  }]);
+                })();
               }} />
             </label>
           </FormSection>
@@ -10392,15 +10477,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <PaperclipIcon size={12} /> {t("btn.upload")}
                           <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const isPdf = file.type === "application/pdf";
-                              const handler = isPdf ? uploadFileToStorage(file) : compressImageToStorage(file, 1200, 0.8);
-                              handler.then(url => {
-                                const arr = [...form.documents];
-                                arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
-                                setField("documents", arr);
-                              });
-                            }
+                            if (!file) return;
+                            const isPdf = file.type === "application/pdf";
+                            setUploadError(null);
+                            void (async () => {
+                              /* A PDF must reach Storage or the attempt is
+                                 abandoned — never quietly kept as base64,
+                                 which is what made SAVING the record fail
+                                 later with no mention of the file. Images go
+                                 through the compressor, which is small enough
+                                 to keep its own inline fallback. */
+                              let url: string;
+                              if (isPdf) {
+                                const up = await uploadFileToStorage(file);
+                                if ("error" in up) { setUploadError(up.error); return; }
+                                url = up.url;
+                              } else {
+                                url = await compressImageToStorage(file, 1200, 0.8);
+                              }
+                              const arr = [...form.documents];
+                              arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                              setField("documents", arr);
+                            })();
                           }} />
                         </label>
                       </>
@@ -11077,16 +11175,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     const isPdf = file.type === "application/pdf";
                     const existing = form.catalogues;
                     (async () => {
-                      // Always upload to Storage (not inline base64) so the catalogue
-                      // gets an http URL that syncs to the Catalogs app — images too.
+                      /* Always upload to Storage — and when that fails, STOP.
+                         This used to fall back to base64, contradicting the
+                         line above it: the catalogue then rode inside the save
+                         payload and took the whole supplier save down with it. */
                       const up = await uploadToMediaStorage(file, file.name);
-                      const url = up ? up.url : await readFileAsDataURL(file);
+                      if (!up.ok) { setUploadError(up.error); return; }
                       const item: (typeof existing)[number] = {
                         name: file.name,
-                        url,
+                        url: up.url,
                         type: isPdf ? "PDF" : (file.type.split("/").pop()?.toUpperCase() || "IMAGE"),
                         uploaded_at: new Date().toISOString(),
-                        ...(up?.path ? { storage_path: up.path } : {}),
+                        storage_path: up.path,
                       };
                       if (isPdf) {
                         // Render the PDF's first page as the cover so the Catalogs app
@@ -11096,10 +11196,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           const cover = await pdfFirstPageCover(file);
                           if (cover) {
                             const cu = await uploadToMediaStorage(cover, `${file.name}.cover.jpg`);
-                            if (cu) { item.cover_url = cu.url; item.cover_path = cu.path; }
+                            if (cu.ok) { item.cover_url = cu.url; item.cover_path = cu.path; }
                           }
                         } catch { /* cover is best-effort */ }
-                      } else if (up) {
+                      } else {
                         item.cover_url = up.url; // image is its own cover
                       }
                       setField("catalogues", [...existing, item]);
@@ -11423,15 +11523,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                             <PaperclipIcon size={12} /> {t("btn.upload")}
                             <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                               const file = e.target.files?.[0];
-                              if (file) {
-                                const isPdf = file.type === "application/pdf";
-                                const handler = isPdf ? uploadFileToStorage(file) : compressImageToStorage(file, 1200, 0.8);
-                                handler.then(url => {
-                                  const arr = [...form.documents];
-                                  arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
-                                  setField("documents", arr);
-                                });
-                              }
+                              if (!file) return;
+                              const isPdf = file.type === "application/pdf";
+                              setUploadError(null);
+                              void (async () => {
+                                let url: string;
+                                if (isPdf) {
+                                  const up = await uploadFileToStorage(file);
+                                  if ("error" in up) { setUploadError(up.error); return; }
+                                  url = up.url;
+                                } else { url = await compressImageToStorage(file, 1200, 0.8); }
+                                const arr = [...form.documents];
+                                arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                                setField("documents", arr);
+                              })();
                             }} />
                           </label>
                         </>
@@ -11739,12 +11844,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {t("photo.uploadDoc")}
                 <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = (file.type.startsWith("image/") ? compressImageToStorage(file) : uploadFileToStorage(file));
-                    reader.then(url => {
-                      setField("visa_documents", [...form.visa_documents, { name: file.name, url, type: file.type, uploaded_at: new Date().toISOString() }]);
-                    });
-                  }
+                  if (!file) return;
+                  setUploadError(null);
+                  void (async () => {
+                    let url: string;
+                    if (file.type.startsWith("image/")) { url = await compressImageToStorage(file); }
+                    else {
+                      const up = await uploadFileToStorage(file);
+                      if ("error" in up) { setUploadError(up.error); return; }
+                      url = up.url;
+                    }
+                    setField("visa_documents", [...form.visa_documents, { name: file.name, url, type: file.type, uploaded_at: new Date().toISOString() }]);
+                  })();
                 }} />
               </label>
             </div>
