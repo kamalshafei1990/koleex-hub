@@ -12,6 +12,9 @@ import Building2Icon from "@/components/icons/ui/Building2Icon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+/* A native <select> draws its list with the OS, so no stylesheet reaches it —
+   MN-5 starts by not being one. See components/kds/Select.tsx. */
+import KdsSelect from "@/components/kds/Select";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
@@ -655,16 +658,15 @@ export default function SimulationForm({ id }: { id?: string }) {
           <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
             {/* §4 Confidence level selector */}
             <div className="relative group" title={t("confidenceHint")}>
-              <select
+              {/* The hand-placed chevron went with the <select>: KdsSelect
+                  draws its own, and two would sit on top of each other. */}
+              <KdsSelect
                 value={confidence}
-                onChange={e => setConfidence(e.target.value as ConfidenceLevel)}
-                className="h-8 pl-2.5 pr-7 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] appearance-none cursor-pointer"
-              >
-                {(Object.keys(CONFIDENCE_META) as ConfidenceLevel[]).map(k => (
-                  <option key={k} value={k}>{t(`conf.${k}`)}</option>
-                ))}
-              </select>
-              <AngleDownIcon className="h-3 w-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-ghost)]" />
+                onChange={v => setConfidence(v as ConfidenceLevel)}
+                options={(Object.keys(CONFIDENCE_META) as ConfidenceLevel[]).map(k => ({ value: k, label: t(`conf.${k}`) }))}
+                panelWidthClassName="min-w-[10rem]"
+                triggerClassName="h-8 ps-2.5 pe-7 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start"
+              />
             </div>
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
             <button onClick={() => handleSave()} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg">
@@ -755,16 +757,14 @@ export default function SimulationForm({ id }: { id?: string }) {
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label={t("product")}>
-                  <select value={productId} onChange={e => onProductSelect(e.target.value)} className={selectCls}>
-                    <option value="">{t("selectProduct")}</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}
-                  </select>
+                  <KdsSelect value={productId} onChange={onProductSelect}
+                    options={products.map(p => ({ value: p.id, label: p.product_name }))}
+                    placeholder={t("selectProduct")} triggerClassName={`${selectCls} pe-7 text-start`} />
                 </Field>
                 <Field label={t("model")}>
-                  <select value={modelId} onChange={e => onModelSelect(e.target.value)} className={selectCls} disabled={!productId}>
-                    <option value="">{t("selectModel")}</option>
-                    {models.map(m => <option key={m.id} value={m.id}>{m.model_name} ({m.sku})</option>)}
-                  </select>
+                  <KdsSelect value={modelId} onChange={onModelSelect} disabled={!productId}
+                    options={models.map(m => ({ value: m.id, label: `${m.model_name} (${m.sku})` }))}
+                    placeholder={t("selectModel")} triggerClassName={`${selectCls} pe-7 text-start`} />
                 </Field>
                 <Field label={t("sku")} fieldState={fs("sku")} badgeLabels={bl}><input type="text" value={skuVal} onChange={e => { setSkuVal(e.target.value); markManual("sku"); }} className={`${inputCls} ${fs("sku") && skuVal ? FIELD_INPUT_STYLES[fs("sku")!] : ""}`} /></Field>
                 <Field label={t("hsCode")} hint={t("hsCodeHint")} fieldState={fs("hsCode")} warn={!hsCode ? t("warn.hsCode") : undefined} badgeLabels={bl}><input type="text" value={hsCode} onChange={e => { setHsCode(e.target.value); markManual("hsCode"); }} className={`${inputCls} ${fs("hsCode") && hsCode ? FIELD_INPUT_STYLES[fs("hsCode")!] : ""}`} placeholder="e.g. 8516.31.00" /></Field>
@@ -784,14 +784,10 @@ export default function SimulationForm({ id }: { id?: string }) {
                   }} warn={!quantity || quantity <= 0 ? t("required") : undefined} />
                   <NumField label={t("unitPrice")} value={unitPrice} onChange={v => { setUnitPrice(v); markManual("unitPrice"); }} suffix={currency} fieldState={fs("unitPrice")} warn={!unitPrice ? t("required") : undefined} badgeLabels={bl} />
                   <Field label={t("currency")}>
-                    <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectCls}>
-                      {["USD","EUR","GBP","CNY","AED","SAR","EGP","TRY","JPY","KRW","INR","BRL"].map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <KdsSelect value={currency} onChange={setCurrency} options={["USD","EUR","GBP","CNY","AED","SAR","EGP","TRY","JPY","KRW","INR","BRL"]} triggerClassName={`${selectCls} pe-7 text-start`} />
                   </Field>
                   <Field label={t("priceBasis")} hint={t(`hint.${priceBasis}`)}>
-                    <select value={priceBasis} onChange={e => setPriceBasis(e.target.value)} className={selectCls}>
-                      {["EXW","FOB","CFR","CIF"].map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
+                    <KdsSelect value={priceBasis} onChange={setPriceBasis} options={["EXW","FOB","CFR","CIF"]} triggerClassName={`${selectCls} pe-7 text-start`} />
                   </Field>
                 </div>
                 <div className="mt-3 px-3 py-2 rounded-lg bg-[var(--bg-inverted)]/[0.03] border border-[var(--border-subtle)]/50">
@@ -806,9 +802,8 @@ export default function SimulationForm({ id }: { id?: string }) {
                   <Field label={t("packingType")} fieldState={fs("packingType")} badgeLabels={bl}><input type="text" value={productInfo.packingType} onChange={e => { setProductInfo(p => ({ ...p, packingType: e.target.value })); markManual("packingType"); }} className={`${inputCls} ${fs("packingType") && productInfo.packingType ? FIELD_INPUT_STYLES[fs("packingType")!] : ""}`} placeholder={t("ph.packingType")} /></Field>
                   <NumField label={t("numCartons")} value={productInfo.numCartons} onChange={v => setProductInfo(p => ({ ...p, numCartons: v }))} />
                   <Field label={t("loadingType")} hint={t(`hint.${productInfo.loadingType}`)}>
-                    <select value={productInfo.loadingType} onChange={e => setProductInfo(p => ({ ...p, loadingType: e.target.value }))} className={selectCls}>
-                      {["LCL","FCL 20GP","FCL 40GP","FCL 40HQ","Air","Courier"].map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
+                    <KdsSelect value={productInfo.loadingType} onChange={v => setProductInfo(p => ({ ...p, loadingType: v }))}
+                      options={["LCL","FCL 20GP","FCL 40GP","FCL 40HQ","Air","Courier"]} triggerClassName={`${selectCls} pe-7 text-start`} />
                   </Field>
                   <NumField label={t("netWeightPerUnit")} value={productInfo.netWeightPerUnit} onChange={v => setProductInfo(p => ({ ...p, netWeightPerUnit: v }))} suffix="kg" />
                   <NumField label={t("grossWeightPerUnit")} value={productInfo.grossWeightPerUnit} onChange={v => { setProductInfo(p => ({ ...p, grossWeightPerUnit: v, totalGrossWeight: v * quantity })); markManual("grossWeight"); }} suffix="kg" hint={t("grossWeightHint")} fieldState={fs("grossWeight")} warn={!productInfo.totalGrossWeight ? t("warn.weight") : undefined} badgeLabels={bl} />
@@ -886,7 +881,7 @@ export default function SimulationForm({ id }: { id?: string }) {
               forceOpen={openedSections.has("shipping")}
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Field label={t("shippingMode")}><select value={shippingCosts.shippingMode} onChange={e => updateShipping("shippingMode", e.target.value)} className={selectCls}>{["Sea","Air","Courier","Land"].map(m => <option key={m} value={m}>{m}</option>)}</select></Field>
+                <Field label={t("shippingMode")}><KdsSelect value={shippingCosts.shippingMode} onChange={v => updateShipping("shippingMode", v)} options={["Sea","Air","Courier","Land"]} triggerClassName={`${selectCls} pe-7 text-start`} /></Field>
                 <Field label={t("portOfLoading")}><input type="text" value={shippingCosts.portOfLoading} onChange={e => updateShipping("portOfLoading", e.target.value)} className={inputCls} placeholder={t("ph.shanghai")} /></Field>
                 <Field label={t("portOfDestination")}><input type="text" value={shippingCosts.portOfDestination} onChange={e => updateShipping("portOfDestination", e.target.value)} className={inputCls} placeholder={t("ph.alexandria")} /></Field>
               </div>
@@ -919,7 +914,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                   <NumField label={t("chargeableWeight")} value={shippingCosts.chargeableWeight} onChange={v => { updateShipping("chargeableWeight", v); markManual("chargeableWeight"); }} suffix="kg" hint={t("chargeableWeightHint")} fieldState={fs("chargeableWeight")} badgeLabels={bl} />
                   <NumField label={t("actualWeight")} value={shippingCosts.actualWeight} onChange={v => { updateShipping("actualWeight", v); markManual("actualWeight"); }} suffix="kg" fieldState={fs("actualWeight")} badgeLabels={bl} />
                   <NumField label={t("volumetricWeight")} value={shippingCosts.volumetricWeight} onChange={v => { updateShipping("volumetricWeight", v); markManual("volumetricWeight"); }} suffix="kg" hint={t("volumetricWeightHint")} fieldState={fs("volumetricWeight")} badgeLabels={bl} />
-                  <Field label={t("freightCurrency")}><select value={shippingCosts.freightCurrency} onChange={e => updateShipping("freightCurrency", e.target.value)} className={selectCls}>{["USD","EUR","GBP","CNY"].map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+                  <Field label={t("freightCurrency")}><KdsSelect value={shippingCosts.freightCurrency} onChange={v => updateShipping("freightCurrency", v)} options={["USD","EUR","GBP","CNY"]} triggerClassName={`${selectCls} pe-7 text-start`} /></Field>
                   <NumField label={t("freightExchangeRate")} value={shippingCosts.freightExchangeRate} onChange={v => updateShipping("freightExchangeRate", v)} hint={t("freightExRateHint")} />
                 </div>
               </SubGroup>
@@ -950,14 +945,13 @@ export default function SimulationForm({ id }: { id?: string }) {
                   <Field label={t("countryOfOriginLbl")}><input type="text" value={customsProfile.countryOfOrigin} onChange={e => setCustomsProfile(p => ({ ...p, countryOfOrigin: e.target.value }))} className={inputCls} placeholder={originCountry || t("ph.countryOfOrigin")} /></Field>
                   <Field label={t("hsCode")}><input type="text" value={customsProfile.hsCode} onChange={e => setCustomsProfile(p => ({ ...p, hsCode: e.target.value }))} className={inputCls} placeholder={hsCode || "8516.31.00"} /></Field>
                   <Field label={t("tradeAgreement")} hint={t("tradeAgreementHint")}>
-                    <select value={customsProfile.tradeAgreement} onChange={e => setCustomsProfile(p => ({ ...p, tradeAgreement: e.target.value }))} className={selectCls}>
-                      {["None","GAFTA","GCC","FTA","COMESA","AfCFTA","EU","Other"].map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
+                    <KdsSelect value={customsProfile.tradeAgreement} onChange={v => setCustomsProfile(p => ({ ...p, tradeAgreement: v }))}
+                      options={["None","GAFTA","GCC","FTA","COMESA","AfCFTA","EU","Other"]} triggerClassName={`${selectCls} pe-7 text-start`} />
                   </Field>
                   <Field label={t("valuationMethod")}>
-                    <select value={customsProfile.valuationMethod} onChange={e => setCustomsProfile(p => ({ ...p, valuationMethod: e.target.value }))} className={selectCls}>
-                      {(["transaction_value","cif","fob","custom"] as const).map(v => <option key={v} value={v}>{t(`val.${v}`)}</option>)}
-                    </select>
+                    <KdsSelect value={customsProfile.valuationMethod} onChange={v => setCustomsProfile(p => ({ ...p, valuationMethod: v }))}
+                      options={(["transaction_value","cif","fob","custom"] as const).map(v => ({ value: v, label: t(`val.${v}`) }))}
+                      triggerClassName={`${selectCls} pe-7 text-start`} />
                   </Field>
                 </div>
               </div>
@@ -968,7 +962,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                 <NumField label={t("customsDutyPct")} value={importCosts.customsDutyPct} onChange={v => { updateImport("customsDutyPct", v); markManual("dutyPct"); }} suffix="%" hint={t("dutyHint")} fieldState={fs("dutyPct")} badgeLabels={bl} />
                 <NumField label={t("importVatPct")} value={importCosts.importVatPct} onChange={v => { updateImport("importVatPct", v); markManual("vatPct"); }} suffix="%" hint={t("vatHint")} fieldState={fs("vatPct")} badgeLabels={bl} />
                 <NumField label={t("additionalTaxPct")} value={importCosts.additionalTaxPct} onChange={v => updateImport("additionalTaxPct", v)} suffix="%" />
-                <Field label={t("calculationBasis")} hint={t("calcBasisHint")}><select value={importCosts.calculationBasis} onChange={e => updateImport("calculationBasis", e.target.value)} className={selectCls}><option value="FOB">{t("basedOnFOB")}</option><option value="CIF">{t("basedOnCIF")}</option><option value="custom_value">{t("customDeclaredValue")}</option></select></Field>
+                <Field label={t("calculationBasis")} hint={t("calcBasisHint")}><KdsSelect value={importCosts.calculationBasis} onChange={v => updateImport("calculationBasis", v)} options={[{ value: "FOB", label: t("basedOnFOB") }, { value: "CIF", label: t("basedOnCIF") }, { value: "custom_value", label: t("customDeclaredValue") }]} triggerClassName={`${selectCls} pe-7 text-start`} /></Field>
                 {importCosts.calculationBasis === "custom_value" && <NumField label={t("customValue")} value={importCosts.customValue} onChange={v => updateImport("customValue", v)} suffix={currency} />}
                 <NumField label={t("antiDumpingDuty")} value={importCosts.antiDumpingDuty} onChange={v => updateImport("antiDumpingDuty", v)} suffix={currency} hint={t("antiDumpingHint")} />
               </div>
@@ -1060,7 +1054,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <NumField label={t("exchangeRate")} value={financial.exchangeRate} onChange={v => updateFinancial("exchangeRate", v)} hint={t("exchangeRateHint")} />
-                <Field label={t("paymentTerm")} hint={t("paymentTermHint")}><select value={financial.paymentTerm} onChange={e => updateFinancial("paymentTerm", e.target.value)} className={selectCls}>{["TT","LC","DP","OA"].map(pt => <option key={pt} value={pt}>{pt}</option>)}</select></Field>
+                <Field label={t("paymentTerm")} hint={t("paymentTermHint")}><KdsSelect value={financial.paymentTerm} onChange={v => updateFinancial("paymentTerm", v)} options={["TT","LC","DP","OA"]} triggerClassName={`${selectCls} pe-7 text-start`} /></Field>
               </div>
               <SubGroup label={t("sub.bankingFinance")}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
