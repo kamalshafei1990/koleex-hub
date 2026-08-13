@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
@@ -13,14 +15,14 @@ function getBreadcrumbs(pathname: string) {
 
   for (const item of POLICY_NAV) {
     if (pathname === item.path) {
-      return [{ label: item.label, path: item.path, current: true }];
+      return [{ id: item.id, label: item.label, path: item.path, current: true }];
     }
     if (item.children) {
       const child = item.children.find((c) => c.path === pathname);
       if (child) {
         return [
-          { label: item.label, path: item.path, current: false },
-          { label: child.label, path: child.path, current: true },
+          { id: item.id, label: item.label, path: item.path, current: false },
+          { id: child.id, label: child.label, path: child.path, current: true },
         ];
       }
     }
@@ -29,6 +31,7 @@ function getBreadcrumbs(pathname: string) {
 }
 
 export default function CommercialPolicyLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   const pathname = usePathname();
   const breadcrumbs = getBreadcrumbs(pathname);
   const isLanding = pathname === "/knowledge/commercial-policy";
@@ -69,14 +72,14 @@ export default function CommercialPolicyLayout({ children }: { children: React.R
                 <span key={crumb.path} className="flex items-center gap-1.5 shrink-0">
                   <AngleRightIcon size={8} style={{ color: "var(--text-ghost)" }} />
                   {crumb.current ? (
-                    <span style={{ color: "var(--text-muted)" }}>{crumb.label}</span>
+                    <span style={{ color: "var(--text-muted)" }}>{t(`nav.${crumb.id}`, crumb.label)}</span>
                   ) : (
                     <Link
                       href={crumb.path}
                       className="transition-colors hover:opacity-80"
                       style={{ color: "var(--text-dim)" }}
                     >
-                      {crumb.label}
+                      {t(`nav.${crumb.id}`, crumb.label)}
                     </Link>
                   )}
                 </span>

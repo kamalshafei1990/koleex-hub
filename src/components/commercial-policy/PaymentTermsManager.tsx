@@ -159,23 +159,23 @@ export default function PaymentTermsManager({
   }, [pendingDelete, refresh]);
 
   const RISK_OPTS = [
-    { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" },
+    { value: "low", label: t("f.low", "Low") }, { value: "medium", label: t("f.medium", "Medium") }, { value: "high", label: t("f.high", "High") },
   ];
   const termFields: CatalogField[] = useMemo(() => [
-    { key: "category_id", label: "Category", type: "select", required: true,
+    { key: "category_id", label: t("f.category", "Category"), type: "select", required: true,
       options: categories.map((c) => ({ value: c.id, label: c.name })) },
-    { key: "code", label: "Code", type: "text", required: true, placeholder: "tt_30_70" },
-    { key: "label", label: "Label", type: "text", required: true, placeholder: "30% deposit, 70% against B/L" },
-    { key: "short_label", label: "Short label", type: "text", placeholder: "T/T 30/70" },
-    { key: "total_days", label: "Total days", type: "number" },
-    { key: "days_basis", label: "Days basis", type: "text", placeholder: "days_after_bl / none" },
-    { key: "exporter_risk", label: "Exporter risk", type: "select", options: RISK_OPTS },
-    { key: "buyer_risk", label: "Buyer risk", type: "select", options: RISK_OPTS },
-    { key: "suitable_for", label: "Suitable for", type: "chips", full: true, placeholder: "new_customer, trusted (comma-separated)" },
-    { key: "sort_order", label: "Sort order", type: "number" },
-    { key: "is_default", label: "Default for category", type: "toggle" },
-    { key: "is_active", label: "Active", type: "toggle" },
-    { key: "notes", label: "Notes", type: "textarea" },
+    { key: "code", label: t("f.code", "Code"), type: "text", required: true, placeholder: "tt_30_70" },
+    { key: "label", label: t("f.label", "Label"), type: "text", required: true, placeholder: "30% deposit, 70% against B/L" },
+    { key: "short_label", label: t("f.shortLabel", "Short label"), type: "text", placeholder: "T/T 30/70" },
+    { key: "total_days", label: t("f.totalDays", "Total days"), type: "number" },
+    { key: "days_basis", label: t("f.daysBasis", "Days basis"), type: "text", placeholder: "days_after_bl / none" },
+    { key: "exporter_risk", label: t("f.exporterRisk", "Exporter risk"), type: "select", options: RISK_OPTS },
+    { key: "buyer_risk", label: t("f.buyerRisk", "Buyer risk"), type: "select", options: RISK_OPTS },
+    { key: "suitable_for", label: t("f.suitableFor", "Suitable for"), type: "chips", full: true, placeholder: "new_customer, trusted (comma-separated)" },
+    { key: "sort_order", label: t("f.sortOrder", "Sort order"), type: "number" },
+    { key: "is_default", label: t("f.defaultForCategory", "Default for category"), type: "toggle" },
+    { key: "is_active", label: t("f.active", "Active"), type: "toggle" },
+    { key: "notes", label: t("f.notes", "Notes"), type: "textarea" },
   ], [categories]);
 
   /* Filtered + searched view. We keep categories in the same order

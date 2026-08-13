@@ -39,7 +39,7 @@ function NavGroup({ item, pathname, onNavigate }: { item: PolicyNavItem; pathnam
           fontWeight: isActive ? 600 : 400,
         }}
       >
-        {item.label}
+        {t(`nav.${item.id}`, item.label)}
       </Link>
     );
   }
@@ -55,7 +55,7 @@ function NavGroup({ item, pathname, onNavigate }: { item: PolicyNavItem; pathnam
         }}
       >
         <Link href={item.path} onClick={(e) => { e.stopPropagation(); onNavigate?.(); }} className="flex-1 text-left">
-          {item.label}
+          {t(`nav.${item.id}`, item.label)}
         </Link>
         {open ? <AngleDownIcon size={12} /> : <AngleRightIcon size={12} />}
       </button>
@@ -77,7 +77,7 @@ function NavGroup({ item, pathname, onNavigate }: { item: PolicyNavItem; pathnam
                   marginLeft: 8,
                 }}
               >
-                {child.label}
+                {t(`nav.${child.id}`, child.label)}
               </Link>
             );
           })}
@@ -118,7 +118,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
               className="mt-4 px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest"
               style={{ color: "var(--text-ghost)" }}
             >
-              {sec.label}
+              {t(`nav.${sec.id}`, sec.label)}
             </p>
           )}
           {sec.items.map((item) => (
