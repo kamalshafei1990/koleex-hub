@@ -13,6 +13,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
@@ -50,6 +52,7 @@ import AppIcon from "@/components/common/AppIcon";
 const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function CommercialPolicyPage() {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <AuthGate>
       <CommercialPolicyView />
@@ -60,6 +63,7 @@ export default function CommercialPolicyPage() {
 /* ─── Top-level view ──────────────────────────────────────── */
 
 function CommercialPolicyView() {
+  const { t } = useTranslation(commercialPolicyT);
   const aurora = useSkin() === "aurora";
   const [snapshot, setSnapshot] = useState<CommercialPolicySnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +153,7 @@ function CommercialPolicyView() {
 }
 
 function LoadingState() {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="flex items-center justify-center py-24">
       <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
@@ -156,6 +161,7 @@ function LoadingState() {
   );
 }
 function ErrorState({ message }: { message: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-5 py-6 flex items-start gap-3">
       <InfoIcon className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
@@ -195,10 +201,12 @@ const POLICY_SECTIONS: { id: string; label: string }[] = [
 ];
 
 function Anchor({ id, children }: { id: string; children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return <div id={id} className="scroll-mt-20">{children}</div>;
 }
 
 function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <>
       <PolicyHealthStrip s={s} />
@@ -207,7 +215,7 @@ function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
       <PriceCalculatorCTA />
 
       {/* ── Pricing policy ── */}
-      <GroupLabel>Pricing policy</GroupLabel>
+      <GroupLabel>{t("pricingPolicy", "Pricing policy")}</GroupLabel>
       <Anchor id="cp-settings"><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
       <Anchor id="cp-levels"><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
       <Anchor id="cp-tiers"><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
@@ -231,6 +239,7 @@ function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
 /* A subtle group divider between the pricing-policy sections and the
    trade-terms/logistics master-data sections. */
 function GroupLabel({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="pt-2 first:pt-0">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{children}</h2>
@@ -240,6 +249,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 
 /* ─── Sticky section nav (jump links) ───────────────────────── */
 function PolicyNav() {
+  const { t } = useTranslation(commercialPolicyT);
   const jump = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -263,6 +273,7 @@ function PolicyNav() {
 
 /* ─── Policy health strip ───────────────────────────────────── */
 function PolicyHealthStrip({ s }: { s: CommercialPolicySnapshot }) {
+  const { t } = useTranslation(commercialPolicyT);
   const engineOn = !!s.settings?.use_policy_engine;
   const updatedAt = s.settings?.updated_at ? new Date(s.settings.updated_at) : null;
   const fxFreshLabel = (() => {
@@ -293,6 +304,7 @@ function PolicyHealthStrip({ s }: { s: CommercialPolicySnapshot }) {
 }
 
 function HealthPill({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="flex items-center gap-2 min-w-0">
       <span className={`h-2 w-2 rounded-full shrink-0 ${ok ? "bg-emerald-400" : "bg-[var(--text-dim)]"}`} />
@@ -320,6 +332,7 @@ function relativeDay(d: Date): string {
    richer and the team's canonical tool — so we link to it here rather than
    duplicate a weaker simulator. The rules below are what it should price by. */
 function PriceCalculatorCTA() {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <Link
       href="/price-calculator?from=/commercial-policy"
@@ -329,7 +342,7 @@ function PriceCalculatorCTA() {
         <PriceCalculatorIcon className="h-5 w-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold text-[var(--text-primary)]">Test a price in the Price Calculator</div>
+        <div className="text-[14px] font-semibold text-[var(--text-primary)]">{t("testInCalculator", "Test a price in the Price Calculator")}</div>
         <p className="text-[12px] text-[var(--text-muted)] mt-0.5">Model cost &rarr; level &rarr; channel ladder &rarr; market band &rarr; final price &amp; margin in the full calculator. The policy below is what it prices by.</p>
       </div>
       <span className="text-[12px] font-medium text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors shrink-0">Open &rarr;</span>
@@ -338,11 +351,11 @@ function PriceCalculatorCTA() {
 }
 
 function InfoBanner() {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 flex items-start gap-3">
       <InfoIcon className="h-4 w-4 text-[var(--text-dim)] mt-0.5 shrink-0" />
-      <div className="min-w-0 text-[12px] text-[var(--text-muted)] leading-relaxed">
-        Click <span className="text-[var(--text-primary)] font-semibold">Edit</span> on any
+      <div className="min-w-0 text-[12px] text-[var(--text-muted)] leading-relaxed">{t("click", "Click")}<span className="text-[var(--text-primary)] font-semibold">Edit</span> on any
         section to change values. Saves are applied per-section and sync to the pricing engine
         immediately. Assign each country to a market band in the Country Segmentation panel under Market Bands.
       </div>
@@ -375,6 +388,7 @@ function SectionShell({
   canSave?: boolean;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <section id={id} className="scroll-mt-20 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)] flex items-start justify-between gap-3 flex-wrap">
@@ -514,6 +528,7 @@ function SettingsSection({
   row: CommercialSettingsRow | null;
   onPatch: (r: CommercialSettingsRow | null) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<CommercialSettingsRow | null>(
     row,
     "/api/commercial-policy/settings",
@@ -568,14 +583,14 @@ function SettingsSection({
   if (!d) {
     return (
       <SectionShell title="Settings" editing={false} saving={false} onEditStart={() => {}} onCancel={() => {}} onSave={() => {}} canSave={false}>
-        <div className="text-[12px] text-[var(--text-dim)]">No settings row yet.</div>
+        <div className="text-[12px] text-[var(--text-dim)]">{t("noSettingsRow", "No settings row yet.")}</div>
       </SectionShell>
     );
   }
   return (
     <SectionShell
       title="Settings"
-      description="Tenant-level knobs that apply to the whole policy."
+      description={t("globalKnobsHint", "Tenant-level knobs that apply to the whole policy.")}
       editing={ed.editing}
       saving={ed.saving}
       onEditStart={ed.begin}
@@ -625,13 +640,13 @@ function SettingsSection({
           footer={
             <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
               CFO cushion against FX swings. Pricing uses{" "}
-              <span className="font-medium text-[var(--text-secondary)]">Effective FX</span> below;
+              <span className="font-medium text-[var(--text-secondary)]">{t("effectiveFx", "Effective FX")}</span> below;
               the live rate is never changed. 0 = no change.
             </p>
           }
         />
         <KpiEditable
-          label="Effective pricing FX"
+          label={t("effectivePricingFx", "Effective pricing FX")}
           value={Number(d.fx_cny_per_usd) * (1 - Number(d.fx_safety_buffer_percent ?? 0) / 100)}
           editing={false}
           type="number"
@@ -646,7 +661,7 @@ function SettingsSection({
           }
         />
         <KpiBool
-          label="Sales sees cost"
+          label={t("salesSeesCost", "Sales sees cost")}
           value={d.sales_sees_cost}
           editing={ed.editing}
           onChange={(v) => ed.setDraft({ ...d, sales_sees_cost: v })}
@@ -679,14 +694,14 @@ function SettingsSection({
           }
         />
         <KpiBool
-          label="Policy engine active"
+          label={t("policyEngineActive", "Policy engine active")}
           value={!!d.use_policy_engine}
           editing={ed.editing}
           onChange={(v) => ed.setDraft({ ...d, use_policy_engine: v })}
           hintTrue="Pricing engine falls back to the 12-step Commercial Policy flow when no override / market price matches."
           hintFalse="Legacy mode — lines without an explicit price stay unresolved. Flip on when you're ready to use the policy as the source of truth."
         />
-        <KpiReadonly label="Policy version" value={d.policy_version} />
+        <KpiReadonly label={t("policyVersion", "Policy version")} value={d.policy_version} />
       </KpiGrid>
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
@@ -704,6 +719,7 @@ function ProductLevelsSection({
   rows: ProductLevelRow[];
   onPatch: (r: ProductLevelRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftProductLevel[]>(
     rows as DraftProductLevel[],
     "/api/commercial-policy/product-levels",
@@ -753,7 +769,7 @@ function ProductLevelsSection({
 
   return (
     <SectionShell
-      title="Product Levels"
+      title={t("productLevels", "Product Levels")}
       description="KOLEEX cost (CNY) auto-detects the level; level carries the default + minimum margin."
       editing={ed.editing}
       saving={ed.saving}
@@ -784,7 +800,7 @@ function ProductLevelsSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add level" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addLevel", "Add level")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -801,6 +817,7 @@ function CustomerTiersSection({
   rows: CustomerTierRow[];
   onPatch: (r: CustomerTierRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftCustomerTier[]>(
     rows as DraftCustomerTier[],
     "/api/commercial-policy/customer-tiers",
@@ -884,7 +901,7 @@ function CustomerTiersSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addTier", "Add tier")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -905,6 +922,7 @@ function MarketBandsSection({
   onPatch: (r: MarketBandRow[]) => void;
   onCountriesPatch: (c: BandCountryRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of countries) m.set(c.band_id, (m.get(c.band_id) ?? 0) + 1);
@@ -961,7 +979,7 @@ function MarketBandsSection({
   return (
     <div className="space-y-4">
     <SectionShell
-      title="Market Bands"
+      title={t("marketBands", "Market Bands")}
       description="Retail-price adjustment by market. Assign countries to bands in Country Segmentation below."
       editing={ed.editing}
       saving={ed.saving}
@@ -987,7 +1005,7 @@ function MarketBandsSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add band" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addBand", "Add band")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
 
@@ -1012,6 +1030,7 @@ function ChannelMultipliersSection({
   rows: ChannelMultiplierRow[];
   onPatch: (r: ChannelMultiplierRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftChannelMultiplier[]>(
     rows as DraftChannelMultiplier[],
     "/api/commercial-policy/channel-multipliers",
@@ -1057,7 +1076,7 @@ function ChannelMultipliersSection({
 
   return (
     <SectionShell
-      title="Channel Multipliers"
+      title={t("channelMultipliers", "Channel Multipliers")}
       description="Sequential ladder applied to the base price to derive each channel's selling price."
       editing={ed.editing}
       saving={ed.saving}
@@ -1096,7 +1115,7 @@ function ChannelMultipliersSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add channel" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addChannel", "Add channel")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1113,6 +1132,7 @@ function DiscountTiersSection({
   rows: DiscountTierRow[];
   onPatch: (r: DiscountTierRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftDiscountTier[]>(
     rows as DraftDiscountTier[],
     "/api/commercial-policy/discount-tiers",
@@ -1156,8 +1176,8 @@ function DiscountTiersSection({
 
   return (
     <SectionShell
-      title="Discount Approval Tiers"
-      description="Who can approve what size of discount."
+      title={t("discountTiers", "Discount Approval Tiers")}
+      description={t("approvalHint", "Who can approve what size of discount.")}
       editing={ed.editing}
       saving={ed.saving}
       onEditStart={ed.begin}
@@ -1179,7 +1199,7 @@ function DiscountTiersSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addTier", "Add tier")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1196,6 +1216,7 @@ function CommissionTiersSection({
   rows: CommissionTierRow[];
   onPatch: (r: CommissionTierRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftCommissionTier[]>(
     rows as DraftCommissionTier[],
     "/api/commercial-policy/commission-tiers",
@@ -1237,7 +1258,7 @@ function CommissionTiersSection({
 
   return (
     <SectionShell
-      title="Commission Tiers"
+      title={t("commissionTiers", "Commission Tiers")}
       description="Applied to invoice amount (not margin). Never reduced by discounts."
       editing={ed.editing}
       saving={ed.saving}
@@ -1259,7 +1280,7 @@ function CommissionTiersSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addTier", "Add tier")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1276,6 +1297,7 @@ function VolumeDiscountTiersSection({
   rows: VolumeDiscountTierRow[];
   onPatch: (r: VolumeDiscountTierRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftVolumeDiscountTier[]>(
     rows as DraftVolumeDiscountTier[],
     "/api/commercial-policy/volume-discount-tiers",
@@ -1321,7 +1343,7 @@ function VolumeDiscountTiersSection({
 
   return (
     <SectionShell
-      title="Volume Discount Tiers"
+      title={t("volumeTiers", "Volume Discount Tiers")}
       description="Auto-applied discount steps based on order size. Separate from the approval-gated discount tiers above."
       editing={ed.editing}
       saving={ed.saving}
@@ -1349,7 +1371,7 @@ function VolumeDiscountTiersSection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addTier", "Add tier")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1366,6 +1388,7 @@ function ApprovalAuthoritySection({
   rows: ApprovalAuthorityRow[];
   onPatch: (r: ApprovalAuthorityRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const ed = useSectionEditor<DraftApprovalAuthority[]>(
     rows as DraftApprovalAuthority[],
     "/api/commercial-policy/approval-authority",
@@ -1408,7 +1431,7 @@ function ApprovalAuthoritySection({
 
   return (
     <SectionShell
-      title="Approval Authority"
+      title={t("approvalAuthority", "Approval Authority")}
       description="Who can approve which decisions. No one can approve above their level — requests auto-escalate."
       editing={ed.editing}
       saving={ed.saving}
@@ -1458,7 +1481,7 @@ function ApprovalAuthoritySection({
           </tr>
         ))}
       />
-      {ed.editing && <AddRowButton onClick={handleAdd} label="Add role" />}
+      {ed.editing && <AddRowButton onClick={handleAdd} label={t("addRole", "Add role")} />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1472,6 +1495,7 @@ const inputCls =
 function TextIn({
   editing, value, onChange,
 }: { editing: boolean; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) return <span>{value || "—"}</span>;
   return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />;
 }
@@ -1485,6 +1509,7 @@ function NumIn({
   step?: string;
   integer?: boolean;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) {
     return <span className="tabular-nums">{fmtInt(value)}</span>;
   }
@@ -1505,6 +1530,7 @@ function NumIn({
 function PctIn({
   editing, value, onChange,
 }: { editing: boolean; value: number; onChange: (v: number) => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) return <span className="tabular-nums">{fmtPct(value)}</span>;
   return (
     <div className="inline-flex items-center gap-1">
@@ -1523,6 +1549,7 @@ function PctIn({
 function SignedPctIn({
   editing, value, onChange,
 }: { editing: boolean; value: number; onChange: (v: number) => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) return <span className="tabular-nums">{fmtSignedPct(value)}</span>;
   return (
     <div className="inline-flex items-center gap-1">
@@ -1551,6 +1578,7 @@ function RangeIn({
   onHi: (v: number | null) => void;
   suffix?: string;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) {
     if (lo === null && hi === null) return <span className="text-[var(--text-dim)]">—</span>;
     if (lo === null || hi === null) {
@@ -1600,6 +1628,7 @@ function NullableNumIn({
   integer?: boolean;
   suffix?: string;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) {
     return (
       <span className="tabular-nums">
@@ -1630,6 +1659,7 @@ function NullableNumIn({
 function BoolIn({
   editing, value, onChange,
 }: { editing: boolean; value: boolean; onChange: (v: boolean) => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   if (!editing) {
     return (
       <span className={`text-[11px] font-semibold ${value ? "text-emerald-300" : "text-[var(--text-dim)]"}`}>
@@ -1653,6 +1683,7 @@ function BoolIn({
 function Td({
   children, align,
 }: { children: React.ReactNode; align?: "left" | "right" }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <td
       className={`px-5 py-2.5 text-${align ?? "left"} text-[var(--text-primary)] text-[12px] tabular-nums`}
@@ -1666,6 +1697,7 @@ function Td({
 function ResponsiveTable({
   head, rows,
 }: { head: string[]; rows: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="overflow-x-auto -mx-5">
       <table className="w-full text-[12px] [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[var(--bg-surface-subtle)]">
@@ -1702,10 +1734,12 @@ function ResponsiveTable({
 }
 
 function KpiGrid({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{children}</div>;
 }
 
 function KpiReadonly({ label, value }: { label: string; value: string | number }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
@@ -1727,6 +1761,7 @@ function KpiEditable({
   /** Optional content rendered under the value — e.g. an action button. */
   footer?: React.ReactNode;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 flex flex-col">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
@@ -1758,6 +1793,7 @@ function KpiBool({
   hintTrue?: string;
   hintFalse?: string;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const tone = value ? "text-amber-300" : "text-emerald-300";
   return (
     <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
@@ -1787,6 +1823,7 @@ function KpiBool({
 }
 
 function ErrorLine({ message }: { message: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="mt-4 text-[11px] text-red-300 bg-red-500/[0.08] border border-red-500/20 rounded-lg px-3 py-2">
       {message}
@@ -1807,12 +1844,13 @@ function removeAt<T>(arr: T[], i: number): T[] {
  *  local component to avoid pulling in a second icon library just for
  *  this one glyph. */
 function DeleteRowBtn({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Delete row"
-      title="Delete row"
+      aria-label={t("deleteRow", "Delete row")}
+      title={t("deleteRow", "Delete row")}
       className="h-8 w-8 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1830,6 +1868,7 @@ function DeleteRowBtn({ onClick }: { onClick: () => void }) {
  *  border so it's clearly a target; collapses visually when the
  *  section is read-only (the caller only renders it while editing). */
 function AddRowButton({ onClick, label }: { onClick: () => void; label: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <button
       type="button"

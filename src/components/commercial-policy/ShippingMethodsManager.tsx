@@ -15,6 +15,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -108,6 +110,7 @@ const SPEED_LABEL: Record<NonNullable<ShippingMethodRow["speed_tier"]>, string> 
 };
 
 export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const { t } = useTranslation(commercialPolicyT);
   const [rows, setRows] = useState<ShippingMethodRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,9 +173,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
     <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">
-            Shipping Methods
-          </h2>
+          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("shippingMethods", "Shipping Methods")}</h2>
           <p className="text-[12px] text-[var(--text-dim)]">
             How goods leave the warehouse. The Quotation editor pulls this list
             for the &ldquo;Sent by …&rdquo; selector and the shipment record uses
@@ -188,9 +189,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
             className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
-            <PlusIcon size={14} />
-            Add Custom Method
-          </button>
+            <PlusIcon size={14} />{t("addCustomMethod", "Add Custom Method")}</button>
         )}
       </div>
 
@@ -285,6 +284,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
 }
 
 function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingMethodRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   const transit =
     row.typical_transit_days_min != null && row.typical_transit_days_max != null
       ? row.typical_transit_days_min === row.typical_transit_days_max
@@ -357,19 +357,13 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
           {(row.supports_dangerous_goods || row.supports_refrigerated || row.supports_oversized) && (
             <div className="flex flex-wrap gap-1 mb-2">
               {row.supports_dangerous_goods && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-red-500/30 bg-red-500/10 text-red-400">
-                  DG / hazmat
-                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-red-500/30 bg-red-500/10 text-red-400">{t("dgHazmat", "DG / hazmat")}</span>
               )}
               {row.supports_refrigerated && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
-                  Refrigerated
-                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">{t("refrigerated", "Refrigerated")}</span>
               )}
               {row.supports_oversized && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                  Oversized
-                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">{t("oversized", "Oversized")}</span>
               )}
             </div>
           )}
@@ -377,7 +371,7 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
           {/* Documents */}
           {row.documents && row.documents.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mr-1 mt-0.5">Docs:</span>
+              <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mr-1 mt-0.5">{t("docs", "Docs:")}</span>
               {row.documents.map((d) => (
                 <span
                   key={d}
@@ -392,7 +386,7 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
           {/* Carriers */}
           {row.common_carriers && row.common_carriers.length > 0 && (
             <p className="text-[10px] text-[var(--text-dim)]">
-              <span className="uppercase tracking-wider opacity-70">Carriers:</span>{" "}
+              <span className="uppercase tracking-wider opacity-70">{t("carriers", "Carriers:")}</span>{" "}
               {row.common_carriers.join(" · ")}
             </p>
           )}

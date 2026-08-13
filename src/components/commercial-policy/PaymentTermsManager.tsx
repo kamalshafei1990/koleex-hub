@@ -21,6 +21,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -112,6 +114,7 @@ export default function PaymentTermsManager({
 }: {
   isSuperAdmin: boolean;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const [categories, setCategories] = useState<PaymentCategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,9 +229,7 @@ export default function PaymentTermsManager({
             className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
-            <PlusIcon size={14} />
-            Add Custom Term
-          </button>
+            <PlusIcon size={14} />{t("addCustomTerm", "Add Custom Term")}</button>
         )}
       </div>
 
@@ -300,9 +301,7 @@ export default function PaymentTermsManager({
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {cat.is_advance && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Advance
-                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{t("advance", "Advance")}</span>
                   )}
                   {cat.is_credit && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -310,9 +309,7 @@ export default function PaymentTermsManager({
                     </span>
                   )}
                   {cat.is_bank_mediated && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      Bank-mediated
-                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">{t("bankMediated", "Bank-mediated")}</span>
                   )}
                 </div>
               </div>
@@ -378,6 +375,7 @@ function TermCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const setDefault = useCallback(async () => {
     if (!canEdit || term.is_system) return;
     await fetch("/api/payment-terms", {
@@ -458,7 +456,7 @@ function TermCard({
               <button
                 type="button"
                 onClick={setDefault}
-                title="Set as the default for this category"
+                title={t("setAsDefault", "Set as the default for this category")}
                 className="p-1.5 text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition"
               >
                 <StarIcon size={12} />

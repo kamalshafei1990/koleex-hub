@@ -1,6 +1,8 @@
 "use client";
 
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 
 /* ---------------------------------------------------------------------------
    IncotermsManager — admin UI for the Incoterms 2020 master list.
@@ -89,6 +91,7 @@ const RESPONSIBILITY_AXIS: {
 ];
 
 export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const { t } = useTranslation(commercialPolicyT);
   const [rows, setRows] = useState<IncotermRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,9 +155,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
     <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">
-            Incoterms (Price Types)
-          </h2>
+          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("incoterms", "Incoterms (Price Types)")}</h2>
           <p className="text-[12px] text-[var(--text-dim)]">
             Cost &amp; risk-transfer rules referenced by every quote, invoice
             and landed-cost calc. {totals.all} terms — {totals.any} any-mode,
@@ -170,9 +171,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
             className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
-            <PlusIcon size={14} />
-            Add Custom Incoterm
-          </button>
+            <PlusIcon size={14} />{t("addCustomIncoterm", "Add Custom Incoterm")}</button>
         )}
       </div>
 
@@ -257,6 +256,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
 }
 
 function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
@@ -280,14 +280,10 @@ function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; ca
               </span>
             )}
             {row.standing === "icc_2020" && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold tracking-wide">
-                ICC 2020
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold tracking-wide">{t("icc2020", "ICC 2020")}</span>
             )}
             {row.standing === "icc_2010" && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold tracking-wide">
-                ICC 2010
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold tracking-wide">{t("icc2010", "ICC 2010")}</span>
             )}
             {row.standing === "variant" && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-bold tracking-wide">
@@ -295,9 +291,7 @@ function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; ca
               </span>
             )}
             {row.is_obsolete && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-bold tracking-wide">
-                OBSOLETE
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-bold tracking-wide">{t("obsolete", "OBSOLETE")}</span>
             )}
           </div>
 
@@ -313,7 +307,7 @@ function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; ca
                       ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                       : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
                   }`}
-                  title={sellerPays ? "Seller pays" : "Buyer pays"}
+                  title={sellerPays ? t("sellerPays", "Seller pays") : t("buyerPays", "Buyer pays")}
                 >
                   {sellerPays ? "✓" : "○"} {axis.label}
                 </span>
@@ -323,7 +317,7 @@ function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; ca
 
           {row.risk_transfer_point && (
             <p className="text-[11px] text-[var(--text-dim)] mb-1">
-              <span className="font-semibold text-[var(--text-primary)]">Risk passes:</span>{" "}
+              <span className="font-semibold text-[var(--text-primary)]">{t("riskPasses", "Risk passes:")}</span>{" "}
               {row.risk_transfer_point}
             </p>
           )}

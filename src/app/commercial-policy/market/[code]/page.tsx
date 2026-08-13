@@ -11,6 +11,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
@@ -43,6 +45,7 @@ function fmtPct(n: number): string {
 }
 
 export default function MarketProfilePage() {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <AuthGate>
       <MarketProfileView />
@@ -51,6 +54,7 @@ export default function MarketProfilePage() {
 }
 
 function MarketProfileView() {
+  const { t } = useTranslation(commercialPolicyT);
   const params = useParams<{ code: string }>();
   const code = (params?.code ?? "").toUpperCase();
   const country = getCountryByCode(code);
@@ -203,7 +207,7 @@ function MarketProfileView() {
             <div className="flex items-center justify-center py-24"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
           ) : !country ? (
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-8 text-center text-[13px] text-[var(--text-dim)]">
-              Unknown country code &ldquo;{code}&rdquo;. <Link href="/commercial-policy#cp-markets" className="underline">Back to segmentation</Link>.
+              Unknown country code &ldquo;{code}&rdquo;. <Link href="/commercial-policy#cp-markets" className="underline">{t("backToSegmentation", "Back to segmentation")}</Link>.
             </div>
           ) : (
             <>
@@ -212,27 +216,23 @@ function MarketProfileView() {
               {/* Market Actions */}
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 flex flex-wrap items-center gap-3">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-2 mr-1">
-                  <MapPinIcon className="h-4 w-4" /> Market Actions
-                </span>
+                  <MapPinIcon className="h-4 w-4" />{t("marketActions", "Market Actions")}</span>
                 <button
                   type="button"
                   onClick={() => setEditingBand((v) => !v)}
                   className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
-                  <PencilIcon className="h-3.5 w-3.5" /> Edit Market
-                </button>
+                  <PencilIcon className="h-3.5 w-3.5" />{t("editMarket", "Edit Market")}</button>
                 <a
                   href="#customers"
                   className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
-                  <UsersIcon className="h-3.5 w-3.5" /> View Customers
-                </a>
+                  <UsersIcon className="h-3.5 w-3.5" />{t("viewCustomers", "View Customers")}</a>
                 <Link
                   href="/customers"
                   className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
                 >
-                  <UserPlusIcon className="h-3.5 w-3.5" /> Add Customer
-                </Link>
+                  <UserPlusIcon className="h-3.5 w-3.5" />{t("addCustomer", "Add Customer")}</Link>
               </section>
 
               {/* Overview + Notes */}
@@ -240,9 +240,9 @@ function MarketProfileView() {
                 <section className="lg:col-span-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
                   <div className="flex items-center gap-2 mb-1">
                     <MapPinIcon className="h-4 w-4 text-[var(--text-dim)]" />
-                    <h2 className="text-[14px] font-semibold">Market Overview</h2>
+                    <h2 className="text-[14px] font-semibold">{t("marketOverview", "Market Overview")}</h2>
                   </div>
-                  <p className="text-[12px] text-[var(--text-dim)] mb-4">Core market identity and pricing context.</p>
+                  <p className="text-[12px] text-[var(--text-dim)] mb-4">{t("marketIdentityHint", "Core market identity and pricing context.")}</p>
 
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-4 py-3 mb-4">
                     <div className="flex items-center gap-3 min-w-0">
@@ -295,10 +295,10 @@ function MarketProfileView() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     <OverviewField label="Band" value={band ? `Band ${band.code}` : "—"} />
                     <OverviewField label="Adjustment %" value={band ? fmtPct(band.adjustment_percent) : "—"} />
-                    <OverviewField label="Region" value={country.region || "—"} />
+                    <OverviewField label={t("region", "Region")} value={country.region || "—"} />
                     <OverviewField label="Currency" value={country.currency || "—"} />
-                    <OverviewField label="Dial code" value={country.dialCode || "—"} />
-                    <OverviewField label="ISO code" value={<span className="font-mono">{country.code}</span>} />
+                    <OverviewField label={t("dialCode", "Dial code")} value={country.dialCode || "—"} />
+                    <OverviewField label={t("isoCode", "ISO code")} value={<span className="font-mono">{country.code}</span>} />
                   </div>
                   {band?.label && (
                     <p className="mt-3 text-[11px] text-[var(--text-dim)]">{band.label}{band.description ? ` — ${band.description}` : ""}</p>
@@ -310,10 +310,8 @@ function MarketProfileView() {
                     <FileIcon className="h-4 w-4 text-[var(--text-dim)]" />
                     <h2 className="text-[14px] font-semibold">Market Notes &amp; Strategy</h2>
                   </div>
-                  <p className="text-[12px] text-[var(--text-dim)] mb-4">Internal pricing remarks, market risk, and strategy notes.</p>
-                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-primary)] px-4 py-10 text-center text-[12px] text-[var(--text-dim)]">
-                    No notes yet. Per-market notes storage is on the roadmap.
-                  </div>
+                  <p className="text-[12px] text-[var(--text-dim)] mb-4">{t("notesHint", "Internal pricing remarks, market risk, and strategy notes.")}</p>
+                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-primary)] px-4 py-10 text-center text-[12px] text-[var(--text-dim)]">{t("noNotes", "No notes yet. Per-market notes storage is on the roadmap.")}</div>
                 </section>
               </div>
 
@@ -321,17 +319,17 @@ function MarketProfileView() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <Kpi label="Total Customers" value={customers == null ? "…" : String(customers.length)} />
                 <Kpi label="Active Customers" value={customers == null ? "…" : String(activeCount)} />
-                <Kpi label="Total Sales" value="—" muted />
-                <Kpi label="Average Order Value" value="—" muted />
+                <Kpi label={t("totalSales", "Total Sales")} value="—" muted />
+                <Kpi label={t("avgOrderValue", "Average Order Value")} value="—" muted />
               </div>
 
               {/* Customers */}
               <section id="customers" className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
                 <div className="flex items-center gap-2 mb-1">
                   <UsersIcon className="h-4 w-4 text-[var(--text-dim)]" />
-                  <h2 className="text-[14px] font-semibold">Customers in this Market</h2>
+                  <h2 className="text-[14px] font-semibold">{t("customersInMarket", "Customers in this Market")}</h2>
                 </div>
-                <p className="text-[12px] text-[var(--text-dim)] mb-4">All customer accounts linked to this market.</p>
+                <p className="text-[12px] text-[var(--text-dim)] mb-4">{t("customersHint", "All customer accounts linked to this market.")}</p>
                 <div className="relative mb-4">
                   <SearchIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
                   <input
@@ -344,9 +342,7 @@ function MarketProfileView() {
                 {customers == null ? (
                   <div className="flex items-center gap-2 py-6 text-[var(--text-dim)] text-[13px]"><SpinnerIcon className="h-4 w-4" /> Loading…</div>
                 ) : customersView.length === 0 ? (
-                  <p className="py-10 text-center text-[13px] text-[var(--text-dim)] border border-dashed border-[var(--border-subtle)] rounded-xl">
-                    No customers linked to this market.
-                  </p>
+                  <p className="py-10 text-center text-[13px] text-[var(--text-dim)] border border-dashed border-[var(--border-subtle)] rounded-xl">{t("noCustomers", "No customers linked to this market.")}</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {customersView.map((c) => (
@@ -367,8 +363,8 @@ function MarketProfileView() {
 
               {/* Future-ready analytics */}
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
-                <h2 className="text-[14px] font-semibold mb-1">Future-Ready Analytics</h2>
-                <p className="text-[12px] text-[var(--text-dim)] mb-4">Activates once orders are linked to customers in this market.</p>
+                <h2 className="text-[14px] font-semibold mb-1">{t("futureAnalytics", "Future-Ready Analytics")}</h2>
+                <p className="text-[12px] text-[var(--text-dim)] mb-4">{t("analyticsHint", "Activates once orders are linked to customers in this market.")}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {["Top Products in this Market", "Sales Trend", "Revenue by Period", "Order Count"].map((t) => (
                     <div key={t} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-4">
@@ -387,6 +383,7 @@ function MarketProfileView() {
 }
 
 function OverviewField({ label, value }: { label: string; value: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2.5">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
@@ -396,6 +393,7 @@ function OverviewField({ label, value }: { label: string; value: React.ReactNode
 }
 
 function Kpi({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>

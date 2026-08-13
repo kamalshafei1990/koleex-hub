@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { priceCalcT } from "@/lib/translations/price-calculator";
 import Link from "next/link";
 import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -39,6 +41,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 /* ═══════════════════ COMPONENT ═══════════════════ */
 
 export default function PricingSettingsPage() {
+  const { t } = useTranslation(priceCalcT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -138,14 +141,14 @@ export default function PricingSettingsPage() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><SettingsIcon2 className="h-4 w-4" /></div>
-            <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">System Control Panel</h1>
+            <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">{t("settings.title", "System Control Panel")}</h1>
           </div>
           <button onClick={handleSave} disabled={saving} className="ml-auto h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shrink-0">
             {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
             {saving ? "Saving..." : saved ? "Saved!" : "Save & Apply"}
           </button>
         </div>
-        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Configure Pricing Rules, Margins & UI Visibility</p>
+        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">{t("settings.subtitle", "Configure Pricing Rules, Margins & UI Visibility")}</p>
 
         {/* ── Tabs ── */}
         <div className="mb-6">
@@ -166,7 +169,7 @@ export default function PricingSettingsPage() {
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><EyeIcon className="h-4 w-4" /></div>
-              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">UI Visibility & Features</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("set.uiVisibility", "UI Visibility & Features")}</span>
             </div>
             <div className="border-t border-[var(--border-subtle)]">
               {([
@@ -194,15 +197,15 @@ export default function PricingSettingsPage() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PercentIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Global Limits & Defaults</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("set.globalLimits", "Global Limits & Defaults")}</span>
               </div>
               <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)] space-y-5">
                 <div>
-                  <label className={labelCls}>Max Allowed Manual Discount (%)</label>
+                  <label className={labelCls}>{t("set.maxDiscount", "Max Allowed Manual Discount (%)")}</label>
                   <input type="number" min={0} max={100} value={config.maxDiscount} onChange={e => setConfig(c => ({ ...c, maxDiscount: parseInt(e.target.value) || 0 }))} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Default Tax Refund Rate (%)</label>
+                  <label className={labelCls}>{t("set.taxRefund", "Default Tax Refund Rate (%)")}</label>
                   <input type="number" min={0} max={100} value={config.defaultTaxRefund} onChange={e => setConfig(c => ({ ...c, defaultTaxRefund: parseInt(e.target.value) || 0 }))} className={inputCls} />
                 </div>
               </div>
@@ -210,7 +213,7 @@ export default function PricingSettingsPage() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><ShieldIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Regional Band Modifiers</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("set.bandModifiers", "Regional Band Modifiers")}</span>
               </div>
               <div className="border-t border-[var(--border-subtle)]">
                 {(["A", "B", "C"] as const).map((band, i) => {
@@ -232,7 +235,7 @@ export default function PricingSettingsPage() {
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><UsersIcon className="h-4 w-4" /></div>
-              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Customer Channels Margin Setup</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">{t("set.channelMargins", "Customer Channels Margin Setup")}</span>
             </div>
             <p className="px-6 text-[11px] text-[var(--text-dim)] -mt-1 pb-2">Define which channels are visible and configure their sequential markups.</p>
             <div className="border-t border-[var(--border-subtle)]">
@@ -257,25 +260,24 @@ export default function PricingSettingsPage() {
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><GlobeIcon className="h-4 w-4" /></div>
-              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Countries & Regional Bands</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">{t("set.countriesBands", "Countries & Regional Bands")}</span>
               <button onClick={addCountry} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
-                <PlusIcon className="h-3.5 w-3.5" /> Add
-              </button>
+                <PlusIcon className="h-3.5 w-3.5" />{t("add", "Add")}</button>
             </div>
             <div className="px-6 pb-3 border-t border-[var(--border-subtle)] pt-3">
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
-                <input type="text" value={countrySearch} onChange={e => setCountrySearch(e.target.value)} placeholder="Search countries…" className={`${inputCls} pl-9`} />
+                <input type="text" value={countrySearch} onChange={e => setCountrySearch(e.target.value)} placeholder={t("set.searchCountries", "Search countries…")} className={`${inputCls} pl-9`} />
               </div>
             </div>
             <div className="max-h-[500px] overflow-y-auto">
               {/* Header */}
               <div className="flex items-center gap-3 px-6 py-2 bg-[var(--bg-surface-subtle)] text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider sticky top-0">
-                <span className="w-16">Code</span>
-                <span className="flex-1">Country</span>
-                <span className="w-20">Currency</span>
-                <span className="w-20 text-center">Band</span>
-                <span className="w-20 text-center">Adj %</span>
+                <span className="w-16">{t("code", "Code")}</span>
+                <span className="flex-1">{t("country", "Country")}</span>
+                <span className="w-20">{t("currency", "Currency")}</span>
+                <span className="w-20 text-center">{t("band", "Band")}</span>
+                <span className="w-20 text-center">{t("res.adjPct", "Adj %")}</span>
                 <span className="w-8"></span>
               </div>
               {filteredCountries.map((co) => {
@@ -287,9 +289,9 @@ export default function PricingSettingsPage() {
                     <input type="text" value={co.name} onChange={e => updateCountry(realIdx, { name: e.target.value })} className="flex-1 h-8 px-3 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
                     <input type="text" value={co.currency} onChange={e => updateCountry(realIdx, { currency: e.target.value.toUpperCase() })} className="w-20 h-8 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] text-center outline-none focus:border-[var(--border-focus)]" maxLength={3} />
                     <select value={co.band} onChange={e => updateCountry(realIdx, { band: e.target.value })} className={`w-20 h-8 px-2 rounded-md border text-[11px] font-semibold text-center outline-none cursor-pointer ${bandColors[co.band as keyof typeof bandColors] ?? ""}`}>
-                      <option value="A">Band A</option>
-                      <option value="B">Band B</option>
-                      <option value="C">Band C</option>
+                      <option value="A">{t("set.bandA", "Band A")}</option>
+                      <option value="B">{t("set.bandB", "Band B")}</option>
+                      <option value="C">{t("set.bandC", "Band C")}</option>
                     </select>
                     <span className="w-20 text-center text-[12px] font-mono text-[var(--text-dim)]">{co.adjustmentPct >= 0 ? "+" : ""}{(co.adjustmentPct * 100).toFixed(0)}%</span>
                     <button onClick={() => removeCountry(realIdx)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors shrink-0">
@@ -300,9 +302,9 @@ export default function PricingSettingsPage() {
               })}
             </div>
             <div className="px-6 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-dim)]">
-              <span className="text-red-400 font-semibold">Band A</span> = {config.bands.A}%
-              <span className="text-blue-400 font-semibold ml-2">Band B</span> = {config.bands.B}%
-              <span className="text-amber-400 font-semibold ml-2">Band C</span> = {config.bands.C}%
+              <span className="text-red-400 font-semibold">{t("set.bandA", "Band A")}</span> = {config.bands.A}%
+              <span className="text-blue-400 font-semibold ml-2">{t("set.bandB", "Band B")}</span> = {config.bands.B}%
+              <span className="text-amber-400 font-semibold ml-2">{t("set.bandC", "Band C")}</span> = {config.bands.C}%
               <span className="ml-auto">{config.countries.length} countries</span>
             </div>
           </div>
@@ -313,32 +315,31 @@ export default function PricingSettingsPage() {
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><LayersIcon className="h-4 w-4" /></div>
-              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Product Category Margin Levels</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">{t("set.categoryMargins", "Product Category Margin Levels")}</span>
               <button onClick={addCategory} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
-                <PlusIcon className="h-3.5 w-3.5" /> Add
-              </button>
+                <PlusIcon className="h-3.5 w-3.5" />{t("add", "Add")}</button>
             </div>
             <div className="border-t border-[var(--border-subtle)]">
               {config.categories.map((cat, idx) => (
                 <div key={cat.id} className={`px-6 py-4 space-y-3 ${idx < config.categories.length - 1 ? "border-b border-[var(--border-subtle)]" : ""}`}>
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] font-bold text-[var(--text-ghost)] w-5 text-center">{idx + 1}</span>
-                    <input type="text" value={cat.name} onChange={e => updateCategory(idx, { name: e.target.value })} placeholder="Category name" className={`${inputCls} flex-1`} />
+                    <input type="text" value={cat.name} onChange={e => updateCategory(idx, { name: e.target.value })} placeholder={t("categoryName", "Category name")} className={`${inputCls} flex-1`} />
                     <button onClick={() => removeCategory(idx)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors shrink-0">
                       <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-3 pl-8">
                     <div>
-                      <label className={labelCls}>Min Cost (CNY)</label>
+                      <label className={labelCls}>{t("set.minCost", "Min Cost (CNY)")}</label>
                       <input type="number" min={0} value={cat.min} onChange={e => updateCategory(idx, { min: parseFloat(e.target.value) || 0 })} className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls}>Max Cost (CNY)</label>
+                      <label className={labelCls}>{t("set.maxCost", "Max Cost (CNY)")}</label>
                       <input type="number" min={0} value={cat.max} onChange={e => updateCategory(idx, { max: parseFloat(e.target.value) || 0 })} className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls}>Margin (%)</label>
+                      <label className={labelCls}>{t("marginPct", "Margin (%)")}</label>
                       <input type="number" min={0} max={100} step={0.1} value={cat.marginPct * 100} onChange={e => updateCategory(idx, { marginPct: (parseFloat(e.target.value) || 0) / 100 })} className={inputCls} />
                     </div>
                   </div>

@@ -11,6 +11,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useToast } from "@/components/kds/useToast";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -75,6 +77,7 @@ const CATEGORY_META: Record<DocRow["category"], { label: string; chip: string }>
 };
 
 export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const { t } = useTranslation(commercialPolicyT);
   const [rows, setRows] = useState<DocRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,9 +139,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
     <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">
-            Shipping Documents
-          </h2>
+          <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("shippingDocuments", "Shipping Documents")}</h2>
           <p className="text-[12px] text-[var(--text-dim)]">
             Master list for the &ldquo;Documents Provided&rdquo; multi-select on every
             Quotation and Invoice. {totals.all} documents
@@ -153,9 +154,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
             className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             onClick={() => setEditing("new")}
           >
-            <PlusIcon size={14} />
-            Add Custom Document
-          </button>
+            <PlusIcon size={14} />{t("addCustomDocument", "Add Custom Document")}</button>
         )}
       </div>
 
@@ -242,6 +241,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
 }
 
 function DocCard({ row, canEdit, onEdit, onDelete }: { row: DocRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
@@ -272,19 +272,13 @@ function DocCard({ row, canEdit, onEdit, onDelete }: { row: DocRow; canEdit: boo
           )}
           <div className="flex flex-wrap gap-1">
             {row.is_mandatory_export && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
-                Mandatory export
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">{t("mandatoryExport", "Mandatory export")}</span>
             )}
             {row.is_lc_required && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                L/C required
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">{t("lcRequired", "L/C required")}</span>
             )}
             {row.is_customs_required && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                Customs required
-              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">{t("customsRequired", "Customs required")}</span>
             )}
             {row.issued_by && row.issued_by !== "any" && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)] capitalize">

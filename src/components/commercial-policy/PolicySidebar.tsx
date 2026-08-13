@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -15,6 +17,7 @@ const SECTIONS: { id: string; label: string }[] = [
 ];
 
 function NavGroup({ item, pathname, onNavigate }: { item: PolicyNavItem; pathname: string; onNavigate?: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   const isActive = pathname === item.path;
   const hasChildren = !!item.children?.length;
   const childActive = hasChildren && item.children!.some((c) => pathname === c.path);
@@ -86,6 +89,7 @@ function NavGroup({ item, pathname, onNavigate }: { item: PolicyNavItem; pathnam
 
 /* ── Shared nav content ── */
 function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   const grouped = SECTIONS.map((sec) => ({
     ...sec,
     items: POLICY_NAV.filter((n) => (n.section || "manual") === sec.id),
@@ -128,6 +132,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
 /* ── Main export ── */
 export default function PolicySidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; onMobileClose?: () => void }) {
+  const { t } = useTranslation(commercialPolicyT);
   const pathname = usePathname();
 
   /* close mobile drawer on route change */

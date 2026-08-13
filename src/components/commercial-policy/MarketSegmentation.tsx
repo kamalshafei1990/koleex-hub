@@ -14,6 +14,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useRouter } from "next/navigation";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import type { MarketBandRow, BandCountryRow } from "@/lib/server/commercial-policy";
@@ -39,6 +41,7 @@ export default function MarketSegmentation({
   canEdit: boolean;
   onSaved: (fresh: BandCountryRow[]) => void;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   const activeBands = useMemo(
     () => [...bands].filter((b) => b.is_active).sort((a, b) => a.sort_order - b.sort_order),
     [bands],
@@ -137,7 +140,7 @@ export default function MarketSegmentation({
     <section className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)] flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Country Segmentation</h2>
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("countrySegmentation", "Country Segmentation")}</h2>
           <p className="text-[11px] text-[var(--text-dim)] mt-1">
             Which market band each country belongs to. The price engine reads this to apply the band&apos;s
             adjustment. {totalAssigned} of {COUNTRIES.length} countries assigned.
@@ -149,9 +152,7 @@ export default function MarketSegmentation({
               type="button"
               onClick={begin}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-            >
-              Manage
-            </button>
+            >{t("manage", "Manage")}</button>
           )}
           {editing && (
             <>

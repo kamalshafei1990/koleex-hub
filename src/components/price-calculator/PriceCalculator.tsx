@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, type ChangeEvent, type ReactNode } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { priceCalcT } from "@/lib/translations/price-calculator";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -126,6 +128,7 @@ function FieldSelect({ value, onChange, children }: {
   onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation(priceCalcT);
   return (
     <div className="relative">
       <select value={value} onChange={onChange} className={SELECT_CLS}>{children}</select>
@@ -137,6 +140,7 @@ function FieldSelect({ value, onChange, children }: {
 /* ═══════════════════ COMPONENT ═══════════════════ */
 
 export default function PriceCalculator() {
+  const { t } = useTranslation(priceCalcT);
   const [products, setProducts] = useState<ProductItem[]>([{ id: uid(), name: "", costCny: 0, qty: 1 }]);
   const [exchangeRate, setExchangeRate] = useState(7.18);
   const [categoryId, setCategoryId] = useState("auto");
@@ -364,21 +368,20 @@ export default function PriceCalculator() {
           </Link>
           <div className="flex-1 flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PriceCalculatorIcon size={16} /></div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Price Calculator</h1>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("title", "Price Calculator")}</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <SettingsIcon2 className="h-3.5 w-3.5" /> <span className="hidden md:inline">Settings</span>
+              <SettingsIcon2 className="h-3.5 w-3.5" /> <span className="hidden md:inline">{t("settingsLink", "Settings")}</span>
             </Link>
             <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <RefreshCwIcon className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
+              <RefreshCwIcon className="h-3.5 w-3.5" /> <span className="hidden md:inline">{t("reset", "Reset")}</span>
             </button>
             <button onClick={generate} className="hidden md:flex h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <ZapIcon className="h-4 w-4" /> Generate Price
-            </button>
+              <ZapIcon className="h-4 w-4" />{t("cfg.generate", "Generate Price")}</button>
           </div>
         </div>
-        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Generate channel pricing with shipping-adjusted ERP logic</p>
+        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">{t("subtitle", "Generate channel pricing with shipping-adjusted ERP logic")}</p>
 
         {/* ── Two Column Layout ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 items-start">
@@ -390,10 +393,9 @@ export default function PriceCalculator() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PackageIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Products</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">{t("products", "Products")}</span>
                 <button onClick={addProduct} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg">
-                  <PlusIcon className="h-3.5 w-3.5" /> Add
-                </button>
+                  <PlusIcon className="h-3.5 w-3.5" />{t("add", "Add")}</button>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-0 border-t border-[var(--border-subtle)] space-y-3">
                 {products.map((prod, i) => (
@@ -401,7 +403,7 @@ export default function PriceCalculator() {
                     {/* Row 1: Name + Delete */}
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-[var(--text-ghost)] w-4 shrink-0 text-center font-mono">{i + 1}</span>
-                      <input type="text" value={prod.name} onChange={e => updateProduct(prod.id, "name", e.target.value)} placeholder="Product name" className={`${inputCls} flex-1 min-w-0`} />
+                      <input type="text" value={prod.name} onChange={e => updateProduct(prod.id, "name", e.target.value)} placeholder={t("productName", "Product name")} className={`${inputCls} flex-1 min-w-0`} />
                       {products.length > 1
                         ? <button onClick={() => removeProduct(prod.id)} className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors shrink-0"><TrashIcon className="h-3.5 w-3.5" /></button>
                         : <span className="w-8 shrink-0 hidden md:block" />}
@@ -409,11 +411,11 @@ export default function PriceCalculator() {
                     {/* Row 2: Cost + Qty */}
                     <div className="flex items-center gap-2 pl-6">
                       <div className="relative flex-1">
-                        <input type="number" min={0} step="0.01" value={prod.costCny || ""} onChange={e => updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)} placeholder="Cost" className={`${inputCls} pr-10`} />
+                        <input type="number" min={0} step="0.01" value={prod.costCny || ""} onChange={e => updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)} placeholder={t("cost", "Cost")} className={`${inputCls} pr-10`} />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">CNY</span>
                       </div>
                       <div className="relative w-24 shrink-0">
-                        <input type="number" min={1} step={1} value={prod.qty || ""} onChange={e => updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)} placeholder="Qty" className={`${inputCls} pr-7`} />
+                        <input type="number" min={1} step={1} value={prod.qty || ""} onChange={e => updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)} placeholder={t("qty", "Qty")} className={`${inputCls} pr-7`} />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">x</span>
                       </div>
                     </div>
@@ -426,24 +428,24 @@ export default function PriceCalculator() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><DollarSignIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Exchange Rate</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("fx.section", "Exchange Rate")}</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-3">
                 <div>
-                  <label className={labelCls}>USD/CNY Rate</label>
+                  <label className={labelCls}>{t("fx.rate", "USD/CNY Rate")}</label>
                   <div className="flex items-center gap-2">
                     <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={`${inputCls} flex-1`} />
-                    <button onClick={fetchLiveRate} disabled={fetchingRate} className="h-10 px-3 md:px-4 rounded-xl border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11px] md:text-[12px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all whitespace-nowrap shrink-0 flex items-center gap-2 disabled:opacity-50"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>{fetchingRate ? "Fetching..." : "Live Rate"}</button>
-                    {cfgUI.showFxRisk && <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-blue-500/50 text-blue-400 bg-blue-500/10" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"}`}>FX Risk</button>}
+                    <button onClick={fetchLiveRate} disabled={fetchingRate} className="h-10 px-3 md:px-4 rounded-xl border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11px] md:text-[12px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all whitespace-nowrap shrink-0 flex items-center gap-2 disabled:opacity-50"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>{fetchingRate ? t("fx.fetching", "Fetching\u2026") : t("fx.live", "Live Rate")}</button>
+                    {cfgUI.showFxRisk && <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-blue-500/50 text-blue-400 bg-blue-500/10" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"}`}>{t("fx.risk", "FX Risk")}</button>}
                   </div>
                 </div>
                 {showFxManager && (
                   <div className="bg-[var(--bg-inverted)]/[0.03] border border-[var(--border-subtle)] rounded-xl p-4 space-y-2">
-                    <label className={labelCls}>FX Risk Scenario</label>
+                    <label className={labelCls}>{t("fx.scenario", "FX Risk Scenario")}</label>
                     <FieldSelect value={fxRisk} onChange={e => setFxRisk(e.target.value as FxRisk)}>
-                      <option value="stable">Stable (No change)</option>
-                      <option value="usd_down">Expect USD to Fall</option>
-                      <option value="usd_up">Expect USD to Rise</option>
+                      <option value="stable">{t("fx.stable", "Stable (No change)")}</option>
+                      <option value="usd_down">{t("fx.fall", "Expect USD to Fall")}</option>
+                      <option value="usd_up">{t("fx.rise", "Expect USD to Rise")}</option>
                     </FieldSelect>
                     <p className="text-[11px] text-[var(--text-ghost)]">Adjusts margin sensitivity before country/discount adjustments.</p>
                   </div>
@@ -455,28 +457,28 @@ export default function PriceCalculator() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><LayersIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Pricing Configuration</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("cfg.section", "Pricing Configuration")}</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-5">
                 <div>
-                  <label className={labelCls}>Product Category</label>
+                  <label className={labelCls}>{t("cfg.productCategory", "Product Category")}</label>
                   <FieldSelect value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                    <option value="auto">Auto-Detect (Smart Margin)</option>
+                    <option value="auto">{t("ovr.autoDetect", "Auto-Detect (Smart Margin)")}</option>
                     {levelOptions.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.marginPct * 100).toFixed(0)}%)</option>)}
                   </FieldSelect>
                 </div>
                 <div>
-                  <label className={labelCls}>Target Country</label>
+                  <label className={labelCls}>{t("cfg.targetCountry", "Target Country")}</label>
                   <FieldSelect value={countryCode} onChange={e => setCountryCode(e.target.value)}>
                     {cfgCountries.map(c => <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>)}
                   </FieldSelect>
                   <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-blue-500/[0.06] border border-blue-500/15">
                     <InfoIcon className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                    <span className="text-[11px] text-blue-300/80">Country adjustment: <span className="font-semibold">{selectedCountry.adjustmentPct >= 0 ? "+" : ""}{(selectedCountry.adjustmentPct * 100).toFixed(0)}%</span></span>
+                    <span className="text-[11px] text-blue-300/80">{t("cfg.countryAdjustment", "Country adjustment:")}<span className="font-semibold">{selectedCountry.adjustmentPct >= 0 ? "+" : ""}{(selectedCountry.adjustmentPct * 100).toFixed(0)}%</span></span>
                   </div>
                 </div>
                 <div>
-                  <label className={labelCls}>Target Customer Type</label>
+                  <label className={labelCls}>{t("cfg.targetCustomer", "Target Customer Type")}</label>
                   <FieldSelect value={customerType} onChange={e => setCustomerType(e.target.value)}>
                     {customerOptions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </FieldSelect>
@@ -488,7 +490,7 @@ export default function PriceCalculator() {
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PercentIcon className="h-4 w-4" /></div>
-                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Adjustments</span>
+                <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("cfg.adjustments", "Adjustments")}</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
                 {/* Override */}
@@ -496,19 +498,19 @@ export default function PriceCalculator() {
                   <>
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <input type="checkbox" checked={overrideActive} onChange={() => setOverrideActive(!overrideActive)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-blue-600 cursor-pointer" />
-                      <span className="text-[13px] font-medium">Override Default Profit Margin</span>
+                      <span className="text-[13px] font-medium">{t("ovr.overrideMargin", "Override Default Profit Margin")}</span>
                     </label>
                     {overrideActive && (
                       <div className="grid grid-cols-2 gap-3 pl-7">
                         <div>
-                          <label className={labelCls}>Override Type</label>
+                          <label className={labelCls}>{t("ovr.type", "Override Type")}</label>
                           <FieldSelect value={overrideMode} onChange={e => setOverrideMode(e.target.value as OverrideMode)}>
-                            <option value="percentage">By Percentage</option>
-                            <option value="amount">By Amount USD</option>
+                            <option value="percentage">{t("ovr.byPercentage", "By Percentage")}</option>
+                            <option value="amount">{t("ovr.byAmount", "By Amount USD")}</option>
                           </FieldSelect>
                         </div>
                         <div>
-                          <label className={labelCls}>Value</label>
+                          <label className={labelCls}>{t("value", "Value")}</label>
                           <input type="number" min={0} step={overrideMode === "percentage" ? "0.1" : "0.01"} value={overrideValue || ""} onChange={e => setOverrideValue(parseFloat(e.target.value) || 0)} placeholder={overrideMode === "percentage" ? "e.g. 12" : "e.g. 150"} className={inputCls} />
                         </div>
                       </div>
@@ -518,7 +520,7 @@ export default function PriceCalculator() {
                 {/* Discount */}
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><TagsIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /> Manual Discount</label>
+                    <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><TagsIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />{t("ovr.manualDiscount", "Manual Discount")}</label>
                     <span className="text-[13px] font-mono font-semibold text-blue-400 tabular-nums">{discountPct}%</span>
                   </div>
                   <input type="range" min={0} max={cfgMaxDiscount} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className={KX_RANGE_CLASS} style={kxRangeStyle(cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0)} />
@@ -529,7 +531,7 @@ export default function PriceCalculator() {
                   <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
                     <input type="checkbox" checked={includeTaxRefund} onChange={() => setIncludeTaxRefund(!includeTaxRefund)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-blue-600 cursor-pointer" />
                     <ShieldCheckIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
-                    <span className="text-[13px] font-medium">Include Tax Refund ({(cfgTaxRefund * 100).toFixed(0)}%)</span>
+                    <span className="text-[13px] font-medium">{t("includeTaxRefund", "Include Tax Refund ({pct}%)").replace("{pct}", (cfgTaxRefund * 100).toFixed(0))}</span>
                   </label>
                 )}
               </div>
@@ -537,8 +539,7 @@ export default function PriceCalculator() {
 
             {/* Mobile Generate Button */}
             <button onClick={generate} className="w-full h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg lg:hidden">
-              <ZapIcon className="h-4 w-4" /> Generate Price
-            </button>
+              <ZapIcon className="h-4 w-4" />{t("cfg.generate", "Generate Price")}</button>
           </div>
 
           {/* ═══════ RIGHT: Results ═══════ */}
@@ -548,7 +549,7 @@ export default function PriceCalculator() {
                 <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mb-4">
                   <PriceCalculatorIcon size={28} className="text-[var(--text-ghost)]" />
                 </div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-muted)] mb-1">No Quotation Yet</h3>
+                <h3 className="text-[14px] font-semibold text-[var(--text-muted)] mb-1">{t("quo.none", "No Quotation Yet")}</h3>
                 <p className="text-[12px] text-[var(--text-dim)] max-w-[280px]">Fill in the product details and click Generate Price to see channel pricing results.</p>
               </div>
             ) : (
@@ -557,7 +558,7 @@ export default function PriceCalculator() {
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                     <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><ActivityIcon className="h-4 w-4" /></div>
-                    <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Quotation Details</span>
+                    <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">{t("quo.details", "Quotation Details")}</span>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[10px] font-medium text-[var(--text-muted)]">
                         <GlobeIcon className="h-3 w-3 text-[var(--text-dim)]" /> {result.countryName}
@@ -568,26 +569,26 @@ export default function PriceCalculator() {
                     </div>
                   </div>
                   <div className="border-t border-[var(--border-subtle)]">
-                    <KV label="Cost CNY" value={`¥${fmt(result.totalCostCny)}`} />
-                    <KV label="Cost USD" value={`$${fmt(result.totalCostUsd)}`} />
+                    <KV label={t("res.costCNY", "Cost CNY")} value={`¥${fmt(result.totalCostCny)}`} />
+                    <KV label={t("res.costUSD", "Cost USD")} value={`$${fmt(result.totalCostUsd)}`} />
                     <KV label="Items / Qty" value={`${result.totalItems} items / ${result.totalQty} units`} />
                     <KV label="Margin %" value={pct(result.items[0].marginPct)} />
-                    <KV label="Country Adj." value={`${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(1)}%`} />
-                    {result.discountPct > 0 && <KV label="Discount" value={`${result.discountPct}%`} />}
+                    <KV label={t("res.countryAdj", "Country Adj.")} value={`${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(1)}%`} />
+                    {result.discountPct > 0 && <KV label={t("discount", "Discount")} value={`${result.discountPct}%`} />}
                     <div className="flex items-center justify-between px-4 md:px-6 py-3 bg-blue-500/[0.06] border-t border-[var(--border-subtle)]">
-                      <span className="text-[12px] font-semibold text-blue-300">Final Base Price</span>
+                      <span className="text-[12px] font-semibold text-blue-300">{t("res.finalBasePrice", "Final Base Price")}</span>
                       <span className="text-[14px] font-bold font-mono text-blue-400">${fmt(result.items[0].finalBase)}</span>
                     </div>
                     {(() => {
                       const tp = result.items.reduce((s, i) => s + i.channelProfits[result.customerType] * i.qty, 0);
                       return (
                         <div className="flex items-center justify-between px-4 md:px-6 py-3 bg-emerald-500/[0.06] border-t border-[var(--border-subtle)]">
-                          <span className="text-[12px] font-semibold text-emerald-300">Total Profit</span>
+                          <span className="text-[12px] font-semibold text-emerald-300">{t("res.totalProfit", "Total Profit")}</span>
                           <span className={`text-[14px] font-bold font-mono ${tp >= 0 ? "text-emerald-400" : "text-red-400"}`}>{tp >= 0 ? "+" : ""}${fmt(tp)}</span>
                         </div>
                       );
                     })()}
-                    <KV label="Tax Refund" value={result.includeTaxRefund ? "Enabled" : "Disabled"} last />
+                    <KV label={t("taxRefund", "Tax Refund")} value={result.includeTaxRefund ? "Enabled" : "Disabled"} last />
                   </div>
                 </div>
 
@@ -606,12 +607,12 @@ export default function PriceCalculator() {
                       </button>
                       {isExp && (
                         <div className="border-t border-[var(--border-subtle)]">
-                          <KV label="Category" value={item.categoryName} />
+                          <KV label={t("category", "Category")} value={item.categoryName} />
                           <KV label="Margin %" value={pct(item.marginPct)} />
-                          <KV label="Margin USD" value={`$${fmt(item.marginUsd)}`} />
-                          <KV label="Initial Base" value={`$${fmt(item.initialBase)}`} />
-                          <KV label="After Country" value={`$${fmt(item.countryAdjusted)}`} />
-                          <KV label="Final Base" value={`$${fmt(item.finalBase)}`} last />
+                          <KV label={t("res.marginUSD", "Margin USD")} value={`$${fmt(item.marginUsd)}`} />
+                          <KV label={t("res.initialBase", "Initial Base")} value={`$${fmt(item.initialBase)}`} />
+                          <KV label={t("res.afterCountry", "After Country")} value={`$${fmt(item.countryAdjusted)}`} />
+                          <KV label={t("res.finalBase", "Final Base")} value={`$${fmt(item.finalBase)}`} last />
                           <ChannelTable item={item} result={result} rows={rowOrder} />
                         </div>
                       )}
@@ -623,16 +624,16 @@ export default function PriceCalculator() {
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                     <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><TrendingUpIcon className="h-4 w-4" /></div>
-                    <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Grand Total Pricing</span>
+                    <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{t("res.grandTotalPricing", "Grand Total Pricing")}</span>
                   </div>
                   <div className="overflow-x-auto border-t border-[var(--border-subtle)]">
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="bg-[var(--bg-surface-subtle)]">
-                          <th className="text-left px-4 md:px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
-                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Unit Price</th>
-                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Total</th>
-                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Profit</th>
+                          <th className="text-left px-4 md:px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("cfg.channel", "Channel")}</th>
+                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("unitPrice", "Unit Price")}</th>
+                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("total", "Total")}</th>
+                          <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("res.profit", "Profit")}</th>
                           {result.includeTaxRefund && <th className="text-right px-3 md:px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+ Tax</th>}
                         </tr>
                       </thead>
@@ -646,7 +647,7 @@ export default function PriceCalculator() {
                           const isTarget = row.id === result.customerType;
                           return (
                             <tr key={row.id} className={`transition-colors ${isTarget ? "bg-blue-500/[0.06]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
-                              <td className="px-4 md:px-6 py-3 font-medium">{row.name}{isTarget && <span className="ml-2 text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">Target</span>}</td>
+                              <td className="px-4 md:px-6 py-3 font-medium">{row.name}{isTarget && <span className="ml-2 text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">{t("res.target", "Target")}</span>}</td>
                               <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">${fmt(unitPrice)}</td>
                               <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">${fmt(totalTotal)}</td>
                               <td className={`text-right px-4 py-3 font-mono ${profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{profit >= 0 ? "+" : ""}${fmt(profit)}</td>
@@ -662,7 +663,7 @@ export default function PriceCalculator() {
                           for (const item of result.items) { ft += item.channelPrices[tr] * item.qty; fp += item.channelProfits[tr] * item.qty; fpt += item.channelProfitsWithTax[tr] * item.qty; }
                           return (
                             <tr className="border-t-2 border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-                              <td className="px-4 md:px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Grand Total</td>
+                              <td className="px-4 md:px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("res.grandTotal", "Grand Total")}</td>
                               <td className="text-right px-4 py-3 font-mono font-semibold text-[var(--text-ghost)]">--</td>
                               <td className="text-right px-4 py-3 font-mono font-bold text-[var(--text-primary)]">${fmt(ft)}</td>
                               <td className={`text-right px-4 py-3 font-mono font-bold ${fp >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fp >= 0 ? "+" : ""}${fmt(fp)}</td>
@@ -700,6 +701,7 @@ export default function PriceCalculator() {
 /* ═══════════════════ SUB-COMPONENTS ═══════════════════ */
 
 function KV({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const { t } = useTranslation(priceCalcT);
   return (
     <div className={`flex items-center justify-between px-4 md:px-6 py-2.5 ${last ? "" : "border-b border-[var(--border-subtle)]"}`}>
       <span className="text-[11px] md:text-[12px] text-[var(--text-dim)] shrink-0">{label}</span>
@@ -709,15 +711,16 @@ function KV({ label, value, last }: { label: string; value: string; last?: boole
 }
 
 function ChannelTable({ item, result, rows }: { item: ItemResult; result: CalcResult; rows: { id: string; name: string }[] }) {
+  const { t } = useTranslation(priceCalcT);
   return (
     <div className="overflow-x-auto border-t border-[var(--border-subtle)]">
       <table className="w-full text-[12px]">
         <thead>
           <tr className="bg-[var(--bg-surface-subtle)]">
-            <th className="text-left px-3 md:px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
-            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Unit</th>
-            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Total</th>
-            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Profit</th>
+            <th className="text-left px-3 md:px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("cfg.channel", "Channel")}</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("unit", "Unit")}</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("total", "Total")}</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("res.profit", "Profit")}</th>
             {result.includeTaxRefund && <th className="text-right px-3 md:px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+Tax</th>}
           </tr>
         </thead>
@@ -727,7 +730,7 @@ function ChannelTable({ item, result, rows }: { item: ItemResult; result: CalcRe
             const isTarget = row.id === result.customerType;
             return (
               <tr key={row.id} className={`${isTarget ? "bg-blue-500/[0.06]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
-                <td className="px-3 md:px-6 py-2 font-medium">{row.name}{isTarget && <span className="ml-2 text-[7px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">Target</span>}</td>
+                <td className="px-3 md:px-6 py-2 font-medium">{row.name}{isTarget && <span className="ml-2 text-[7px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">{t("res.target", "Target")}</span>}</td>
                 <td className="text-right px-2 md:px-4 py-2 font-mono text-[var(--text-highlight)]">${fmt(up)}</td>
                 <td className="text-right px-2 md:px-4 py-2 font-mono text-[var(--text-highlight)]">${fmt(up * item.qty)}</td>
                 <td className={`text-right px-2 md:px-4 py-2 font-mono ${pr >= 0 ? "text-emerald-400" : "text-red-400"}`}>{pr >= 0 ? "+" : ""}${fmt(pr * item.qty)}</td>

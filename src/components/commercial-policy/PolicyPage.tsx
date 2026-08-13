@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
@@ -14,6 +16,7 @@ interface PolicyPageProps {
 }
 
 export default function PolicyPage({ title, subtitle, badge, children }: PolicyPageProps) {
+  const { t } = useTranslation(commercialPolicyT);
   const pathname = usePathname();
   const { prev, next } = getAdjacentPages(pathname);
 
@@ -81,6 +84,7 @@ export default function PolicyPage({ title, subtitle, badge, children }: PolicyP
 /* ── Reusable Section Components ── */
 
 export function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <section>
       {title && (
@@ -94,6 +98,7 @@ export function Section({ title, children }: { title?: string; children: React.R
 }
 
 export function SectionDesc({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <p className="mb-4 text-[14px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
       {children}
@@ -102,6 +107,7 @@ export function SectionDesc({ children }: { children: React.ReactNode }) {
 }
 
 export function CardGrid({ cols = 3, children }: { cols?: 2 | 3 | 4; children: React.ReactNode }) {
+  const { t } = useTranslation(commercialPolicyT);
   const colClass =
     cols === 2
       ? "grid-cols-1 md:grid-cols-2"
@@ -124,6 +130,7 @@ export function InfoCard({
   color?: string;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div
       className="rounded-xl border p-5 transition-colors"
@@ -155,6 +162,7 @@ export function DataTable({
   headers: (string | React.ReactNode)[];
   rows: (string | React.ReactNode)[][];
 }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border-subtle)" }}>
       <table className="w-full text-[13px]">
@@ -188,6 +196,7 @@ export function DataTable({
 }
 
 export function StepFlow({ steps }: { steps: { label: string; description?: string }[] }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div className="flex flex-col gap-3">
       {steps.map((step, i) => (
@@ -215,6 +224,7 @@ export function StepFlow({ steps }: { steps: { label: string; description?: stri
 }
 
 export function Badge({ label, color }: { label: string; color?: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <span
       className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
@@ -229,6 +239,7 @@ export function Badge({ label, color }: { label: string; color?: string }) {
 }
 
 export function RuleList({ rules }: { rules: string[] }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <ul className="flex flex-col gap-2">
       {rules.map((rule, i) => (
@@ -245,6 +256,7 @@ export function RuleList({ rules }: { rules: string[] }) {
 }
 
 export function Callout({ title, children, color }: { title?: string; children: React.ReactNode; color?: string }) {
+  const { t } = useTranslation(commercialPolicyT);
   return (
     <div
       className="rounded-xl border-l-4 p-5"
