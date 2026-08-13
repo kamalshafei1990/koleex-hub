@@ -56,8 +56,8 @@ export const FACETS: Record<string, FacetDefinition> = {
   /* §2 Machine facets */
   bed_type: {
     key: "bed_type", type: "single_select", source: "§2 Machine facets",
-    values: ["flat", "cylinder", "post", "feed-off-arm", "long-arm"],
-    note: "Long-arm is a BED value, not a separate 'arm' facet — the dictionary lists it here.",
+    values: ["flat", "cylinder", "post", "feed-off-arm", "long-arm", "bending-arm", "pillar"],
+    note: "Long-arm is a BED value, not a separate 'arm' facet — the dictionary lists it here. `bending-arm` and `pillar` added 2026-08-13 (dictionary §10): both are printed as whole product families in the Yuegong/SEASTAR zigzag catalogue (GG8530-DZ; GG591/GG9910), and both are bed shapes — NOT new subcategories, per the CL-0020 ruling.",
   },
   needle_count: {
     key: "needle_count", type: "number", source: "§2 Machine facets",

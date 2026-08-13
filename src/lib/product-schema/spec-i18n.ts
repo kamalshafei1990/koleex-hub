@@ -12,6 +12,43 @@
 import type { Translations } from "@/lib/i18n";
 
 export const SPEC_I18N: Translations = {
+  /* ── XSZ Zigzag (2026-08-13) — Yuegong/SEASTAR catalogue ──────────────
+     Trade terms, not literal glosses: 曲折缝 is the Chinese name of the
+     machine class, and 一步两点 / 二步三点 / 三步四点 are printed exactly
+     that way in the catalogue, so the zh values reuse the source wording
+     rather than re-translating from English. */
+  "g:Zigzag Stitch Configuration": { en: "Zigzag Stitch Configuration", zh: "曲折缝线迹配置", ar: "إعدادات غرزة الزيجزاج" },
+  "g:Pattern Control": { en: "Pattern Control", zh: "花样控制", ar: "التحكّم في الأنماط" },
+  "g:Machine & Drive": { en: "Machine & Drive", zh: "机器与驱动", ar: "الماكينة والدفع" },
+  "g:Automation & Lubrication": { en: "Automation & Lubrication", zh: "自动化与润滑", ar: "الأتمتة والتزييت" },
+  "g:Weight & Packing": { en: "Weight & Packing", zh: "重量与包装", ar: "الوزن والتغليف" },
+  "f:zigzag_bight_max": { en: "Max Zigzag Bight", zh: "最大曲折缝宽", ar: "أقصى اتساع الزيجزاج" },
+  "f:zigzag_pattern": { en: "Step / Point Pattern", zh: "步数/点数花样", ar: "نمط الخطوات والنقاط" },
+  "f:stitch_width_max": { en: "Max Stitch Width", zh: "最大针距宽度", ar: "أقصى عرض للغرزة" },
+  "f:needle_positions": { en: "Needle Position Adjustment", zh: "针位调节", ar: "ضبط موضع الإبرة" },
+  "f:pattern_control_type": { en: "Pattern Control", zh: "花样控制方式", ar: "طريقة التحكّم في النمط" },
+  "f:built_in_patterns": { en: "Built-in Patterns", zh: "内置花样数", ar: "عدد الأنماط المدمجة" },
+  "f:pattern_programmable": { en: "User-Programmable Patterns", zh: "可自编花样", ar: "أنماط قابلة للبرمجة" },
+  "f:control_panel_type": { en: "Control Panel", zh: "操作面板", ar: "لوحة التحكّم" },
+  "f:drive_system": { en: "Drive System", zh: "驱动方式", ar: "نظام الدفع" },
+  "f:auto_presser_foot_lift": { en: "Auto Presser Foot Lift", zh: "自动抬压脚", ar: "رفع قدم آلي" },
+  "f:auto_back_tacking": { en: "Auto Back-Tacking", zh: "自动倒缝", ar: "تثبيت رجعي آلي" },
+  "o:1_step_2_point": { en: "1-Step 2-Point", zh: "一步两点", ar: "خطوة واحدة نقطتين" },
+  "o:2_step_3_point": { en: "2-Step 3-Point", zh: "二步三点", ar: "خطوتين ٣ نقاط" },
+  "o:3_step_4_point": { en: "3-Step 4-Point", zh: "三步四点", ar: "٣ خطوات ٤ نقاط" },
+  "o:left_right_centre": { en: "Left / Right / Centre", zh: "左/右/中", ar: "يسار / يمين / وسط" },
+  /* NOT `o:fixed` — that value already means "Fixed Speed" on speed_control.
+     One word, two meanings, so this one gets its own value rather than a
+     field-scoped override; the needle either swings or it does not. */
+  "o:needle_fixed": { en: "Fixed Needle Position", zh: "\u9488\u4f4d\u56fa\u5b9a", ar: "\u0645\u0648\u0636\u0639 \u0625\u0628\u0631\u0629 \u062b\u0627\u0628\u062a" },
+  "o:cam": { en: "Mechanical (Cam)", zh: "机械凸轮", ar: "ميكانيكي (كام)" },
+  "o:computerized": { en: "Computerized", zh: "电脑控制", ar: "بالحاسوب" },
+  "o:single_step_motor": { en: "Single Step Motor", zh: "单步进电机", ar: "موتور خطوة واحدة" },
+  "o:double_step_motor": { en: "Double Step Motor", zh: "双步进电机", ar: "موتور خطوتين" },
+  "o:none": { en: "None", zh: "无", ar: "بدون" },
+  "o:key_panel": { en: "Key Panel", zh: "按键屏", ar: "لوحة أزرار" },
+  "o:touch_screen": { en: "Touch Screen", zh: "触摸屏", ar: "شاشة لمس" },
+  "o:auto_oil": { en: "Automatic Oil Supply", zh: "自动加油", ar: "تزييت أوتوماتيكي" },
   /* ── Group titles ── */
   "g:Application": { en: "Application", zh: "应用", ar: "التطبيق" },
   "g:Automation": { en: "Automation", zh: "自动化", ar: "الأتمتة" },
@@ -782,6 +819,7 @@ export const SPEC_NAME_I18N: Translations = {
   "s:spotting-machine.v1": { en: "Spotting / Stain Removal Machine", zh: "去渍机", ar: "ماكينة إزالة البقع" },
   "s:thread-sucking.v1": { en: "Thread Sucking / Brushing Machine", zh: "吸线头 / 刷毛机", ar: "ماكينة شفط وفرش الخيوط" },
   "s:overlock.v1": { en: "Overlock Machine", zh: "包缝机", ar: "ماكينة أوفرلوك" },
+  "s:zigzag.v1": { en: "Zigzag Machine", zh: "曲折缝纫机", ar: "ماكينة زيجزاج" },
   "s:coverstitch.v1": { en: "Coverstitch (Flatlock) Machine", zh: "绷缝机（覆盖缝）", ar: "ماكينة الغرزة المغطّية (فلاتلوك)" },
   "s:chainstitch.v1": { en: "Chainstitch Machine", zh: "链缝机", ar: "ماكينة الغرزة السلسلية" },
   "s:steam-iron.v1": { en: "Steam Iron / Boiler-Iron Set", zh: "蒸汽熨斗 / 锅炉熨斗组", ar: "مكواة بخار / طقم غلاية ومكواة" },
@@ -801,6 +839,29 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* XSZ Zigzag (2026-08-13) — Yuegong/SEASTAR. */
+  "The sideways swing of the needle — the column printed as a range (0-5 … 0-12). This is what makes the machine a zigzag; it is NOT the stitch width of a straight seam.": { zh: "针杆的横向摆动量——目录中以区间形式印出（0-5 … 0-12）。这是曲折缝机的定义特征，不是直线缝的针距宽度。", ar: "اتساع تأرجح الإبرة جانبيًا — العمود المطبوع كمدى (0-5 … 0-12). ده اللي بيخلّي الماكينة زيجزاج، ومش عرض غرزة الخياطة المستقيمة." },
+  "Printed as 一步两点 / 二步三点 / 三步四点. It separates models inside one series (GG20U457A vs 457B vs 457D), which is why it lives on the model and not on the Machine Kind.": { zh: "目录印为一步两点 / 二步三点 / 三步四点。它区分同一系列内的不同型号（GG20U457A / 457B / 457D），因此属于型号属性而非机型属性。", ar: "مطبوع كـ一步两点 / 二步三点 / 三步四点. بيفرّق بين موديلات في نفس السلسلة (GG20U457A و457B و457D)، وعشان كده هو خاصية موديل مش خاصية نوع ماكينة." },
+  "Second column of the printed bar (4 – 6 mm across the range).": { zh: "印刷规格表第二列（全系列 4 – 6 毫米）。", ar: "العمود التاني في الجدول المطبوع (4 – 6 مم عبر المدى)." },
+  "Third column (4 – 6 mm). Reused from the shared sewing vocabulary.": { zh: "第三列（4 – 6 毫米）。沿用缝制通用字段。", ar: "العمود التالت (4 – 6 مم). مُعاد استخدامه من مفردات الخياطة المشتركة." },
+  "GG20U33/43/53/63 states the needle position can be set left, right or centre. Left blank where a model does not print it.": { zh: "GG20U33/43/53/63 说明针位可在左、右、中调节。型号未印出时留空。", ar: "GG20U33/43/53/63 بيقول إن موضع الإبرة يتظبط يسار أو يمين أو وسط. يُترك فاضي لو الموديل مابيطبعوش." },
+  "The catalogue's own top-level split: cam-changed models (GG2284, 'different stitch designs by changing the optional cams') vs single/double step-motor decorative heads vs computerized 20U series.": { zh: "目录自身的顶层分类：更换凸轮的机型（GG2284）、单/双步进电机花样机头、以及电脑控制的 20U 系列。", ar: "التقسيم الرئيسي في الكتالوج نفسه: موديلات بتغيير الكام (GG2284)، ورؤوس زخرفية بموتور خطوة واحدة أو خطوتين، وسلسلة 20U بالحاسوب." },
+  "Advertised on the page, not in the table: 190 (GG20U-A/C), 240 (GG20U-B), 200+ (YG1996-A4), 700+ (YG1996-B5 / GG5530-B4).": { zh: "印在页面而非规格表：190（GG20U-A/C）、240（GG20U-B）、200+（YG1996-A4）、700+（YG1996-B5 / GG5530-B4）。", ar: "مذكور في الصفحة مش في الجدول: 190 (GG20U-A/C) و240 (GG20U-B) و200+ (YG1996-A4) و700+ (YG1996-B5 / GG5530-B4)." },
+  "Whether the operator can author and download patterns. True on A3/A4, B3/B4, C3/C4 and the 700-design heads; false on the plain cam models.": { zh: "操作者能否自编并下载花样。A3/A4、B3/B4、C3/C4 及 700 花样机头为是；普通凸轮机型为否。", ar: "هل المشغّل يقدر يصمّم وينزّل أنماط. نعم في A3/A4 وB3/B4 وC3/C4 والرؤوس بـ700 نمط؛ لأ في موديلات الكام العادية." },
+  "Several heads print 可选配触摸屏款 — touch screen optional. Record what the quoted configuration actually ships with.": { zh: "多款机头标注可选配触摸屏款。请按报价实际配置填写。", ar: "كذا رأس مكتوب عليه 可选配触摸屏款 — شاشة اللمس اختيارية. سجّل التكوين اللي فعلاً بيتشحن مع العرض." },
+  "Fourth column. 1800 – 4000 s.p.m across this catalogue.": { zh: "第四列。本目录范围 1800 – 4000 针/分。", ar: "العمود الرابع. من 1800 لـ4000 غرزة/دقيقة في الكتالوج ده." },
+  "First column. DPx5 on most heads; DPX17 on the post-bed GG9530/GG9630.": { zh: "第一列。多数机头为 DPx5；立柱机 GG9530/GG9630 为 DPX17。", ar: "العمود الأول. DPx5 في معظم الرؤوس؛ وDPX17 في ماكينة العمود GG9530/GG9630." },
+  "Printed as a PAIR (6/10, 6/12, 8/13) — hand lift / knee lift. Kept as text so both numbers survive; splitting them would invent a precision the page does not give.": { zh: "以一对数值印出（6/10、6/12、8/13）——手抬/膝抬。保留为文本以免拆分后虚构页面未给出的精度。", ar: "مطبوع كزوج (6/10 · 6/12 · 8/13) — رفع يدوي / رفع بالركبة. متسجّل كنص عشان الرقمين يفضلوا؛ تقسيمهم هيخترع دقّة الصفحة مابتديهاش." },
+  "'LARGE HOOK' is called out in the model titles (GG5530-DZ, GG652-XL, GG1530, GG2530) because it is a buying decision.": { zh: "型号标题中标明“大旋梭”（GG5530-DZ、GG652-XL、GG1530、GG2530），因为这是采购决策点。", ar: "«الخطاف الكبير» مذكور في عناوين الموديلات (GG5530-DZ وGG652-XL وGG1530 وGG2530) لأنه قرار شرائي." },
+  "550 W on every zigzag model in this catalogue; the pillar/edge-trimming machines print a clutch motor in HP instead.": { zh: "本目录所有曲折缝机型均为 550 W；罗拉车与修边机改印离合器马达（HP）。", ar: "550 وات في كل موديلات الزيجزاج في الكتالوج ده؛ وماكينات العمود وقص الحواف مكتوب عليها موتور كلتش بالحصان." },
+  "The -DZ suffix throughout this catalogue means direct drive.": { zh: "本目录中 -DZ 后缀表示直驱。", ar: "لاحقة ‎-DZ‎ في الكتالوج ده معناها دفع مباشر." },
+  "Last column of the printed table, shown as ✓ or ✗.": { zh: "规格表最后一列，以 ✓ 或 ✗ 表示。", ar: "آخر عمود في الجدول المطبوع، معروض كـ ✓ أو ✗." },
+  "Listed in the prose for the trimmer-equipped heads (自动抬压脚).": { zh: "在配剪线机头的说明文字中列出（自动抬压脚）。", ar: "مذكور في وصف الرؤوس المزوّدة بالقص (自动抬压脚)." },
+  "自动倒缝 — reverse stitching at the seam ends without the operator touching the lever.": { zh: "自动倒缝——缝合两端自动回针，无需操作者拨杆。", ar: "自动倒缝 — خياطة رجعية في طرفي الخط من غير ما المشغّل يلمس الذراع." },
+  "AUTO-OIL is in the model titles (自动加油); the sealed-ridge note on GG9530 is about preventing oil leaking onto the work.": { zh: "型号标题含自动加油；GG9530 的密封式背脊说明用于防止漏油污染缝料。", ar: "«التزييت الأوتوماتيكي» في عناوين الموديلات (自动加油)؛ وملاحظة الحافة المحكمة في GG9530 بتمنع تسرّب الزيت على الشغل." },
+  "Printed as a net/gross pair (e.g. 45/40, 24/21) — the FIRST number.": { zh: "以净重/毛重一对印出（如 45/40、24/21）——取第一个数。", ar: "مطبوع كزوج صافي/إجمالي (زي 45/40 و24/21) — الرقم الأول." },
+  "The SECOND number of the same pair.": { zh: "同一对中的第二个数。", ar: "الرقم التاني في نفس الزوج." },
+  "Carton a×b×c in cm (67x25x57, 54.5x24x36.5 …). Kept as text because the page gives one string, not three measured axes.": { zh: "纸箱 a×b×c，单位厘米（67x25x57、54.5x24x36.5 …）。页面给出的是一个字符串而非三个独立尺寸，故保留为文本。", ar: "الكرتونة a×b×c بالسنتيمتر (67x25x57 و54.5x24x36.5 …). متسجّلة كنص لأن الصفحة بتدي سلسلة واحدة مش تلات محاور مقيسة." },
   /* ── Backfill 2026-08-12: the last 96 untranslated descriptions.
      They belong to the finishing/ironing batch, which shipped with English
      helper text under translated labels. Counted 181 by OCCURRENCE because

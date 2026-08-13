@@ -20,6 +20,7 @@ import {
 import { YILI_BATCH_SCHEMAS } from "./schemas/yili-batch-2026-08-12";
 import { IRONING_HEATPRESS_BATCH_SCHEMAS } from "./schemas/ironing-heatpress-batch-2026-08-12";
 import { SEWING_STITCH_TYPE_SCHEMAS } from "./schemas/sewing-stitch-types-2026-08-12";
+import { ZIGZAG_SCHEMAS } from "./schemas/zigzag-2026-08-13";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -69,6 +70,11 @@ for (const schema of IRONING_HEATPRESS_BATCH_SCHEMAS) registerSchema(schema);
    these schemas — they live on the facet axis and reach the form through the
    Machine-Kind attributes, which is the whole point of the two-axis model. */
 for (const schema of SEWING_STITCH_TYPE_SCHEMAS) registerSchema(schema);
+
+/* XSZ Zigzag — CL-0020 minted the token but shipped no template, so the form
+   rendered zero fields for every zigzag model. Built 2026-08-13 off the
+   Yuegong/SEASTAR printed spec table. */
+for (const schema of ZIGZAG_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */

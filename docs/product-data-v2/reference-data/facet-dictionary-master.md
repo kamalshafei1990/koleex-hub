@@ -21,7 +21,7 @@ New facets are added **here only** (governance). Categories *reference* facets; 
 ## 2. Machine facets (sewing / embroidery / automation / cutting / finishing / print / packing)
 | Facet | Type | Unit | Allowed Values |
 |---|---|---|---|
-| bed_type | single_select | — | Flat · Cylinder · Post · Feed-off-Arm · Long-arm |
+| bed_type | single_select | — | Flat · Cylinder · Post · Feed-off-Arm · Long-arm · Bending-Arm · Pillar |
 | needle_count | number | — | 1 · 2 · multi |
 | thread_count | number | — | 2 · 3 · 4 · 5 · 6 |
 | gauge | measurement | mm / inch | numeric |
@@ -179,6 +179,28 @@ Six distinctions had no facet. Each is printed in a real catalogue and none is i
 | `welt_count` | single_select | Single · Double | The pocket-welting split. |
 | `flap_handling` | boolean | true / false | Whether the welter also sets the flap. |
 | `vision_guided` | boolean | true / false | **Named explicitly in the audit's OUTPUT 8** as an attribute, so vision never becomes a "Vision-X" type under every stitch class. |
+
+## 10. Bed-type values added by the Yuegong/SEASTAR zigzag catalogue (2026-08-13)
+
+Two bed shapes are printed as whole product families in a real supplier
+catalogue and had no value in `bed_type`:
+
+| Value | Printed as | Model evidence |
+|---|---|---|
+| `bending-arm` | BENDING ARM ZIGZAG SEWING MACHINE | GG8530-DZ |
+| `pillar` | PILLAR SEWING MACHINE | GG591 · GG9910 |
+
+They are **bed values, not new subcategories** — exactly the CL-0020 ruling that
+put bed shape on the facet axis. `post` already covered GG9530-DZ (POST BED) and
+`cylinder` already covered GG2312 (CYLINDRICAL BED), which is why only two were
+missing rather than four.
+
+> ⚠️ **The step/point pattern is NOT a facet.** The same catalogue prints
+> 一步两点 / 二步三点 / 三步四点 (1-step-2-point · 2-step-3-point ·
+> 3-step-4-point) — but those separate MODELS inside one series
+> (GG20U457A vs 457B vs 457D), not kinds of machine. A facet distinguishes
+> kinds; a model difference belongs in the spec template. It is a field on the
+> XSZ schema, not a value here.
 
 ### Enforcement
 The registry lives in `src/lib/product-facets.ts` and **mirrors this document** — it does not maintain a parallel list. `validate:budgets` **section H** fails the build when a Machine Kind uses a key that is not in the registry, a value that is not in the facet's list, or a key/value with no en/zh/ar label. It also fails if any kind is ever filed back under a retired configuration shelf.
