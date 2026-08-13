@@ -1411,14 +1411,35 @@ input[type="number"]:not(.kx-spinner) {
      problem with that?" and the honest answer was: none, once the real bug
      below was found. Every earlier recipe on this spot LOOKED wrong for a
      reason that had nothing to do with these numbers. */
-  background: rgba(11, 14, 20, 0.6);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  backdrop-filter: blur(40px) saturate(150%);
+  /* …AND THAT COPY WAS STILL NOT THE SIGN-IN CARD, because the numbers were
+     never the whole recipe. Owner, 2026-08-13: "i don't feel it glass same as
+     signin page." The sign-in markup says why in its own comment — "with a
+     moving ground behind it… the waves have to reach through". That card sits
+     on the LIT, moving wave field. A modal sits on a dark list. Identical
+     values, opposite result: a 60%-DARK fill over a dark page only makes it
+     darker, so the card reads as a solid slab.
+
+     Same cure as the menus, which is the one thing already proven to make
+     glass legible on a dark ground: a pale film instead of a dark one, and
+     BRIGHTNESS in the filter to lift what shows through. Lighter than the
+     menus on purpose — the note below is right that a menu is denser glass
+     than a modal (0.045 vs 0.05 fill, brightness 1.38 vs 1.5). */
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.04) 34%, rgba(255, 255, 255, 0) 66%),
+    rgba(255, 255, 255, 0.045);
+  -webkit-backdrop-filter: blur(40px) saturate(170%) brightness(1.38);
+  backdrop-filter: blur(40px) saturate(170%) brightness(1.38);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
               0 40px 80px -30px rgba(0, 0, 0, 0.9);
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop {
-  background: rgba(252, 253, 255, 0.68);
+  /* Light needs the opposite of a lift: the ground is already bright, so the
+     film carries the tint and brightness stays just under 1. */
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.60) 0%, rgba(255, 255, 255, 0.30) 34%, rgba(255, 255, 255, 0.12) 66%),
+    rgba(255, 255, 255, 0.50);
+  -webkit-backdrop-filter: blur(40px) saturate(170%) brightness(0.99);
+  backdrop-filter: blur(40px) saturate(170%) brightness(0.99);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
               0 40px 80px -34px rgba(16, 24, 40, 0.28);
 }
