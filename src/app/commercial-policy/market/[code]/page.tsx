@@ -261,7 +261,7 @@ function MarketProfileView() {
                           className="h-8 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] px-2 outline-none focus:border-[var(--border-strong)] disabled:opacity-50"
                         >
                           {activeBands.map((b) => <option key={b.id} value={b.id}>Band {b.code} ({fmtPct(b.adjustment_percent)})</option>)}
-                          <option value={UNASSIGNED}>Unassigned</option>
+                          <option value={UNASSIGNED}>{t("unassigned", "Unassigned")}</option>
                         </select>
                         {savingBand ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} className="text-[var(--text-dim)]" />}
                       </span>
@@ -294,7 +294,7 @@ function MarketProfileView() {
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     <OverviewField label="Band" value={band ? `Band ${band.code}` : "—"} />
-                    <OverviewField label="Adjustment %" value={band ? fmtPct(band.adjustment_percent) : "—"} />
+                    <OverviewField label={t("adjustmentPct", "Adjustment %")} value={band ? fmtPct(band.adjustment_percent) : "—"} />
                     <OverviewField label={t("region", "Region")} value={country.region || "—"} />
                     <OverviewField label="Currency" value={country.currency || "—"} />
                     <OverviewField label={t("dialCode", "Dial code")} value={country.dialCode || "—"} />
@@ -317,8 +317,8 @@ function MarketProfileView() {
 
               {/* KPIs */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Kpi label="Total Customers" value={customers == null ? "…" : String(customers.length)} />
-                <Kpi label="Active Customers" value={customers == null ? "…" : String(activeCount)} />
+                <Kpi label={t("totalCustomers", "Total Customers")} value={customers == null ? "…" : String(customers.length)} />
+                <Kpi label={t("activeCustomers", "Active Customers")} value={customers == null ? "…" : String(activeCount)} />
                 <Kpi label={t("totalSales", "Total Sales")} value="—" muted />
                 <Kpi label={t("avgOrderValue", "Average Order Value")} value="—" muted />
               </div>
@@ -366,10 +366,18 @@ function MarketProfileView() {
                 <h2 className="text-[14px] font-semibold mb-1">{t("futureAnalytics", "Future-Ready Analytics")}</h2>
                 <p className="text-[12px] text-[var(--text-dim)] mb-4">{t("analyticsHint", "Activates once orders are linked to customers in this market.")}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {["Top Products in this Market", "Sales Trend", "Revenue by Period", "Order Count"].map((t) => (
-                    <div key={t} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-4">
-                      <div className="text-[12px] font-semibold mb-1">{t}</div>
-                      <div className="text-[15px] text-[var(--text-dim)]">No data available</div>
+                  {/* The loop variable was `t`, which SHADOWED the translation
+                      function — the placeholder card titles are translated via
+                      their own keys and the map binds `card` instead. */}
+                  {([
+                    ["analytics.topProducts", "Top Products in this Market"],
+                    ["analytics.salesTrend", "Sales Trend"],
+                    ["analytics.revenueByPeriod", "Revenue by Period"],
+                    ["analytics.orderCount", "Order Count"],
+                  ] as const).map(([key, fallback]) => (
+                    <div key={key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-4">
+                      <div className="text-[12px] font-semibold mb-1">{t(key, fallback)}</div>
+                      <div className="text-[15px] text-[var(--text-dim)]">{t("noData", "No data available")}</div>
                     </div>
                   ))}
                 </div>

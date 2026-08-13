@@ -320,12 +320,12 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
             </span>
             {row.is_default && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-bold tracking-wide">
-                DEFAULT
+                {t("badgeDefault", "DEFAULT")}
               </span>
             )}
             {row.is_system && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-bold tracking-wide">
-                SYSTEM
+                {t("badgeSystem", "SYSTEM")}
               </span>
             )}
           </div>
@@ -407,7 +407,7 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
             <button type="button" onClick={onEdit} title="Edit" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={onDelete} title="Delete" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition-colors">
+            <button type="button" onClick={onDelete} title={t("delete", "Delete")} className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition-colors">
               <TrashIcon className="h-3.5 w-3.5" />
             </button>
           </div>

@@ -162,7 +162,7 @@ export default function MarketSegmentation({
                 disabled={saving}
                 className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
               >
-                Cancel
+                {t("cancel", "Cancel")}
               </button>
               <button
                 type="button"

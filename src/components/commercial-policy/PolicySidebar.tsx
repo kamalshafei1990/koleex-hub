@@ -105,7 +105,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         style={{ color: "var(--text-dim)" }}
       >
         <AngleRightIcon size={10} className="rotate-180" />
-        Knowledge
+        {t("knowledge", "Knowledge")}
       </Link>
       <div className="px-3 pb-2">
         <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Commercial Policy &amp; Pricing</p>

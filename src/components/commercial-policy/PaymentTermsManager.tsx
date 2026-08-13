@@ -209,7 +209,7 @@ export default function PaymentTermsManager({
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">
-            Payment Terms
+            {t("paymentTerms", "Payment Terms")}
           </h2>
           <p className="text-[12px] text-[var(--text-dim)]">
             Master list used by Quotations, Invoices, Sales Contracts, and the
@@ -305,7 +305,7 @@ export default function PaymentTermsManager({
                   )}
                   {cat.is_credit && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      Credit
+                      {t("credit", "Credit")}
                     </span>
                   )}
                   {cat.is_bank_mediated && (
@@ -397,12 +397,12 @@ function TermCard({
             </span>
             {term.is_default && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-bold tracking-wide">
-                DEFAULT
+                {t("badgeDefault", "DEFAULT")}
               </span>
             )}
             {term.is_system && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-bold tracking-wide">
-                SYSTEM
+                {t("badgeSystem", "SYSTEM")}
               </span>
             )}
           </div>
@@ -473,7 +473,7 @@ function TermCard({
             <button
               type="button"
               onClick={onDelete}
-              title="Delete"
+              title={t("delete", "Delete")}
               className="p-1.5 text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
             >
               <TrashIcon className="h-3 w-3" />

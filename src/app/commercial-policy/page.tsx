@@ -127,7 +127,7 @@ function CommercialPolicyView() {
                 <AppIcon appId="commercial-policy" className="h-4 w-4" size={16} />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Commercial Setup
+                {t("commercialSetup", "Commercial Setup")}
               </h1>
             </div>
           </div>
@@ -405,7 +405,7 @@ function SectionShell({
               onClick={onEditStart}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              Edit
+              {t("edit", "Edit")}
             </button>
           )}
           {editing && (
@@ -416,7 +416,7 @@ function SectionShell({
                 disabled={saving}
                 className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
               >
-                Cancel
+                {t("cancel", "Cancel")}
               </button>
               <button
                 type="button"
@@ -630,7 +630,7 @@ function SettingsSection({
           }
         />
         <KpiEditable
-          label="FX safety buffer %"
+          label={t("fxBufferPct", "FX safety buffer %")}
           value={d.fx_safety_buffer_percent ?? 0}
           editing={ed.editing}
           type="number"
@@ -669,7 +669,7 @@ function SettingsSection({
           hintFalse="Sales users cannot view KOLEEX cost (matches the Commercial Policy)."
         />
         <KpiEditable
-          label="Cost uplift %"
+          label={t("costUpliftPct", "Cost uplift %")}
           value={d.cost_uplift_percent ?? 0}
           editing={ed.editing}
           type="number"
@@ -678,7 +678,7 @@ function SettingsSection({
           renderValue={(v) => `${Number(v).toFixed(2)}%`}
         />
         <KpiEditable
-          label="Tax refund rate %"
+          label={t("taxRefundPct", "Tax refund rate %")}
           value={d.tax_refund_rate_percent ?? 0}
           editing={ed.editing}
           type="number"
@@ -779,8 +779,8 @@ function ProductLevelsSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin Range %", "Default %", "Floor %", "Active", ""]
-          : ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin Range %", "Default %", "Floor %", "Active"]}
+          ? [t("col.code", "Code"), t("col.name", "Name"), t("col.minCost", "Min Cost (CNY)"), t("col.maxCost", "Max Cost (CNY)"), t("col.marginRange", "Margin Range %"), t("col.defaultPct", "Default %"), t("col.floorPct", "Floor %"), t("col.active", "Active"), ""]
+          : [t("col.code", "Code"), t("col.name", "Name"), t("col.minCost", "Min Cost (CNY)"), t("col.maxCost", "Max Cost (CNY)"), t("col.marginRange", "Margin Range %"), t("col.defaultPct", "Default %"), t("col.floorPct", "Floor %"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td>{r.code || <span className="text-[var(--text-dim)]">—</span>}</Td>
@@ -870,7 +870,7 @@ function CustomerTiersSection({
 
   return (
     <SectionShell
-      title="Customer Tiers"
+      title={t("customerTiers", "Customer Tiers")}
       description="Classification for every customer. Drives discount caps, credit, and market rights."
       editing={ed.editing}
       saving={ed.saving}
@@ -880,8 +880,8 @@ function CustomerTiersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Level", "Tier", "Commercial Role", "Discount Cap %", "Has Credit", "Credit ×", "Credit Days", "Market Rights", "Active", ""]
-          : ["Level", "Tier", "Commercial Role", "Discount Cap %", "Has Credit", "Credit ×", "Credit Days", "Market Rights", "Active"]}
+          ? [t("col.level", "Level"), t("col.tier", "Tier"), t("col.commercialRole", "Commercial Role"), t("col.discountCap", "Discount Cap %"), t("col.hasCredit", "Has Credit"), t("col.creditMult", "Credit ×"), t("col.creditDays", "Credit Days"), t("col.marketRights", "Market Rights"), t("col.active", "Active"), ""]
+          : [t("col.level", "Level"), t("col.tier", "Tier"), t("col.commercialRole", "Commercial Role"), t("col.discountCap", "Discount Cap %"), t("col.hasCredit", "Has Credit"), t("col.creditMult", "Credit ×"), t("col.creditDays", "Credit Days"), t("col.marketRights", "Market Rights"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td align="right">
@@ -989,8 +989,8 @@ function MarketBandsSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Band", "Label", "Adjustment %", "Flexible", "Flex Min %", "Flex Max %", "Countries", "Active", ""]
-          : ["Band", "Label", "Adjustment %", "Flexible", "Flex Min %", "Flex Max %", "Countries", "Active"]}
+          ? [t("col.band", "Band"), t("col.label", "Label"), t("col.adjustmentPct", "Adjustment %"), t("col.flexible", "Flexible"), t("col.flexMin", "Flex Min %"), t("col.flexMax", "Flex Max %"), t("col.countries", "Countries"), t("col.active", "Active"), ""]
+          : [t("col.band", "Band"), t("col.label", "Label"), t("col.adjustmentPct", "Adjustment %"), t("col.flexible", "Flexible"), t("col.flexMin", "Flex Min %"), t("col.flexMax", "Flex Max %"), t("col.countries", "Countries"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td>{r.code || <span className="text-[var(--text-dim)]">—</span>}</Td>
@@ -1086,8 +1086,8 @@ function ChannelMultipliersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Step", "Channel", "Customer Tier", "Margin Range %", "Multiplier (fallback)", "Active", ""]
-          : ["Step", "Channel", "Customer Tier", "Margin Range %", "Multiplier (fallback)", "Active"]}
+          ? [t("col.step", "Step"), t("col.channel", "Channel"), t("col.customerTier", "Customer Tier"), t("col.marginRange", "Margin Range %"), t("col.multiplier", "Multiplier (fallback)"), t("col.active", "Active"), ""]
+          : [t("col.step", "Step"), t("col.channel", "Channel"), t("col.customerTier", "Customer Tier"), t("col.marginRange", "Margin Range %"), t("col.multiplier", "Multiplier (fallback)"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td align="right">
@@ -1186,8 +1186,8 @@ function DiscountTiersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Tier", "Min %", "Max %", "Approver Role", "Active", ""]
-          : ["Tier", "Min %", "Max %", "Approver Role", "Active"]}
+          ? [t("col.tier", "Tier"), t("col.minPct", "Min %"), t("col.maxPct", "Max %"), t("col.approverRole", "Approver Role"), t("col.active", "Active"), ""]
+          : [t("col.tier", "Tier"), t("col.minPct", "Min %"), t("col.maxPct", "Max %"), t("col.approverRole", "Approver Role"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td><TextIn editing={ed.editing} value={r.label} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { label: v }))} /></Td>
@@ -1268,8 +1268,8 @@ function CommissionTiersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Tier", "Rate %", "Applies To", "Active", ""]
-          : ["Tier", "Rate %", "Applies To", "Active"]}
+          ? [t("col.tier", "Tier"), t("col.ratePct", "Rate %"), t("col.appliesTo", "Applies To"), t("col.active", "Active"), ""]
+          : [t("col.tier", "Tier"), t("col.ratePct", "Rate %"), t("col.appliesTo", "Applies To"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
@@ -1353,8 +1353,8 @@ function VolumeDiscountTiersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Tier", "Min Order (USD)", "Max Order (USD)", "Discount Range %", "Active", ""]
-          : ["Tier", "Min Order (USD)", "Max Order (USD)", "Discount Range %", "Active"]}
+          ? [t("col.tier", "Tier"), t("col.minOrder", "Min Order (USD)"), t("col.maxOrder", "Max Order (USD)"), t("col.discountRange", "Discount Range %"), t("col.active", "Active"), ""]
+          : [t("col.tier", "Tier"), t("col.minOrder", "Min Order (USD)"), t("col.maxOrder", "Max Order (USD)"), t("col.discountRange", "Discount Range %"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
@@ -1441,8 +1441,8 @@ function ApprovalAuthoritySection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Level", "Role", "Can Approve (comma-separated)", "Active", ""]
-          : ["Level", "Role", "Can Approve (comma-separated)", "Active"]}
+          ? [t("col.level", "Level"), t("col.role", "Role"), t("col.canApprove", "Can Approve (comma-separated)"), t("col.active", "Active"), ""]
+          : [t("col.level", "Level"), t("col.role", "Role"), t("col.canApprove", "Can Approve (comma-separated)"), t("col.active", "Active")]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td align="right">
