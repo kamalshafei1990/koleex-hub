@@ -1591,6 +1591,18 @@ const AR: Content = {
 const CONTENT: Record<Lang, Content> = { en: EN, zh: ZH, ar: AR };
 
 /* ── helpers ── */
+
+/* Declared at module scope: defining a component INSIDE another makes it a new
+   type on every render, so React unmounts and remounts its subtree each time.
+   It closed over `c` (the language pack), which now arrives as a prop. */
+function TierBadge({ t, labels }: { t: Tier; labels: Record<Tier, string> }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${TIER_STYLE[t]}`}>
+      {labels[t]}
+    </span>
+  );
+}
+
 function DeptDot({ d }: { d: DeptKey }) {
   return <span className={`inline-block h-2 w-2 rounded-full ${DEPT_STYLE[d].dot}`} aria-hidden />;
 }
@@ -1599,12 +1611,6 @@ export default function SupplierDataGuidePage() {
   const { lang } = useTranslation({});
   const c = CONTENT[lang] ?? EN;
   const dir = lang === "ar" ? "rtl" : "ltr";
-
-  const TierBadge = ({ t }: { t: Tier }) => (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${TIER_STYLE[t]}`}>
-      {c.tierLabels[t]}
-    </span>
-  );
 
   return (
     <div dir={dir} className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -1759,7 +1765,7 @@ export default function SupplierDataGuidePage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <TierBadge t={meta.tier} />
+                          <TierBadge t={meta.tier} labels={c.tierLabels} />
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ${st.text}`}>
                             <DeptDot d={meta.dept} /> {c.depts[meta.dept].name}
                           </span>
@@ -1793,9 +1799,9 @@ export default function SupplierDataGuidePage() {
               <SectionHeading icon={GaugeIcon} eyebrow={c.completeness.eyebrow} title={c.completeness.title} />
               <p className="text-[14px] leading-relaxed text-[var(--text-faint)] max-w-3xl mb-4">{c.completeness.intro}</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <TierExplain badge={<TierBadge t="required" />} body={c.completeness.required} />
-                <TierExplain badge={<TierBadge t="preferred" />} body={c.completeness.preferred} />
-                <TierExplain badge={<TierBadge t="optional" />} body={c.completeness.optional} />
+                <TierExplain badge={<TierBadge t="required" labels={c.tierLabels} />} body={c.completeness.required} />
+                <TierExplain badge={<TierBadge t="preferred" labels={c.tierLabels} />} body={c.completeness.preferred} />
+                <TierExplain badge={<TierBadge t="optional" labels={c.tierLabels} />} body={c.completeness.optional} />
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
                   <div className="text-[13px] font-semibold mb-1">{c.completeness.overallTitle}</div>
                   <div className="text-[12.5px] leading-relaxed text-[var(--text-faint)]">{c.completeness.overall}</div>

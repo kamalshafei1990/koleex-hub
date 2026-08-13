@@ -75,8 +75,11 @@ export function PortCombobox({
     const onScroll = () => place();
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     const onDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (triggerRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      /* Renamed from `t`: that name is the translation function everywhere
+         else in the Hub, and shadowing it inside a handler is how two earlier
+         files broke when the i18n hook was added. */
+      const node = e.target as Node;
+      if (triggerRef.current?.contains(node) || panelRef.current?.contains(node)) return;
       close();
     };
     window.addEventListener("scroll", onScroll, true);

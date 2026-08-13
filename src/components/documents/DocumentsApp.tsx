@@ -17,6 +17,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { documentsT } from "@/lib/translations/documents";
 import { useConfirm } from "@/components/kds/useConfirm";
 import PageHeader from "@/components/ui/PageHeader";
 import QuotationA4Preview, {
@@ -97,6 +99,7 @@ function DocEditor({
   onBack: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation(documentsT);
   const [current, setCurrent] = useState<Quotation | null>(() => {
     if (!initial) return makeBlankDoc();
     const doc = { ...(initial.doc as unknown as Quotation) };
@@ -402,6 +405,7 @@ function SavedList({
   onOpen: (row: DocumentRow) => void;
   onDelete: (row: DocumentRow) => void;
 }) {
+  const { t } = useTranslation(documentsT);
   const [filter, setFilter] = useState<OpenKind | "all">("all");
   const shown = filter === "all" ? docs : docs.filter((d) => d.doc_kind === filter);
 
@@ -477,6 +481,7 @@ function SavedList({
    Root
    ═══════════════════════════════════════════════════════════════════════════ */
 export default function DocumentsApp() {
+  const { t } = useTranslation(documentsT);
   const [openKind, setOpenKind] = useState<OpenKind | null>(null);
   const [editing, setEditing] = useState<DocumentRow | null>(null);
   const [docs, setDocs] = useState<DocumentRow[]>([]);
@@ -525,7 +530,7 @@ export default function DocumentsApp() {
       <div className="px-4 md:px-6 pt-5 sm:pt-6">
       {confirmDialog}
         <PageHeader
-          title="Documents"
+          title={t("title", "Documents")}
           subtitle="Koleex document formats — create, save, and manage your quotations, invoices, and packing lists"
           icon={<DocumentsIcon size={20} />}
         />
@@ -533,25 +538,25 @@ export default function DocumentsApp() {
       <div className="px-4 md:px-6 py-6 w-full space-y-8">
         {/* New from template */}
         <div>
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">New document</h2>
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{t("newDocument", "New document")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {TEMPLATES.map((t) => (
+            {TEMPLATES.map((tpl) => (
               <button
-                key={t.kind}
+                key={tpl.kind}
                 type="button"
-                onClick={() => openTemplate(t.kind)}
+                onClick={() => openTemplate(tpl.kind)}
                 className="group text-start rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--border-focus)] transition-colors"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
-                    {t.icon}
+                    {tpl.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[15px] font-semibold text-[var(--text-primary)]">{t.title}</div>
-                    <div className="text-xs text-[var(--text-dim)] truncate">{t.subtitle}</div>
+                    <div className="text-[15px] font-semibold text-[var(--text-primary)]">{tpl.title}</div>
+                    <div className="text-xs text-[var(--text-dim)] truncate">{tpl.subtitle}</div>
                   </div>
                 </div>
-                <div className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider font-semibold">Blank A4 · fill · save · print</div>
+                <div className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider font-semibold">{t("blankA4", "Blank A4 · fill · save · print")}</div>
               </button>
             ))}
           </div>

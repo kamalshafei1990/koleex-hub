@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { websiteT } from "@/lib/translations/website";
 import Link from "next/link";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import TabletIcon from "@/components/icons/ui/TabletIcon";
@@ -22,26 +24,27 @@ const WEBSITE_URL = "https://koleex-website.vercel.app";
 const CMS_URL = `${WEBSITE_URL}/admin?v=2`;
 
 const quickLinks = [
-  { label: "Page Builder", icon: <LayoutIcon size={16} />, url: `${WEBSITE_URL}/admin?v=2` },
-  { label: "Products", icon: <PackageIcon size={16} />, url: "/products" },
-  { label: "Divisions", icon: <LayersIcon size={16} />, url: "/divisions" },
-  { label: "Categories", icon: <TagsIcon size={16} />, url: "/categories" },
-  { label: "Subcategories", icon: <DocumentIcon size={16} />, url: "/subcategories" },
+  { label: "Page Builder", labelKey: "pageBuilder", icon: <LayoutIcon size={16} />, url: `${WEBSITE_URL}/admin?v=2` },
+  { label: "Products", labelKey: "page.products", icon: <PackageIcon size={16} />, url: "/products" },
+  { label: "Divisions", labelKey: "page.divisions", icon: <LayersIcon size={16} />, url: "/divisions" },
+  { label: "Categories", labelKey: "page.categories", icon: <TagsIcon size={16} />, url: "/categories" },
+  { label: "Subcategories", labelKey: "page.subcategories", icon: <DocumentIcon size={16} />, url: "/subcategories" },
 ];
 
 const websitePages = [
-  { label: "Home", path: "/" },
-  { label: "About", path: "/about" },
-  { label: "Products", path: "/products" },
-  { label: "Solutions", path: "/solutions" },
-  { label: "Stories", path: "/stories" },
-  { label: "Careers", path: "/careers" },
-  { label: "Contact", path: "/contact" },
+  { label: "Home", labelKey: "page.home", path: "/" },
+  { label: "About", labelKey: "page.about", path: "/about" },
+  { label: "Products", labelKey: "page.products", path: "/products" },
+  { label: "Solutions", labelKey: "page.solutions", path: "/solutions" },
+  { label: "Stories", labelKey: "page.stories", path: "/stories" },
+  { label: "Careers", labelKey: "page.careers", path: "/careers" },
+  { label: "Contact", labelKey: "page.contact", path: "/contact" },
 ];
 
 type Viewport = "desktop" | "tablet" | "mobile" | "full";
 
 export default function WebsiteCMS() {
+  const { t } = useTranslation(websiteT);
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
   const [viewport, setViewport] = useState<Viewport>("full");
   const [previewPage, setPreviewPage] = useState("/");
@@ -75,7 +78,7 @@ export default function WebsiteCMS() {
               className="flex items-center gap-2 text-gray-400 hover:text-[var(--text-primary)] transition-colors text-sm"
             >
               <ArrowLeftIcon size={16} />
-              <span className="hidden sm:inline">Hub</span>
+              <span className="hidden sm:inline">{t("hub", "Hub")}</span>
             </Link>
             <div className="w-px h-6 bg-[#333]" />
             <div className="flex items-center gap-2">
@@ -83,7 +86,7 @@ export default function WebsiteCMS() {
                 <WebsiteIcon size={18} className="text-emerald-400" />
               </div>
               <div>
-                <h1 className="text-sm font-semibold leading-tight">Website</h1>
+                <h1 className="text-sm font-semibold leading-tight">{t("title", "Website")}</h1>
                 <p className="text-[10px] text-gray-500 leading-tight hidden sm:block">
                   CMS &amp; Page Builder
                 </p>
@@ -103,7 +106,7 @@ export default function WebsiteCMS() {
             >
               <span className="flex items-center gap-1.5">
                 <LayoutIcon size={13} />
-                <span className="hidden sm:inline">Page Builder</span>
+                <span className="hidden sm:inline">{t("pageBuilder", "Page Builder")}</span>
               </span>
             </button>
             <button
@@ -116,7 +119,7 @@ export default function WebsiteCMS() {
             >
               <span className="flex items-center gap-1.5">
                 <EyeIcon size={13} />
-                <span className="hidden sm:inline">Live Preview</span>
+                <span className="hidden sm:inline">{t("livePreview", "Live Preview")}</span>
               </span>
             </button>
           </div>
@@ -127,10 +130,10 @@ export default function WebsiteCMS() {
             {activeTab === "preview" && (
               <div className="hidden md:flex items-center gap-1 bg-[var(--bg-secondary)] rounded-lg p-0.5 border border-[var(--border-color)]">
                 {([
-                  { key: "full" as Viewport, icon: <Maximize2Icon size={13} />, title: "Full Width" },
-                  { key: "desktop" as Viewport, icon: <MonitorIcon size={13} />, title: "Desktop" },
-                  { key: "tablet" as Viewport, icon: <TabletIcon size={13} />, title: "Tablet" },
-                  { key: "mobile" as Viewport, icon: <SmartphoneIcon size={13} />, title: "Mobile" },
+                  { key: "full" as Viewport, icon: <Maximize2Icon size={13} />, title: t("fullWidth", "Full Width") },
+                  { key: "desktop" as Viewport, icon: <MonitorIcon size={13} />, title: t("desktop", "Desktop") },
+                  { key: "tablet" as Viewport, icon: <TabletIcon size={13} />, title: t("tablet", "Tablet") },
+                  { key: "mobile" as Viewport, icon: <SmartphoneIcon size={13} />, title: t("mobile", "Mobile") },
                 ]).map(({ key, icon, title }) => (
                   <button
                     key={key}
@@ -161,7 +164,7 @@ export default function WebsiteCMS() {
               >
                 {websitePages.map((p) => (
                   <option key={p.path} value={p.path}>
-                    {p.label}
+                    {t(p.labelKey, p.label)}
                   </option>
                 ))}
               </select>
@@ -170,7 +173,7 @@ export default function WebsiteCMS() {
             <button
               onClick={handleRefresh}
               className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
-              title="Refresh"
+              title={t("refresh", "Refresh")}
             >
               <RefreshIcon size={14} />
             </button>
@@ -180,7 +183,7 @@ export default function WebsiteCMS() {
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
-              title="Open in New Tab"
+              title={t("openInNewTab", "Open in New Tab")}
             >
               <ExternalLinkIcon size={14} />
             </a>
@@ -207,7 +210,7 @@ export default function WebsiteCMS() {
                   }`}
                 >
                   {link.icon}
-                  {link.label}
+                  {t(link.labelKey, link.label)}
                 </button>
               );
             }
@@ -218,7 +221,7 @@ export default function WebsiteCMS() {
                 className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
               >
                 {link.icon}
-                {link.label}
+                {t(link.labelKey, link.label)}
               </Link>
             );
           })}
@@ -228,9 +231,7 @@ export default function WebsiteCMS() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all ml-auto"
           >
-            <WebsiteIcon size={13} />
-            Visit Website
-            <ExternalLinkIcon size={10} />
+            <WebsiteIcon size={13} />{t("visitWebsite", "Visit Website")}<ExternalLinkIcon size={10} />
           </a>
         </div>
       </header>

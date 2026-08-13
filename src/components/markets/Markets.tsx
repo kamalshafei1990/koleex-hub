@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { marketsT } from "@/lib/translations/markets";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -139,6 +141,7 @@ function getAdjustmentDisplay(pct: number): string {
 /* ─────────── Component ─────────── */
 
 export default function Markets() {
+  const { t } = useTranslation(marketsT);
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K + tooltip
   const [markets] = useState<MarketEntry[]>(() => parseReferenceData());
   const [search, setSearch] = useState("");
@@ -261,7 +264,7 @@ export default function Markets() {
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight">
                   {selectedMarket.name}
                 </h1>
-                <p className="text-sm text-[var(--text-subtle)]">Market Profile</p>
+                <p className="text-sm text-[var(--text-subtle)]">{t("profile", "Market Profile")}</p>
               </div>
             </div>
           </div>
@@ -274,9 +277,7 @@ export default function Markets() {
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <ShieldIcon size={16} />
-                <span className="text-xs font-medium uppercase tracking-wider">
-                  Band Classification
-                </span>
+                <span className="text-xs font-medium uppercase tracking-wider">{t("bandClassification", "Band Classification")}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span
@@ -298,7 +299,7 @@ export default function Markets() {
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <TrendingUpIcon size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
-                  Price Adjustment
+                  {t("priceAdjustment", "Price Adjustment")}
                 </span>
               </div>
               <div className="flex items-baseline gap-2">
@@ -327,19 +328,13 @@ export default function Markets() {
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <MapPinIcon size={16} />
-                <span className="text-xs font-medium uppercase tracking-wider">
-                  Market Status
-                </span>
+                <span className="text-xs font-medium uppercase tracking-wider">{t("marketStatus", "Market Status")}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-[var(--text-highlight)] text-sm font-medium">
-                  Active Market
-                </span>
+                <span className="text-[var(--text-highlight)] text-sm font-medium">{t("activeMarket", "Active Market")}</span>
               </div>
-              <p className="text-[var(--text-faint)] text-xs">
-                Included in pricing engine calculations
-              </p>
+              <p className="text-[var(--text-faint)] text-xs">{t("inPricingEngine", "Included in pricing engine calculations")}</p>
             </div>
           </div>
 
@@ -354,9 +349,7 @@ export default function Markets() {
                   <h2 className="text-base font-semibold">
                     Customers in {selectedMarket.name}
                   </h2>
-                  <p className="text-xs text-[var(--text-faint)] mt-0.5">
-                    Accounts associated with this market
-                  </p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">{t("customersInMarket", "Accounts associated with this market")}</p>
                 </div>
               </div>
               <span className="text-xs text-[var(--text-dim)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-full">
@@ -368,9 +361,7 @@ export default function Markets() {
               <div className="flex items-center justify-center py-16">
                 <div className="flex flex-col items-center gap-3">
                   <SpinnerIcon className="w-8 h-8" />
-                  <span className="text-sm text-[var(--text-faint)]">
-                    Loading customers...
-                  </span>
+                  <span className="text-sm text-[var(--text-faint)]">{t("loadingCustomers", "Loading customers...")}</span>
                 </div>
               </div>
             ) : customers.length === 0 ? (
@@ -378,35 +369,25 @@ export default function Markets() {
                 <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
                   <UsersIcon size={24} className="text-[var(--text-ghost)]" />
                 </div>
-                <p className="text-[var(--text-faint)] text-sm font-medium">
-                  No customers in this market yet
-                </p>
-                <p className="text-[var(--text-dim)] text-xs">
-                  Customers will appear here when added to this market
-                </p>
+                <p className="text-[var(--text-faint)] text-sm font-medium">{t("noCustomers", "No customers in this market yet")}</p>
+                <p className="text-[var(--text-dim)] text-xs">{t("customersAppear", "Customers will appear here when added to this market")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-color)]">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("customerName", "Customer Name")}</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("company", "Company")}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Customer Name
+                        {t("type", "Type")}
                       </th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Company
+                        {t("status", "Status")}
                       </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("email", "Email")}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                        Phone
+                        {t("phone", "Phone")}
                       </th>
                     </tr>
                   </thead>
@@ -489,9 +470,7 @@ export default function Markets() {
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <MarketsIcon size={16} />
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              Markets
-            </h1>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("title", "Markets")}</h1>
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
@@ -516,13 +495,13 @@ export default function Markets() {
                 <MarketsIcon size={16} className="text-[var(--text-subtle)]" />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">
-                Total Markets
+                {t("totalMarkets", "Total Markets")}
               </span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
               {markets.length}
             </p>
-            <p className="text-xs text-[var(--text-dim)] mt-1">All countries</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">{t("allCountries", "All countries")}</p>
           </button>
 
           {/* Band A */}
@@ -540,14 +519,12 @@ export default function Markets() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
                 <BarChart3Icon size={16} className="text-blue-400" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">
-                Band A
-              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("bandA", "Band A")}</span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-blue-400">
               {bandACounts}
             </p>
-            <p className="text-xs text-[var(--text-dim)] mt-1">Emerging (-3%)</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">{t("emerging", "Emerging (-3%)")}</p>
           </button>
 
           {/* Band B */}
@@ -565,14 +542,12 @@ export default function Markets() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-500/10">
                 <Building2Icon size={16} className="text-gray-400" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400/60">
-                Band B
-              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400/60">{t("bandB", "Band B")}</span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-gray-400">
               {bandBCounts}
             </p>
-            <p className="text-xs text-[var(--text-dim)] mt-1">Standard (0%)</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">{t("standard", "Standard (0%)")}</p>
           </button>
 
           {/* Band C */}
@@ -590,9 +565,7 @@ export default function Markets() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
                 <StarIcon size={16} className="text-amber-400" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">
-                Band C
-              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("bandC", "Band C")}</span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-amber-400">
               {bandCCounts}
@@ -617,9 +590,7 @@ export default function Markets() {
               <button
                 onClick={() => setSearch("")}
                 className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors px-2 py-1 rounded bg-[var(--bg-surface)]"
-              >
-                Clear
-              </button>
+              >{t("clear", "Clear")}</button>
             )}
             {/* Issue d54f3e66 (reopened): platform-aware label + hover
                 tooltip + click-to-focus. The Ctrl/⌘+K listener already
@@ -639,16 +610,12 @@ export default function Markets() {
         {/* Markets Table */}
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[var(--text-secondary)]">
-              Markets Directory
-            </h2>
+            <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("directory", "Markets Directory")}</h2>
             {bandFilter !== "all" && (
               <button
                 onClick={() => setBandFilter("all")}
                 className="text-xs text-[var(--text-faint)] hover:text-[var(--text-primary)]/70 transition-colors bg-[var(--bg-surface)] px-3 py-1.5 rounded-lg border border-[var(--border-color)]"
-              >
-                Clear filter
-              </button>
+              >{t("clearFilter", "Clear filter")}</button>
             )}
           </div>
 
@@ -658,10 +625,10 @@ export default function Markets() {
                 <SearchIcon size={24} className="text-[var(--text-ghost)]" />
               </div>
               <p className="text-[var(--text-faint)] text-sm font-medium">
-                No markets found
+                {t("noMarkets", "No markets found")}
               </p>
               <p className="text-[var(--text-dim)] text-xs">
-                Try adjusting your search or filter
+                {t("tryAdjusting", "Try adjusting your search or filter")}
               </p>
             </div>
           ) : (
@@ -669,21 +636,11 @@ export default function Markets() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#1a1a1a]">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                      Market Name
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                      Band
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden md:table-cell">
-                      Adjustment
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden lg:table-cell">
-                      Classification
-                    </th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                      Action
-                    </th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("marketName", "Market Name")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("band", "Band")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden md:table-cell">{t("adjustment", "Adjustment")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden lg:table-cell">{t("classification", "Classification")}</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">{t("action", "Action")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -743,7 +700,7 @@ export default function Markets() {
                           >
                             <EyeIcon size={13} />
                             <span className="hidden sm:inline">
-                              View Profile
+                              {t("viewProfile", "View Profile")}
                             </span>
                             <AngleRightIcon
                               size={13}

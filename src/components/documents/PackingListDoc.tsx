@@ -16,6 +16,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { documentsT } from "@/lib/translations/documents";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
@@ -41,6 +43,7 @@ const T = {
 } as const;
 
 function MetaStripCell({ label, isFirst, isLast, children }: { label: string; isFirst?: boolean; isLast?: boolean; children: React.ReactNode }) {
+  const { t } = useTranslation(documentsT);
   return (
     <div style={{ borderLeft: isFirst ? "none" : `1px solid ${T.border}` }}>
       <div style={{ background: T.black, color: "#fff", padding: "5px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderTopLeftRadius: isFirst ? 12 : 0, borderTopRightRadius: isLast ? 12 : 0 }}>
@@ -116,6 +119,7 @@ function todayISO(): string {
 }
 
 function KoleexLogo() {
+  const { t } = useTranslation(documentsT);
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="180" height="28" viewBox="-4 -4 727.83 115.57" preserveAspectRatio="xMinYMid meet" style={{ display: "block", overflow: "visible" }}>
       <path fill={T.black} d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
@@ -188,6 +192,7 @@ export default function PackingListDoc({
   onBack: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation(documentsT);
   const seed = (initial?.doc ?? {}) as { rows?: PackingRow[]; meta?: PackingMeta };
   const [rows, setRowsState] = useState<PackingRow[]>(() =>
     seed.rows && seed.rows.length ? seed.rows.map((r) => ({ ...blankRow(), ...r })) : Array.from({ length: 8 }, blankRow),
@@ -689,10 +694,10 @@ export default function PackingListDoc({
             {/* Row controls (screen only) */}
             <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button type="button" onClick={() => setRows((p) => [...p, blankRow()])} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: T.inkSoft, border: `1px dashed ${T.border}`, borderRadius: 8, padding: "5px 10px", background: "#fff" }}>
-                <PlusIcon size={12} /> Add row
+                <PlusIcon size={12} /> {t("addRow", "Add row")}
               </button>
               <button type="button" onClick={() => setRows((p) => (p.length > 1 ? p.slice(0, -1) : p))} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: T.inkSoft, border: `1px dashed ${T.border}`, borderRadius: 8, padding: "5px 10px", background: "#fff" }}>
-                <MinusIcon size={12} /> Remove row
+                <MinusIcon size={12} /> {t("removeRow", "Remove row")}
               </button>
             </div>
 

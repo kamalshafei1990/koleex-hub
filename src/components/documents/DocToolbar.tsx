@@ -9,6 +9,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { documentsT } from "@/lib/translations/documents";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
@@ -36,6 +38,7 @@ function StatusPill({
   statuses: string[];
   onChange: (next: string) => void;
 }) {
+  const { t } = useTranslation(documentsT);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -55,7 +58,7 @@ function StatusPill({
         onClick={() => setOpen((v) => !v)}
         className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${cls}`}
         style={{ cursor: "pointer" }}
-        title="Click to change status"
+        title={t("tip.status", "Click to change status")}
       >
         {status}
         <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
@@ -135,6 +138,7 @@ export default function DocToolbar({
   onPrint: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useTranslation(documentsT);
   const saving = saveState === "saving";
   return (
     <div
@@ -167,8 +171,7 @@ export default function DocToolbar({
           title="You have unsaved changes"
           style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 9px", borderRadius: 999, background: "rgba(255,204,0,0.12)", color: "#FFCC00", border: "1px solid rgba(255,204,0,0.28)" }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFCC00" }} />
-          Unsaved
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFCC00" }} /> {t("unsaved", "Unsaved")}
         </span>
       )}
 
@@ -205,26 +208,26 @@ export default function DocToolbar({
       >
         {saving ? "Saving…" : "Save Final"}
       </button>
-      <button onClick={onDuplicate} className={btn} title="Clone this document into a new draft (fresh number).">
-        <CopyIcon size={14} /> Duplicate
+      <button onClick={onDuplicate} className={btn} title={t("tip.duplicate", "Clone this document into a new draft (fresh number).")}>
+        <CopyIcon size={14} /> {t("duplicate", "Duplicate")}
       </button>
-      <button onClick={onExportPdf} disabled={pdfLoading} className={btn} title="Open the browser print dialog and pick 'Save as PDF'.">
+      <button onClick={onExportPdf} disabled={pdfLoading} className={btn} title={t("tip.print", "Open the browser print dialog and pick 'Save as PDF'.")}>
         <DownloadIcon size={14} /> {pdfLoading ? "Opening…" : "Export PDF"}
       </button>
-      <button onClick={onExcel} className={btn} title="Download this document as an Excel (.xlsx) spreadsheet.">
-        <TableIcon size={14} /> Excel
+      <button onClick={onExcel} className={btn} title={t("tip.excel", "Download this document as an Excel (.xlsx) spreadsheet.")}>
+        <TableIcon size={14} /> {t("excel", "Excel")}
       </button>
-      <button onClick={onSend} className={btn} title="Open your mail app pre-filled with the recipient and a cover note.">
-        <PaperPlaneIcon size={14} /> Send
+      <button onClick={onSend} className={btn} title={t("tip.send", "Open your mail app pre-filled with the recipient and a cover note.")}>
+        <PaperPlaneIcon size={14} /> {t("send", "Send")}
       </button>
       <button onClick={onPrint} className={btn}>
-        <PrintIcon size={14} /> Print
+        <PrintIcon size={14} /> {t("print", "Print")}
       </button>
       {onDelete && (
         <button
           onClick={onDelete}
           className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"
-          title="Delete this saved document"
+          title={t("tip.delete", "Delete this saved document")}
         >
           <TrashIcon size={14} />
         </button>
