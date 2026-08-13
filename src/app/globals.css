@@ -55,8 +55,15 @@
   --bg-inverted-hover: rgba(255,255,255,0.90);
   --text-inverted: #000000;
 
-  /* Overlay */
-  --bg-overlay: rgba(0,0,0,0.60);
+  /* Overlay — the dim a modal sits on.
+     WAS 0.60/0.50 and that is what made every glass modal read as a flat
+     panel: 60% black leaves 40% of the page, and the card's own 60% fill
+     leaves 40% of THAT — about 16% of an already dark page, i.e. nothing for
+     the glass to show. The card's material is not at fault (it is the sign-in
+     card copied to the value, at the owner's request); it was working on an
+     empty backdrop. 0.30 is the figure the dropdown scrims already use and
+     that the owner signed off on seeing. */
+  --bg-overlay: rgba(0,0,0,0.30);
 
   /* Header */
   --header-bg: rgba(0,0,0,0.80);
@@ -129,8 +136,8 @@
   --bg-inverted-hover: rgba(0,0,0,0.85);
   --text-inverted: #ffffff;
 
-  /* Overlay */
-  --bg-overlay: rgba(0,0,0,0.50);
+  /* Overlay — see the note on the dark value. */
+  --bg-overlay: rgba(0,0,0,0.30);
 
   /* Header */
   --header-bg: rgba(255,255,255,0.95);

@@ -58,13 +58,17 @@ export function ScrollLockOverlay({
      container, so nothing about the look changes except that the glass now
      has a real backdrop to sample. */
   const cls = rest.className ?? "";
-  const blurTokens = cls.match(/(?:^|\s)backdrop-blur-[\w[\]/.-]+/g) ?? [];
-  const containerCls = blurTokens.length ? cls.replace(/(?:^|\s)backdrop-blur-[\w[\]/.-]+/g, " ").replace(/\s+/g, " ").trim() : cls;
+  const hasBlur = /(?:^|\s)backdrop-blur-/.test(cls);
+  const containerCls = hasBlur ? cls.replace(/(?:^|\s)backdrop-blur-[\w[\]/.-]+/g, " ").replace(/\s+/g, " ").trim() : cls;
 
   return createPortal(
     <div {...rest} className={containerCls} style={{ zIndex: 110, ...(rest.style ?? {}) }}>
-      {blurTokens.length > 0 && (
-        <div aria-hidden className={`absolute inset-0 ${blurTokens.join(" ").trim()}`} style={{ zIndex: -1 }} />
+      {hasBlur && (
+        /* blur-SM, not whatever the caller asked for. Callers said `md` (12px),
+           which mashes the page into a smear — nothing with shape survives for
+           the card's glass to pick up. The dropdown scrims use 4px and read as
+           glass, so modals use 4px too. */
+        <div aria-hidden className="absolute inset-0 backdrop-blur-sm" style={{ zIndex: -1 }} />
       )}
       {children}
     </div>,
