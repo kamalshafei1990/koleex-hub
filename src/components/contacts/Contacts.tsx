@@ -2274,12 +2274,11 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
   const [active, setActive] = React.useState(-1);
   const ref = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const filtered = React.useMemo(() => {
     const q = (value || "").trim().toLowerCase();
@@ -2420,13 +2419,13 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
 
   React.useEffect(() => {
     if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
+    /* Escape and focus only — outside-click belongs to PopoverPanel, which
+       knows about the portalled panel. See the note on ComboInput. */
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", onKey);
     // focus the search box when the menu opens
     const tmr = setTimeout(() => searchRef.current?.focus(), 30);
-    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", onKey); clearTimeout(tmr); };
+    return () => { document.removeEventListener("keydown", onKey); clearTimeout(tmr); };
   }, [open]);
 
   const selected = React.useMemo(
@@ -2663,12 +2662,11 @@ const TimeField = React.memo(function TimeField({ label, value, onChange, tier }
 }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
   const [hh, mm] = (value || "").split(":");
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
   const mins = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
@@ -2837,11 +2835,11 @@ const LabelSelect = React.memo(function LabelSelect({ value, onChange, options, 
 const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
   return (
     <div ref={wrapRef} className="relative">
       <button
@@ -2893,11 +2891,11 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
   const selected = options.find((o) => o.value === value);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -2934,7 +2932,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
         <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>{selected?.label || value || placeholder}</span>
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="max-h-72 overflow-hidden">
+      <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-72 overflow-hidden">
           <div className="p-2 border-b border-[var(--border-faint)]">
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
           </div>
@@ -3650,12 +3648,11 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
   const [newSite, setNewSite] = React.useState("");
   const ref = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setAddMode(false); } };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const addValue = (v: string) => {
     const t = v.trim();
@@ -3697,7 +3694,7 @@ const CarrierTagEditor = React.memo(function CarrierTagEditor({
         />
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      <PopoverPanel anchorRef={ref} open={open} onClose={() => setOpen(false)} className="max-h-60 overflow-y-auto">
+      <PopoverPanel anchorRef={ref} open={open} onClose={() => { setOpen(false); setAddMode(false); }} className="max-h-60 overflow-y-auto">
           {filtered.map(opt => (
             <button key={opt} type="button" onClick={() => { addValue(opt); setDraft(""); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors">
               <CarrierLogo name={opt} />{opt}
@@ -3752,12 +3749,11 @@ const TagEditor = React.memo(function TagEditor({
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const add = (val: string) => {
     const v = val.trim();
@@ -4159,11 +4155,11 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
     if (p && p !== selCode) setSelCode(p);
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const number = parsed.number;
   const emit = (code: string, num: string) => {
@@ -4204,7 +4200,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
           placeholder={placeholder || label || "Phone number"}
           className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
         />
-        <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} className="w-64 max-h-60 overflow-hidden">
+        <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="w-64 max-h-60 overflow-hidden">
             <div className="p-2 border-b border-[var(--border-faint)]">
               <input
                 autoFocus
@@ -4429,11 +4425,10 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
   // Close on outside click / Escape.
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    /* Escape only — outside-click belongs to PopoverPanel. */
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   const toggle = () => {
@@ -4552,12 +4547,11 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
   const q = value.trim().toLowerCase();
   const filtered = q ? options.filter(o => o.toLowerCase().includes(q)) : options;
   return (
@@ -4724,16 +4718,11 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const filtered = useMemo(() => {
     if (!query.trim()) return ALL_COUNTRIES;
@@ -4768,7 +4757,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
@@ -4811,16 +4800,11 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
     return getStatesOfCountrySync(countryCode);
   }, [countryCode, geoReady]);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const filtered = useMemo(() => {
     if (!query.trim()) return states;
@@ -4848,7 +4832,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
@@ -4898,16 +4882,11 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
     return getCitiesOfCountrySync(countryCode);
   }, [countryCode, stateCode, geoReady]);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  /* No outside-click listener here: the panel is PORTALLED to <body>, so it
+     is NOT inside this wrapper — a mousedown on a row counted as "outside",
+     closed the panel, and the click never landed on the row. The user sees
+     a menu that refuses every choice. PopoverPanel owns this and tests the
+     panel as well as the anchor. */
 
   const filtered = useMemo(() => {
     if (!query.trim()) return cities;
@@ -4940,7 +4919,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
         />
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
+      <PopoverPanel anchorRef={wrapperRef} open={open} onClose={() => { setOpen(false); setQuery(""); }} className="max-h-[22rem] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
