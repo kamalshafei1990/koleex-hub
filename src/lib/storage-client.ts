@@ -132,15 +132,23 @@ export async function uploadToStorage(
      ordinary, and asking a person to re-pick the file for it is not. Two extra
      attempts with a short backoff. Only transport failures are retried: an
      HTTP answer, however unwelcome, is a decision and gets reported as-is. */
+  /* THE MESSAGE CARRIES THE FACTS, so one screenshot settles what would
+     otherwise be another round of guessing. Size and route decide everything
+     here: under the threshold the bytes cross a serverless function, at or
+     over it the browser writes straight to Storage — and those two fail for
+     completely different reasons, especially on a long route. Two attempts,
+     not three: a third only triples the wait before the same answer. */
+  const mb = (file.size / 1048576).toFixed(1);
+  const route = file.size >= DIRECT_UPLOAD_THRESHOLD ? "direct" : "via server";
   let lastError = "Upload failed";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 800));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
     const res = await uploadOnce(bucket, path, file, options);
     if (res.ok) return res;
     lastError = res.error;
-    if (!res.retryable) return { ok: false, error: res.error };
+    if (!res.retryable) return { ok: false, error: `${res.error} (${mb}MB, ${route})` };
   }
-  return { ok: false, error: `${lastError} — after 3 attempts.` };
+  return { ok: false, error: `${lastError} (${mb}MB, ${route}, 2 attempts)` };
 }
 
 async function uploadOnce(
@@ -172,7 +180,7 @@ async function uploadOnce(
       method: "POST",
       credentials: "include",
       body: form,
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(45_000),
     });
   } catch (e) {
     const timedOut = e instanceof DOMException && e.name === "TimeoutError";
