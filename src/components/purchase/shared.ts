@@ -101,7 +101,23 @@ export function groupForTab(tabId: PurchaseTabId): PurchaseGroupId {
 
 /* Shared design tokens (use these instead of inlining) so the
    Purchase app matches Sales / HR / Contacts visually. */
-export const cardCls = "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
+
+/* kx-glass, and it is UNCONDITIONAL on purpose. The class is defined only
+   under [data-kx-skin="aurora"], so Core matches nothing and renders exactly
+   the flat --bg-secondary card it always had — which is why this needs no
+   useSkin() branch and can live in a plain string constant imported by all
+   thirteen modules.
+
+   kx-glass, not kx-glass-drawer: these cards float with margins on every
+   side, so the four-edge lighting rim is correct here. (Mail's columns are
+   flush against the viewport, which is why they take the rimless variant —
+   a rim on a panel that touches the screen edge reads as a border.)
+
+   Without it the card is a HOLE, not a surface: the app-scope remap turns
+   --bg-secondary into a translucent fill, so a card with no blur pass lets
+   the wave through at full strength and the KPI numbers sit on moving
+   colour. Glass the container before the thing standing on it. */
+export const cardCls = "kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
 export const sectionTitleCls = "text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3 flex items-center gap-2";
 export const linkBtnCls = "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors";
 
@@ -143,10 +159,32 @@ export function relativeTime(d: string | Date | null | undefined): string {
    Keys are lowercased to be tolerant of how each table stores its
    enum text. */
 const TONE_NEUTRAL = "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]";
-const TONE_INFO    = "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40";
+/* Exported because the Requisitions priority ramp needs the SAME informational
+   step. This file already spends Hub Blue in both skins — TONE_INFO has never
+   been skin-branched — so an "informational" chip that reached for Tailwind's
+   blue instead was inconsistent with its own neighbours in Core too, not only
+   under Aurora. One info colour, one place to change it. */
+export const TONE_INFO = "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40";
 const TONE_WARN    = "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
 const TONE_OK      = "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35";
 const TONE_BAD     = "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35";
+
+/* CATEGORY PALETTES COLLAPSE UNDER AURORA; STATUS PALETTES DO NOT.
+
+   The tones above encode a STATE — draft, overdue, paid — and a state earns
+   its colour, so they are untouched. But two modules were using a four- and
+   five-hue palette to encode a KIND: spend category (direct / indirect /
+   services / capex) and payment method (bank transfer / cash / check / card /
+   wire). Nothing there is better or worse than anything else, so the hue
+   carries no information — and each chip already prints its own label right
+   beside the colour, which is what a reader actually uses. Payments gave it
+   away outright: `bank_transfer` and `wire` were assigned the SAME blue, so
+   the palette did not even distinguish reliably.
+
+   Aurora allows one accent, so under Aurora both collapse to it. Core keeps
+   its palettes; this is offered as an alternative, never a replacement. */
+export const TONE_KIND_AURORA =
+  "border-[rgba(86,127,178,0.40)] bg-[rgba(86,127,178,0.12)] text-[#BCD8F0]";
 
 export const STATUS_TONE_PO: Record<string, string> = {
   draft:     TONE_WARN,

@@ -49,6 +49,7 @@ interface PurchaseDashRow {
   expected_delivery_date?: string | null;
 }
 import KpiCard from "@/components/ui/KpiCard";
+import { useSkin } from "@/lib/appearance";
 import Button from "@/components/ui/Button";
 import RrIcon from "@/components/ui/RrIcon";
 import { formatMoney, relativeTime } from "./shared";
@@ -74,19 +75,31 @@ interface QuickActionProps {
   tone: "blue" | "teal" | "amber" | "violet";
 }
 function QuickActionCard({ href, icon, label, hint, tone }: QuickActionProps) {
-  const accentBar =
-    tone === "blue"   ? "bg-blue-500/60" :
-    tone === "teal"   ? "bg-teal-500/60" :
-    tone === "amber"  ? "bg-amber-500/60" :
-                        "bg-violet-500/60";
+  const aurora = useSkin() === "aurora";
+  /* FOUR ACCENTS ON ONE SCREEN WAS THE LOUDEST VIOLATION ON THIS PAGE.
+     Blue / teal / amber / violet hairlines sat side by side above four
+     otherwise identical cards, and the colours carried no meaning — they
+     were not status, not category, not priority, just variety. The canon
+     allows Aurora exactly one accent, so under Aurora all four become Hub
+     Blue and the cards are told apart by their labels, which is what was
+     doing the work anyway. Core keeps its four tones. */
+  const accentBar = aurora
+    ? "bg-[rgba(86,127,178,0.60)]"
+    : tone === "blue"   ? "bg-blue-500/60" :
+      tone === "teal"   ? "bg-teal-500/60" :
+      tone === "amber"  ? "bg-amber-500/60" :
+                          "bg-violet-500/60";
   return (
     <Link
       href={href}
-      className="group relative flex h-full min-h-[120px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 shadow-sm transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
+      /* kx-glass: these sit directly on the ground, not inside another card,
+         so they are the surface that has to carry the wave. */
+      className="kx-glass group relative flex h-full min-h-[120px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 shadow-sm transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
     >
       <span aria-hidden className={`absolute left-4 top-0 h-px w-12 ${accentBar}`} />
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        {/* kx-stat — same --bg-primary hole as KpiCard's chip. */}
+        <span className="kx-stat flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
           <RrIcon name={icon} size={16} />
         </span>
         <div className="text-[14px] font-medium tracking-tight text-[var(--text-primary)]">
@@ -108,10 +121,16 @@ interface AlertCardProps {
   tone: "rose" | "amber" | "blue";
 }
 function AlertCard({ href, label, count, tone }: AlertCardProps) {
+  const aurora = useSkin() === "aurora";
+  /* These dots DO mean something — rose = overdue, amber = needs attention,
+     blue = informational — so unlike the quick-action bars above they are
+     status and the warm two stay exactly as they are. Only the informational
+     blue moves to Hub Blue, because that one was competing with the accent
+     rather than reporting a state. */
   const dot =
     tone === "rose"  ? "bg-rose-500"  :
     tone === "amber" ? "bg-amber-500" :
-                       "bg-blue-500";
+                       aurora ? "bg-[#567FB2]" : "bg-blue-500";
   return (
     <Link
       href={href}
@@ -286,6 +305,7 @@ export default function PurchaseHome() {
       <section>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard
+            className="kx-glass"
             icon="box-open"
             label="Open Orders"
             value={String(stats.openPOs)}
@@ -293,6 +313,7 @@ export default function PurchaseHome() {
             href="/purchase/orders"
           />
           <KpiCard
+            className="kx-glass"
             icon="wallet"
             label="Spend (MTD)"
             value={formatMoney(stats.spendMTD)}
@@ -300,6 +321,7 @@ export default function PurchaseHome() {
             href="/purchase/payments"
           />
           <KpiCard
+            className="kx-glass"
             icon="file-invoice"
             label="Outstanding"
             value={formatMoney(stats.outstandingBills)}
@@ -307,6 +329,7 @@ export default function PurchaseHome() {
             href="/purchase/bills"
           />
           <KpiCard
+            className="kx-glass"
             icon="info"
             label="Overdue Bills"
             value={String(stats.overdueBills)}

@@ -122,8 +122,16 @@ export default function KpiCard({
   const inner = (
     <>
       <div className="flex items-center gap-2.5">
+        {/* kx-stat on the chip below, because --bg-primary is TRANSPARENT
+            inside an Aurora app scope: the remap is what lets the ground show
+            through the page, so any element filled with that token stops being
+            a surface and becomes a hole — here, an icon floating inside a bare
+            rounded border. kx-stat is the system's answer for exactly this
+            case: a 5% surface tint rather than a blur pass, because these chips
+            appear a dozen to a screen and blur is priced per element.
+            Aurora-scoped, so unconverted apps and Core are untouched. */}
         {icon !== undefined && (
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+          <span className="kx-stat flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
             {typeof icon === "string" ? (
               <RrIcon name={icon as RrIconName} size={14} />
             ) : (

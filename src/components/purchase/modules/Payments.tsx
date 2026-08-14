@@ -6,7 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, TONE_KIND_AURORA } from "../shared";
+import { useSkin } from "@/lib/appearance";
 import { NewPaymentDialog } from "../dialogs";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -29,6 +30,7 @@ const METHOD_TONE: Record<string, string> = {
 };
 
 export default function PaymentsModule({ t }: PurchaseModuleProps) {
+  const aurora = useSkin() === "aurora";
   const [rows, setRows] = useState<Payment[]>([]);
   const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
   const [billNo, setBillNo] = useState<Map<string, string>>(new Map());
@@ -112,7 +114,11 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
         <div className={`${cardCls} divide-y divide-[var(--border-subtle)] overflow-hidden`}>
           {rows.map((p) => {
             const method = (p.method || "").toLowerCase();
-            const tone = METHOD_TONE[method] || "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
+            /* Aurora: one accent. The method NAME is printed in the chip,
+               so the hue was never what told these apart. */
+            const tone = aurora
+              ? TONE_KIND_AURORA
+              : METHOD_TONE[method] || "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
             const linkedBill = p.bill_id ? billNo.get(p.bill_id) : null;
             return (
               <div key={p.id} {...kxInspectAttrs({ component: "PurchasePaymentRow", module: "Purchases", section: "Payments", recordId: p.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import KdsSelect from "@/components/kds/Select";
 
 interface POItem {
   id: string;
@@ -198,7 +199,18 @@ export default function ReceiveDialog({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-3xl rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* THE PANEL WAS FILLED WITH --bg-primary, WHICH IS TRANSPARENT HERE.
+          Inside an Aurora app scope that token is the ground showing through,
+          so this modal would have rendered as an outline with the dimmed page
+          visible straight through its middle. It now takes the canonical
+          FormModal recipe — kx-glass-pop over --bg-secondary — so it is the
+          same material as every other modal on the Hub.
+
+          The sixteen form fields below still carry the same token and are left
+          alone deliberately: the Aurora field rule is UNLAYERED, so it beats
+          Tailwind's layered utility and repaints each one as a recessed well
+          without an edit. Verified by measuring a field, not by assuming. */}
+      <div className="kx-glass-pop w-full max-w-3xl rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">Receive Goods</h2>
@@ -263,15 +275,24 @@ export default function ReceiveDialog({
                 {destinationMode === "warehouse" && (
                   <label className="block sm:col-span-1">
                     <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Warehouse</div>
-                    <select
+                    {/* The Purchase app's LAST native <select>. Its sibling
+                        file dialogs.tsx converted to KdsSelect during MN-5 and
+                        says why in its own header: a native select draws its
+                        list with the OS, so no stylesheet of ours ever reaches
+                        it — OS type, OS radius, OS colours, dropped into the
+                        middle of a glass modal. The field itself was already
+                        being repainted by the Aurora rule, which is exactly
+                        what made this easy to miss: the closed control looked
+                        converted and only the open list gave it away. */}
+                    <KdsSelect
                       value={warehouseId}
-                      onChange={(e) => setWarehouseId(e.target.value)}
-                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                    >
-                      {warehouses.filter((w) => !("location_type" in w) || (w as { location_type?: string }).location_type === "warehouse" || (w as { location_type?: string }).location_type === undefined).map((w) => (
-                        <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
-                      ))}
-                    </select>
+                      onChange={setWarehouseId}
+                      options={warehouses
+                        .filter((w) => !("location_type" in w) || (w as { location_type?: string }).location_type === "warehouse" || (w as { location_type?: string }).location_type === undefined)
+                        .map((w) => ({ value: w.id, label: `${w.code} — ${w.name}` }))}
+                      placeholder="Select warehouse…"
+                      triggerClassName="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] pe-7 cursor-pointer text-start"
+                    />
                   </label>
                 )}
                 {destinationMode === "port" && (

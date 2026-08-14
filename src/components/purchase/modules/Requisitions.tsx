@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ, TONE_INFO } from "../shared";
 import { NewRequisitionDialog } from "../dialogs";
 import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -24,9 +24,19 @@ type Requisition = {
 };
 
 const PRIORITY_LABEL = ["Low", "Normal", "High", "Urgent"];
+/* THIS RAMP STAYS A RAMP. Unlike the spend-category and payment-method
+   palettes — where the hues encoded a kind and were collapsed to the one
+   accent — these four encode SEVERITY: quiet, then blue, then amber, then
+   rose as the request gets more urgent. That is a real ordering the colour
+   is carrying, and flattening it would delete information rather than noise.
+   Only the informational step changes, and it is NOT skin-branched: it now
+   reuses shared.ts's TONE_INFO, the same Hub Blue this file's own status
+   chips have always used in BOTH skins. A "Normal" chip reaching for
+   Tailwind's blue was sitting next to a "Confirmed" chip in Hub Blue and
+   disagreeing with it under Core as well. */
 const PRIORITY_TONE = [
   "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
-  "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  TONE_INFO,
   "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 ];

@@ -12,7 +12,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, sectionTitleCls } from "../shared";
+import { cardCls, sectionTitleCls, TONE_KIND_AURORA } from "../shared";
+import { useSkin } from "@/lib/appearance";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -37,6 +38,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default function CategoriesModule({ t }: PurchaseModuleProps) {
+  const aurora = useSkin() === "aurora";
   const [rows, setRows] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,7 +89,7 @@ export default function CategoriesModule({ t }: PurchaseModuleProps) {
           <div key={kind} className={`${cardCls} overflow-hidden`}>
             <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${KIND_TONE[kind]}`}>{KIND_LABEL[kind]}</span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${aurora ? TONE_KIND_AURORA : KIND_TONE[kind]}`}>{KIND_LABEL[kind]}</span>
                 <span className="text-[12px] text-[var(--text-dim)]">{list.length} categor{list.length === 1 ? "y" : "ies"}</span>
               </div>
             </div>
