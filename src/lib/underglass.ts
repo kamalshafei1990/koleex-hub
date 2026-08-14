@@ -21,7 +21,20 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        the top of a glass page. Sticky audit done: the app's one sticky
        (PageHeader's tab band) stays at top-0, because a sticky inside the
        padded under-glass scroller already lands below the header. */
-    p.startsWith("/inventory")
+    p.startsWith("/inventory") ||
+    /* Purchase, 2026-08-14. Converting the app's own surfaces and stopping
+       there is exactly the failure this file warns about two comments up: the
+       ground, the glass cards and the chrome were all done, and the screen
+       still wore a solid black bar across its top because the header pane
+       only frosts on routes listed HERE. Owner reported it as the missing
+       edge blur.
+
+       Sticky audit, required by the note at the top of this file: Purchase
+       has ZERO stickies of its own — grepped, every hit in the app is a
+       comment. Its only sticky is PageHeader's tab band at top-0, the same
+       one Inventory declares safe, and for the same reason: a sticky inside
+       the padded under-glass scroller already lands below the header. */
+    p.startsWith("/purchase")
   );
 }
 
@@ -39,5 +52,18 @@ export function appOwnsTopRamp(pathname: string | null): boolean {
   /* Inventory has a sticky tab band of its own, so the header keeps its flat
      frost and the screen shows ONE blurred edge, not two stacked. */
   return p === "/products" || p.startsWith("/products/") || p.startsWith("/product-data")
-    || p.startsWith("/inventory");
+    || p.startsWith("/inventory")
+    /* Purchase, like Inventory, and the deciding number is 104 vs 56.
+       This entry is easy to misread as "the app draws its own long fade" —
+       and on PageHeader apps nothing does: `.kx-ph-band` is a transparent
+       sticky carrier and `.kx-ph-tabs` is a blur(16px) glass pill. But that
+       is not what the entry has to protect against. The progressive pane is
+       **104px** tall (header 56 + a 48px approach ramp), while PageHeader's
+       sticky tab strip pins at exactly 56 and stands ~40px tall — so under
+       the ramp the app's primary navigation sits ENTIRELY inside the blurred
+       band and goes soft. Owner: "this should be in the top not under the
+       blur edge."
+       The flat frost stops dead at 56, so the strip clears it and stays
+       crisp. That is the whole reason Inventory is here too. */
+    || p.startsWith("/purchase");
 }

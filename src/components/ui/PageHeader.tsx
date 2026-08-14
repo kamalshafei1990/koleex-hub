@@ -140,7 +140,19 @@ export default function PageHeader({
           >
             <RrIcon name="arrow-left" size={14} />
           </Link>
-          <div className="kx-ph-chrome flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
+          {/* NO kx-ph-chrome HERE. This is the app-icon chip: a plain div with
+              no href and no handler, sitting next to a back LINK that wears
+              the identical box. It was carrying the chrome recipe anyway, so
+              hovering it lit the Hub-Blue border exactly like the button
+              beside it — the header advertised an interaction that does not
+              exist, and the one control there that IS clickable lost the only
+              thing distinguishing it.
+
+              Dropping the class costs nothing at rest: under Aurora
+              .kx-ph-chrome declares ONLY a transition, and the resting look
+              (border-subtle over bg-surface) comes from the utilities that are
+              still here. Verified against the rule, not assumed. */}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
             {typeof icon === "string" ? (
               <RrIcon name={icon as RrIconName} size={16} />
             ) : isValidElement(icon) ? (
