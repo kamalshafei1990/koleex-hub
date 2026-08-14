@@ -102,8 +102,36 @@ const squash = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 const EMPTY_SUPPLIERS: string[] = [];
 
 /* Hoisted: a fresh style object per section per render defeated nothing but
-   allocated needlessly. */
-const SECTION_CV = { contentVisibility: "auto", containIntrinsicSize: "1px 800px" } as const;
+   allocated needlessly.
+
+   ⚠️ THE PADDING IS NOT DECORATION — IT STOPS THE CARDS' HOVER BEING CLIPPED.
+   `content-visibility: auto` applies PAINT containment permanently, not only
+   while the subtree is being skipped, so anything a child paints outside this
+   section's border box is cut off. `.kx-hover-card:hover` reaches ~18px past
+   the card (`0 0 16px` glow plus `0 10px 30px -12px`), and measured on this
+   page 43 of the 65 cards in the largest section sit within that reach of the
+   edge — they came back with the glow shaved off while inner cards were
+   perfect. Same defect the Home launcher grids had (`.kx-lazy-grid`).
+
+   Nothing is clipped at the TOP: each section opens with the category header
+   block, not with cards. Sides and bottom are what need the room.
+
+   ⚠️ THE SIDES CANCEL THEIR PADDING WITH A NEGATIVE MARGIN — THE BOTTOM MUST
+   NOT. Read the parent before touching this: the sections are stacked by
+   `space-y-8` on the wrapping div, and **Tailwind v4 implements space-y as
+   `margin-block-end` on `:not(:last-child)`, not as margin-top.** So a
+   `marginBottom` here does not sit alongside that gap, it REPLACES it — I
+   tried `marginBottom: -24` first and every gap between categories collapsed
+   from 56px to -24px, measured. The bottom padding is instead paid for by
+   shrinking the utility itself: 32px gap + 24px padding = the same 56px that
+   `space-y-14` used to give. Change one and change the other. */
+const SECTION_CV = {
+  contentVisibility: "auto",
+  containIntrinsicSize: "1px 800px",
+  paddingInline: 24,
+  paddingBottom: 24,
+  marginInline: -24,
+} as const;
 
 const levelColors: Record<string, string> = {
   entry: LEVEL_CHIP, mid: LEVEL_CHIP, premium: LEVEL_CHIP, enterprise: LEVEL_CHIP,
@@ -2699,7 +2727,10 @@ export default function ProductList() {
               </nav>
             )}
 
-          <div className="space-y-14">
+          {/* 8, not 14: each section now carries 24px of its own bottom padding
+              so its cards' hover glow is not clipped by paint containment
+              (see SECTION_CV). 32 + 24 = the 56px this used to be. */}
+          <div className="space-y-8">
           {categoryTree.map((cat) => (
             /* Every section renders; content-visibility:auto skips the paint +
                layout of the offscreen ones. This replaced a progressive-mount
