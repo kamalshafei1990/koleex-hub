@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
+import { resolveUploadMime } from "@/lib/suppliers/upload-policy";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
@@ -1545,6 +1546,19 @@ async function compressImage(file: File, maxWidth = 800, quality = 0.7): Promise
  *  plumbing. Do not put a transport-shaped number back here. */
 const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
 
+/* WHAT A DOCUMENT SLOT OFFERS IN THE PICKER. Every file input in this file
+   advertised ".pdf,image/*", so a contract in .docx or a price list in .xlsx
+   could not even be CHOSEN — the file was greyed out and the failure looked
+   like the upload was broken. Nothing was enforcing that: these all go to the
+   public `media` bucket, which accepts any type up to 500MB. The narrow filter
+   was simply never revisited. Owner: "I can't upload a file PDF or excel or
+   photo etc." UX only — the store remains the authority. */
+const DOCUMENT_ACCEPT_ATTR = [
+  ".pdf", "image/*",
+  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+  ".txt", ".csv", ".zip",
+].join(",");
+
 type MediaUpload =
   | { ok: true; url: string; path: string }
   | { ok: false; error: string };
@@ -1562,7 +1576,11 @@ async function uploadToMediaStorage(blob: Blob, name: string, prefix = "supplier
      kept this path stuck behind that cap while the rest of the Hub moved on. */
   const up = await uploadToStorage("media", `${prefix}/${Date.now()}_${safe}`, blob, {
     cacheControl: "3600",
-    contentType: (blob as File).type || "application/octet-stream",
+    /* resolveUploadMime, not blob.type: Windows with no Office association
+       reports "" for a .docx and some clients send application/octet-stream,
+       and the store then refuses the very file the screen just offered. The
+       filename is the user's own evidence of intent. */
+    contentType: resolveUploadMime(name, (blob as File).type),
   });
   if (!up.ok) return { ok: false, error: up.error };
   if (!up.data.publicUrl) return { ok: false, error: "Upload returned no file location." };
@@ -10049,7 +10067,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 setUploadError(null);
                 void (async () => {
                   let url: string;
-                  if (isImage) { url = await compressImageToStorage(file, 1200, 0.8); }
+                  if (isImage) { {
+                                /* A FAILED IMAGE MUST NOT BECOME base64.
+                                   compressImageToStorage falls back to the
+                                   data: URL when the upload fails, which put a
+                                   multi-MB string into the row, rode inside the
+                                   contact PATCH and came back as a non-JSON
+                                   platform error rendered as a bare "Failed" —
+                                   a legible upload error turned into an
+                                   illegible save error. Compressing is still
+                                   worth it; smuggling is not. */
+                                const compressed = await compressImageToStorage(file, 1200, 0.8);
+                                if (compressed.startsWith("data:")) {
+                                  setUploadError("Could not upload that image — please try again.");
+                                  return;
+                                }
+                                url = compressed;
+                              } }
                   else {
                     const up = await uploadFileToStorage(file);
                     if ("error" in up) { setUploadError(up.error); return; }
@@ -10471,7 +10505,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         />
                         <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
                           <PaperclipIcon size={12} /> {t("btn.upload")}
-                          <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                          <input type="file" accept={DOCUMENT_ACCEPT_ATTR} className="hidden" onChange={e => {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             const isPdf = file.type === "application/pdf";
@@ -10489,10 +10523,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                                 if ("error" in up) { setUploadError(up.error); return; }
                                 url = up.url;
                               } else {
-                                url = await compressImageToStorage(file, 1200, 0.8);
+                                {
+                                /* A FAILED IMAGE MUST NOT BECOME base64.
+                                   compressImageToStorage falls back to the
+                                   data: URL when the upload fails, which put a
+                                   multi-MB string into the row, rode inside the
+                                   contact PATCH and came back as a non-JSON
+                                   platform error rendered as a bare "Failed" —
+                                   a legible upload error turned into an
+                                   illegible save error. Compressing is still
+                                   worth it; smuggling is not. */
+                                const compressed = await compressImageToStorage(file, 1200, 0.8);
+                                if (compressed.startsWith("data:")) {
+                                  setUploadError("Could not upload that image — please try again.");
+                                  return;
+                                }
+                                url = compressed;
+                              }
                               }
                               const arr = [...form.documents];
-                              arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                              arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : ((file.name.split(".").pop() ?? "").toUpperCase() || "FILE"), uploaded_at: new Date().toISOString() };
                               setField("documents", arr);
                             })();
                           }} />
@@ -11165,7 +11215,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <label className="flex items-center gap-2 px-3 py-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] cursor-pointer transition-colors">
                   <FilePlusIcon size={14} className="text-[var(--text-faint)]" />
                   <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadCatalogue")}</span>
-                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                  <input type="file" accept={DOCUMENT_ACCEPT_ATTR} className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     const isPdf = file.type === "application/pdf";
@@ -11180,7 +11230,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       const item: (typeof existing)[number] = {
                         name: file.name,
                         url: up.url,
-                        type: isPdf ? "PDF" : (file.type.split("/").pop()?.toUpperCase() || "IMAGE"),
+                        type: isPdf ? "PDF" : ((file.name.split(".").pop() ?? "").toUpperCase() || "IMAGE"),
                         uploaded_at: new Date().toISOString(),
                         storage_path: up.path,
                       };
@@ -11517,7 +11567,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           />
                           <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
                             <PaperclipIcon size={12} /> {t("btn.upload")}
-                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                            <input type="file" accept={DOCUMENT_ACCEPT_ATTR} className="hidden" onChange={e => {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               const isPdf = file.type === "application/pdf";
@@ -11528,9 +11578,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                                   const up = await uploadFileToStorage(file);
                                   if ("error" in up) { setUploadError(up.error); return; }
                                   url = up.url;
-                                } else { url = await compressImageToStorage(file, 1200, 0.8); }
+                                } else { {
+                                /* A FAILED IMAGE MUST NOT BECOME base64.
+                                   compressImageToStorage falls back to the
+                                   data: URL when the upload fails, which put a
+                                   multi-MB string into the row, rode inside the
+                                   contact PATCH and came back as a non-JSON
+                                   platform error rendered as a bare "Failed" —
+                                   a legible upload error turned into an
+                                   illegible save error. Compressing is still
+                                   worth it; smuggling is not. */
+                                const compressed = await compressImageToStorage(file, 1200, 0.8);
+                                if (compressed.startsWith("data:")) {
+                                  setUploadError("Could not upload that image — please try again.");
+                                  return;
+                                }
+                                url = compressed;
+                              } }
                                 const arr = [...form.documents];
-                                arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                                arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : ((file.name.split(".").pop() ?? "").toUpperCase() || "FILE"), uploaded_at: new Date().toISOString() };
                                 setField("documents", arr);
                               })();
                             }} />
@@ -11711,7 +11777,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-strong)] hover:border-[var(--border-focus)] text-xs text-[var(--text-faint)] cursor-pointer transition-colors">
                         <FilePlusIcon size={14} />
                         {t("field.uploadCertificate")}
-                        <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                        <input type="file" accept={DOCUMENT_ACCEPT_ATTR} className="hidden" onChange={e => {
                           const file = e.target.files?.[0];
                           if (file) {
                             if (file.type.startsWith("image/")) {
