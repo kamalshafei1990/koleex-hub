@@ -43,6 +43,11 @@ export const settingsT: Translations = {
   /* Shown on the master row only when something IS muted — see the note where
      mutedCount is computed. {n} is replaced with the count. */
   "nav.notifications.muted": { en: "{n} muted", zh: "已静音 {n} 项", ar: "{n} مكتوم" },
+  /* Headings for the per-activity switches, grouped by who or what the alert
+     is about — the question someone silencing notifications is asking. */
+  "act.group.forMe":    { en: "Waiting on me",  zh: "等我处理",   ar: "مستني مني" },
+  "act.group.myWork":   { en: "My schedule",    zh: "我的日程",   ar: "مواعيدي" },
+  "act.group.business": { en: "The business",   zh: "业务动态",   ar: "حركة الشغل" },
   "nav.push":             { en: "Push notifications", zh: "推送通知", ar: "الإشعارات الفورية" },
   "nav.push.sub":         { en: "Devices and alerts", zh: "设备与提醒", ar: "الأجهزة والتنبيهات" },
   "nav.password":         { en: "Password", zh: "密码", ar: "كلمة المرور" },

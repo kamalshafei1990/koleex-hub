@@ -26,24 +26,53 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app" | "quiet_hours">;
 
-const ACTIVITIES: { key: ActivityKey; tKey: string }[] = [
-  { key: "mentions", tKey: "act.mentions" },
-  { key: "approvals", tKey: "act.approvals" },
-  { key: "assignments", tKey: "act.assignments" },
-  { key: "tasks_due", tKey: "act.tasksDue" },
-  { key: "calendar_events", tKey: "act.calendar" },
-  { key: "projects_planning", tKey: "act.projects" },
-  { key: "quotation_activity", tKey: "act.quotation" },
-  { key: "membership_requests", tKey: "act.membership" },
-  { key: "low_stock", tKey: "act.lowStock" },
-  { key: "inventory_activity", tKey: "act.inventory" },
-  { key: "finance_activity", tKey: "act.finance" },
-  { key: "qa_reports", tKey: "act.qa" },
-  { key: "price_fx", tKey: "act.priceFx" },
-  { key: "hr_activity", tKey: "act.hr" },
-  { key: "discuss_messages", tKey: "act.discuss" },
-  { key: "security_alerts", tKey: "act.security" },
-  { key: "comments_activity", tKey: "act.comments" },
+/* SEVENTEEN SWITCHES IN THREE GROUPS, NOT ONE FLAT RUN.
+   This was a single undifferentiated list — the same "not organised enough"
+   the whole rebuild is about, sitting in the busiest screen of the app. A
+   reader hunting for one toggle had to scan all seventeen, and the two that
+   matter most to them sat between low stock and FX rates.
+
+   Grouped by WHO OR WHAT THE ALERT IS ABOUT, which is the question someone
+   silencing notifications is actually asking — not by which app emitted it.
+   Same principle as the master list: group by what the reader is trying to
+   do. Order inside each group is unchanged, so nobody's muscle memory moves
+   further than it has to. */
+const ACTIVITY_GROUPS: { tKey: string; items: { key: ActivityKey; tKey: string }[] }[] = [
+  {
+    /* Something is waiting on me personally. */
+    tKey: "act.group.forMe",
+    items: [
+      { key: "mentions", tKey: "act.mentions" },
+      { key: "approvals", tKey: "act.approvals" },
+      { key: "assignments", tKey: "act.assignments" },
+      { key: "comments_activity", tKey: "act.comments" },
+      { key: "discuss_messages", tKey: "act.discuss" },
+      { key: "membership_requests", tKey: "act.membership" },
+    ],
+  },
+  {
+    /* My own schedule and commitments. */
+    tKey: "act.group.myWork",
+    items: [
+      { key: "tasks_due", tKey: "act.tasksDue" },
+      { key: "calendar_events", tKey: "act.calendar" },
+      { key: "projects_planning", tKey: "act.projects" },
+    ],
+  },
+  {
+    /* The business moving, whether or not I am in it. */
+    tKey: "act.group.business",
+    items: [
+      { key: "quotation_activity", tKey: "act.quotation" },
+      { key: "low_stock", tKey: "act.lowStock" },
+      { key: "inventory_activity", tKey: "act.inventory" },
+      { key: "finance_activity", tKey: "act.finance" },
+      { key: "price_fx", tKey: "act.priceFx" },
+      { key: "qa_reports", tKey: "act.qa" },
+      { key: "hr_activity", tKey: "act.hr" },
+      { key: "security_alerts", tKey: "act.security" },
+    ],
+  },
 ];
 
 function PushEnableCard() {
@@ -261,19 +290,30 @@ export default function NotificationsTab({ account, onChanged }: {
         <SwitchRow label={t("notif.inApp")} hint={t("notif.inApp.hint")} checked={n.in_app} onChange={(v) => patch({ in_app: v })} last />
       </SettingsCard>
 
-      <SettingsCard title={t("sounds.byActivity")} subtitle={t("notif.byActivity.sub")}>
-        {ACTIVITIES.map((a, i) => (
-          <SwitchRow
-            key={a.key}
-            icon={<BoundIcon semanticKey={`activity.${a.key}`} className="h-4 w-4" fallback={null} />}
-            label={t(a.tKey)}
-            hint={t(`${a.tKey}.hint`)}
-            checked={n[a.key] ?? true}
-            onChange={(v) => patch({ [a.key]: v } as Partial<NotificationPrefs>)}
-            last={i === ACTIVITIES.length - 1}
-          />
-        ))}
-      </SettingsCard>
+      {/* One card per group. The gap between cards does the separating, so the
+          group titles stay small and the switches keep the whole width. */}
+      {ACTIVITY_GROUPS.map((g, gi) => (
+        <SettingsCard
+          key={g.tKey}
+          title={gi === 0 ? t("sounds.byActivity") : undefined}
+          subtitle={gi === 0 ? t("notif.byActivity.sub") : undefined}
+        >
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
+            {t(g.tKey)}
+          </p>
+          {g.items.map((a, i) => (
+            <SwitchRow
+              key={a.key}
+              icon={<BoundIcon semanticKey={`activity.${a.key}`} className="h-4 w-4" fallback={null} />}
+              label={t(a.tKey)}
+              hint={t(`${a.tKey}.hint`)}
+              checked={n[a.key] ?? true}
+              onChange={(v) => patch({ [a.key]: v } as Partial<NotificationPrefs>)}
+              last={i === g.items.length - 1}
+            />
+          ))}
+        </SettingsCard>
+      ))}
 
       <QuietHoursCard
         value={n.quiet_hours ?? { enabled: false, start: "22:00", end: "08:00" }}
