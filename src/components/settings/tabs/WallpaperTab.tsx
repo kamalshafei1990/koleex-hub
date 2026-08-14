@@ -134,7 +134,7 @@ export default function WallpaperTab(
       <SettingsCard title={t("wp.title")} subtitle={t("wp.subtitle")}>
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-4 items-start">
-          <Preview pref={current} theme={theme} className="w-full sm:w-56 h-32 shrink-0" />
+          <Preview pref={current} theme={theme} name={currentName} className="w-full sm:w-56 h-32 shrink-0" />
           <div className="flex-1 min-w-0 w-full space-y-3">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">{t("wp.current")}</div>
@@ -321,10 +321,24 @@ function Tile({ selected, label, badge, background, fit, onClick }: {
   );
 }
 
-/** The hero. Shows the real thing including its scrim, so what you see is what
- *  the Hub will look like — not the raw gradient with the dimming imagined. */
-function Preview({ pref, theme, className = "" }: {
-  pref: WallpaperPref; theme: "dark" | "light"; className?: string;
+/** The hero — a miniature Hub, not a swatch.
+ *
+ *  It began as wallpaper + scrim and nothing else, and the owner caught it
+ *  immediately: with Graphite on a light theme the box looked EMPTY. Nothing
+ *  was broken. Graphite's light face is #F2F4F7 → #D9DDE3, the scrim whitens
+ *  it further, and the card behind is #f8f8f8 — pale on pale on pale, with a
+ *  hairline border for evidence.
+ *
+ *  The deeper mistake was next to it: the control beside this box is called
+ *  READABILITY, and the box contained nothing to read. A preview that cannot
+ *  demonstrate the one thing its slider changes is decoration.
+ *
+ *  So it now carries real text over real glass. Drag the slider and you watch
+ *  the words win or lose against the ground, which is the actual question.
+ *  The strings are the brand and the wallpaper's own name — real copy at real
+ *  contrast, and no new translation keys to drift. */
+function Preview({ pref, theme, name, className = "" }: {
+  pref: WallpaperPref; theme: "dark" | "light"; name: string; className?: string;
 }) {
   const bg = backgroundCss(pref, theme, new Date().getHours());
   const w = getWallpaper(pref.id);
@@ -336,6 +350,26 @@ function Preview({ pref, theme, className = "" }: {
       style={{ backgroundImage: fallback, ...fitStyle(pref.fit) }}
     >
       <div className="absolute inset-0" style={{ background: scrim(theme, dimFor(pref)) }} />
+      {/* The miniature. Proportions echo the Hub — a header strip, a card
+          carrying type, a row of app tiles — so the eye reads it as "this is
+          my screen" rather than "this is a colour". */}
+      <div className="absolute inset-0 p-2.5 flex flex-col gap-1.5 pointer-events-none select-none">
+        <div className="flex items-center gap-1">
+          <span className="h-1 w-6 rounded-full bg-[var(--text-primary)] opacity-45" />
+          <span className="ms-auto h-1 w-3 rounded-full bg-[var(--text-primary)] opacity-25" />
+        </div>
+        <div className="kx-glass rounded-lg border border-[var(--border-subtle)] px-2 py-1.5 flex-1 flex flex-col justify-center">
+          <span className="text-[10px] font-semibold leading-tight text-[var(--text-primary)] truncate">
+            KOLEEX hub
+          </span>
+          <span className="text-[9px] leading-tight text-[var(--text-dim)] truncate">{name}</span>
+        </div>
+        <div className="flex gap-1">
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="kx-glass h-3.5 flex-1 rounded-md border border-[var(--border-subtle)]" />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
