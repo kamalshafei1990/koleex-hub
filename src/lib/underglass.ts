@@ -54,6 +54,27 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/crm") ||
     p.startsWith("/settings")
   );
+  /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
+     the measurement is what settled it. I added all three, then took them out.
+
+     One component (components/contacts/Contacts.tsx) serves the three routes,
+     and it puts its list in its OWN scroll container. Measured on /suppliers:
+     that container starts at y=207 while the header pane ends at 104. Nothing
+     these screens render ever passes under the header — so the ramp would
+     frost nothing, while permanently softening the one thing that IS in its
+     band: the static app title at y=76. ProductForm's own comment states the
+     rule I was breaking — "the ramp is for content PASSING under a bar, not
+     for content parked there."
+
+     THE EDGE BLUR IS NOT UNIVERSAL. It belongs to apps whose content scrolls
+     beneath the header. An app with an internal scroller keeps the flat frost,
+     and that is correct rather than unfinished.
+
+     A second thing this cost me: my sticky audit for /suppliers grepped the
+     app's own folder and found nothing, so I nearly called it clean. Measuring
+     the rendered route found 21 sticky alphabet headers — the element lives in
+     contacts/, and a route can render components from anywhere. AUDIT STICKIES
+     BY MEASURING THE ROUTE, NEVER BY GREPPING THE FOLDER. */
 }
 
 /* Routes where the APP owns the top edge-blur, so the header pane must NOT
