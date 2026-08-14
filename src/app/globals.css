@@ -3426,7 +3426,16 @@ input[type="number"]:not(.kx-spinner) {
    (checked against every a/button/input on the page — the orb and the Discuss
    bar are `fixed` and stay above it).
 
-   24 px, not 20: it has to clear 19.5 px on the widest tile we render. */
+   24 px, not 20: it has to clear 19.5 px on the widest tile we render.
+
+   ⚠️ ON MOBILE THE 24 px IS WIDER THAN THE PAGE GUTTER, AND THAT IS FINE —
+   but know why before you change it. At 375 px the tiles are 106 px, so the
+   room needed drops to 18.7 px and 24 still clears it; the page gutter there
+   is only 16 px, so the grid's box overhangs the viewport by 8 px on each
+   side. Measured: NO horizontal scrollbar, because the body already carries
+   `overflow-x: hidden` on mobile. Nothing paints in that 8 px but the edge
+   tiles' glow, which the screen edge would cut anyway. If that body rule is
+   ever removed, this becomes an 8 px horizontal drift — re-measure here. */
 .kx-lazy-grid {
   content-visibility: auto;
   contain-intrinsic-size: auto 340px;

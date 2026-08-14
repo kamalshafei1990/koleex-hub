@@ -124,7 +124,12 @@ const EMPTY_SUPPLIERS: string[] = [];
    tried `marginBottom: -24` first and every gap between categories collapsed
    from 56px to -24px, measured. The bottom padding is instead paid for by
    shrinking the utility itself: 32px gap + 24px padding = the same 56px that
-   `space-y-14` used to give. Change one and change the other. */
+   `space-y-14` used to give. Change one and change the other.
+
+   Checked at 375px too: the room needed drops to 18px against the same 24px,
+   the section overhangs the viewport by 8px each side, and there is still no
+   horizontal scrollbar because the body carries `overflow-x: hidden` there.
+   Same dependency as `.kx-lazy-grid`; the full note is in globals.css. */
 const SECTION_CV = {
   contentVisibility: "auto",
   containIntrinsicSize: "1px 800px",
