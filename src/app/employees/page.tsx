@@ -10,7 +10,7 @@ import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -192,31 +192,29 @@ export default function EmployeesPage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* Header */}
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <EmployeesIcon size={16} />
-            </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("app.title")}</h1>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/employees/new"
-              className="h-10 px-3 sm:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-              aria-label={t("app.add")}
-            >
-              <PlusIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("app.add")}</span>
-            </Link>
-          </div>
+        {/* Shared header — this block was a copy of it, so the screen never
+            got the longer BK-4 back button and was still printing "Employees"
+            under a system bar already saying it. The Add link keeps its markup,
+            href and aria-label and moves into `action`. The subtitle was
+            already a count, which is the state line M-1 wants. */}
+        <div className="mb-6 md:mb-8">
+          <PageHeader
+            title={t("app.title")}
+            subtitle={t("list.showing", `${employees.length} employees`).replace("{x}", String(employees.length)).replace("{y}", String(employees.length))}
+            icon={<EmployeesIcon size={16} />}
+            showTabs={false}
+            action={
+              <Link
+                href="/employees/new"
+                className="h-10 px-3 sm:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
+                aria-label={t("app.add")}
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("app.add")}</span>
+              </Link>
+            }
+          />
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {t("list.showing", `${employees.length} employees`).replace("{x}", String(employees.length)).replace("{y}", String(employees.length))}
-        </p>
 
         {/* Search + Filters */}
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
