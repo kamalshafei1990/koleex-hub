@@ -16,6 +16,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/kds/useToast";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
+/* ssr:false — the canvas has no server rendering, and mounting it only under
+   Aurora is the ONE JavaScript branch the skin system allows itself. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
@@ -265,6 +270,10 @@ function categoryBadge(category: InboxMessageWithSender["category"]): {
 export default function InboxPage() {
   const { account, loading: accountLoading } = useCurrentAccount();
   const accountId = account?.id ?? null;
+  /* The only thing the skin decides in JavaScript: whether the wave canvas
+     mounts. Every other Aurora difference is CSS scoped to
+     [data-kx-skin="aurora"], which is what keeps Core byte-identical. */
+  const aurora = useSkin() === "aurora";
 
   /* Deep-link support. NotificationBell routes `router.push(msg.link)`
      and the membership-request trigger emits `/inbox?request=<uuid>`,
@@ -498,12 +507,27 @@ export default function InboxPage() {
        MainHeader (which sits on top with h-14). Using h-screen here
        would be 100vh — ignoring the header — and push the whole page
        into overflow, so the header would scroll out of view. */
-    <div className="flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+    /* `kx-app` is the whole var-remap step: under Aurora it turns
+       --bg-primary transparent and --bg-secondary into the glass fill, so
+       every surface below inherits the skin without being rewritten. Under
+       Core the class matches nothing and this renders byte-identical. */
+    <div className="kx-app relative flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+      {aurora && (
+        <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
+          <WavyBackground topLight />
+        </div>
+      )}
       {/* Top bar — one compact row across all columns. Holds back arrow,
           app title, the list/detail toggle on mobile, and the Compose
           button. Matches macOS Mail's single title strip above the
           3-column content area. */}
-      <header className="shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+      {/* TINT, NOT BLUR. The Hub's own header pane sits directly above this
+          strip with blur(40px); giving this one its own backdrop-filter would
+          stack two filtered bands in the busiest 100px of the screen — the
+          "the upper part still blurred" complaint. It takes the remapped
+          --bg-secondary fill and a hairline, and lets the pane above do the
+          frosting. */}
+      <header className="relative z-10 shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <Link
           href="/"
           className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
@@ -557,13 +581,25 @@ export default function InboxPage() {
       </header>
 
       {/* Three-column body */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="relative z-10 flex-1 min-h-0 flex">
         {/* ── Column 1: Mailbox sidebar ─────────────────────────────
             Hidden on mobile — the same nav sits inside the list column
             header as a compact selector. 220px wide on desktop matches
             macOS Mail's source list. */}
         <aside
-          className={`w-[220px] shrink-0 border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-y-auto ${
+          /* kx-glass-drawer, not kx-glass: a FLUSH panel. kx-glass draws its
+             lighting rim on all four edges, which on a panel that touches the
+             viewport reads as the border the owner rejected. Same recipe,
+             no rim.
+
+             THE bg-* UTILITY STAYS. .kx-glass-drawer is scoped to
+             [data-kx-skin="aurora"], so dropping the fill left this column
+             with NO background at all under Core — the skin switch is meant to
+             be pure CSS over identical markup, and removing a class the other
+             skin depends on breaks that. The var supplies the colour in both
+             skins (solid under Core, glass after kx-app's remap under Aurora);
+             the class only adds the blur. */
+          className={`kx-glass-drawer w-[220px] shrink-0 border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-y-auto ${
             mobileView === "list" ? "hidden md:flex md:flex-col" : "hidden md:flex md:flex-col"
           }`}
         >
@@ -623,7 +659,7 @@ export default function InboxPage() {
 
         {/* ── Column 2: Message list ─────────────────────────────── */}
         <section
-          className={`shrink-0 md:w-[380px] md:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
+          className={`kx-glass-drawer shrink-0 md:w-[380px] md:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
             mobileView === "list" ? "flex w-full" : "hidden md:flex"
           }`}
         >
@@ -867,8 +903,15 @@ export default function InboxPage() {
              an inline ComposeView. That means the user never loses
              sight of the mailbox list — Gmail + Apple Mail "reply in
              pane" pattern, but applied to brand-new messages too. */}
+        {/* GLASS THE CONTAINER BEFORE WHAT SITS ON IT. Left bare, this column
+            put the body of a message straight onto the moving wave — the one
+            surface on the page holding long-form text to read. It takes the
+            same flush-panel material as the two columns beside it, so the
+            ground still travels through at 16px blur but the words have a
+            sheet to sit on. The columns stay told apart by their hairlines,
+            not by different fills. */}
         <section
-          className={`flex-1 min-h-0 bg-[var(--bg-primary)] ${
+          className={`kx-glass-drawer flex-1 min-h-0 bg-[var(--bg-primary)] ${
             mobileView === "detail" ? "flex w-full" : "hidden md:flex"
           }`}
         >
