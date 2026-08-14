@@ -35,7 +35,7 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper,
-  type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
+  asImage, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
 } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SettingsCard, ControlRow, SelectControl } from "./ui";
@@ -231,7 +231,7 @@ export default function WallpaperTab({ account }: { account: AccountWithLinks })
                 className={`w-9 h-9 rounded-full border transition-shadow flex items-center justify-center ${
                   on ? "border-[var(--border-focus)] shadow-[0_0_0_2px_var(--border-focus)]"
                      : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"}`}
-                style={{ background: theme === "light" ? w.light : w.dark }}
+                style={{ backgroundImage: asImage(theme === "light" ? w.light : w.dark) }}
               >
                 {on && <CheckIcon className="h-3.5 w-3.5 text-white mix-blend-difference" />}
               </button>
@@ -262,7 +262,7 @@ function TileGroup({ title, footer, items, current, theme, onPick, t }: {
             selected={current.id === w.id}
             label={t(w.nameKey)}
             badge={w.kind === "live" ? t("wp.live.badge") : w.kind === "dynamic" ? t("wp.dynamic.badge") : undefined}
-            background={theme === "light" ? w.light : w.dark}
+            background={asImage(theme === "light" ? w.light : w.dark)}
             onClick={() => onPick(w)}
           />
         ))}
@@ -292,7 +292,7 @@ function Tile({ selected, label, badge, background, fit, onClick }: {
         className={`block w-full h-[68px] rounded-xl border overflow-hidden relative transition-shadow ${
           selected ? "border-[var(--border-focus)] shadow-[0_0_0_2px_var(--border-focus)]"
                    : "border-[var(--border-subtle)] group-hover:border-[var(--border-strong)]"}`}
-        style={{ background, ...(fit ? fitStyle(fit) : null) }}
+        style={{ backgroundImage: background, ...fitStyle(fit) }}
       >
         {badge && (
           <span className="absolute top-1 start-1 px-1.5 py-[1px] rounded-full text-[9px] font-medium bg-black/45 text-white backdrop-blur-[2px]">
@@ -319,11 +319,12 @@ function Preview({ pref, theme, className = "" }: {
 }) {
   const bg = backgroundCss(pref, theme, new Date().getHours());
   const w = getWallpaper(pref.id);
-  const fallback = bg ?? (theme === "light" ? w?.light : w?.dark) ?? "";
+  const raw = bg ?? (theme === "light" ? w?.light : w?.dark) ?? "";
+  const fallback = raw ? asImage(raw) : "";
   return (
     <div
       className={`rounded-2xl border border-[var(--border-subtle)] overflow-hidden relative ${className}`}
-      style={{ background: fallback, ...fitStyle(pref.fit) }}
+      style={{ backgroundImage: fallback, ...fitStyle(pref.fit) }}
     >
       <div className="absolute inset-0" style={{ background: scrim(theme, dimFor(pref)) }} />
     </div>

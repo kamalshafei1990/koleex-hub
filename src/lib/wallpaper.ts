@@ -102,8 +102,11 @@ export const WALLPAPERS: Wallpaper[] = [
        light values are only ever seen as the picker's thumbnail — when this id
        is active the canvas paints the real thing. */
     id: "hub-live", kind: "live", group: "koleex", nameKey: "wp.hubLive", dim: 0,
-    dark: `radial-gradient(120% 90% at 50% 50%, ${HUB[2]}55 0%, ${HUB[3]}88 45%, #05070C 100%), #05070C`,
-    light: `radial-gradient(120% 90% at 50% 50%, ${HUB[1]}66 0%, ${HUB[3]}22 45%, #F4F7FA 100%), #F4F7FA`,
+    /* The base layer is linear-gradient(c, c) and not the bare colour it looks
+       like it wants to be. Every value in this file is consumed as
+       background-IMAGE, where a bare colour is invalid — see asImage(). */
+    dark: `radial-gradient(120% 90% at 50% 50%, ${HUB[2]}55 0%, ${HUB[3]}88 45%, #05070C 100%), linear-gradient(#05070C, #05070C)`,
+    light: `radial-gradient(120% 90% at 50% 50%, ${HUB[1]}66 0%, ${HUB[3]}22 45%, #F4F7FA 100%), linear-gradient(#F4F7FA, #F4F7FA)`,
   },
   {
     id: "hub-deep", kind: "still", group: "koleex", nameKey: "wp.hubDeep", dim: 46,
@@ -250,8 +253,24 @@ export function dynamicCss(theme: ThemeMode, hour: number): string {
   }[phase];
 }
 
-/** The `background` shorthand for a preference, or null when the wave field
- *  should paint instead. `hour` is only read for the dynamic wallpaper. */
+/** Wrap a bare colour so it is a legal background-IMAGE.
+ *
+ *  Why everything here is an image and never the `background` shorthand: the
+ *  shorthand RESETS background-size, -position and -repeat to their defaults.
+ *  Setting it beside fitStyle()'s longhands in one style object is a race that
+ *  React warns about by name — "Updating a style property during rerender when
+ *  a conflicting property is set" — and the failure is silent and occasional:
+ *  a photo's fill style quietly reverting to auto on some later render. The
+ *  colour wallpapers are the only values that are not already images, so they
+ *  become a two-stop gradient of themselves. */
+export function asImage(v: string): string {
+  const t = v.trim();
+  return /^(#|rgb|hsl)/i.test(t) ? `linear-gradient(${t}, ${t})` : t;
+}
+
+/** The background-IMAGE for a preference, or null when the wave field should
+ *  paint instead. Pair it with fitStyle(); never assign it to `background`.
+ *  `hour` is only read for the dynamic wallpaper. */
 export function backgroundCss(
   pref: WallpaperPref | null | undefined,
   theme: ThemeMode,
@@ -269,8 +288,8 @@ export function backgroundCss(
 
   const w = pref?.id ? BY_ID.get(pref.id) : undefined;
   if (!w) return null;
-  if (w.kind === "dynamic") return dynamicCss(theme, hour);
-  return theme === "light" ? w.light : w.dark;
+  if (w.kind === "dynamic") return asImage(dynamicCss(theme, hour));
+  return asImage(theme === "light" ? w.light : w.dark);
 }
 
 /** background-size / position for photos; the gradients ignore it. */

@@ -377,7 +377,7 @@ export default function WavyBackground(
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
-          style={{ background: wpBackground!, ...fitStyle(wallpaper.fit) }}
+          style={{ backgroundImage: wpBackground!, ...fitStyle(wallpaper.fit) }}
         />
       )}
       {/* The box runs 48px past the viewport on every side — uniform across
