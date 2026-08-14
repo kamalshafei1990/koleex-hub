@@ -3064,6 +3064,42 @@ input[type="number"]:not(.kx-spinner) {
   transition-duration: 0.1s;
 }
 
+/* ── Directory row highlight ──────────────────────────────────────────────
+   Owner, on the Contacts directory 2026-08-15: "i don't want the hover with
+   this style and i don't want it with sharp angles should be rounded".
+
+   The rows were painting `hover:bg-…` on the row element itself. A directory
+   row is full-bleed — it carries the list's own side padding and a full-width
+   divider — so filling its background gives a hard-edged band running the
+   whole width, corner to corner. Rounding the ROW cannot fix that: the divider
+   and the padding belong to the full-bleed box, and rounding it would round
+   the divider with it.
+
+   So the highlight is a separate layer INSET from the row, and the row keeps
+   its geometry. `isolation: isolate` makes the row its own stacking context,
+   which is what lets `z-index: -1` put the layer behind the row's text and
+   avatar while staying in front of the page — without giving every child its
+   own z-index.
+
+   The same shape carries BOTH states on purpose. Hover and selected were two
+   different full-bleed fills; leaving the selected row square while its
+   neighbours highlight as rounded pills reads as a bug, not as a selection. */
+.kx-row-hl { position: relative; isolation: isolate; }
+.kx-row-hl::before {
+  content: "";
+  position: absolute;
+  /* 4px vertical keeps the pill clear of the dividers above and below;
+     8px horizontal is what makes the radius visible at all. */
+  inset: 4px 8px;
+  border-radius: 12px;
+  background: transparent;
+  transition: background-color 0.15s ease-out;
+  z-index: -1;
+  pointer-events: none;
+}
+.kx-row-hl:hover::before { background: var(--bg-surface-hover); }
+.kx-row-hl[data-selected="true"]::before { background: var(--bg-surface-active); }
+
 /* Progressive-mount polish: sections fade in instead of popping. */
 @keyframes kx-section-in { from { opacity: 0; } to { opacity: 1; } }
 .kx-section-in { animation: kx-section-in 0.3s ease both; }

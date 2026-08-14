@@ -6906,11 +6906,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       section: "Directory list",
                       recordId: c.id,
                     })}
-                    className={`group/row relative w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout ${
-                      isSelected
-                        ? "bg-[var(--bg-surface-active)]"
-                        : "hover:bg-[var(--bg-surface-subtle)]"
-                    }`}
+                    data-selected={isSelected}
+                    /* Hover and selection are painted by `.kx-row-hl` as an
+                       inset rounded layer, not as a background on the row —
+                       the row is full-bleed and carries the divider, so a
+                       background on it can only ever be a hard-edged band the
+                       full width of the list. See globals.css. */
+                    className="group/row kx-row-hl w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer border-b border-[var(--border-faint)] contain-layout"
                   >
                     {/* Avatar — stronger container on the active row */}
                     <div className={`w-12 h-12 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--border-color)]" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
