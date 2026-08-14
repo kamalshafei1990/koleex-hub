@@ -57,7 +57,7 @@ export const FACETS: Record<string, FacetDefinition> = {
   bed_type: {
     key: "bed_type", type: "single_select", source: "§2 Machine facets",
     values: ["flat", "cylinder", "post", "feed-off-arm", "long-arm", "bending-arm", "pillar"],
-    note: "Long-arm is a BED value, not a separate 'arm' facet — the dictionary lists it here. `bending-arm` and `pillar` added 2026-08-13 (dictionary §10): both are printed as whole product families in the Yuegong/SEASTAR zigzag catalogue (GG8530-DZ; GG591/GG9910), and both are bed shapes — NOT new subcategories, per the CL-0020 ruling.",
+    note: "Long-arm is a BED value, not a separate 'arm' facet — the dictionary lists it here. `bending-arm` and `pillar` added 2026-08-13 (dictionary §10). CORRECTED 2026-08-14: `bending-arm` is evidenced by GG8530-DZ, a ZIGZAG machine; `pillar` by GG591/GG9910, which are pillar-bed roller-feed LOCKSTITCH machines (p.16 of the same catalogue, no bight column) — NOT zigzags as first written. The correction strengthens the CL-0020 ruling: the same bed shape appears under DIFFERENT stitch classes, so bed can only ever be a facet, never a subcategory.",
   },
   needle_count: {
     key: "needle_count", type: "number", source: "§2 Machine facets",

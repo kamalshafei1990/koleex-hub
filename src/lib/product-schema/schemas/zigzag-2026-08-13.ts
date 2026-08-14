@@ -24,12 +24,22 @@
  *   foot lift   6/10 · 6/12 · 8/13 mm
  *   motor       550 W throughout
  *
- * WHAT IS DELIBERATELY NOT HERE — bed shape. GG9530 is POST BED, GG2312 is
- * CYLINDRICAL, GG8530 is BENDING ARM, GG591 is a PILLAR machine. Those are
- * `bed_type` facet values reaching the form through the Machine Kind, exactly
- * as CL-0020 ruled. `bending-arm` and `pillar` were added to the facet
- * registry in the same change (dictionary §10); `post` and `cylinder` already
- * existed.
+ * WHAT IS DELIBERATELY NOT HERE — bed shape. Within the zigzag family this
+ * catalogue prints GG9530 as POST BED, GG2312 as CYLINDRICAL and GG8530 as
+ * BENDING ARM. Those are `bed_type` facet values reaching the form through the
+ * Machine Kind, exactly as CL-0020 ruled.
+ *
+ * ⚠️ CORRECTION (2026-08-14). This header originally listed GG591 as the PILLAR
+ * example. **GG591/GG9910 are NOT zigzag machines.** They sit on p.16 under the
+ * title "PILLAR SEWING MACHINE" (电脑罗拉车 = computerised ROLLER machine), and
+ * their table has ONE stitch length and NO BIGHT COLUMN — a zigzag always
+ * quotes bight. With "overload clutch to protect the hook", "auto reverse feed"
+ * and needle DPX5, they are pillar-bed ROLLER-FEED LOCKSTITCH machines (`XSL`).
+ *
+ * The `pillar` facet value is still right, and the mistake makes the CL-0020
+ * ruling STRONGER than the original wording did: bed shape cuts ACROSS stitch
+ * classes — pillar on a lockstitch, post and cylinder on zigzags — which is
+ * exactly why it can only be a facet and never a subcategory.
  *
  * WHAT *IS* HERE AND MIGHT LOOK LIKE A FACET — `zigzag_pattern`. The catalogue
  * prints 一步两点 / 二步三点 / 三步四点 (1-step-2-point, 2-step-3-point,

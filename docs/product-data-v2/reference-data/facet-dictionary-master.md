@@ -188,7 +188,7 @@ catalogue and had no value in `bed_type`:
 | Value | Printed as | Model evidence |
 |---|---|---|
 | `bending-arm` | BENDING ARM ZIGZAG SEWING MACHINE | GG8530-DZ |
-| `pillar` | PILLAR SEWING MACHINE | GG591 · GG9910 |
+| `pillar` | PILLAR SEWING MACHINE | GG591 · GG9910 — ⚠️ these are LOCKSTITCH (roller feed), not zigzag; corrected 2026-08-14 |
 
 They are **bed values, not new subcategories** — exactly the CL-0020 ruling that
 put bed shape on the facet axis. `post` already covered GG9530-DZ (POST BED) and
