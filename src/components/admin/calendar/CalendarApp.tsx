@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -385,23 +385,21 @@ export default function CalendarApp() {
       <div className="w-full">
         {/* ── Header ── */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
-          <div className="flex flex-wrap items-center gap-3 mb-1">
-            <Link
-              href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <CalendarIcon size={16} />
-              </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                {t("app.title")}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap shrink-0">
-              {/* Account picker */}
+          {/* Shared header. This block was a copy of it, so the screen never
+              got the longer BK-4 back button and was still printing "Calendar"
+              under a system bar already saying it.
+
+              The account picker moves to `controls` and the New-event button to
+              `action` — both keep their markup, handlers and disabled logic
+              exactly. The date navigation and the month/week/day switcher stay
+              where they are: those are the calendar's own state, not app
+              navigation, and they belong next to the grid they drive. */}
+          <PageHeader
+            title={t("app.title")}
+            subtitle={`${timezone} · ${t("app.subtitle")}`}
+            icon={<CalendarIcon size={16} />}
+            showTabs={false}
+            controls={
               <div className="flex items-center gap-2">
                 <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" />
                 <select
@@ -422,6 +420,8 @@ export default function CalendarApp() {
                     ))}
                 </select>
               </div>
+            }
+            action={
               <button
                 onClick={() => openNewEvent()}
                 disabled={!activeAccountId}
@@ -429,11 +429,8 @@ export default function CalendarApp() {
               >
                 <PlusIcon className="h-4 w-4" /> {t("newEvent")}
               </button>
-            </div>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            {timezone} · {t("app.subtitle")}
-          </p>
+            }
+          />
         </div>
 
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
