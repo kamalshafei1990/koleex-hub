@@ -35,7 +35,7 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
-  asImage, isShader, shaderFallback, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
+  asImage, isShader, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
 } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
@@ -201,12 +201,7 @@ export default function WallpaperTab(
               selected={current.id === sw.id}
               label={t(sw.nameKey)}
               badge={t("wp.live.badge")}
-              /* A CSS approximation, NOT the shader. Twenty-five live tiles
-                 would be twenty-five WebGL contexts on one screen, which is
-                 how a picker becomes heavier than everything it picks. The
-                 thumbnail is the same fallback the ground shows, so it moves
-                 with the tint and stays honest about the colour. */
-              background={asImage(shaderFallback(current.tint, theme))}
+              sprite={sw.sprite}
               onClick={() => choose({ ...current, id: sw.id })}
             />
           ))}
@@ -319,9 +314,36 @@ function TileGroup({ title, footer, items, current, theme, onPick, t }: {
   );
 }
 
-function Tile({ selected, label, badge, background, fit, onClick }: {
-  selected: boolean; label: string; badge?: string; background: string;
-  fit?: WallpaperFit; onClick: () => void;
+/* One sheet, one request, twenty-three real pictures.
+   ---------------------------------------------------------------------------
+   The first version drew every live tile with the same derived gradient, so
+   all twenty-five looked IDENTICAL and the picker could not be picked from —
+   the owner spotted it immediately, and they were right: a chooser whose
+   options are indistinguishable is not a chooser.
+
+   The reason for the shortcut was real — twenty-five live tiles means
+   twenty-five WebGL contexts, and browsers cap them around sixteen, so the
+   grid would start losing contexts. The answer is neither: each shader was
+   rendered ONCE offscreen at 208x136 and packed into a single sprite sheet.
+   One request (our measured law is round-trips, not bytes), no contexts, and
+   every tile shows the thing it actually is. */
+const SHEET = "/wallpapers/shader-thumbs.webp";
+const SHEET_COLS = 5;
+const TILE_W = 104, TILE_H = 68;
+
+function spriteStyle(index: number): React.CSSProperties {
+  const col = index % SHEET_COLS, row = Math.floor(index / SHEET_COLS);
+  return {
+    backgroundImage: `url("${SHEET}")`,
+    backgroundSize: `${SHEET_COLS * TILE_W}px auto`,
+    backgroundPosition: `-${col * TILE_W}px -${row * TILE_H}px`,
+    backgroundRepeat: "no-repeat",
+  };
+}
+
+function Tile({ selected, label, badge, background, sprite, fit, onClick }: {
+  selected: boolean; label: string; badge?: string; background?: string;
+  sprite?: number; fit?: WallpaperFit; onClick: () => void;
 }) {
   return (
     <button
@@ -332,7 +354,9 @@ function Tile({ selected, label, badge, background, fit, onClick }: {
         className={`block w-full h-[68px] rounded-xl border overflow-hidden relative transition-shadow ${
           selected ? "border-[var(--border-focus)] shadow-[0_0_0_2px_var(--border-focus)]"
                    : "border-[var(--border-subtle)] group-hover:border-[var(--border-strong)]"}`}
-        style={{ backgroundImage: background, ...fitStyle(fit) }}
+        style={sprite !== undefined
+          ? spriteStyle(sprite)
+          : { backgroundImage: background, ...fitStyle(fit) }}
       >
         {badge && (
           <span className="absolute top-1 start-1 px-1.5 py-[1px] rounded-full text-[9px] font-medium bg-black/45 text-white backdrop-blur-[2px]">

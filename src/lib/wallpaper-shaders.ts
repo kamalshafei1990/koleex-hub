@@ -32,6 +32,20 @@ export interface TintPalette { base: string; light: string; dark: string }
 
 export interface ShaderWallpaper {
   id: string;
+  /** Slot in public/wallpapers/shader-thumbs.webp.
+   *
+   *  PINNED, not derived from array position. The sheet was rendered from the
+   *  full generated list; two entries were then removed because they never
+   *  produced a canvas to capture. Deriving the offset from the index would
+   *  have silently shifted every thumbnail after them onto the wrong
+   *  wallpaper — a bug that looks like nothing at all until you notice the
+   *  picture never matches the name. */
+  sprite: number;
+  /** The prop that turns cursor-following OFF, for the two components that
+   *  have one. Named per entry rather than passed to everybody: several of
+   *  these spread `...rest` onto their container, so an unknown prop lands on
+   *  a real DOM node and React warns about it in the console. */
+  mouseProp?: "mouseInteraction" | "mouseReact";
   /** File under components/wallpapers/reactbits — also the LOADERS key. */
   component: string;
   nameKey: string;
@@ -40,55 +54,51 @@ export interface ShaderWallpaper {
 }
 
 export const SHADER_WALLPAPERS: ShaderWallpaper[] = [
-  { id: "fx-acid-squares", component: "AcidSquares", nameKey: "wp.fx.acidSquares",
+  { id: "fx-acid-squares", component: "AcidSquares", sprite: 0, nameKey: "wp.fx.acidSquares",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-aurora", component: "Aurora", nameKey: "wp.fx.aurora",
+  { id: "fx-aurora", component: "Aurora", sprite: 1, nameKey: "wp.fx.aurora",
     tint: (p) => ({ colorStops: [p.dark, p.base, p.light] }) },
-  { id: "fx-balatro", component: "Balatro", nameKey: "wp.fx.balatro",
+  { id: "fx-balatro", component: "Balatro", sprite: 2, mouseProp: "mouseInteraction", nameKey: "wp.fx.balatro",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-evil-eye", component: "EvilEye", nameKey: "wp.fx.evilEye",
+  { id: "fx-evil-eye", component: "EvilEye", sprite: 3, nameKey: "wp.fx.evilEye",
     tint: (p) => ({ eyeColor: p.base, backgroundColor: p.dark }) },
-  { id: "fx-faulty-terminal", component: "FaultyTerminal", nameKey: "wp.fx.faultyTerminal",
+  { id: "fx-faulty-terminal", component: "FaultyTerminal", sprite: 4, mouseProp: "mouseReact", nameKey: "wp.fx.faultyTerminal",
     tint: (p) => ({ tint: p.base }) },
-  { id: "fx-ferrofluid", component: "Ferrofluid", nameKey: "wp.fx.ferrofluid",
+  { id: "fx-ferrofluid", component: "Ferrofluid", sprite: 5, nameKey: "wp.fx.ferrofluid",
     tint: (p) => ({ colors: [p.dark, p.base, p.light] }) },
-  { id: "fx-gradient-waves", component: "GradientWaves", nameKey: "wp.fx.gradientWaves",
+  { id: "fx-gradient-waves", component: "GradientWaves", sprite: 6, nameKey: "wp.fx.gradientWaves",
     tint: (p) => ({ horizonColor: p.base, waveColor: p.light, crestColor: p.dark }) },
-  { id: "fx-grainient", component: "Grainient", nameKey: "wp.fx.grainient",
+  { id: "fx-grainient", component: "Grainient", sprite: 7, nameKey: "wp.fx.grainient",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-light-rays", component: "LightRays", nameKey: "wp.fx.lightRays",
-    tint: (p) => ({ DEFAULT_COLOR: p.base }) },
-  { id: "fx-light-tunnel", component: "LightTunnel", nameKey: "wp.fx.lightTunnel",
+  { id: "fx-light-tunnel", component: "LightTunnel", sprite: 9, nameKey: "wp.fx.lightTunnel",
     tint: (p) => ({ cableColor: p.base, pulseColor: p.light, tunnelColor: p.dark }) },
-  { id: "fx-lightfall", component: "Lightfall", nameKey: "wp.fx.lightfall",
+  { id: "fx-lightfall", component: "Lightfall", sprite: 10, nameKey: "wp.fx.lightfall",
     tint: (p) => ({ colors: [p.dark, p.base, p.light] }) },
-  { id: "fx-line-waves", component: "LineWaves", nameKey: "wp.fx.lineWaves",
+  { id: "fx-line-waves", component: "LineWaves", sprite: 11, nameKey: "wp.fx.lineWaves",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-molten-metal", component: "MoltenMetal", nameKey: "wp.fx.moltenMetal",
+  { id: "fx-molten-metal", component: "MoltenMetal", sprite: 12, nameKey: "wp.fx.moltenMetal",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-orb", component: "Orb", nameKey: "wp.fx.orb",
+  { id: "fx-orb", component: "Orb", sprite: 13, nameKey: "wp.fx.orb",
     tint: (p) => ({ backgroundColor: p.base }) },
-  { id: "fx-particles", component: "Particles", nameKey: "wp.fx.particles",
+  { id: "fx-particles", component: "Particles", sprite: 14, nameKey: "wp.fx.particles",
     tint: (p) => ({ defaultColors: [p.dark, p.base, p.light] }) },
-  { id: "fx-plasma", component: "Plasma", nameKey: "wp.fx.plasma",
+  { id: "fx-plasma", component: "Plasma", sprite: 15, nameKey: "wp.fx.plasma",
     tint: (p) => ({ color: p.base }) },
-  { id: "fx-plasma-wave", component: "PlasmaWave", nameKey: "wp.fx.plasmaWave",
+  { id: "fx-plasma-wave", component: "PlasmaWave", sprite: 16, nameKey: "wp.fx.plasmaWave",
     tint: (p) => ({ colors: [p.dark, p.base, p.light] }) },
-  { id: "fx-radar", component: "Radar", nameKey: "wp.fx.radar",
+  { id: "fx-radar", component: "Radar", sprite: 17, nameKey: "wp.fx.radar",
     tint: (p) => ({ color: p.base, backgroundColor: p.dark }) },
-  { id: "fx-ripple-grid", component: "RippleGrid", nameKey: "wp.fx.rippleGrid",
+  { id: "fx-ripple-grid", component: "RippleGrid", sprite: 18, nameKey: "wp.fx.rippleGrid",
     tint: (p) => ({ gridColor: p.base }) },
-  { id: "fx-scanner", component: "Scanner", nameKey: "wp.fx.scanner",
+  { id: "fx-scanner", component: "Scanner", sprite: 19, nameKey: "wp.fx.scanner",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-side-rays", component: "SideRays", nameKey: "wp.fx.sideRays",
-    tint: (p) => ({ rayColor1: p.base, rayColor2: p.dark }) },
-  { id: "fx-sliced-waves", component: "SlicedWaves", nameKey: "wp.fx.slicedWaves",
+  { id: "fx-sliced-waves", component: "SlicedWaves", sprite: 21, nameKey: "wp.fx.slicedWaves",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
-  { id: "fx-soft-aurora", component: "SoftAurora", nameKey: "wp.fx.softAurora",
+  { id: "fx-soft-aurora", component: "SoftAurora", sprite: 22, nameKey: "wp.fx.softAurora",
     tint: (p) => ({ color1: p.base, color2: p.dark }) },
-  { id: "fx-topography", component: "Topography", nameKey: "wp.fx.topography",
+  { id: "fx-topography", component: "Topography", sprite: 23, nameKey: "wp.fx.topography",
     tint: (p) => ({ lowColor: p.base, midColor: p.light, highColor: p.dark }) },
-  { id: "fx-web-threads", component: "WebThreads", nameKey: "wp.fx.webThreads",
+  { id: "fx-web-threads", component: "WebThreads", sprite: 24, nameKey: "wp.fx.webThreads",
     tint: (p) => ({ color1: p.base, color2: p.light, color3: p.dark }) },
 ];
 
@@ -117,7 +127,6 @@ export const LOADERS = {
   Ferrofluid: () => import("@/components/wallpapers/reactbits/Ferrofluid.jsx"),
   GradientWaves: () => import("@/components/wallpapers/reactbits/GradientWaves.jsx"),
   Grainient: () => import("@/components/wallpapers/reactbits/Grainient.jsx"),
-  LightRays: () => import("@/components/wallpapers/reactbits/LightRays.jsx"),
   LightTunnel: () => import("@/components/wallpapers/reactbits/LightTunnel.jsx"),
   Lightfall: () => import("@/components/wallpapers/reactbits/Lightfall.jsx"),
   LineWaves: () => import("@/components/wallpapers/reactbits/LineWaves.jsx"),
@@ -129,7 +138,6 @@ export const LOADERS = {
   Radar: () => import("@/components/wallpapers/reactbits/Radar.jsx"),
   RippleGrid: () => import("@/components/wallpapers/reactbits/RippleGrid.jsx"),
   Scanner: () => import("@/components/wallpapers/reactbits/Scanner.jsx"),
-  SideRays: () => import("@/components/wallpapers/reactbits/SideRays.jsx"),
   SlicedWaves: () => import("@/components/wallpapers/reactbits/SlicedWaves.jsx"),
   SoftAurora: () => import("@/components/wallpapers/reactbits/SoftAurora.jsx"),
   Topography: () => import("@/components/wallpapers/reactbits/Topography.jsx"),

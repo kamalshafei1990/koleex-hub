@@ -88,10 +88,13 @@ export default function ShaderWallpaper({ id, tint }: { id: string; tint?: strin
   const props = shader.tint(palette(tint || DEFAULT_TINT));
   return (
     <div className="absolute inset-0 pointer-events-none" aria-hidden>
-      {/* mouseInteraction off across the board: this is a BACKGROUND. A ground
-          that reacts to the cursor competes with the thing being pointed at,
-          and it keeps a listener alive on every mousemove for a decoration. */}
-      <Comp {...props} mouseInteraction={false} mouseReact={false} />
+      {/* Cursor-following off, but ONLY on the two components that have a prop
+          for it. Passing both to all of them put an unknown attribute on a real
+          DOM node — several spread `...rest` onto their container — and React
+          says so in the console. This is a BACKGROUND: a ground that chases the
+          cursor competes with whatever is being pointed at, and keeps a
+          mousemove listener alive for a decoration. */}
+      <Comp {...props} {...(shader.mouseProp ? { [shader.mouseProp]: false } : {})} />
     </div>
   );
 }
