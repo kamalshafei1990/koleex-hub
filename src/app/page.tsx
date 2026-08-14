@@ -640,11 +640,15 @@ export default function HomePage() {
     };
   }, [account?.id, badgesReady]);
 
-  /* ── To-do unread badge ──
-     Count unread task-assignment inbox messages, kept live via the inbox
-     realtime INSERT stream (recount only when a new TASK arrives), the
-     shared "inbox:force-recount" event (fired when a task is read/edited),
-     and a slow visible-tab poll. */
+  /* ── To-do badge = OPEN TASKS ASSIGNED TO YOU ──
+     It used to count unread task-assignment inbox messages, i.e. MESSAGES.
+     Nobody reads a number on an app icon that way — it says "this much work
+     is on you". Owner, looking at 37: "I don't know this notifications for
+     what." Now it asks the tasks themselves, so it drops the moment one is
+     finished, needs no notification opened to clear, and cannot drift.
+
+     Still refreshed by the same three signals: a new task arriving on the
+     inbox stream, the shared force-recount event, and a slow visible poll. */
   useEffect(() => {
     if (!badgesReady) return; // WS1: defer off the hydration critical path
     const id = account?.id ?? getCurrentAccountIdSync();
@@ -654,9 +658,12 @@ export default function HomePage() {
     let unsubscribe: () => void = () => {};
     const recount = async () => {
       try {
-        const { fetchUnreadTaskCount } = await import("@/lib/inbox");
-        const n = await fetchUnreadTaskCount(id);
-        if (!cancelled) setTodoUnread(n);
+        const { cachedGet } = await import("@/lib/client-cache");
+        const json = await cachedGet<{ data?: { open?: number } }>(
+          "/api/todos?resource=openCount",
+          15_000,
+        );
+        if (!cancelled) setTodoUnread(json?.data?.open ?? 0);
       } catch {
         /* keep prior count on transient failure */
       }

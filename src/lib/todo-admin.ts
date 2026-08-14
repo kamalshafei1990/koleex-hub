@@ -140,6 +140,22 @@ export async function createTodo(input: {
 
 /* ── Update todo ── */
 
+/* ── Tell the rest of the Hub a task changed ────────────────────────────────
+   Only createTodo ever announced itself, so finishing a task left the home
+   badge showing the old number until the next 60s poll — which from the
+   outside is a badge that "never changes". Anything that can alter how many
+   tasks are open must both drop the cached count and fire the recount event
+   the home page already listens for. */
+async function announceTodoChange(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const { invalidateCachedGet } = await import("@/lib/client-cache");
+    invalidateCachedGet("/api/todos");        // the openCount badge
+    invalidateCachedGet("/api/inbox/feed");   // bell + tile unread counts
+  } catch { /* the event below still refreshes it */ }
+  window.dispatchEvent(new CustomEvent("inbox:force-recount"));
+}
+
 export async function updateTodo(
   id: string,
   updates: TodoUpdate,
@@ -152,7 +168,7 @@ export async function updateTodo(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ updates, newAssigneeIds }),
     });
-    if (res.ok) return true;
+    if (res.ok) { await announceTodoChange(); return true; }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
       console.error("[Todos] updateTodo:", res.status);
     }
@@ -171,7 +187,7 @@ export async function toggleTodo(id: string): Promise<boolean> {
       method: "POST",
       credentials: "include",
     });
-    if (res.ok) return true;
+    if (res.ok) { await announceTodoChange(); return true; }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
       console.error("[Todos] toggleTodo:", res.status);
     }
@@ -190,7 +206,7 @@ export async function deleteTodo(id: string): Promise<boolean> {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) return true;
+    if (res.ok) { await announceTodoChange(); return true; }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
       console.error("[Todos] deleteTodo:", res.status);
     }

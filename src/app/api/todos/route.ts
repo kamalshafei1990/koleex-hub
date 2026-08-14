@@ -33,11 +33,47 @@ interface AssigneeInfo {
   position: string | null;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "To-do");
   if (deny) return deny;
+
+  /* ── ?resource=openCount → the To-do tile badge ───────────────────────────
+     WHAT THE NUMBER ON AN APP ICON MEANS. It used to be "assignment
+     notifications you have not opened", which is a count of MESSAGES. Nobody
+     reads it that way: a number on the To-do icon says "this much work is on
+     you". Owner, looking at 37: "I don't know this notifications for what."
+
+     So it counts OPEN TASKS ASSIGNED TO YOU. It falls the moment a task is
+     finished, with no notification to open and nothing to dismiss, and it can
+     never drift from reality because it is derived from the tasks themselves
+     rather than from a side-effect record.
+
+     Assignees only, not observers — watching someone else's task is not your
+     workload. Two count-only queries, no rows fetched. */
+  if (new URL(req.url).searchParams.get("resource") === "openCount") {
+    const { data: mine } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("todo_id")
+      .eq("account_id", auth.account_id);
+    const ids = (mine ?? []).map((r) => (r as { todo_id: string }).todo_id);
+    if (ids.length === 0) {
+      return NextResponse.json({ ok: true, data: { open: 0 } });
+    }
+    let q = supabaseServer
+      .from("koleex_todos")
+      .select("*", { count: "exact", head: true })
+      .in("id", ids)
+      .neq("status", "done");
+    if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+    const { count, error } = await q;
+    if (error) {
+      console.error("[api/todos GET openCount]", error.message);
+      return NextResponse.json({ ok: true, data: { open: 0 } });
+    }
+    return NextResponse.json({ ok: true, data: { open: count ?? 0 } });
+  }
 
   // Step 1: resolve the set of todo_ids the caller is an assignee of,
   // plus the ones they observe (metadata.observers). Needed for the
