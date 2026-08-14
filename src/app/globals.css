@@ -3402,9 +3402,34 @@ input[type="number"]:not(.kx-spinner) {
    grid that has been on screen once never guesses again — which is what keeps
    the scrollbar honest and stops it jumping under the thumb.
 
-   Nothing visual changes: a grid inside the viewport renders exactly as before.
-   This only stops work that could never have been seen. */
+   ⚠️ AND IT CLIPS THE HOVER. `content-visibility: auto` applies PAINT
+   containment permanently — not only while the subtree is being skipped — so
+   anything a child paints outside the grid's border box is cut off. The tiles
+   on the outer rows and columns sit flush against that edge, so their hover
+   lost exactly this much (measured while actually hovering, desktop 987 px):
+
+     tile scales 1.05  → 141.2 → 148.2 px, so its box moves   3.5 px out
+     outer glow `0 0 16px`                    reaches a further 16.0 px out
+                                              ────────────────────────────
+                                                            19.5 px clipped
+
+   Edge tiles came back shaved with no glow while inner tiles were perfect —
+   an inconsistent hover, which is the bug the owner reported. My earlier claim
+   here that "nothing visual changes" was wrong.
+
+   THE FIX: give the containment box room to paint into, and take that room
+   straight back so the layout is untouched. Padding is inside the clip box;
+   the negative margin cancels it for everything around. Verified live while
+   hovering: full paint now sits inside the clip box with 4.5 px to spare,
+   every tile in the same position to the pixel, no horizontal drift at any
+   width, and no interactive element under the expanded box loses its click
+   (checked against every a/button/input on the page — the orb and the Discuss
+   bar are `fixed` and stay above it).
+
+   24 px, not 20: it has to clear 19.5 px on the widest tile we render. */
 .kx-lazy-grid {
   content-visibility: auto;
   contain-intrinsic-size: auto 340px;
+  padding: 24px;
+  margin: -24px;
 }
