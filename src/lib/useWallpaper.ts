@@ -53,6 +53,10 @@ export function useWallpaper(): WallpaperPref {
      paint, which is exactly the shift this exists to avoid. */
   const [pref, setPref] = useState<WallpaperPref>(() => readCachedWallpaper() ?? FALLBACK);
   const [adopted, setAdopted] = useState("");
+  /* Once the person has picked something in this session, THEIR choice wins
+     until the page reloads. See the note on the adopt block below — this flag
+     is the whole fix for wallpapers reverting to the previous one. */
+  const [chosenHere, setChosenHere] = useState(false);
   const { account } = useCurrentAccount();
 
   const stored = account?.preferences?.wallpaper;
@@ -70,7 +74,27 @@ export function useWallpaper(): WallpaperPref {
      the picker writes the mirror and broadcasts immediately, while the saved
      account round-trips. Re-adopting on every render would let a stale server
      copy overwrite the selection the user just made. */
-  if (storedKey && storedKey !== adopted) {
+  /* AND NOT AFTER A LOCAL CHOICE. This is the bug the owner hit as "changing
+     the wallpaper from one to another": every second switch silently reverted.
+     Traced, and the trace is the explanation —
+
+       t=7480  broadcast fx-radar     the pick
+       t=7520  mirror    fx-radar     applied
+       t=8477  PATCH     fx-radar     saved, correctly
+       t=9478  mirror    fx-plasma    reverted to the PREVIOUS wallpaper
+
+     The revert is the refresh this file's own sibling asks for after a save:
+     the account comes back still carrying the previous value, storedKey
+     changes, and the adopt below trusted it over a choice made a second ago.
+     The refresh exists to stop STALE WRITERS clobbering the wallpaper; it had
+     quietly become the vehicle for a stale READ doing the same thing.
+
+     There is no timestamp to compare, so the rule is the one that is true
+     anyway: a person changes their wallpaper on this screen, and while they
+     are doing it nothing the server says about it is newer than what they just
+     tapped. Cross-device sync still works — it happens on the next load, where
+     no local choice has been made yet. */
+  if (!chosenHere && storedKey && storedKey !== adopted) {
     setAdopted(storedKey);
     const next = fromPrefs(stored);
     if (next && JSON.stringify(next) !== JSON.stringify(pref)) setPref(next);
@@ -83,7 +107,7 @@ export function useWallpaper(): WallpaperPref {
   useEffect(() => {
     const onPick = (e: Event) => {
       const detail = (e as CustomEvent<WallpaperPref>).detail;
-      if (detail?.id) setPref(detail);
+      if (detail?.id) { setPref(detail); setChosenHere(true); }
     };
     /* `storage` covers the other-tab case: two Hub tabs open, choice made in
        one. The mirror is already written by then, so re-reading it is enough. */
