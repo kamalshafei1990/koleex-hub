@@ -206,7 +206,11 @@ export default function MediaSection({
          preflight and then uploading it as octet-stream would have the store
          refuse the exact file we just accepted. */
       const up = await uploadToStorage(bucket, path, file, { contentType: mime || undefined });
-      if (!up.ok) throw new Error(humanizeError(up.error));
+      /* Keep the technical tail. humanizeError turns "Network error during
+         upload (7.4MB, direct)" into a friendly sentence — and drops the two
+         facts that say WHICH half failed, which is exactly what four rounds of
+         diagnosis needed. Friendly first, evidence after. */
+      if (!up.ok) throw new Error(`${humanizeError(up.error)}\n${up.error}`);
       /* A sensitive asset lands in the private bucket, which has no public URL
          (publicUrl === null). The row is then identified by bucket + path and
          the server signs it on read — so send null rather than inventing a

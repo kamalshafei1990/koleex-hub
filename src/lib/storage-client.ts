@@ -175,16 +175,22 @@ async function uploadOnce(
   if (file.size >= DIRECT_UPLOAD_THRESHOLD && !options.__forceServer) {
     const direct = await uploadDirectToStorage(bucket, path, file, options);
     if (direct.ok) return direct;
-    /* FALL BACK ONTO THE ROUTE THAT WORKS. The direct PUT goes browser →
-       Supabase with nothing of ours in between, so when that link is the
-       broken one there is nothing to retry against — repeating it just fails
-       again more slowly. If the file still fits through our own function,
-       send it that way instead. */
-    if (file.size <= SERVER_ROUTE_MAX && direct.error.startsWith("Network error")) {
-      const viaServer = await uploadOnce(bucket, path, file, { ...options, __forceServer: true } as UploadOptions);
+    if (!direct.error.startsWith("Network error")) return { ...direct, retryable: false };
+
+    /* A DROPPED CONNECTION IS WORTH ONE MORE TRY, even on this link. The last
+       commit refused to retry the direct PUT on the grounds that nothing of
+       ours sits in it — true, and beside the point: the connection itself is
+       what dropped, and a shaky link often carries the second attempt. */
+    const again = await uploadDirectToStorage(bucket, path, file, options);
+    if (again.ok) return again;
+
+    /* Then fall back onto the route production logs show WORKING, if the file
+       still fits through our own function. */
+    if (file.size <= SERVER_ROUTE_MAX) {
+      const viaServer = await uploadOnce(bucket, path, file, { ...options, __forceServer: true });
       if (viaServer.ok) return viaServer;
     }
-    return { ...direct, retryable: false };
+    return { ...again, retryable: false };
   }
 
   const form = new FormData();
