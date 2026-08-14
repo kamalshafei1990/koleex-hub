@@ -89,18 +89,6 @@ export default function PageHeader({
   onSearchSubmit,
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
-  /* ONE LONG RAMP BEHIND THE WHOLE TOP STRIP, owner's words on this header:
-     "you only can use one but more longer — it can work for main header,
-     search area and categories area", and later, pointing at Purchase, "put
-     the blured edge on the back of the top page components".
-
-     appOwnsTopRamp routes are the ones where MainHeader keeps a FLAT 56px
-     frost instead of its own 104px ramp, precisely so the app can run a
-     single taller one. Until now nothing in PageHeader actually drew it —
-     measured on /inventory/items: .kx-ph-band computed backdrop-filter NONE
-     — so the entry was a promise the header never kept, and the screen had
-     no edge blur at all past the header line. This is the ramp it owes. */
-  const ownsRamp = isUnderglassRoute(pathname) && appOwnsTopRamp(pathname);
   const resolvedBackHref = backHref ?? parentPath(pathname);
 
   /* Flatten any overflow groups into the main tab list so every item
@@ -121,6 +109,34 @@ export default function PageHeader({
 
   const hasTabs = showTabs && mergedTabs.length > 0;
   const hasSearch = !!searchPlaceholder;
+
+  /* ONE LONG RAMP BEHIND THE WHOLE TOP STRIP, owner's words on this header:
+     "you only can use one but more longer — it can work for main header,
+     search area and categories area", and later, pointing at Purchase, "put
+     the blured edge on the back of the top page components".
+
+     appOwnsTopRamp routes are the ones where MainHeader keeps a FLAT 56px
+     frost instead of its own 104px ramp, precisely so the app can run a
+     single taller one. Until now nothing in PageHeader actually drew it —
+     measured on /inventory/items: .kx-ph-band computed backdrop-filter NONE
+     — so the entry was a promise the header never kept, and the screen had
+     no edge blur at all past the header line. This is the ramp it owes. */
+  const ownsRamp = isUnderglassRoute(pathname) && appOwnsTopRamp(pathname) && hasTabs;
+
+  /* Tell the shell that THIS screen's blurred edge is already drawn, so the
+     main header pane stands down and the screen shows one edge instead of two
+     (its flat 40px frost used to sit on top of this ramp and stop dead at
+     y=56 — the second edge the owner could see).
+
+     Declared here rather than derived from the route, because the route only
+     says what an app usually does. Cleared on the way out, and `hasTabs` is in
+     the condition above for the same reason: no band, no ramp, no claim. */
+  useEffect(() => {
+    if (!ownsRamp) return;
+    const root = document.documentElement;
+    root.dataset.kxTopramp = "app";
+    return () => { delete root.dataset.kxTopramp; };
+  }, [ownsRamp]);
 
   /* Longest-prefix match — detail pages still light the right tab. */
   const allKeys = mergedTabs.map((t) => t.key);

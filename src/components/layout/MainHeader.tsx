@@ -188,6 +188,14 @@ export default function MainHeader() {
         /* …and NOT where the screen already runs its own ramp: one blurred
            edge per screen, owner's rule. There the header keeps its flat
            frost and the app's sticky stack owns the long fade. */
+        /* Unchanged: progressive ramp on under-glass routes that do not own
+           one, flat frost everywhere else. The THIRD state — pane draws
+           nothing, because the app's own ramp already reaches up over this
+           strip and two filtered bands read as two edges — is not decided
+           here. It is declared at runtime by whichever component actually
+           mounts the ramp (data-kx-topramp="app" on <html>), because an app
+           can own a ramp on paper and not render one: Product Data's rides a
+           category nav that needs more than one category to exist. */
         className={`kx-header-pane fixed top-0 left-0 right-0 z-[99] pointer-events-none ${
           isUnderglassRoute(pathname) && !appOwnsTopRamp(pathname) ? "kx-pane-progressive" : ""
         }`}

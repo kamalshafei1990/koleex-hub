@@ -1258,6 +1258,44 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"][data-theme="light"] .kx-header-pane {
   background: transparent;
 }
+
+/* THE PANE DRAWS NOTHING WHERE THE APP'S RAMP ALREADY COVERS IT.
+   ONE RAMP PER SCREEN, and this is the case that rule did not previously
+   reach. appOwnsTopRamp routes were given the pane's FLAT 40px frost on the
+   assumption that the app's ramp starts BELOW the header. It does not: the
+   ramp is hosted on the sticky bar with --kx-ramp-top:26rem, so it reaches up
+   past y=0, and the top 56px of the screen carried TWO filtered regions —
+   pane blur(40px) over ramp blur(28px) — with the pane stopping dead at the
+   header's bottom edge. Owner: "why I feel there is two blur edge… so it's
+   not one blur edge." That stop was the second edge.
+
+   Checked before writing this, not after: the header's own background
+   computes rgba(0,0,0,0) under Aurora, so it contributes nothing and the
+   frost behind it IS the effect. Switching the pane's filter off in the live
+   page left the header fully legible on the ramp's heaviest layer, and the
+   blur became one continuous fall from the top of the screen to the tail
+   below the tab strip.
+
+   The element stays mounted: it still carries the low-power and
+   no-backdrop-filter fallbacks further down, where a solid fill is the whole
+   effect and removing it would leave those users with nothing.
+
+   DRIVEN BY A LIVE DECLARATION, NOT BY THE ROUTE LIST. My first attempt keyed
+   this off appOwnsTopRamp() and it broke /products immediately: Product Data's
+   ramp rides its category jump-nav, which only renders when there is more than
+   one category, and the catalog is currently empty — so the route claimed to
+   own a ramp, nothing drew one, the pane went bare on that claim and the page
+   ended up with NO blur over the header at all (measured: zero filtered
+   elements crossing y=0..40). A route list says what an app usually does; only
+   the component that mounts the layer knows whether it did. So the host sets
+   data-kx-topramp="app" on <html> while it is mounted and clears it on the way
+   out, and the pane steps aside for exactly as long as that is true. */
+[data-kx-skin="aurora"][data-kx-topramp="app"] .kx-header-pane {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: transparent;
+}
+
 /* No fill AND no hairline: with the bar reduced to pure blur, the border-b
    was the last thing drawing a line across the ground. border-color rather
    than border-width so nothing shifts by the 1px. Core keeps its border. */
