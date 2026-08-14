@@ -6907,6 +6907,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       recordId: c.id,
                     })}
                     data-selected={isSelected}
+                    /* ⚠️ OPTING OUT OF AURORA'S BUTTON HOVER, AND THIS IS THE
+                       HALF THAT ACTUALLY MADE THE SHARP BOX. The row declares
+                       `role="button"` for keyboard use, so it was being caught
+                       by the skin's global control-hover rule (globals.css
+                       ~2369), which forces a Hub-Blue `border-color` and a 3%
+                       white fill with `!important`. On a control that is a
+                       rounded chip that reads as a rim; on a full-bleed row
+                       with radius 0 it is a hard blue box around the whole
+                       row — which is what the owner still saw after the
+                       highlight below was already rounded.
+
+                       A directory row is not a control chip: it is a list row
+                       that happens to be focusable. `data-kx-keep-hover` is
+                       that rule's own documented escape hatch — first use in
+                       the repo. Used here instead of adding another `:not()`
+                       to the selector because there is exactly ONE call site,
+                       and every `:not()` adds (0,1,0) to a rule already at
+                       (0,8,0) that other fixes depend on outranking. */
+                    data-kx-keep-hover=""
                     /* Hover and selection are painted by `.kx-row-hl` as an
                        inset rounded layer, not as a background on the row —
                        the row is full-bleed and carries the divider, so a
