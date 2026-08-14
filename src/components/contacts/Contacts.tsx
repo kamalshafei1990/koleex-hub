@@ -5531,7 +5531,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setContacts(merged);
     try {
       const json = JSON.stringify(slim);
-      if (json.length < 2_500_000) localStorage.setItem(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
+      /* setCache, not setItem. The old per-key `< 2_500_000` guard was correct
+         for ONE key but this cache is written once per FILTER (:all, :customer,
+         :supplier) — three keys individually "under the limit" can reach 7.5 MB
+         against a ~5 MB quota, and measured live they held 3,785 KB of a
+         4,568 KB total. setCache prunes rebuildable cache and retries on
+         QuotaExceeded instead of silently giving up, which is what kept the
+         warm start dying without a trace. */
+      void import("@/lib/storage-guard").then(({ setCache }) => {
+        setCache(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
+      }).catch(() => { /* cache is an optimisation — never fail the render for it */ });
     } catch { /* quota → next visit cold-loads */ }
     // Fetch logos only for genuinely new rows (avoids per-poll avatar churn).
     const missing = merged.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);

@@ -54,7 +54,23 @@ function useIdleMount(): boolean {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const flag = () => { if (!cancelled) setReady(true); };
+    const flag = () => {
+      if (cancelled) return;
+      /* Keep localStorage under the origin quota. Measured 2026-08-15 on the
+         owner's browser: 4,568 KB of a ~5,120 KB quota — 89 % full on 344
+         contacts, with three contact caches alone holding 83 % of it. Past the
+         quota `setItem` throws, every caller swallows it, and THE WARM START
+         SILENTLY STOPS — no error, no log, the app just gets permanently
+         slower. This evicts rebuildable cache only; drafts and preferences are
+         never touched. Runs at idle so it can never delay a paint. */
+      void import("@/lib/storage-guard").then(({ pruneStorage }) => {
+        const r = pruneStorage();
+        if (r.evictedKeys.length && process.env.NODE_ENV !== "production") {
+          console.info(`[storage-guard] ${r.percentFull}% full — freed ${Math.round(r.freedBytes / 1024)} KB from ${r.evictedKeys.length} cache keys`);
+        }
+      }).catch(() => { /* guard must never break the shell */ });
+      setReady(true);
+    };
     const w = window as unknown as {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
     };
