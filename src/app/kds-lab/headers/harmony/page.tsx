@@ -329,21 +329,21 @@ export default function HeaderHarmony() {
         </div>
 
         <Option
-          id="A" title="Continuity — the system bar owns the name" rec
+          id="M-1" title="Continuity — the system bar owns the name" rec
           claim="The app header stops repeating the app name and says what the system bar cannot: the state of what you are looking at (344 contacts · 196 customers). Everything else stays where it is, so the 23 apps already on PageHeader move for free and the rest have a small target to hit."
           costs="Least ambitious of the three. It fixes the duplication and the drift, not the height — you still have two bars."
           desktop={<A_Desktop />} mobile={<A_Mobile />}
         />
 
         <Option
-          id="B" title="Single bar — merge the two headers"
+          id="M-2" title="Single bar — merge the two headers"
           claim="There is no app header at all. The app icon, name, sections and actions move INTO the 56px system bar. One bar, one name, and the most content of any option — on desktop it gives back roughly 70px of vertical space on every screen in the Hub."
           costs="The biggest change, and it breaks down on a phone: the sections cannot fit beside the logo, so they need their own strip and the saving is halved. Apps with many sections or long titles will crowd the bar."
           desktop={<B_Desktop />} mobile={<B_Mobile />}
         />
 
         <Option
-          id="C" title="Handoff — the name moves up as you scroll"
+          id="M-3" title="Handoff — the name moves up as you scroll"
           claim="At rest the app owns its identity: a real title block that tells you where you are when you arrive. As you scroll, the name hands off to the system bar and the app header shrinks to just the sections — so exactly one copy of the name is on screen at any moment."
           costs="The only option with moving parts: a scroll listener and a state the other two do not have. Two headers to keep in sync, and the handoff has to be exactly right or it reads as a glitch."
           desktop={<C_Rest />} mobile={<C_Rest />} mobile2={<C_Scrolled />}
@@ -352,7 +352,7 @@ export default function HeaderHarmony() {
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
           <h2 className="mb-2 text-[15px] font-semibold tracking-tight">What I would do</h2>
           <p className="mb-3 text-[12px] leading-relaxed text-[var(--text-secondary)]">
-            <span className="font-semibold text-[var(--text-primary)]">A, and not because it is the prettiest.</span> The
+            <span className="font-semibold text-[var(--text-primary)]">M-1, and not because it is the prettiest.</span> The
             measurable problem is not the design — it is that only 23 files share a header while the
             apps you use most each built their own. A new design that lands only in those 23 leaves
             the Hub exactly as inconsistent as it is today. So the work is one component every app
@@ -360,9 +360,9 @@ export default function HeaderHarmony() {
             already ships, which is what makes that migration realistic rather than a rewrite.
           </p>
           <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
-            B is the better design in isolation and I would want it if the Hub were being started
+            M-2 is the better design in isolation and I would want it if the Hub were being started
             today — but it is the one that suffers most on a phone, which is the platform you said
-            you are worried about. C is a real option if arriving in an app should feel like
+            you are worried about. M-3 is a real option if arriving in an app should feel like
             arriving somewhere; it is the only one that costs behaviour, not just markup.
           </p>
         </div>

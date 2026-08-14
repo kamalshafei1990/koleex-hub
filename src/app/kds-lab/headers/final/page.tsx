@@ -8,7 +8,7 @@
 
    NOTHING SHIPS. Ballot page, same as ../ and ../harmony.
 
-   THE PICK: round-2 option A (Continuity) wearing round-1 H-2's rail.
+   THE PICK: round-2 model M-1 (Continuity) wearing round-1 H-2's rail.
    Why A is in ../harmony; the short version is that only 23 files share
    a header today, so the migration is the work and the look is the
    smaller half — A is the shape closest to what ships, which is what
@@ -196,24 +196,24 @@ export default function HeaderFinal() {
       <div className="relative z-[1] mx-auto max-w-[1150px] px-6 py-10 md:px-10">
         <h1 className="mb-1 text-[26px] font-bold tracking-tight">The pick, and four back buttons</h1>
         <p className="mb-8 max-w-3xl text-[12px] leading-relaxed text-[var(--text-dim)]">
-          The header is round-2 <span className="text-[var(--text-secondary)]">A — Continuity</span>: the system bar
+          The header is round-2 <span className="text-[var(--text-secondary)]">M-1 — Continuity</span>: the system bar
           keeps the app name, and the app header stops repeating it and carries live state instead. Below, the
           same header four times, changing only the back button — it is shown in place because what decides its
           length is how it balances against the icon chip beside it, not how it looks alone.
         </p>
 
-        <Candidate id="B-1" kind="square" name="Square — what ships today" note="40×40 desktop, 32×32 phone. It matches the icon chip beside it exactly, which is the problem: two identical boxes side by side, and only one of them does anything." />
-        <Candidate id="B-2" kind="wide" name="Wider — same shape, more room" note="64×40. The smallest change that answers the ask: the arrow gets a wider target and stops being a twin of the icon chip, with nothing new to translate. Phone goes to 48×32." />
-        <Candidate id="B-3" kind="labelled" name="Labelled — arrow + “Back”" note="Unmistakable, and the widest. But “Back” is a word in three languages, and on a phone it competes with the state line for the same row." />
-        <Candidate id="B-4" kind="named" name="Named — arrow + where it goes" rec note="Says the DESTINATION rather than the gesture: ← Hub, ← Products, ← Quotation #1042. It is the only one that answers “back to what?”, which is the actual question on a screen you can arrive at from three places. Drops the word on phones and becomes B-2, so the state line never gets squeezed." />
+        <Candidate id="BK-1" kind="square" name="Square — what ships today" note="40×40 desktop, 32×32 phone. It matches the icon chip beside it exactly, which is the problem: two identical boxes side by side, and only one of them does anything." />
+        <Candidate id="BK-2" kind="wide" name="Wider — same shape, more room" note="64×40. The smallest change that answers the ask: the arrow gets a wider target and stops being a twin of the icon chip, with nothing new to translate. Phone goes to 48×32." />
+        <Candidate id="BK-3" kind="labelled" name="Labelled — arrow + “Back”" note="Unmistakable, and the widest. But “Back” is a word in three languages, and on a phone it competes with the state line for the same row." />
+        <Candidate id="BK-4" kind="named" name="Named — arrow + where it goes" rec note="Says the DESTINATION rather than the gesture: ← Hub, ← Products, ← Quotation #1042. It is the only one that answers “back to what?”, which is the actual question on a screen you can arrive at from three places. Drops the word on phones and becomes B-2, so the state line never gets squeezed." />
 
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
           <h2 className="mb-2 text-[15px] font-semibold tracking-tight">What I would take</h2>
           <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
-            <span className="font-semibold text-[var(--text-primary)]">Header A, back button B-4.</span> You asked for
-            longer and B-4 is longer for a reason rather than for balance — it turns the control from a gesture into a
+            <span className="font-semibold text-[var(--text-primary)]">Model M-1, back button BK-4.</span> You asked for
+            longer and BK-4 is longer for a reason rather than for balance — it turns the control from a gesture into a
             destination, which is worth the extra width. If you would rather not carry a translated word in the
-            chrome at all, <span className="font-semibold text-[var(--text-primary)]">B-2</span> is the honest
+            chrome at all, <span className="font-semibold text-[var(--text-primary)]">BK-2</span> is the honest
             second: it answers the ask exactly, costs nothing, and is a one-line change.
           </p>
         </div>

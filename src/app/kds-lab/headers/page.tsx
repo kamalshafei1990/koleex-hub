@@ -436,11 +436,48 @@ export default function HeaderBallot() {
           navigation model, and is drawn only from tokens — so this page in Aurora and the same page
           in Core is the dual-skin proof, not two sets of markup.
         </p>
-        <p className="mb-8 flex items-center gap-2 text-[11px] text-[var(--text-ghost)]">
+        <p className="mb-6 flex items-center gap-2 text-[11px] text-[var(--text-ghost)]">
           <AppsIcon className="h-3 w-3" />
           Currently rendering: <span className="font-semibold text-[#7FA9D6]">{aurora ? "Aurora" : "Core"}</span>
           — switch skin in Settings → Display to judge the other one.
         </p>
+
+        {/* ⚠️ THREE SEPARATE DECISIONS, THREE SEPARATE ID PREFIXES.
+            Round 2 used to be A/B/C while the back buttons were B-1..B-4, so a
+            one-letter answer ("b") pointed at two different things and the work
+            stalled on a question that should never have existed. Prefixes are
+            now unique per decision: H- layout, M- model, BK- back button. */}
+        <div className="mb-10 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+          <h2 className="mb-1 text-[14px] font-semibold tracking-tight">Three decisions, in order</h2>
+          <p className="mb-4 text-[11px] leading-relaxed text-[var(--text-dim)]">
+            Each has its own id prefix, so one answer can never mean two things.
+          </p>
+          <ol className="space-y-3">
+            <li className="flex gap-3">
+              <span className="mt-0.5 shrink-0 rounded-md bg-[#7FA9D6]/12 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[#7FA9D6]">M-1…3</span>
+              <span className="min-w-0 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                <a href="/kds-lab/headers/harmony" className="font-semibold text-[var(--text-primary)] underline decoration-[var(--border-color)] underline-offset-2">The model</a>
+                {" — "}what the app header is FOR, next to the system bar. Decide this first: it decides the rest.
+                <span className="block text-[var(--text-dim)]">M-1 Continuity · M-2 Single bar · M-3 Handoff</span>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-0.5 shrink-0 rounded-md bg-[#7FA9D6]/12 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[#7FA9D6]">H-1…10</span>
+              <span className="min-w-0 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                <span className="font-semibold text-[var(--text-primary)]">The layout</span>
+                {" — "}the ten below. Only some of them fit each model, so this is the second question, not the first.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-0.5 shrink-0 rounded-md bg-[#7FA9D6]/12 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[#7FA9D6]">BK-1…4</span>
+              <span className="min-w-0 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                <a href="/kds-lab/headers/final" className="font-semibold text-[var(--text-primary)] underline decoration-[var(--border-color)] underline-offset-2">The back button</a>
+                {" — "}the length you asked to see longer, shown in place.
+                <span className="block text-[var(--text-dim)]">BK-1 square · BK-2 wider · BK-3 “Back” · BK-4 names its destination</span>
+              </span>
+            </li>
+          </ol>
+        </div>
 
         <Sample id="H-1" title="Command line" model="one 52px row · tabs inline" best="tool apps with ≤4 sections where vertical space is the scarce thing — Inventory counts, Calendar.">
           <H1 />
