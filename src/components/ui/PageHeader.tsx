@@ -235,22 +235,33 @@ export default function PageHeader({
            its own pill strip. kx-bar-host also strips any blur off the host
            itself — a host that filters becomes a backdrop root and starves
            the four layers inside it. */
-        /* --kx-ramp-ext:1rem — the TAIL, and it is measured, not picked. At
-           the 3rem default the ramp ended at y=298 while the first section
-           heading under the bar starts at y=272, so the page's own first line
-           of text sat 26px inside the blur and read as a smudge. 16px of tail
-           clears it with room to spare. Product Data landed on the same
-           number for the same reason: the tail is what "longer" lengthens,
-           and it is the one part of this ramp that can eat real content. */
+        /* TWO VARS, AND THEY TRAVEL TOGETHER. Product Data sets both on its
+           bar. I set only the tail, and that shipped a ramp which measured
+           perfect and showed nothing.
+
+           --kx-ramp-fade:4rem — the FADE, and it has to be an absolute length
+           the moment --kx-ramp-top stretches the layer. The 45% default is a
+           PERCENTAGE OF THE LAYER, and --kx-ramp-top:26rem makes that layer
+           481px tall — so 45% became a 216px fade: the heavy blur's opaque
+           band landed at y=-360..-96, entirely above the viewport, and the
+           only stretch on screen (56..121, behind the tab strip) sat in the
+           near-transparent tail. Owner: "the blur edge disappeared in purchase
+           app." Every probe still passed — layer mounted, four blurs, opacity
+           1, correct rect — because what had gone was the MASK, not the
+           filter. Measure the layers' masks, not just their presence.
+
+           --kx-ramp-ext:1rem — the TAIL, measured. At the 3rem default the
+           ramp ended at y=298 while the first section heading under the bar
+           starts at y=272, so the page's own first line of text sat 26px
+           inside the blur. 16px clears it with room to spare. */
         className={`kx-ph-band sticky top-0 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6 ${
-          ownsRamp ? "kx-bar-host z-20 [--kx-ramp-ext:1rem]" : "z-30"
+          ownsRamp ? "kx-bar-host z-20 [--kx-ramp-top:6rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]" : "z-30"
         }`}
         /* 26rem, the same as Product Data's, and generous on purpose: the
            strip's height changes with the title's wrap and whether a search
            row is present, and anything taller than needed is simply clipped
            above the viewport. Too SHORT is the visible failure — the frost
            would start mid-page. */
-        style={ownsRamp ? ({ ["--kx-ramp-top" as string]: "26rem" }) : undefined}
       >
         {ownsRamp && (
           <div aria-hidden className="kx-glass-bar kx-bar-prog">
