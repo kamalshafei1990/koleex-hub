@@ -176,7 +176,22 @@ export default function PageHeader({
           starts higher on small viewports — addresses the "not organized"
           complaint that the header was dominating the screen. */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-        <div className="flex min-w-0 items-center gap-2 sm:items-start sm:gap-4">
+        {/* ⚠️ ALIGNMENT FOLLOWS THE LINE COUNT, AND M-1 CHANGED THE LINE COUNT.
+            `sm:items-start` is right for a TWO-line block — a 26px title with a
+            subtitle under it should hang from the top of the 40px chips beside
+            it, not float in their middle. But from md up the title is now
+            `sr-only`, so what is left is a SINGLE line, and top-aligning one
+            line against 40px chips leaves it sitting high with a gap under it.
+            Owner, on Purchases: "wht the text not in the middle?"
+
+            So the alignment switches back to centre at exactly the breakpoint
+            where the title disappears — the same `md` that MainHeader and the
+            title itself use. Three places, one breakpoint, on purpose. */}
+        <div
+          className={`flex min-w-0 items-center gap-2 sm:items-start sm:gap-4 ${
+            systemBarNamesThisApp ? "md:items-center" : ""
+          }`}
+        >
           {/* BK-4 — THE BACK BUTTON NAMES ITS DESTINATION (owner pick,
               2026-08-15: "i think the back button can be little longer").
 
