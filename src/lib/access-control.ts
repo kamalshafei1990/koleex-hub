@@ -477,6 +477,17 @@ export function withDefaults(
       out_of_office:
         p.calendar?.out_of_office ?? DEFAULT_PREFERENCES.calendar.out_of_office,
     },
+    /* CARRIED THROUGH, and the reason is a bug this function caused the day
+       the key was added. withDefaults rebuilds preferences key by key, so any
+       key it does not name is DROPPED — and fifteen call sites save
+       `withDefaults(account.preferences)` wholesale. Every one of them was
+       therefore deleting the stored wallpaper: choosing a ground and then
+       switching language wiped the choice, silently, in the database.
+
+       Adding a key to AccountPreferences means adding it here too. The
+       Required<> on DEFAULT_PREFERENCES catches a missing DEFAULT; nothing
+       catches a missing passthrough, which is why this comment exists. */
+    wallpaper: p.wallpaper ?? DEFAULT_PREFERENCES.wallpaper,
   };
 }
 

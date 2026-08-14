@@ -256,7 +256,7 @@ function SettingsContent() {
       id: "wallpaper", label: t("nav.wallpaper"), subtitle: t("nav.wallpaper.sub"),
       value: wallpaperLabel,
       icon: <PictureIcon className="h-3.5 w-3.5" />,
-      node: <WallpaperTab account={account} />,
+      node: <WallpaperTab account={account} onChanged={onChanged} />,
     },
     {
       id: "sounds", label: t("nav.sounds"), subtitle: t("nav.sounds.sub"),

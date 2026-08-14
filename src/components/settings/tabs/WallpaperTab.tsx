@@ -53,7 +53,9 @@ const GROUPS: { id: WallpaperGroup; labelKey: string; footerKey?: string }[] = [
   { id: "still", labelKey: "wp.group.still" },
 ];
 
-export default function WallpaperTab({ account }: { account: AccountWithLinks }) {
+export default function WallpaperTab(
+  { account, onChanged }: { account: AccountWithLinks; onChanged?: () => void },
+) {
   const { t } = useTranslation(settingsT);
   const current = useWallpaper();
   const theme = getTheme();
@@ -67,7 +69,14 @@ export default function WallpaperTab({ account }: { account: AccountWithLinks })
   const choose = (next: WallpaperPref) => {
     announceWallpaper(next);
     const prefs = withDefaults(account.preferences);
-    void updateAccountPreferences(account.id, { ...prefs, wallpaper: next });
+    /* REFRESH AFTER THE SAVE, and it is not politeness — it is the second half
+       of a bug. Every settings writer sends `withDefaults(account.preferences)`
+       WHOLESALE, so a writer holding a stale account re-saves the wallpaper it
+       was loaded with and undoes a newer choice. Measured: pick Ember, switch
+       language, reload — the ground came back Tide. Telling identity the
+       account moved keeps the next writer's copy current. */
+    void updateAccountPreferences(account.id, { ...prefs, wallpaper: next })
+      .then(() => onChanged?.());
   };
 
   const pick = (w: Wallpaper) => choose({
