@@ -16,7 +16,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/kds/useToast";
 import FormModal from "@/components/kds/FormModal";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -713,31 +713,30 @@ export default function RolesPage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* Header */}
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <AppIcon appId="roles" className="h-4 w-4" size={16} />
-            </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              {t("app.title")}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => { setEditRole(null); setShowRoleModal(true); }}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-            >
-              <PlusIcon className="h-4 w-4" /> {t("btn.newRole")}
-            </button>
-          </div>
+        {/* Shared header. The identity block here was a copy of it, so this
+            screen never received the longer BK-4 back button and was still
+            printing "Roles" under a system bar already saying "Roles".
+
+            The New-role button keeps its exact markup and handler — it moves
+            into `action`, which is the slot the shared header already has for
+            it. The subtitle was already a count, which is the state line M-1
+            wants, so nothing had to be invented. */}
+        <div className="mb-6 md:mb-8">
+          <PageHeader
+            title={t("app.title")}
+            subtitle={`${totalRoles} ${totalRoles === 1 ? t("app.subtitle.one") : t("app.subtitle.many")}`}
+            icon={<AppIcon appId="roles" className="h-4 w-4" size={16} />}
+            showTabs={false}
+            action={
+              <button
+                onClick={() => { setEditRole(null); setShowRoleModal(true); }}
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
+              >
+                <PlusIcon className="h-4 w-4" /> {t("btn.newRole")}
+              </button>
+            }
+          />
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {totalRoles} {totalRoles === 1 ? t("app.subtitle.one") : t("app.subtitle.many")}
-        </p>
 
         {/* Search + Filters */}
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
