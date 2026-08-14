@@ -352,6 +352,10 @@ export interface AccountPreferences {
   notifications?: NotificationPrefs;
   calendar?: CalendarPrefs;
   profile?: ProfilePrefs;
+  /* The ground behind every screen. Typed loosely here on purpose: the shape
+     lives in lib/wallpaper.ts, and importing it would drag the catalogue into
+     everything that reads an account. Absent means the Aurora wave field. */
+  wallpaper?: { id: string; photoUrl?: string; photoPath?: string; fit?: string; dim?: number };
 }
 
 /**
