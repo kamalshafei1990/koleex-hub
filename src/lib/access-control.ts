@@ -369,6 +369,10 @@ export const DEFAULT_PREFERENCES: Required<
   language: "en",
   theme: "system",
   email_signature: "",
+  /* The Aurora wave field. Spelled out rather than left undefined so the
+     Required<> above keeps forcing this list to stay complete — that
+     constraint is what caught this key being added with no default. */
+  wallpaper: { id: "hub-live" },
   profile: { pronouns: "", links: {} },
   notifications: {
     email: true,
