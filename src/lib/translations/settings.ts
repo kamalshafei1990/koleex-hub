@@ -40,6 +40,9 @@ export const settingsT: Translations = {
   "nav.region.sub":       { en: "Date, time, number formats", zh: "日期、时间、数字格式", ar: "تنسيقات التاريخ والوقت والأرقام" },
   "nav.notifications":    { en: "Notification preferences", zh: "通知偏好", ar: "تفضيلات الإشعارات" },
   "nav.notifications.sub":{ en: "Channels and per-activity", zh: "渠道与按活动设置", ar: "القنوات وحسب النشاط" },
+  /* Shown on the master row only when something IS muted — see the note where
+     mutedCount is computed. {n} is replaced with the count. */
+  "nav.notifications.muted": { en: "{n} muted", zh: "已静音 {n} 项", ar: "{n} مكتوم" },
   "nav.push":             { en: "Push notifications", zh: "推送通知", ar: "الإشعارات الفورية" },
   "nav.push.sub":         { en: "Devices and alerts", zh: "设备与提醒", ar: "الأجهزة والتنبيهات" },
   "nav.password":         { en: "Password", zh: "密码", ar: "كلمة المرور" },

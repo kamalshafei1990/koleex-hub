@@ -27,7 +27,9 @@ import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import AuthGate from "@/components/admin/AuthGate";
-import { useSkin } from "@/lib/appearance";
+import { useSkin, SKINS } from "@/lib/appearance";
+import { withDefaults } from "@/lib/access-control";
+import type { NotificationPrefs } from "@/lib/access-control";
 import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
@@ -48,7 +50,6 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { Chevron } from "@/components/settings/tabs/ui";
-import type { AccountWithLinks } from "@/types/supabase";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -90,10 +91,17 @@ const StampSignatureTab = dynamic(() => import("@/components/settings/tabs/Stamp
 const AdminTab          = dynamic(() => import("@/components/settings/tabs/AdminTab"),          { loading: tabLoading });
 const AboutTab          = dynamic(() => import("@/components/settings/tabs/AboutTab"),          { loading: tabLoading });
 
+/* Language names in their own script, the way the switcher shows them — a
+   reader scanning for "العربية" should find the word they picked, not a
+   translation of it. */
+const LANG_LABEL: Record<string, string> = { en: "English", zh: "中文", ar: "العربية" };
+
 type Tab = "profile" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
+  /** Current state for the master list — free to compute, never fetched. */
+  value?: string;
   icon: React.ReactNode; node: React.ReactNode;
 };
 
@@ -125,9 +133,10 @@ function capitalize(s: string) {
    --------------------------------------------------------------------------- */
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
-  const { t } = useTranslation(settingsT);
+  const { t, lang } = useTranslation(settingsT);
   const { data: boot } = useMeBootstrap();
-  const aurora = useSkin() === "aurora";
+  const skin = useSkin();
+  const aurora = skin === "aurora";
   const isSA = !!boot?.isSuperAdmin;
   const [tab, setTab] = useState<Tab>("profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
@@ -149,6 +158,30 @@ function SettingsContent() {
     .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   const roleLine = account.role?.name || capitalize(account.user_type);
 
+  /* ROW VALUES — FREE OR NOT AT ALL.
+     The point of a value is that the list can be read without opening
+     anything; the trap is paying for that with a request per row, which would
+     undo Phase 0 exactly. So every value here comes from state this page has
+     already loaded — the skin from useSkin, the language from useTranslation,
+     the formats from account.preferences, which arrives with the account.
+
+     Deliberately left blank: Push notifications (needs the subscription
+     state), Signature & stamp (needs the stored asset), Login history and
+     Privacy (a log and a set of actions have no single state), Password. A
+     blank is honest. Three true values beat eight with two guesses in them,
+     and a wrong value is worse than none — it is read as fact. */
+  const skinLabel = SKINS.find((s) => s.value === skin)?.[lang] ?? "";
+  const langLabel = LANG_LABEL[lang] ?? "";
+  /* Notifications reports what is SILENCED, not what is on. Per-activity
+     toggles default to on and stay undefined until touched, so a count of the
+     enabled ones would read "17" for a user who has never opened the screen —
+     technically true, and useless. What a reader wants to know is whether
+     anything is being held back, so the row is blank when nothing is. */
+  const notifPrefs = withDefaults(account.preferences).notifications as NotificationPrefs;
+  const mutedCount = Object.entries(notifPrefs).filter(
+    ([k, v]) => k !== "email" && k !== "in_app" && v === false,
+  ).length;
+
   const sections: SectionDef[] = [
     {
       id: "profile", label: t("nav.profile"), subtitle: t("nav.profile.sub"),
@@ -162,6 +195,7 @@ function SettingsContent() {
     },
     {
       id: "display", label: t("nav.display"), subtitle: t("nav.display.sub"),
+      value: skinLabel,
       icon: <PaletteIcon className="h-3.5 w-3.5" />,
       node: <DisplayTab account={account} onChanged={onChanged} />,
     },
@@ -172,11 +206,13 @@ function SettingsContent() {
     },
     {
       id: "region", label: t("nav.region"), subtitle: t("nav.region.sub"),
+      value: langLabel,
       icon: <GlobeIcon className="h-3.5 w-3.5" />,
       node: <RegionTab account={account} onChanged={onChanged} />,
     },
     {
       id: "notifications", label: t("nav.notifications"), subtitle: t("nav.notifications.sub"),
+      value: mutedCount > 0 ? t("nav.notifications.muted").replace("{n}", String(mutedCount)) : undefined,
       icon: <BellIcon className="h-3.5 w-3.5" />,
       node: <NotificationsTab account={account} onChanged={onChanged} />,
     },
@@ -388,6 +424,7 @@ function MasterGroup({
             icon={s.icon}
             label={s.label}
             subtitle={s.subtitle}
+            value={s.value}
             isLast={i === items.length - 1}
           />
         ))}
@@ -399,10 +436,12 @@ function MasterGroup({
 /* ─────────────── iOS-style disclosure row ─────────────── */
 
 function SettingsRow({
-  active, onClick, href, icon, label, subtitle, isLast,
+  active, onClick, href, icon, label, subtitle, value, isLast,
 }: {
   active?: boolean; onClick?: () => void; href?: string;
-  icon: React.ReactNode; label: string; subtitle?: string; isLast?: boolean;
+  icon: React.ReactNode; label: string; subtitle?: string;
+  /** Current state, shown at the inline end. Omit when the row has none. */
+  value?: string; isLast?: boolean;
 }) {
   const aurora = useSkin() === "aurora";
   const inner = (
@@ -425,6 +464,14 @@ function SettingsRow({
         <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">{label}</span>
         {subtitle && <span className="block text-[11px] text-[var(--text-dim)] truncate">{subtitle}</span>}
       </span>
+      {/* The row's current state, so the list can be READ instead of opened —
+          the reference's central habit (WLAN "Not Connected", iCloud "50 GB").
+          Rendered only when there is one: a row with no state shows nothing,
+          never an em dash, which would be a value meaning "empty" rather than
+          the absence of a value. */}
+      {value && (
+        <span className="shrink-0 text-[12px] text-[var(--text-dim)] truncate max-w-[40%]">{value}</span>
+      )}
       <Chevron className="text-[var(--text-faint)] shrink-0" />
     </>
   );
