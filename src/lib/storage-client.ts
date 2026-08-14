@@ -34,7 +34,19 @@ export interface UploadResult {
  *  function, whose request body the platform hard-caps at 4.5MB. Set below the
  *  cap, not at it: multipart framing adds overhead, so a 4.4MB file is already
  *  over the wire limit. */
-const DIRECT_UPLOAD_THRESHOLD = 3.5 * 1024 * 1024;
+/* THE SERVER ROUTE IS THE ONE THAT WORKS, so send as much through it as the
+   platform allows. Production logs settled this: /api/storage/signed-upload
+   answers 200 every single time and /api/storage/upload answers 200 too — it
+   is the browser's DIRECT PUT to Supabase Storage, the one hop that never
+   touches us, that fails. Small files upload; large ones do not.
+
+   4.2MB against the platform's 4.5MB body cap, leaving room for the multipart
+   envelope. Was 3.5MB, which pushed a whole band of ordinary documents onto
+   the broken path for no reason. */
+const DIRECT_UPLOAD_THRESHOLD = 4.2 * 1024 * 1024;
+
+/** Anything at or under this can still be retried through the server route. */
+const SERVER_ROUTE_MAX = 4.2 * 1024 * 1024;
 
 /**
  * Upload a large file by having the SERVER mint a one-shot signed URL and the
@@ -148,18 +160,31 @@ export async function uploadToStorage(
     lastError = res.error;
     if (!res.retryable) return { ok: false, error: `${res.error} (${mb}MB, ${route})` };
   }
-  return { ok: false, error: `${lastError} (${mb}MB, ${route}, 2 attempts)` };
+  const tooBigForServer = file.size > SERVER_ROUTE_MAX
+    ? " — this file is above the size our server route can carry, and the direct link to storage is not responding."
+    : "";
+  return { ok: false, error: `${lastError} (${mb}MB, ${route})${tooBigForServer}` };
 }
 
 async function uploadOnce(
   bucket: string,
   path: string,
   file: Blob | File,
-  options: UploadOptions,
+  options: UploadOptions & { __forceServer?: boolean },
 ): Promise<{ ok: true; data: UploadResult } | { ok: false; error: string; retryable: boolean }> {
-  if (file.size >= DIRECT_UPLOAD_THRESHOLD) {
+  if (file.size >= DIRECT_UPLOAD_THRESHOLD && !options.__forceServer) {
     const direct = await uploadDirectToStorage(bucket, path, file, options);
-    return direct.ok ? direct : { ...direct, retryable: direct.error.startsWith("Network error") };
+    if (direct.ok) return direct;
+    /* FALL BACK ONTO THE ROUTE THAT WORKS. The direct PUT goes browser →
+       Supabase with nothing of ours in between, so when that link is the
+       broken one there is nothing to retry against — repeating it just fails
+       again more slowly. If the file still fits through our own function,
+       send it that way instead. */
+    if (file.size <= SERVER_ROUTE_MAX && direct.error.startsWith("Network error")) {
+      const viaServer = await uploadOnce(bucket, path, file, { ...options, __forceServer: true } as UploadOptions);
+      if (viaServer.ok) return viaServer;
+    }
+    return { ...direct, retryable: false };
   }
 
   const form = new FormData();
