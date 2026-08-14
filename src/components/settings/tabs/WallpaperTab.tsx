@@ -24,7 +24,7 @@
      the Hub unreadable rather than merely busy. Uploads keep a minimum dim
      that the slider cannot go under. */
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
@@ -64,21 +64,57 @@ export default function WallpaperTab(
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /* Applied immediately and saved in the background — the whole app is the
-     preview, so a Save button would mean choosing a wallpaper you cannot see.
-     Same contract as Display & accessibility. */
-  const choose = (next: WallpaperPref) => {
-    announceWallpaper(next);
+  /* ── applying vs saving, and why they are no longer the same act ──────────
+     They were, and it was a bug the owner caught by pointing at the slider.
+     Every change called announce + save, which is fine for a tile you tap once
+     and catastrophic for a control you DRAG: measured on one sweep of the
+     Readability slider, 0 to 90 at step 2, this issued **135 preference
+     requests** — a PATCH per step, plus the identity refresh each one triggers
+     — and the queue fell so far behind that the persisted value was 64 while
+     the thumb sat at 90. A flood that also saves the wrong number.
+
+     Split in two, because the two halves want opposite things:
+       · APPLYING is instant and free. announceWallpaper only writes the
+         localStorage mirror and fires an event, so the ground follows the
+         thumb with no network at all.
+       · SAVING is debounced to one write once the hand stops moving.
+     Nothing about the preview changes; the only thing that got slower is the
+     part nobody can see. */
+  const savePref = useRef<WallpaperPref | null>(null);
+  const saveTimer = useRef<number | null>(null);
+
+  const flush = useCallback(() => {
+    const next = savePref.current;
+    savePref.current = null;
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (!next) return;
     const prefs = withDefaults(account.preferences);
     /* REFRESH AFTER THE SAVE, and it is not politeness — it is the second half
-       of a bug. Every settings writer sends `withDefaults(account.preferences)`
-       WHOLESALE, so a writer holding a stale account re-saves the wallpaper it
-       was loaded with and undoes a newer choice. Measured: pick Ember, switch
-       language, reload — the ground came back Tide. Telling identity the
-       account moved keeps the next writer's copy current. */
+       of an earlier bug. Every settings writer sends
+       `withDefaults(account.preferences)` WHOLESALE, so a writer holding a
+       stale account re-saves the wallpaper it was loaded with and undoes a
+       newer choice. Measured: pick Ember, switch language, reload — the ground
+       came back Tide. Telling identity the account moved keeps the next
+       writer's copy current. */
     void updateAccountPreferences(account.id, { ...prefs, wallpaper: next })
       .then(() => onChanged?.());
-  };
+  }, [account, onChanged]);
+
+  const choose = useCallback((next: WallpaperPref) => {
+    announceWallpaper(next);                 // instant, and never touches the network
+    savePref.current = next;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(flush, 500);
+  }, [flush]);
+
+  /* Leaving mid-drag must not lose the choice: the debounce is an optimisation,
+     not a reason to drop a write. Flushed on unmount, and on the browser
+     closing under it. */
+  useEffect(() => {
+    const onLeave = () => flush();
+    window.addEventListener("pagehide", onLeave);
+    return () => { window.removeEventListener("pagehide", onLeave); flush(); };
+  }, [flush]);
 
   const pick = (w: Wallpaper) => choose({
     id: w.id,
