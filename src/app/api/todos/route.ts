@@ -61,18 +61,65 @@ export async function GET(req: Request) {
     if (ids.length === 0) {
       return NextResponse.json({ ok: true, data: { open: 0 } });
     }
+    /* A RAW ROW COUNT IS NOT WHAT THE USER SEES. A recurring task is stored
+       as ONE ROW PER PERIOD, and the list collapses the dead ones — a period
+       nobody acted on that has already been superseded carries nothing the
+       newest one doesn't. Counting rows made the badge say 36 while the app
+       showed an empty list, because 36 of them were untouched past periods of
+       a handful of repeating tasks. Owner: "still 36 and the to-do app have
+       no any tasks not done."
+
+       So the same collapse rule runs here. Keep a period only if it is the
+       NEWEST in its series or someone actually touched it — finished it,
+       moved it off "todo", submitted it for approval, or wrote a note. The
+       badge and the list now answer the same question. */
     let q = supabaseServer
       .from("koleex_todos")
-      .select("*", { count: "exact", head: true })
+      .select("id, status, completed, approval_state, series_cadence, recurrence_parent_id, series_period")
       .in("id", ids)
       .neq("status", "done");
     if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
-    const { count, error } = await q;
+    const { data: openRows, error } = await q;
     if (error) {
       console.error("[api/todos GET openCount]", error.message);
       return NextResponse.json({ ok: true, data: { open: 0 } });
     }
-    return NextResponse.json({ ok: true, data: { open: count ?? 0 } });
+    type OpenRow = {
+      id: string; status: string | null; completed: boolean | null;
+      approval_state: string | null; series_cadence: string | null;
+      recurrence_parent_id: string | null; series_period: string | null;
+    };
+    const rows = (openRows ?? []) as OpenRow[];
+    const series = rows.filter((r) => r.series_cadence);
+    if (series.length === 0) {
+      return NextResponse.json({ ok: true, data: { open: rows.length } });
+    }
+    /* Which periods carry a note? Only asked for when a series is involved. */
+    const { data: noteRows } = await supabaseServer
+      .from("koleex_todo_notes")
+      .select("todo_id")
+      .in("todo_id", series.map((r) => r.id));
+    const hasNote = new Set(((noteRows ?? []) as Array<{ todo_id: string }>).map((n) => n.todo_id));
+
+    const newestPerSeries = new Map<string, string>();
+    for (const r of rows) {
+      if (!r.series_cadence) continue;
+      const key = r.recurrence_parent_id ?? r.id;
+      const period = r.series_period ?? "";
+      if (period > (newestPerSeries.get(key) ?? "")) newestPerSeries.set(key, period);
+    }
+    const open = rows.filter((r) => {
+      if (!r.series_cadence) return true;
+      const key = r.recurrence_parent_id ?? r.id;
+      if ((r.series_period ?? "") === newestPerSeries.get(key)) return true;
+      const touched =
+        r.completed === true ||
+        (r.status !== null && r.status !== "todo") ||
+        r.approval_state !== null ||
+        hasNote.has(r.id);
+      return touched;
+    }).length;
+    return NextResponse.json({ ok: true, data: { open } });
   }
 
   // Step 1: resolve the set of todo_ids the caller is an assignee of,
