@@ -51,9 +51,17 @@
  *  priority: earlier entries are dropped first because they are the cheapest
  *  to refetch and the least likely to be needed on the very next screen. */
 const CACHE_PREFIXES: readonly string[] = [
-  "kx_contacts_v1:",      // biggest by far, and refetched on entering Contacts
+  "kx_contacts_v1:",      // legacy copies only — this cache lives in IndexedDB
+                          // now (idb-cache.ts); listed so any left behind by an
+                          // older build are still evictable rather than stuck.
   "kx_products_list_v1:",
   "kx_products_meta_v1:",
+  "kx_products_models_v1:",  // added 2026-08-15: found holding 23 KB while the
+  "kx_products_imgs_v1:",    // guard treated all three as precious, because an
+  "kx_class_icons_v1:",      // unlisted key defaults to KEEP. All three are
+                             // rebuilt from the server on the next fetch, so
+                             // they are cache and belong here — 103 KB that was
+                             // previously unreclaimable.
   "kx_vb_v1",             // visual library
   "kx_todo_snap_v1",
   "kx:taxo:",             // taxonomy + logos — small, cheap, and rarely stale

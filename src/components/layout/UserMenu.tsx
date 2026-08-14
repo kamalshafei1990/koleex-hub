@@ -212,7 +212,11 @@ export default function UserMenu({ dk }: { dk: boolean }) {
        would otherwise survive; the legacy path hard-reloads (drops the
        QueryClient) but localStorage survives a reload, so both paths need this. */
     try { queryClient.clear(); } catch { /* ignore */ }
-    clearSessionScopedCaches();
+    /* AWAITED on purpose — the contacts directory lives in IndexedDB now and
+       deleting from there is async. Not awaiting lets the legacy path's hard
+       reload below cut the delete short, which would leave the previous user's
+       directory readable by the next one on a shared device. */
+    await clearSessionScopedCaches();
     if (identity.mode === "supabase") {
       const { signOut: supabaseSignOut } = await import("@/lib/auth-client");
       await supabaseSignOut();

@@ -4,9 +4,11 @@
    session-caches — wipe tenant/account-scoped client caches on sign-out.
    (Phase 4 — Platform Speed Max-Out, Workstream 3: safe cache strategy)
 
-   The Hub keeps warm-start caches in localStorage/sessionStorage (products,
-   contacts, customers/suppliers directories, supplier coverage/taxonomy, the
-   me-bootstrap identity payload, the SA tenant override) plus a single
+   The Hub keeps warm-start caches in localStorage/sessionStorage — and, since
+   the contacts directory outgrew the localStorage quota, in IndexedDB too
+   (products, contacts, customers/suppliers directories, supplier
+   coverage/taxonomy, the me-bootstrap identity payload, the SA tenant
+   override) plus a single
    long-lived TanStack QueryClient. On a Supabase-mode sign-out the app did a
    SOFT navigation (router.replace) — so none of that was cleared and the next
    session (or a different user on a shared device) could paint the previous
@@ -30,7 +32,7 @@ import { clearScopeContextCache } from "@/lib/scope";
    customers/suppliers lists+views, supplier coverage/taxonomy, taxo, compare);
    `koleex.sa.` = the super-admin active-tenant override. me-bootstrap and the
    scope cache are cleared via their own helpers below. */
-const SCOPED_PREFIXES = ["kx_", "kx:", "koleex.sa."];
+const SCOPED_PREFIXES = ["kx_", "kx:", "koleex.sa."] as const;
 
 function clearByPrefix(store: Storage): void {
   try {
@@ -48,8 +50,15 @@ function clearByPrefix(store: Storage): void {
 /** Clear every tenant/account-scoped client cache. Call on sign-out (and on
     account/tenant/view-as switch where a session boundary is crossed). Pair
     with `queryClient.clear()` at the call site to also drop in-memory query
-    data. Best-effort and idempotent. */
-export function clearSessionScopedCaches(): void {
+    data. Best-effort and idempotent.
+
+    ⚠️ AWAIT IT. The synchronous stores are wiped before this returns, but the
+    contacts directory now lives in IndexedDB (see `idb-cache.ts`) and deleting
+    from there is asynchronous. The returned promise covers that. Signing out
+    without awaiting leaves a window in which the legacy path's hard reload can
+    cut the delete short — and the whole point of this file is that the next
+    user on a shared device cannot paint the previous user's data. */
+export async function clearSessionScopedCaches(): Promise<void> {
   try { invalidateMeBootstrap(); } catch { /* ignore */ }
   try { clearScopeContextCache(); } catch { /* ignore */ }
   /* Coalesced reference payloads (/api/me/permissions, departments, ...) are
@@ -58,4 +67,10 @@ export function clearSessionScopedCaches(): void {
   if (typeof window === "undefined") return;
   clearByPrefix(window.localStorage);
   clearByPrefix(window.sessionStorage);
+  /* Same prefixes, third store. Imported lazily so sign-out stays the only
+     thing that pulls IndexedDB into the shell bundle. */
+  try {
+    const { clearScopedIdbCaches } = await import("@/lib/idb-cache");
+    await clearScopedIdbCaches(SCOPED_PREFIXES);
+  } catch { /* IndexedDB unavailable — the localStorage sweep above covered it */ }
 }

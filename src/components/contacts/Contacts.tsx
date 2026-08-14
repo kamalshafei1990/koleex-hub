@@ -5402,21 +5402,33 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       setLoading(false);
       return;
     }
-    /* PERF — warm start: paint the last-known directory instantly from
-       localStorage (same pattern as the hub bootstrap warm-start), then
-       refresh from the network in the background and silently replace it.
-       Keyed by tenant + contact type so no cross-tenant/cross-app bleed. */
+    /* PERF — warm start: paint the last-known directory instantly from cache
+       (same pattern as the hub bootstrap warm-start), then refresh from the
+       network in the background and silently replace it. Keyed by tenant +
+       contact type so no cross-tenant/cross-app bleed.
+
+       ⚠️ THE CACHE LIVES IN INDEXEDDB, NOT localStorage, AND THAT IS NOT
+       INTERCHANGEABLE HERE. Measured: 5.9 KB per contact, so the 6,000-contact
+       target is ~35 MB on this key alone against a ~5 MB localStorage quota —
+       the write simply started throwing and the warm start silently stopped
+       happening. IndexedDB has no such ceiling, and being async it also stops a
+       multi-megabyte read blocking the main thread.
+
+       Safe to be async ONLY because this read already sits in an effect behind
+       a loading state — the screen is not waiting on it mid-render, so nothing
+       moves when it lands. A cache read by a lazy useState initialiser could
+       not move here; see the note in idb-cache.ts. `idbGet` also migrates any
+       value the previous build left in localStorage, so the first load after
+       deploy is still warm. */
     const cacheKey = `kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`;
     let paintedFromCache = false;
     try {
-      const raw = localStorage.getItem(cacheKey);
-      if (raw) {
-        const cached = JSON.parse(raw) as ContactRow[];
-        if (Array.isArray(cached) && cached.length) {
-          setContacts(cached);
-          setLoading(false);
-          paintedFromCache = true;
-        }
+      const { idbGet } = await import("@/lib/idb-cache");
+      const cached = await idbGet<ContactRow[]>(cacheKey);
+      if (Array.isArray(cached) && cached.length) {
+        setContacts(cached);
+        setLoading(false);
+        paintedFromCache = true;
       }
     } catch { /* corrupt/absent cache → normal load path */ }
     /* Painted from cache → the rows on screen are last visit's. Say so with a
@@ -5450,11 +5462,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const slim = data.filter(c => c.contact_type !== "employee");
       setContacts(slim);
       setLoading(false);
-      /* Refresh the warm-start cache (skip oversized payloads — quota safety). */
-      try {
-        const json = JSON.stringify(slim);
-        if (json.length < 2_500_000) localStorage.setItem(cacheKey, json);
-      } catch { /* quota exceeded → next visit just cold-loads */ }
+      /* Refresh the warm-start cache. Same store as the other write below —
+         ⚠️ THERE ARE TWO WRITERS ON THIS KEY and they must not diverge: this
+         one runs on the plain fetch path, the other after the avatar merge. A
+         bare `localStorage.setItem` guarded by `json.length < 2_500_000` lived
+         here until 2026-08-15 and was the survivor of the earlier quota fix,
+         which only converted the other one — so this path kept refilling
+         localStorage with a 2 MB copy of a cache that had already moved. If
+         you change where this cache lives, change BOTH. */
+      void import("@/lib/idb-cache").then(({ idbSet }) => { idbSet(cacheKey, slim); })
+        .catch(() => { /* cache is an optimisation — never fail the load for it */ });
       /* The list endpoint drops heavy base64 avatars so the response stays under
          the function size limit. Lazy-load the real logos in small batches and
          merge them in, so the directory paints instantly and logos stream in. */
@@ -5529,19 +5546,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       } as ContactRow;
     });
     setContacts(merged);
-    try {
-      const json = JSON.stringify(slim);
-      /* setCache, not setItem. The old per-key `< 2_500_000` guard was correct
-         for ONE key but this cache is written once per FILTER (:all, :customer,
-         :supplier) — three keys individually "under the limit" can reach 7.5 MB
-         against a ~5 MB quota, and measured live they held 3,785 KB of a
-         4,568 KB total. setCache prunes rebuildable cache and retries on
-         QuotaExceeded instead of silently giving up, which is what kept the
-         warm start dying without a trace. */
-      void import("@/lib/storage-guard").then(({ setCache }) => {
-        setCache(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
-      }).catch(() => { /* cache is an optimisation — never fail the render for it */ });
-    } catch { /* quota → next visit cold-loads */ }
+    /* Written to IndexedDB, and the reasons are cumulative:
+
+       · SIZE — this cache is written once per FILTER (:all, :customer,
+         :supplier). At 5.9 KB per contact and a 6,000-contact target that is
+         ~35 MB on the `:all` key alone; localStorage gave us ~5 MB for all
+         three, so the writes had begun throwing QuotaExceeded into an empty
+         catch and the warm start had silently stopped happening.
+       · COST — localStorage is synchronous, so even a write that fits blocks
+         the main thread while it serialises. This one does not.
+       · SHAPE — `slim` is stored as an object, not a JSON string. IndexedDB
+         structured-clones it, so JSON.stringify is pure waste here and would
+         double the payload in memory while writing.
+
+       ⚠️ This is tenant data and it now lives in a third store. It is covered
+       by the sign-out wipe through `clearSessionScopedCaches` → the `kx_`
+       prefix — do not rename this key out of that prefix. */
+    void import("@/lib/idb-cache").then(({ idbSet }) => {
+      idbSet(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, slim);
+    }).catch(() => { /* cache is an optimisation — never fail the render for it */ });
     // Fetch logos only for genuinely new rows (avoids per-poll avatar churn).
     const missing = merged.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
     if (missing.length) {
