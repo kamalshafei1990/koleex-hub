@@ -1983,7 +1983,14 @@ export default function ProductList() {
               "Product Data" to "Pr…". The actions now take a row of their own
               below (w-full forces the wrap), so the title gets the full width
               of the first row. Desktop is untouched — one row, as before. */}
-          <div className="flex items-center gap-2 shrink-0 max-sm:w-full max-sm:mt-2">
+          {/* NO LONGER A ROW OF ITS OWN ON A PHONE. Giving the actions their
+              own line cost a full band and let Add Product take 295px of a
+              375px screen — 79% of the width for one button, the heaviest
+              object on a page whose job is showing products. Below `sm` it
+              becomes an icon, like Settings beside it, and both ride the title
+              line: back+icon+title needs ~184px there, leaving room for two
+              40px buttons. The label stays in aria-label and title. */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* Settings + Add are admin tools — only surface them on
                 the internal /product-data path. The public /products
                 catalog is read-only for customers. */}
@@ -1997,8 +2004,14 @@ export default function ProductList() {
                     Database app (Database › Visual Library › Specs & Attributes;
                     /product-data/visual-mapping already redirects there), so a
                     duplicate entry point here was just header clutter. */}
-                <Link href={`${baseRoute}/new`} className="h-10 px-5 max-sm:flex-1 max-sm:justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg">
-                  <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
+                <Link
+                  href={`${baseRoute}/new`}
+                  aria-label={t("action.addProduct")}
+                  title={t("action.addProduct")}
+                  className="h-10 px-5 max-sm:w-10 max-sm:px-0 max-sm:justify-center shrink-0 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg"
+                >
+                  <PlusIcon className="h-4 w-4 shrink-0" />
+                  <span className="max-sm:hidden">{t("action.addProduct")}</span>
                 </Link>
               </>
             )}
@@ -2007,35 +2020,6 @@ export default function ProductList() {
         {/* Long catalogues need a way back up — one control serves both
             /products and /product-data since they share this component. */}
         <BackToTop label={t("list.backToTop", "Back to top")} />
-        {/* Phone only — from `sm` up these two facts sit on the title line. */}
-        <p className="sm:hidden relative z-30 text-[12px] text-[var(--text-dim)] mb-1 ml-0 flex items-center gap-2 flex-wrap">
-          <span>
-            {/* The server's exact count, not how many rows happen to be
-                loaded — with paging those are different numbers, and the one
-                the operator wants is "how big is the catalogue". Falls back
-                to the loaded count while the first page is still in flight
-                (warm-start paint) or if the endpoint returned no count. */}
-            {total ?? (isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}{" "}
-            {t("list.countInCatalog")}
-          </span>
-          {/* The rate every "≈ $" on this page was computed with. Shown once,
-              here, rather than repeated on sixty cards — but shown, because a
-              converted figure whose rate you cannot see is a number you have
-              to take on trust. */}
-          {fx && (
-            <span
-              className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] text-[var(--text-subtle)] tabular-nums"
-              title={fxTitle}
-            >
-              {formatRate(fx.rate)}
-              {fx.source === "fallback" && (
-                <span className="ms-1 text-[var(--text-ghost)]">
-                  {t("list.fxOffline", "(offline)")}
-                </span>
-              )}
-            </span>
-          )}
-        </p>
 
         {/* Search + Filters — sticky to the top of the viewport so
             the user can refine the query without scrolling back up.
@@ -2294,6 +2278,26 @@ export default function ProductList() {
                 <CrossIcon className="h-3 w-3" /> Clear
               </button>
             )}
+            {/* Phone only — from `sm` up these two facts ride the title line.
+                They sit at the END of this row rather than in a band of their
+                own: the row carried just the view switch and Filters, 177px of
+                controls in a 375px line, so 166px sat empty while this text
+                paid for a whole band above it. Two half-empty rows became one
+                full one. `ms-auto` pushes them to the far edge, and RTL flips
+                with it because it is a logical property. */}
+            <p className="sm:hidden ms-auto flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
+              <span className="tabular-nums">
+                {total ?? (isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}
+              </span>
+              {fx && (
+                <span
+                  className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] text-[var(--text-subtle)] tabular-nums"
+                  title={fxTitle}
+                >
+                  {formatRate(fx.rate)}
+                </span>
+              )}
+            </p>
           </div>
 
           {showFilters && (
