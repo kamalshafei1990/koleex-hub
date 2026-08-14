@@ -219,17 +219,27 @@ Held to, all of it:
 - Did not restyle anything outside Settings
 - Did not change what any setting *does* — only where it lives and how it reads
 
-**Left on the table**, in the order I would take them:
+**Left on the table** — checked against the code this time, because the first
+draft of this list was not:
 
-1. **Focus / modes.** The largest idea in the reference and the one Koleex has
-   no equivalent of: a named profile bundling who may interrupt you, which
-   appearance, and when it turns on. Its own project.
-2. **The two SettingsRow components.** `tabs/ui.tsx` has the new one; the
-   master list in `page.tsx` still has its own. Merging them is a behaviour
-   change, which is why Phase 2 deliberately left it — but they will drift.
-3. **More row values.** Seven rows are blank because their state needs a
-   request. Push notifications and Signature & stamp are the two worth paying
-   for, if their state can ride an existing call rather than a new one.
-4. **The live region preview.** The reference shows a worked example of the
-   chosen date / number / currency formats. We have the formats and three
-   languages; we do not show the result.
+1. **More row values.** Seven master rows are blank because their state needs
+   a request. Push notifications and Signature & stamp are the two worth
+   paying for, and only if their state can ride an existing call.
+2. **Focus / modes.** Partially foundationed, not absent: `quiet_hours` already
+   exists in `NotificationPrefs` (enabled + start + end), which is the
+   time-window third of it. What is missing is the profile that bundles
+   interruptions, appearance and an automatic trigger under one name. Its own
+   project.
+
+**Already built — items this document previously listed as missing:**
+
+| Claimed missing | Reality |
+|---|---|
+| Per-event sound assignment | 17 activities with tone overrides, play-on-select picker |
+| Live region format preview | `RegionTab` renders date · time · currency · units **and** a week-start sentence — wider than the reference's |
+| The two `SettingsRow`s must merge | They should not. One is a setting (conditional chevron), one is navigation (selected state). The value they share is now one `RowValue`; the rows stay apart, and each carries a comment saying why |
+
+**Three wrong "missing" claims in one document is the finding.** Every one came
+from writing what the app probably lacked instead of opening the file; every
+measured claim in §1 held. When this plan is next extended, the entry cost for
+adding a line to a gap list is a grep.
