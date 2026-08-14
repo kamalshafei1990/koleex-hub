@@ -24,6 +24,7 @@ import { useEffect, useRef, useState, isValidElement, type FormEvent, type Keybo
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 
 /* Sliding-pill geometry — change in one place. */
@@ -88,6 +89,18 @@ export default function PageHeader({
   onSearchSubmit,
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
+  /* ONE LONG RAMP BEHIND THE WHOLE TOP STRIP, owner's words on this header:
+     "you only can use one but more longer — it can work for main header,
+     search area and categories area", and later, pointing at Purchase, "put
+     the blured edge on the back of the top page components".
+
+     appOwnsTopRamp routes are the ones where MainHeader keeps a FLAT 56px
+     frost instead of its own 104px ramp, precisely so the app can run a
+     single taller one. Until now nothing in PageHeader actually drew it —
+     measured on /inventory/items: .kx-ph-band computed backdrop-filter NONE
+     — so the entry was a promise the header never kept, and the screen had
+     no edge blur at all past the header line. This is the ramp it owes. */
+  const ownsRamp = isUnderglassRoute(pathname) && appOwnsTopRamp(pathname);
   const resolvedBackHref = backHref ?? parentPath(pathname);
 
   /* Flatten any overflow groups into the main tab list so every item
@@ -125,7 +138,14 @@ export default function PageHeader({
         wrapper as the scroll context, instead of being trapped inside
         this short space-y wrapper (which would un-stick the moment the
         hero scrolled past). */}
-    <div className="space-y-3 sm:space-y-5">
+    {/* relative z-30 LIFTS THE HERO ABOVE THE RAMP, and this is the whole
+        difference between "frost behind the header" and a dark smear over it.
+        The ramp below reaches UP past this block; anything left underneath it
+        gets blurred as though it were scrolled-under content — which on
+        Product Data turned the title and the divisions row to mush before the
+        same fix was applied there. The frost passes behind these components;
+        only real scrolling content dissolves into it. */}
+    <div className={`space-y-3 sm:space-y-5 ${ownsRamp ? "relative z-30" : ""}`}>
       {/* ── Hero row: back + icon + name + subtitle + actions ───
           On mobile: tighter gaps (gap-2), smaller back/icon chips (h-8),
           smaller title (18px). Drops ~40px of vertical space so content
@@ -201,7 +221,41 @@ export default function PageHeader({
           -mx + px restore the page's horizontal padding so the bar
           bleeds to the edges and content scrolling under is hidden. */}
     {hasTabs && (
-      <div className="kx-ph-band sticky top-0 z-30 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6">
+      <div
+        /* THE BAND HOSTS THE RAMP, and drops to z-20 to do it: the layer has
+           to sit UNDER the hero block (z-30) it reaches up behind, and under
+           its own pill strip. kx-bar-host also strips any blur off the host
+           itself — a host that filters becomes a backdrop root and starves
+           the four layers inside it. */
+        /* --kx-ramp-ext:1rem — the TAIL, and it is measured, not picked. At
+           the 3rem default the ramp ended at y=298 while the first section
+           heading under the bar starts at y=272, so the page's own first line
+           of text sat 26px inside the blur and read as a smudge. 16px of tail
+           clears it with room to spare. Product Data landed on the same
+           number for the same reason: the tail is what "longer" lengthens,
+           and it is the one part of this ramp that can eat real content. */
+        className={`kx-ph-band sticky top-0 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6 ${
+          ownsRamp ? "kx-bar-host z-20 [--kx-ramp-ext:1rem]" : "z-30"
+        }`}
+        /* 26rem, the same as Product Data's, and generous on purpose: the
+           strip's height changes with the title's wrap and whether a search
+           row is present, and anything taller than needed is simply clipped
+           above the viewport. Too SHORT is the visible failure — the frost
+           would start mid-page. */
+        style={ownsRamp ? ({ ["--kx-ramp-top" as string]: "26rem" }) : undefined}
+      >
+        {ownsRamp && (
+          <div aria-hidden className="kx-glass-bar kx-bar-prog">
+            <i /><i /><i /><i />
+          </div>
+        )}
+        {/* NO LIFT WRAPPER HERE — the host contract already does it.
+            `.kx-bar-host > :not(.kx-glass-bar):not(.absolute):not(.fixed):not(.sticky)`
+            gives every non-layer child `position:relative; z-index:1`, and
+            being unlayered it beats a Tailwind z-* utility outright: the
+            `relative z-30` wrapper I first wrapped this in measured z:1, not
+            30. The strip is this bar's own content, so it is lifted above the
+            layer automatically and the fade runs behind it. */}
         <SlidingPillNav
           tabs={mergedTabs}
           activeKey={active}
