@@ -384,7 +384,12 @@ export default function CalendarApp() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-full">
         {/* ── Header ── */}
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
+        {/* ⚠️ pb-4 IS THE GAP THE OLD SUBTITLE USED TO CARRY. The line this
+            header replaced was `<p … mb-4>`, and that margin was the ONLY
+            thing separating the band from the date row below — the next
+            container has bottom padding but no top padding. Dropping the
+            <p> silently dropped the gap and the two rows collided. */}
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
           {/* Shared header. This block was a copy of it, so the screen never
               got the longer BK-4 back button and was still printing "Calendar"
               under a system bar already saying it.

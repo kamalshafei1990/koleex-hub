@@ -1989,7 +1989,9 @@ export default function TodoPage() {
 
               The subtitle already carried state (`… · {total}`), which is
               exactly what M-1 wants on that line. */}
-          <div className="pt-5">
+          {/* pb-3 = the `mb-3` the subtitle line used to carry; without it the
+              search row below sits flush against the band. */}
+          <div className="pt-5 pb-3">
             <PageHeader
               title={t("app.title")}
               subtitle={`${t("app.subtitle")} · ${stats.total}`}
