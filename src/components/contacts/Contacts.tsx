@@ -5320,6 +5320,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      place. Kept separate rather than folded into saveError's title logic so
      neither can silently clear the other. */
   const [uploadError, setUploadError] = useState<string | null>(null);
+  /* AN ERROR NOBODY CAN SEE IS AN ERROR THAT DID NOT HAPPEN. The banner sits
+     at the very top of the form, beside Save; the document slots are a
+     thousand lines of JSX below it. So a failed upload reported itself
+     off-screen and the operator saw an empty file row and no explanation —
+     "it just keeps loading, then nothing is uploaded". Scroll the banner into
+     view whenever it appears, wherever the user happens to be. */
+  const uploadErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!uploadError) return;
+    uploadErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [uploadError]);
   // True while the full record (images/docs) is being fetched for an edit —
   // Save is blocked until it loads so we never overwrite unloaded images.
   const [formHydrating, setFormHydrating] = useState(false);
@@ -9150,7 +9161,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Upload error banner — a file never reached Storage. Distinct from
             the save banner below: this one means the RECORD is untouched. */}
         {uploadError && (
-          <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+          <div ref={uploadErrorRef} className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
             <div className="flex items-start gap-2">
               <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
