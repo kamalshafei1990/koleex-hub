@@ -125,8 +125,33 @@ export async function uploadToStorage(
   file: Blob | File,
   options: UploadOptions = {},
 ): Promise<{ ok: true; data: UploadResult } | { ok: false; error: string }> {
+  /* RETRY A DROPPED CONNECTION, DON'T HAND IT TO THE USER. "Network error
+     during upload" is a thrown fetch, not a refusal — the request never got an
+     answer. On a long route (the Hub is used from Shanghai; the bytes cross to
+     a serverless function and on to Storage) a single dropped connection is
+     ordinary, and asking a person to re-pick the file for it is not. Two extra
+     attempts with a short backoff. Only transport failures are retried: an
+     HTTP answer, however unwelcome, is a decision and gets reported as-is. */
+  let lastError = "Upload failed";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 800));
+    const res = await uploadOnce(bucket, path, file, options);
+    if (res.ok) return res;
+    lastError = res.error;
+    if (!res.retryable) return { ok: false, error: res.error };
+  }
+  return { ok: false, error: `${lastError} — after 3 attempts.` };
+}
+
+async function uploadOnce(
+  bucket: string,
+  path: string,
+  file: Blob | File,
+  options: UploadOptions,
+): Promise<{ ok: true; data: UploadResult } | { ok: false; error: string; retryable: boolean }> {
   if (file.size >= DIRECT_UPLOAD_THRESHOLD) {
-    return uploadDirectToStorage(bucket, path, file, options);
+    const direct = await uploadDirectToStorage(bucket, path, file, options);
+    return direct.ok ? direct : { ...direct, retryable: direct.error.startsWith("Network error") };
   }
 
   const form = new FormData();
@@ -150,11 +175,11 @@ export async function uploadToStorage(
       signal: AbortSignal.timeout(90_000),
     });
   } catch (e) {
+    const timedOut = e instanceof DOMException && e.name === "TimeoutError";
     return {
       ok: false,
-      error: e instanceof DOMException && e.name === "TimeoutError"
-        ? "Upload timed out"
-        : "Network error during upload",
+      error: timedOut ? "Upload timed out" : "Network error during upload",
+      retryable: true,
     };
   }
   if (res.ok) {
@@ -164,6 +189,9 @@ export async function uploadToStorage(
   return {
     ok: false,
     error: (err as { error?: string }).error ?? "Upload failed",
+    /* An HTTP answer is a decision — a 415 or a 413 will not change on a
+       retry. Only a 5xx is worth another attempt. */
+    retryable: res.status >= 500,
   };
 }
 

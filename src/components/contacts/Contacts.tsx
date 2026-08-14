@@ -1553,6 +1553,19 @@ const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
    public `media` bucket, which accepts any type up to 500MB. The narrow filter
    was simply never revisited. Owner: "I can't upload a file PDF or excel or
    photo etc." UX only — the store remains the authority. */
+/* The short message that belongs NEXT TO the field that failed. Owner: "I
+   want a short message same as this for the field have a problem, not should
+   every time go to the top of the page to know what is the problem." */
+function FieldUploadError({ show, message }: { show: boolean; message: string | null }) {
+  if (!show || !message) return null;
+  return (
+    <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-red-400">
+      <TriangleWarningIcon size={12} className="mt-px shrink-0" />
+      <span className="whitespace-pre-line">{message}</span>
+    </p>
+  );
+}
+
 const DOCUMENT_ACCEPT_ATTR = [
   ".pdf", "image/*",
   ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
@@ -5320,17 +5333,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      place. Kept separate rather than folded into saveError's title logic so
      neither can silently clear the other. */
   const [uploadError, setUploadError] = useState<string | null>(null);
-  /* AN ERROR NOBODY CAN SEE IS AN ERROR THAT DID NOT HAPPEN. The banner sits
-     at the very top of the form, beside Save; the document slots are a
-     thousand lines of JSX below it. So a failed upload reported itself
-     off-screen and the operator saw an empty file row and no explanation —
-     "it just keeps loading, then nothing is uploaded". Scroll the banner into
-     view whenever it appears, wherever the user happens to be. */
-  const uploadErrorRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!uploadError) return;
-    uploadErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [uploadError]);
+  /* WHICH FIELD FAILED, NOT JUST THAT SOMETHING DID. The banner lives at the
+     top of the form, beside Save, and the file slots are a thousand lines of
+     JSX below it — so a failure reported itself somewhere the operator was not
+     looking. Scrolling them up there was still the wrong shape: owner asked
+     for "a short message for the field that has a problem, not every time go
+     to the top of the page to know what is the problem". So the message goes
+     UNDER THE ROW that failed, keyed by slot. */
+  const [uploadErrorAt, setUploadErrorAt] = useState<string | null>(null);
+  const failUpload = useCallback((key: string, message: string) => {
+    setUploadErrorAt(key);
+    setUploadError(message);
+  }, []);
+  const clearUploadError = useCallback(() => {
+    setUploadErrorAt(null);
+    clearUploadError();
+  }, []);
   // True while the full record (images/docs) is being fetched for an edit —
   // Save is blocked until it loads so we never overwrite unloaded images.
   const [formHydrating, setFormHydrating] = useState(false);
@@ -9160,15 +9178,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Upload error banner — a file never reached Storage. Distinct from
             the save banner below: this one means the RECORD is untouched. */}
-        {uploadError && (
-          <div ref={uploadErrorRef} className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+        {/* Only for failures with no field to point at — anything keyed to a
+            slot shows itself down there instead. */}
+        {uploadError && !uploadErrorAt && (
+          <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
             <div className="flex items-start gap-2">
               <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-red-400 font-medium">{t("error.uploadFailed", "Upload failed")}</p>
                 <p className="text-xs text-red-400/70 mt-0.5 whitespace-pre-line">{uploadError}</p>
               </div>
-              <button onClick={() => setUploadError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
+              <button onClick={clearUploadError} className="text-red-400/50 hover:text-red-400 shrink-0">
                 <CrossIcon size={14} />
               </button>
             </div>
@@ -10075,7 +10095,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const isImage = file.type.startsWith("image/");
-                setUploadError(null);
+                const errKey = "attachment";
+                clearUploadError();
                 void (async () => {
                   let url: string;
                   if (isImage) { {
@@ -10090,14 +10111,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                                    worth it; smuggling is not. */
                                 const compressed = await compressImageToStorage(file, 1200, 0.8);
                                 if (compressed.startsWith("data:")) {
-                                  setUploadError("Could not upload that image — please try again.");
+                                  failUpload(errKey, "Could not upload that image — please try again.");
                                   return;
                                 }
                                 url = compressed;
                               } }
                   else {
                     const up = await uploadFileToStorage(file);
-                    if ("error" in up) { setUploadError(up.error); return; }
+                    if ("error" in up) { failUpload(errKey, up.error); return; }
                     url = up.url;
                   }
                   setField("attachments", [...form.attachments, {
@@ -10520,7 +10541,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                             const file = e.target.files?.[0];
                             if (!file) return;
                             const isPdf = file.type === "application/pdf";
-                            setUploadError(null);
+                            const errKey = `documents:${i}`;
+                            clearUploadError();
                             void (async () => {
                               /* A PDF must reach Storage or the attempt is
                                  abandoned — never quietly kept as base64,
@@ -10531,7 +10553,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               let url: string;
                               if (isPdf) {
                                 const up = await uploadFileToStorage(file);
-                                if ("error" in up) { setUploadError(up.error); return; }
+                                if ("error" in up) { failUpload(errKey, up.error); return; }
                                 url = up.url;
                               } else {
                                 {
@@ -10546,7 +10568,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                                    worth it; smuggling is not. */
                                 const compressed = await compressImageToStorage(file, 1200, 0.8);
                                 if (compressed.startsWith("data:")) {
-                                  setUploadError("Could not upload that image — please try again.");
+                                  failUpload(errKey, "Could not upload that image — please try again.");
                                   return;
                                 }
                                 url = compressed;
@@ -10561,6 +10583,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </>
                     )}
                   </div>
+                  <FieldUploadError show={uploadErrorAt === `documents:${i}`} message={uploadError} />
                 </div>
               ))}
               <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
@@ -11236,8 +11259,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                          This used to fall back to base64, contradicting the
                          line above it: the catalogue then rode inside the save
                          payload and took the whole supplier save down with it. */
+                      const errKey = "catalogue";
                       const up = await uploadToMediaStorage(file, file.name);
-                      if (!up.ok) { setUploadError(up.error); return; }
+                      if (!up.ok) { failUpload(errKey, up.error); return; }
                       const item: (typeof existing)[number] = {
                         name: file.name,
                         url: up.url,
@@ -11582,12 +11606,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               const file = e.target.files?.[0];
                               if (!file) return;
                               const isPdf = file.type === "application/pdf";
-                              setUploadError(null);
+                              const errKey = `visa:${i}`;
+                              clearUploadError();
                               void (async () => {
                                 let url: string;
                                 if (isPdf) {
                                   const up = await uploadFileToStorage(file);
-                                  if ("error" in up) { setUploadError(up.error); return; }
+                                  if ("error" in up) { failUpload(errKey, up.error); return; }
                                   url = up.url;
                                 } else { {
                                 /* A FAILED IMAGE MUST NOT BECOME base64.
@@ -11601,7 +11626,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                                    worth it; smuggling is not. */
                                 const compressed = await compressImageToStorage(file, 1200, 0.8);
                                 if (compressed.startsWith("data:")) {
-                                  setUploadError("Could not upload that image — please try again.");
+                                  failUpload(errKey, "Could not upload that image — please try again.");
                                   return;
                                 }
                                 url = compressed;
@@ -11918,13 +11943,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  setUploadError(null);
+                  const errKey = "resume";
+                  clearUploadError();
                   void (async () => {
                     let url: string;
                     if (file.type.startsWith("image/")) { url = await compressImageToStorage(file); }
                     else {
                       const up = await uploadFileToStorage(file);
-                      if ("error" in up) { setUploadError(up.error); return; }
+                      if ("error" in up) { failUpload(errKey, up.error); return; }
                       url = up.url;
                     }
                     setField("visa_documents", [...form.visa_documents, { name: file.name, url, type: file.type, uploaded_at: new Date().toISOString() }]);
