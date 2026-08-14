@@ -860,8 +860,16 @@ export default function HomePage() {
 
 
 
+  /* kx-wp-root on the div below: this root paints its OWN opaque colour, so a
+     Core wallpaper — which is painted on `body` — would sit invisible behind
+     it. Deliberately NOT kx-app: that class also remaps vars under Aurora, and
+     Home is signed off without it. See the wallpaper block in globals.css.
+
+     The comment lives here rather than above the element because a JSX comment
+     before the returned root makes it a second sibling, which is a syntax
+     error — the same slip that broke KpiCard across thirteen apps. */
   return (
-    <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
+    <div className={`kx-wp-root ${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
       {/* THE GROUND — Aurora only. Every other surface on this page switches
           skin in CSS, because `.kx-glass` is scoped to [data-kx-skin="aurora"]
           and the elements keep their original solid classes underneath: under

@@ -20,9 +20,11 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentAccount } from "./identity";
+import { useSkin } from "./appearance";
+import { getTheme, type ThemeMode } from "./display-prefs";
 import {
-  DEFAULT_WALLPAPER_ID, WALLPAPER_EVENT, cacheWallpaper, readCachedWallpaper,
-  type WallpaperFit, type WallpaperPref,
+  DEFAULT_WALLPAPER_ID, WALLPAPER_EVENT, backgroundCss, cacheWallpaper, dimFor,
+  fitStyle, readCachedWallpaper, type WallpaperFit, type WallpaperPref,
 } from "./wallpaper";
 
 const FALLBACK: WallpaperPref = { id: DEFAULT_WALLPAPER_ID };
@@ -97,6 +99,65 @@ export function useWallpaper(): WallpaperPref {
   }, []);
 
   return pref;
+}
+
+/* ── Core ───────────────────────────────────────────────────────────────── */
+
+/** Paints the wallpaper under the CORE skin, where there is no ground to paint
+ *  it into.
+ *
+ *  Aurora mounts WavyBackground on twenty pages and the wallpaper lives inside
+ *  it. Core mounts nothing — the pages read `{aurora && <WavyBackground/>}` —
+ *  so a Core user could pick a wallpaper and watch nothing happen. That is the
+ *  bug this closes, and the owner found it by doing exactly that.
+ *
+ *  It renders NO DOM. Editing twenty more files was the obvious fix and the
+ *  wrong one; instead this writes custom properties on :root and lets one CSS
+ *  rule paint `body`. The whole Core path is an attribute and three variables.
+ *
+ *  THE CANON IS KEPT, and it is kept by hub-live rather than by an exception.
+ *  Core with the default choice resolves to no image, so the attribute is
+ *  removed and Core renders byte-identical to what it always did. Only an
+ *  explicit choice — a deliberate act by the person looking at the screen —
+ *  changes anything. */
+export function WallpaperApplier(): null {
+  const pref = useWallpaper();
+  const skin = useSkin();
+  const hour = useHour(pref.id === "hub-dynamic");
+  const [theme, setTheme] = useState<ThemeMode>(() => getTheme());
+
+  useEffect(() => {
+    const onTheme = () => setTheme(getTheme());
+    window.addEventListener("themechange", onTheme);
+    return () => window.removeEventListener("themechange", onTheme);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    /* Aurora already has a ground; painting body underneath it would be a
+       second copy nobody can see, and one more layer to composite. */
+    const image = skin === "core" ? backgroundCss(pref, theme, hour) : null;
+
+    const clear = () => {
+      root.removeAttribute("data-kx-wallpaper");
+      for (const v of ["--kx-wp-image", "--kx-wp-scrim", "--kx-wp-size"]) {
+        root.style.removeProperty(v);
+      }
+    };
+    if (!image) { clear(); return; }
+
+    /* Core has no glass to frost, so the scrim is a flat wash rather than the
+       radial floor — a vignette would read as a shadow on an opaque page. */
+    const rgb = theme === "light" ? "247,249,252" : "5,7,12";
+    const a = ((dimFor(pref) / 100) * 0.62).toFixed(3);
+    root.style.setProperty("--kx-wp-image", image);
+    root.style.setProperty("--kx-wp-scrim", `linear-gradient(rgba(${rgb},${a}), rgba(${rgb},${a}))`);
+    root.style.setProperty("--kx-wp-size", fitStyle(pref.fit).backgroundSize);
+    root.setAttribute("data-kx-wallpaper", "on");
+    return clear;
+  }, [pref, skin, theme, hour]);
+
+  return null;
 }
 
 /** Current hour, re-read on a coarse timer for the dynamic wallpaper.

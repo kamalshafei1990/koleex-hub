@@ -32,6 +32,7 @@ import DevReload from "@/components/pwa/DevReload";
 import UpdateWatcher from "@/components/pwa/UpdateWatcher";
 import PerfVitals from "@/components/perf/PerfVitals";
 import { DisplayPreferencesApplier } from "@/lib/display-prefs";
+import { WallpaperApplier } from "@/lib/useWallpaper";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
   SidebarProvider,
@@ -392,6 +393,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <PerfVitals />
       {/* Applies the user's Appearance / Accessibility / Region prefs to <html>. */}
       <DisplayPreferencesApplier />
+      {/* Renders no DOM. Under Core it paints a chosen wallpaper onto body
+          via custom properties, because Core mounts no ground of its own. */}
+      <WallpaperApplier />
     </QAInspectorProvider>
   );
 }

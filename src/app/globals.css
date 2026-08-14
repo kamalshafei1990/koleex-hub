@@ -428,6 +428,41 @@ body {
 .notes-surface-ruled .notes-editor h2,
 .notes-surface-ruled .notes-editor h3 { line-height: var(--rule-h); margin: 0; }
 
+/* ── Wallpaper under the CORE skin ──────────────────────────────────────────
+   Aurora paints a chosen wallpaper inside WavyBackground, which twenty pages
+   mount. Core mounts nothing — those pages read `{aurora && <WavyBackground/>}`
+   — so under Core a wallpaper could be chosen and nothing would change. The
+   owner found it by doing exactly that.
+
+   Fixed here rather than in twenty more files: WallpaperApplier (lib/
+   useWallpaper.ts) sets the three variables and the attribute, and this rule
+   does the painting. No new DOM anywhere.
+
+   THE ATTRIBUTE IS ONLY EVER SET UNDER CORE WITH AN EXPLICIT CHOICE. The
+   default (hub-live) resolves to no image, the attribute is removed, and Core
+   renders byte-identical to what it always did — so the canon holds by
+   construction rather than by an exception.
+
+   The background-COLOR is left in place beneath the image on purpose: it is
+   what shows while a photo is still loading, and it keeps the page opaque if a
+   custom property is ever missing. */
+[data-kx-wallpaper="on"] body {
+  background-image: var(--kx-wp-scrim), var(--kx-wp-image);
+  background-size: var(--kx-wp-size, cover);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* The page roots paint --bg-primary, which would hide the body underneath
+   them. Two class names because Core uses both as an app root; the selector is
+   (0,2,0) so it outranks Tailwind's bg-[var(--bg-primary)] utility. */
+[data-kx-wallpaper="on"] .kx-app,
+[data-kx-wallpaper="on"] .kx-pd,
+[data-kx-wallpaper="on"] .kx-wp-root {
+  background-color: transparent;
+}
+
 /* ── Utility: hide scrollbars on horizontally-scrollable rows ────
    Used by tab strips, day pickers, filter pills — anywhere we want
    swipe/drag scrolling without the chunky browser scrollbar taking
