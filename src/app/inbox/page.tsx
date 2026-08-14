@@ -14,6 +14,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/kds/useToast";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import dynamic from "next/dynamic";
@@ -489,7 +490,11 @@ export default function InboxPage() {
         </p>
         <Link
           href="/"
-          className="text-[12px] font-semibold text-blue-400 hover:text-blue-300"
+          /* Signed-out screen: this renders OUTSIDE kx-app, so no skin rule
+             reaches it. It was the one Tailwind blue with no status meaning
+             at all — the sole action on the screen, so it gets the system's
+             primary-button recipe instead of a coloured word. */
+          className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center transition-opacity hover:opacity-90"
         >
           Back to home
         </Link>
@@ -530,7 +535,10 @@ export default function InboxPage() {
       <header className="relative z-10 shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <Link
           href="/"
-          className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          /* kx-ph-chrome is the system's chrome-control recipe: border-colour
+             answers hover and NOTHING else moves. Owner's rule, verbatim —
+             "only the borders colors, no more". Inert under Core. */
+          className="kx-ph-chrome h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
           aria-label="Back to Hub"
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -542,7 +550,11 @@ export default function InboxPage() {
           <button
             type="button"
             onClick={() => setMobileView("list")}
-            className="md:hidden h-8 px-2 flex items-center gap-1 rounded-lg text-[12px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+            /* Was text-blue-400: a SECOND blue, and on a navigation control
+               rather than a status. Back is chrome — it takes the same
+               neutral-text/border-hover language as the Hub back arrow beside
+               it, so the two back controls in one strip stop disagreeing. */
+            className="kx-ph-chrome md:hidden h-8 px-2 flex items-center gap-1 rounded-lg border border-transparent text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Mailboxes
@@ -607,7 +619,13 @@ export default function InboxPage() {
             <div className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider px-2 mb-1">
               Mailboxes
             </div>
-            <nav className="flex flex-col gap-0.5">
+            {/* role=tablist, not a bare nav: aria-selected is only valid on a
+                handful of roles, and `button` is not one of them. The state is
+                real (one mailbox is chosen and the column to the right is its
+                panel), so the fix is to declare the role that carries it
+                rather than to drop the attribute — the Aurora hover rule keys
+                off aria-selected to avoid marking a selected row twice. */}
+            <nav role="tablist" aria-orientation="vertical" className="flex flex-col gap-0.5">
               {MAILBOX_ORDER.map((box) => {
                 const active = activeMailbox === box;
                 const count = mailboxCounts[box];
@@ -629,15 +647,33 @@ export default function InboxPage() {
                       setActiveMailbox(box);
                       setMobileView("list");
                     }}
+                    /* aria-selected is not decoration here: the blanket Aurora
+                       hover rule EXCLUDES [aria-selected="true"], so without it
+                       the already-selected mailbox also took a hover tint —
+                       two marks for one state, which is exactly what the canon
+                       forbids. Marking the state correctly is what turns the
+                       rule off. */
+                    role="tab"
+                    aria-selected={active}
                     className={`h-8 px-2 rounded-md flex items-center gap-2 text-[12.5px] font-medium transition-colors ${
                       active
-                        ? "bg-blue-500/15 text-[var(--text-primary)]"
+                        ? aurora
+                          /* kx-seg-on = the Hub's ONE selection mark: a Hub-Blue
+                             inset ring over a 10% wash. Replaces a Tailwind
+                             blue-500 fill that was a second accent competing
+                             with the sidebar's own selected row. */
+                          ? "kx-seg-on"
+                          : "bg-blue-500/15 text-[var(--text-primary)]"
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     <Icon
                       className={`h-3.5 w-3.5 ${
-                        active ? "text-blue-400" : "text-[var(--text-dim)]"
+                        active
+                          ? aurora
+                            ? "text-[#BCD8F0]"
+                            : "text-blue-400"
+                          : "text-[var(--text-dim)]"
                       }`}
                     />
                     <span className="flex-1 text-left">{MAILBOX_LABEL[box]}</span>
@@ -678,23 +714,55 @@ export default function InboxPage() {
                     : `${filtered.length} ${filtered.length === 1 ? "message" : "messages"}`}
                 </div>
               </div>
-              {/* Mobile mailbox picker — on phones the aside is hidden,
-                  so we surface a compact segmented control here. */}
-              <div className="md:hidden">
-                <select
-                  value={activeMailbox}
-                  onChange={(e) => setActiveMailbox(e.target.value as Mailbox)}
-                  className="h-8 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] font-semibold text-[var(--text-primary)] outline-none"
-                >
-                  {MAILBOX_ORDER.map((box) => (
-                    <option key={box} value={box}>
-                      {MAILBOX_LABEL[box]} ({mailboxCounts[box]})
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
-            <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+            {/* Mobile mailbox picker. The comment here used to promise a
+                "compact segmented control" and the code was a native <select>
+                — an OS-drawn menu with the OS's own type, radius and colours,
+                which is why the phone header read as a different product. It
+                is now the real thing: one tab per mailbox, wearing the same
+                kx-seg-on mark as the desktop sidebar, so both sizes say
+                "selected" the same way. Scrolls sideways rather than wrapping,
+                so the header height never changes with the label count. */}
+            <div
+              role="tablist"
+              aria-label="Mailbox"
+              className="md:hidden -mx-4 px-4 mb-3 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {MAILBOX_ORDER.map((box) => {
+                const on = activeMailbox === box;
+                return (
+                  <button
+                    key={box}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setActiveMailbox(box)}
+                    className={`shrink-0 h-7 px-2.5 rounded-lg text-[11.5px] font-semibold whitespace-nowrap transition-colors ${
+                      on
+                        ? aurora
+                          ? "kx-seg-on"
+                          : "bg-blue-500/15 text-[var(--text-primary)]"
+                        : `${aurora ? "kx-seg-off" : ""} text-[var(--text-muted)]`
+                    }`}
+                  >
+                    {MAILBOX_LABEL[box]}
+                    {mailboxCounts[box] > 0 && (
+                      <span className="ms-1 tabular-nums opacity-70">
+                        {mailboxCounts[box]}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {/* kx-ph-search is the system's search recipe, and it is the WELL
+                — recessed fill + inset shadow + Hub-Blue focus ring — not the
+                raised --bg-surface box this used to be. That box was the
+                "search bar doesn't belong" tell: every other Aurora field on
+                the Hub is sunk into the glass, this one sat on top of it.
+                The rule also blanks the inner input so the well is drawn once,
+                not nested. Scoped to Aurora, so Core keeps its box. */}
+            <div className="kx-ph-search flex items-center gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
               <SearchIcon size={14} className="text-[var(--text-dim)] shrink-0" />
               <input
                 type="text"
@@ -741,7 +809,12 @@ export default function InboxPage() {
                 </p>
               </div>
             ) : (
-              <ul>
+              /* listbox/option, for the same reason as the sidebar: exactly one
+                 message is selected at a time, and that is what aria-selected
+                 means. On a plain button it is an invalid attribute that
+                 assistive tech may drop — while the Aurora hover rule reads it
+                 anyway, so the visual and the announced state could disagree. */
+              <ul role="listbox" aria-label={`${activeLabel} messages`}>
                 {filtered.map((msg) => {
                   const isSelected = msg.id === selectedId;
                   const isUnread = !msg.read_at;
@@ -762,32 +835,52 @@ export default function InboxPage() {
                     ? (meta!.products as unknown[]).length > 0
                     : false;
                   return (
-                    <li key={msg.id} className="relative group/row">
+                    <li key={msg.id} role="presentation" className="relative group/row">
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedId(msg.id);
                           setMobileView("detail");
                         }}
+                        /* Same reason as the sidebar: without aria-selected the
+                           blanket hover rule re-tints the row you are already
+                           reading. */
+                        role="option"
+                        aria-selected={isSelected}
                         className={`relative w-full text-left px-4 py-3 transition-colors border-b border-[var(--border-subtle)] ${
                           isSelected
-                            ? "bg-blue-500/10"
+                            ? aurora
+                              /* NOT kx-seg-on. That mark is an inset ring on all
+                                 four sides, which on a full-bleed row draws a box
+                                 inside the column. A row edge-to-edge takes the
+                                 wash only and lets the leading bar carry the
+                                 state — same Hub Blue, different geometry. */
+                              ? "bg-[rgba(86,127,178,0.14)]"
+                              : "bg-blue-500/10"
                             : "hover:bg-white/[0.03]"
                         }`}
                       >
-                        {/* Apple Mail selection indicator: a 3px blue bar
-                            on the leading edge of the selected row. */}
+                        {/* Apple Mail selection indicator: a 3px bar on the
+                            leading edge of the selected row — in Hub Blue, not
+                            Tailwind's blue-500. */}
                         {isSelected && (
                           <span
-                            className="absolute inset-y-0 start-0 w-[3px] bg-blue-500"
+                            className={`absolute inset-y-0 start-0 w-[3px] ${
+                              aurora ? "bg-[#567FB2]" : "bg-blue-500"
+                            }`}
                             aria-hidden
                           />
                         )}
                         <div className="flex gap-2.5 items-start min-w-0">
-                          {/* Unread dot (blue, like Apple Mail). */}
+                          {/* Unread dot, like Apple Mail — Hub Blue under
+                              Aurora so the list has one blue, not two. */}
                           <span
                             className={`mt-2 h-2 w-2 rounded-full shrink-0 ${
-                              isUnread ? "bg-blue-500" : "bg-transparent"
+                              isUnread
+                                ? aurora
+                                  ? "bg-[#567FB2]"
+                                  : "bg-blue-500"
+                                : "bg-transparent"
                             }`}
                             aria-hidden
                           />
@@ -1459,6 +1552,14 @@ function ComposeView({
   onClose: () => void;
   onSent: () => void;
 }) {
+  const aurora = useSkin() === "aurora";
+  /* One recipe, three pills. Under Aurora a recipient chip carries Hub Blue —
+     the Hub's only accent — instead of Tailwind's blue-500, which is a far
+     more saturated hue and read as a sticker stuck onto the glass field. */
+  const PILL = aurora
+    ? "bg-[rgba(86,127,178,0.18)] text-[#BCD8F0] border-[rgba(86,127,178,0.45)]"
+    : "bg-blue-500/15 text-blue-300 border-blue-500/30";
+  const PILL_AVATAR = aurora ? "bg-[rgba(86,127,178,0.40)]" : "bg-blue-500/30";
   /* Reply always wants a single person (locked to sender). Forward /
      fresh compose default to person-picker; the user can switch. */
   const [mode, setMode] = useState<"person" | "role">("person");
@@ -1672,9 +1773,16 @@ function ComposeView({
               <button
                 type="button"
                 onClick={() => setMode(mode === "person" ? "role" : "person")}
+                /* aria-PRESSED, not aria-selected: this is a two-state toggle,
+                   not one option among several. It does not need the hover-rule
+                   exclusion that aria-selected buys — kx-seg-on is itself on
+                   the exclusion list, and that is the class it wears when on. */
+                aria-pressed={mode === "role"}
                 className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
                   mode === "role"
-                    ? "bg-blue-500/15 text-blue-300"
+                    ? aurora
+                      ? "kx-seg-on"
+                      : "bg-blue-500/15 text-blue-300"
                     : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
                 }`}
                 title={mode === "role" ? "Switch to single recipient" : "Broadcast to role"}
@@ -1701,8 +1809,8 @@ function ComposeView({
               <div className="flex-1 flex items-center gap-1.5 flex-wrap py-1.5 min-w-0">
                 {/* Reply: locked pill, no picker. */}
                 {lockedRecipient ? (
-                  <span className="inline-flex items-center gap-1.5 h-6 pl-1 pr-2.5 rounded-full bg-blue-500/15 text-blue-300 text-[12px] font-semibold border border-blue-500/30">
-                    <span className="h-4 w-4 rounded-full bg-blue-500/30 flex items-center justify-center text-[8px]">
+                  <span className={`inline-flex items-center gap-1.5 h-6 pl-1 pr-2.5 rounded-full text-[12px] font-semibold border ${PILL}`}>
+                    <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[8px] ${PILL_AVATAR}`}>
                       {initialsOf(initial.recipientLabel ?? "?")}
                     </span>
                     {initial.recipientLabel ?? "(original sender)"}
@@ -1728,8 +1836,8 @@ function ComposeView({
                   <>
                     {/* Selected recipient as a pill */}
                     {selectedRecipient && (
-                      <span className="inline-flex items-center gap-1.5 h-6 pl-1 pr-1.5 rounded-full bg-blue-500/15 text-blue-300 text-[12px] font-semibold border border-blue-500/30">
-                        <span className="h-4 w-4 rounded-full bg-blue-500/30 flex items-center justify-center text-[8px]">
+                      <span className={`inline-flex items-center gap-1.5 h-6 pl-1 pr-1.5 rounded-full text-[12px] font-semibold border ${PILL}`}>
+                        <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[8px] ${PILL_AVATAR}`}>
                           {initialsOf(
                             selectedRecipient.full_name ??
                               selectedRecipient.username,
@@ -1742,7 +1850,16 @@ function ComposeView({
                             setRecipientId("");
                             setRecipientSearch("");
                           }}
-                          className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-blue-500/25"
+                          /* data-kx-keep-hover: this sits INSIDE a pill that is
+                             already accented, so the blanket border-hover rule
+                             would put a second mark on it. Its own hover is the
+                             meaningful one. */
+                          data-kx-keep-hover
+                          className={`h-4 w-4 rounded-full flex items-center justify-center ${
+                            aurora
+                              ? "hover:bg-[rgba(86,127,178,0.35)]"
+                              : "hover:bg-blue-500/25"
+                          }`}
                           aria-label="Remove recipient"
                         >
                           <CrossIcon className="h-2.5 w-2.5" />
@@ -2026,7 +2143,13 @@ function ComposeView({
             <button
               type="submit"
               disabled={busy}
-              className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-400 transition-colors disabled:opacity-40 disabled:pointer-events-none shadow-sm"
+              /* Send is a PRIMARY action and now wears the system's primary
+                 recipe — the same inverted block as the Compose button that
+                 opened this pane. It was a solid Tailwind blue-500 circle: the
+                 single loudest off-system element in the app, and the only
+                 place where the Hub's primary action was a colour instead of
+                 an inverted surface. */
+              className="h-8 w-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40 disabled:pointer-events-none shadow-sm"
               title="Send"
               aria-label="Send"
             >
@@ -2080,6 +2203,7 @@ function ProductPickerModal({
   onConfirm: (picked: InboxProductRef[]) => void;
 }) {
   useScrollLock();
+  const aurora = useSkin() === "aurora";
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [images, setImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -2146,8 +2270,24 @@ function ProductPickerModal({
     onConfirm(picked);
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh] overflow-y-auto bg-black/70 backdrop-blur-sm">
+  /* PORTALLED TO document.body, AND IT HAS TO BE.
+     This modal renders inside the message-detail column, and that column now
+     carries backdrop-filter (kx-glass-drawer). A filtered element becomes the
+     containing block for its fixed-position descendants, so `fixed inset-0`
+     stopped meaning "the viewport" and started meaning "this column":
+     measured at 1280x820, the overlay came back 620x708 — a box parked in the
+     right-hand column instead of a centred modal over the page. All three
+     columns test positive, so this is a property of the conversion, not of
+     this modal.
+
+     Same escape the KDS menus already use (Select, PopoverPanel both portal to
+     body). The wrapper re-declares `kx-app` because leaving the app subtree
+     also leaves the var remap behind — without it the modal would read its
+     tokens from :root and render in Core colours while the page around it is
+     Aurora. */
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="kx-app fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh] overflow-y-auto bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
@@ -2157,7 +2297,11 @@ function ProductPickerModal({
               Select product
             </h2>
             {selected.size > 0 && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-blue-500/15 text-blue-300 border-blue-500/30">
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                aurora
+                  ? "bg-[rgba(86,127,178,0.18)] text-[#BCD8F0] border-[rgba(86,127,178,0.45)]"
+                  : "bg-blue-500/15 text-blue-300 border-blue-500/30"
+              }`}>
                 {selected.size} selected
               </span>
             )}
@@ -2221,7 +2365,9 @@ function ProductPickerModal({
                         isAlready
                           ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] opacity-60 cursor-not-allowed"
                           : isSelected
-                            ? "bg-blue-500/[0.08] border-blue-500/40"
+                            ? aurora
+                              ? "bg-[rgba(86,127,178,0.12)] border-[rgba(86,127,178,0.55)]"
+                              : "bg-blue-500/[0.08] border-blue-500/40"
                             : "bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
                       }`}
                     >
@@ -2257,7 +2403,11 @@ function ProductPickerModal({
                           Added
                         </span>
                       ) : isSelected ? (
-                        <CheckCircleIcon className="h-4 w-4 text-blue-400 shrink-0" />
+                        <CheckCircleIcon
+                          className={`h-4 w-4 shrink-0 ${
+                            aurora ? "text-[#BCD8F0]" : "text-blue-400"
+                          }`}
+                        />
                       ) : (
                         <PlusIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
                       )}
@@ -2289,6 +2439,7 @@ function ProductPickerModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

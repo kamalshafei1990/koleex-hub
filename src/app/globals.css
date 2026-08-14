@@ -2421,8 +2421,27 @@ input[type="number"]:not(.kx-spinner) {
 }
 /* The input INSIDE that well must not draw a second well on top of it —
    two nested recesses read as a box in a box. It goes transparent and lets
-   the wrapper be the field. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search input {
+   the wrapper be the field.
+
+   IT WAS LOSING, AND HAD BEEN SINCE IT WAS WRITTEN. Measured in Mail:
+   the inner input rendered background rgba(3,5,9,.55) — the wrapper's own
+   fill, composited a second time over itself — plus its own inset shadow,
+   in a 295x19 band inside a 343x32 box. A dark stripe through the middle of
+   every search field on the Hub, because PageHeader shares this recipe.
+
+   The cause is specificity, and it is the kind that reads as equal at a
+   glance. The generic field rule above is scoped
+   `input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])`,
+   and `:not()` contributes the specificity of its ARGUMENT — four attribute
+   selectors, so that rule scores (0,5,1). This one scored (0,1,1) and was
+   overridden every time. Both are unlayered, so layer order never entered
+   into it and nothing about the CSS looked wrong.
+
+   Repeating the four :not()s here is not duplication for its own sake: it is
+   what makes the two selectors comparable, and it lands this rule at (0,7,1).
+   No !important needed once the arithmetic is right. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
   background-color: transparent;
   border-color: transparent;
   box-shadow: none;
