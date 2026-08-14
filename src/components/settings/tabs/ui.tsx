@@ -47,6 +47,117 @@ export function SettingsCard({ title, subtitle, children, flush }: {
   );
 }
 
+/** THE READING ROW: a label, its current value, and a chevron ONLY if there
+ *  is somewhere to go.
+ *
+ *  This is the piece the Settings app did not have. `ControlRow` hosts a
+ *  control; nothing here reported a value and then got out of the way, so the
+ *  only way to learn a setting's state was to open it. Owner's reference is
+ *  iOS Settings, where every row carries its answer on the right — WLAN "Not
+ *  Connected", iCloud "50 GB", Birthday "July 20, 1990" — and a whole screen
+ *  can be read without entering anything.
+ *
+ *  THE CHEVRON IS THE AFFORDANCE, AND IT IS ENFORCED HERE RATHER THAN LEFT TO
+ *  DISCIPLINE. Pass a handler and the row becomes a button with a chevron;
+ *  pass none and it renders as plain text with no chevron and no hover. That
+ *  is the same contract iOS's About screen uses — Model Number and Serial have
+ *  no chevron because they are facts, not doors — and it is the reason a
+ *  reader never taps something that cannot be tapped.
+ *
+ *  NO PLACEHOLDER FOR A MISSING VALUE. A row with nothing to report shows
+ *  nothing; an em dash would be a value that says "empty", which is different
+ *  from having no state at all. Use `value="Set Up"` for the third case the
+ *  reference names: configured, unconfigured, and not-yet-set-up are three
+ *  states, not two. */
+export function SettingsRow({
+  label, hint, value, icon, onClick, href, destructive, last,
+}: {
+  label: string;
+  hint?: string;
+  /** Current state, shown at the inline end. Omit when the row has none. */
+  value?: ReactNode;
+  icon?: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  /** Sign out, delete, reset — red label, and by convention alone in its own group. */
+  destructive?: boolean;
+  last?: boolean;
+}) {
+  /* A CHEVRON MEANS "THERE IS MORE BEHIND THIS", SO AN ACTION MUST NOT HAVE
+     ONE. Destructive rows are interactive but they do not disclose — Sign Out
+     does not take you anywhere, it does something — so they drop the chevron
+     and centre their label, the way the reference draws them. Caught on the
+     probe: the first version tied the chevron to "has a handler" alone and
+     put an arrow on Sign Out, promising a screen that does not exist. */
+  const isAction = !!destructive;
+  const interactive = !!(onClick || href);
+  const body = (
+    <>
+      {icon && (
+        <span className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+          {icon}
+        </span>
+      )}
+      <span className={`min-w-0 flex-1 ${isAction ? "text-center" : "text-start"}`}>
+        <span className={`block text-[13px] font-medium ${isAction ? "text-[#FF3333]" : "text-[var(--text-primary)]"}`}>
+          {label}
+        </span>
+        {hint && <span className="block text-[11px] text-[var(--text-dim)] mt-0.5">{hint}</span>}
+      </span>
+      {value !== undefined && value !== null && value !== "" && (
+        <span className="shrink-0 text-[12.5px] text-[var(--text-dim)] tabular-nums">{value}</span>
+      )}
+      {interactive && !isAction && <Chevron className="shrink-0 text-[var(--text-ghost)]" />}
+    </>
+  );
+  /* gap-3 not gap-4: the chevron needs to sit close to the value it belongs
+     to, or the two read as separate columns. */
+  const cls = `w-full flex items-center gap-3 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`;
+  if (href) return <a href={href} className={cls}>{body}</a>;
+  if (onClick) return <button type="button" onClick={onClick} className={cls}>{body}</button>;
+  return <div className={cls}>{body}</div>;
+}
+
+/** A card with the label ABOVE it and the explanation BELOW it.
+ *
+ *  `SettingsCard` puts its title inside the card, which is right for a titled
+ *  panel and wrong for a list group: in the reference the small uppercase
+ *  label sits outside, so the card itself contains nothing but rows, and the
+ *  sentence that explains the group sits under it in muted text — right where
+ *  the reader looks after touching the control, instead of in a tooltip.
+ *
+ *  Both are optional. Most groups in the reference carry NEITHER: the gap
+ *  between cards does the grouping, and a header is spent only where the
+ *  grouping itself is information (iOS uses none through most of General, and
+ *  names every group in Accessibility, where "Vision / Hearing / Speech" IS
+ *  the point). Do not add a header just because a group exists. */
+export function SettingsGroup({ header, footer, children, flush = true }: {
+  header?: string;
+  footer?: ReactNode;
+  children: ReactNode;
+  /** Rows edge-to-edge, each row's bottom border acting as the divider. */
+  flush?: boolean;
+}) {
+  return (
+    <div>
+      {header && (
+        <h3 className="mb-2 ps-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
+          {header}
+        </h3>
+      )}
+      {/* Same material as SettingsCard — kx-glass is Aurora-scoped, so Core
+          renders the flat card it always had. px only: a flush list needs its
+          rows to reach the card's edges, and their own py does the spacing. */}
+      <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-5 md:px-6">
+        <div className={flush ? "" : "space-y-1 py-2"}>{children}</div>
+      </section>
+      {footer && (
+        <p className="mt-2 px-1 text-[11.5px] leading-relaxed text-[var(--text-dim)]">{footer}</p>
+      )}
+    </div>
+  );
+}
+
 /** A labeled row that hosts a control on the right (segmented / select). */
 export function ControlRow({ label, hint, children, last }: {
   label: string; hint?: string; children: ReactNode; last?: boolean;
