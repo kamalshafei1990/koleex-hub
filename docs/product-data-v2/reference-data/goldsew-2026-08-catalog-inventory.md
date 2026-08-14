@@ -7,7 +7,7 @@ sewing equipment… more than 70 kinds of products."*
 **Declared scope:** *SHOES · LUGGAGE · BAGS · SOFA · GLOVES* — thick material and leather.
 
 > ⚠️ **IMAGE-ONLY.** `pdftotext` returns **0 characters**. Every fact below was read by
-> rendering the pages. It is one of the 51 image-only files out of 76 in the library —
+> rendering the pages. It is one of the 51 image-only files in the library (76 files, **75 unique** — see trap 2) —
 > which is why no earlier keyword sweep for leather or footwear ever found it.
 
 > **Model codes are the SUPPLIER's.** Per the standing rule, only the FIELDS are taken
@@ -18,8 +18,9 @@ sewing equipment… more than 70 kinds of products."*
 
 ## 1. Why this catalogue matters
 
-**Leather & Footwear Machinery is the Hub's largest untouched gap — 6 coded
-subcategories, 0 templates.** Before this file the library had no leather/footwear
+**Leather & Footwear Machinery was the Hub's largest untouched gap — 6 coded
+subcategories, 0 templates. `XSES` and `XSEB` were built from this file
+(`a926154c`), taking it to 2 of 6.** Before this file the library had no leather/footwear
 source at all: Koleex's own post-bed page is 18 names with no table, and S-TEFEILA is a
 cutter specialist that merely mentions leather. This is the first catalogue in the
 library **built around footwear and bags**, and it prints spec tables.
@@ -29,7 +30,7 @@ library **built around footwear and bags**, and it prints spec tables.
 | **XSES** | Shoe Sewing Machines | SR-168 · 168S · 168-1 · 168W · 168H · 169 · 2169 (双线座式内线机, *Double Thread Side Seam Shoe Sewing*) + SR-2971/2972 八方车 shoe-mending + SR-05/5 · SR-5-2 mocca | ✅ **yes** — SR-168 / 168S / 168-1, and a second for SR-05/5 |
 | **XSEB** | Bag Sewing Machines | SR-5168 · SR-6168 · SR-6168D (双线座式缝包机, *Double Thread Side Seam Bag Sewing*) | ⚠️ shares the SR-168 family sheet; no table of its own |
 | **XSEK** | Skiving & Edge Trimming | SR-902 · SR-902D · SR-209 (鞋底、内里修边机 *Sole and Lining Trimming*) · **SR-801C 圆刀削皮机** *Leather Round Knife Skiving Machine with dust extraction* | ❌ names + photos only |
-| **XSEL** | Leather Sewing Machines | SR-243 · SR-441 extra-heavy compound feed · SR-205 unison extra-heavy · SR-868 / 868H / 885 皮革花样机 *Leather Pattern Machine* | ✅ indirectly (SR-243 family shares the compound-feed sheets) |
+| **XSEL** | Leather Sewing Machines | SR-243 · SR-441 extra-heavy compound feed · SR-205 unison extra-heavy · SR-868 / 868H / 885 皮革花样机 *Leather Pattern Machine* | ⛔ **do not build — see §7.** Every one of these belongs to `XSL` or `XAPT`; filing them here would shelve the same machine twice |
 | **XSEE** | Edge Binding Machines | ⚠️ **nothing that is binding.** SR-298B is a *gluing + folding* machine — a different operation. Do not file it here to make the shelf non-empty. | — |
 | **XSET** | Tape Attaching Machines | ❌ nothing | — |
 
