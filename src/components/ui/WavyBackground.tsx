@@ -46,6 +46,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import { useHour, useWallpaper } from "@/lib/useWallpaper";
+import { backgroundCss, dimFor, fitStyle, floorCss, isLive } from "@/lib/wallpaper";
 
 /* Hub Blue instead of the original's sky / indigo / purple / fuchsia / cyan —
    a rainbow, and against everything the brand says.
@@ -190,7 +192,28 @@ export default function WavyBackground(
     return () => window.removeEventListener("themechange", onTheme);
   }, [forced]);
 
+  /* THE GROUND SWITCH. This component is mounted by twenty pages, which makes
+     it the only sane place to ask which wallpaper is chosen — the alternative
+     was the same question answered in twenty files.
+
+     The wave field is still the default and the code below is untouched. A
+     different choice does not modify the field, it declines to mount it: the
+     canvas is not rendered and the draw loop never starts, so a still
+     wallpaper is strictly cheaper than the ground it replaces.
+
+     The gate pins its theme with `forced`, and it has no account — the hook
+     falls back to hub-live there, which is what the gate was signed off with. */
+  const wallpaper = useWallpaper();
+  const live = isLive(wallpaper);
+  const hour = useHour(wallpaper.id === "hub-dynamic");
+  const wpBackground = backgroundCss(wallpaper, theme, hour);
+  /* A chosen wallpaper that cannot paint — an upload deleted from Storage,
+     an id from a newer build — resolves to null, and null means the field.
+     Falling back to the Hub's own ground beats showing a flat page colour. */
+  const showCanvas = live || wpBackground === null;
+
   useEffect(() => {
+    if (!showCanvas) return;      // guard INSIDE the effect: hooks stay unconditional
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext("2d");
@@ -343,19 +366,31 @@ export default function WavyBackground(
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("resize", onResize);
     };
-  }, [theme, topLight]);
+  }, [theme, topLight, showCanvas]);
 
   return (
     <>
+      {/* A chosen wallpaper. Rendered INSTEAD of the canvas, never behind it:
+          two grounds stacked would be one layer of pure waste, since the
+          canvas is opaque wherever it paints. */}
+      {!showCanvas && (
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: wpBackground!, ...fitStyle(wallpaper.fit) }}
+        />
+      )}
       {/* The box runs 48px past the viewport on every side — uniform across
           engines so both blur paths (ctx.filter / CSS element filter) render
           the same picture, and the CSS path's edge falloff stays off-screen. */}
+      {showCanvas && (
       <canvas
         ref={ref}
         aria-hidden
         className="absolute pointer-events-none"
         style={{ inset: -48, width: "calc(100% + 96px)", height: "calc(100% + 96px)" }}
       />
+      )}
       {/* Contrast floor. The waves cross the middle of the screen, which is
           exactly where the password field sits, and the brightest stop is
           #BCD8F0 under white type. */}
@@ -370,7 +405,15 @@ export default function WavyBackground(
            band, which reads as a black slab (owner, three times). Apps opt
            in; Home keeps the floor it was signed off with. */
         style={{
-          background: topLight
+          /* A wallpaper brings its own scrim. The two floors below were tuned
+             against the wave field's specific brightness and say nothing
+             useful about someone's photograph, so a chosen ground computes its
+             own from the catalogue's dim — with a hard floor for uploads,
+             because we cannot know what is in them. topLight still applies:
+             it is about where the header ramp sits, not what is underneath. */
+          background: !showCanvas
+            ? floorCss(theme, dimFor(wallpaper))
+            : topLight
             ? (theme === "light"
                 ? "radial-gradient(120% 90% at 50% 78%, rgba(247,249,252,.30) 0%, rgba(247,249,252,.34) 56%, rgba(247,249,252,.72) 100%)"
                 : "radial-gradient(120% 90% at 50% 78%, rgba(5,7,12,.22) 0%, rgba(5,7,12,.30) 56%, rgba(5,7,12,.66) 100%)")
