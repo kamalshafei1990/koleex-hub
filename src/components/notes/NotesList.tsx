@@ -229,6 +229,13 @@ function NoteRowItem({
     <div
       role="button"
       tabIndex={0}
+      /* KDS row rule: a full-bleed row declares `role="button"` only so it can
+         be opened from the keyboard — it is not a control. Without this, the
+         Aurora skin's control-hover rule paints a Hub-Blue border and a 3%
+         white fill over it with `!important`, which on a square full-bleed row
+         is a hard blue box, and it also overrode the row's own
+         `hover:bg-[var(--bg-surface)]` below. */
+      data-kx-keep-hover=""
       onClick={() => onSelect(note.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(note.id); }

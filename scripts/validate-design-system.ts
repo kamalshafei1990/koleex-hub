@@ -23,6 +23,8 @@
          @/components/ui/Button. (Heuristic — flags new ad-hoc cases.)
      07  No local KpiCard: every "KPI tile" must use @/components/ui/KpiCard.
          (Heuristic — flags new local definitions named `KpiCard`.)
+     08  A full-bleed list row that declares `role="button"` must carry
+         `data-kx-keep-hover`. See the block comment on that rule below.
    ========================================================================== */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -116,6 +118,51 @@ scan(
     /src\/components\/finance\/FinanceUi\.tsx$/,
   ],
 );
+
+/* ── 08 — full-bleed row + role="button" must opt out of Aurora's control hover
+   ───────────────────────────────────────────────────────────────────────────
+   globals.css (~2369) forces a Hub-Blue `border-color` and a 3% white fill with
+   `!important` on `:is(button, a, summary, [role="button"])` inside a converted
+   app. It is written for CONTROLS. A list row that declares `role="button"` so
+   it can be opened from the keyboard gets caught by it too — and on a full-bleed
+   row with `border-radius: 0` that is not a rim, it is a hard blue box around
+   the whole row. Owner reported it on the Contacts directory twice: rounding
+   the highlight did not fix it, because the border is on the row and the row IS
+   the full-bleed box.
+
+   `data-kx-keep-hover` is that rule's own documented escape hatch. Stamp it on
+   the row and the row keeps whatever hover it defines for itself.
+
+   ⚠️ Do NOT "fix" a new violation by adding another `:not()` to the CSS
+   selector. It already sits at (0,8,0) and other rules depend on being
+   outranked by it; every `:not()` adds (0,1,0) and moves that target.
+
+   DETECTION is deliberately narrow: the full-bleed divider className with a
+   `role="button"` within the same open tag above it. That is the exact shape
+   that reproduces, so a card, a chip or a plain non-interactive row will not
+   trip it. */
+{
+  const ROW_DIVIDER = /border-b border-\[var\(--border-faint\)\]/;
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    const lines = readFileSync(file, "utf8").split("\n");
+    lines.forEach((text, i) => {
+      if (!ROW_DIVIDER.test(text)) return;
+      /* Walk back to the start of this JSX open tag, not a fixed window — the
+         previous `>` ends the element before it, so anything past that belongs
+         to a different element and must not be read as this row's attributes. */
+      const attrs: string[] = [];
+      for (let j = i; j >= 0 && i - j < 25; j--) {
+        attrs.unshift(lines[j]);
+        if (j < i && /^\s*[<{]/.test(lines[j])) break;
+      }
+      const block = attrs.join("\n");
+      if (!/role=["']button["']/.test(block)) return;
+      if (/data-kx-keep-hover/.test(block)) return;
+      findings.push({ file: rel, line: i + 1, text: text.trim(), rule: "08 row role=button without data-kx-keep-hover" });
+    });
+  }
+}
 
 if (findings.length === 0) {
   console.log("✓ Design-system drift detector — all checks passed.");

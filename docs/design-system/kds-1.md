@@ -27,6 +27,36 @@ removal rides the waves.
   fill, white knob. Modals/drawers: dim + `backdrop-blur-sm`, always.
 - Motion: 2D only, 150-300ms, spring-out for entrances; no bounce theatrics.
 
+### 2a. List rows (owner rule, 2026-08-15)
+A **full-bleed list row** — one that carries the list's own side padding and a
+full-width divider — is **not a control**, even when it declares
+`role="button"` so it can be opened from the keyboard. Two things follow, and
+both are CI-enforced or CI-adjacent:
+
+1. **Its highlight is an inset rounded layer, never a background on the row.**
+   Filling the row's own background can only ever be a hard-edged band running
+   the full width, corner to corner — and rounding the row does not help,
+   because the padding and the divider belong to that same full-bleed box, so
+   the radius rounds the divider with it. Use `.kx-row-hl` (globals.css):
+   `::before { inset: 4px 8px; border-radius: 12px; z-index: -1 }` over
+   `isolation: isolate`. 4px vertical clears the dividers above and below; 8px
+   horizontal is what makes the radius visible at all.
+2. **Hover and selected share that one shape.** A square selected row among
+   rounded neighbours reads as a bug, not as a selection. Selected stays the
+   stronger fill (`--bg-surface-active`), hover the lighter one
+   (`--bg-surface-hover`).
+3. **The row must carry `data-kx-keep-hover`.** Aurora's global control-hover
+   rule forces a Hub-Blue `border-color` and a 3% white fill with `!important`
+   on anything matching `[role="button"]` inside a converted app; on a square
+   full-bleed row that is a hard blue box around the whole row, and it also
+   kills the row's own hover. That attribute is the rule's own documented
+   escape hatch. **Checked by `npm run validate:design-system` (rule 08).**
+   ⚠️ Never fix a violation by adding another `:not()` to that selector — it
+   sits at (0,8,0), other rules depend on being outranked by it, and every
+   `:not()` adds (0,1,0).
+
+Reference implementation: the Contacts directory row.
+
 ## 3. Type scale (Helvetica Neue; 4pt grid; NOTHING else)
 `10 · 11 · 12 · 13 · 14(body) · 16 · 18 · 22 · 26 · 32 · 44+(display, Light)`
 Weights: Light(display) / Regular(body) / Medium(labels) / Semibold(titles) /
