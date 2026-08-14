@@ -3376,3 +3376,35 @@ input[type="number"]:not(.kx-spinner) {
   padding: 0;
 }
 
+
+/* ── Off-screen app grids skip their paint ────────────────────────────────
+   MEASURED on the Home launcher 2026-08-15, mobile viewport 375×812:
+
+     glass elements total            52
+     glass ON screen        21  =  0.50 MP   (1.7× the screen itself)
+     glass OFF screen       31  =  0.38 MP   ← pure waste
+     28 of those 31 are app tiles sitting ~1,240 px above the fold
+
+   Every one of those tiles carries `backdrop-filter: blur(16px) saturate(1.5)`,
+   and the GPU re-samples what is behind it — while scrolling, what is behind it
+   changes, so they are all recomputed every frame whether or not they can be
+   seen. `content-visibility: auto` lets the browser skip layout, paint AND the
+   backdrop work for a subtree that is outside the viewport.
+
+   ⚠️ IT GOES ON THE GRID, NEVER ON THE TILE — that distinction is the whole
+   fix and it was found by testing both, live, before writing any code:
+     · on a single `.kx-hover-tile`  → the tile is removed from its parent
+       grid's track sizing and the layout SHIFTS. Rejected.
+     · on the grid container itself  → container 343×343 before and after,
+       tile 106×106 before and after. Zero movement, glass intact.
+
+   `contain-intrinsic-size: auto` remembers the real size once rendered, so a
+   grid that has been on screen once never guesses again — which is what keeps
+   the scrollbar honest and stops it jumping under the thumb.
+
+   Nothing visual changes: a grid inside the viewport renders exactly as before.
+   This only stops work that could never have been seen. */
+.kx-lazy-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}

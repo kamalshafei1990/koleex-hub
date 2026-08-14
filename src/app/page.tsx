@@ -992,7 +992,7 @@ export default function HomePage() {
           />
         ) : isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category */
-          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
+          <div className={`${introMotion ? "kx-grid " : ""}kx-lazy-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
             {filteredApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -1017,7 +1017,7 @@ export default function HomePage() {
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
                 </div>
-                <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
+                <div className={`${introMotion ? "kx-grid " : ""}kx-lazy-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
                   {group.apps.map((app) => (
                     <AppCard
                       key={app.id}
