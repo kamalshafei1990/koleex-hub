@@ -31,6 +31,7 @@ import { CUTTING_SYSTEM_SCHEMAS } from "./schemas/cutting-systems-2026-08-14";
 import { FOLDING_PACKING_SCHEMAS } from "./schemas/folding-packing-2026-08-14";
 import { SEWING_MOTOR_SCHEMAS } from "./schemas/sewing-motors-2026-08-14";
 import { SHOE_BAG_SEWING_SCHEMAS } from "./schemas/shoe-bag-sewing-2026-08-14";
+import { SEAM_SEALING_SCHEMAS } from "./schemas/seam-sealing-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -134,6 +135,11 @@ for (const schema of SEWING_MOTOR_SCHEMAS) registerSchema(schema);
    Leather & Footwear Machinery, which had 6 coded subcategories and none.
    Source S-GOLDSEW, image-only, read by rendering. */
 for (const schema of SHOE_BAG_SEWING_SCHEMAS) registerSchema(schema);
+
+/* XFSS Seam Sealing & Bonding (2026-08-14) — closes one of Finishing
+   Equipment's two remaining gaps. Source `中性款`, an UNBRANDED image-only
+   catalogue found by the cover triage; its DL codes are generic to the trade. */
+for (const schema of SEAM_SEALING_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
