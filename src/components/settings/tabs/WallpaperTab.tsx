@@ -34,10 +34,11 @@ import { settingsT } from "@/lib/translations/settings";
 import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
-  announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper,
-  asImage, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
+  announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
+  asImage, isShader, shaderFallback, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
 } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
+import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
 import { SettingsCard, ControlRow, SelectControl } from "./ui";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -125,9 +126,7 @@ export default function WallpaperTab(
   };
 
   const isPhoto = current.id === PHOTO_ID && !!current.photoUrl;
-  const currentName = isPhoto
-    ? t("wp.yourPhoto")
-    : t(getWallpaper(current.id)?.nameKey ?? "wp.hubLive");
+  const currentName = isPhoto ? t("wp.yourPhoto") : t(nameKeyFor(current));
 
   return (
     <div className="space-y-4">
@@ -193,6 +192,27 @@ export default function WallpaperTab(
         />
       ))}
 
+      {/* ── Live patterns ───────────────────────────────────────────────── */}
+      <SettingsCard title={t("wp.group.shader")} subtitle={t("wp.group.shader.footer")}>
+        <div className="flex flex-wrap gap-3">
+          {SHADER_WALLPAPERS.map((sw) => (
+            <Tile
+              key={sw.id}
+              selected={current.id === sw.id}
+              label={t(sw.nameKey)}
+              badge={t("wp.live.badge")}
+              /* A CSS approximation, NOT the shader. Twenty-five live tiles
+                 would be twenty-five WebGL contexts on one screen, which is
+                 how a picker becomes heavier than everything it picks. The
+                 thumbnail is the same fallback the ground shows, so it moves
+                 with the tint and stays honest about the colour. */
+              background={asImage(shaderFallback(current.tint, theme))}
+              onClick={() => choose({ ...current, id: sw.id })}
+            />
+          ))}
+        </div>
+      </SettingsCard>
+
       {/* ── Your photos ─────────────────────────────────────────────────── */}
       <SettingsCard title={t("wp.group.photo")} subtitle={t("wp.group.photo.footer")}>
         <div className="flex flex-wrap gap-3">
@@ -229,13 +249,24 @@ export default function WallpaperTab(
       </SettingsCard>
 
       {/* ── Colors ──────────────────────────────────────────────────────── */}
-      <SettingsCard title={t("wp.group.color")}>
+      {/* The colours do two jobs, and which one is obvious from what is
+          selected: with a still wallpaper they ARE the wallpaper; with a live
+          pattern they colour it. That is the owner's ask — "when I select a
+          colour the wallpaper colour changes" — and it needs no second row of
+          swatches to say so, only a line of text that changes with it. */}
+      <SettingsCard
+        title={t("wp.group.color")}
+        subtitle={isShader(current) ? t("wp.tintNote") : undefined}
+      >
         <div className="flex flex-wrap gap-2.5">
           {WALLPAPERS.filter((w) => w.group === "color").map((w) => {
-            const on = current.id === w.id;
+            const tinting = isShader(current);
+            const swatch = theme === "light" ? w.light : w.dark;
+            const on = tinting ? current.tint === swatch : current.id === w.id;
             return (
               <button
-                key={w.id} type="button" onClick={() => pick(w)} title={t(w.nameKey)}
+                key={w.id} type="button" title={t(w.nameKey)}
+                onClick={() => (tinting ? choose({ ...current, tint: swatch }) : pick(w))}
                 aria-label={t(w.nameKey)} aria-pressed={on}
                 className={`w-9 h-9 rounded-full border transition-shadow flex items-center justify-center ${
                   on ? "border-[var(--border-focus)] shadow-[0_0_0_2px_var(--border-focus)]"

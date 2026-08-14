@@ -40,6 +40,7 @@
    break a good machine; they do not describe a weak one. */
 
 import type { ThemeMode } from "./display-prefs";
+import { getShader, isShaderId, palette } from "./wallpaper-shaders";
 
 /* ── types ──────────────────────────────────────────────────────────────── */
 
@@ -48,10 +49,10 @@ import type { ThemeMode } from "./display-prefs";
  *  still  — a fixed CSS gradient.
  *  color  — a flat brand or user colour.
  *  photo  — an uploaded image held in Storage. */
-export type WallpaperKind = "live" | "dynamic" | "still" | "color" | "photo";
+export type WallpaperKind = "live" | "dynamic" | "still" | "color" | "photo" | "shader";
 
 /** Groups are the picker's sections, in the order they are shown. */
-export type WallpaperGroup = "koleex" | "dynamic" | "still" | "color";
+export type WallpaperGroup = "koleex" | "dynamic" | "still" | "color" | "shader";
 
 /** How an uploaded photo fills the viewport. Named as macOS names them so the
  *  owner's reference and our UI agree. */
@@ -84,6 +85,11 @@ export interface WallpaperPref {
   fit?: WallpaperFit;
   /** User override of the catalogue's dim, 0–100. */
   dim?: number;
+  /** The colour an animated ground is tinted with. One hex; the shader
+   *  registry derives a light and a dark partner from it, because asking
+   *  someone to fill three colour slots per wallpaper is a chore, not a
+   *  choice. Ignored by every still wallpaper. */
+  tint?: string;
 }
 
 /* ── the catalogue ──────────────────────────────────────────────────────── */
@@ -213,6 +219,20 @@ export const MAX_UPLOAD_EDGE = 2560;
 
 /* ── resolving a preference to CSS ──────────────────────────────────────── */
 
+/** The i18n key for whatever is currently chosen.
+ *
+ *  Exists because the obvious version — getWallpaper(id)?.nameKey ?? hubLive —
+ *  is wrong the moment a second catalogue appears. Shader ids live in
+ *  wallpaper-shaders.ts, not in WALLPAPERS, so every shader silently rendered
+ *  as "Wave field" while the ground behind it was demonstrably a shader. The
+ *  fallback hid the miss instead of surfacing it.
+ *
+ *  Photos are the caller's job — they have a name, not a key. */
+export function nameKeyFor(pref: WallpaperPref | null | undefined): string {
+  const id = pref?.id ?? DEFAULT_WALLPAPER_ID;
+  return getShader(id)?.nameKey ?? BY_ID.get(id)?.nameKey ?? "wp.hubLive";
+}
+
 export function getWallpaper(id: string): Wallpaper | undefined {
   return BY_ID.get(id);
 }
@@ -223,6 +243,25 @@ export function wallpapersInGroup(group: WallpaperGroup): Wallpaper[] {
 
 /** Is this preference the animated canvas? Everything downstream branches on
  *  this one question, so it is asked in exactly one place. */
+/** Is this an animated shader ground? The ground branches on it, and so does
+ *  the picker: a shader has no fixed thumbnail because its colour is the
+ *  user's. */
+export function isShader(pref: WallpaperPref | null | undefined): boolean {
+  return !!pref?.id && isShaderId(pref.id);
+}
+
+/** The still gradient a shader falls back to — shown while its chunk loads,
+ *  and shown permanently under prefers-reduced-motion. Derived from the same
+ *  tint, so the fallback is recognisably the same wallpaper rather than a
+ *  different one wearing its name. */
+export function shaderFallback(tint: string | undefined, theme: ThemeMode): string {
+  const p = palette(tint || "#567FB2");
+  const floor = theme === "light" ? "#F4F7FA" : "#05070C";
+  return `radial-gradient(95% 75% at 28% 18%, ${p.base}55 0%, transparent 62%),
+          radial-gradient(85% 70% at 80% 84%, ${p.dark}99 0%, transparent 60%),
+          linear-gradient(158deg, ${p.dark} 0%, ${floor} 100%)`;
+}
+
 export function isLive(pref: WallpaperPref | null | undefined): boolean {
   return (pref?.id ?? DEFAULT_WALLPAPER_ID) === DEFAULT_WALLPAPER_ID;
 }
@@ -286,6 +325,11 @@ export function backgroundCss(
     return `url("${pref.photoUrl.replace(/"/g, '%22')}")`;
   }
 
+  /* A shader paints itself. This returns its STILL fallback so the ground has
+     something correct on screen the moment the choice is made, rather than a
+     blank frame while a chunk and a WebGL context are set up. */
+  if (isShader(pref)) return asImage(shaderFallback(pref?.tint, theme));
+
   const w = pref?.id ? BY_ID.get(pref.id) : undefined;
   if (!w) return null;
   if (w.kind === "dynamic") return asImage(dynamicCss(theme, hour));
@@ -313,6 +357,9 @@ export function dimFor(pref: WallpaperPref | null | undefined): number {
   if (isLive(pref)) return 0;                       // the field owns its floor
   const base = pref?.id === PHOTO_ID
     ? PHOTO_MIN_DIM
+    /* Shaders are brighter and busier than the still gradients, so they take
+       the photo floor rather than the gentler catalogue default. */
+    : isShader(pref) ? PHOTO_MIN_DIM
     : (pref?.id ? BY_ID.get(pref.id)?.dim ?? 44 : 44);
   const user = pref?.dim;
   if (typeof user !== "number") return base;

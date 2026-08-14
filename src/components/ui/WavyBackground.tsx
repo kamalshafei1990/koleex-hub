@@ -47,7 +47,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useHour, useWallpaper } from "@/lib/useWallpaper";
-import { backgroundCss, dimFor, fitStyle, floorCss, isLive } from "@/lib/wallpaper";
+import { backgroundCss, dimFor, fitStyle, floorCss, isLive, isShader } from "@/lib/wallpaper";
+import dynamicImport from "next/dynamic";
+
+/* The shader host is itself split out: Core users, Aurora users on a still
+   ground, and anyone under reduced motion never download it. */
+const ShaderWallpaper = dynamicImport(() => import("@/components/wallpapers/ShaderWallpaper"), { ssr: false });
 
 /* Hub Blue instead of the original's sky / indigo / purple / fuchsia / cyan —
    a rainbow, and against everything the brand says.
@@ -379,6 +384,14 @@ export default function WavyBackground(
           className="absolute inset-0 pointer-events-none"
           style={{ backgroundImage: wpBackground!, ...fitStyle(wallpaper.fit) }}
         />
+      )}
+      {/* An animated ground paints OVER its own still fallback, never instead
+          of it: the gradient is already correct on the first frame, so there is
+          no blank flash while a chunk downloads and a WebGL context spins up —
+          and if either fails, what stays on screen is the same wallpaper, just
+          not moving. */}
+      {!showCanvas && isShader(wallpaper) && (
+        <ShaderWallpaper id={wallpaper.id} tint={wallpaper.tint} />
       )}
       {/* The box runs 48px past the viewport on every side — uniform across
           engines so both blur paths (ctx.filter / CSS element filter) render

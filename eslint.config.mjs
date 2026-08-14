@@ -13,6 +13,22 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    /* VENDORED, NOT OURS. The shader wallpapers under this folder are React
+       Bits (MIT + Commons Clause, LICENSE.md sits beside them), copied in
+       unmodified so they can be re-copied when upstream changes. Linting third
+       party code to our house rules only creates a choice between a red build
+       and edits that make the next update a merge — so the rules stop at the
+       folder boundary. Type checking does NOT: tsc still covers these files,
+       and the wrapper that mounts them is ours and fully linted. */
+    files: ["src/components/wallpapers/reactbits/**"],
+    rules: {
+      "react-hooks/purity": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

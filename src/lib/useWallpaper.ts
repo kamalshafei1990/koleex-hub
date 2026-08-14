@@ -44,6 +44,7 @@ function fromPrefs(raw: unknown): WallpaperPref | null {
     fit: fit === "fill" || fit === "fit" || fit === "stretch" || fit === "center"
       ? (fit as WallpaperFit) : undefined,
     dim: typeof p.dim === "number" ? p.dim : undefined,
+    tint: typeof p.tint === "string" ? p.tint : undefined,
   };
 }
 

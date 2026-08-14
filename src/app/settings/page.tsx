@@ -54,7 +54,7 @@ import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { Chevron, RowValue } from "@/components/settings/tabs/ui";
 import { useWallpaper } from "@/lib/useWallpaper";
-import { PHOTO_ID, getWallpaper } from "@/lib/wallpaper";
+import { PHOTO_ID, nameKeyFor } from "@/lib/wallpaper";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -207,7 +207,7 @@ function SettingsContent() {
      to this route: WavyBackground below already pulls it in. */
   const wallpaperLabel = wallpaperPref.id === PHOTO_ID && wallpaperPref.photoUrl
     ? t("wp.yourPhoto")
-    : t(getWallpaper(wallpaperPref.id)?.nameKey ?? "wp.hubLive");
+    : t(nameKeyFor(wallpaperPref));
   /* Notifications reports what is SILENCED, not what is on. Per-activity
      toggles default to on and stay undefined until touched, so a count of the
      enabled ones would read "17" for a user who has never opened the screen —
