@@ -34,6 +34,7 @@ import { SHOE_BAG_SEWING_SCHEMAS } from "./schemas/shoe-bag-sewing-2026-08-14";
 import { SEAM_SEALING_SCHEMAS } from "./schemas/seam-sealing-2026-08-14";
 import { MACHINE_PARTS_SCHEMAS } from "./schemas/machine-parts-2026-08-14";
 import { EMBROIDERY_SCHEMAS } from "./schemas/embroidery-2026-08-14";
+import { HEAT_PRESS_SCHEMAS } from "./schemas/heat-press-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -154,6 +155,13 @@ for (const schema of MACHINE_PARTS_SCHEMAS) registerSchema(schema);
    shared and `head_count` decides the shelf. Deliberately NOT registered under
    XEC: "computerized" is a control attribute that overlaps both of these. */
 for (const schema of EMBROIDERY_SCHEMAS) registerSchema(schema);
+
+/* XPHR Rotary + XPH Heat Press (2026-08-14) — source KILO 2024, image-only.
+   TWO templates and not one: the roller sheet and the flat-press sheet share
+   only voltage and packing size. A roller is specified by pressure and table
+   length (material runs THROUGH); a flat press by plate size and dwell time
+   (material sits IN). Printing & Heat Press 2/7 -> 4/7. */
+for (const schema of HEAT_PRESS_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */

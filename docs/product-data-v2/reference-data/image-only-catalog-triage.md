@@ -200,3 +200,52 @@ That is the same defect CL-0020 removed from sewing when `needle_count` and
 code is an owner decision.** The template deliberately does not register under
 `XEC`. `XEB` and `XEQ` are genuinely different devices; this catalogue prints
 neither.
+
+---
+
+## Follow-up: `KILO (麒龙) 2024` read (2026-08-14) — Printing & Heat Press 2/7 → 4/7
+
+36 pages, image-only. Pages 33–44 carry dozens of heat-press models under **two
+different table shapes**, which is why this landed as two templates:
+
+| | Roller sheet (pp. 33–36) | Flat sheet (pp. 37–44) |
+|---|---|---|
+| size column | **规格CM = drum ⌀ × working width** | 加热板尺寸 **cm AND inch** |
+| force | 工作压力 **0–8 kg/cm²** | — (operator's lever) |
+| time | 定时关机 **0–4 HOURS** | 时间范围 **0–999 SECONDS** |
+| temperature | **0–399 °C** | **0–299 °C** |
+| extent | 工作台尺寸 1.5 / 2.65 / 3.35 **m** | — |
+
+**They share only voltage and packing size.** A roller is specified by pressure
+and table length because material runs THROUGH it; a flat press by plate size and
+dwell because material sits IN it.
+
+**Traps recorded in the schema header:**
+1. **规格(CM) on the roller is NOT a plate size** — `120*190` is a 120 cm drum
+   diameter × 190 cm width. Read as a platen it is the wrong machine by an order
+   of magnitude in throughput.
+2. **The temperature ceilings differ by class and it is not a typo** — 399 on a
+   flat-press row means the row came off the roller table, and vice versa.
+3. **The flat press prints plate size twice, in two units** — `38x38 / 15x15` is
+   cm then inches. Record both: inches is what the trade quotes and what transfer
+   paper is sold in; centimetres is what matches the packing size on the row.
+
+### ⚠️ The check that caught a template which would never have appeared
+
+Written with `categoryCode: "printing-heat-press"`. **The live DB slug is
+`printing-heat-press-equipment`** — and `ProductForm` passes
+`product.category_slug` straight into `resolveSchema`, so a category code one
+word off is a template that **silently never renders**. Probing with the DB's own
+slug returned NO TEMPLATE for both new schemas while returning the existing
+`XPPH`/`XPDH` correctly, which is what exposed it.
+
+**The check, worth running after every new schema:** the set of schema
+`categoryCode` values minus the set of live category slugs must be **empty**.
+It is now.
+
+### Still open in this category
+
+`XPDT` digital textile (DTG) · `XPSP` screen printing · `XPSU` sublimation.
+KILO pages 5–20 do carry DTF/DTG/UV printers with spec tables, so **`XPDT` is
+sourced and buildable** — it was not built in this pass only to keep the change
+reviewable.
