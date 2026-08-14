@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
@@ -84,26 +84,20 @@ export default function KnowledgePage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* Header — matches Hub pattern */}
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link
-            href="/"
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <KnowledgeIcon size={16} />
-            </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              Knowledge
-            </h1>
-          </div>
+        {/* The comment here used to read "Header — matches Hub pattern", and
+            that was the whole problem: it MATCHED the shared header instead of
+            BEING it, so every improvement to the real one (the longer BK-4 back
+            button, M-1 dropping the name the system bar already prints, the
+            alignment fix) stopped at this file's edge. Now it is the same
+            component, and the next change arrives here for free. */}
+        <div className="mb-6 md:mb-8">
+          <PageHeader
+            title="Knowledge"
+            subtitle="Company policies, manuals, and reference documentation"
+            icon={<KnowledgeIcon size={16} />}
+            showTabs={false}
+          />
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          Company policies, manuals, and reference documentation
-        </p>
 
         {/* Knowledge Base Cards */}
         <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
