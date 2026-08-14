@@ -2340,7 +2340,7 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
         />
         <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
-      <PopoverPanel anchorRef={ref} open={open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
+      <PopoverPanel anchorRef={ref} open={open && filtered.length > 0} onClose={() => setOpen(false)} scrim={false} className="max-h-[22rem] overflow-y-auto">
           {filtered.map((opt, i) => (
             <button
               key={opt}
@@ -3828,7 +3828,7 @@ const TagEditor = React.memo(function TagEditor({
         />
         {suggestions && <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />}
       </div>
-      <PopoverPanel anchorRef={ref} open={!!suggestions && open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto">
+      <PopoverPanel anchorRef={ref} open={!!suggestions && open && filtered.length > 0} onClose={() => setOpen(false)} scrim={false} className="max-h-[22rem] overflow-y-auto">
           {filtered.map(opt => (
             <button
               key={opt}
@@ -4628,7 +4628,7 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
           className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer ${icon ? "ps-9 pe-9" : "ps-3 pe-9"}`}
         />
         <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
-        <PopoverPanel anchorRef={wrapRef} open={open && filtered.length > 0} onClose={() => setOpen(false)} className="max-h-[22rem] overflow-y-auto p-1">
+        <PopoverPanel anchorRef={wrapRef} open={open && filtered.length > 0} onClose={() => setOpen(false)} scrim={false} className="max-h-[22rem] overflow-y-auto p-1">
             {filtered.map((o, i) => (
               <button
                 key={i}
@@ -6518,7 +6518,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
           {/* Smart suggestions — each row names the supplier AND why it matched
               (brand, contact person, app ID, country…). Click opens that supplier. */}
-          <PopoverPanel anchorRef={searchWrapRef} open={searchFocused && !!debouncedSearch.trim() && suggestions.length > 0} onClose={() => setSearchFocused(false)} className="max-h-[22rem] overflow-y-auto">
+          {/* No scrim: these appear as you type. Dimming the page mid-keystroke
+              interrupts the very reading the suggestions are meant to help. */}
+          <PopoverPanel anchorRef={searchWrapRef} open={searchFocused && !!debouncedSearch.trim() && suggestions.length > 0} onClose={() => setSearchFocused(false)} scrim={false} className="max-h-[22rem] overflow-y-auto">
               {suggestions.map(c => {
                 const reason = searchMatchReason(c, searchTerms);
                 const cn = (c as unknown as Record<string, unknown>).company_name_cn;

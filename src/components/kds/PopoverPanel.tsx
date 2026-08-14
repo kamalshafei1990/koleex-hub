@@ -41,6 +41,7 @@ export default function PopoverPanel({
   matchAnchorWidth = true,
   align = "start",
   mobileSheet = false,
+  scrim = true,
   maxHeight = 352,
   children,
 }: {
@@ -59,6 +60,14 @@ export default function PopoverPanel({
       the notification panel is a sheet on a phone and a dropdown above it.
       One panel, two positioning modes, because that is what it actually is. */
   mobileSheet?: boolean;
+  /** A TYPE-AHEAD LIST IS NOT A MENU. Suggestions that appear while the user
+      is still typing must not dim and blur the page behind them — the user is
+      reading the field, not choosing from a modal surface, and darkening the
+      screen mid-keystroke is an interruption. Owner: "when I search by typing
+      the background become blur. for searching no need that."
+      Menus opened by a deliberate press keep the scrim; pass false only for
+      lists that open as a side effect of typing. */
+  scrim?: boolean;
   /** Tallest the panel may grow when the room allows. 352 suits a select list;
       a feed with its own header and filter chips needs more before its inner
       scroller starts doing the work. Never a floor — the room still wins. */
@@ -250,19 +259,20 @@ export default function PopoverPanel({
 
   return createPortal(
     <>
-      {/* One scrim, owned here, for every panel. The four shell menus each
-          hand-rolled this exact div; the selects had none at all, which is why
-          page text read straight through an open menu over a dense list. The
-          material is signed off and unchanged — the scrim is what gives it
-          something soft to be glass AGAINST. Below the header by design: the
-          header stays crisp and usable while a menu is open, which is the
-          behaviour already approved on the bell. */}
+      {/* One scrim, owned here, for every panel that wants one. The four shell
+          menus each hand-rolled this exact div; the selects had none at all,
+          which is why page text read straight through an open menu over a
+          dense list. The material is signed off and unchanged — the scrim is
+          what gives it something soft to be glass AGAINST. Below the header by
+          design: the header stays crisp and usable while a menu is open. */}
+      {scrim && (
       <div
         aria-hidden
         onMouseDown={() => closeRef.current()}
         className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm"
         style={{ zIndex: 199 }}
       />
+      )}
     <div
       ref={panelRef}
       style={{
