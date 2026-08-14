@@ -223,12 +223,24 @@ function SettingsContent() {
      the notification channel toggles (superseded by Notifications, and
      saving them wiped the per-activity switches). The admin Accounts app
      keeps its own copy for account administration. */
-  const personalItems = (["profile", "calendar"] as Tab[]).map(byId);
-  const displayItems = (["display", "sounds", "region"] as Tab[]).map(byId);
+  /* GROUPED BY WHAT THE READER IS TRYING TO DO. Two moves, both of them the
+     point of the regrouping rather than tidying:
+
+     · Calendar joins Display / Sounds / Region. Working hours and timezone are
+       not "personal details" like a photo and a phone number — they are part
+       of how the Hub behaves for you, which is the question that group answers.
+
+     · Signature & stamp leaves its own "Workspace" group and joins
+       Administration. The plan had it under Me; reading it corrected that —
+       its own copy says "Applied tenant-wide to quotations, invoices, and
+       packing lists". It is the COMPANY seal, not the user's, which is also
+       why it was already Super-Admin-only. A group of one called "Workspace"
+       was hiding that. */
+  const personalItems = (["profile"] as Tab[]).map(byId);
+  const displayItems = (["display", "sounds", "region", "calendar"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
-  const workspaceItems = isSA ? (["assets"] as Tab[]).map(byId) : [];
-  const adminItems = isSA ? (["admin"] as Tab[]).map(byId) : [];
+  const adminItems = isSA ? (["assets", "admin"] as Tab[]).map(byId) : [];
   const aboutItems = (["about"] as Tab[]).map(byId);
 
   return (
@@ -319,12 +331,9 @@ function SettingsContent() {
             {/* Security */}
             <MasterGroup label={t("group.security")} items={securityItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
-            {/* Workspace (super-admin) */}
-            {workspaceItems.length > 0 && (
-              <MasterGroup label={t("group.workspace")} items={workspaceItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
-            )}
-
-            {/* Admin (super-admin) */}
+            {/* Administration (super-admin) — Signature & stamp folded in
+                here from the old one-item "Workspace" group; it is the
+                tenant's seal, not the user's. */}
             {adminItems.length > 0 && (
               <MasterGroup label={t("group.admin")} items={adminItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
             )}

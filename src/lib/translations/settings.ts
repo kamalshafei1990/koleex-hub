@@ -10,12 +10,20 @@ export const settingsT: Translations = {
   "subtitle":             { en: "Your profile, preferences, and calendar defaults", zh: "您的资料、偏好和日历默认设置", ar: "ملفك الشخصي وتفضيلاتك وإعدادات التقويم" },
   "allSettings":          { en: "All settings", zh: "全部设置", ar: "كل الإعدادات" },
 
-  "group.personal":       { en: "Personal", zh: "个人", ar: "شخصي" },
-  "group.display":        { en: "Display", zh: "显示", ar: "العرض" },
-  "group.notifications":  { en: "Notifications", zh: "通知", ar: "الإشعارات" },
+  /* Group names answer "what am I trying to do", not "what kind of setting is
+     this". Display / Sounds / Region were three separate groups that all
+     answered one question — how the Hub presents itself to me — so they are
+     one group now. Owner's reference does the same: Accessibility groups by
+     Vision / Hearing / Speech, a human capability, not by feature type. */
+  "group.personal":       { en: "Me", zh: "我", ar: "أنا" },
+  "group.display":        { en: "The Hub, for me", zh: "我的 Hub", ar: "الهاب عندي" },
+  "group.notifications":  { en: "What reaches me", zh: "发送给我的内容", ar: "اللي يوصلني" },
   "group.security":       { en: "Security", zh: "安全", ar: "الأمان" },
-  "group.workspace":      { en: "Workspace", zh: "工作区", ar: "مساحة العمل" },
-  "group.admin":          { en: "Admin", zh: "管理", ar: "الإدارة" },
+  /* "group.workspace" removed with its group: it labelled a single row
+     (Signature & stamp) that has moved into Administration, where the
+     tenant-wide seal belongs. A key with no caller is a name that reads as a
+     section someone can look for and never find. */
+  "group.admin":          { en: "Administration", zh: "管理", ar: "الإدارة" },
   "group.about":          { en: "About", zh: "关于", ar: "حول" },
 
   "nav.profile":          { en: "Profile", zh: "个人资料", ar: "الملف الشخصي" },
