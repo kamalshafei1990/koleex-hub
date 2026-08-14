@@ -86,3 +86,53 @@ spec tables.
 
 **Next, in value order:** `XFSS` (confirmed, tables in hand) → Spare Parts (82 pages
 to read) → Stands & Tables → Embroidery.
+
+---
+
+## Follow-up: `2025杰克零件手册` read in full (2026-08-14)
+
+**82 pages. Its directory page is a printed taxonomy — 22 spare-part classes and
+16 accessory classes** — and that list is now `part_class` in the `XSPP` template,
+transcribed rather than invented.
+
+**⚠️ THE GAP TABLE'S "SPARE PARTS 6 CODED / 0 TEMPLATED" WAS STALE.** `XSPS`
+servo motors and `XSPD` direct drives had already landed from S-HONGYU. The real
+gap was **4**, and is now **3**: `XSPA` attachments & folders · `XSPC` control
+panels · `XSPT` touch screens. **Re-measure before quoting a gap.**
+
+### ⭐ What a parts catalogue actually prints — and why it changes the template shape
+
+Every one of the several hundred entries carries **exactly three lines**:
+
+```
+名称 / Description : Presser Foot (Heavy Duty)
+代码 / Part NO.    : 12121605400
+适配 / Machine Type: 798D/E4/E4S/C4/C5/C5S/C7-BK
+```
+
+**No dimensions. No materials. No weights. No tolerances.** Eighty-two pages and
+not one number a spec field could hold.
+
+That is not a gap in the catalogue — **it is what a part is**. A machine is
+defined by what it *does*; a part is defined by **what it FITS**. A presser foot
+has no performance to quote; its whole value is the list of machines it bolts
+onto, and a buyer searches by machine model, never by millimetre.
+
+So `XSPP` is the Hub's **first fitment template rather than spec template** —
+built around `compatible_machine_models`, with the physical fields that carry
+every other template absent by design. **Do not "improve" it by adding dimensions
+or material:** nothing in the source prints them, and an invented field gets
+filled with a guess and is wrong forever.
+
+### The gate earned its keep on this one
+
+`validate:budgets` section G rejected the build twice before it landed:
+1. **A duplicate i18n key** — `o:fit_interlock`. It already exists on the motor
+   templates meaning *"fits an interlock MACHINE"*, which is **not** the same
+   claim as *"belongs to the interlock section of a parts book"*. Renamed to
+   `thread_group_*`. **A value is only shared if the MEANING is shared.**
+2. **A stale description key** — editing a field's description silently orphans
+   its `SPEC_DESC_I18N` entry, because that map is keyed by the exact English
+   sentence. Change a description, change the key.
+
+**Result:** `XSPP` 4 groups / 17 fields. Spare Parts 2/6 → **3/6**.

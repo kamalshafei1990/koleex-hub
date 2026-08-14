@@ -12,6 +12,49 @@
 import type { Translations } from "@/lib/i18n";
 
 export const SPEC_I18N: Translations = {
+  /* ── XSPP Machine Parts (2026-08-14) — `2025杰克零件手册`. The 22 part
+     classes are transcribed from the catalogue's own directory page, so the
+     zh values are the printed Chinese, not a re-translation. */
+  "g:Part Identity": { en: "Part Identity", zh: "零件识别", ar: "هوية القطعة" },
+  "g:Fitment": { en: "Fitment", zh: "适配", ar: "التركيب والتوافق" },
+  "f:part_class": { en: "Part Class", zh: "零件类别", ar: "فئة القطعة" },
+  "f:manufacturer_part_number": { en: "Manufacturer Part Number", zh: "厂家零件代码", ar: "كود القطعة عند المصنّع" },
+  "f:part_variant": { en: "Variant / Duty", zh: "款式/料厚", ar: "الطراز / درجة التحمّل" },
+  "f:compatible_machine_models": { en: "Compatible Machine Models", zh: "适配机型", ar: "الموديلات المتوافقة" },
+  "f:fitment_scope": { en: "Fitment Scope", zh: "适配范围", ar: "نطاق التوافق" },
+  "f:thread_count_fitment": { en: "Thread Count (Fitment Group)", zh: "线数分组", ar: "عدد الخيوط (مجموعة التوافق)" },
+  "f:oem_status": { en: "OEM / Aftermarket", zh: "原厂/副厂", ar: "أصلي / تجاري" },
+  "o:part_bobbin_case": { en: "Bobbin / Bobbin Case", zh: "梭芯/梭壳", ar: "مكوك / بيت المكوك" },
+  "o:part_hook": { en: "Hook", zh: "旋梭", ar: "لقّاطة" },
+  "o:part_presser_foot": { en: "Presser Foot", zh: "压脚", ar: "قدم الضغط" },
+  "o:part_needle_plate": { en: "Needle Plate", zh: "针板", ar: "لوح الإبرة" },
+  "o:part_feed_dog": { en: "Feed Dog", zh: "牙齿", ar: "أسنان التغذية" },
+  "o:part_knife_set": { en: "Knives / Needle Protecting Patch", zh: "动定刀/分线片", ar: "سكاكين / واقي الإبرة" },
+  "o:part_blade": { en: "Knife / Blade", zh: "刀片", ar: "سكينة / نصلة" },
+  "o:part_looper": { en: "Looper", zh: "弯针", ar: "لوبر" },
+  "o:part_needle_clamp": { en: "Needle Clamp", zh: "针夹头", ar: "مشبك الإبرة" },
+  "o:part_needle_bar": { en: "Needle Bar", zh: "针杆", ar: "عمود الإبرة" },
+  "o:part_needle_gauge_set": { en: "Needle Gauge Set", zh: "针位组", ar: "طقم ضبط الإبر" },
+  "o:part_thread_tension": { en: "Thread Tension", zh: "夹线器", ar: "شادّ الخيط" },
+  "o:part_bobbin_winder": { en: "Bobbin Winder", zh: "绕线器", ar: "لفّاف المكوك" },
+  "o:part_solenoid": { en: "Solenoid", zh: "电磁铁", ar: "ملف كهرومغناطيسي" },
+  "o:part_overlock_conrod": { en: "Overlock Connecting Rod", zh: "包缝连杆", ar: "ذراع توصيل أوفرلوك" },
+  "o:part_thread_trimmer_asm": { en: "Thread Trimmer Assembly", zh: "剪线刀组", ar: "مجموعة قصّ الخيط" },
+  "o:part_upper_looper_holder": { en: "Upper Looper Holder Assembly", zh: "上弯针滑杆", ar: "حامل اللوبر العلوي" },
+  "o:part_led_switch": { en: "LED & Switch", zh: "双开关", ar: "لمبة ومفتاح" },
+  "o:part_sensor": { en: "Sensor", zh: "传感器", ar: "حسّاس" },
+  "o:part_thread_takeup": { en: "Thread Take-up", zh: "挑线杆", ar: "رافع الخيط" },
+  "o:part_thread_stand": { en: "Thread Stand", zh: "线架组件", ar: "حامل البكر" },
+  "o:part_auxiliary_device": { en: "Auxiliary Device", zh: "辅助器", ar: "جهاز مساعد" },
+  "o:fitment_single_model": { en: "Single Model", zh: "单一机型", ar: "موديل واحد" },
+  "o:fitment_model_series": { en: "Model Series", zh: "整个系列", ar: "سلسلة موديلات" },
+  "o:fitment_cross_brand": { en: "Cross-Brand / Universal", zh: "跨品牌通用", ar: "عام / متعدّد الماركات" },
+  "o:thread_group_4": { en: "4 Thread", zh: "四线", ar: "٤ خيوط" },
+  "o:thread_group_5": { en: "5 Thread", zh: "五线", ar: "٥ خيوط" },
+  "o:thread_group_6": { en: "6 Thread", zh: "六线", ar: "٦ خيوط" },
+  "o:thread_group_interlock": { en: "Interlock / Coverstitch", zh: "绷缝", ar: "إنترلوك / غرزة تغطية" },
+  "o:part_oem_original": { en: "OEM / Original", zh: "原厂件", ar: "أصلي" },
+  "o:part_aftermarket": { en: "Aftermarket", zh: "副厂件", ar: "تجاري" },
   /* ── XFSS Seam Sealing & Bonding (2026-08-14) — `中性款`, an UNBRANDED
      catalogue. 热风缝口密封 is the trade's own name for the process; the zh
      values reuse it rather than back-translating from English. */
@@ -1142,6 +1185,7 @@ export const SPEC_I18N: Translations = {
 
 /* ── Schema display names (s:<schema id>) ── */
 export const SPEC_NAME_I18N: Translations = {
+  "s:machine-parts.v1": { en: "Sewing Machine Part", zh: "缝纫机零件", ar: "قطعة غيار ماكينة خياطة" },
   "s:seam-sealing.v1": { en: "Seam Sealing & Bonding Machine", zh: "热风缝口密封机", ar: "ماكينة لحام ولصق الدرزات" },
   "s:shoe-sewing.v1": { en: "Shoe Sewing Machine", zh: "双线座式内线机", ar: "ماكينة خياطة الأحذية" },
   "s:bag-sewing.v1": { en: "Bag Sewing Machine", zh: "双线座式缝包机", ar: "ماكينة خياطة الشنط" },
@@ -1206,6 +1250,14 @@ export const SPEC_NAME_I18N: Translations = {
 
 /* ── Field descriptions, keyed by the exact English sentence ── */
 export const SPEC_DESC_I18N: Record<string, { zh: string; ar: string }> = {
+  /* ── XSPP Machine Parts (2026-08-14) — JACK 零件手册, a FITMENT sheet ─── */
+  "The twenty-two classes printed in the source catalogue's own directory, transcribed rather than invented. Pick the class before anything else: it is what a mechanic searches by, and it is the only field on a part that behaves like a category.": { zh: "源样册**自身目录页**所印的 22 个零件大类，此处为**照录，非自拟**。请**先选大类**：这是维修师傅**检索时用的入口**，也是零件身上**唯一像“类别”的字段**。", ar: "الـ٢٢ فئة قطع غيار المطبوعة في **صفحة فهرس الكتالوج نفسه** — **منقولة مش من عندي**. **اختار الفئة الأول**: دي اللي الفني بيدوّر بيها، وهي **الحقل الوحيد في القطعة اللي بيتصرّف كأنه تصنيف**." },
+  "The maker's own code — 8 or 10 digits in this catalogue (2081600700, 30116006). Enter it EXACTLY, including leading zeros: it is the string a customer quotes down the phone and the only key that matches a Koleex line to a supplier invoice. It is not a KOLEEX code and never becomes one.": { zh: "厂家自己的编码——本样册为 **8 位或 10 位**（2081600700、30116006）。请**原样录入，包括前导零**：这是客户**在电话里报的那串字符**，也是把 Koleex 的一行**对上供应商发票**的唯一键。它**不是 KOLEEX 代码，也永远不会变成**。", ar: "كود المصنّع نفسه — **٨ أو ١٠ أرقام** في الكتالوج ده (2081600700 · 30116006). اكتبه **بالظبط بما فيه الأصفار البادئة**: دي السلسلة اللي **العميل بيقولها في التليفون**، وهي المفتاح الوحيد اللي **بيربط سطر كوليكس بفاتورة المورّد**. **مش كود كوليكس ومش هيبقى كده أبدًا**." },
+  "The qualifier printed in brackets after the name — 薄料 light duty, 厚料 heavy duty, 70款 \"70 type\". Two parts can share a name, a class and nearly the same part number and differ only here, so a record without it is ambiguous exactly where it matters.": { zh: "名称后括号里所印的限定词——**薄料**、**厚料**、**70款**。两个零件可能**同名、同类、编码几乎相同**，而**只差在这里**；缺了本字段的记录，恰恰在**最要紧的地方是含混的**。", ar: "الوصف المطبوع بين القوسين بعد الاسم — **薄料 خفيف** · **厚料 تقيل** · **70款 «طراز ٧٠»**. ممكن قطعتين يبقى ليهم **نفس الاسم ونفس الفئة ورقم شبه متطابق** و**الفرق هنا بس**؛ فسجل من غير الحقل ده بيبقى **ملخبط في أهم نقطة بالظبط**." },
+  "⭐ THE FIELD THIS WHOLE TEMPLATE EXISTS FOR. Printed as 适配 / Machine Type, and it runs from a single model (\"798T\") to a fourteen-model list (\"C3/C4/E4S/C5/C5S/C6/C8/C7-M04/435\"). Copy the printed string whole, separators and all — do not tidy it, do not split it, and do not drop the tail after a dash: \"C7-M04/435\" is a different fit from bare \"C7\". A part with this field blank cannot be sold, because nobody can tell what it goes on.": { zh: "⭐ **本模板存在的全部理由**。印为 **适配 / Machine Type**，范围从**单一机型**（“798T”）到**十四款机型的清单**（“C3/C4/E4S/C5/C5S/C6/C8/C7-M04/435”）。请**整串照抄，连分隔符一起**——**不要整理、不要拆分、不要丢掉破折号后面的尾巴**：“C7-M04/435” 与光秃秃的 “C7” 是**两种不同的适配**。本字段为空的零件**根本无法销售**，因为**没人说得出它装在什么上面**。", ar: "⭐ **ده كل سبب وجود القالب ده**. مطبوع **适配 / Machine Type**، وبيروح من **موديل واحد** («798T») لحد **قايمة ١٤ موديل** («C3/C4/E4S/C5/C5S/C6/C8/C7-M04/435»). **انقل السلسلة كلها بفواصلها** — **ماتظبّطهاش، ماتقسّمهاش، وماترميش اللي بعد الشرطة**: «C7-M04/435» **تركيبة تانية غير** «C7» لوحدها. أي قطعة الحقل ده فاضي فيها **مايصحّش تتباع**، لأن **محدش هيعرف بتتركّب على إيه**." },
+  "How wide the list above reaches. It is the commercial fact hiding inside a fitment string: a part that fits one model is a service item held for one customer, and a part that fits a whole series is stock that turns. Read it off the printed list rather than assuming — a long list of models from one series is still one series.": { zh: "上面那份清单**铺得多广**。它是**藏在适配串里的商业事实**：只配一款机型的零件是**为某一个客户备的服务件**，而配整个系列的零件是**会周转的库存**。请**从所印清单读出**，不要想当然——**同一系列里的一长串机型，仍然只是一个系列**。", ar: "قد إيه القايمة اللي فوق **بتوصل**. دي **الحقيقة التجارية المخبّاية جوّه نص التركيب**: القطعة اللي بتركّب على موديل واحد **قطعة خدمة متحجوزة لعميل واحد**، واللي بتركّب على سلسلة كاملة **مخزون بيدور**. **اقراها من القايمة المطبوعة** وماتفترضش — **قايمة طويلة من موديلات سلسلة واحدة برضه تفضل سلسلة واحدة**." },
+  "⚠️ These values are `thread_group_*`, NOT the `fit_*` family — `o:fit_interlock` already exists on the motor templates meaning \"fits an interlock MACHINE\", which is a different claim from \"belongs to the interlock section of a parts book\". A shared value is only shared if the meaning is shared. The catalogue groups overlock and interlock parts under 四线/五线/六线 headings before it lists them, because a 5-thread foot will not serve a 4-thread machine. Leave BLANK on a lockstitch part — the grouping only exists where thread count changes the fit, and a value here on a part that has none is noise.": { zh: "⚠️ 本组取值为 **`thread_group_*`，而非 `fit_*` 家族**——`o:fit_interlock` 已存在于电机模板，含义是“**适配绷缝机器**”，这与“**属于零件手册中的绷缝分区**”是**两种不同的断言**。**取值只有在含义相同时才可共用**。样册在列出包缝与绷缝零件之前，先按 **四线/五线/六线** 分组，因为**五线的压脚装不上四线的机器**。**平缝零件请留空**——该分组只存在于线数会改变适配的地方；给一个本无线数概念的零件填值，只是噪音。", ar: "⚠️ القيم دي **`thread_group_*` مش عيلة `fit_*`** — `o:fit_interlock` موجودة أصلًا في قوالب الموتورات ومعناها «**بتركّب على ماكينة إنترلوك**»، وده **ادّعاء تاني غير** «**تبع قسم الإنترلوك في كتاب القطع**». **القيمة ماتتشاركش إلا لو المعنى واحد**. الكتالوج بيجمّع قطع الأوفرلوك والإنترلوك تحت عناوين **٤/٥/٦ خيوط** قبل ما يعدّدها، لأن **قدم بتاعة ٥ خيوط مش هتركّب على ماكينة ٤ خيوط**. **سيبها فاضية في قطع الغرزة المقفلة** — التجميع ده موجود بس حيث عدد الخيوط بيغيّر التركيب، وأي قيمة هنا في قطعة مالهاش عدد خيوط دوشة مش أكتر." },
+  "This catalogue is a maker's own parts book, so everything in it is original. Recorded anyway because the same part class is sold both ways at very different prices, and a parts line that cannot say which is a warranty argument waiting to happen.": { zh: "本样册是**厂家自己的零件手册**，因此其中一切皆为原厂件。**仍然记录**，是因为**同一类零件以两种身份、以差距极大的价格在售**；一条说不清自己是哪一种的零件记录，就是**一场等着发生的保修争议**。", ar: "الكتالوج ده **كتاب قطع بتاع المصنّع نفسه**، يعني كل اللي فيه أصلي. **سجّلناه برضه** لأن **نفس فئة القطعة بتتباع بالطريقتين وبفرق سعر كبير**؛ وسطر قطعة **مش عارف يقول هو أنهي واحدة فيهم** ده **خلاف ضمان مستني يحصل**." },
   /* ── XFSS Seam Sealing & Bonding (2026-08-14) — 中性款, unbranded ─────── */
   "Fill this FIRST — it decides which of the fields below mean anything. A hot-air machine melts an adhesive tape onto the seam and is described by temperature and tape width; an ultrasonic machine welds the fabric to itself with vibration and has neither. Only the hot-air machines are printed in the source catalogue, so an ultrasonic entry will leave several fields blank, and blank is the correct record.": { zh: "**先填这一项**——它决定下面哪些字段才有意义。热风机是把胶条熔贴到缝口上，用**温度和胶条宽度**来描述；超声波机是靠振动把面料自身焊合，**两者都没有**。源样册只印了热风机型，因此超声波条目会留下若干空白字段，而**留空正是正确的记录**。", ar: "**املا دي الأول** — هي اللي بتحدّد أي حقول تحتها ليها معنى أصلًا. ماكينة الهواء الساخن بتصهر شريط لاصق على الدرزة وبتتوصف بـ**الحرارة وعرض الشريط**؛ الماكينة فوق الصوتية بتلحم القماش في نفسه بالاهتزاز و**مالهاش لا دي ولا دي**. الكتالوج المصدر طبع ماكينات الهواء الساخن بس، فأي إدخال فوق صوتي هيسيب حقول فاضية — و**الفاضي هنا هو التسجيل الصح**." },
   "The three machines share a frame, a power rating and a temperature range and differ HERE — flat for garment panels, horizontal cylinder for tubular work such as a sleeve, shoe for a lasted upper. Read it together with the sealing speed: the shoe model runs at a quarter of the flat model's rate, and without this field the two speeds look like a quality difference instead of two different jobs.": { zh: "三款机器共用同一机架、同一功率与同一温度范围，差别**就在这里**——平板式用于服装裁片，横筒式用于袖筒等筒状件，鞋机式用于已绷帮的鞋帮。请与封合速度**一起读**：鞋机的速度只有平板式的四分之一，缺了本字段，两个速度看起来会像**质量差距**，而不是**两种不同的活**。", ar: "التلات ماكينات بيتشاركوا نفس الهيكل ونفس القدرة ونفس مدى الحرارة، والفرق **هنا بالظبط** — المسطّحة لقصّات الملابس، الأسطوانية للشغل الأنبوبي زي الكُم، وبتاعة الأحذية لوجه حذاء مجلّب. اقراها **مع سرعة اللحام**: موديل الأحذية بيمشي رُبع سرعة المسطّح، ومن غير الحقل ده السرعتين هيبانوا **فرق جودة** مش **شغلانتين مختلفتين**." },

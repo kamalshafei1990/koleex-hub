@@ -32,6 +32,7 @@ import { FOLDING_PACKING_SCHEMAS } from "./schemas/folding-packing-2026-08-14";
 import { SEWING_MOTOR_SCHEMAS } from "./schemas/sewing-motors-2026-08-14";
 import { SHOE_BAG_SEWING_SCHEMAS } from "./schemas/shoe-bag-sewing-2026-08-14";
 import { SEAM_SEALING_SCHEMAS } from "./schemas/seam-sealing-2026-08-14";
+import { MACHINE_PARTS_SCHEMAS } from "./schemas/machine-parts-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -140,6 +141,11 @@ for (const schema of SHOE_BAG_SEWING_SCHEMAS) registerSchema(schema);
    Equipment's two remaining gaps. Source `中性款`, an UNBRANDED image-only
    catalogue found by the cover triage; its DL codes are generic to the trade. */
 for (const schema of SEAM_SEALING_SCHEMAS) registerSchema(schema);
+
+/* XSPP Machine Parts (2026-08-14) — the first FITMENT template, not a spec
+   template. A parts catalogue prints description, part number and machine
+   compatibility and nothing measurable; a part is defined by what it fits. */
+for (const schema of MACHINE_PARTS_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
