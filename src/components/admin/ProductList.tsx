@@ -1955,6 +1955,28 @@ export default function ProductList() {
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               {isInternal ? t("list.productData") : t("list.products")}
             </h1>
+            {/* Count and rate ride the TITLE line instead of owning a row of
+                their own. Measured before this: the catalogue's first product
+                started 597px down a 686px viewport — 87% of the opening screen
+                was chrome. A row that carries two short facts is the cheapest
+                of those bands to reclaim. They wrap away on a phone, where the
+                title already needs the width. */}
+            <span className="hidden sm:flex items-center gap-2 shrink-0 text-[12px] text-[var(--text-dim)]">
+              <span className="tabular-nums">
+                {total ?? (isInternal ? products.length : products.filter((p) => (p.status || "draft") === "active").length)}
+              </span>
+              {fx && (
+                <span
+                  className="px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] text-[var(--text-subtle)] tabular-nums"
+                  title={fxTitle}
+                >
+                  {formatRate(fx.rate)}
+                  {fx.source === "fallback" && (
+                    <span className="ms-1 text-[var(--text-ghost)]">{t("list.fxOffline", "(offline)")}</span>
+                  )}
+                </span>
+              )}
+            </span>
           </div>
           {/* On a phone this row had to hold back + icon + title + settings +
               "Add Product" in ~360px, which left the title about 60px and cut
@@ -1985,7 +2007,8 @@ export default function ProductList() {
         {/* Long catalogues need a way back up — one control serves both
             /products and /product-data since they share this component. */}
         <BackToTop label={t("list.backToTop", "Back to top")} />
-        <p className="relative z-30 text-[12px] text-[var(--text-dim)] mb-1 md:mb-1.5 ml-0 md:ml-11 flex items-center gap-2 flex-wrap">
+        {/* Phone only — from `sm` up these two facts sit on the title line. */}
+        <p className="sm:hidden relative z-30 text-[12px] text-[var(--text-dim)] mb-1 ml-0 flex items-center gap-2 flex-wrap">
           <span>
             {/* The server's exact count, not how many rows happen to be
                 loaded — with paging those are different numbers, and the one
@@ -2627,7 +2650,15 @@ export default function ProductList() {
                     instead of ~380px. From `sm` up the tile grid is unchanged.
                     One DOM tree, responsive classes: no duplicated markup and
                     no second copy for screen readers to read out. */}
-                <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(100px,1fr))] max-sm:flex max-sm:overflow-x-auto max-sm:pb-0.5 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
+                {/* THE PILL ROW IS NOW THE ONLY LAYOUT, not the phone fallback.
+                    The 88px tile grid was already replaced below `sm` for the
+                    exact reason it fails everywhere: it is the largest object
+                    on the page and it is NAVIGATION, not content. On a laptop
+                    it pushed the first product to 597px of a 686px viewport.
+                    Same DOM, same links, same icons — one row that scrolls,
+                    ~44px instead of ~200px, and identical on every size, which
+                    also removes a whole breakpoint's worth of divergence. */}
+                <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -2637,14 +2668,17 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-col items-center justify-center gap-2 w-full h-[88px] p-2 rounded-2xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 max-sm:h-[36px] max-sm:w-auto max-sm:shrink-0 max-sm:flex-row max-sm:justify-start max-sm:gap-1.5 max-sm:px-3 max-sm:py-0 max-sm:rounded-full"
+                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[36px] w-auto shrink-0 px-3 rounded-full kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       {classIcons.category?.[cat.slug] ? (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 max-sm:h-4 max-sm:w-4 max-sm:shrink-0" />
+                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       ) : (
-                        <LayoutGridIcon className="kx-neon-svg h-[22px] w-[22px] text-[var(--text-primary)] opacity-90 max-sm:h-4 max-sm:w-4 max-sm:shrink-0" />
+                        <LayoutGridIcon className="kx-neon-svg h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       )}
-                      <span className="kx-neon-label text-[10px] font-medium text-center leading-tight text-[var(--text-muted)] line-clamp-2 max-sm:text-[11px] max-sm:leading-none max-sm:whitespace-nowrap">{cat.name}</span>
+                      <span className="kx-neon-label text-[11px] font-medium leading-none whitespace-nowrap text-[var(--text-muted)]">{cat.name}</span>
+                      {/* The count earns the pill its keep: the row is now
+                          navigation AND a size read, which the tile never was. */}
+                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
                     </a>
                   ))}
                 </div>
@@ -2675,7 +2709,14 @@ export default function ProductList() {
                         <ClassMonoIcon src={classIcons.category?.[cat.slug]} className="h-[18px] w-[18px] text-[var(--text-secondary)]" />
                       </span>
                     )}
-                    <h2 className="text-[18px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
+                    {/* The sample I showed dropped this heading entirely, on the
+                        grounds that the selected pill already says where you
+                        are. Building it proved that wrong: these pills are JUMP
+                        links, not filters, so this heading is the anchor they
+                        scroll to — remove it and a 27,000px page loses its
+                        milestones. Quieter instead of gone: it no longer
+                        competes with the product names underneath it. */}
+                    <h2 className="text-[15px] md:text-[17px] font-semibold tracking-tight text-[var(--text-primary)] truncate leading-tight">
                       {cat.name}
                     </h2>
                   </div>
