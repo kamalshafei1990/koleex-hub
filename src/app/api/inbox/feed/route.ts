@@ -43,6 +43,63 @@ function flattenSender(raw: SenderJoin) {
   return { id: s.id, username: s.username, avatar_url: s.avatar_url, full_name: person?.full_name ?? null, name_alt: person?.name_alt ?? null };
 }
 
+/* ── Self-healing: a notification for work that is already finished ─────────
+   The fixes in /api/todos only help NEW activity. Every assignment written
+   before them is still sitting unread for a task that was completed — or
+   deleted — long ago, which is exactly what the owner sees: "I already mark
+   all of tasks as done, nothing left, but it still have notifications."
+
+   A one-off SQL backfill would clear today's pile and leave the next one, and
+   it needs someone to run it against production. Reconciling here instead
+   means the count corrects itself the moment anyone loads the Hub, for every
+   user, with no migration.
+
+   Cost is one extra query, and only when unread assignments actually exist:
+   read their todo ids, ask which of those are still open, mark the rest read.
+   Missing ids (deleted tasks) are stale by definition. Marked READ, never
+   deleted — the message stays in the inbox history where it belongs. */
+async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
+  try {
+    const { data: pending } = await supabaseServer
+      .from(INBOX)
+      .select("id, metadata")
+      .eq("recipient_account_id", me)
+      .eq("category", "task")
+      .eq("metadata->>type", "todo_assignment")
+      .is("read_at", null)
+      .is("archived_at", null)
+      .limit(500);
+    if (!pending?.length) return;
+
+    const rows = pending as Array<{ id: string; metadata: { todo_id?: string } | null }>;
+    const todoIds = [...new Set(rows.map((r) => r.metadata?.todo_id).filter(Boolean))] as string[];
+    if (!todoIds.length) return;
+
+    const { data: live } = await supabaseServer
+      .from("koleex_todos")
+      .select("id, status")
+      .in("id", todoIds);
+    const stillOpen = new Set(
+      ((live ?? []) as Array<{ id: string; status: string | null }>)
+        .filter((t) => t.status !== "done")
+        .map((t) => t.id),
+    );
+
+    const staleIds = rows
+      .filter((r) => !r.metadata?.todo_id || !stillOpen.has(r.metadata.todo_id))
+      .map((r) => r.id);
+    if (!staleIds.length) return;
+
+    await supabaseServer
+      .from(INBOX)
+      .update({ read_at: new Date().toISOString() })
+      .in("id", staleIds);
+  } catch (e) {
+    /* Never fail a badge read over housekeeping. */
+    console.error("[api/inbox/feed] reconcile finished tasks:", e instanceof Error ? e.message : e);
+  }
+}
+
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
@@ -54,6 +111,9 @@ export async function GET(req: Request) {
   try {
     switch (resource) {
       case "messages": {
+        /* Reconcile here too, so opening the list shows finished work as read
+           rather than leaving the user to clear rows by hand. */
+        await reconcileFinishedTaskNotifications(me);
         const includeArchived = url.searchParams.get("archived") === "1";
         /* 300 cap serves the bell's "Show all" view — slim rows are ~200B
            each, so the worst case stays ~60KB. */
@@ -95,6 +155,7 @@ export async function GET(req: Request) {
       }
 
       case "unread": {
+        await reconcileFinishedTaskNotifications(me);
         const { count, error } = await supabaseServer
           .from(INBOX)
           .select("*", { count: "exact", head: true })
@@ -111,6 +172,7 @@ export async function GET(req: Request) {
       }
 
       case "unreadTasks": {
+        await reconcileFinishedTaskNotifications(me);
         const { count, error } = await supabaseServer
           .from(INBOX)
           .select("*", { count: "exact", head: true })
@@ -137,6 +199,7 @@ export async function GET(req: Request) {
          border crossing for users in China. The two counts still exist
          separately above for callers that need only one. */
       case "badges": {
+        await reconcileFinishedTaskNotifications(me);
         const base = () => supabaseServer
           .from(INBOX)
           .select("*", { count: "exact", head: true })
