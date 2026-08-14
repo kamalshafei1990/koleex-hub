@@ -243,3 +243,26 @@ draft of this list was not:
 from writing what the app probably lacked instead of opening the file; every
 measured claim in §1 held. When this plan is next extended, the entry cost for
 adding a line to a gap list is a grep.
+
+## A fourth false finding, and this one was a measurement
+
+Commit `aa54d428` reports that `/settings` issues `me/can-edit-profile` twice
+and `geocode` twice per load, "so every user pays it". **That is wrong and
+should not be acted on.**
+
+It was measured on the dev server, where `reactStrictMode: true` makes React
+mount components and run effects twice on purpose. Re-measured against a real
+production build (`next start`, ProfileTab confirmed rendered): both endpoints
+fire **once**. There is no duplicate to fix, and chasing one would have meant
+adding guards to correct code.
+
+The lesson is narrower than "measure" — I did measure. **A number from the dev
+server is a number about the dev server.** Anything about per-request cost,
+call counts, or effect behaviour has to come from a production build, because
+StrictMode, on-demand compilation and the dev-only endpoints (`dev/build-stamp`
+fired six times in one earlier reading) all change exactly those figures.
+
+Incidentally confirmed the same run: the push row correctly showed **no value**
+on `localhost:3010`, because notification permission is per-origin and that
+origin had never been asked — the "never asked says nothing" rule behaving as
+designed, on a case that could not be staged deliberately.
