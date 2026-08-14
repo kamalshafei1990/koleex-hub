@@ -127,8 +127,13 @@ Two facet notes fall straight out of it:
 
 1. **`pdftotext` gives nothing.** Render it. Anyone searching the library by keyword
    will conclude this catalogue does not mention shoes.
-2. **Two files, one supplier.** `Goldsew (金梭).pdf` also exists and is also image-only.
-   They have not been compared; a model in one is not evidence of absence in the other.
+2. ~~**Two files, one supplier.**~~ **RESOLVED 2026-08-14 — they are the SAME FILE.**
+   `Goldsew (金梭).pdf` and `金梭样册定稿文件.pdf` have identical MD5
+   (`a4e3c97655d28ef4b9cf6a00b518c521`), identical page count, identical byte size.
+   There is no second Goldsew catalogue and **no second chance at an `XSEK` table.**
+   A full-library checksum sweep found this to be the only duplicate pair:
+   **the library holds 76 files but 75 unique catalogues.** Count content, not
+   filenames — two names for one PDF inflate every coverage figure derived from it.
 3. **SR-01 … SR-24 have no names at all** — two spreads of bare photographs with code
    labels. Twenty-four machines that cannot be classified from this file.
 4. **SR-298B glues and folds; it does not bind.** `XSEE` is Edge *Binding*. Filing it
@@ -137,3 +142,33 @@ Two facet notes fall straight out of it:
 5. **The SR-168 sheet covers three models and the bag variants share the family**, so
    the bag machines' own weights and dimensions are **not printed**. Do not copy the
    shoe figures across.
+
+---
+
+## 7. ⛔ XSEL Leather Sewing Machines — examined, and deliberately NOT built
+
+The obvious next template looked like `XSEL`, since the catalogue is full of
+machines that sew leather. **It should not be built from this source, and
+probably not at all.** Every candidate already belongs somewhere else:
+
+| Candidate | What it actually is | Correct home |
+|---|---|---|
+| SR-243 特厚料综合送料平缝机 | extra-heavy **compound-feed lockstitch**, flat bed | **XSL** + `feed_type: compound-unison` + `fabric_weight_class: extra-heavy` |
+| SR-441 简型综合送料极厚料 | the same machine on a **cylinder** bed | **XSL** + `bed_type: cylinder` |
+| SR-205 综合送料极厚料单针 | unison feed, extra-heavy | **XSL** |
+| SR-868 · 868H · 885 皮革花样机 | **pattern machines** that happen to be sold for leather | **XAPT** + a leather application |
+| SR-05/5 · SR-5-2 马克花样机 | moccasin stitcher — 400 s.p.m, 2 needles, 6 mm gauge, chain stitch, *"footwear upper moccasin sewing, twelve sewing patterns"* | **XSES** — it sews shoe uppers |
+
+**The test that decided it: does the machine have a mechanism that its stitch
+class cannot describe?** `XSES` passed that test — the side-seam machine is a
+curved-needle seat-type mechanism running CP×5 at 800 s.p.m., which no lockstitch
+row can express. **Nothing here passes it for `XSEL`.** These are lockstitches
+sewing a thick material, and thickness is `fabric_weight_class` — a facet.
+
+Building `XSEL` from them would file the same machines on two shelves, which is
+exactly the defect CL-0020 removed and CL-0023 found again in zigzag. **An empty
+subcategory is cheaper than a duplicated one.**
+
+`XSEL` stays open until a catalogue prints a machine class that is defined by
+leather rather than by its stitch — a harness/saddle stitcher or a shoe patcher
+sold as its own family with its own spec table.
