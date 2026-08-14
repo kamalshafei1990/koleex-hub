@@ -6727,6 +6727,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Contact list */}
       <div className="flex-1 overflow-y-auto will-change-scroll">
+        {/* LIST EDGE — the same ramp Purchase runs, moved to the surface that
+            actually scrolls.
+
+            This app fails the header-ramp entry test on purpose: its list
+            lives in this container, which starts ~150px below the header, so
+            nothing ever passes beneath the main header and a ramp up there
+            would frost empty air while softening the static title. The edge
+            belongs to the scrollport the content moves through — here.
+
+            Hosted on a sticky h-0 wrapper so it pins to the list's own top
+            edge and costs ZERO layout: kx-bar-prog is absolutely positioned
+            and `inset: 0 0 calc(var(--kx-ramp-ext) * -1) 0` grows it downward
+            out of a zero-height box. No new CSS — one recipe for every edge on
+            the Hub.
+
+            IT NEEDS A z-index, AND MY FIRST VERSION LEFT IT OUT. Without one
+            the rows — later siblings in the same stacking context — paint ON
+            TOP of the layer, so backdrop-filter samples the page behind the
+            list and the rows scroll past perfectly crisp. It looked mounted
+            and measured correct (0-height host, 40px band, four layers) while
+            doing nothing at all. Proved by lifting it live: the moment the
+            host got a z the rows entering the band went soft.
+
+            z-[5] puts it above the rows; the alphabet headers take z-10 to
+            stay above IT, since they pin into exactly this band and are the
+            one thing the reader scans for. */}
+        {aurora && (
+          <div aria-hidden className="kx-bar-host sticky top-0 z-[5] h-0 pointer-events-none [--kx-ramp-ext:2.5rem]">
+            <div className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
+          </div>
+        )}
         {/* Compact KPI strip — stacked mode only (in split view the full
             dashboard is the right panel, so this would be a duplicate) */}
         {moduleKpis && filterType === "customer" && (
@@ -6801,7 +6832,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         ) : (
           grouped.map(([letter, items]) => (
             <div key={letter}>
-              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 backdrop-blur-sm">
+              {/* z-10 keeps these above the list's edge ramp (z-5), which pins
+                  to the same top edge they do. Without it the ramp blurs the
+                  section letters — the one thing the reader scans an A-Z list
+                  for. top-0 is correct: these pin to the LIST's scroller, not
+                  the page, so the under-glass offset other apps need does not
+                  apply here. */}
+              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 z-10 backdrop-blur-sm">
                 {letter}
               </div>
               {/* Stacked mode puts the list across the whole app width, where a
