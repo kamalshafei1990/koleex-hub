@@ -353,6 +353,11 @@ const INTERLOCK_KINDS: MachineKind[] = [
     name: "2-Needle Coverstitch",
     description: "Two parallel top stitches — hemming, binding, T-shirt finish.",
     subcategory: "interlock-machines",
+    /* CL-0023 — the name said "2-Needle" and the kind recorded nothing, so it
+       resolved to 2 cards / 35 fields, identical to skipping the kind step.
+       With the count recorded it collects Twin-Needle Configuration, whose
+       needle-gauge fields are the defining spec of a coverstitch. */
+    attributes: { needle_count: "2" },
     templateSlug: "flatlock-interlock",
     icon: CoverstitchIcon,
   },
@@ -361,6 +366,9 @@ const INTERLOCK_KINDS: MachineKind[] = [
     name: "3-Needle Coverstitch",
     description: "Three parallel top stitches — stronger, wider cover seam.",
     subcategory: "interlock-machines",
+    /* CL-0023 — same as the 2-needle above. Collects Multi-Needle
+       Configuration, whose own subtitle names coverstitch as a target. */
+    attributes: { needle_count: "3" },
     templateSlug: "flatlock-interlock",
     icon: CoverstitchIcon,
   },
@@ -429,14 +437,16 @@ const CHAINSTITCH_KINDS: MachineKind[] = [
     templateSlug: "flatlock-interlock",
     icon: ChainstitchIcon,
   },
-  {
-    slug: "chainstitch-double-needle",
-    name: "Double-Needle Chainstitch",
-    description: "Two parallel chainstitch rows — denim, workwear topstitch.",
-    subcategory: "chainstitch-machines",
-    templateSlug: "flatlock-interlock",
-    icon: ChainstitchIcon,
-  },
+  /* CL-0023 — `chainstitch-double-needle` "Double-Needle Chainstitch" REMOVED.
+     It was the same machine as `dn-chainstitch` "Double Needle Chainstitch",
+     one shelf, one hyphen apart, and it was the WEAKER of the two: measured,
+     it resolved to 2 cards / 34 fields — byte-identical to picking no kind at
+     all — while `dn-chainstitch` carries `needle_count: "2"` and resolves to
+     4 cards / 55 fields (adds Twin-Needle Configuration + Chainstitch
+     Geometry). The operator was being asked to choose between two cards with
+     the same name where the better-looking one silently cost 21 fields.
+     Same ruling that removed `sp-zigzag`: a kind that duplicates a shelf-mate
+     and carries no attributes is a prompt with no answer. */
   {
     slug: "chainstitch-feed-off-arm",
     name: "Feed-Off-the-Arm Chainstitch",
@@ -445,14 +455,12 @@ const CHAINSTITCH_KINDS: MachineKind[] = [
     templateSlug: "flatlock-interlock",
     icon: FeedOffArmMachineIcon,
   },
-  {
-    slug: "chainstitch-multi-needle",
-    name: "Multi-Needle Chainstitch",
-    description: "3–12 needles — waistbands, smocking, shirring.",
-    subcategory: "chainstitch-machines",
-    templateSlug: "flatlock-interlock",
-    icon: MultiNeedleIcon,
-  },
+  /* CL-0023 — `chainstitch-multi-needle` "Multi-Needle Chainstitch" REMOVED.
+     Its own description read "3–12 needles", which is EXACTLY the range the
+     explicit ladder already partitions: `mn-3-chain` (3) · `mn-4-chain` (4) ·
+     `mn-multi-chain` (6/8/12). A fourth card spanning all three, carrying no
+     `needle_count`, resolved to 2 cards / 34 fields — same as no kind — while
+     `mn-multi-chain` resolves to 3 cards / 50 fields. Measured, not assumed. */
   {
     slug: "chainstitch-post-bed",
     name: "Post-Bed Chainstitch",
