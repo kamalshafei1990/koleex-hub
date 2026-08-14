@@ -1,9 +1,28 @@
-# Koleex Catalog 2025 — inventory of OUR OWN range
+# Koleex Catalog 2025 — read as a TEMPLATE source only
 
 **Status:** inventory only. Nothing created, coded or populated.
 
 **Source:** `Koleex Catalog 2025.pdf` — 138 spread pages (printed pages 1–271),
 80MB, in Drive and in `~/Documents/Supplier Catalogs/`.
+
+---
+
+## ⚠️ TWO OWNER CONSTRAINTS THAT GOVERN THIS DOCUMENT (2026-08-14)
+
+**1. THIS CATALOGUE IS THE OLD ONE AND ITS MODEL CODES ARE OLD.** A new Koleex
+catalogue will be created. Every `XA-…`, `XSL-…`, `XSO-…` code quoted below is
+therefore a SUPERSEDED reference, useful for finding a machine on the page and
+for nothing else. **Do not treat any code here as a product identifier, do not
+seed anything from it, and do not cite it to anyone outside this document.**
+
+**2. WE WORK ON TEMPLATES, NOT ON ADDING PRODUCTS.** Product entry is the
+owner's, done manually, unless he explicitly asks for a specific item. This
+catalogue is read for ONE purpose: to learn **which fields a machine class
+actually publishes**, so a spec template can be built from evidence. It is not
+an entry queue and this document must never be used as one.
+
+Both constraints are why §4 of the first draft — a recommended order for
+entering products from this catalogue — has been removed rather than reworded.
 
 ---
 
@@ -127,23 +146,30 @@ cover most of them.**
 
 ---
 
-## 4. What this catalogue is actually for
+## 4. What this catalogue is worth, given both constraints
 
-Templates were the reason it was opened, but they are the smaller prize.
+**Its value is EVIDENCE OF FIELDS, not a list of products.** The model codes are
+old and the range will be renumbered, but the *physics* does not renumber: a
+collar-blocking machine will still publish a collar diameter range, a hemming
+machine will still publish a hem width, whatever the new code says. That is the
+part of this catalogue that survives the new edition, and it is the only part
+this document is for.
 
-**This is our own range with our own model codes, and it is not in the Hub.**
-The Products app currently holds 121 products; this catalogue lists **several
-hundred** across eleven sections — every one of them something Koleex sells,
-already carrying the `X*` prefix the taxonomy uses.
+**Where it adds evidence the supplier catalogues did not:**
 
-Recommended order:
-1. **Sections whose templates already exist** — pre-sewing (`XF-`), cutting
-   (`XC-`), industrial sewing (`XSL-`/`XSO-`/`XSI-`), automatic units (`XA-`),
-   printing (`XP-`), ironing (`XI-`). These can be entered now.
-2. **`XACL`** — decide whether one machine justifies a template, or wait.
-3. **Sections needing an owner decision on codes** — belt loop, zipper, tape
-   attaching, elastic joining, needle butler. Same list as §4 of the JOOKE
-   inventory; the two catalogues agree on which gaps are real.
+| Machine class | What only this catalogue printed | Template use |
+|---|---|---|
+| Collar blocking | collar size range (diameter), output pcs/h | the ONLY collar evidence anywhere in the library — see §3 |
+| Pocket-mouth curling | curling stitch length, curling stitch width, sewing centre, material receiving device | would deepen `XAPW`, which is currently built from welting machines only |
+| Pillowcase / fitted-sheet hemming | four-side vs single-side vs bottom hemming as distinct machines | confirms `XAHM`'s tubular-vs-flat split is real beyond one supplier |
+
+**Where it adds nothing:** every page carrying only the generic six-column table
+(§2). Those machines cannot deepen any template, whatever their model code.
+
+**What NOT to do with it** — restated because the first draft got this wrong:
+do not build an entry queue from it, do not seed products, do not treat its
+codes as identifiers. When the new catalogue exists, re-read it the same way and
+for the same single purpose.
 
 ---
 
