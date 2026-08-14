@@ -424,4 +424,65 @@ export const settingsT: Translations = {
   "notif.muted.none":          { en: "No muted conversations.", zh: "没有已静音的会话。", ar: "لا توجد محادثات مكتومة." },
   "notif.muted.unmute":        { en: "Unmute", zh: "取消静音", ar: "إلغاء الكتم" },
   "notif.muted.dm":            { en: "Direct message", zh: "私信", ar: "رسالة مباشرة" },
+
+  /* ── Wallpaper ──
+     Wallpaper NAMES are translated, unlike tone names above, and the
+     difference is real: a tone name is a product ("Galaxy"), while these
+     describe what you are looking at. Someone reading Chinese should not have
+     to know the English word for a colour to pick it. */
+  "nav.wallpaper":             { en: "Wallpaper", zh: "墙纸", ar: "الخلفية" },
+  "nav.wallpaper.sub":         { en: "The ground behind every screen", zh: "所有界面的背景", ar: "الأرضية وراء كل شاشة" },
+
+  "wp.title":                  { en: "Wallpaper", zh: "墙纸", ar: "الخلفية" },
+  "wp.subtitle":               { en: "Choose what sits behind the Hub. Everything here is drawn by the browser — no image is downloaded.", zh: "选择 Hub 背后的画面。此处所有选项均由浏览器绘制，不下载任何图片。", ar: "اختر اللي وراء الهاب. كل اللي هنا بيرسمه المتصفح — مافيش صورة بتتحمّل." },
+
+  "wp.group.koleex":           { en: "Koleex Hub", zh: "Koleex Hub", ar: "Koleex Hub" },
+  "wp.group.koleex.footer":    { en: "The wave field is the Hub's own ground. It animates; the rest are still.", zh: "波纹场是 Hub 自带的背景，会动；其余为静态。", ar: "حقل الموج هو أرضية الهاب الأصلية — بيتحرك، والباقي ثابت." },
+  "wp.group.dynamic":          { en: "Dynamic", zh: "动态", ar: "متغيّرة" },
+  "wp.group.dynamic.footer":   { en: "Changes with the time of day — night, dawn, day, dusk.", zh: "随时间变化——夜晚、黎明、白天、黄昏。", ar: "بتتغيّر مع وقت اليوم — ليل، فجر، نهار، غروب." },
+  "wp.group.still":            { en: "Still", zh: "静态", ar: "ثابتة" },
+  "wp.group.color":            { en: "Colors", zh: "颜色", ar: "ألوان" },
+  "wp.group.photo":            { en: "Your photos", zh: "你的照片", ar: "صورك" },
+  "wp.group.photo.footer":     { en: "Your photo is stored with your account and resized before upload. It is the only choice here that costs a download.", zh: "照片随账户保存，上传前会压缩。这是此处唯一需要下载的选项。", ar: "صورتك بتتخزن مع حسابك وبتتصغّر قبل الرفع. دي الاختيار الوحيد هنا اللي بيكلّف تحميل." },
+
+  "wp.hubLive":                { en: "Wave field", zh: "波纹场", ar: "حقل الموج" },
+  "wp.hubDeep":                { en: "Deep", zh: "深邃", ar: "عميق" },
+  "wp.hubDawn":                { en: "Dawn", zh: "破晓", ar: "فجر" },
+  "wp.hubGraphite":            { en: "Graphite", zh: "石墨", ar: "جرافيت" },
+  "wp.hubDynamic":             { en: "Hub, through the day", zh: "Hub 一日之间", ar: "الهاب على مدار اليوم" },
+  "wp.tide":                   { en: "Tide", zh: "潮汐", ar: "مدّ" },
+  "wp.ember":                  { en: "Ember", zh: "余烬", ar: "جمر" },
+  "wp.moss":                   { en: "Moss", zh: "苔藓", ar: "طحلب" },
+  "wp.dusk":                   { en: "Dusk", zh: "黄昏", ar: "غسق" },
+  "wp.ink":                    { en: "Ink", zh: "墨黑", ar: "حبر" },
+  "wp.graphite":               { en: "Graphite", zh: "石墨", ar: "جرافيت" },
+  "wp.slate":                  { en: "Slate", zh: "板岩", ar: "أردواز" },
+  "wp.hubBlue":                { en: "Hub Blue", zh: "Hub 蓝", ar: "أزرق الهاب" },
+  "wp.steel":                  { en: "Steel", zh: "钢青", ar: "فولاذي" },
+  "wp.teal":                   { en: "Teal", zh: "青碧", ar: "أزرق مخضر" },
+  "wp.mossFlat":               { en: "Moss", zh: "苔绿", ar: "طحلبي" },
+  "wp.clay":                   { en: "Clay", zh: "陶土", ar: "طيني" },
+  "wp.plum":                   { en: "Plum", zh: "梅紫", ar: "برقوقي" },
+  "wp.sand":                   { en: "Sand", zh: "沙色", ar: "رملي" },
+
+  "wp.current":                { en: "Current wallpaper", zh: "当前墙纸", ar: "الخلفية الحالية" },
+  "wp.yourPhoto":              { en: "Your photo", zh: "你的照片", ar: "صورتك" },
+  "wp.addPhoto":               { en: "Add photo", zh: "添加照片", ar: "أضف صورة" },
+  "wp.replacePhoto":           { en: "Replace", zh: "更换", ar: "استبدال" },
+  "wp.removePhoto":            { en: "Remove photo", zh: "移除照片", ar: "احذف الصورة" },
+  "wp.uploading":              { en: "Uploading…", zh: "上传中…", ar: "بيترفع…" },
+  "wp.uploadFailed":           { en: "Upload failed. Try again.", zh: "上传失败，请重试。", ar: "الرفع فشل — جرّب تاني." },
+  "wp.notAnImage":             { en: "That file is not an image.", zh: "该文件不是图片。", ar: "الملف ده مش صورة." },
+
+  "wp.fit":                    { en: "Fill style", zh: "填充方式", ar: "طريقة الملء" },
+  "wp.fit.fill":               { en: "Fill screen", zh: "填充屏幕", ar: "ملء الشاشة" },
+  "wp.fit.fit":                { en: "Fit to screen", zh: "适应屏幕", ar: "احتواء الشاشة" },
+  "wp.fit.stretch":            { en: "Stretch", zh: "拉伸", ar: "تمديد" },
+  "wp.fit.center":             { en: "Center", zh: "居中", ar: "توسيط" },
+
+  "wp.dim":                    { en: "Readability", zh: "可读性", ar: "وضوح القراءة" },
+  "wp.dim.hint":               { en: "How much the wallpaper is dimmed so text and glass stay legible over it.", zh: "墙纸的压暗程度，以保证文字与毛玻璃可读。", ar: "قد إيه الخلفية بتتعتّم عشان النص والزجاج يفضلوا مقروءين." },
+  "wp.dim.photoFloor":         { en: "Photos keep a minimum dim — we can't know what's in them.", zh: "照片保留最低压暗值——我们无法预知其内容。", ar: "الصور ليها حد أدنى من التعتيم — مانعرفش فيها إيه." },
+  "wp.live.badge":             { en: "Live", zh: "动态", ar: "حيّة" },
+  "wp.dynamic.badge":          { en: "Dynamic", zh: "随时", ar: "متغيّرة" },
 };

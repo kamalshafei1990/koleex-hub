@@ -40,6 +40,7 @@ import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
@@ -52,6 +53,8 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { Chevron, RowValue } from "@/components/settings/tabs/ui";
+import { useWallpaper } from "@/lib/useWallpaper";
+import { PHOTO_ID, getWallpaper } from "@/lib/wallpaper";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -84,6 +87,7 @@ const ProfileTab        = dynamic(() => import("@/components/settings/tabs/Profi
 const CalendarTab       = dynamic(() => import("@/components/admin/accounts/tabs/CalendarTab"), { loading: tabLoading });
 const DisplayTab        = dynamic(() => import("@/components/settings/tabs/DisplayTab"),        { loading: tabLoading });
 const SoundsTab         = dynamic(() => import("@/components/settings/tabs/SoundsTab"),         { loading: tabLoading });
+const WallpaperTab      = dynamic(() => import("@/components/settings/tabs/WallpaperTab"),      { loading: tabLoading });
 const RegionTab         = dynamic(() => import("@/components/settings/tabs/RegionTab"),         { loading: tabLoading });
 const NotificationsTab  = dynamic(() => import("@/components/settings/tabs/NotificationsTab"),  { loading: tabLoading });
 const PasswordTab       = dynamic(() => import("@/components/settings/tabs/PasswordTab"),       { loading: tabLoading });
@@ -98,7 +102,7 @@ const AboutTab          = dynamic(() => import("@/components/settings/tabs/About
    translation of it. */
 const LANG_LABEL: Record<string, string> = { en: "English", zh: "中文", ar: "العربية" };
 
-type Tab = "profile" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "calendar" | "display" | "wallpaper" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -162,6 +166,10 @@ function SettingsContent() {
   const [tab, setTab] = useState<Tab>("profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
   const [mobileDetail, setMobileDetail] = useState(false);
+  /* ABOVE the `if (!account)` return below. A hook under an early return is
+     what took out /projects with React #310 — the order changes the moment
+     the account resolves. Every hook in this component stays up here. */
+  const wallpaperPref = useWallpaper();
 
   if (!account) {
     return (
@@ -193,6 +201,13 @@ function SettingsContent() {
      and a wrong value is worse than none — it is read as fact. */
   const skinLabel = SKINS.find((s) => s.value === skin)?.[lang] ?? "";
   const langLabel = LANG_LABEL[lang] ?? "";
+  /* Free, and live. The hook is already the ground's subscription, so this
+     row's value follows a change made inside the tab without a reload —
+     the same property Phase 3's other values have. lib/wallpaper adds nothing
+     to this route: WavyBackground below already pulls it in. */
+  const wallpaperLabel = wallpaperPref.id === PHOTO_ID && wallpaperPref.photoUrl
+    ? t("wp.yourPhoto")
+    : t(getWallpaper(wallpaperPref.id)?.nameKey ?? "wp.hubLive");
   /* Notifications reports what is SILENCED, not what is on. Per-activity
      toggles default to on and stay undefined until touched, so a count of the
      enabled ones would read "17" for a user who has never opened the screen —
@@ -233,6 +248,15 @@ function SettingsContent() {
       value: skinLabel,
       icon: <PaletteIcon className="h-3.5 w-3.5" />,
       node: <DisplayTab account={account} onChanged={onChanged} />,
+    },
+    {
+      /* Next to Display rather than in a group of its own: both answer "how
+         does the Hub look to me", and the reference keeps Wallpaper adjacent
+         to Appearance for the same reason. */
+      id: "wallpaper", label: t("nav.wallpaper"), subtitle: t("nav.wallpaper.sub"),
+      value: wallpaperLabel,
+      icon: <PictureIcon className="h-3.5 w-3.5" />,
+      node: <WallpaperTab account={account} />,
     },
     {
       id: "sounds", label: t("nav.sounds"), subtitle: t("nav.sounds.sub"),
@@ -315,7 +339,7 @@ function SettingsContent() {
        why it was already Super-Admin-only. A group of one called "Workspace"
        was hiding that. */
   const personalItems = (["profile"] as Tab[]).map(byId);
-  const displayItems = (["display", "sounds", "region", "calendar"] as Tab[]).map(byId);
+  const displayItems = (["display", "wallpaper", "sounds", "region", "calendar"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
   const adminItems = isSA ? (["assets", "admin"] as Tab[]).map(byId) : [];
