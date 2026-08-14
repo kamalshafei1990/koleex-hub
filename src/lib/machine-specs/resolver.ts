@@ -269,7 +269,10 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Narrow-arm specifics for jeans inseams + tubular side-seams.",
     fields: FEED_OFF_ARM_FIELDS,
   },
-  "lockstitch-zigzag": {
+  /* CL-0023 — key renamed with the kind (XSL → XSZ). The card stays: XSZ's
+     schema carries the bight fields, and this shelf carries the resolver's
+     own ZIGZAG_FIELDS for the kind-level detail. */
+  "zigzag-standard": {
     title: "Zig-Zag Stitch",
     subtitle: "Width + pattern specs for the zigzag swing.",
     fields: ZIGZAG_FIELDS,

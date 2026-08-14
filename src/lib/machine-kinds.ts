@@ -172,10 +172,28 @@ const LOCKSTITCH_KINDS: MachineKind[] = [
     icon: FeedOffArmMachineIcon,
   },
   {
-    slug: "lockstitch-zigzag",
-    name: "Zig-Zag Lockstitch",
+    slug: "zigzag-standard",
+    name: "Zig-Zag Standard",
     description: "Lockstitch head with a zigzag swing for elastic / decorative seams.",
-    subcategory: "lockstitch-machines",
+    /* CL-0023 — WAS `lockstitch-machines`, slug `lockstitch-zigzag`. Zigzag
+       lived in TWO subcategories at once, split by DUTY: the ordinary machine
+       sat here under Lockstitch and only the heavy one (`hd-zigzag`) sat under
+       Zigzag. Duty is a facet, so that split put the same stitch class in two
+       homes and left XSZ holding a single kind.
+
+       This was not cosmetic. `resolveSchema` is called with the SUBCATEGORY
+       CODE and no machine kind (ProductForm.tsx:1496, :2532, :5680), so the
+       subcategory alone decides the spec form. Filed under XSL a zigzag got
+       the straight-lockstitch schema, which has no `zigzag_bight_max`,
+       `zigzag_pattern`, `stitch_width_max` or `needle_positions` — the
+       machine could not record the spec that defines it. Filed under XSZ it
+       gets zigzag.v1 and all four fields.
+
+       Slug renamed because `lockstitch-zigzag` asserted the wrong home. Safe:
+       `machine_kind` is persisted only in
+       `product_sewing_specs.common_specs.machine_kind`, and that table held
+       one row with no kind set when this ran — zero products affected. */
+    subcategory: "zigzag-machines",
     templateSlug: "single-needle-lockstitch",
     icon: ZigzagMachineIcon,
   },
@@ -996,7 +1014,11 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-belt-loop-maker",
     name: "Belt-Loop Making Machine",
     description: "Continuously forms belt-loop strips from tape.",
-    subcategory: "lockstitch-machines",
+    /* CL-0023 — WAS `lockstitch-machines`. A loop maker folds tape and closes
+       it with a CHAINSTITCH; it forms no lockstitch. Its own `templateSlug`
+       already said `flatlock-interlock` and its icon is ChainstitchIcon —
+       the subcategory was the only field claiming otherwise. */
+    subcategory: "chainstitch-machines",
     attributes: { application: "belt-loop-making" },
     templateSlug: "flatlock-interlock",
     icon: ChainstitchIcon,
@@ -1005,7 +1027,11 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-sleeve-placket",
     name: "Sleeve-Vent / Placket Setter",
     description: "Automatic shirt sleeve placket construction.",
-    subcategory: "lockstitch-machines",
+    /* CL-0023 — WAS `lockstitch-machines`. This is an automatic WORKSTATION,
+       not a lockstitch head, and Automatic Sewing Systems already codes it
+       exactly: XAPP Placket Sewing Units. Under XSL it drew the plain
+       lockstitch spec form and had nowhere to record the unit's own specs. */
+    subcategory: "placket-sewing-units",
     attributes: { application: "sleeve-placket" },
     templateSlug: "bartacking",
     icon: AutomaticMachineIcon,
@@ -1014,7 +1040,10 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-collar-runstitcher",
     name: "Collar / Cuff Runstitcher",
     description: "Automatic collar and cuff seam finishing.",
-    subcategory: "lockstitch-machines",
+    /* CL-0023 — WAS `lockstitch-machines`. Automatic workstation; XACL Collar
+       Machines is its coded home. XACL previously held a single kind, which is
+       why it read as an empty subcategory. */
+    subcategory: "collar-machines",
     attributes: { application: "collar-cuff-runstitch" },
     templateSlug: "bartacking",
     icon: AutomaticMachineIcon,
@@ -1023,9 +1052,19 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-yoke-attach",
     name: "Yoke Attacher",
     description: "Attaches shirt yoke to back panel automatically.",
+    /* CL-0023 — STAYS under Lockstitch, unlike the placket and collar units it
+       was grouped with. Those two had coded homes (XAPP, XACL); yoke attaching
+       has NO code in Automatic Sewing Systems, and inventing one or forcing it
+       into XAPT (Programmable/CNC — which this is not) would be worse than
+       leaving it on the lockstitch head it is actually built around.
+       ⚠️ OWNER DECISION PENDING: give yoke attaching its own XA* code, or keep
+       it here as `application: "yoke-attaching"` permanently. */
     subcategory: "lockstitch-machines",
     attributes: { application: "yoke-attaching" },
-    templateSlug: "bartacking",
+    /* Was "bartacking" — it forms no bartack. Legacy field: the spec form
+       resolves from the subcategory code, not from here. Corrected so the
+       value stops asserting something untrue. */
+    templateSlug: "single-needle-lockstitch",
     icon: AutomaticMachineIcon,
   },
   {

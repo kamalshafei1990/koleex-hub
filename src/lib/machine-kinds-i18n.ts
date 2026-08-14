@@ -17,7 +17,9 @@ export const MK_NAME_I18N: Record<string, L> = {
   "lockstitch-cylinder-bed": { zh: "筒式平缝机", ar: "غرزة مقفلة بقاعدة أسطوانية" },
   "lockstitch-post-bed": { zh: "立柱式平缝机", ar: "غرزة مقفلة بقاعدة عمودية" },
   "lockstitch-feed-off-arm": { zh: "臂式(埋夹)平缝机", ar: "غرزة مقفلة بذراع جانبية" },
-  "lockstitch-zigzag": { zh: "曲折缝平缝机", ar: "غرزة مقفلة متعرجة (زجزاج)" },
+  /* CL-0023 — renamed from `lockstitch-zigzag` when the kind moved from XSL to
+     XSZ. Reads as the standard partner of `hd-zigzag`, not as a lockstitch. */
+  "zigzag-standard": { zh: "普通曲折缝机", ar: "زجزاج عادي" },
   "lockstitch-edge-trimmer": { zh: "带切边平缝机", ar: "غرزة مقفلة مع قصّ الحواف" },
   "overlock-1n-2t": { zh: "单针双线包缝机", ar: "أوفرلوك إبرة وخيطين" },
   "overlock-1n-3t": { zh: "单针三线包缝机", ar: "أوفرلوك إبرة وثلاثة خيوط" },
@@ -125,7 +127,7 @@ export const MK_DESC_I18N: Record<string, L> = {
   "lockstitch-cylinder-bed": { zh: "窄筒臂，适合筒状部位(袖口、袖子)。", ar: "ذراع أسطوانية ضيقة للأجزاء الأنبوبية (الأساور والأكمام)." },
   "lockstitch-post-bed": { zh: "立柱机头——鞋、帽及立体产品。", ar: "رأس عمودي — أحذية وقبعات ومنتجات ثلاثية الأبعاد." },
   "lockstitch-feed-off-arm": { zh: "窄侧出臂——牛仔内侧缝、衬衫侧缝。", ar: "ذراع جانبية ضيقة — درزات الجينز الداخلية وجوانب القمصان." },
-  "lockstitch-zigzag": { zh: "带曲折摆动的平缝机头，弹性/装饰缝。", ar: "رأس غرزة مقفلة بحركة متعرجة للدرزات المرنة والزخرفية." },
+  "zigzag-standard": { zh: "带曲折摆动的平缝机头，弹性/装饰缝。", ar: "رأس غرزة مقفلة بحركة متعرجة للدرزات المرنة والزخرفية." },
   "lockstitch-edge-trimmer": { zh: "内置切刀，边缝边切除多余面料。", ar: "سكين مدمجة تقصّ القماش الزائد أثناء الخياطة." },
   "overlock-1n-2t": { zh: "轻型包边，适合内衣与娇嫩面料。", ar: "حياكة حواف خفيفة للملابس الداخلية والأقمشة الرقيقة." },
   "overlock-1n-3t": { zh: "标准锁边，适合轻中厚面料。", ar: "لفّ حواف قياسي للأقمشة الخفيفة إلى المتوسطة." },
