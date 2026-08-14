@@ -249,3 +249,66 @@ It is now.
 KILO pages 5–20 do carry DTF/DTG/UV printers with spec tables, so **`XPDT` is
 sourced and buildable** — it was not built in this pass only to keep the change
 reviewable.
+
+---
+
+## `XPDT` Digital Textile Printers built (2026-08-14) — Printing & Heat Press 4/7 → 5/7
+
+KILO pages 3–10, three families each with a full table: **DTF** direct-to-film ·
+**DTG** direct-to-garment · **UV-DTF**. 32 fields.
+
+**⚠️ DTF and DTG are opposite workflows sharing one shelf**, which is why
+`print_process` is the first field. DTF prints onto PET film, powders it, cures
+it, and the film is pressed onto the garment *later* — a DTF printer is useless
+without a press and a shaker. DTG prints straight onto the garment. Two machines
+here quoting "5 sqm/h" are not comparable until that field is filled.
+
+**⚠️⚠️ PRINT SPEED IS QUOTED PER PASS.** One machine prints
+`4pass 7 sqm/h · 6pass 5 sqm/h · 8pass 3.5 sqm/h` — twice as fast at half the
+quality. **A record saying "7 sqm/h" makes this printer look twice as productive
+as an identical one honestly quoted at 8-pass.** Store the pass count with the
+speed, always.
+
+**⚠️ A DTF machine is TWO units and the catalogue gives the second its own
+table** — EH2 / VH2 / A3 powder shakers, 800–4000 W, 50–150 kg. A DTF printer
+recorded without its shaker is missing half the purchase, half the floor space
+and most of the power draw.
+
+**⚠️ "Unlimited printing length" is literal** — roll-fed, so width is the only
+bound. DTG is the opposite: a fixed tray, bounded both ways.
+
+**⚠️ Working environment is a specification, not boilerplate.** 18–30 °C,
+35–65 % RH on every model. White pigment settles and clogs outside that band, so
+it is a site-survey question at quotation time.
+
+### Taxonomy flag — UV-DTF is not textile
+
+The UV-DTF machines print on **acrylic, aluminium board, ceramic tile, glass,
+wood and leather**, and one does 360° printing on bottles. `XPDT` is named
+*Digital Textile Printers (DTG)*. They are covered here because the catalogue
+sells them in the same family and no better code exists, but a `UV printer` code
+may be the honest answer. **Owner decision, like the `XEC` overlap.**
+
+---
+
+## ✅ Knowledge coding-system audit (2026-08-14) — the check the gate cannot run
+
+`validate:budgets` section K only compares Knowledge against codes that **have a
+spec template**, and it says so in its own comment: *"It cannot read the database
+(no network in the build)."* Run against the live DB instead:
+
+```
+Knowledge page teaches : 88 codes
+Live DB taxonomy has   : 88 codes
+live in DB but NOT taught in Knowledge : 0
+taught in Knowledge but NOT in the DB  : 0
+```
+
+**Perfect alignment in both directions.** Every code templated this session —
+`XSES` `XSEB` `XFSS` `XSPP` `XES` `XEM` `XPHR` `XPH` `XPDT` — is present in the
+DB, present in Knowledge and bound to a schema.
+
+**Why nothing needed adding: this session minted NO new codes.** Every template
+was built onto a code that already existed in the taxonomy, and CL-0023c
+explicitly *declined* to mint one for yoke attaching. The owner rule bites when a
+code is created; that did not happen here.

@@ -35,6 +35,7 @@ import { SEAM_SEALING_SCHEMAS } from "./schemas/seam-sealing-2026-08-14";
 import { MACHINE_PARTS_SCHEMAS } from "./schemas/machine-parts-2026-08-14";
 import { EMBROIDERY_SCHEMAS } from "./schemas/embroidery-2026-08-14";
 import { HEAT_PRESS_SCHEMAS } from "./schemas/heat-press-2026-08-14";
+import { DIGITAL_TEXTILE_PRINTER_SCHEMAS } from "./schemas/digital-textile-printer-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -162,6 +163,11 @@ for (const schema of EMBROIDERY_SCHEMAS) registerSchema(schema);
    length (material runs THROUGH); a flat press by plate size and dwell time
    (material sits IN). Printing & Heat Press 2/7 -> 4/7. */
 for (const schema of HEAT_PRESS_SCHEMAS) registerSchema(schema);
+
+/* XPDT Digital Textile Printers (2026-08-14) — KILO 2024 pp.3-10. DTF, DTG and
+   UV-DTF share the shelf but are opposite workflows, so `print_process` is the
+   first field. Printing & Heat Press 4/7 -> 5/7. */
+for (const schema of DIGITAL_TEXTILE_PRINTER_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
