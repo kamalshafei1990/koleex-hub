@@ -533,28 +533,38 @@ export default function InboxPage() {
           --bg-secondary fill and a hairline, and lets the pane above do the
           frosting. */}
       <header className="relative z-10 shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+        {/* ONE BACK CONTROL AT A TIME, AND IT GOES EXACTLY ONE LEVEL UP.
+            Two back arrows used to sit side by side on a phone in the detail
+            view — one to the Hub, one to the message list. Making them look
+            alike (the previous commit) only made the ambiguity tidier: two
+            identical arrows that go to different places is a coin toss, and
+            the one the thumb reaches first was the one that left the app.
+
+            Phones have a real hierarchy here — Hub > mailbox list > message —
+            so back means the level directly above, which is the LIST while a
+            message is open and the HUB otherwise. Desktop keeps the Hub arrow
+            permanently, because there the list never leaves the screen and
+            there is no level to climb back to. */}
         <Link
           href="/"
           /* kx-ph-chrome is the system's chrome-control recipe: border-colour
              answers hover and NOTHING else moves. Owner's rule, verbatim —
              "only the borders colors, no more". Inert under Core. */
-          className="kx-ph-chrome h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          className={`kx-ph-chrome h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
+            mobileView === "detail" ? "hidden md:flex" : "flex"
+          }`}
           aria-label="Back to Hub"
         >
           <ArrowLeftIcon className="h-4 w-4" />
         </Link>
-        {/* Mobile back: when we're on the detail view, this flips us
-            back to the list. Invisible on desktop where the list is
-            always in view. */}
         {mobileView === "detail" && (
           <button
             type="button"
             onClick={() => setMobileView("list")}
             /* Was text-blue-400: a SECOND blue, and on a navigation control
-               rather than a status. Back is chrome — it takes the same
-               neutral-text/border-hover language as the Hub back arrow beside
-               it, so the two back controls in one strip stop disagreeing. */
-            className="kx-ph-chrome md:hidden h-8 px-2 flex items-center gap-1 rounded-lg border border-transparent text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+               rather than a status. Back is chrome — same neutral-text /
+               border-hover language as the Hub arrow it replaces on phones. */
+            className="kx-ph-chrome md:hidden h-8 ps-1.5 pe-2.5 flex items-center gap-1 rounded-lg border border-transparent text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Mailboxes
