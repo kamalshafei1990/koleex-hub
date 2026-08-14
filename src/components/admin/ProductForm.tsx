@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import BoundIcon from "@/components/common/BoundIcon";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
@@ -397,6 +398,11 @@ function SectionTabs({
   activeIndex: number;
   onSelect: (i: number) => void;
 }) {
+  /* This bar hosts the screen's ONE long ramp, so the main header pane
+     must not add its flat frost on top — two filtered bands in the same
+     strip read as two edges. Declared live, because only the component
+     that mounts the layer knows it actually rendered. */
+  useTopRampOwner(true);
   /* RAMP OVERHANG, TUNED. Without the two vars this bar took the 3rem
      default, so its ramp hung 48px BELOW itself while `mb-6` only clears 24 —
      the top half of whatever sits under the tabs (here the product title row

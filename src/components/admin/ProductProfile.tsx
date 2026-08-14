@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { IMG } from "@/lib/cdn";
@@ -415,6 +416,11 @@ const STEPS = [
 /* The editor's own sticky tab bar, via the same canonical TabStrip — not a
    lookalike, the same component. */
 function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number) => void }) {
+  /* This bar hosts the screen's ONE long ramp, so the main header pane
+     must not add its flat frost on top — two filtered bands in the same
+     strip read as two edges. Declared live, because only the component
+     that mounts the layer knows it actually rendered. */
+  useTopRampOwner(true);
   return (
     /* Ramp length is tuned to THIS page, not inherited from the list.
 

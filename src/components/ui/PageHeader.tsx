@@ -25,6 +25,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
+import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 
 /* Sliding-pill geometry — change in one place. */
@@ -123,20 +124,11 @@ export default function PageHeader({
      no edge blur at all past the header line. This is the ramp it owes. */
   const ownsRamp = isUnderglassRoute(pathname) && appOwnsTopRamp(pathname) && hasTabs;
 
-  /* Tell the shell that THIS screen's blurred edge is already drawn, so the
-     main header pane stands down and the screen shows one edge instead of two
-     (its flat 40px frost used to sit on top of this ramp and stop dead at
-     y=56 — the second edge the owner could see).
-
-     Declared here rather than derived from the route, because the route only
-     says what an app usually does. Cleared on the way out, and `hasTabs` is in
-     the condition above for the same reason: no band, no ramp, no claim. */
-  useEffect(() => {
-    if (!ownsRamp) return;
-    const root = document.documentElement;
-    root.dataset.kxTopramp = "app";
-    return () => { delete root.dataset.kxTopramp; };
-  }, [ownsRamp]);
+  /* Tell the shell this screen's blurred edge is already drawn, so the main
+     header pane stands down and the screen shows one edge instead of two.
+     `hasTabs` is in the condition above for the same reason the hook takes a
+     flag at all: no band, no ramp, no claim. */
+  useTopRampOwner(ownsRamp);
 
   /* Longest-prefix match — detail pages still light the right tab. */
   const allKeys = mergedTabs.map((t) => t.key);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import KdsSelect from "@/components/kds/Select";
 import TabStrip from "@/components/ui/TabStrip";
 
@@ -1887,6 +1888,15 @@ export default function ProductList() {
       return { slug: catSlug, name: displayName, total, loaded, subSections };
     });
   }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier]);
+
+  /* THE CONDITION HAS TO MATCH THE RENDER, EXACTLY.
+     The category jump-nav below hosts this screen's long ramp, and it only
+     renders when there is more than one category — in grid view, with results.
+     Claiming the ramp unconditionally is what broke /products the first time
+     this was wired: the main header pane stood down on the claim, nothing drew
+     a ramp because the catalog was empty, and the page ended up with no blur
+     over its header at all. Same expression as the JSX guard, deliberately. */
+  useTopRampOwner(categoryTree.length > 1);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the

@@ -34,7 +34,25 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        comment. Its only sticky is PageHeader's tab band at top-0, the same
        one Inventory declares safe, and for the same reason: a sticky inside
        the padded under-glass scroller already lands below the header. */
-    p.startsWith("/purchase")
+    p.startsWith("/purchase") ||
+    /* CRM and Settings, 2026-08-15. Owner: make every app's top edge match
+       Purchase. Both render the canonical PageHeader, so listing them here is
+       the entire change — the band draws the ramp, the hero lifts above it and
+       the pane stands down, with no per-app code.
+
+       Sticky audit, required by the note at the top of this file:
+       · /crm has ZERO stickies of its own.
+       · /settings has exactly one, and it is `sticky bottom-0` (the profile
+         tab's save bar). Bottom-anchored, so the top geometry cannot reach it.
+       Both therefore inherit the same clean case as Purchase.
+
+       NOT here on purpose: /suppliers. It ships two `sticky top-0` bars of its
+       own (SupplierDetail's toolbar, KoleexMainSuppliers' group header), which
+       under this geometry would pin at the same y as PageHeader's band and
+       collide with it. That one needs its own measured pass, not a list
+       entry. */
+    p.startsWith("/crm") ||
+    p.startsWith("/settings")
   );
 }
 
@@ -65,5 +83,15 @@ export function appOwnsTopRamp(pathname: string | null): boolean {
        blur edge."
        The flat frost stops dead at 56, so the strip clears it and stays
        crisp. That is the whole reason Inventory is here too. */
-    || p.startsWith("/purchase");
+    || p.startsWith("/purchase")
+    /* CRM: same PageHeader, same sticky tab band, same choice as Purchase. */
+    || p.startsWith("/crm");
+  /* SETTINGS IS DELIBERATELY ABSENT, and the measurement is why. It renders a
+     PageHeader with NO tabs, so there is no band, no ramp host and nothing to
+     own — `.kx-ph-band` and `.kx-ph-tabs` both measured absent, and its only
+     sticky is a bottom-anchored save bar. Listing it here would hand it the
+     flat 56px frost in exchange for a ramp that never gets drawn, which is the
+     same trade that left /products with no blur at all. Left off, it takes the
+     pane's own 104px progressive ramp — the Home case, which is the correct
+     one for a screen with no sticky bar of its own. */
 }
