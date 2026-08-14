@@ -110,7 +110,7 @@ async function fetchBatch(
   if (state.inflight) return state.inflight;
   state.inflight = (async () => {
     try {
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) return null;
       const body = (await res.json()) as Record<string, unknown>;
       const now = Date.now();
@@ -148,6 +148,19 @@ function pickBatch(url: string) {
   return null;
 }
 
+/* `cache: "no-store"` ON EVERY FETCH HERE — see the note in cachedGet.
+
+   THIS TTL IS THE ONLY CACHE THAT MAY EXIST. The routes behind these keys send
+   `Cache-Control: private, max-age=15, stale-while-revalidate=60`, so the
+   BROWSER kept its own copy underneath us. invalidateCachedGet() clears this
+   map, but it cannot reach the HTTP cache — so a recount right after a
+   mutation was answered from the browser with the PRE-mutation number, for up
+   to 15s and as much as 75s with stale-while-revalidate.
+
+   That is what made a read notification come back: the badge dropped on the
+   optimistic update, then the next poll restored the old count from cache.
+   The map above already stops the repeat traffic those headers were added
+   for, so nothing is lost by refusing the second, invisible cache. */
 export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
   const hit = cache.get(url);
 
@@ -164,7 +177,7 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
       const value = body?.[batch.section];
       if (value != null) return value as T;
       /* Batch unavailable for this key — take the original path. */
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
       return (await res.json()) as T;
     })();
@@ -180,7 +193,7 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
   }
 
   const inflight = (async () => {
-    const res = await fetch(url, { credentials: "include" });
+    const res = await fetch(url, { credentials: "include", cache: "no-store" });
     if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
     return (await res.json()) as T;
   })();

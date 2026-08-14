@@ -271,6 +271,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 
+  /* A FINISHED TASK MUST NOT LEAVE ITS NOTIFICATION UNREAD.
+     The assignment fan-out below writes an inbox row per assignee, and until
+     now NOTHING ever cleared it: completing the task changed koleex_todos and
+     never touched inbox_messages, so the row stayed read_at = null forever and
+     kept being counted by the bell and the To-do tile badge. Owner: "if one
+     task finished or read still I can see the notification."
+
+     Marking read (not archiving) is the honest move — the message still
+     belongs in the inbox history, it simply is not outstanding any more.
+     Scoped to this todo's own assignment rows, and only for recipients who
+     had not already read them. Best-effort: a failure here must not fail the
+     task update, which is the thing the user actually asked for. */
+  if (typeof updates.status === "string" && updates.status === "done") {
+    const { error: clearErr } = await supabaseServer
+      .from("inbox_messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("category", "task")
+      .eq("metadata->>type", "todo_assignment")
+      .eq("metadata->>todo_id", id)
+      .is("read_at", null);
+    if (clearErr) console.error("[api/todos/[id] PATCH] clear task notifications:", clearErr.message);
+  }
+
   // Approval notifications (submit → assigner; decide → assignees).
   if (submittedForApproval) await notifySubmittedForApproval(existing, auth.account_id);
   if (approvalDecision) {
@@ -416,5 +439,20 @@ export async function DELETE(
     console.error("[api/todos/[id] DELETE]", error.message);
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
+
+  /* The task is gone, so its assignment notification must go too — otherwise
+     it keeps counting in the bell and links to /todo?task=<id> for a row that
+     no longer exists. ARCHIVED here rather than merely read: unlike a finished
+     task there is nothing left to look back at. Best-effort; the delete
+     already succeeded and must not be reported as failed. */
+  const { error: clearErr } = await supabaseServer
+    .from("inbox_messages")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("category", "task")
+    .eq("metadata->>type", "todo_assignment")
+    .eq("metadata->>todo_id", id)
+    .is("archived_at", null);
+  if (clearErr) console.error("[api/todos/[id] DELETE] clear task notifications:", clearErr.message);
+
   return NextResponse.json({ ok: true });
 }
