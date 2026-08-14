@@ -28,6 +28,7 @@ import { BUTTON_ATTACHING_SCHEMAS } from "./schemas/button-attaching-2026-08-13"
 import { HEMMING_SCHEMAS } from "./schemas/hemming-2026-08-13";
 import { KNIFE_CUTTING_SCHEMAS } from "./schemas/knife-cutting-2026-08-14";
 import { CUTTING_SYSTEM_SCHEMAS } from "./schemas/cutting-systems-2026-08-14";
+import { FOLDING_PACKING_SCHEMAS } from "./schemas/folding-packing-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -116,6 +117,11 @@ for (const schema of KNIFE_CUTTING_SCHEMAS) registerSchema(schema);
    Cutting Equipment at 7 of 9. XCB band knife and XCD fabric drilling have no
    machine of their own in any catalogue and stay empty rather than invented. */
 for (const schema of CUTTING_SYSTEM_SCHEMAS) registerSchema(schema);
+
+/* XPCF Folding & Packing — the ONLY one of Packing & Inspection's seven gaps
+   with a printed spec table anywhere in the library. See the file header for
+   what the other six lack. */
+for (const schema of FOLDING_PACKING_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */

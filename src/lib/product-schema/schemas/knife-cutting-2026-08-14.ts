@@ -7,9 +7,16 @@
  * single gap — 9 subcategories, ZERO templates.** Straight knife and round knife
  * are the two densest of the nine, so they go first.
  *
- * SOURCE — the Koleex 2025 catalogue's Cutting Machines section (PDF pages
- * 37–39), read by rendering: the file has no extractable text at all. See
- * docs/product-data-v2/reference-data/koleex-catalog-2025-inventory.md.
+ * SOURCES — TWO, and the second one corrected the first.
+ *   · Koleex 2025 Cutting Machines section (PDF 37–39), read by rendering; the
+ *     file has no extractable text. See
+ *     docs/product-data-v2/reference-data/koleex-catalog-2025-inventory.md.
+ *   · S-TEFEILA, a 16-page cutter specialist (T500 auto-sharpening cutter and
+ *     siblings), also image-only. Found by accident: it matched a search for
+ *     LEATHER machines because its description says the cutter suits leather.
+ *     It is not a leather catalogue at all — and reading it exposed a mistake
+ *     in the blade-length field below, which said the trade always quotes in
+ *     inches. Tefeila quotes the same blades in millimetres.
  *
  * ⚠️ THE SOURCE CATALOGUE'S MODEL CODES ARE OLD AND ARE BEING RENUMBERED. Only
  * the FIELDS are taken from it, never the codes — a code from that edition is
@@ -17,11 +24,13 @@
  * publish a blade length list and a round knife a blade diameter whatever the
  * new code says.
  *
- * ⚠️ "CUTTING HEIGHT" MEANS TWO DIFFERENT THINGS ON THESE TWO MACHINES, IN TWO
- * DIFFERENT UNITS, AND THE CATALOGUE USES ONE COLUMN HEADING FOR BOTH.
- *   · Straight knife — printed in INCHES as a LIST of the blade lengths the
- *     machine accepts (5/6/8/10/12/13/15/17"). It is a fitment range, not a
- *     measurement, and no single number can express it.
+ * ⚠️ "CUTTING HEIGHT" MEANS TWO DIFFERENT THINGS ON THESE TWO MACHINES, AND
+ * THE CATALOGUE USES ONE COLUMN HEADING FOR BOTH.
+ *   · Straight knife — a LIST of the blade lengths the machine accepts. It is a
+ *     fitment range, not a measurement, and no single number can express it.
+ *     THE UNIT VARIES BY SUPPLIER: Koleex prints inches (5/6/8/10/12/13/15/17),
+ *     Tefeila prints millimetres (110/160/210/260/285/335) for the same blades.
+ *     Store the printed list WITH its unit; a unitless number here is unusable.
  *   · Round knife — printed in MILLIMETRES as ONE number, the maximum fabric
  *     stack the blade will cut (10–48 mm).
  * They are therefore two DIFFERENT fields with different keys. Collapsing them
@@ -126,7 +135,7 @@ export const STRAIGHT_KNIFE_SCHEMA: ProductSchemaDefinition = {
         {
           id: "blade_length_options", key: "blade_length_options", label: "Blade Lengths Available", order: 10,
           fieldType: "text" as const, dataType: "string" as const, required: false,
-          description: "Printed in INCHES as the LIST the machine accepts — 5/6/8/10/12/13/15/17\". It is a fitment range, not a measurement: the same machine takes several blades and the customer picks by lay height. Record the printed list, not one number, and NEVER convert it to millimetres — the trade quotes this class in inches and a converted figure will not match any blade on the shelf.",
+          description: "The LIST of blade sizes the machine accepts — a fitment range, not a measurement: one machine takes several blades and the customer picks by lay height. ⚠️ RECORD THE PRINTED LIST *WITH ITS UNIT*, and never convert. The trade uses BOTH: Koleex prints 5/6/8/10/12/13/15/17 INCHES, S-TEFEILA prints 110/160/210/260/285/335 MILLIMETRES for the same class of blade. A converted figure matches no blade on either supplier's shelf, and a unitless number is worse than no number.",
           ...pub, visualRenderType: "spec_card" as const,
         },
         {
