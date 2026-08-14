@@ -33,6 +33,7 @@ import { SEWING_MOTOR_SCHEMAS } from "./schemas/sewing-motors-2026-08-14";
 import { SHOE_BAG_SEWING_SCHEMAS } from "./schemas/shoe-bag-sewing-2026-08-14";
 import { SEAM_SEALING_SCHEMAS } from "./schemas/seam-sealing-2026-08-14";
 import { MACHINE_PARTS_SCHEMAS } from "./schemas/machine-parts-2026-08-14";
+import { EMBROIDERY_SCHEMAS } from "./schemas/embroidery-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -146,6 +147,13 @@ for (const schema of SEAM_SEALING_SCHEMAS) registerSchema(schema);
    template. A parts catalogue prints description, part number and machine
    compatibility and nothing measurable; a part is defined by what it fits. */
 for (const schema of MACHINE_PARTS_SCHEMAS) registerSchema(schema);
+
+/* XES Single Head + XEM Multi Head Embroidery (2026-08-14) — the first
+   templates in Embroidery Equipment, which had 5 codes and none. Source FNZ,
+   image-only. One seven-column table spans 1 to 12 heads, so the fields are
+   shared and `head_count` decides the shelf. Deliberately NOT registered under
+   XEC: "computerized" is a control attribute that overlaps both of these. */
+for (const schema of EMBROIDERY_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */

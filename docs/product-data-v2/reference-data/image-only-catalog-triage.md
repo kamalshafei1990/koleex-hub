@@ -136,3 +136,67 @@ filled with a guess and is wrong forever.
    sentence. Change a description, change the key.
 
 **Result:** `XSPP` 4 groups / 17 fields. Spare Parts 2/6 → **3/6**.
+
+---
+
+## Follow-up: QINGONG and FNZ read in full (2026-08-14)
+
+### ⛔ `琴工电子版` QINGONG — Stands & Tables stays UNBUILDABLE
+
+10 pages. Six of them are factory photography (punch presses, saw plate, edge
+banding, flame plating, ball blasting). The product pages give **series names and
+model codes and nothing else**:
+
+- **Tableboards** (`XAT`): three named series — *New Design*, **HY Potenuse PVC
+  (斜边 bevelled edge)**, **Straight Edge PVC (直边)**.
+- **Stands** (`XAS`): ~16 coded models — GI-2-01/02/03/04/05 · GZ-2 · GI-591 ·
+  GI2-4-01/02/03 · EU-302 · GD-2HH · GI-2M · GK-2 · GI-2 全沉式 (fully submerged) ·
+  GI-2-9270.
+
+**Not one dimension, board thickness, height range, load rating or material grade
+is printed anywhere.** The bevelled/straight distinction is real printed data —
+it is in the series names — but one attribute is not a template. Building from
+the photographs would mean inventing every field, which is the rule that keeps
+`XSEK` and `XSBL` empty. **Recorded so the catalogue is not re-opened hoping for
+a table: there isn't one.**
+
+### ✅ `FNZ (芬瓷)` — Embroidery Equipment 0/5 → **2/5**
+
+6 pages, and **every one of five series carries a printed spec table with the
+same seven columns**: series · model · head count · needle count · embroidery
+area (Y×X mm) · gross weight · overall size.
+
+| Series | Models | Heads | Area | Weight |
+|---|---|---|---|---|
+| PRINCIPAL 马头机 (cantilever) | P106–P115 | 1 | 300×(400–600) → 500×(500–800) | 150–210 kg |
+| CLASSICAL 铝盆机 (basin) | C106–C115 | 1 | 500×1200 · 500×800 | 210 kg |
+| MAESTRO 龙门机 (gantry) | M106–M1215 | **1 → 12** | 400×500 → 800×1600 | 220–**1500 kg** |
+| PRINCIPAL PLUS 大行程 | P106–P115 plus | 1 | 500×(500–800) → **1000×2000** | 200–430 kg |
+| SOLO 桌面台式机 (desktop) | S106–S115 | 1 | 200×360 → 400×600 | **120 kg** |
+
+Built as **one field set under two codes** (`XES` + `XEM`), the XSES/XSEB
+reasoning: the catalogue prints *the same table* from a 1-head desktop to a
+12-head gantry, so head count is a column of it, not a different document.
+
+**Three traps recorded in the schema header:**
+1. **`体积(mm)` is labelled *volume* and is not one.** It prints `1120*880*910` —
+   L×W×H in millimetres. Converting it to m³ produces nonsense.
+2. **The model code encodes the spec and proofreads the row.** `M106` = 1 head,
+   06 needles; `M1215` = 12 heads, 15 needles. If code and columns disagree, the
+   row was mis-transcribed. `M130` at **30 needles** is the deliberate exception.
+3. **`f:head_count` was already taken — meaning "Detection Heads"** (探头层数) on
+   the needle-detector template. The gate caught it as a duplicate key, and the
+   naive fix would have left this field silently rendering as *Detection Heads*
+   in all three languages. Renamed `embroidery_head_count`.
+
+### ⚠️ Taxonomy flag for the owner — `XEC` overlaps, it does not sit beside
+
+Embroidery's five codes are `XES` single-head · `XEM` multi-head · **`XEC`
+computerized** · `XEB` cording/beading · `XEQ` sequin. **"Computerized" is a
+CONTROL attribute, and every machine in this catalogue is computerized** — so
+`XEC` completely overlaps `XES` and `XEM` rather than being a sibling of them.
+That is the same defect CL-0020 removed from sewing when `needle_count` and
+`duty` were demoted from subcategories to facets. **Not acted on: retiring a live
+code is an owner decision.** The template deliberately does not register under
+`XEC`. `XEB` and `XEQ` are genuinely different devices; this catalogue prints
+neither.
