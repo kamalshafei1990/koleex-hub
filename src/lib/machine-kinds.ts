@@ -1060,14 +1060,32 @@ const SPECIAL_KINDS: MachineKind[] = [
     slug: "sp-yoke-attach",
     name: "Yoke Attacher",
     description: "Attaches shirt yoke to back panel automatically.",
-    /* CL-0023 — STAYS under Lockstitch, unlike the placket and collar units it
-       was grouped with. Those two had coded homes (XAPP, XACL); yoke attaching
-       has NO code in Automatic Sewing Systems, and inventing one or forcing it
-       into XAPT (Programmable/CNC — which this is not) would be worse than
-       leaving it on the lockstitch head it is actually built around.
-       ⚠️ OWNER DECISION PENDING: give yoke attaching its own XA* code, or keep
-       it here as `application: "yoke-attaching"` permanently. */
-    subcategory: "lockstitch-machines",
+    /* CL-0023c — RESOLVED BY THE CATALOGUES, and it overturns what CL-0023
+       wrote here. CL-0023 kept this under Lockstitch and called XAPT wrong
+       ("Programmable/CNC — which this is not"). That was a guess. The library
+       says otherwise, in print:
+
+         · a shirt-automation catalogue lists one machine as
+           "CNC Template Sewing Machine for Top Placket OR YOKE TO BACK OR
+           DART" — one unit, three jobs, chosen by which template is loaded;
+         · the same catalogue's template unit (RFID template switching, ≥999
+           patterns, 30x50 cm field) lists "back yoke attaching" among its
+           applications;
+         · Durkopp Adler prints yoke seams as an APPLICATION of a general
+           machine, never as a machine class.
+
+       So there is no yoke-attaching machine to code — there is a CNC template
+       machine running a yoke template. NO CODE IS MINTED: a KOLEEX code is
+       permanent and never recycled, and minting one for a machine family that
+       does not exist is the failure the coding rules forbid. The kind moves to
+       where its real machine lives, beside `Automatic Dart Sewer` — which the
+       same printed line pairs it with — plus waistband, label/patch and
+       belt-loop attaching, every one of them an application of the same unit.
+
+       ⚠️ TRAP FOR THE NEXT SEARCH: a shirt catalogue also sells an "Automatic
+       Rotation Shoulder and Yoke Press". That is a PRESS — Finishing, not
+       sewing. A text search for "yoke" surfaces it first. */
+    subcategory: "programmable-cnc-sewing",
     attributes: { application: "yoke-attaching" },
     /* Was "bartacking" — it forms no bartack. Legacy field: the spec form
        resolves from the subcategory code, not from here. Corrected so the
