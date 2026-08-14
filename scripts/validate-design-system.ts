@@ -137,29 +137,79 @@ scan(
    selector. It already sits at (0,8,0) and other rules depend on being
    outranked by it; every `:not()` adds (0,1,0) and moves that target.
 
-   DETECTION is deliberately narrow: the full-bleed divider className with a
-   `role="button"` within the same open tag above it. That is the exact shape
-   that reproduces, so a card, a chip or a plain non-interactive row will not
-   trip it. */
+   ⚠️ DETECTION MUST RESOLVE THE ELEMENT, NOT A WINDOW. A ±20-line window around
+   the divider was tried and is useless: it returned 28 findings, nearly all of
+   them `<div className="p-2 border-b …">` padding wrappers, `<tr>`s and `<li>`s
+   that merely happened to sit near some button. The divider class has to be
+   traced to the element that actually carries it, and only then is that element
+   checked for being one the CSS selector matches.
+
+   Two shapes carry it, and both occur in this repo:
+     A  inline  — `<button … className="… border-b …">`
+     B  hoisted — `const cls = \`… border-b …\`` used later as `className={cls}`
+   B is how the Settings nav rows are written, and an earlier version of this
+   rule that only walked UP from the divider missed all of them. */
 {
   const ROW_DIVIDER = /border-b border-\[var\(--border-faint\)\]/;
+  /* What the Aurora selector matches. A plain <div> row is NOT in it unless it
+     declares role="button" — which is why the wrappers above must not flag. */
+  const INTERACTIVE_TAG = /^\s*<\s*(button|a|Link|summary)\b/;
+  const ANY_TAG = /^\s*<\s*[A-Za-z]/;
+
   for (const file of files) {
     const rel = relative(ROOT, file);
     const lines = readFileSync(file, "utf8").split("\n");
+
+    /** Read the open tag that starts at `start`, up to its closing `>`. */
+    const openTagAt = (start: number): { text: string; head: string } | null => {
+      if (!ANY_TAG.test(lines[start])) return null;
+      const buf: string[] = [];
+      for (let j = start; j < lines.length && j - start < 30; j++) {
+        buf.push(lines[j]);
+        if (/>\s*$/.test(lines[j]) || /\/>\s*$/.test(lines[j])) break;
+      }
+      return { text: buf.join("\n"), head: lines[start] };
+    };
+    /** Walk up from `i` to the line that opens the element containing it. */
+    const elementStart = (i: number): number | null => {
+      for (let j = i; j >= 0 && i - j < 30; j--) if (ANY_TAG.test(lines[j])) return j;
+      return null;
+    };
+    const check = (start: number, reportLine: number, reportText: string) => {
+      const tag = openTagAt(start);
+      if (!tag) return;
+      const isInteractive = INTERACTIVE_TAG.test(tag.head) || /role=["']button["']/.test(tag.text);
+      if (!isInteractive) return;
+      if (/data-kx-keep-hover/.test(tag.text)) return;
+      findings.push({ file: rel, line: reportLine + 1, text: reportText.trim(), rule: "08 interactive row divider without data-kx-keep-hover" });
+    };
+
     lines.forEach((text, i) => {
       if (!ROW_DIVIDER.test(text)) return;
-      /* Walk back to the start of this JSX open tag, not a fixed window — the
-         previous `>` ends the element before it, so anything past that belongs
-         to a different element and must not be read as this row's attributes. */
-      const attrs: string[] = [];
-      for (let j = i; j >= 0 && i - j < 25; j--) {
-        attrs.unshift(lines[j]);
-        if (j < i && /^\s*[<{]/.test(lines[j])) break;
+
+      /* B — is this divider inside a hoisted `const NAME = ...`? Then the
+         element to check is wherever NAME is spread into a className. */
+      let varName: string | null = null;
+      for (let j = i; j >= 0 && i - j < 8; j--) {
+        const m = lines[j].match(/(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=/);
+        if (m) { varName = m[1]; break; }
+        if (ANY_TAG.test(lines[j])) break;   // an element opened first → shape A
       }
-      const block = attrs.join("\n");
-      if (!/role=["']button["']/.test(block)) return;
-      if (/data-kx-keep-hover/.test(block)) return;
-      findings.push({ file: rel, line: i + 1, text: text.trim(), rule: "08 row role=button without data-kx-keep-hover" });
+      if (varName) {
+        const use = new RegExp(`className=\\{\\s*\`?[^}]*\\b${varName}\\b`);
+        let found = false;
+        lines.forEach((l, k) => {
+          if (!use.test(l)) return;
+          found = true;
+          const s = elementStart(k);
+          if (s !== null) check(s, i, text);
+        });
+        if (found) return;
+      }
+
+      /* A — the divider sits in the element's own className. */
+      const s = elementStart(i);
+      if (s !== null) check(s, i, text);
     });
   }
 }

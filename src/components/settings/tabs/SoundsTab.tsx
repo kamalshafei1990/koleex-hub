@@ -235,6 +235,10 @@ function NavRow({
     <button
       type="button"
       onClick={onClick}
+      /* KDS-1 §2a: this row is inset inside the card (px-2), so rounding the
+         row itself is the right shape here — but it is still a <button> with a
+         divider, so Aurora would recolour that divider Hub Blue on hover. */
+      data-kx-keep-hover=""
       /* rounded-lg: the highlight has to be a SHAPE, not a full-bleed
          band with square corners sitting inside a 16px-rounded card. */
       className={`flex w-full items-center justify-between gap-4 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
@@ -380,6 +384,8 @@ function ToneRow({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
+      /* KDS-1 §2a — inset row, own rounding; hatch keeps Aurora off the divider. */
+      data-kx-keep-hover=""
       className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
         last ? "" : "border-b border-[var(--border-faint)]"
       }`}

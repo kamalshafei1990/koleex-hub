@@ -22,7 +22,11 @@ function LinkRow({ href, icon, label, hint, last }: {
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-3 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors ${last ? "" : "border-b border-[var(--border-faint)]"}`}
+      /* KDS-1 §2a — full-bleed row: inset rounded highlight via `.kx-row-hl`,
+         and `data-kx-keep-hover` so Aurora's control-hover rule does not
+         recolour the divider Hub Blue on hover. */
+      data-kx-keep-hover=""
+      className={`kx-row-hl flex items-center gap-3 px-3 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}
     >
       <span className="h-8 w-8 rounded-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
         {icon}

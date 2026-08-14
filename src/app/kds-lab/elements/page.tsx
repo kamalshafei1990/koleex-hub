@@ -979,7 +979,7 @@ function ChoiceRows() {
       <Variant vid="RD-2" apps="Settings sounds" count="iOS checkmark row, no chrome" elected>
         <div className="w-full max-w-sm rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2">
           {["Chime", "Pulse"].map((l, i) => (
-            <button key={l} onClick={() => setR1(i)} className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${i === 0 ? "border-b border-[var(--border-faint)]" : ""}`}>
+            <button key={l} onClick={() => setR1(i)} data-kx-keep-hover="" className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${i === 0 ? "border-b border-[var(--border-faint)]" : ""}`}>
               <span><span className={`block truncate text-[13px] ${r1 === i ? "font-semibold" : ""} text-[var(--text-primary)]`}>{l}</span><span className="mt-0.5 block text-[11px] text-[var(--text-dim)]">Notification tone</span></span>
               <span className="flex h-5 w-5 shrink-0 items-center justify-center">{r1 === i && <CheckIcon className="h-3.5 w-3.5 text-[var(--text-primary)]" />}</span>
             </button>

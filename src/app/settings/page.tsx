@@ -43,9 +43,11 @@ import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
-import LockIcon from "@/components/icons/ui/LockIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -255,8 +257,12 @@ function SettingsContent() {
       node: <PasswordTab account={account} />,
     },
     {
+      /* The id is "security" for historical reasons; the section is a LIST OF
+         SIGN-INS, so the glyph is the Hub's history/timeline mark, not a lock.
+         A lock here also read as a third security padlock next to Key and
+         Shield, which said "protected" three times and "when" not once. */
       id: "security", label: t("nav.history"), subtitle: t("nav.history.sub"),
-      icon: <LockIcon className="h-3.5 w-3.5" />,
+      icon: <HistoryIcon className="h-3.5 w-3.5" />,
       node: <LoginHistoryTab account={account} />,
     },
     {
@@ -272,8 +278,11 @@ function SettingsContent() {
         node: <StampSignatureTab account={account} />,
       },
       {
+        /* Shield stays with Privacy & data, which is the one of the two that
+           is actually about protection. This row is literally "Admin tools" —
+           QA reporter, activity, roles, accounts — so it takes the toolbox. */
         id: "admin" as Tab, label: t("nav.admin"), subtitle: t("nav.admin.sub"),
-        icon: <ShieldIcon className="h-3.5 w-3.5" />,
+        icon: <WrenchIcon className="h-3.5 w-3.5" />,
         node: <AdminTab account={account} />,
       },
     ] : []),
@@ -384,11 +393,18 @@ function SettingsContent() {
                   isLast={!isSA}
                 />
                 {/* The push-management page is Super-Admin-only; showing the
-                    row to everyone sent regular users into a lock screen. */}
+                    row to everyone sent regular users into a lock screen.
+
+                    Not a second bell. This row sat directly under the
+                    preferences row, so two identical bells stacked and the
+                    pair read as one thing listed twice. The page it opens is a
+                    list of REGISTERED DEVICES, drawn there with this same
+                    MonitorIcon — so the row borrows its destination's own
+                    vocabulary: bell = which alerts, device = which screens. */}
                 {isSA && (
                   <SettingsRow
                     href="/settings/notifications"
-                    icon={<BellIcon className="h-3.5 w-3.5" />}
+                    icon={<MonitorIcon className="h-3.5 w-3.5" />}
                     label={t("nav.push")}
                     subtitle={t("nav.push.sub")}
                     value={pushValue}
@@ -507,19 +523,27 @@ function SettingsRow({
       <Chevron className="text-[var(--text-faint)] shrink-0" />
     </>
   );
-  const cls = `w-full flex items-center gap-3 px-3 py-2.5 text-start transition-colors ${
-    active ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]"
-  } ${!isLast ? "border-b border-[var(--border-faint)]" : ""}`;
+  /* KDS-1 §2a — a full-bleed nav row. Hover and selection are painted by
+     `.kx-row-hl` as an inset rounded layer instead of a background on the row
+     itself: this row spans the card edge to edge and carries the divider, so
+     filling it can only be a hard-edged band, and rounding the row would round
+     the divider with it. One shape for both states, selected simply stronger.
+     `data-kx-keep-hover` keeps the Aurora control-hover rule off it — without
+     it, hover recolours this divider Hub Blue and adds a 3% white fill with
+     `!important`, which is the square box the owner reported on Contacts. */
+  const cls = `kx-row-hl w-full flex items-center gap-3 px-3 py-2.5 text-start ${
+    !isLast ? "border-b border-[var(--border-faint)]" : ""
+  }`;
 
   if (href) {
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} data-selected={active} data-kx-keep-hover="">
         {inner}
       </Link>
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls}>
+    <button type="button" onClick={onClick} className={cls} data-selected={active} data-kx-keep-hover="">
       {inner}
     </button>
   );

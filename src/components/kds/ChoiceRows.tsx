@@ -30,6 +30,9 @@ export default function ChoiceRows<T extends string>({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(o.value)}
+            /* KDS-1 §2a — inset row, own rounding; hatch keeps Aurora's
+               control-hover off the divider between choices. */
+            data-kx-keep-hover=""
             className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-start transition-colors hover:bg-[var(--bg-surface-hover)] ${
               i < options.length - 1 ? "border-b border-[var(--border-faint)]" : ""
             }`}

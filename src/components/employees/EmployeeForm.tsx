@@ -740,6 +740,9 @@ function CollapsibleSection({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
+        /* Section header, not a list row — but it still carries a divider when
+           open, and Aurora would light that divider Hub Blue on hover. */
+        data-kx-keep-hover=""
         className={`w-full flex items-start gap-3 text-start group ${open ? "mb-5 pb-4 border-b border-[var(--border-faint)]" : ""}`}
       >
         <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0" aria-hidden="true">
