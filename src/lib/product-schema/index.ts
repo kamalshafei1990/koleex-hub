@@ -26,6 +26,7 @@ import { AUTOMATION_UNIT_SCHEMAS } from "./schemas/automation-units-2026-08-13";
 import { BUTTONHOLE_BARTACK_SCHEMAS } from "./schemas/buttonhole-bartack-2026-08-13";
 import { BUTTON_ATTACHING_SCHEMAS } from "./schemas/button-attaching-2026-08-13";
 import { HEMMING_SCHEMAS } from "./schemas/hemming-2026-08-13";
+import { KNIFE_CUTTING_SCHEMAS } from "./schemas/knife-cutting-2026-08-14";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
@@ -104,6 +105,11 @@ for (const schema of BUTTON_ATTACHING_SCHEMAS) registerSchema(schema);
    current catalogue library can support: XACL, XASL and XASS have no source
    with a printed spec table and stay empty rather than invented. */
 for (const schema of HEMMING_SCHEMAS) registerSchema(schema);
+
+/* XCS Straight Knife + XCR Round Knife — the first two templates in Cutting
+   Equipment, measured as the Hub's largest single gap (9 subcategories, zero
+   templates). Read from the Koleex catalogue by RENDERING; it has no text. */
+for (const schema of KNIFE_CUTTING_SCHEMAS) registerSchema(schema);
 
 /* CL-0018 — ironing family re-bound under the new "ironing-systems"
    category (tokens unchanged; see finishing-batch-2026-08.ts). */
