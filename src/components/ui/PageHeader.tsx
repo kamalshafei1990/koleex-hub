@@ -20,11 +20,12 @@
    · Menu pills at the bottom — text + active state + "More ▾" overflow
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
+import { APP_REGISTRY } from "@/lib/navigation";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 
@@ -48,6 +49,10 @@ export interface PageHeaderProps {
   subtitle?: string;
   icon: RrIconName | ReactNode;
   backHref?: string;
+  /** Where the back button GOES, shown beside its arrow (BK-4). Defaults to
+   *  "Hub". Set it when the parent is a specific record — "Quotation #1042" —
+   *  so the control answers "back to what?" instead of just "back". */
+  backLabel?: string;
   action?: ReactNode;
   controls?: ReactNode;
   meta?: ReactNode;
@@ -77,6 +82,7 @@ export default function PageHeader({
   subtitle,
   icon,
   backHref,
+  backLabel,
   action,
   controls,
   meta,
@@ -91,6 +97,16 @@ export default function PageHeader({
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
   const resolvedBackHref = backHref ?? parentPath(pathname);
+
+  /* Does the system bar already carry this app's name? Resolved exactly the way
+     MainHeader resolves it — longest matching registry route wins — so the two
+     read one source and cannot drift apart. See the M-1 note on the title. */
+  const systemBarNamesThisApp = useMemo(() => {
+    const routes = APP_REGISTRY.filter((a) => a.route && a.tKey)
+      .map((a) => a.route as string)
+      .sort((a, b) => b.length - a.length);
+    return routes.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  }, [pathname]);
 
   /* Flatten any overflow groups into the main tab list so every item
      is visible inline (no "More" dropdown). De-dup by key to avoid
@@ -161,12 +177,27 @@ export default function PageHeader({
           complaint that the header was dominating the screen. */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
         <div className="flex min-w-0 items-center gap-2 sm:items-start sm:gap-4">
+          {/* BK-4 — THE BACK BUTTON NAMES ITS DESTINATION (owner pick,
+              2026-08-15: "i think the back button can be little longer").
+
+              It was a 40×40 square, which made it an exact twin of the app-icon
+              chip immediately to its right: two identical boxes, only one of
+              them interactive. Longer for its own sake would fix the twinning
+              and nothing else, so the extra width carries the answer to the
+              question this control actually raises — back to WHAT — on a screen
+              you can arrive at from three different places.
+
+              The word is dropped below sm, where the row is tight and the title
+              beside it must not be squeezed; there it is the wider arrow (BK-2)
+              instead. `backLabel` lets a caller name a real parent
+              ("Quotation #1042"); the default is the Hub. */}
           <Link
             href={resolvedBackHref}
-            aria-label="Back"
-            className="kx-ph-chrome flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10 sm:rounded-xl sm:hover:-translate-y-0.5"
+            aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
+            className="kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5"
           >
             <RrIcon name="arrow-left" size={14} />
+            <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
           </Link>
           {/* NO kx-ph-chrome HERE. This is the app-icon chip: a plain div with
               no href and no handler, sitting next to a back LINK that wears
@@ -187,12 +218,54 @@ export default function PageHeader({
               icon
             ) : null}
           </div>
+          {/* M-1 · CONTINUITY — DO NOT PRINT A NAME THE SYSTEM BAR IS ALREADY
+              PRINTING (owner pick, 2026-08-15).
+
+              Measured on /contacts before this: "Contacts" in the system bar,
+              and the same word again 20px below it in this block. Both of the
+              screenshots the owner sent showed it — KOLEEX hub | Settings, then
+              Settings again. The Hub was spending its largest type on a word
+              already on screen a finger-width away.
+
+              ⚠️ THE CONDITION IS NOT A PROP, AND THAT IS DELIBERATE. MainHeader
+              derives the app name from APP_REGISTRY by route; asking each of the
+              23 call sites to declare "the bar shows my name" would be the same
+              fact written twice, and would drift the first time a route moved.
+              This reads the SAME source, so the two can never disagree — and a
+              route that is not in the registry (a deep record page, a lab) gets
+              no name up there and therefore keeps its title here.
+
+              The <h1> never leaves the document: it stays for assistive tech and
+              for the document outline, only visually hidden. What takes its
+              place on screen is the subtitle, promoted to the primary line —
+              which is where an app should say what the bar cannot: its state.
+
+              ⚠️⚠️ AND IT IS `md:sr-only`, NOT `sr-only`. MainHeader renders the
+              app name `hidden md:inline` — the phone header declutters to
+              menu · logo · bell · avatar and drops the name entirely. Hiding
+              the title unconditionally therefore deleted the app's name from
+              the phone: caught on /documents at 375px, where the screen was
+              left saying only "Koleex document formats — create, save…" with
+              nothing naming the app. The breakpoint here MUST track the one in
+              MainHeader; if that `md:` ever moves, this one moves with it. */}
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-[17px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[24px] md:text-[26px]">
+            <h1
+              className={
+                systemBarNamesThisApp
+                  ? "text-[17px] font-bold leading-tight tracking-tight text-[var(--text-primary)] md:sr-only"
+                  : "text-[17px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[24px] md:text-[26px]"
+              }
+            >
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-[var(--text-muted)] sm:line-clamp-none sm:mt-1 sm:text-[13px]">
+              <p
+                className={
+                  systemBarNamesThisApp
+                    ? "mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-[var(--text-muted)] md:mt-0 md:line-clamp-none md:text-[14px] md:text-[var(--text-secondary)]"
+                    : "mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-[var(--text-muted)] sm:line-clamp-none sm:mt-1 sm:text-[13px]"
+                }
+              >
                 {subtitle}
               </p>
             )}
