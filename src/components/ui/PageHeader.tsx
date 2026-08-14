@@ -250,12 +250,22 @@ export default function PageHeader({
            1, correct rect — because what had gone was the MASK, not the
            filter. Measure the layers' masks, not just their presence.
 
+           ONCE THE FADE IS ABSOLUTE, A TALL LAYER IS FREE. I first "fixed"
+           this by shrinking --kx-ramp-top to 6rem, which cured the scrolled
+           state and broke the resting one: the band sits at y=203 at scroll
+           top, so a 96px reach left everything above 107 with no backdrop at
+           all, and the app title scrolled straight through the Hub logo.
+           The frost boundary is `bottom - fade`, so height only ever extends
+           it UPWARD — 26rem covers the header from both ends and the surplus
+           is clipped above the viewport. --kx-ramp-top is reach; the fade is
+           what had to stop being a percentage.
+
            --kx-ramp-ext:1rem — the TAIL, measured. At the 3rem default the
            ramp ended at y=298 while the first section heading under the bar
            starts at y=272, so the page's own first line of text sat 26px
            inside the blur. 16px clears it with room to spare. */
         className={`kx-ph-band sticky top-0 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6 ${
-          ownsRamp ? "kx-bar-host z-20 [--kx-ramp-top:6rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]" : "z-30"
+          ownsRamp ? "kx-bar-host z-20 [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]" : "z-30"
         }`}
         /* 26rem, the same as Product Data's, and generous on purpose: the
            strip's height changes with the title's wrap and whether a search
