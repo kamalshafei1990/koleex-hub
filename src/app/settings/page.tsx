@@ -117,6 +117,25 @@ function capitalize(s: string) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
+/** Push state for the master row, read straight from the browser.
+ *
+ *  Deliberately NOT a hook and not stateful: `Notification.permission` only
+ *  changes when the user answers the prompt, which happens on the push page,
+ *  and coming back here remounts this list. Subscribing to it would be a
+ *  listener earning nothing.
+ *
+ *  Returns undefined where there is nothing true to say — no Notification API
+ *  at all, or the value is still "default" on a browser that cannot support
+ *  push anyway — so the row shows nothing rather than a state it does not
+ *  have. */
+function pushPermissionValue(t: (k: string) => string): string | undefined {
+  if (typeof Notification === "undefined") return undefined;
+  const p = Notification.permission;
+  if (p === "granted") return t("push.on");
+  if (p === "denied") return t("push.off");
+  return undefined;   // "default" — never asked; say nothing, do not guess
+}
+
 /* ---------------------------------------------------------------------------
    Settings shell — iOS / iPadOS style.
 
@@ -177,6 +196,20 @@ function SettingsContent() {
      enabled ones would read "17" for a user who has never opened the screen —
      technically true, and useless. What a reader wants to know is whether
      anything is being held back, so the row is blank when nothing is. */
+  /* PUSH IS FREE; THE STAMP IS NOT — the difference is worth stating, because
+     it is the whole test for whether a row earns a value.
+
+     Push permission is `Notification.permission`, a synchronous local read,
+     so this row can report itself for nothing. Signature & stamp would need
+     GET /api/quotations/saved-assets, a server round-trip on every Settings
+     open to fill one row that only Super Admins can see — which is exactly
+     the trade Phase 0 was undone to avoid. It stays blank.
+
+     "Off" also covers "never asked", and that is honest: from the reader's
+     side a permission never granted and one denied are the same state — no
+     alerts arrive. The screen behind the row is where the difference matters,
+     and it says so there. */
+  const pushValue = pushPermissionValue(t);
   const notifPrefs = withDefaults(account.preferences).notifications as NotificationPrefs;
   const mutedCount = Object.entries(notifPrefs).filter(
     ([k, v]) => k !== "email" && k !== "in_app" && v === false,
@@ -358,6 +391,7 @@ function SettingsContent() {
                     icon={<BellIcon className="h-3.5 w-3.5" />}
                     label={t("nav.push")}
                     subtitle={t("nav.push.sub")}
+                    value={pushValue}
                     isLast
                   />
                 )}

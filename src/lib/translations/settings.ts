@@ -45,6 +45,10 @@ export const settingsT: Translations = {
   "nav.notifications.muted": { en: "{n} muted", zh: "已静音 {n} 项", ar: "{n} مكتوم" },
   /* Headings for the per-activity switches, grouped by who or what the alert
      is about — the question someone silencing notifications is asking. */
+  /* Push state on the master row. Only these two — "default" (never asked)
+     shows nothing, because it is not a state the reader has chosen. */
+  "push.on":            { en: "On",             zh: "已开启",     ar: "مفعّل" },
+  "push.off":           { en: "Off",            zh: "已关闭",     ar: "مقفول" },
   "act.group.forMe":    { en: "Waiting on me",  zh: "等我处理",   ar: "مستني مني" },
   "act.group.myWork":   { en: "My schedule",    zh: "我的日程",   ar: "مواعيدي" },
   "act.group.business": { en: "The business",   zh: "业务动态",   ar: "حركة الشغل" },
