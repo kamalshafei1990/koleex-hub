@@ -158,6 +158,79 @@ export function SettingsGroup({ header, footer, children, flush = true }: {
   );
 }
 
+/** A miniature of the Hub rendered in a GIVEN skin + theme, so a choice can
+ *  be seen before it is made.
+ *
+ *  Style and theme were two rows of word-buttons — "Aurora / Core",
+ *  "Light / Dark / Auto" — which asks the reader to pick a look from its name.
+ *  The reference does not: Light and Dark are two little screens with a radio
+ *  under each, and the answer is visible before the tap. We have four
+ *  combinations and none of them were visible until applied.
+ *
+ *  IT IS TOKEN-DRIVEN, NOT PAINTED. This works because `[data-theme="light"]`
+ *  and `[data-theme="dark"]` are plain attribute selectors in globals.css, not
+ *  `:root`-bound — verified live before building on it: a nested div carrying
+ *  the attribute reports --bg-primary #fff while the page around it reports
+ *  #0a0a0a. So the preview redeclares the real tokens for its own subtree and
+ *  cannot drift from the thing it is previewing. Hand-picked hexes would have
+ *  been a second source of truth that silently goes stale.
+ *
+ *  THE AURORA GROUND IS A STILL. The real one is a canvas, and four canvases
+ *  on a settings screen is a cost the canon already refuses for blur, let
+ *  alone animation. The gradient stands in for the wave; everything else —
+ *  fills, text, border, the glass card — is the genuine token. */
+export function AppearancePreview({ skin, theme, label, selected, onSelect }: {
+  skin: "aurora" | "core";
+  theme: "light" | "dark";
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className="flex flex-col items-center gap-2 group"
+    >
+      <span
+        data-kx-skin={skin}
+        data-theme={theme}
+        aria-hidden
+        className={`block w-[84px] h-[112px] rounded-xl overflow-hidden border-2 transition-colors ${
+          selected ? "border-[#567FB2]" : "border-[var(--border-subtle)] group-hover:border-[var(--border-color)]"
+        }`}
+      >
+        <span className="relative block h-full w-full bg-[var(--bg-primary)]">
+          {skin === "aurora" && (
+            <span
+              className="absolute inset-0 block"
+              style={{
+                background:
+                  theme === "dark"
+                    ? "radial-gradient(120% 80% at 30% 15%, #1d2a3d 0%, #0b0f16 60%)"
+                    : "radial-gradient(120% 80% at 30% 15%, #dbe7f5 0%, #f4f7fb 60%)",
+              }}
+            />
+          )}
+          {/* header strip */}
+          <span className="absolute inset-x-0 top-0 h-4 block bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)]" />
+          {/* a card with two lines of "content" */}
+          <span className="absolute inset-x-2 top-6 block rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1.5">
+            <span className="block h-1 w-3/4 rounded-full bg-[var(--text-primary)] opacity-80" />
+            <span className="mt-1 block h-1 w-1/2 rounded-full bg-[var(--text-primary)] opacity-35" />
+          </span>
+          {/* the one accent, so the preview shows where colour lands */}
+          <span className="absolute start-2 bottom-2 block h-2.5 w-8 rounded-full bg-[#567FB2]" />
+        </span>
+      </span>
+      <span className={`text-[11.5px] ${selected ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-dim)]"}`}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
 /** A labeled row that hosts a control on the right (segmented / select). */
 export function ControlRow({ label, hint, children, last }: {
   label: string; hint?: string; children: ReactNode; last?: boolean;

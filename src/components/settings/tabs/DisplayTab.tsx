@@ -12,7 +12,7 @@ import {
   applyDisplayPreferences, saveDisplayPreferencesLocally, getThemePreference, setTheme,
   TEXT_SCALE, type ThemePreference,
 } from "@/lib/display-prefs";
-import { SettingsCard, ControlRow, Segmented, SwitchRow } from "./ui";
+import { SettingsCard, ControlRow, Segmented, SwitchRow, AppearancePreview } from "./ui";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { getSkin, setSkin, DEFAULT_SKIN, type Skin } from "@/lib/appearance";
@@ -98,30 +98,64 @@ export default function DisplayTab({ account, onChanged }: {
   return (
     <div className="space-y-4">
       <SettingsCard title={t("display.title")} subtitle={t("display.sub")}>
-        {/* Style sits ABOVE theme deliberately: it is the bigger decision —
-            which visual language — and theme is the brightness within it.
-            The two are independent, so every style has both faces. */}
-        <ControlRow label={t("display.style")} hint={t("display.style.hint")}>
-          <Segmented<Skin>
-            value={skin}
-            onChange={pickSkin}
-            options={[
-              { value: "aurora", label: t("display.style.aurora") },
-              { value: "core", label: t("display.style.core") },
-            ]}
-          />
-        </ControlRow>
-        <ControlRow label={t("display.theme")} hint={theme === "system" ? t("display.theme.autoHint") : t("display.theme.hint")}>
-          <Segmented<ThemePreference>
-            value={theme}
-            onChange={pickTheme}
-            options={[
-              { value: "light", label: t("display.light") },
-              { value: "dark", label: t("display.dark") },
-              { value: "system", label: t("display.auto") },
-            ]}
-          />
-        </ControlRow>
+        {/* THE CHOICE IS SHOWN, NOT NAMED. Both of these were rows of
+            word-buttons, which asks the reader to pick a look from its label —
+            and "Aurora" tells you nothing until you have already switched.
+            Each preview renders in the combination it offers.
+
+            Style is asked first and separately because it is the bigger
+            decision (which visual language), and theme is the brightness
+            within it. Splitting them keeps four combinations to two questions
+            of two answers instead of one question of four.
+
+            The style previews are drawn in the CURRENT theme and the theme
+            previews in the CURRENT style, so each pair differs in exactly the
+            thing it is asking about. */}
+        <div className="py-3 border-b border-[var(--border-faint)]">
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("display.style")}</p>
+          <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{t("display.style.hint")}</p>
+          <div className="mt-3 flex gap-4">
+            <AppearancePreview
+              skin="aurora" theme={theme === "light" ? "light" : "dark"}
+              label={t("display.style.aurora")}
+              selected={skin === "aurora"} onSelect={() => pickSkin("aurora")}
+            />
+            <AppearancePreview
+              skin="core" theme={theme === "light" ? "light" : "dark"}
+              label={t("display.style.core")}
+              selected={skin === "core"} onSelect={() => pickSkin("core")}
+            />
+          </div>
+        </div>
+
+        <div className="py-3 border-b border-[var(--border-faint)]">
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("display.theme")}</p>
+          <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
+            {theme === "system" ? t("display.theme.autoHint") : t("display.theme.hint")}
+          </p>
+          <div className="mt-3 flex gap-4">
+            <AppearancePreview
+              skin={skin} theme="light" label={t("display.light")}
+              selected={theme === "light"} onSelect={() => pickTheme("light")}
+            />
+            <AppearancePreview
+              skin={skin} theme="dark" label={t("display.dark")}
+              selected={theme === "dark"} onSelect={() => pickTheme("dark")}
+            />
+          </div>
+          {/* Auto is a SWITCH, not a third picture: it is not a look you can
+              preview, it is "follow the device", and drawing it as a third
+              little screen would promise an appearance it does not have. The
+              reference makes the same split. */}
+          <div className="mt-1">
+            <SwitchRow
+              label={t("display.auto")}
+              checked={theme === "system"}
+              onChange={(on) => pickTheme(on ? "system" : "dark")}
+              last
+            />
+          </div>
+        </div>
         <ControlRow label={t("display.textSize")} hint={t("display.textSize.hint")}>
           <Segmented<TextSizePref>
             value={d.text_size}
