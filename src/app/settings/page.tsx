@@ -49,7 +49,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
-import { Chevron } from "@/components/settings/tabs/ui";
+import { Chevron, RowValue } from "@/components/settings/tabs/ui";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -464,14 +464,12 @@ function SettingsRow({
         <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">{label}</span>
         {subtitle && <span className="block text-[11px] text-[var(--text-dim)] truncate">{subtitle}</span>}
       </span>
-      {/* The row's current state, so the list can be READ instead of opened —
-          the reference's central habit (WLAN "Not Connected", iCloud "50 GB").
-          Rendered only when there is one: a row with no state shows nothing,
-          never an em dash, which would be a value meaning "empty" rather than
-          the absence of a value. */}
-      {value && (
-        <span className="shrink-0 text-[12px] text-[var(--text-dim)] truncate max-w-[40%]">{value}</span>
-      )}
+      {/* Shared with the settings rows in tabs/ui.tsx — one definition, because
+          this is the part that must look the same in both lists and had
+          already drifted (12px vs 12.5px, truncate vs tabular-nums) within a
+          day. The rows themselves stay separate: that one is a setting, this
+          is a navigation item with a selected state. */}
+      <RowValue value={value} />
       <Chevron className="text-[var(--text-faint)] shrink-0" />
     </>
   );

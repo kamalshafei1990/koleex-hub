@@ -47,6 +47,31 @@ export function SettingsCard({ title, subtitle, children, flush }: {
   );
 }
 
+/** The value a row reports at its inline end — ONE definition, used by both
+ *  the settings rows here and the master-list rows in app/settings/page.tsx.
+ *
+ *  Those two are NOT the same component and should not be merged: one is a
+ *  setting (chevron only when there is somewhere to go), the other a
+ *  navigation item (always navigates, carries a selected state). Forcing them
+ *  together needs an `active` flag and a `compact` flag, which is two
+ *  components wearing one name.
+ *
+ *  But the VALUE has to look identical in both, and within a day of shipping
+ *  it already did not: 12.5px + tabular-nums here, 12px + truncate + a 40% cap
+ *  there. Same idea, two sizes. So the thing that must match is the thing that
+ *  is shared, and the parts that legitimately differ stay apart.
+ *
+ *  Returns null rather than an em dash. A dash is a value meaning "empty",
+ *  which is a different statement from having no state to report. */
+export function RowValue({ value }: { value?: ReactNode }) {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <span className="shrink-0 max-w-[45%] truncate text-[12px] text-[var(--text-dim)] tabular-nums">
+      {value}
+    </span>
+  );
+}
+
 /** THE READING ROW: a label, its current value, and a chevron ONLY if there
  *  is somewhere to go.
  *
@@ -104,9 +129,7 @@ export function SettingsRow({
         </span>
         {hint && <span className="block text-[11px] text-[var(--text-dim)] mt-0.5">{hint}</span>}
       </span>
-      {value !== undefined && value !== null && value !== "" && (
-        <span className="shrink-0 text-[12.5px] text-[var(--text-dim)] tabular-nums">{value}</span>
-      )}
+      <RowValue value={value} />
       {interactive && !isAction && <Chevron className="shrink-0 text-[var(--text-ghost)]" />}
     </>
   );
