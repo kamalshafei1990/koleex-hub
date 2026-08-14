@@ -928,11 +928,16 @@ export default function HomePage() {
         </div>
 
         {/* ── Zone A: Search (primary action — elevated) ── */}
-        <div className="mb-7">
+        {/* mb-8 (32px), not mb-7. This is the gap that separates the INTRO
+            from the workspace, and it was the same 28px as the gap between two
+            app groups — so nothing told the eye where the page changes gear.
+            Groups stay at 28 (space-y-7) so they read as siblings of each
+            other and children of this break. Owner picked the two numbers. */}
+        <div className="mb-8">
           <div className={`search-neon relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 ${
             dk
-              ? "kx-glass bg-[#0c0c0c] border-white/[0.07]"
-              : "kx-glass bg-black/[0.02] border-black/[0.07]"
+              ? "kx-glass kx-search-well border-white/[0.08]"
+              : "kx-glass kx-search-well border-black/[0.10]"
           }`}>
             <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
             <input
@@ -1105,6 +1110,23 @@ export default function HomePage() {
             0 0 24px rgba(188,216,240,0.08);
         }
         `}
+        /* A FORM FIELD ON A GLASSED PAGE IS A RECESSED WELL, NOT A TINT.
+           At rest this bar was a flat #0c0c0c sheet, so it FLOATED on the wave
+           field instead of being cut into it — the one place Home disagreed
+           with a rule the canon enforces everywhere else (a white tint simply
+           disappears against dark glass). The fill drops to the canon value
+           and an inner shadow carves the edge; kx-glass keeps supplying the
+           16px blur underneath, so the ground still moves through it.
+           The FOCUS state below is untouched: it has its own documented
+           history and the owner signed it off. */
+        ${skin === "aurora" ? `
+        .kx-search-well {
+          background: ${dk ? "rgba(3, 5, 9, 0.55)" : "rgba(255, 255, 255, 0.70)"};
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,${dk ? "0.10" : "0.90"}),
+            inset 0 1.5px 4px rgba(0,0,0,${dk ? "0.40" : "0.10"});
+        }
+        ` : ""}
         /* Search bar: focusing it lights the same Hub Blue gradient border
            + glow the tiles use on hover — one interaction language. */
         ${skin === "aurora" ? `
