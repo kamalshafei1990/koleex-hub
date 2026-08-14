@@ -66,8 +66,8 @@ export const FACETS: Record<string, FacetDefinition> = {
   },
   feed_type: {
     key: "feed_type", type: "single_select", source: "§2 Machine facets",
-    values: ["drop", "needle", "compound-unison", "differential", "puller", "top-and-bottom", "walking-foot"],
-    note: "'walking-foot' is the shop-floor name for compound/unison feed; both spellings are kept because catalogues print both.",
+    values: ["drop", "needle", "compound-unison", "differential", "puller", "top-and-bottom", "walking-foot", "roller"],
+    note: "'walking-foot' is the shop-floor name for compound/unison feed; both spellings are kept because catalogues print both. `roller` added 2026-08-14 (dictionary §2b): a driven roller presser that pulls from above, evidenced by Yuegong GG591/GG9910 (电脑罗拉车). It is NOT `puller` — a puller is a separate device downstream of the needle, a roller IS the presser at the needle.",
   },
   drive_type: {
     key: "drive_type", type: "single_select", source: "§2 Machine facets",
@@ -182,6 +182,7 @@ export const FACET_I18N: Translations = {
   "fv:compound-unison": { en: "Compound (Unison) Feed", zh: "综合送料", ar: "تغذية مركّبة" },
   "fv:differential": { en: "Differential Feed", zh: "差动送料", ar: "تغذية تفاضلية" },
   "fv:puller": { en: "Puller Feed", zh: "拉布送料", ar: "تغذية بالسحب" },
+  "fv:roller": { en: "Roller Feed", zh: "罗拉送料", ar: "تغذية بالرولر" },
   "fv:top-and-bottom": { en: "Top and Bottom Feed", zh: "上下送料", ar: "تغذية علوية وسفلية" },
   "fv:walking-foot": { en: "Walking Foot", zh: "行走压脚", ar: "قدم ماشية" },
   "fv:clutch": { en: "Clutch Motor", zh: "离合电机", ar: "موتور كلتش" },

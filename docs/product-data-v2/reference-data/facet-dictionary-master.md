@@ -26,7 +26,7 @@ New facets are added **here only** (governance). Categories *reference* facets; 
 | thread_count | number | — | 2 · 3 · 4 · 5 · 6 |
 | gauge | measurement | mm / inch | numeric |
 | drive_type | single_select | — | Clutch · Servo · Direct-Drive |
-| feed_type | single_select | — | Drop · Needle · Compound(Unison) · Differential · Puller · Top-and-Bottom |
+| feed_type | single_select | — | Drop · Needle · Compound(Unison) · Differential · Puller · Top-and-Bottom · **Roller** |
 | stitch_type | single_select | — | Lockstitch · Chainstitch · Overlock · Coverstitch · Chenille · Zigzag · Blind |
 | hook_size | single_select | — | Standard · Large · Huge |
 | head_count | number | — | 1 … 56 |
@@ -206,3 +206,19 @@ missing rather than four.
 The registry lives in `src/lib/product-facets.ts` and **mirrors this document** — it does not maintain a parallel list. `validate:budgets` **section H** fails the build when a Machine Kind uses a key that is not in the registry, a value that is not in the facet's list, or a key/value with no en/zh/ar label. It also fails if any kind is ever filed back under a retired configuration shelf.
 
 Current: **105 kinds · 77 facet pairs · 0 violations.**
+
+### §2b — `roller` added to `feed_type` (2026-08-14)
+
+A driven ROLLER presser replaces the presser foot and pulls the work through
+from above. It is a distinct mechanism, not a spelling of an existing value:
+`puller` is a separate downstream device that tensions fabric AFTER the needle,
+while a roller foot IS the presser at the needle.
+
+**Evidence:** Yuegong/SEASTAR p.16, GG591 / GG9910, printed 电脑罗拉车 /
+普通罗拉车 — "computerised / ordinary ROLLER machine", pillar bed, lockstitch.
+Roller feed is standard on pillar and post-bed machines for leather and
+footwear, so this value will be needed again as soon as that category has a
+source.
+
+Added because a real product could not be described without it, not to round
+out the set.
