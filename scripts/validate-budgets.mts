@@ -114,7 +114,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "quotations": { chunks: 13, kbytes: 880 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },
-  "settings": { chunks: 14, kbytes: 1071 },
+  /* Re-measured 2026-08-15 after the tabs were moved to next/dynamic:
+     11 chunks / 980 KB → 8 / 560. The old 14/1071 was headroom over a route
+     that was loading all twelve tab components to show one; leaving it there
+     would have let the regression walk straight back in. */
+  "settings": { chunks: 9, kbytes: 630 },
   "software-center": { chunks: 10, kbytes: 551 },
   "suppliers": { chunks: 10, kbytes: 515 },
   "todo": { chunks: 12, kbytes: 964 },

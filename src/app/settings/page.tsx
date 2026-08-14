@@ -35,19 +35,8 @@ import { WorkspaceSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
-import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
-import DisplayTab from "@/components/settings/tabs/DisplayTab";
-import SoundsTab from "@/components/settings/tabs/SoundsTab";
-import RegionTab from "@/components/settings/tabs/RegionTab";
-import AboutTab from "@/components/settings/tabs/AboutTab";
-import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
-import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
-import PrivacyTab from "@/components/settings/tabs/PrivacyTab";
-import PasswordTab from "@/components/settings/tabs/PasswordTab";
-import ProfileTab from "@/components/settings/tabs/ProfileTab";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
-import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
-import AdminTab from "@/components/settings/tabs/AdminTab";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
@@ -63,6 +52,43 @@ import type { AccountWithLinks } from "@/types/supabase";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+
+/* ── TABS LOAD ON DEMAND ───────────────────────────────────────────────────
+   All twelve of these were static imports, and `dynamic` was sitting three
+   lines above being used once, for the canvas. So opening Settings downloaded
+   every tab's code to show exactly one of them — which is the whole reason
+   this route measured 11 chunks / 980 KB, the heaviest of the Hub's 39
+   budgeted routes despite the app being only ~2,400 lines.
+
+   On production the cost of that is round-trips, not bytes: measured on
+   hub.koleexgroup.com, file size barely predicts load time (correlation 0.42
+   — a 2.4 KB file took 1357 ms, a 70.8 KB file 2280 ms). Eleven chunks is
+   eleven waits.
+
+   The `sections` array below builds a JSX element for every tab, but creating
+   an element does not invoke its component — only `active.node` is ever
+   mounted, and next/dynamic fires its loader on MOUNT. So exactly one tab's
+   chunk is fetched, and it is fetched when the user opens that tab.
+
+   `loading` matters here: without it the panel would be blank for the length
+   of a round-trip. A quiet centred spinner, the same shape the modules use. */
+const tabLoading = () => (
+  <div className="h-full min-h-[200px] flex items-center justify-center text-[var(--text-dim)]">
+    <SpinnerIcon size={20} />
+  </div>
+);
+const ProfileTab        = dynamic(() => import("@/components/settings/tabs/ProfileTab"),        { loading: tabLoading });
+const CalendarTab       = dynamic(() => import("@/components/admin/accounts/tabs/CalendarTab"), { loading: tabLoading });
+const DisplayTab        = dynamic(() => import("@/components/settings/tabs/DisplayTab"),        { loading: tabLoading });
+const SoundsTab         = dynamic(() => import("@/components/settings/tabs/SoundsTab"),         { loading: tabLoading });
+const RegionTab         = dynamic(() => import("@/components/settings/tabs/RegionTab"),         { loading: tabLoading });
+const NotificationsTab  = dynamic(() => import("@/components/settings/tabs/NotificationsTab"),  { loading: tabLoading });
+const PasswordTab       = dynamic(() => import("@/components/settings/tabs/PasswordTab"),       { loading: tabLoading });
+const LoginHistoryTab   = dynamic(() => import("@/components/settings/tabs/LoginHistoryTab"),   { loading: tabLoading });
+const PrivacyTab        = dynamic(() => import("@/components/settings/tabs/PrivacyTab"),        { loading: tabLoading });
+const StampSignatureTab = dynamic(() => import("@/components/settings/tabs/StampSignatureTab"), { loading: tabLoading });
+const AdminTab          = dynamic(() => import("@/components/settings/tabs/AdminTab"),          { loading: tabLoading });
+const AboutTab          = dynamic(() => import("@/components/settings/tabs/AboutTab"),          { loading: tabLoading });
 
 type Tab = "profile" | "calendar" | "display" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
