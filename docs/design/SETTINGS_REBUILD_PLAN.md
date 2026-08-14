@@ -266,3 +266,36 @@ Incidentally confirmed the same run: the push row correctly showed **no value**
 on `localhost:3010`, because notification permission is per-origin and that
 origin had never been asked — the "never asked says nothing" rule behaving as
 designed, on a case that could not be staged deliberately.
+
+## 8. The icons — one glyph, one meaning
+
+Owner: "please choose the right and suitable icons from our icons library."
+The Hub's rule is that an icon carries exactly one meaning, so the audit was a
+duplicate check first and a taste question second. Three rows failed it.
+
+| Row | Was | Now | Why the old one was wrong |
+|---|---|---|---|
+| Login history | `LockIcon` | `HistoryIcon` | The tab is `LoginHistoryTab` — a list of sign-ins. Next to Password's key and Privacy's shield, a padlock said "protected" a third time and "when" not once. `HistoryIcon` already means timeline/audit in four other files, so this is joining an existing meaning rather than inventing one. |
+| Push notifications | `BellIcon` | `MonitorIcon` | **A duplicate on adjacent rows** — it sat directly under Notification preferences, so two identical bells stacked and the pair read as one thing listed twice. The page it opens draws its registered devices with this same `MonitorIcon`, so the row now borrows its destination's vocabulary: bell = which alerts, device = which screens. |
+| Admin tools | `ShieldIcon` | `WrenchIcon` | **A duplicate with Privacy & data.** Of the two, Privacy has the better claim to a shield; this row is literally "Admin tools" — QA reporter, activity, roles, accounts. |
+
+The other nine were checked and left: `UserIcon`, `CalendarRawIcon`,
+`PaletteIcon`, `Volume2Icon`, `GlobeIcon`, `BellIcon`, `KeyIcon`,
+`FileBadge2Icon`, `InfoIcon`. Verified afterwards as **14 icons, 14 distinct**.
+
+**One mismatch was found and deliberately not changed.** Privacy & data keeps
+its shield although the section currently holds one control — a JSON export —
+and its own subtitle reads "Download your data". A download glyph would
+describe today's contents more honestly, and would be wrong the moment a real
+privacy control lands there: the icon names the section's scope, not its
+current single action. Recorded here so the next reader knows it was seen.
+
+**Process note, and it is the uncomfortable part.** These edits are on `main`
+inside commit `0b240962`, whose message is about the KDS row rule and does not
+mention icons. The concurrent session staged the tree while this change sat
+uncommitted and swept it in. Nothing was lost or corrupted — the code is
+correct and verified — but the history is now misleading, and rewriting a
+pushed commit while another session works the same tree would trade a bad
+message for a real hazard. This section is the searchable record instead.
+The lesson for a shared tree is to commit at the end of each edit, not at the
+end of each task.
