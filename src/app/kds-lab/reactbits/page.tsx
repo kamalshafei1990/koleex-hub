@@ -101,24 +101,32 @@ export default function ReactBitsLab() {
           n="01" title="GlassSurface — refraction, not blur" verdict="risky"
           note={`The only genuinely new capability in the library. Ours blurs and saturates what is behind it; this BENDS it, with an SVG displacement map — the "liquid glass" look. Cost: SVG filters are expensive, backdrop support for feImage is uneven, and it takes FIXED PIXEL dimensions — it will not size itself to a fluid card, which is most of our layout. Browser check below.`}
         >
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <div className="text-[11px] text-[var(--text-dim)] mb-1.5">Ours — .kx-glass (54 files)</div>
-              <OurCard>{CARD}</OurCard>
-            </div>
-            <div>
-              <div className="text-[11px] text-[var(--text-dim)] mb-1.5">Theirs — GlassSurface</div>
-              <GlassSurface width={320} height={116} borderRadius={16} displace={2} distortionScale={-140} redOffset={2} greenOffset={8} blueOffset={14} brightness={55} opacity={0.9} blur={12}>
-                <div className="p-4 w-full">{CARD}</div>
-              </GlassSurface>
+          {/* BOTH SIT ON A RULED GROUND, and that is the whole point of the
+              rework. My first version put them on the Hub's near-flat dark
+              page: refraction of a flat colour IS a flat colour, so the card
+              read as broken rather than as pointless. Straight lines make the
+              difference unmissable — ours SOFTENS them, theirs BENDS them. */}
+          <div className="relative rounded-2xl overflow-hidden p-5" style={{
+            backgroundImage:
+              "repeating-linear-gradient(90deg, #BCD8F0 0 2px, transparent 2px 22px)," +
+              "repeating-linear-gradient(0deg, #567FB2 0 2px, transparent 2px 22px)," +
+              "linear-gradient(135deg, #16233A 0%, #0A0E17 100%)",
+          }}>
+            <div className="grid sm:grid-cols-2 gap-4 items-start">
+              <div>
+                <div className="text-[11px] text-white/70 mb-1.5">Ours — .kx-glass (54 files)</div>
+                <div className="kx-glass rounded-2xl border border-white/15 bg-white/5 p-4 h-[116px]">{CARD}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-white/70 mb-1.5">Theirs — GlassSurface</div>
+                <GlassSurface width={300} height={116} borderRadius={16}
+                  displace={6} distortionScale={-160} redOffset={4} greenOffset={14} blueOffset={24}
+                  brightness={60} opacity={0.86} blur={2} backgroundOpacity={0.05} saturation={1.3}>
+                  <div className="p-4 w-full">{CARD}</div>
+                </GlassSurface>
+              </div>
             </div>
           </div>
-          <p className="text-[11px] mt-3 text-[var(--text-dim)]">
-            This browser supports backdrop SVG filters:{" "}
-            <b className={svgOk ? "text-emerald-300" : "text-amber-300"}>
-              {svgOk === null ? "checking…" : svgOk ? "yes" : "NO — it falls back to a plain tint"}
-            </b>
-          </p>
         </Section>
 
         {/* 2 ── SpotlightCard */}
@@ -190,13 +198,28 @@ export default function ReactBitsLab() {
           n="05" title="GradualBlur — we already win this one" verdict="have-it"
           note="Their progressive edge is layered backdrop-filter under a mask. That is exactly what kx-bar-prog already does, with four stacked layers at 3/7/14/28px, tuned on this Hub and signed off. Included so the comparison is on the record rather than assumed — nothing to take."
         >
-          <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden h-[110px] relative kx-bar-host [--kx-ramp-top:7rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
-            <div className="kx-glass-bar kx-bar-prog absolute inset-x-0 top-0 h-[64px] z-10" />
-            <div className="p-4 text-[12px] text-[var(--text-dim)] leading-relaxed">
-              Ours, live: text sliding under a progressive frost. Same effect, already tuned,
-              already shipped in five files.
+          {/* SCROLL THIS BOX. The first version was static, and a progressive
+              frost with nothing passing under it shows nothing at all — the
+              owner said so immediately and was right. The effect IS the
+              transition, so the demo has to move. */}
+          <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden h-[190px] relative kx-bar-host [--kx-ramp-top:9rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
+            <div className="kx-glass-bar kx-bar-prog absolute inset-x-0 top-0 h-[62px] z-10 pointer-events-none" />
+            <div className="absolute inset-x-0 top-0 h-[62px] z-20 flex items-center px-4 pointer-events-none">
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Sticky header</span>
+            </div>
+            <div className="h-full overflow-y-auto pt-[62px] px-4 pb-4 space-y-2">
+              {Array.from({ length: 14 }, (_, i) => (
+                <div key={i} className="flex items-center justify-between text-[12px] text-[var(--text-primary)] border-b border-[var(--border-subtle)] pb-2">
+                  <span>Invoice INV-2026-{String(1040 + i)}</span>
+                  <span className="tabular-nums text-[var(--text-dim)]">USD {(3200 + i * 417).toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           </div>
+          <p className="text-[11px] text-[var(--text-dim)] mt-2">
+            Scroll inside the box — the rows dissolve into frost as they pass under the header
+            instead of being cut by a hard edge.
+          </p>
         </Section>
       </div>
     </div>
