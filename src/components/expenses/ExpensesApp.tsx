@@ -289,7 +289,12 @@ export default function ExpensesApp() {
                       key={c.name}
                       type="button"
                       onClick={() => setCategoryFilter(active ? "" : (cat?.id ?? ""))}
-                      className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-[var(--border-color)] ${active ? "border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
+                      /* kx-cat-tile drops the per-category wash under Aurora. It also
+                         carries the VALUE's colour — accentBgClass ends in
+                         `text-lime-300` and friends, which the amount inherits — so
+                         neutralising the tile is what takes the hue off the number too.
+                         Core keeps both. */
+                      className={`kx-cat-tile rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-[var(--border-color)] ${active ? "border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={18} /></span>
@@ -300,7 +305,17 @@ export default function ExpensesApp() {
                       </div>
                       <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
                       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-                        <div className={`h-full rounded-full ${accentSolidBg(style.accent)} transition-all`} style={{ width: "100%" }} />
+                        {/* `kx-cat-bar` collapses this to the one Aurora accent; the
+                            per-category class stays for Core. And the width is now the
+                            category's SHARE of the largest — it was hardcoded 100% on
+                            every tile, so the bar carried no information at all and the
+                            hue was the only thing it said. Length is the signal a
+                            reader actually compares; the sibling Finance tile has
+                            always done it this way. */}
+                        <div
+                          className={`kx-cat-bar h-full rounded-full ${accentSolidBg(style.accent)} transition-all`}
+                          style={{ width: `${Math.min(100, Math.max(2, Math.round((c.total / (topCategories[0]?.total || 1)) * 100)))}%` }}
+                        />
                       </div>
                     </button>
                   );

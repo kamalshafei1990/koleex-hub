@@ -2629,6 +2629,40 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ahm-pill-on > * {
   color: inherit;
 }
+
+/* ── Expense-category colour, in a converted app ──────────────────────────
+   AURORA HAS ONE ACCENT. Sixteen hues at equal strength give no ranking, so
+   on a surface whose job is COMPARING amounts the colour competes with the
+   two signals that do encode rank — the bar's length and the value's size.
+
+   The rule applied here is narrower than "collapse everything", and the
+   difference is the task:
+
+     COMPARING   the "Top categories" dashboard tiles in Expenses AND Finance.
+                 The bar and the card wash go to the one accent. All sixteen
+                 accents are unique, so the colour does identify — but on this
+                 surface the reader is ranking spend, not hunting a category,
+                 and the label is already right there.
+     IDENTIFYING the category PICKER in the expense editor, where you choose
+                 one of sixteen. There the hue is a real retrieval handle
+                 ("marketing is the pink one") and it is NOT touched.
+
+   Core keeps all sixteen accents on both surfaces — this is an Aurora rule,
+   and the per-category classes are still on the elements underneath. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-cat-bar {
+  background-image: linear-gradient(90deg, rgba(86, 127, 178, 0.95), rgba(188, 216, 240, 0.95));
+  background-color: transparent;
+}
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-cat-tile {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-subtle);
+  /* accentBgClass ends in a text colour (`text-lime-300` …) which the amount
+     inherits, so the wash and the number are the same decision. */
+  color: var(--text-primary);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-cat-bar {
+  background-image: linear-gradient(90deg, rgba(62, 103, 150, 0.95), rgba(86, 127, 178, 0.95));
+}
 /* The input INSIDE that well must not draw a second well on top of it —
    two nested recesses read as a box in a box. It goes transparent and lets
    the wrapper be the field.
@@ -3626,4 +3660,5 @@ input[type="number"]:not(.kx-spinner) {
 
    If off-screen skipping is ever attempted again, the padding comes back WITH
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
+
 

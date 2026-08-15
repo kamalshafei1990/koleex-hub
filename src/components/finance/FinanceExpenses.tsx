@@ -299,7 +299,10 @@ export default function FinanceExpenseAnalytics() {
                   return (
                     <div
                       key={c.name}
-                      className={`rounded-2xl border ${accentBgClass(style.accent)} bg-[var(--bg-secondary)] p-4 transition hover:border-[var(--border-color)]`}
+                      /* kx-cat-tile drops the per-category wash under Aurora — a tinted
+                         fill on a glass card is the loudest thing on the screen and says
+                         nothing the label does not. Core keeps it. */
+                      className={`kx-cat-tile rounded-2xl border ${accentBgClass(style.accent)} bg-[var(--bg-secondary)] p-4 transition hover:border-[var(--border-color)]`}
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={16} /></div>
@@ -318,7 +321,7 @@ export default function FinanceExpenseAnalytics() {
                         )}
                       </div>
                       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
-                        <div className={`h-full rounded-full ${accentSolidBg(style.accent)} transition-all`} style={{ width: `${Math.min(100, Math.max(2, c.share))}%` }} />
+                        <div className={`kx-cat-bar h-full rounded-full ${accentSolidBg(style.accent)} transition-all`} style={{ width: `${Math.min(100, Math.max(2, c.share))}%` }} />
                       </div>
                     </div>
                   );
