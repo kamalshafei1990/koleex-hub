@@ -311,11 +311,30 @@ console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
     out.push(buf);
     return out;
   };
-  const selectors: string[] = [];
-  for (const [, group] of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+  /* The BODY matters, not just the selector — and it matters PER PROPERTY.
+     Specificity only decides between declarations of the same importance, so a
+     state rule that shouts a property cannot be "outranked" on that property
+     at any specificity. Reading the body as one boolean is not good enough and
+     is actively dangerous: the field focus rule shouts `border-color` but
+     leaves `box-shadow` quiet, so a rule-level flag would mark it safe while
+     the RING — the whole point of the state — still silently loses. That is
+     the original defect wearing a disguise.
+
+     So: collect each declared property with its own importance, and compare
+     only properties both rules actually set. Property names are matched
+     exactly; a shorthand competing with a longhand (`background` vs
+     `background-color`) is not modelled, which keeps the check from crying
+     wolf at the cost of a gap worth remembering. */
+  type Decl = Map<string, boolean>;
+  const selectors: { sel: string; decls: Decl }[] = [];
+  for (const [, group, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const decls: Decl = new Map();
+    for (const [, prop, val] of (body ?? "").matchAll(/([-\w]+)\s*:([^;]*)/g)) {
+      decls.set(prop!.trim(), /!\s*important/.test(val ?? ""));
+    }
     for (const raw of splitTop(group!)) {
       const s = raw.trim().replace(/\s+/g, " ");
-      if (s && !s.startsWith("@")) selectors.push(s);
+      if (s && !s.startsWith("@")) selectors.push({ sel: s, decls });
     }
   }
   /* Two rules can collide only if they can match the same element. Approximate
@@ -326,18 +345,35 @@ console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
     const tag = new RegExp(`^(${TAGS})\\b`).exec(parts[parts.length - 1]!);
     return tag ? `${parts[0]}|${tag[1]}` : null;
   };
-  const resting = selectors.filter((s) => !STATES.some((st) => s.includes(st)));
-  const stated = selectors.filter((s) => STATES.some((st) => s.includes(st)));
+  const resting = selectors.filter((s) => !STATES.some((st) => s.sel.includes(st)));
+  const stated = selectors.filter((s) => STATES.some((st) => s.sel.includes(st)));
+
+  /* A resting rule that DELIBERATELY resets a region, and is expected to beat
+     the chrome's state rules inside it. The A4 sheet is the only one: those
+     fields are paper, and the owner asked for them "same as before" — no well,
+     no ring, focused or not. Everything about it is intentional and measured
+     (22 paper fields, all transparent with no box-shadow), so pairing it
+     against the chrome focus rule is a true observation about a deliberate
+     override rather than a defect. Keep this list to overrides you have
+     actually looked at in a browser. */
+  const DELIBERATE_REGION_RESET = [".quot-doc-inner"];
 
   const losers: string[] = [];
-  for (const s of stated) {
-    const k = key(s);
+  outer: for (const s of stated) {
+    const k = key(s.sel);
     if (!k) continue;
     for (const r of resting) {
-      if (key(r) !== k) continue;
-      if (!wins(spec(s), spec(r))) {
-        losers.push(`${s}\n         is outranked by  ${r}`);
-        break;
+      if (key(r.sel) !== k) continue;
+      if (DELIBERATE_REGION_RESET.some((c) => r.sel.includes(c) && !s.sel.includes(c))) continue;
+      const specWins = wins(spec(s.sel), spec(r.sel));
+      for (const [prop, sImp] of s.decls) {
+        const rImp = r.decls.get(prop);
+        if (rImp === undefined) continue;               // they do not compete on this one
+        /* Cascade order: importance first, THEN specificity — and only for a
+           property BOTH rules set. */
+        if (sImp !== rImp ? sImp : specWins) continue;  // the state rule paints this property
+        losers.push(`${s.sel}\n         loses "${prop}" to  ${r.sel}`);
+        continue outer;
       }
     }
   }
