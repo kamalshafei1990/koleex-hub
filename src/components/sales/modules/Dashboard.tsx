@@ -19,7 +19,6 @@ import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
-import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -35,17 +34,7 @@ interface Stats {
   wonThisMonth: number;
 }
 
-export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
-  const navItems: AppHomeNavItem[] = [
-    { key: "dashboard",  onClick: () => setActiveTab?.("dashboard"),  icon: <BarChart3Icon size={13} />,    label: "Dashboard",  active: true },
-    { key: "pipeline",   onClick: () => setActiveTab?.("pipeline"),   icon: <LayoutGridIcon size={13} />,   label: "Pipeline"    },
-    { key: "quotations", onClick: () => setActiveTab?.("quotations"), icon: <DocumentIcon size={13} />,     label: "Quotations"  },
-    { key: "orders",     onClick: () => setActiveTab?.("orders"),     icon: <BoxesIcon size={13} />,        label: "Orders"      },
-    { key: "invoices",   onClick: () => setActiveTab?.("invoices"),   icon: <DocumentIcon size={13} />,     label: "Invoices"    },
-    { key: "customers",  onClick: () => setActiveTab?.("customers"),  icon: <UsersIcon size={13} />,        label: "Customers"   },
-    { key: "activities", onClick: () => setActiveTab?.("activities"), icon: <ActivityIcon size={13} />,     label: "Activities"  },
-    { key: "reports",    onClick: () => setActiveTab?.("reports"),    icon: <LineChartIcon size={13} />,    label: "Reports"     },
-  ];
+export default function DashboardModule({ t }: SalesModuleProps) {
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<{ id: string; kind: string; label: string; ts: string }[]>([]);

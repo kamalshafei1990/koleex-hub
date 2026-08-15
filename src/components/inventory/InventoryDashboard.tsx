@@ -20,10 +20,8 @@ import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 import RrIcon from "@/components/ui/RrIcon";
-import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
-import { ACCENT } from "@/lib/accentColors";
 import {
   ActionCard,
   AlertCard,
@@ -59,19 +57,6 @@ interface OperatorSummary {
   };
 }
 
-/* ── Nav card entries — all 10 routes, always shown (pages themselves are RLS-gated) ── */
-const NAV_CARDS: AppHomeNavItem[] = [
-  { href: "/inventory",           icon: "home",         label: "Home",       chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
-  { href: "/inventory/items",     icon: "box-open",     label: "Items",      chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
-  { href: "/inventory/movements", icon: "file-invoice", label: "Movements",  chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
-  { href: "/inventory/transfers", icon: "truck-side",   label: "Transfers",  chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
-  { href: "/inventory/returns",   icon: "recycle",      label: "Returns",    chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
-  { href: "/inventory/search",    icon: "search",       label: "Search",     chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
-  { href: "/inventory/balances",  icon: "badge-check",  label: "Balances",   chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
-  { href: "/inventory/serials",   icon: "fingerprint",  label: "Serials",    chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
-  { href: "/inventory/batches",   icon: "box-circle-check", label: "Batches",chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
-  { href: "/inventory/warehouses",icon: "building",     label: "Warehouses", chipBg: ACCENT.amber.chipBg, chipText: ACCENT.amber.chipText },
-];
 
 /* ── Dashboard ────────────────────────────────────────────────────────────── */
 export default function InventoryDashboard() {

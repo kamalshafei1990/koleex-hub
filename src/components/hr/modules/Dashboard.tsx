@@ -40,7 +40,6 @@ import WalletIcon from "@/components/icons/ui/WalletIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
-import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
