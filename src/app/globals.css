@@ -3448,96 +3448,27 @@ input[type="number"]:not(.kx-spinner) {
 }
 
 
-/* ── Off-screen app grids skip their paint ────────────────────────────────
-   MEASURED on the Home launcher 2026-08-15, mobile viewport 375×812:
-
-     glass elements total            52
-     glass ON screen        21  =  0.50 MP   (1.7× the screen itself)
-     glass OFF screen       31  =  0.38 MP   ← pure waste
-     28 of those 31 are app tiles sitting ~1,240 px above the fold
-
-   Every one of those tiles carries `backdrop-filter: blur(16px) saturate(1.5)`,
-   and the GPU re-samples what is behind it — while scrolling, what is behind it
-   changes, so they are all recomputed every frame whether or not they can be
-   seen. `content-visibility: auto` lets the browser skip layout, paint AND the
-   backdrop work for a subtree that is outside the viewport.
-
-   ⚠️ IT GOES ON THE GRID, NEVER ON THE TILE — that distinction is the whole
-   fix and it was found by testing both, live, before writing any code:
-     · on a single `.kx-hover-tile`  → the tile is removed from its parent
-       grid's track sizing and the layout SHIFTS. Rejected.
-     · on the grid container itself  → container 343×343 before and after,
-       tile 106×106 before and after. Zero movement, glass intact.
-
-   `contain-intrinsic-size: auto` remembers the real size once rendered, so a
-   grid that has been on screen once never guesses again — which is what keeps
-   the scrollbar honest and stops it jumping under the thumb.
-
-   ⚠️ AND IT CLIPS THE HOVER. `content-visibility: auto` applies PAINT
-   containment permanently — not only while the subtree is being skipped — so
-   anything a child paints outside the grid's border box is cut off. The tiles
-   on the outer rows and columns sit flush against that edge, so their hover
-   lost exactly this much (measured while actually hovering, desktop 987 px):
-
-     tile scales 1.05  → 141.2 → 148.2 px, so its box moves   3.5 px out
-     outer glow `0 0 16px`                    reaches a further 16.0 px out
-                                              ────────────────────────────
-                                                            19.5 px clipped
-
-   Edge tiles came back shaved with no glow while inner tiles were perfect —
-   an inconsistent hover, which is the bug the owner reported. My earlier claim
-   here that "nothing visual changes" was wrong.
-
-   THE FIX: give the containment box room to paint into, and take that room
-   straight back so the layout is untouched. Padding is inside the clip box;
-   the negative margin cancels it for everything around. Verified live while
-   hovering: full paint now sits inside the clip box with 4.5 px to spare,
-   every tile in the same position to the pixel, no horizontal drift at any
-   width, and no interactive element under the expanded box loses its click
-   (checked against every a/button/input on the page — the orb and the Discuss
-   bar are `fixed` and stay above it).
-
-   24 px, not 20: it has to clear 19.5 px on the widest tile we render.
-
-   ⚠️ ON MOBILE THE 24 px IS WIDER THAN THE PAGE GUTTER, AND THAT IS FINE —
-   but know why before you change it. At 375 px the tiles are 106 px, so the
-   room needed drops to 18.7 px and 24 still clears it; the page gutter there
-   is only 16 px, so the grid's box overhangs the viewport by 8 px on each
-   side. Measured: NO horizontal scrollbar, because the body already carries
-   `overflow-x: hidden` on mobile. Nothing paints in that 8 px but the edge
-   tiles' glow, which the screen edge would cut anyway. If that body rule is
-   ever removed, this becomes an 8 px horizontal drift — re-measure here. */
-/* ⚠️ content-visibility WAS HERE AND IS GONE. It made Home dance on a phone.
+/* ⚠️ `.kx-lazy-grid` IS GONE, AND SO IS THE REASON FOR THE PADDING IT CARRIED.
    ---------------------------------------------------------------------------
-   `content-visibility: auto` skips off-screen work and substitutes
-   `contain-intrinsic-size` for the real height. That is only safe when the
-   substitute is close to the truth. Measured on the launcher at 375x812, with
-   the one value every grid was given:
+   The class was `content-visibility: auto` plus 24px of padding cancelled by a
+   -24px margin. The padding was never decoration: paint containment clips
+   whatever a child draws outside the box, so the edge tiles' hover glow needed
+   room INSIDE it.
 
-     tiles  real    assumed  error
-        10   510      340     +170
-         7   391      340      +51
-         5   273      340      -67
-         3   154      340     -186
-         2   154      340     -186
+   `content-visibility` was removed (it made Home dance on a phone — one
+   `contain-intrinsic-size` cannot stand in for grids whose real heights run
+   154px to 510px). That left the padding compensating for a clip box that no
+   longer exists: zero benefit, and one real cost. The page gutter on a phone is
+   16px, so 24px of padding put the grid at -8px / 383px in a 375px viewport —
+   8px off the screen on each side, and visibly out of line with the search bar
+   directly above it, which sits correctly at 16px. Owner: "not fit the screen".
 
-   Real heights run 154px to 510px; a single 340px cannot serve them. Across
-   the eight grids the page mis-states its own height by 961px — more than a
-   whole viewport — and every grid corrects itself as it scrolls into view, so
-   the page height changes under the thumb and everything below jumps. That is
-   the "dancing", and it is worse on a phone precisely because three columns
-   make the groups taller and the errors larger than the desktop the number was
-   presumably chosen on.
+   No horizontal scrollbar appeared, because the body carries
+   `overflow-x: hidden` on mobile — which is exactly why measuring for a
+   scrollbar is not the same as measuring alignment. I had checked the former
+   and reported it fine.
 
-   The paint saving was real; it was not worth a launcher that will not hold
-   still. It can come back the moment the placeholder is PER GRID — derived
-   from that grid's own row count at the current breakpoint — rather than one
-   number standing in for all of them. Not before.
+   If off-screen skipping is ever attempted again, the padding comes back WITH
+   it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
 
-   The padding/margin pair stays: it is the glow room, and removing it clips
-   the edge tiles' hover. See the note above for why it is 24px. */
-.kx-lazy-grid {
-  padding: 24px;
-  margin: -24px;
-}
 
