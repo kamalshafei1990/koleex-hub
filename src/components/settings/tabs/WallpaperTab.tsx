@@ -35,7 +35,7 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
-  asImage, isShader, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
+  asImage, effectiveTint, isShader, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
 import { SettingsCard, ControlRow, SelectControl } from "./ui";
@@ -292,7 +292,7 @@ export default function WallpaperTab(
           {WALLPAPERS.filter((w) => w.group === "color").map((w) => {
             const tinting = isTintable(current);
             const swatch = theme === "light" ? w.light : w.dark;
-            const on = tinting ? current.tint === swatch : current.id === w.id;
+            const on = tinting ? effectiveTint(current) === swatch : current.id === w.id;
             return (
               <button
                 key={w.id} type="button" title={t(w.nameKey)}

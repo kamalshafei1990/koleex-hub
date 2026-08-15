@@ -85,7 +85,10 @@ export default function ShaderWallpaper({ id, tint }: { id: string; tint?: strin
 
   if (!shader || !Comp) return null;
 
-  const props = shader.tint(palette(tint || DEFAULT_TINT));
+  /* The user's colour wins; then the pattern's OWN colour; Hub Blue only if a
+     shader has not declared one. Before this every shader opened Hub Blue, so
+     picking one showed its shape and never its intent. */
+  const props = shader.tint(palette(tint || shader.defaultTint || DEFAULT_TINT));
   return (
     <div className="absolute inset-0 pointer-events-none" aria-hidden>
       {/* Cursor-following off, but ONLY on the two components that have a prop

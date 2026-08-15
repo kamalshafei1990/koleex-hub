@@ -217,6 +217,28 @@ export const WALLPAPERS: Wallpaper[] = [
     ["color-clay", "wp.clay", "#3A2420", "#EBD5CB", 36],
     ["color-plum", "wp.plum", "#2C1E3C", "#DCCBEF", 36],
     ["color-sand", "wp.sand", "#332B1F", "#EFE4CE", 36],
+    /* ── Added 2026-08-15 (owner: "I need you to increase the colors") ──
+       Ten was a range, not a palette: five neutrals-into-blue and then one
+       each of teal / moss / clay / plum / sand, so half the wheel had no
+       representative at all — nothing warm-red, nothing gold, nothing violet,
+       and no light option in a set that is dark-first.
+
+       Each is written the same way as the ten above: a DEEP value for dark
+       theme and a PALE one for light, because these do two jobs — they are a
+       flat wallpaper on their own AND the tint another pattern is drawn in, so
+       each has to work as a full-screen ground and as a five-stop source. Dim
+       rises with lightness for the same reason it does above: the readability
+       scrim has more to cover on a brighter ground. */
+    ["color-ocean", "wp.ocean", "#0E2A3A", "#C2DCE8", 34],
+    ["color-forest", "wp.forest", "#12281C", "#CBE0CE", 34],
+    ["color-olive", "wp.olive", "#262B18", "#DFE3C8", 34],
+    ["color-amber", "wp.amber", "#3A2A12", "#F0DFC0", 38],
+    ["color-rust", "wp.rust", "#3B1E14", "#EDCDBC", 38],
+    ["color-crimson", "wp.crimson", "#361419", "#EFC8CE", 38],
+    ["color-rose", "wp.rose", "#39202C", "#F0CEDC", 38],
+    ["color-violet", "wp.violet", "#241C3E", "#D3CBEF", 36],
+    ["color-indigo", "wp.indigo", "#151C34", "#C8CFEC", 34],
+    ["color-mist", "wp.mist", "#2A3138", "#E8EDF2", 30],
   ] as const).map(([id, nameKey, dark, light, dim]) => ({
     id, nameKey, dark, light, dim,
     kind: "color" as const, group: "color" as const,
@@ -280,6 +302,17 @@ export function isShader(pref: WallpaperPref | null | undefined): boolean {
  *  which is the right answer for those. */
 export function isTintable(pref: WallpaperPref | null | undefined): boolean {
   return isShader(pref) || pref?.id === DEFAULT_WALLPAPER_ID;
+}
+
+/** The colour a wallpaper is ACTUALLY being drawn in: the user's choice first,
+ *  then the pattern's own default. Undefined means "whatever the renderer
+ *  falls back to" — today Hub Blue, and the wave field's shipped palette.
+ *
+ *  The picker needs this, not `pref.tint`: a shader opened in its own default
+ *  has no `tint` stored, so reading the raw field would leave the whole swatch
+ *  row unpressed while the screen is plainly showing one of those colours. */
+export function effectiveTint(pref: WallpaperPref | null | undefined): string | undefined {
+  return pref?.tint ?? (pref?.id ? getShader(pref.id)?.defaultTint : undefined);
 }
 
 /** The still gradient a shader falls back to — shown while its chunk loads,
@@ -360,7 +393,13 @@ export function backgroundCss(
   /* A shader paints itself. This returns its STILL fallback so the ground has
      something correct on screen the moment the choice is made, rather than a
      blank frame while a chunk and a WebGL context are set up. */
-  if (isShader(pref)) return asImage(shaderFallback(pref?.tint, theme));
+  /* The fallback has to use the SAME effective colour as the shader that is
+     about to paint over it, or the ground flashes Hub Blue and then settles
+     into the pattern's own colour — the exact "blank flash" the fallback
+     exists to prevent, wearing a different disguise. */
+  if (isShader(pref)) {
+    return asImage(shaderFallback(pref?.tint ?? getShader(pref!.id!)?.defaultTint, theme));
+  }
 
   const w = pref?.id ? BY_ID.get(pref.id) : undefined;
   if (!w) return null;
