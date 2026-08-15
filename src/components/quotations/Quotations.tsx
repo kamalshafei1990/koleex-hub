@@ -2625,10 +2625,25 @@ export default function Quotations() {
   return (
     <AuroraShell className="text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
+      {/* ── ONE EDGE, NOT THREE ────────────────────────────────────────────
+          Owner, on Product Data and again here: "you are using three blur edge
+          and this is wrong, you only can use one but more longer." Glassing
+          each bar on its own gave exactly that — the toolbar frosted, the
+          status row frosted, the customer row frosted, three translucent
+          strips stacked under the Hub header.
+
+          One host, one progressive ramp, and the bars inside carry no frost of
+          their own. --kx-ramp-top is 0 because nothing sits above this host
+          inside it; the reach it needs is DOWNWARD, into the document, which
+          is --kx-ramp-ext. The four <i> are the ramp — the class alone renders
+          nothing. */}
+      <div className="no-print relative kx-bar-host [--kx-ramp-top:0rem] [--kx-ramp-ext:2.5rem] [--kx-ramp-fade:1.25rem]">
+        <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
+        <div className="relative z-[1]">
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div
-        className="no-print kx-glass"
+        className="no-print"
         style={{
           display: "flex",
           alignItems: "center",
@@ -2805,7 +2820,7 @@ export default function Quotations() {
       {/* ── Loading bar — full doc (items) is hydrating from the server ── */}
       {hydrating && (
         <div
-          className="no-print kx-glass"
+          className="no-print"
           style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 16px",             borderBottom: "1px solid var(--border-subtle)",
@@ -2824,7 +2839,7 @@ export default function Quotations() {
           chooses Load Latest or dismiss. */}
       {saveNotice && (
         <div
-          className="no-print kx-glass"
+          className="no-print"
           style={{
             display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
             padding: "10px 16px",
@@ -2871,7 +2886,7 @@ export default function Quotations() {
 
       {/* ── Customer fields (dark row, above A4, not inside document) ── */}
       <div
-        className="no-print kx-glass"
+        className="no-print"
         style={{
           display: "flex",
           gap: 12,
@@ -2927,6 +2942,8 @@ export default function Quotations() {
             placeholder="e.g. ABC Trading Co."
             className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
+        </div>
+      </div>
         </div>
       </div>
 
