@@ -2245,12 +2245,16 @@ export default function DiscussApp() {
        area instead of getting hidden under the keyboard. 3.5rem = 56px
        = `h-14` on MainHeader. */
     <div
-      className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
-      /* Header height comes from the shell's CSS var so the installed
-          iOS PWA (safe-top) and the desktop shell (title bar) stay in
-          sync — the hardcoded 3.5rem drifted on both (documented
-          follow-up of the unified-header design). */
-      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}
+      /* `h-full` SUPERSEDES the `calc(100dvh - var(--kx-header-h))` this
+         replaces, and keeps what that fix was for. Reading the var instead of
+         a hardcoded 3.5rem was right — it stopped the installed iOS PWA
+         (safe-top) and the desktop shell (title bar) from drifting. Filling the
+         parent is simply the version of that with no subtraction to get wrong:
+         the shell has ALREADY subtracted the header, so there is nothing left
+         to compute. It also drops the `dvh`, which is taller than its `svh`
+         parent whenever a mobile toolbar retracts and recomputes live as it
+         hides — the "dancing" reported on quotations and invoices. */
+      className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
     >
       {confirmDialog}
       {/* ═══ Top bar ═══
@@ -2263,7 +2267,14 @@ export default function DiscussApp() {
       <div className="flex-1 min-h-0 flex">
         {/* ── Column 1: Channels + DMs list ────────────────────────── */}
         <aside
-          className={`shrink-0 md:w-[300px] md:border-e border-[var(--border-color)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
+          /* kx-glass-DRAWER, not kx-glass: this is a flush full-height pane, and
+             .kx-glass would draw its ::before lighting rim on all four edges —
+             the "border" the owner rejects on flush surfaces. Same treatment as
+             the AI sidebar and the Notes panes.
+             The message BUBBLES are deliberately left alone: they are the most
+             repeated element here, backdrop-filter is priced per element, and
+             the WeChat design is approved as it stands. */
+          className={`kx-glass-drawer shrink-0 md:w-[300px] md:border-e border-[var(--border-color)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
             mobileView === "list" ? "flex w-full" : "hidden md:flex"
           }`}
         >

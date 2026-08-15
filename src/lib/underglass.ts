@@ -151,7 +151,13 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        scroller genuinely scrolls, so content really passes under the header.
        No band means no ramp host, so neither belongs in appOwnsTopRamp. */
     p.startsWith("/calendar") ||
-    p.startsWith("/catalogs")
+    p.startsWith("/catalogs") ||
+    /* Discuss, 2026-08-16. Sticky audit by measuring the route: 0 stickies, no
+       `.kx-ph-band`, and DiscussApp is `flex flex-col h-full overflow-hidden`
+       with its own scroller, so the Hub scroller cannot move — the pane frosts
+       at rest here, as on /sales and /hr. Not in appOwnsTopRamp: no band, so
+       nothing would draw the ramp. */
+    p.startsWith("/discuss")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.
