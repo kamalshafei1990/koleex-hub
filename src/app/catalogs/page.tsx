@@ -1981,7 +1981,10 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   return (
     <div
       {...kxInspectAttrs({ component: "CatalogCard", module: "Catalogs", section: "Main List", recordId: catalog.id })}
-      className={`group relative flex h-full flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}
+      /* Leaf card → kx-glass. The white plate behind the cover IMAGE stays
+             opaque on purpose: catalog artwork is usually printed on white, and a
+             translucent backing would let the ground bleed through the page. */
+      className={`kx-glass group relative flex h-full flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}
     >
       {/* Selection checkbox */}
       <button onClick={onToggleSelect} aria-label={t("cat.select", "Select")}
@@ -3123,7 +3126,7 @@ function CatalogsApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}

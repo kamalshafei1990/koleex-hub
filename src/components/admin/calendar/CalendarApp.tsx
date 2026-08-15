@@ -381,7 +381,7 @@ export default function CalendarApp() {
           });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-full">
         {/* ── Header ── */}
         {/* ⚠️ pb-4 IS THE GAP THE OLD SUBTITLE USED TO CARRY. The line this
@@ -525,7 +525,12 @@ export default function CalendarApp() {
         )}
 
         {/* ── View body ── */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+        {/* The month grid is ONE glass surface, so the frost costs one pass.
+            The 31+ day cells inside stay tints on purpose — backdrop-filter is
+            priced per element, and a month of individually-blurred cells is the
+            most expensive thing that could be on this screen for no gain. Same
+            call as Planning's schedule grid. */}
+        <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
           {!activeAccountId ? (
             <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">
               Pick an account above to see its calendar.

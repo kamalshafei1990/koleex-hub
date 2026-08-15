@@ -145,7 +145,13 @@ export function isUnderglassRoute(pathname: string | null): boolean {
                        strip measured 210 before AND after a 600px scroll. It
                        can never reach the ramp. Same resolution as /sales. */
     p.startsWith("/employees") ||
-    p.startsWith("/hr")
+    p.startsWith("/hr") ||
+    /* Calendar and Catalogs, 2026-08-16. Sticky audit by MEASURING each route:
+       both 0 stickies, neither renders a `.kx-ph-band`, and both FLOW — the Hub
+       scroller genuinely scrolls, so content really passes under the header.
+       No band means no ramp host, so neither belongs in appOwnsTopRamp. */
+    p.startsWith("/calendar") ||
+    p.startsWith("/catalogs")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.
