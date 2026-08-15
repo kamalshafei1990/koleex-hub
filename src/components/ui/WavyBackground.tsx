@@ -46,13 +46,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { useHour, useWallpaper } from "@/lib/useWallpaper";
-import { backgroundCss, dimFor, fitStyle, floorCss, isLive, isShader } from "@/lib/wallpaper";
-import dynamicImport from "next/dynamic";
-
-/* The shader host is itself split out: Core users, Aurora users on a still
-   ground, and anyone under reduced motion never download it. */
-const ShaderWallpaper = dynamicImport(() => import("@/components/wallpapers/ShaderWallpaper"), { ssr: false });
+import { useWallpaper } from "@/lib/useWallpaper";
+import { isLive } from "@/lib/wallpaper";
 
 /* Hub Blue instead of the original's sky / indigo / purple / fuchsia / cyan —
    a rainbow, and against everything the brand says.
@@ -246,13 +241,13 @@ export default function WavyBackground(
      The gate pins its theme with `forced`, and it has no account — the hook
      falls back to hub-live there, which is what the gate was signed off with. */
   const wallpaper = useWallpaper();
-  const live = isLive(wallpaper);
-  const hour = useHour(wallpaper.id === "hub-dynamic");
-  const wpBackground = backgroundCss(wallpaper, theme, hour);
-  /* A chosen wallpaper that cannot paint — an upload deleted from Storage,
-     an id from a newer build — resolves to null, and null means the field.
-     Falling back to the Hub's own ground beats showing a flat page colour. */
-  const showCanvas = live || wpBackground === null;
+  /* THE WAVE FIELD, AND NOTHING ELSE. Every other wallpaper is painted by
+     WallpaperApplier at SHELL level, because this component is mounted by
+     twelve of the Hub's 251 pages — so a wallpaper living here appeared on
+     twelve routes and nowhere else, which is what the owner saw as "it only
+     shows in settings". Painting it in both places would be two copies of one
+     picture, the lower of them invisible. */
+  const showCanvas = isLive(wallpaper);
 
   useEffect(() => {
     if (!showCanvas) return;      // guard INSIDE the effect: hooks stay unconditional
@@ -417,24 +412,6 @@ export default function WavyBackground(
 
   return (
     <>
-      {/* A chosen wallpaper. Rendered INSTEAD of the canvas, never behind it:
-          two grounds stacked would be one layer of pure waste, since the
-          canvas is opaque wherever it paints. */}
-      {!showCanvas && (
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{ backgroundImage: wpBackground!, ...fitStyle(wallpaper.fit) }}
-        />
-      )}
-      {/* An animated ground paints OVER its own still fallback, never instead
-          of it: the gradient is already correct on the first frame, so there is
-          no blank flash while a chunk downloads and a WebGL context spins up —
-          and if either fails, what stays on screen is the same wallpaper, just
-          not moving. */}
-      {!showCanvas && isShader(wallpaper) && (
-        <ShaderWallpaper id={wallpaper.id} tint={wallpaper.tint} />
-      )}
       {/* The box runs 48px past the viewport on every side — uniform across
           engines so both blur paths (ctx.filter / CSS element filter) render
           the same picture, and the CSS path's edge falloff stays off-screen. */}
@@ -466,8 +443,11 @@ export default function WavyBackground(
              own from the catalogue's dim — with a hard floor for uploads,
              because we cannot know what is in them. topLight still applies:
              it is about where the header ramp sits, not what is underneath. */
+          /* No floor when the field is not painting: the shell-level ground
+             carries its own scrim, and a second one here would darken it
+             twice. */
           background: !showCanvas
-            ? floorCss(theme, dimFor(wallpaper))
+            ? "transparent"
             : topLight
             ? (theme === "light"
                 ? "radial-gradient(120% 90% at 50% 78%, rgba(247,249,252,.30) 0%, rgba(247,249,252,.34) 56%, rgba(247,249,252,.72) 100%)"

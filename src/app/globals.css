@@ -500,9 +500,22 @@ body {
   background-attachment: fixed;
 }
 
-/* The page roots paint --bg-primary, which would hide the body underneath
-   them. Two class names because Core uses both as an app root; the selector is
-   (0,2,0) so it outranks Tailwind's bg-[var(--bg-primary)] utility. */
+/* THE PAGE ROOT, WHATEVER IT CALLS ITSELF.
+   ---------------------------------------------------------------------------
+   Every page paints its own opaque --bg-primary, and there are 251 of them; a
+   list of class names was never going to hold. Two of them had already been
+   added by hand (.kx-app, .kx-wp-root) and /quotations still covered the
+   wallpaper completely, because its root is just
+   `min-h-full bg-[var(--bg-primary)]` with no class we could name.
+
+   So the selector is STRUCTURAL instead: #main-scroll-container is the shell's
+   single scroll host and every route renders as its direct child. That is one
+   rule for all 251, and — unlike remapping --bg-primary globally — it cannot
+   reach a dropdown or a modal, which need their opaque ground precisely
+   because a wallpaper is now behind everything.
+
+   The named classes stay: some app roots sit outside the scroll host. */
+[data-kx-wallpaper="on"] #main-scroll-container > *,
 [data-kx-wallpaper="on"] .kx-app,
 [data-kx-wallpaper="on"] .kx-pd,
 [data-kx-wallpaper="on"] .kx-wp-root {
@@ -3516,5 +3529,3 @@ input[type="number"]:not(.kx-spinner) {
 
    If off-screen skipping is ever attempted again, the padding comes back WITH
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
-
-
