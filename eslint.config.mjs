@@ -21,7 +21,7 @@ const eslintConfig = defineConfig([
        and edits that make the next update a merge — so the rules stop at the
        folder boundary. Type checking does NOT: tsc still covers these files,
        and the wrapper that mounts them is ours and fully linted. */
-    files: ["src/components/wallpapers/reactbits/**"],
+    files: ["src/components/wallpapers/reactbits/**", "src/components/vendor/reactbits/**"],
     rules: {
       "react-hooks/purity": "off",
       "react-hooks/exhaustive-deps": "off",
