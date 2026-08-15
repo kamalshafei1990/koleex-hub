@@ -242,7 +242,6 @@ export default function PlanningApp() {
               { key: "schedule",  onClick: () => setTab("schedule"), icon: "calendar",     label: t("tab.schedule")      },
               { key: "open",      onClick: () => setTab("open"),     icon: "paper-plane",  label: t("tab.openShifts")   },
               { key: "mine",      onClick: () => setTab("mine"),     icon: "clock",        label: t("tab.myPlanning")   },
-              { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: t("action.new") },
               { key: "utilization", onClick: () => setTab("utilization"), icon: "clock", label: t("tab.utilization") },
               { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: t("tab.configuration") },
             ]}
