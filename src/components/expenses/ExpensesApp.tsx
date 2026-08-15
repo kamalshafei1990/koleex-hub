@@ -204,7 +204,9 @@ export default function ExpensesApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    /* min-h-full — a 100vh floor inside the Hub scroller is one header-height
+       taller than the visible area. */
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <ExpensesHeader
           title={t("app.title", "Expenses")}
@@ -276,7 +278,7 @@ export default function ExpensesApp() {
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
           <div className="mt-6">
-            <SectionCard title={t("categories.title", "Top categories")} subtitle={t("categories.tapHint", "Tap a tile to filter the list below.")} helpId="expense.section.topCategories">
+            <SectionCard className="kx-glass" title={t("categories.title", "Top categories")} subtitle={t("categories.tapHint", "Tap a tile to filter the list below.")} helpId="expense.section.topCategories">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {topCategories.map((c) => {
                   const style = styleForCategory(c.name);
@@ -332,7 +334,7 @@ export default function ExpensesApp() {
         {/* ── EXPENSE LIST ───────────────────────────────────────── */}
         <div className="mt-4">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("list.loading", "Loading expenses…")}</div></SectionCard>
+            <SectionCard className="kx-glass"><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("list.loading", "Loading expenses…")}</div></SectionCard>
           ) : filtered.length === 0 ? (
             <EmptyState
               title={search || categoryFilter
@@ -651,7 +653,10 @@ function ExpenseEditor({
       onClick={onClose}
     >
       <div
-        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_24px_72px_rgba(0,0,0,0.6)] sm:rounded-2xl"
+        /* kx-glass-pop — the Hub's one modal material, and it brings the
+           pop-in entrance with it. Under Core the class matches nothing and
+           the panel keeps its solid --bg-secondary. */
+        className="kx-glass-pop relative flex w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_24px_72px_rgba(0,0,0,0.6)] sm:rounded-2xl"
         style={{ maxHeight: "min(92vh, 880px)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1077,7 +1082,7 @@ function CategoryPicker({
 
       {/* ── Expanded sub-category panel for the active parent ── */}
       {activeParentObj && (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+        <div className="kx-glass overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
           {/* Panel header — shows which group is open + a tiny search */}
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
             <div className="inline-flex min-w-0 items-center gap-2">

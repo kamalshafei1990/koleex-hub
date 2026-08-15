@@ -84,7 +84,16 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        toward it because nothing scrolls underneath. Handing this segment the
        flat 56px frost would buy a ramp that never gets drawn on the order
        pages, which is the exact trade Settings is excluded for. */
-    p.startsWith("/sales")
+    p.startsWith("/sales") ||
+    /* Expenses, 2026-08-16. Sticky audit: ZERO stickies of its own — grepped
+       across all three of its components, no hits outside comments.
+
+       Like Settings, it renders the canonical PageHeader with `showTabs={false}`
+       and puts its navigation in AppHomeMenu instead, so there is no sticky tab
+       band. That is precisely why it belongs HERE and not in appOwnsTopRamp
+       below: with no band there is no ramp host, and listing it there would
+       trade the pane's frost for a ramp that never gets drawn. */
+    p.startsWith("/expenses")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

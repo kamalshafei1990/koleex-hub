@@ -89,9 +89,19 @@ export default function AppHomeMenu({
 
 function HomePill({ href, onClick, icon, label, count, active }: AppHomeNavItem) {
   const isActive = !!active;
-  const baseClass = `inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12px] font-medium transition-all duration-200 sm:h-9 sm:px-4 sm:text-[12.5px] ${
+  /* IDENTITY HOOKS ONLY — no paint decisions here. This component is shared by
+     nine apps and most of them are still Core, so the Aurora look lives in
+     globals bound to `:is(.kx-pd, .kx-app)`: the app converts, these hooks
+     light up, and nothing else in the Hub moves. Same arrangement PageHeader
+     uses with .kx-ph-band / .kx-ph-tabs / .kx-ph-search.
+
+     Both states need one. Inactive is filled with `--bg-card`, a solid #111
+     the Aurora remap does not cover, so it stays an opaque slab on a glass
+     page; active is `--bg-inverted`, a solid white block, which is Core's
+     selection language and the loudest flat shape that can sit on glass. */
+  const baseClass = `kx-ahm-pill inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12px] font-medium transition-all duration-200 sm:h-9 sm:px-4 sm:text-[12.5px] ${
     isActive
-      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
+      ? "kx-ahm-pill-on bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
       : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
   }`;
   const inner = (
@@ -164,7 +174,7 @@ function HomeSearchBar({
   };
   return (
     <form onSubmit={handleSubmit}>
-      <div className="group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
+      <div className="kx-ahm-search group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
         <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
           ref={inputRef}

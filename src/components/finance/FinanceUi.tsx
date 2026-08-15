@@ -280,15 +280,21 @@ export function SectionCard({
   action,
   children,
   helpId,
+  className = "",
 }: {
   title?: string;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
   helpId?: string;
+  /** Extra classes from the CALLING app. This is how a converted app gives the
+   *  card its Aurora glass without dragging every other Finance screen along:
+   *  the default is empty, so callers that pass nothing render exactly as
+   *  before. */
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+    <div className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

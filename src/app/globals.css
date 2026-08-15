@@ -2569,19 +2569,57 @@ input[type="number"]:not(.kx-spinner) {
 /* The search box is a WELL, matching the input rules above — same fill, same
    inset, same Hub-Blue focus ring, so the box and the field inside it read as
    one control. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(.kx-ph-search, .kx-ahm-search) {
   background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
 }
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-search:focus-within {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(.kx-ph-search, .kx-ahm-search):focus-within {
   border-color: rgba(86, 127, 178, 0.70);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-search {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(.kx-ph-search, .kx-ahm-search) {
   background-color: rgba(255, 255, 255, 0.70);
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+
+/* ── AppHomeMenu's nav pills, in a converted app ──────────────────────────
+   The row of tile-pills every Hub app puts under its header. Neither state
+   survived the remap, for two different reasons:
+
+     inactive  filled with `--bg-card`, which is a SOLID #111 (#fff light) and
+               is NOT one of the five tokens the remap rewrites — so it stayed
+               an opaque slab sitting on a glass page. Measured on /expenses:
+               rgb(17,17,17), 1075px wide. This is the Inventory `--bg-elevated`
+               lesson again: check the app's tokens against the remap list, do
+               not assume a `--bg-*` name is covered.
+     active    `--bg-inverted`, a solid white block — Core's selection
+               language, and per canon the loudest flat shape that can sit on
+               glass. Aurora marks selection with the Hub-Blue ring instead.
+
+   Paint lives here rather than in the component because AppHomeMenu is shared
+   by nine apps and most are still Core. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ahm-pill:not(.kx-ahm-pill-on) {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ahm-pill-on {
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
+  color: var(--text-primary);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ahm-pill:not(.kx-ahm-pill-on) {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ahm-pill-on {
+  box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
+}
+/* The icon inside the selected pill is authored for a white fill (it inherits
+   --text-inverted); on the Hub-Blue outline it must follow the label. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ahm-pill-on > * {
+  color: inherit;
 }
 /* The input INSIDE that well must not draw a second well on top of it —
    two nested recesses read as a box in a box. It goes transparent and lets
