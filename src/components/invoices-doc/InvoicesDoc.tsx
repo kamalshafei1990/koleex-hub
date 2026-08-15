@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import AuroraShell from "@/components/ui/AuroraShell";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
 import Link from "next/link";
@@ -1779,9 +1780,9 @@ export default function Quotations() {
          100svh − var(--kx-header-h), so 100vh here adds a phantom scroll the
          exact height of the header. NOTE: this removes the phantom scroll —
          it is not by itself proven to be the whole of the "dancing". */
-      <div className="min-h-full bg-[var(--bg-primary)]">
+      <AuroraShell>
         <BrandLoading />
-      </div>
+      </AuroraShell>
     );
   }
 
@@ -1790,7 +1791,7 @@ export default function Quotations() {
      ══════════════════════════════════════════════════════════ */
   if (view === "list") {
     return (
-      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <AuroraShell className="text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar */}
@@ -1965,7 +1966,7 @@ export default function Quotations() {
             </div>
           )}
         </div>
-      </div>
+      </AuroraShell>
     );
   }
 
@@ -1975,7 +1976,7 @@ export default function Quotations() {
   if (!current) return null;
 
   return (
-    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <AuroraShell className="text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {toastElement}
 
@@ -2207,7 +2208,7 @@ export default function Quotations() {
         onClose={() => setCustomerPickerOpen(false)}
         onPick={applyCustomerPick}
       />
-    </div>
+    </AuroraShell>
   );
 }
 

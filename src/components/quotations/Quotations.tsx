@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import AuroraShell from "@/components/ui/AuroraShell";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
@@ -2397,9 +2398,9 @@ export default function Quotations() {
       /* min-h-full, never min-h-screen: the Hub scroller is already
          100svh − var(--kx-header-h), so 100vh here is a phantom scroll the
          exact height of the header on every quotations screen. */
-      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center">
+      <AuroraShell className="flex items-center justify-center">
         <div className="text-gray-400 text-lg">Loading...</div>
-      </div>
+      </AuroraShell>
     );
   }
 
@@ -2408,7 +2409,7 @@ export default function Quotations() {
      ══════════════════════════════════════════════════════════ */
   if (view === "list") {
     return (
-      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <AuroraShell className="text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar — canonical Hub PageHeader */}
@@ -2593,7 +2594,7 @@ export default function Quotations() {
             </div>
           )}
         </div>
-      </div>
+      </AuroraShell>
     );
   }
 
@@ -2603,7 +2604,7 @@ export default function Quotations() {
   if (!current) return null;
 
   return (
-    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <AuroraShell className="text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
 
       {/* ── Toolbar (dark bar above A4) ── */}
@@ -3103,7 +3104,7 @@ export default function Quotations() {
           </div>
         </div>
       )}
-    </div>
+    </AuroraShell>
   );
 }
 
