@@ -19,6 +19,8 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import DatePicker from "@/components/ui/DatePicker";
 import PageHeader from "@/components/ui/PageHeader";
+import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
 import TaskExtras from "@/components/todo/TaskExtras";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
@@ -180,7 +182,7 @@ function Section({ title, count, color, children }: {
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+    <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 px-4 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors">
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "" : "-rotate-90"}`} />
@@ -200,7 +202,7 @@ function DeleteModal({ open, deleting, onConfirm, onClose }: {
   if (!open) return null;
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] p-6 space-y-4">
+      <div className="kx-glass w-full max-w-sm rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] p-6 space-y-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">{t("modal.delete")}</h3>
         <p className="text-sm text-[var(--text-muted)]">{t("modal.deleteConfirm")}</p>
         <div className="flex items-center justify-end gap-2 pt-2">
@@ -341,7 +343,7 @@ function LabelPicker({ labels, value, onChange, t, newLabelName, setNewLabelName
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
+        <div className="kx-glass absolute z-30 mt-1 w-full rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
           {/* Search */}
           <div className="p-1.5 border-b border-[var(--border-subtle)]">
             <input autoFocus value={q} onChange={(ev) => setQ(ev.target.value)}
@@ -583,7 +585,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-20 md:pt-24 pb-6 overflow-y-auto bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[94vh] md:max-h-none flex flex-col">
+      <div className="kx-glass w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[94vh] md:max-h-none flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
@@ -1413,7 +1415,7 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
 
       {/* Top Performers */}
       {topPerformers.length > 0 && (
-        <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
+        <div className="kx-glass bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
             <AwardIcon size={14} className="text-yellow-400" />
             <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("kpi.topPerformers")}</span>
@@ -1448,6 +1450,10 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
    known list instantly, refresh from the network in the background. The
    `kx_` prefix means sign-out wipes it (session-caches.ts). saView lenses
    filter in-memory, so the raw fetch result is safe to mirror. */
+/* Aurora ground — loaded only under the skin, ssr:false like every other
+   app that mounts it. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+
 const TODO_SNAP_KEY = "kx_todo_snap_v1";
 interface TodoSnap {
   todos: TodoWithRelations[];
@@ -1474,6 +1480,7 @@ function persistTodoSnap(s: TodoSnap): void {
 
 export default function TodoPage() {
   const { t } = useTranslation(todoT);
+  const aurora = useSkin() === "aurora";
   const [snap] = useState(readTodoSnap);
   const [todos, setTodos] = useState<TodoWithRelations[]>(snap?.todos ?? []);
   const [loading, setLoading] = useState(!snap);
@@ -1980,8 +1987,24 @@ export default function TodoPage() {
   );
 
   return (
-    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}>
+    /* ── AURORA ──────────────────────────────────────────────────────────
+       `kx-app` is the whole conversion, not a class among many: globals
+       remaps this app's OWN tokens under that scope, so every panel, chip,
+       row, hover and form field in these 2,400 lines turns translucent at
+       once and Core keeps the original solid values untouched. Adding it
+       per-element instead would be the same work spread over hundreds of
+       lines and would drift the first time someone adds a card.
+
+       The ground mounts only under the skin — Core never pays for the
+       canvas — and the content is lifted to z-[1] above it. */
+    <div className="kx-app kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
+      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}>
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] flex flex-col min-h-0 flex-1">
 
       {/* ── FIXED HEADER (never scrolls) ── */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
@@ -2018,7 +2041,7 @@ export default function TodoPage() {
 
           {/* Search + Add */}
           <div className="flex items-center gap-2 pb-2 min-w-0">
-            <div className="flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
+            <div className="kx-glass flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
               <SearchIcon size={16} className="text-[var(--text-dim)] shrink-0" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("search")}
@@ -2040,7 +2063,7 @@ export default function TodoPage() {
               {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
             </button>
             <Link href="/todo/report"
-              className="h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-all shrink-0 bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              className="kx-glass h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-all shrink-0 bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               title={t("report.link")}>
               <BarChart3Icon size={14} />
               <span className="hidden md:inline">{t("report.link")}</span>
@@ -2061,7 +2084,10 @@ export default function TodoPage() {
               <button key={f} onClick={() => setFilter(f)}
                 className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border whitespace-nowrap ${
                   filter === f
-                    ? "bg-white/10 border-white/20 text-[var(--text-primary)]"
+                    /* kx-chip-on, not a white tint: on glass a neutral fill is
+                       just a paler slab, while the skin's selected state is a
+                       Hub-Blue ring — the one accent this design has. */
+                    ? "kx-chip-on border-white/20 text-[var(--text-primary)]"
                     : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
                 {f === "all" ? `${t("pill.all")} (${stats.total})` : f === "active" ? `${t("pill.active")} (${stats.active})` : `${t("pill.done")} (${stats.completed})`}
@@ -2153,7 +2179,9 @@ export default function TodoPage() {
               {(["list", "board"] as const).map((v) => (
                 <button key={v} onClick={() => setViewMode(v)}
                   className={`h-8 px-3 text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
-                    viewMode === v ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    /* seg-on, never the solid inverted block: that is the
+                       loudest flat shape that can sit on a glass page. */
+                    viewMode === v ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                   }`}>
                   {v === "list" ? <LayoutListIcon size={13} /> : <LayoutGridIcon size={13} />}
                   {t("view." + v)}
@@ -2285,7 +2313,7 @@ export default function TodoPage() {
           <TodoBoard tasks={sortedFlat} onSetStatus={handleSetStatus} t={t} />
         ) : sortBy !== "smart" ? (
           /* Flat, explicitly-sorted list */
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+          <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
             {sortedFlat.map(renderRow)}
           </div>
         ) : (
@@ -2339,7 +2367,7 @@ export default function TodoPage() {
       {rejectTaskId && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setRejectTaskId(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 shadow-2xl"
+          <div className="kx-glass w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("approval.rejectTitle")}</h3>
             <p className="text-[12px] text-[var(--text-dim)] mt-1">{t("approval.rejectHint")}</p>
@@ -2370,5 +2398,6 @@ export default function TodoPage() {
         </div>
       )}
     </div>
+      </div>
   );
 }
