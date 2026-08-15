@@ -1622,8 +1622,21 @@ export default function Quotations() {
      four flows are gated client-side on isSuperAdmin AND server-
      side on auth.is_super_admin so the UI gate is a hint, not the
      security perimeter. */
+  /* ONCE, ON MOUNT — not per editor, and not per document.
+     ---------------------------------------------------------------------
+     This used to read `if (view !== "editor") return;` with
+     `[view, current?.id]` deps, which cost twice over:
+
+       · it sat BEHIND the document fetch. Opening a quotation was two
+         sequential round-trips — the document, then this — even though the
+         stamp and signature have nothing to do with which document is open.
+       · it re-ran on `current?.id`, so opening five quotations fetched the
+         same tenant assets five times.
+
+     They belong to the TENANT, not the quotation. Fetching once when the app
+     mounts puts it alongside the list load instead of after the document, and
+     the editor finds it already there. */
   useEffect(() => {
-    if (view !== "editor") return;
     let cancelled = false;
     (async () => {
       try {
@@ -1641,7 +1654,7 @@ export default function Quotations() {
       } catch { /* non-fatal — buttons just degrade to upload-only */ }
     })();
     return () => { cancelled = true; };
-  }, [view, current?.id]);
+  }, []);
 
   const attachSavedStamp = useCallback(() => {
     if (!current || !savedStampUrl) return;
