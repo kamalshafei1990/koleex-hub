@@ -3507,9 +3507,37 @@ input[type="number"]:not(.kx-spinner) {
    `overflow-x: hidden` on mobile. Nothing paints in that 8 px but the edge
    tiles' glow, which the screen edge would cut anyway. If that body rule is
    ever removed, this becomes an 8 px horizontal drift — re-measure here. */
+/* ⚠️ content-visibility WAS HERE AND IS GONE. It made Home dance on a phone.
+   ---------------------------------------------------------------------------
+   `content-visibility: auto` skips off-screen work and substitutes
+   `contain-intrinsic-size` for the real height. That is only safe when the
+   substitute is close to the truth. Measured on the launcher at 375x812, with
+   the one value every grid was given:
+
+     tiles  real    assumed  error
+        10   510      340     +170
+         7   391      340      +51
+         5   273      340      -67
+         3   154      340     -186
+         2   154      340     -186
+
+   Real heights run 154px to 510px; a single 340px cannot serve them. Across
+   the eight grids the page mis-states its own height by 961px — more than a
+   whole viewport — and every grid corrects itself as it scrolls into view, so
+   the page height changes under the thumb and everything below jumps. That is
+   the "dancing", and it is worse on a phone precisely because three columns
+   make the groups taller and the errors larger than the desktop the number was
+   presumably chosen on.
+
+   The paint saving was real; it was not worth a launcher that will not hold
+   still. It can come back the moment the placeholder is PER GRID — derived
+   from that grid's own row count at the current breakpoint — rather than one
+   number standing in for all of them. Not before.
+
+   The padding/margin pair stays: it is the glow room, and removing it clips
+   the edge tiles' hover. See the note above for why it is 24px. */
 .kx-lazy-grid {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 340px;
   padding: 24px;
   margin: -24px;
 }
+
