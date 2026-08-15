@@ -13,6 +13,21 @@ export const notesT: Translations = {
   "smart.shared":      { en: "Shared with me",       zh: "与我共享",           ar: "مشاركة معي" },
   "smart.trash":       { en: "Recently Deleted",     zh: "最近删除",           ar: "المحذوفة مؤخرًا" },
 
+  /* SHORT forms for the AppHomeMenu pill row. The sidebar says "Shared with
+     me" and "Recently Deleted"; a pill has no room for either, so the two
+     lengths are separate keys rather than one truncated at the call site. */
+  "nav.shared":        { en: "Shared",               zh: "共享",               ar: "مشاركة" },
+  "nav.trash":         { en: "Trash",                zh: "回收站",             ar: "المهملات" },
+
+  /* The header's note count and the focus toggle — the last three English
+     literals on the Arabic screen. Singular/plural is a separate key because
+     Arabic and Chinese do not inflect the way the English ternary assumed. */
+  "count.note":        { en: "note",                 zh: "条笔记",             ar: "ملاحظة" },
+  "count.notes":       { en: "notes",                zh: "条笔记",             ar: "ملاحظة" },
+  "focus.exit":        { en: "Exit focus",           zh: "退出专注",           ar: "إنهاء التركيز" },
+  "focus.enter":       { en: "Focus mode",           zh: "专注模式",           ar: "وضع التركيز" },
+  "list.noText":       { en: "No additional text",  zh: "无其他内容",         ar: "لا يوجد نص إضافي" },
+
   /* Sharing */
   "share.title":       { en: "Share note",           zh: "共享笔记",           ar: "مشاركة الملاحظة" },
   "share.subtitle":    { en: "Invite people in your organization to collaborate",

@@ -410,7 +410,10 @@ function ProjectCard({
   return (
     <div
       onClick={onOpen}
-      className="group cursor-pointer rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-all overflow-hidden"
+      /* Leaf card → kx-glass. The remap already made it translucent; without
+         the frost its text sits directly on the moving ground. Remap and
+         frost are two steps, not one. */
+      className="kx-glass group cursor-pointer rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-all overflow-hidden"
     >
       {/* Colour stripe */}
       <div className="h-1" style={{ background: color }} />
@@ -1714,7 +1717,7 @@ function ProjectFormModal({
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
       {confirmDialog}
-      <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="kx-glass-pop w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">
             {editing ? t("form.title.edit") : t("form.title.new")}
@@ -2016,7 +2019,7 @@ function TaskFormModal({
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
       {confirmDialog}
-      <div className="w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="kx-glass-pop w-full max-w-xl sm:max-w-2xl rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">
             {editing ? t("task.title.edit") : t("task.title.new")}

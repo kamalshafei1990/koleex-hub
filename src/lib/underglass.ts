@@ -93,7 +93,25 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        band. That is precisely why it belongs HERE and not in appOwnsTopRamp
        below: with no band there is no ramp host, and listing it there would
        trade the pane's frost for a ramp that never gets drawn. */
-    p.startsWith("/expenses")
+    p.startsWith("/expenses") ||
+    /* Notes, Projects, Planning — 2026-08-16, converted together.
+
+       Sticky audit: all three have ZERO stickies. The only `sticky` hit across
+       their components is inside a comment in NotesList.
+
+       All three render PageHeader with `showTabs={false}` and put their
+       navigation in AppHomeMenu, so like Settings and Expenses there is no
+       sticky tab band — which is why they belong here and NOT in
+       appOwnsTopRamp: no band means no ramp host, and listing them there
+       would trade the pane's frost for a ramp nothing draws.
+
+       All three are also internal-scroller apps (`h-full overflow-hidden`),
+       so as on /sales the pane frosts at rest rather than having content
+       travel under it. Listing them is still what stops the top edge reading
+       as a solid bar over a glass page. */
+    p.startsWith("/notes") ||
+    p.startsWith("/projects") ||
+    p.startsWith("/planning")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

@@ -460,10 +460,12 @@ export default function NotesApp() {
 
   const totalNotes = notes.length;
 
-  // RootShell already renders MainHeader (top) and Sidebar (left). Our
-  // page fills the remaining viewport. Use 100dvh-3.5rem so the three
-  // panes stretch to the bottom without producing a double-scrollbar,
-  // matching the To-do and Calendar apps.
+  // RootShell already renders MainHeader (top) and Sidebar (left), and it has
+  // ALREADY subtracted the header — so this fills its parent with `h-full`
+  // rather than measuring the viewport again. The three panes stretch to the
+  // bottom with no double scrollbar, and unlike the old `100dvh - 3.5rem` it
+  // is not wrong by the iOS safe-area or the desktop title bar, and does not
+  // re-compute as a mobile toolbar retracts.
   return (
     <div
       className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -473,7 +475,7 @@ export default function NotesApp() {
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 min-w-0 pt-5 pb-3">
           <PageHeader
             title={t("app.title")}
-            subtitle={`${t("app.subtitle")} · ${totalNotes} ${totalNotes === 1 ? "note" : "notes"}`}
+            subtitle={`${t("app.subtitle")} · ${totalNotes} ${t(totalNotes === 1 ? "count.note" : "count.notes")}`}
             icon={<NotesIcon size={16} />}
             showTabs={false}
           />
@@ -483,12 +485,12 @@ export default function NotesApp() {
             <AppHomeMenu
               hideSearch
               navItems={[
-                { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document", label: "All Notes", active: selection.kind === "smart" && selection.key === "all" },
-                { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: <PinIcon className="h-[13px] w-[13px]" />,   label: "Pinned",  active: selection.kind === "smart" && selection.key === "pinned" },
-                { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",     label: "Unfiled", active: selection.kind === "smart" && selection.key === "none" },
-                { key: "shared",  onClick: () => setSelection({ kind: "smart", key: "shared" }), icon: <UsersIcon className="h-[13px] w-[13px]" />, label: "Shared",  active: selection.kind === "smart" && selection.key === "shared" },
-                { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",  label: "Trash",   active: selection.kind === "smart" && selection.key === "trash" },
-                { key: "new",     onClick: onCreateNote,                                          icon: "plus",     label: "New Note" },
+                { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document", label: t("smart.allNotes"), active: selection.kind === "smart" && selection.key === "all" },
+                { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: <PinIcon className="h-[13px] w-[13px]" />,   label: t("smart.pinned"),  active: selection.kind === "smart" && selection.key === "pinned" },
+                { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",     label: t("smart.none"), active: selection.kind === "smart" && selection.key === "none" },
+                { key: "shared",  onClick: () => setSelection({ kind: "smart", key: "shared" }), icon: <UsersIcon className="h-[13px] w-[13px]" />, label: t("nav.shared"),  active: selection.kind === "smart" && selection.key === "shared" },
+                { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",  label: t("nav.trash"),   active: selection.kind === "smart" && selection.key === "trash" },
+                { key: "new",     onClick: onCreateNote,                                          icon: "plus",     label: t("newNote") },
               ]}
               searchPlaceholder={searchPlaceholder}
             />
@@ -540,7 +542,7 @@ export default function NotesApp() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 9V5a2 2 0 0 1 2-2h4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M21 15v4a2 2 0 0 1-2 2h-4" />
             </svg>
-            {focusMode ? "Exit focus" : "Focus mode"}
+            {focusMode ? t("focus.exit") : t("focus.enter")}
           </button>
         </div>
       </div>
@@ -549,7 +551,7 @@ export default function NotesApp() {
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`h-full grid grid-cols-1 ${focusMode ? "md:grid-cols-1" : "md:grid-cols-[200px_260px_1fr]"}`}>
           {/* Pane 1 — Folders (hidden in focus mode) */}
-          <div className={`${focusMode ? "hidden" : "hidden md:block"} border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto`}>
+          <div className={`${focusMode ? "hidden" : "hidden md:block"} kx-glass-drawer border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto`}>
             <FoldersSidebar
               folders={folders}
               selection={selection}
@@ -562,7 +564,7 @@ export default function NotesApp() {
           </div>
 
           {/* Pane 2 — Notes list (hidden in focus mode) */}
-          <div className={`${focusMode ? "hidden" : "hidden md:block"} border-e border-[var(--border-subtle)] overflow-hidden`}>
+          <div className={`${focusMode ? "hidden" : "hidden md:block"} kx-glass-drawer border-e border-[var(--border-subtle)] overflow-hidden`}>
             <NotesList
               notes={notes}
               activeId={activeNoteId}

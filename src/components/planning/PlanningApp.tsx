@@ -652,7 +652,10 @@ function ScheduleView({
       </div>
 
       {/* ── Desktop: full 7-day grid ── */}
-      <div className="hidden md:block rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+      {/* The schedule grid — one big leaf surface, so one blur pass rather
+          than one per cell. Frost is a separate step from the remap: without
+          it the whole roster reads directly against the moving ground. */}
+      <div className="kx-glass hidden md:block rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         {/* Header row */}
         <div
           className="grid border-b border-[var(--border-subtle)]"
@@ -1442,7 +1445,7 @@ function ItemModal({
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
       {confirmDialog}
-      <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh]">
+      <div className="kx-glass-pop w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
           <h2 className="text-[15px] font-bold text-[var(--text-primary)]">

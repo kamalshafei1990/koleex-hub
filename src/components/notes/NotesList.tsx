@@ -122,6 +122,7 @@ export default function NotesList({
         )}
         {pinned.map((n) => (
           <NoteRowItem
+            t={t}
             key={n.id}
             note={n}
             active={n.id === activeId}
@@ -140,6 +141,7 @@ export default function NotesList({
             <SectionHeader label={labelize(g.label, t)} />
             {g.notes.map((n) => (
               <NoteRowItem
+            t={t}
                 key={n.id}
                 note={n}
                 active={n.id === activeId}
@@ -187,6 +189,7 @@ function NoteRowItem({
   onRestore,
   onPurge,
   isTrashView,
+  t,
 }: {
   note: NoteRow;
   active: boolean;
@@ -197,6 +200,10 @@ function NoteRowItem({
   onRestore: (id: string) => void;
   onPurge: (id: string) => void;
   isTrashView: boolean;
+  /* Passed down rather than re-subscribed: this row renders once per note,
+     and useTranslation() in here would open a subscription per row. Same
+     reason labelize() above takes it as an argument. */
+  t: (k: string) => string;
 }) {
   const plain = (note.body_plain || "").replace(/\s+/g, " ").trim();
   // List preview — title line if the user typed one, otherwise first
@@ -209,7 +216,7 @@ function NoteRowItem({
       const take = firstSentence || plain;
       return take.length > 60 ? take.slice(0, 60) + "…" : take;
     }
-    return "New Note";
+    return t("newNote");
   })();
   // Second line — whatever comes after the title in the body, truncated.
   const preview = (() => {
@@ -267,7 +274,7 @@ function NoteRowItem({
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
             <span className="shrink-0">{formatNoteTimestamp(note.updated_at)}</span>
-            <span className="truncate">{preview || "No additional text"}</span>
+            <span className="truncate">{preview || t("list.noText")}</span>
           </div>
         </div>
 
