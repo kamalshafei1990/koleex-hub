@@ -114,16 +114,19 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/planning") ||
     /* Finance, 2026-08-16 — 29 routes, one entry.
 
-       Sticky audit: ZERO stickies across all 36 finance components; every
-       `sticky` hit in the app is inside a comment.
-
-       Finance does NOT render the canonical PageHeader — FinanceUi exports its
-       own, which is a plain title/subtitle/action block with no band and no
-       tab strip. So there is no `.kx-ph-band` to host a ramp, which puts it in
-       the Settings case: it belongs HERE, where the pane's own frost stops the
-       top edge reading as a solid bar, and NOT in appOwnsTopRamp, which would
-       hand it the flat 56px frost in exchange for a ramp nothing draws. */
-    p.startsWith("/finance")
+       CORRECTED the same day. This comment first said "ZERO stickies across
+       all 36 components" and "Finance does not render the canonical
+       PageHeader". Both came from grepping the folder and both were wrong:
+       measuring the route found `.kx-ph-band`, and with the scroller at 600px
+       the tab strip pinned entirely inside the ramp. Finance IS in
+       appOwnsTopRamp below because of it. Left here as the record of why the
+       note at the top of this file says to measure the ROUTE. */
+    p.startsWith("/finance") ||
+    /* Documents, 2026-08-16. Sticky audit done the way this file insists on —
+       by MEASURING the rendered route, not by grepping the folder: 0 stickies,
+       no `.kx-ph-band`, and the Hub scroller cannot scroll there at all. So
+       there is no band to host a ramp and nothing to go soft under one. */
+    p.startsWith("/documents")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

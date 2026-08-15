@@ -356,7 +356,7 @@ console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
      against the chrome focus rule is a true observation about a deliberate
      override rather than a defect. Keep this list to overrides you have
      actually looked at in a browser. */
-  const DELIBERATE_REGION_RESET = [".quot-doc-inner"];
+  const DELIBERATE_REGION_RESET = [".quot-doc-inner", ".quot-a4-doc"];
 
   const losers: string[] = [];
   outer: for (const s of stated) {

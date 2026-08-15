@@ -440,7 +440,7 @@ export default function PackingListDoc({
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {confirmDialog}
       {toastElement}

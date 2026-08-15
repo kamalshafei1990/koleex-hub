@@ -1845,8 +1845,16 @@ input[type="number"]:not(.kx-spinner) {
    shadow was still painting. Matching their :not() chain would work too and
    would be four more places to keep in step; !important states the intent —
    paper wins over chrome — in one word. */
-[data-kx-skin="aurora"] .quot-doc-inner :is(input, textarea, select),
-[data-kx-skin="aurora"] .quot-doc-inner :is(input, textarea, select):focus {
+/* `.quot-a4-doc` is in this selector because the A4 SHEET is what makes a
+   field paper, not the wrapper one app happens to put around it. The packing
+   list (components/documents/PackingListDoc) renders the same sheet class and
+   imports from QuotationA4Preview, but has no `.quot-doc-inner` — so scoping
+   /documents would have turned its 18 fields into dark recessed wells on white
+   paper, which is the exact regression the owner reported on quotations
+   ("i need them same as before"). Matching the sheet means the next document
+   to reuse it is covered without anyone remembering to add a hook. */
+[data-kx-skin="aurora"] :is(.quot-doc-inner, .quot-a4-doc) :is(input, textarea, select),
+[data-kx-skin="aurora"] :is(.quot-doc-inner, .quot-a4-doc) :is(input, textarea, select):focus {
   box-shadow: none !important;
   background-color: transparent !important;
   border-color: transparent !important;
@@ -3618,3 +3626,4 @@ input[type="number"]:not(.kx-spinner) {
 
    If off-screen skipping is ever attempted again, the padding comes back WITH
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
+

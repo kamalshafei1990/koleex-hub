@@ -316,7 +316,7 @@ function DocEditor({
   if (!current) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {confirmDialog}
       <style>{`
@@ -421,7 +421,11 @@ function SavedList({
               onClick={() => setFilter(k)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 filter === k
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  /* kx-chip-on carries the selected state under Aurora — a
+                     solid inverted block is Core's language and the loudest
+                     flat shape that can sit on glass. The Core classes stay
+                     beside it; the class is defined only under the skin. */
+                  ? "kx-chip-on bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                   : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]"
               }`}
             >
@@ -526,7 +530,7 @@ export default function DocumentsApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)]">
       <div className="px-4 md:px-6 pt-5 sm:pt-6">
       {confirmDialog}
         <PageHeader
@@ -545,7 +549,9 @@ export default function DocumentsApp() {
                 key={tpl.kind}
                 type="button"
                 onClick={() => openTemplate(tpl.kind)}
-                className="group text-start rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--border-focus)] transition-colors"
+                /* Leaf card → kx-glass. The remap already made it translucent;
+                   frost is the second step, or the label sits on the ground. */
+                className="kx-glass group text-start rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--border-focus)] transition-colors"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
