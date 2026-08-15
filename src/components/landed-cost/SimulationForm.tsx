@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useSkin } from "@/lib/appearance";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useRouter } from "next/navigation";
@@ -648,17 +649,35 @@ export default function SimulationForm({ id }: { id?: string }) {
   return (
     <AuroraShell className="text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
 
-      {/* ── Header ── */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/landed-cost" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className={`h-4 w-4 ${isRtl ? "rotate-180" : ""}`} />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><CalculatorIcon className="h-4 w-4" /></div>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("untitledSimulation")} />
-          </div>
-          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+      {/* ── THE HUB'S HEADER, NOT THIS APP'S ─────────────────────────────────
+          Owner: "this is the old header." Hand-rolled — its own back button,
+          its own icon chip, its own title size — while 38 other files use
+          PageHeader. Converting the shell and the cards and leaving the header
+          is the same miss as the tab strip one screen earlier: SURFACES
+          converted, ELEMENTS left behind.
+
+          The title stays an INPUT, because a simulation is a document people
+          rename in place. PageHeader gained a `titleNode` slot for exactly
+          that; its `title` prop stays a STRING on purpose — it is also the
+          navigation's aria-label, and widening it to ReactNode would have
+          produced "[object Object] navigation". */}
+      <PageHeader
+        title={name || t("untitledSimulation")}
+        titleNode={
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full bg-transparent outline-none placeholder:text-[var(--text-ghost)]"
+            placeholder={t("untitledSimulation")}
+          />
+        }
+        subtitle={t("subtitle")}
+        icon={<CalculatorIcon className="h-4 w-4" />}
+        backHref="/landed-cost"
+        showTabs={false}
+        action={
+          <div className="flex items-center gap-2 shrink-0">
             {/* §4 Confidence level selector */}
             <div className="relative group" title={t("confidenceHint")}>
               {/* The hand-placed chevron went with the <select>: KdsSelect
@@ -682,9 +701,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               </button>
             )}
           </div>
-        </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">{t("subtitle")}</p>
-      </div>
+        }
+      />
 
       {/* ── Tab Navigation Bar (sticky) ── */}
       <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">

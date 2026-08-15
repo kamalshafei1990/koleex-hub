@@ -45,7 +45,13 @@ export interface PageTab {
 }
 
 export interface PageHeaderProps {
+  /** The accessible name. Stays a STRING even when `titleNode` draws
+   *  something else, because it is also the nav's aria-label — widening this
+   *  to ReactNode would have produced "[object Object] navigation". */
   title: string;
+  /** Drawn in place of `title` when an app's title is editable — a document
+   *  name people rename in situ, rather than a page label. */
+  titleNode?: ReactNode;
   subtitle?: string;
   icon: RrIconName | ReactNode;
   backHref?: string;
@@ -79,6 +85,7 @@ function parentPath(pathname: string): string {
 
 export default function PageHeader({
   title,
+  titleNode,
   subtitle,
   icon,
   backHref,
@@ -266,12 +273,17 @@ export default function PageHeader({
           <div className="flex min-w-0 flex-col">
             <h1
               className={
-                systemBarNamesThisApp
+                /* `&& !titleNode` — the sr-only exists because the system bar
+                   already names the APP, so repeating it here is noise. A
+                   titleNode is not the app's name: it is the DOCUMENT's, the
+                   thing the reader renames in place. Hiding that on desktop
+                   collapsed the h1 to 1px and took its input with it. */
+                systemBarNamesThisApp && !titleNode
                   ? "text-[17px] font-bold leading-tight tracking-tight text-[var(--text-primary)] md:sr-only"
                   : "text-[17px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[24px] md:text-[26px]"
               }
             >
-              {title}
+              {titleNode ?? title}
             </h1>
             {subtitle && (
               <p
