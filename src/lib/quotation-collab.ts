@@ -18,7 +18,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { getBrowserSupabase } from "@/lib/supabase-browser";
+/* getBrowserSupabase is deliberately NOT imported here — see the join effect.
+   `RealtimeChannel` above is a type-only import, which erases at compile time
+   and pulls no runtime bytes. */
 
 export type CollabStatus = "viewing" | "editing";
 
@@ -73,60 +75,84 @@ export function useQuotationCollab(opts: {
   // so changing viewing↔editing does NOT tear down the channel (handled below).
   useEffect(() => {
     if (!active || !me) return;
-    const supa = getBrowserSupabase();
-    if (!supa) return;
 
-    const channel = supa.channel(`quotation:${quotationId}`, {
-      config: { presence: { key: me.id } },
-    });
-    channelRef.current = channel;
+    /* supabase-js is ~185 KB and this hook is the ONLY thing on the quotations
+       route that pulls it — measured against the production build, no other
+       route loads that chunk at all. A static top-level import made every
+       visit to the LIST pay for it, even though the list never opens a channel
+       (`quotationId` is null there and this effect returns above). Importing it
+       here moves those bytes off the route's critical path and onto the first
+       time a quotation is actually opened.
 
-    const syncPeers = () => {
-      const state = channel.presenceState() as Record<string, Array<Record<string, unknown>>>;
-      const out: CollabPeer[] = [];
-      for (const [key, metas] of Object.entries(state)) {
-        if (key === me.id) continue; // exclude self
-        const m = metas[metas.length - 1] || {};
-        out.push({
-          id: key,
-          name: typeof m.name === "string" ? m.name : "Someone",
-          status: m.status === "editing" ? "editing" : "viewing",
-          at: typeof m.at === "string" ? m.at : new Date().toISOString(),
-        });
-      }
-      /* Presence "sync" fires on every heartbeat, and each peer's `at` bumps
-         each time — so a naive setPeers(out) would hand back a new array on
-         every tick and re-render the (very heavy) quotation editor + A4 preview
-         constantly, which starves route transitions (Back / the Koleex logo
-         feel unresponsive). Only update when the meaningful peer set actually
-         changes (who's present + their status). The `at` timestamp is presence
-         noise and intentionally excluded from the comparison. */
-      setPeers((prev) => (peersMeaningfullyEqual(prev, out) ? prev : out));
-    };
+       Everything from the `cancelled` check down is synchronous, deliberately:
+       the only await is the import itself, so there is exactly one window in
+       which the editor can close underneath us, and one flag closes it. */
+    let cancelled = false;
+    let teardown: (() => void) | null = null;
 
-    channel
-      .on("presence", { event: "sync" }, syncPeers)
-      .on("presence", { event: "join" }, syncPeers)
-      .on("presence", { event: "leave" }, syncPeers)
-      .on("broadcast", { event: "saved" }, ({ payload }) => {
-        const p = payload as Partial<SaveNotice>;
-        if (!p || p.by === me.id) return; // ignore our own save echo
-        setSaveNotice({
-          by: String(p.by ?? ""),
-          byName: String(p.byName ?? "Another user"),
-          version: typeof p.version === "number" ? p.version : 0,
-          at: typeof p.at === "string" ? p.at : new Date().toISOString(),
-        });
-      })
-      .subscribe((s) => {
-        if (s === "SUBSCRIBED") {
-          channel.track({ name: me.name, status: statusRef.current, at: new Date().toISOString() });
-        }
+    void (async () => {
+      const { getBrowserSupabase } = await import("@/lib/supabase-browser");
+      if (cancelled) return;
+      const supa = getBrowserSupabase();
+      if (!supa) return;
+
+      const channel = supa.channel(`quotation:${quotationId}`, {
+        config: { presence: { key: me.id } },
       });
+      channelRef.current = channel;
+
+      const syncPeers = () => {
+        const state = channel.presenceState() as Record<string, Array<Record<string, unknown>>>;
+        const out: CollabPeer[] = [];
+        for (const [key, metas] of Object.entries(state)) {
+          if (key === me.id) continue; // exclude self
+          const m = metas[metas.length - 1] || {};
+          out.push({
+            id: key,
+            name: typeof m.name === "string" ? m.name : "Someone",
+            status: m.status === "editing" ? "editing" : "viewing",
+            at: typeof m.at === "string" ? m.at : new Date().toISOString(),
+          });
+        }
+        /* Presence "sync" fires on every heartbeat, and each peer's `at` bumps
+           each time — so a naive setPeers(out) would hand back a new array on
+           every tick and re-render the (very heavy) quotation editor + A4 preview
+           constantly, which starves route transitions (Back / the Koleex logo
+           feel unresponsive). Only update when the meaningful peer set actually
+           changes (who's present + their status). The `at` timestamp is presence
+           noise and intentionally excluded from the comparison. */
+        setPeers((prev) => (peersMeaningfullyEqual(prev, out) ? prev : out));
+      };
+
+      channel
+        .on("presence", { event: "sync" }, syncPeers)
+        .on("presence", { event: "join" }, syncPeers)
+        .on("presence", { event: "leave" }, syncPeers)
+        .on("broadcast", { event: "saved" }, ({ payload }) => {
+          const p = payload as Partial<SaveNotice>;
+          if (!p || p.by === me.id) return; // ignore our own save echo
+          setSaveNotice({
+            by: String(p.by ?? ""),
+            byName: String(p.byName ?? "Another user"),
+            version: typeof p.version === "number" ? p.version : 0,
+            at: typeof p.at === "string" ? p.at : new Date().toISOString(),
+          });
+        })
+        .subscribe((s) => {
+          if (s === "SUBSCRIBED") {
+            channel.track({ name: me.name, status: statusRef.current, at: new Date().toISOString() });
+          }
+        });
+
+      teardown = () => {
+        channelRef.current = null;
+        try { supa.removeChannel(channel); } catch { /* ignore */ }
+      };
+    })();
 
     return () => {
-      channelRef.current = null;
-      try { supa.removeChannel(channel); } catch { /* ignore */ }
+      cancelled = true;
+      teardown?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, quotationId, me?.id]);
