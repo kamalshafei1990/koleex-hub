@@ -20,6 +20,7 @@ import CountUp from "@/components/vendor/CountUp";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 const GlassSurface = dynamic(() => import("@/components/vendor/reactbits/GlassSurface.jsx"), { ssr: false });
+const LiquidGlass = dynamic(() => import("@/components/ui/LiquidGlass"), { ssr: false });
 const SpotlightCard = dynamic(() => import("@/components/vendor/reactbits/SpotlightCard.jsx"), { ssr: false });
 const GlareHover = dynamic(() => import("@/components/vendor/reactbits/GlareHover.jsx"), { ssr: false });
 const StarBorder = dynamic(() => import("@/components/vendor/reactbits/StarBorder.jsx"), { ssr: false });
@@ -118,13 +119,25 @@ export default function ReactBitsLab() {
                 <div className="kx-glass rounded-2xl border border-white/15 bg-white/5 p-4 h-[116px]">{CARD}</div>
               </div>
               <div>
-                <div className="text-[11px] text-white/70 mb-1.5">Theirs — GlassSurface</div>
+                <div className="text-[11px] text-white/70 mb-1.5">Theirs — GlassSurface (fixed 300px)</div>
                 <GlassSurface width={300} height={116} borderRadius={16}
                   displace={6} distortionScale={-160} redOffset={4} greenOffset={14} blueOffset={24}
                   brightness={60} opacity={0.86} blur={2} backgroundOpacity={0.05} saturation={1.3}>
                   <div className="p-4 w-full">{CARD}</div>
                 </GlassSurface>
               </div>
+            </div>
+            {/* The wrapper that removes the only structural objection left:
+                GlassSurface takes PIXELS, so it cannot fit a fluid card.
+                LiquidGlass measures the box and hands it real numbers. This one
+                is full-width and follows the column. */}
+            <div className="mt-4">
+              <div className="text-[11px] text-white/70 mb-1.5">
+                Ours — LiquidGlass (same filter, fluid width)
+              </div>
+              <LiquidGlass radius={16} className="rounded-2xl border border-white/15">
+                <div className="p-4">{CARD}</div>
+              </LiquidGlass>
             </div>
           </div>
         </Section>
@@ -180,7 +193,7 @@ export default function ReactBitsLab() {
               <OurCard>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Outstanding</div>
                 <div className="text-[22px] font-bold mt-0.5">
-                  <CountUp value={kpi} prefix="USD " />
+                  <CountUp value={kpi} format={(n) => "USD " + Math.round(n).toLocaleString("en-US")} />
                 </div>
               </OurCard>
               <button
