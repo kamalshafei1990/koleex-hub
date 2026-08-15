@@ -2004,14 +2004,13 @@ export default function Quotations() {
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div
-        className="no-print"
+        className="no-print kx-glass"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
           padding: "10px 16px",
-          background: "#111",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    borderBottom: "1px solid var(--border-subtle)",
           flexWrap: "wrap",
         }}
       >
@@ -2119,13 +2118,12 @@ export default function Quotations() {
 
       {/* ── Customer fields (dark row, above A4, not inside document) ── */}
       <div
-        className="no-print"
+        className="no-print kx-glass"
         style={{
           display: "flex",
           gap: 12,
           padding: "12px 16px",
-          background: "#0d0d0d",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    borderBottom: "1px solid var(--border-subtle)",
           flexWrap: "wrap",
         }}
       >

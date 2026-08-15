@@ -2628,14 +2628,13 @@ export default function Quotations() {
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div
-        className="no-print"
+        className="no-print kx-glass"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
           padding: "10px 16px",
-          background: "#111",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    borderBottom: "1px solid var(--border-subtle)",
           flexWrap: "wrap",
         }}
       >
@@ -2806,11 +2805,10 @@ export default function Quotations() {
       {/* ── Loading bar — full doc (items) is hydrating from the server ── */}
       {hydrating && (
         <div
-          className="no-print"
+          className="no-print kx-glass"
           style={{
             display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 16px", background: "#0d0d0d",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            padding: "8px 16px",             borderBottom: "1px solid var(--border-subtle)",
             fontSize: 12, color: "rgba(255,255,255,0.6)",
           }}
         >
@@ -2826,7 +2824,7 @@ export default function Quotations() {
           chooses Load Latest or dismiss. */}
       {saveNotice && (
         <div
-          className="no-print"
+          className="no-print kx-glass"
           style={{
             display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
             padding: "10px 16px",
@@ -2873,13 +2871,12 @@ export default function Quotations() {
 
       {/* ── Customer fields (dark row, above A4, not inside document) ── */}
       <div
-        className="no-print"
+        className="no-print kx-glass"
         style={{
           display: "flex",
           gap: 12,
           padding: "12px 16px",
-          background: "#0d0d0d",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    borderBottom: "1px solid var(--border-subtle)",
           flexWrap: "wrap",
         }}
       >
@@ -3064,7 +3061,8 @@ export default function Quotations() {
             role="dialog"
             aria-modal="true"
             aria-label="Quotation updated by another user"
-            style={{ width: "100%", maxWidth: 460, background: "#1A1A1A", color: "#fff", border: "1px solid #2E2E2E", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
+            className="kx-glass-pop"
+            style={{ width: "100%", maxWidth: 460, color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
           >
             <div style={{ padding: "20px 22px 6px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
