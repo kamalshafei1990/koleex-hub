@@ -26,7 +26,7 @@ function fmt(n: number): string {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
+  return <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -94,7 +94,7 @@ export default function FinanceGeneralLedger() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("accounting.gl.title", "General Ledger")}

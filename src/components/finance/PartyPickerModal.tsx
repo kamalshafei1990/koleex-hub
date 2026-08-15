@@ -112,7 +112,7 @@ export default function PartyPickerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm px-4 py-12" onClick={onClose}>
       <div
-        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="relative w-full max-w-2xl overflow-hidden kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

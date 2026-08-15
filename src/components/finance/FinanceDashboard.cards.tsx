@@ -86,7 +86,7 @@ export const TopOrdersCard = memo(function TopOrdersCard({ kpi, currency }: { kp
       ) : (
         <ol className="space-y-1.5">
           {rows.map((o, idx) => (
-            <li key={o.id} className="flex items-center justify-between rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5 transition hover:border-[var(--border-subtle)]">
+            <li key={o.id} className="flex items-center justify-between kx-glass rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5 transition hover:border-[var(--border-subtle)]">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[11px] font-medium text-[var(--text-highlight)]">{idx + 1}</span>
                 <div className="min-w-0">
@@ -124,7 +124,7 @@ export const TopCategoriesCard = memo(function TopCategoriesCard({ kpi, currency
           {rows.map((c) => {
             const style = styleForCategory(c.name);
             return (
-              <li key={c.name} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5">
+              <li key={c.name} className="kx-glass rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <RrIcon name={style.icon} size={14} className="opacity-80" />

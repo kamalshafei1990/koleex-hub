@@ -140,7 +140,7 @@ export default function FinanceWorkspace() {
                   {t("workspace.viewAll", "View all")}{totalPending > 0 ? ` (${totalPending})` : ""} →
                 </Link>
               </div>
-              <ErpPanel>
+              <ErpPanel className="kx-glass">
                 {snap.pending.length === 0 ? (
                   <EmptyState
                     icon="badge-check"
@@ -177,7 +177,7 @@ export default function FinanceWorkspace() {
                 <ErpEyebrow>{t("workspace.banks", "Bank Accounts")}</ErpEyebrow>
                 <Link href="/finance/bank-accounts" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("workspace.manage", "Manage →")}</Link>
               </div>
-              <ErpPanel>
+              <ErpPanel className="kx-glass">
                 {snap.banks.length === 0 ? (
                   <EmptyState
                     icon="bank" title={t("workspace.empty.noBanks", "No bank accounts added yet")}
@@ -213,7 +213,7 @@ export default function FinanceWorkspace() {
               <ErpEyebrow>{t("workspace.recent", "Recent Activity")}</ErpEyebrow>
               <span className="text-[10.5px] text-[var(--text-dim)]">{t("workspace.lastEvents", "Last {n} events").replace("{n}", String(snap.recent.length))}</span>
             </div>
-            <ErpPanel>
+            <ErpPanel className="kx-glass">
               {snap.recent.length === 0 ? (
                 <EmptyState
                   icon="clock" title={t("workspace.empty.noActivity", "No activity yet")}
@@ -224,7 +224,7 @@ export default function FinanceWorkspace() {
                   {snap.recent.map((r, idx) => (
                     <li key={`${r.kind}-${r.id}`} className="relative border-b border-[var(--border-faint)] last:border-b-0">
                       <Link href={r.href} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-secondary)]">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
                           <RrIcon name={KIND_ICON[r.kind]} size={12} />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -295,9 +295,9 @@ function NavCard({ href, icon, label, count }: {
   const { t } = useTranslation(financeT);
   return (
     <Link href={href} className="block">
-      <ErpPanel className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">
+      <ErpPanel className="kx-glass px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
+          <span className="flex h-8 w-8 items-center justify-center kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
             <RrIcon name={icon} size={14} />
           </span>
           <div className="min-w-0 flex-1">

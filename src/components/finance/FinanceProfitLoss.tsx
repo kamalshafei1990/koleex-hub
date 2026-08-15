@@ -79,7 +79,7 @@ export default function FinanceProfitLoss() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("accounting.pl.title", "Profit & Loss")}
@@ -87,7 +87,7 @@ export default function FinanceProfitLoss() {
         />
 
         {/* Period filter */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+        <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
           <div className="flex flex-wrap items-end gap-3">
             <Field label={t("pl.from", "From")}>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
@@ -110,7 +110,7 @@ export default function FinanceProfitLoss() {
         )}
 
         {data && (
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+          <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.12em] text-[var(--text-dim)]">

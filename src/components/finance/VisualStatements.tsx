@@ -185,7 +185,7 @@ function isAtOrAfterToday(iso: string, g: Granularity): boolean {
    data. Pure CSS pulse, reduced-motion-safe, matches the hero + table layout. */
 function HeroSkeleton() {
   return (
-    <ErpPanel className="px-5 py-6 sm:px-8 sm:py-8" aria-busy>
+    <ErpPanel className="kx-glass px-5 py-6 sm:px-8 sm:py-8" aria-busy>
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 animate-pulse motion-reduce:animate-none">
         {[0, 1].map((i) => (
           <div key={i} className="space-y-3">
@@ -200,7 +200,7 @@ function HeroSkeleton() {
 }
 function BodySkeleton() {
   return (
-    <ErpPanel className="px-5 py-6 sm:px-8 animate-pulse motion-reduce:animate-none" aria-busy>
+    <ErpPanel className="kx-glass px-5 py-6 sm:px-8 animate-pulse motion-reduce:animate-none" aria-busy>
       <div className="h-5 w-44 rounded bg-[var(--bg-surface-active)] mb-4" />
       <div className="space-y-2.5">
         {Array.from({ length: 8 }).map((_, i) => (
@@ -302,14 +302,14 @@ export function StatementsDashboard() {
   return (
     <div className="space-y-5">
       {error && (
-        <ErpPanel className="px-5 py-3">
+        <ErpPanel className="kx-glass px-5 py-3">
           <div className="text-[13px] text-rose-600 dark:text-rose-300">{error}</div>
         </ErpPanel>
       )}
 
       {/* ── Hero KPIs + trend bars ───────────────────────────────────── */}
       {snap && (
-        <ErpPanel className="px-5 py-6 sm:px-8 sm:py-8">
+        <ErpPanel className="kx-glass px-5 py-6 sm:px-8 sm:py-8">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             <KpiHero label={t("visual.totalRevenue", "TOTAL REVENUE")} ccy={ccy} value={totalRevenue}
                      delta={revDelta} pct={revPct} tone="neutral" />
@@ -326,7 +326,7 @@ export function StatementsDashboard() {
            container so the operator sees "Statement view" and
            "Period selection" as related controls instead of three
            floating centered groups. */}
-      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 sm:px-5 sm:py-4">
+      <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 sm:px-5 sm:py-4">
         {/* Row 1 — Statement view (left) + Granularity (right) */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PillToggle
@@ -421,7 +421,7 @@ export function StatementsDashboard() {
         )}
         {!snap && !error && <BodySkeleton />}
         {snap && (
-        <ErpPanel className={`px-5 py-6 sm:px-8 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
+        <ErpPanel className={`kx-glass px-5 py-6 sm:px-8 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
           {tab === "income"   && (
             <IncomeView
               pl={snap.income}

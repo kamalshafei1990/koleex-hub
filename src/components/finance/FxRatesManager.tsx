@@ -199,7 +199,7 @@ export default function FxRatesManager() {
                 </div>
               </ErpPanel>
             ) : (
-              <ErpPanel className="px-4 py-3">
+              <ErpPanel className="kx-glass px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-700 dark:text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.allConfigured", "All exposed pairs configured")}
                 </div>
@@ -227,7 +227,7 @@ export default function FxRatesManager() {
                 </div>
               </ErpPanel>
             ) : (
-              <ErpPanel className="px-4 py-3">
+              <ErpPanel className="kx-glass px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-700 dark:text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.ratesFresh", "Rates fresh")}
                 </div>
@@ -237,7 +237,7 @@ export default function FxRatesManager() {
               </ErpPanel>
             )}
             {/* Used by open documents */}
-            <ErpPanel className="px-4 py-3">
+            <ErpPanel className="kx-glass px-4 py-3">
               <div className="flex items-center gap-2 text-[11.5px] text-[var(--text-highlight)]">
                 <RrIcon name="signal-stream" size={12} /> {t("fx.openExposure", "Open exposure")}
               </div>
@@ -264,7 +264,7 @@ export default function FxRatesManager() {
       <section>
         <ErpEyebrow>{t("fx.latestPerPair", "Latest rate per pair")}</ErpEyebrow>
         {latestByPair.length === 0 ? (
-          <ErpPanel className="mt-2 px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
+          <ErpPanel className="kx-glass mt-2 px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
             {t("fx.noneYet", "No rates configured yet. Add one below.")}
           </ErpPanel>
         ) : (
@@ -283,7 +283,7 @@ export default function FxRatesManager() {
       {/* Add new rate */}
       <section>
         <ErpEyebrow>{t("fx.addRateSection", "Add rate")}</ErpEyebrow>
-        <ErpPanel className="mt-2 px-4 py-4">
+        <ErpPanel className="kx-glass mt-2 px-4 py-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <SmartField label={t("fx.field.from", "From")}>
               <SmartSelect value={from} onChange={(e) => setFrom(e.target.value)}>

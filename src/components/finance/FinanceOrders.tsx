@@ -171,7 +171,7 @@ export default function FinanceOrders() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -319,7 +319,7 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
   const collectionPct = sellingPrice > 0 ? Math.min(100, (collected / sellingPrice) * 100) : 0;
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-colors hover:border-[var(--border-color)]">
+    <div className="group overflow-hidden kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-colors hover:border-[var(--border-color)]">
       {/* ── HEADER STRIP ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-faint)] px-5 py-4">
         <div className="min-w-0 flex-1">
@@ -385,7 +385,7 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
           <div className="mt-1.5">
             <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
           </div>
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2">
+          <div className="mt-3 flex items-center justify-between kx-glass rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2">
             <span className="text-[11px] text-[var(--text-secondary)]">{t("orders.risk.level", "Risk level")}</span>
             <span className={`text-[11px] font-medium uppercase tracking-wide ${
               risk === "alert" ? "text-rose-600 dark:text-rose-300"
@@ -663,7 +663,7 @@ function OrderEditor({
     : null;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Picker modals */}
       <PartyPickerModal
         open={customerPickerOpen}

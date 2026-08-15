@@ -104,7 +104,7 @@ export default function DataEntryHub() {
           <ErpEyebrow>{t("dataEntry.section.starting", "① Starting Data · one-time")}</ErpEyebrow>
           <Link href="/finance/setup" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("dataEntry.openSetup", "Open Finance Setup →")}</Link>
         </div>
-        <ErpPanel>
+        <ErpPanel className="kx-glass">
           <ul>
             {STARTING_DATA.map((r) => <EntryRowItem key={r.href} row={r} />)}
           </ul>
@@ -121,7 +121,7 @@ export default function DataEntryHub() {
           <ErpEyebrow>{t("dataEntry.section.daily", "② Day-to-Day Entries · ongoing")}</ErpEyebrow>
           <Link href="/create" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("dataEntry.openAllCreate", "Open all create flows →")}</Link>
         </div>
-        <ErpPanel>
+        <ErpPanel className="kx-glass">
           <ul>
             {DAILY_ENTRIES.map((r) => <EntryRowItem key={r.href} row={r} />)}
           </ul>
@@ -150,7 +150,7 @@ function EntryRowItem({ row }: { row: EntryRow }) {
   return (
     <li className="border-b border-[var(--border-faint)] last:border-b-0">
       <Link href={row.href} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-surface-subtle)]">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
           <RrIcon name={row.icon} size={14} />
         </span>
         <div className="min-w-0 flex-1">

@@ -52,7 +52,7 @@ export default function FinanceHome() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <FinanceHeader
           title={t("app.title", "Finance")}
@@ -82,7 +82,7 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
     <section className="mt-5">
       <Link
         href="/finance/setup"
-        className="group relative flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 transition-colors hover:border-[var(--border-color)]"
+        className="group relative flex items-start gap-3 kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 transition-colors hover:border-[var(--border-color)]"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
           <RrIcon name="shield-check" size={14} />

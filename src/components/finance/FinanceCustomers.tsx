@@ -64,7 +64,7 @@ export default function FinanceCustomers() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -89,7 +89,7 @@ export default function FinanceCustomers() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
-                <div key={r.customer_id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
+                <div key={r.customer_id} className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-base font-semibold">{r.customer_name || "—"}</div>

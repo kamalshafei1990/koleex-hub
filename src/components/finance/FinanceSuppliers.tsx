@@ -62,7 +62,7 @@ export default function FinanceSuppliers() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -86,7 +86,7 @@ export default function FinanceSuppliers() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
-                <div key={r.supplier_id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
+                <div key={r.supplier_id} className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
                   <div>
                     <div className="text-base font-semibold">{r.supplier_name || "—"}</div>
                     <div className="mt-1 text-[11px] text-[var(--text-dim)]">{r.payment_terms ?? t("suppliers.noTerms", "No payment terms set")}</div>

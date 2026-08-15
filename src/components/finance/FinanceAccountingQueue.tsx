@@ -195,7 +195,7 @@ export default function FinanceAccountingQueue() {
   const visibleItems = useMemo(() => items, [items]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {inputDialog}
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
@@ -242,7 +242,7 @@ export default function FinanceAccountingQueue() {
 
         {/* Table + drawer */}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+          <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             {loading ? (
               <div className="px-4 py-8 text-center text-[11px] text-[var(--text-dim)]">{t("accounting.queue.loading", "Loading…")}</div>
             ) : visibleItems.length === 0 ? (
@@ -310,7 +310,7 @@ export default function FinanceAccountingQueue() {
               callAction={callAction}
             />
           ) : (
-            <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-12 text-center lg:block">
+            <div className="hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-12 text-center lg:block">
               <Eyebrow>{t("accounting.queue.review.panel", "Review panel")}</Eyebrow>
               <p className="mt-2 text-[12px] text-[var(--text-dim)]">{t("accounting.queue.review.empty", "Select an item to view its operational source and journal draft.")}</p>
             </div>
@@ -425,7 +425,7 @@ function InventoryCogsSection() {
       {error && (
         <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
       )}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+      <div className="overflow-hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
@@ -593,7 +593,7 @@ function ReviewDrawer({
   const balanced = Math.abs(totalDr - totalCr) < 0.005;
 
   return (
-    <aside className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+    <aside className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-center justify-between">
         <Eyebrow>{t("accounting.queue.review.title", "Review · {kind}").replace("{kind}", KIND_LABEL[item.kind])}</Eyebrow>
         <button type="button" onClick={onClose} className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-highlight)]">{t("accounting.queue.review.close", "Close")}</button>
@@ -781,7 +781,7 @@ function SalesRevenueSection() {
       {error && (
         <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
       )}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+      <div className="overflow-hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">

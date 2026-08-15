@@ -80,6 +80,12 @@ const ACCENT_BAR: Record<KpiAccent, string> = {
   default: "bg-gradient-to-b from-white/30 to-white/10",
 };
 
+/* kx-glass on the three card recipes is the whole surface conversion for this
+   app: seventeen files import them, so one edit each frosts every card on all
+   twenty-nine finance routes. Safe unconditionally — the class is DEFINED only
+   under [data-kx-skin="aurora"], so Core matches nothing and these keep the
+   solid --bg-secondary they always had. The remap alone would leave their text
+   sitting on the moving ground: remap and frost are two steps, not one. */
 export function KpiCard({
   label,
   value,
@@ -115,7 +121,7 @@ export function KpiCard({
   const goodDirection = invertDelta ? deltaSign < 0 : deltaSign > 0;
   const neutralDelta = deltaSign === 0;
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)] hover:bg-[var(--bg-secondary)]/90">
+    <div className="kx-glass group relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)] hover:bg-[var(--bg-secondary)]/90">
       {/* Left accent bar — subtle visual cue for the metric family */}
       <div className={`absolute left-0 top-4 bottom-4 w-[3px] rounded-r ${ACCENT_BAR[accent]}`} />
       <div className="ml-1.5">
@@ -264,7 +270,7 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[var(--bg-secondary)] py-16 text-center">
+    <div className="kx-glass flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[var(--bg-secondary)] py-16 text-center">
       <div className="mb-4 opacity-50">{icon}</div>
       <p className="text-base font-medium text-[var(--text-primary)]">{title}</p>
       {hint && <p className="mt-1 text-sm text-[var(--text-dim)]">{hint}</p>}
@@ -294,7 +300,7 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 ${className}`}>
+    <div className={`kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

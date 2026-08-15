@@ -146,7 +146,7 @@ export default function FinanceApprovals() {
               <span className="text-[10.5px] text-[var(--text-dim)]">{t("approvals.readOnly", "Read-only · approver permission required")}</span>
             )}
           </div>
-          <ErpPanel>
+          <ErpPanel className="kx-glass">
             {items.length === 0 ? (
               <div className="px-4 py-8 text-center text-[11.5px] text-[var(--text-dim)]">{t("approvals.empty", "No items awaiting action.")}</div>
             ) : (
@@ -199,7 +199,7 @@ export default function FinanceApprovals() {
             <ErpEyebrow>{t("approvals.activity", "Activity")}</ErpEyebrow>
             <span className="text-[10.5px] text-[var(--text-dim)]">{t("approvals.lastEvents", "Last {n} events").replace("{n}", String(activity.length))}</span>
           </div>
-          <ErpPanel>
+          <ErpPanel className="kx-glass">
             {activity.length === 0 ? (
               <div className="px-4 py-8 text-center text-[11.5px] text-[var(--text-dim)]">{t("approvals.activityEmpty", "No activity yet.")}</div>
             ) : (

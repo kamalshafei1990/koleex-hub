@@ -278,7 +278,7 @@ export default function ExpensesApp() {
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
           <div className="mt-6">
-            <SectionCard className="kx-glass" title={t("categories.title", "Top categories")} subtitle={t("categories.tapHint", "Tap a tile to filter the list below.")} helpId="expense.section.topCategories">
+            <SectionCard title={t("categories.title", "Top categories")} subtitle={t("categories.tapHint", "Tap a tile to filter the list below.")} helpId="expense.section.topCategories">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {topCategories.map((c) => {
                   const style = styleForCategory(c.name);
@@ -334,7 +334,7 @@ export default function ExpensesApp() {
         {/* ── EXPENSE LIST ───────────────────────────────────────── */}
         <div className="mt-4">
           {loading ? (
-            <SectionCard className="kx-glass"><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("list.loading", "Loading expenses…")}</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("list.loading", "Loading expenses…")}</div></SectionCard>
           ) : filtered.length === 0 ? (
             <EmptyState
               title={search || categoryFilter

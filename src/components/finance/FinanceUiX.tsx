@@ -85,7 +85,7 @@ export function HeroKpiCard({
        the gradient background, the hover y-lift, and the drop shadow
        all removed. The card now reads as data printed on dark paper:
        a hairline border, a flat surface, typography that breathes. */
-    <div className="group relative isolate overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition-colors duration-200 hover:border-[var(--border-subtle)]">
+    <div className="group relative isolate overflow-hidden kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition-colors duration-200 hover:border-[var(--border-subtle)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">
@@ -168,7 +168,7 @@ export function MetricCard({
   const display = typeof value === "string" ? value : formatCompact(value);
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
   return (
-    <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3.5 transition hover:border-[var(--border-subtle)]">
+    <div className="kx-glass rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3.5 transition hover:border-[var(--border-subtle)]">
       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-dim)]">
         <span>{label}</span>
         {helpId && <GuidanceTip guidanceId={helpId} />}
@@ -329,7 +329,7 @@ export function ChartCard({
        single hairline border on a flat slightly-tinted surface, so
        the chart-data inside reads as the loud element, not the
        wrapper. */
-    <div className="relative isolate overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+    <div className="relative isolate overflow-hidden kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">
@@ -436,7 +436,7 @@ export function WorkflowRail({
           );
 
           const cls =
-            "group flex w-[200px] shrink-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] sm:w-auto " +
+            "group flex w-[200px] shrink-0 flex-col kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] sm:w-auto " +
             (it.disabled ? "pointer-events-none opacity-50" : "");
 
           if (it.href) {
@@ -472,7 +472,7 @@ export function SegmentedNav({
 }) {
   return (
     <nav aria-label="Section navigation" className="overflow-x-auto">
-      <div className="relative inline-flex items-center gap-0.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md">
+      <div className="relative inline-flex items-center gap-0.5 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md">
         {items.map((it) => {
           const active = it.key === activeKey;
           const cls =
@@ -588,7 +588,7 @@ export function ModeToggle({
     <div
       role="tablist"
       aria-label={t("uix.mode.aria", "Finance view mode")}
-      className="relative inline-flex items-center gap-0.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md"
+      className="relative inline-flex items-center gap-0.5 kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md"
     >
       {opts.map((o) => {
         const active = o.key === value;
@@ -669,7 +669,7 @@ export function LiquidityMeter({
   const tone = (v: number): string =>
     v >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("uix.liquidity.pressure", "Liquidity pressure")}</div>
         <div className="text-[10px] text-[var(--text-dim)]">{t("uix.liquidity.inflow", "Inflow {pct}%").replace("{pct}", inflowPct.toFixed(0))}</div>
@@ -686,7 +686,7 @@ export function LiquidityMeter({
           { d: "30 d", v: d30 },
           { d: "60 d", v: d60 },
         ] as const).map((w) => (
-          <div key={w.d} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] py-2">
+          <div key={w.d} className="kx-glass rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] py-2">
             <div className="text-[9px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{w.d}</div>
             <div className={`mt-0.5 text-[14px] font-medium tabular-nums tracking-tight ${tone(w.v)}`}>
               {w.v >= 0 ? "+" : "−"}{formatCompact(Math.abs(w.v))}
@@ -732,7 +732,7 @@ export function AgingTable({
   const critical = (k: AgingBucketView["key"]) => k === "61_90" || k === "90_plus";
   const watch    = (k: AgingBucketView["key"]) => k === "31_60";
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
@@ -753,7 +753,7 @@ export function AgingTable({
                          : watch(b.key)    ? "text-amber-700 dark:text-amber-200"
                          : "text-[var(--text-highlight)]";
           return (
-            <div key={b.key} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-2 py-2">
+            <div key={b.key} className="kx-glass rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-2 py-2">
               <div className="text-[9px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{b.label}</div>
               <div className={`mt-1 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>{formatCompact(b.amount)}</div>
               <div className="mt-1 text-[9px] text-[var(--text-ghost)]">{b.count} {b.count === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")} · {share.toFixed(0)}%</div>
@@ -802,7 +802,7 @@ export function TimelineStrip({
   const overdueCount = events.filter((e) => e.state === "overdue").length;
   const dueSoonCount = events.filter((e) => e.state === "due_soon").length;
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
@@ -878,7 +878,7 @@ export function ConcentrationBar({
   : severity === "watch" ? "bg-amber-500/65 dark:bg-amber-300/65"
   :                        "bg-white/45";
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{label}</div>
         <div className={
@@ -910,7 +910,7 @@ export function StatRow({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       {stats.map((s, i) => (
-        <div key={i} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3">
+        <div key={i} className="kx-glass rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3">
           <div className={`text-[16px] font-medium tabular-nums tracking-tight ${TONE_TEXT[s.tone ?? "neutral"]}`}>
             {s.value}
           </div>

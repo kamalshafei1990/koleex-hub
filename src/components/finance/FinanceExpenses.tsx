@@ -180,7 +180,7 @@ export default function FinanceExpenseAnalytics() {
   void categories;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("expAnalytics.title", "Expense Analytics")}
@@ -268,7 +268,7 @@ export default function FinanceExpenseAnalytics() {
               ) : (
                 <ol className="space-y-1.5">
                   {topVendors.map((v, idx) => (
-                    <li key={v.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2 text-[12px]">
+                    <li key={v.key} className="flex items-center justify-between gap-3 kx-glass rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2 text-[12px]">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-highlight)]">{idx + 1}</span>
                         <span className="truncate text-[var(--text-highlight)]">{v.name === "Unlinked" ? t("expAnalytics.vendors.unlinked", "Unlinked") : v.name}</span>

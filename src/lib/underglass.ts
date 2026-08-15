@@ -111,7 +111,19 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        as a solid bar over a glass page. */
     p.startsWith("/notes") ||
     p.startsWith("/projects") ||
-    p.startsWith("/planning")
+    p.startsWith("/planning") ||
+    /* Finance, 2026-08-16 — 29 routes, one entry.
+
+       Sticky audit: ZERO stickies across all 36 finance components; every
+       `sticky` hit in the app is inside a comment.
+
+       Finance does NOT render the canonical PageHeader — FinanceUi exports its
+       own, which is a plain title/subtitle/action block with no band and no
+       tab strip. So there is no `.kx-ph-band` to host a ramp, which puts it in
+       the Settings case: it belongs HERE, where the pane's own frost stops the
+       top edge reading as a solid bar, and NOT in appOwnsTopRamp, which would
+       hand it the flat 56px frost in exchange for a ramp nothing draws. */
+    p.startsWith("/finance")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

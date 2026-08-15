@@ -64,7 +64,7 @@ export default function FinanceStatements() {
   const [to,   setTo]   = useState(today);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("statements.title", "Statements")}
@@ -80,7 +80,7 @@ export default function FinanceStatements() {
         />
 
         {/* Period bar */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3 print:hidden">
+        <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3 print:hidden">
           <div className="flex flex-wrap items-end gap-3">
             <label className="block">
               <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("statements.from", "From")}</div>
@@ -157,7 +157,7 @@ function Panel({ children, title }: { children: React.ReactNode; title: string }
       <div className="mb-3">
         <Eyebrow>{title}</Eyebrow>
       </div>
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] print:border-0 print:bg-transparent">
+      <div className="overflow-hidden kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] print:border-0 print:bg-transparent">
         {children}
       </div>
     </section>

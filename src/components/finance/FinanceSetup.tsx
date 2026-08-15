@@ -110,7 +110,7 @@ export default function FinanceSetup() {
   const startedCount = snapshot?.cards.filter((c) => c.status !== "empty").length ?? 0;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("setup.title.long", "Financial Setup")}
@@ -124,7 +124,7 @@ export default function FinanceSetup() {
         )}
 
         {/* Progress strip */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
+        <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <Eyebrow>{t("setup.progress.label", "Setup progress")}</Eyebrow>
@@ -161,7 +161,7 @@ export default function FinanceSetup() {
               type="button"
               onClick={() => setActiveCard(c.key)}
               disabled={loading}
-              className="group text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-white/[0.10]"
+              className="group text-left kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-white/[0.10]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">
@@ -823,7 +823,7 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
       )}
 
       {/* Recommended order — a clean checklist, not a wizard. */}
-      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
+      <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("setup.guidance.recommended", "Recommended order")}</div>
           {firstEmpty && (

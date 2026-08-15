@@ -203,7 +203,7 @@ export default function FinanceTreasuryPlans() {
   }, [plans]);
 
   return (<>
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("treasuryPlans.title", "Treasury Plans")}
@@ -413,7 +413,7 @@ function PlanDetail({
   const canArchive = p.status !== "archived";
 
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+    <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("treasuryPlans.detail.title", "Plan detail")}</div>

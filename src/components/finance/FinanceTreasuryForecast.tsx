@@ -208,7 +208,7 @@ export default function FinanceTreasuryForecast() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
           title={t("forecast.title", "Treasury Forecast")}
@@ -333,7 +333,7 @@ export default function FinanceTreasuryForecast() {
         )}
 
         {/* Safety disclaimer */}
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+        <div className="mt-4 flex items-center gap-2 kx-glass rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
           <RrIcon name="info" size={11} />
           <span>{t("forecast.disclaimer", "This is a deterministic forecast based on current records and selected assumptions. It is not a guarantee.")}</span>
         </div>
