@@ -7,7 +7,6 @@ import { useSkin } from "@/lib/appearance";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
