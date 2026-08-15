@@ -2084,10 +2084,14 @@ export default function TodoPage() {
               <button key={f} onClick={() => setFilter(f)}
                 className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border whitespace-nowrap ${
                   filter === f
-                    /* kx-chip-on, not a white tint: on glass a neutral fill is
-                       just a paler slab, while the skin's selected state is a
-                       Hub-Blue ring — the one accent this design has. */
-                    ? "kx-chip-on border-white/20 text-[var(--text-primary)]"
+                    /* ⚠️ seg-on, NOT chip-on. Both are "selected" in the skin
+                       and they are not interchangeable: kx-chip-on is an 85%
+                       SOLID Hub Blue, built for a large standalone filter
+                       chip. Dropped onto this dense toolbar row it is far
+                       louder than the quiet white tint it replaced — I swapped
+                       the design's volume while only meaning to swap its
+                       language. seg-on is the quiet one: 10% fill + ring. */
+                    ? "kx-seg-on border-transparent text-[var(--text-primary)]"
                     : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
                 {f === "all" ? `${t("pill.all")} (${stats.total})` : f === "active" ? `${t("pill.active")} (${stats.active})` : `${t("pill.done")} (${stats.completed})`}
@@ -2178,9 +2182,16 @@ export default function TodoPage() {
             <div className="inline-flex rounded-lg border border-[var(--border-color)] overflow-hidden">
               {(["list", "board"] as const).map((v) => (
                 <button key={v} onClick={() => setViewMode(v)}
-                  className={`h-8 px-3 text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
-                    /* seg-on, never the solid inverted block: that is the
-                       loudest flat shape that can sit on a glass page. */
+                  /* ⚠️ `rounded-md` ON THE BUTTON IS NOT DECORATION — kx-seg-on
+                     paints an INSET RING, and a ring follows the element's own
+                     radius. This button had none (the group's rounded-lg +
+                     overflow-hidden used to be enough because the old selected
+                     state was a solid FILL, which the parent could clip). A
+                     ring cannot be clipped into a curve, so it rendered as a
+                     hard rectangle inside a rounded group — the owner's
+                     report. A state class that draws an outline needs the
+                     shape it should outline. */
+                  className={`h-8 px-3 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
                     viewMode === v ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                   }`}>
                   {v === "list" ? <LayoutListIcon size={13} /> : <LayoutGridIcon size={13} />}

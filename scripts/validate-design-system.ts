@@ -25,6 +25,8 @@
          (Heuristic — flags new local definitions named `KpiCard`.)
      08  A full-bleed list row that declares `role="button"` must carry
          `data-kx-keep-hover`. See the block comment on that rule below.
+     09  `kx-seg-on` / `kx-chip-on` need the element's OWN border-radius —
+         they paint a ring, and a ring cannot be clipped into a curve.
    ========================================================================== */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -210,6 +212,58 @@ scan(
       /* A — the divider sits in the element's own className. */
       const s = elementStart(i);
       if (s !== null) check(s, i, text);
+    });
+  }
+}
+
+/* ── 09 — a state class that draws a RING needs a radius to draw it on
+   ───────────────────────────────────────────────────────────────────────────
+   Owner, on the To-do view switch: "hover and selected have UI bug and you
+   always do this mistake I don't want this mistake happen again."
+
+   He is right that it is a pattern, not an incident. `kx-seg-on` is
+   `box-shadow: inset 0 0 0 1px` — an INSET RING, not a fill. A ring follows
+   the element's own border-radius, and a parent's `rounded-lg overflow-hidden`
+   cannot round it: clipping can cut a FILL into a curve, it cannot bend a
+   ring. So the moment a solid selected fill is replaced by seg-on on an
+   element with no radius of its own, the outline renders as a hard rectangle
+   inside a rounded group.
+
+   THE GENERAL SHAPE OF THE MISTAKE, which is what he is naming: applying a
+   state class without checking what geometry the class needs FROM the
+   element. The same family produced the clipped hover glow (paint containment
+   needed padding) and the square row highlight (a full-bleed row needed an
+   inset layer). Each was found by the owner, on screen, after shipping.
+
+   This is the mechanical half, so CI can hold it: an element wearing
+   `kx-seg-on` or `kx-chip-on` must also carry a `rounded-*` of its own. */
+{
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    const lines = readFileSync(file, "utf8").split("\n");
+    lines.forEach((text, i) => {
+      const m = text.match(/kx-(seg|chip)-on/);
+      if (!m) return;
+      /* ⚠️ SKIP COMMENTS. The first version flagged two lines in inbox that
+         merely NAME the class while explaining why it is not used there —
+         a guard against carelessness has no business being careless. Only a
+         line that puts the token inside a quoted class string counts. */
+      const before = text.slice(0, m.index ?? 0);
+      if (/^\s*(\/\/|\/?\*)/.test(text) || before.includes("//")) return;
+      if (!/["'`][^"'`]*kx-(seg|chip)-on/.test(text)) return;
+      /* The class list this token sits in — a template literal branch is still
+         one string, so the radius has to be visible on the same element. Walk
+         out to the enclosing className={...} / class="..." block. */
+      const from = Math.max(0, i - 12);
+      const block = lines.slice(from, i + 4).join("\n");
+      const open = block.lastIndexOf("className=");
+      if (open === -1) return;
+      const attr = block.slice(open);
+      if (/\brounded-(none|sm|md|lg|xl|2xl|3xl|full|\[)/.test(attr)) return;
+      findings.push({
+        file: rel, line: i + 1, text: text.trim(),
+        rule: `09 ${m[0]} without a rounded-* on the same element`,
+      });
     });
   }
 }

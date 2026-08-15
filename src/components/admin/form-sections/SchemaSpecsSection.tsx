@@ -368,7 +368,13 @@ function FieldInput({
               key={o.label}
               type="button"
               onClick={() => onSet(o.val)}
-              className={`h-9 px-3 text-[12px] font-semibold transition-colors ${
+              /* rounded-md: kx-chip-on below paints an inset ring, and a ring
+                 follows THIS element's radius — the group's rounded-lg +
+                 overflow-hidden can clip a fill into a curve but cannot bend
+                 an outline, so without this the selected segment draws a hard
+                 rectangle inside a rounded group. Same defect the To-do view
+                 switch had; found by validate:design-system rule 09. */
+              className={`h-9 px-3 rounded-md text-[12px] font-semibold transition-colors ${
                 active
                   ? "kx-chip-on bg-[var(--text-primary)] text-[var(--text-inverted)]"
                   : "bg-[var(--bg-surface-subtle)]/60 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
