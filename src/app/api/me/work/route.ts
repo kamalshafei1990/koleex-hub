@@ -6,6 +6,7 @@ import "server-only";
    the strip renders inside the To-do app, which already shows them. */
 
 import { NextResponse } from "next/server";
+import { countOpenTodos } from "@/lib/todo-open-count";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
@@ -52,23 +53,16 @@ export async function GET() {
     planningCount = count ?? 0;
   }
 
-  // Open to-dos assigned to the viewer — powers the To-do app-icon badge.
-  let todoCount = 0;
-  {
-    const { data: myAssign } = await supabaseServer
-      .from("koleex_todo_assignees")
-      .select("todo_id")
-      .eq("account_id", auth.account_id);
-    const tids = (myAssign ?? []).map((r) => (r as { todo_id: string }).todo_id);
-    if (tids.length > 0) {
-      const { count } = await supabaseServer
-        .from("koleex_todos")
-        .select("id", { count: "exact", head: true })
-        .in("id", tids)
-        .eq("completed", false);
-      todoCount = count ?? 0;
-    }
-  }
+  /* Open to-dos assigned to the viewer — powers the To-do app-icon badge.
+
+     ⚠️ THIS USED TO BE ITS OWN RAW ROW COUNT and it was wrong in three ways:
+     no tenant filter, no `status != done`, and no collapsing of untouched past
+     periods of recurring tasks. It reported 38 while the app showed 13 tasks
+     and 2 active. The correct rule already existed in /api/todos?openCount —
+     written after the owner reported this exact symptom once before — and was
+     never applied here, which is why the badge stayed wrong after the "fix".
+     Both routes now call the one definition. */
+  const todoCount = await countOpenTodos(supabaseServer, auth.account_id, auth.tenant_id);
 
   return NextResponse.json({
     tasks: taskRes.data ?? [],
