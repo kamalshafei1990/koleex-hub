@@ -38,6 +38,7 @@ import EmployeeBehaviorSection from "@/components/employees/EmployeeBehaviorSect
 import { usePermissions } from "@/lib/permissions";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
+import TabStrip from "@/components/ui/TabStrip";
 import {
   emptyWizardData,
   generateEmployeeNumber,
@@ -978,33 +979,31 @@ function EmployeeTabBar({ activeTab, onChange, errorTabs }: {
   const { t } = useTranslation(employeesT);
   return (
     <div className="sticky top-[58px] z-20 -mx-4 md:-mx-6 lg:-mx-10 xl:-mx-16 px-4 md:px-6 lg:px-10 xl:px-16 bg-[var(--bg-primary)] pt-1 pb-2 mb-4">
-      <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
-        {EMP_TABS.map(({ id, label, icon: Icon }) => {
+      {/* Shape stays `pill` so the form looks as it shipped; what it gains is
+          the measured slider every other tab bar in the Hub already had. */}
+      <TabStrip
+        shape="pill"
+        items={EMP_TABS.map(({ id, label, icon: Icon }) => {
           const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onChange(id)}
-              aria-current={active ? "true" : undefined}
-              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
-                active
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              <Icon size={14} className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"} />
-              <span>{t(label)}</span>
-              {errorTabs?.has(id) && !active && (
-                <span className="h-1.5 w-1.5 rounded-full bg-red-400" aria-hidden="true" />
-              )}
-            </button>
-          );
+          return {
+            key: id,
+            active,
+            onClick: () => onChange(id),
+            icon: <Icon size={14} className={active ? "text-[var(--text-primary)]" : "text-[var(--text-faint)]"} />,
+            label: t(label),
+            /* The error dot rides the badge slot, and only when the tab is NOT
+               current: on the tab you are already looking at, the invalid
+               fields are on screen saying so themselves. */
+            badge: errorTabs?.has(id) && !active
+              ? <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400 align-middle" aria-hidden="true" />
+              : undefined,
+          };
         })}
-      </nav>
+      />
     </div>
   );
 }
+
 
 /* ═══════════════════════════════════════════════════
    PAGE COMPONENT

@@ -13,6 +13,7 @@ import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import TabStrip from "@/components/ui/TabStrip";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import SquareLogoCropper from "@/components/contacts/SquareLogoCropper";
@@ -3173,72 +3174,36 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
      super-admin-only Account tab). */
   extraTabs?: { id: CustomerTab; label: string; icon: React.ReactNode }[];
 }) {
-  /* Read the skin here rather than threading a prop: this bar renders ONCE
-     per screen (it is memoised), so a subscription costs nothing — unlike a
-     list row, which would open one per record. */
-  const aurora = useSkin() === "aurora";
   const t = translate ?? ((_k: string, f: string) => f);
   const tabs = extraTabs && extraTabs.length ? [...CUSTOMER_TABS, ...extraTabs] : CUSTOMER_TABS;
 
-  /* Measured slider — the TabStrip mechanic. offsetLeft/offsetWidth of the
-     current tab, re-measured on resize AND once after hydration, because
-     web fonts land after first paint and every label is a translation. */
-  const navRef = useRef<HTMLElement | null>(null);
-  const [ind, setInd] = useState<{ x: number; w: number }>({ x: 0, w: 0 });
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const measure = () => {
-      const el = nav.querySelector<HTMLElement>('[aria-current="true"]');
-      if (!el) return;
-      setInd({ x: el.offsetLeft, w: el.offsetWidth });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(nav);
-    const settle = window.setTimeout(measure, 250);
-    return () => { ro.disconnect(); window.clearTimeout(settle); };
-  }, [activeTab, tabs.length]);
-  /* Full-width opaque strip (panel bg) masks scrolling content behind the
-     pill. Under Aurora that fill is TRANSPARENT (the kx-app remap), so the
-     strip stops masking anything — the pane pattern supplies a real frosted
-     layer instead: filterless host, .kx-glass-bar child at z-0, content
-     lifted above it by the globals rule. */
+  /* This bar used to carry its own copy of the measured slider — the same
+     offsetLeft/offsetWidth mechanic, the same resize observer, the same
+     post-hydration re-measure for translated labels. It was a faithful
+     reimplementation of TabStrip, which is exactly why it should not exist:
+     two copies of a mechanic drift, and only one of them gets the next fix.
+
+     Shape stays `pill` so the screen looks as it shipped, and glass is OFF
+     because the wrapper below already frosts. */
   return (
+    /* Full-width opaque strip (panel bg) masks scrolling content behind the
+       pill. Under Aurora that fill is TRANSPARENT (the kx-app remap), so the
+       strip stops masking anything — the pane pattern supplies a real frosted
+       layer instead: filterless host, .kx-glass-bar child at z-0, content
+       lifted above it by the globals rule. */
     <div className={`kx-bar-host sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
-    <div aria-hidden className="kx-glass-bar" />
-    <nav ref={navRef} className="relative flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
-      {/* The selection SLIDES between tabs instead of blinking from one to
-          the next (owner: "slider tabs" still had no motion). Measured, not
-          calculated: these labels are translated, so their widths differ
-          per language and no fixed step would land. Core keeps its filled
-          pill, which is why the indicator only renders under Aurora. */}
-      {aurora && ind.w > 0 ? (
-        <span
-          aria-hidden
-          className="kx-tabstrip-ind !rounded-full"
-          style={{ transform: `translateX(${ind.x}px)`, width: ind.w, top: 6, bottom: 6 }}
-        />
-      ) : null}
-      {tabs.map(tab => {
-        const active = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            aria-current={active ? "true" : undefined}
-            className={`relative shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] whitespace-nowrap ${
-              active
-                ? (aurora ? "text-[var(--text-primary)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]")
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <span className={active && !aurora ? "text-[var(--text-inverted)]" : active ? "text-[var(--text-primary)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
-            <span>{t(`customerTab.${tab.id}`, tab.label)}</span>
-          </button>
-        );
-      })}
-    </nav>
+      <div aria-hidden className="kx-glass-bar" />
+      <TabStrip
+        shape="pill"
+        glass={false}
+        items={tabs.map(tab => ({
+          key: tab.id,
+          active: activeTab === tab.id,
+          onClick: () => onChange(tab.id),
+          icon: tab.icon,
+          label: t(`customerTab.${tab.id}`, tab.label),
+        }))}
+      />
     </div>
   );
 });

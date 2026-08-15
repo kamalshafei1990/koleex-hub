@@ -39,12 +39,24 @@ export interface TabStripItem {
 /* kx-glass: the strip is a real glass surface, not a flat panel (owner, on
    the Divisions bar: "this tab bar make it's background with glass effect").
    The class evaluates to nothing under Core, so this is Aurora-only. */
-const SHELL =
-  "kx-glass relative flex items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+/* Two shapes, because the Hub genuinely has two and pretending otherwise would
+   mean restyling shipped screens to adopt this component:
 
-function tabClass(active: boolean, aurora: boolean): string {
+     "rounded"  app-level tabs — rounded-xl shell, rounded-lg tabs. The default.
+     "pill"     fully-round, the shape the employee and customer DETAIL forms
+                already use for their section tabs.
+
+   The shape is a prop rather than a fork so both stay one implementation. If
+   the two should collapse into one, that is a design call to make once, here,
+   and every caller follows. */
+export type TabStripShape = "rounded" | "pill";
+
+const shellCls = (pill: boolean, glass: boolean) =>
+  `${glass ? "kx-glass " : ""}relative flex items-center gap-1 overflow-x-auto ${pill ? "rounded-full" : "rounded-xl"} border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`;
+
+function tabClass(active: boolean, aurora: boolean, pill: boolean): string {
   const base =
-    "relative shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] ";
+    `relative shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap ${pill ? "rounded-full" : "rounded-lg"} px-3.5 py-1.5 text-[12.5px] font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] `;
   if (aurora) {
     /* The sliding pill carries the selected state; buttons only speak in
        text colour (the header language bar's rule). */
@@ -61,11 +73,20 @@ export default function TabStrip({
   items,
   className = "",
   ariaLabel,
+  shape = "rounded",
+  glass = true,
 }: {
   items: TabStripItem[];
   className?: string;
   ariaLabel?: string;
+  shape?: TabStripShape;
+  /** Set FALSE when the strip sits inside a surface that already frosts — a
+   *  `kx-bar-host` / `kx-glass-bar` pane, say. The strip is a glass surface by
+   *  default, and two blurred layers at the same edge is the "ONE edge blur,
+   *  not three" mistake. This prop is that rule, made sayable. */
+  glass?: boolean;
 }) {
+  const pill = shape === "pill";
   const aurora = useSkin() === "aurora";
   const listRef = useRef<HTMLDivElement | null>(null);
   /* Measured geometry of the active tab, in the scroll-content's own
@@ -103,11 +124,11 @@ export default function TabStrip({
   }, [aurora, activeKey]);
 
   return (
-    <div ref={listRef} role="tablist" aria-label={ariaLabel} className={`${SHELL} ${className}`}>
+    <div ref={listRef} role="tablist" aria-label={ariaLabel} className={`${shellCls(pill, glass)} ${className}`}>
       {aurora && (
         <span
           aria-hidden
-          className="kx-tabstrip-ind"
+          className={`kx-tabstrip-ind${pill ? " !rounded-full" : ""}`}
           style={ind
             ? { transform: `translateX(${ind.x}px)`, width: ind.w, opacity: 1 }
             : { opacity: 0, width: 0 }}
@@ -128,7 +149,7 @@ export default function TabStrip({
           role: "tab" as const,
           "aria-selected": active,
           "aria-current": active ? ("page" as const) : undefined,
-          className: tabClass(active, aurora),
+          className: tabClass(active, aurora, pill),
         };
         if (it.href && !it.onClick) {
           return (

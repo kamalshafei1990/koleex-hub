@@ -18,6 +18,7 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
+import TabStrip from "@/components/ui/TabStrip";
 
 /* ── Config ── */
 const WEBSITE_URL = "https://koleex-website.vercel.app";
@@ -95,34 +96,34 @@ export default function WebsiteCMS() {
           </div>
 
           {/* Center — Tabs */}
-          <div className="flex items-center gap-1 bg-[var(--bg-secondary)] rounded-lg p-0.5 border border-[var(--border-color)]">
-            <button
-              onClick={() => { setActiveTab("builder"); setIsLoading(true); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                activeTab === "builder"
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : "text-gray-400 hover:text-[var(--text-primary)]"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <LayoutIcon size={13} />
-                <span className="hidden sm:inline">{t("pageBuilder", "Page Builder")}</span>
-              </span>
-            </button>
-            <button
-              onClick={() => { setActiveTab("preview"); setIsLoading(true); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                activeTab === "preview"
-                  ? "bg-blue-500/20 text-blue-400"
-                  : "text-gray-400 hover:text-[var(--text-primary)]"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <EyeIcon size={13} />
-                <span className="hidden sm:inline">{t("livePreview", "Live Preview")}</span>
-              </span>
-            </button>
-          </div>
+          {/* Was two hand-rolled buttons that encoded KIND in colour — emerald
+              for the builder, blue for the preview. Two accents for two tabs
+              that both print their own label, so the colour carried nothing
+              the text did not; the canonical strip marks WHICH is selected
+              instead, which is the only thing here worth encoding. */}
+          <TabStrip
+            /* The page HEADER is already a backdrop-blur bar, so the strip
+               must not bring a second one — measured at two stacked layers
+               before this was set. */
+            glass={false}
+            ariaLabel={t("pageBuilder", "Page Builder")}
+            items={[
+              {
+                key: "builder",
+                active: activeTab === "builder",
+                onClick: () => { setActiveTab("builder"); setIsLoading(true); },
+                icon: <LayoutIcon size={13} />,
+                label: <span className="hidden sm:inline">{t("pageBuilder", "Page Builder")}</span>,
+              },
+              {
+                key: "preview",
+                active: activeTab === "preview",
+                onClick: () => { setActiveTab("preview"); setIsLoading(true); },
+                icon: <EyeIcon size={13} />,
+                label: <span className="hidden sm:inline">{t("livePreview", "Live Preview")}</span>,
+              },
+            ]}
+          />
 
           {/* Right — Controls */}
           <div className="flex items-center gap-2">
