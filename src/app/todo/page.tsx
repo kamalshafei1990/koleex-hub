@@ -1546,6 +1546,22 @@ export default function TodoPage() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  /* ⚠️ THE SNAPSHOT HAS TO FOLLOW EVERY CHANGE, NOT JUST THE FIRST LOAD.
+     It was written only inside loadAll(), which runs once on mount — so
+     ticking a task updated the screen and the server and left the mirror
+     saying "not done". The next open painted that stale mirror first, which
+     is half of why "I press some tasks as done and after refresh it is back
+     as undone" looked total rather than momentary.
+
+     Keyed off the todos array itself so every mutation path is covered —
+     toggle, approve, reopen, delete, create — instead of remembering to call
+     it from each. Skipped while the first load is still in flight so an empty
+     initial state cannot overwrite a good mirror with nothing. */
+  useEffect(() => {
+    if (loading) return;
+    persistTodoSnap({ todos, employees, departments, labels });
+  }, [todos, employees, departments, labels, loading]);
+
   /* Deep link: inbox "New task" notifications point at /todo?task=<id>. Open
      that task once the list has loaded, then strip the param so a refresh
      doesn't reopen it. (The link was previously dead — the page ignored it.) */

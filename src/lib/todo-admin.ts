@@ -56,7 +56,9 @@ export async function fetchTodos(
 ): Promise<TodoWithRelations[]> {
   void ctx; // the server derives scope from the session; see the file header
   try {
-    const res = await fetch("/api/todos", { credentials: "include" });
+    /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
+       a toggle repaints the cached, pre-toggle list. */
+    const res = await fetch(`/api/todos?v=${todoWriteVersion()}`, { credentials: "include" });
     if (!res.ok) {
       if (res.status !== 401 && res.status !== 403) {
         console.error("[Todos] fetchTodos:", res.status);
@@ -146,8 +148,40 @@ export async function createTodo(input: {
    outside is a badge that "never changes". Anything that can alter how many
    tasks are open must both drop the cached count and fire the recount event
    the home page already listens for. */
+/* ⚠️ THE WRITE VERSION IS THE ACTUAL INVALIDATE, AND IT WAS MISSING.
+   `/api/todos` answers with `Cache-Control: private, max-age=30,
+   stale-while-revalidate=300` — deliberate, the list is expensive. The route's
+   own comment says it "refreshes on any write via a client-side invalidate",
+   and `announceTodoChange` below does invalidate… the IN-MEMORY cachedGet
+   layer, which `fetchTodos` does not use. It does a plain `fetch`, so the
+   BROWSER HTTP CACHE kept serving the pre-write list.
+
+   Owner: "I press some tasks as a done already but when I make refresh it back
+   as undone." The write landed every time — verified against the database —
+   and the read came from cache.
+
+   A version in the URL is what actually busts an HTTP cache: a different URL
+   is a different entry. sessionStorage, not memory, because the case being
+   fixed IS a page reload. Ordinary repeat loads with no write in between keep
+   the 30s cache. */
+const WRITE_VERSION_KEY = "kx_todo_write_v";
+
+export function bumpTodoWriteVersion(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const n = Number(window.sessionStorage.getItem(WRITE_VERSION_KEY) ?? "0") + 1;
+    window.sessionStorage.setItem(WRITE_VERSION_KEY, String(n));
+  } catch { /* private mode — the no-store fallback below still applies */ }
+}
+
+function todoWriteVersion(): string {
+  if (typeof window === "undefined") return "";
+  try { return window.sessionStorage.getItem(WRITE_VERSION_KEY) ?? "0"; } catch { return "0"; }
+}
+
 async function announceTodoChange(): Promise<void> {
   if (typeof window === "undefined") return;
+  bumpTodoWriteVersion();
   try {
     const { invalidateCachedGet } = await import("@/lib/client-cache");
     invalidateCachedGet("/api/todos");        // the openCount badge
