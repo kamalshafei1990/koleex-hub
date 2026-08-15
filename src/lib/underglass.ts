@@ -177,7 +177,20 @@ export function appOwnsTopRamp(pathname: string | null): boolean {
        crisp. That is the whole reason Inventory is here too. */
     || p.startsWith("/purchase")
     /* CRM: same PageHeader, same sticky tab band, same choice as Purchase. */
-    || p.startsWith("/crm");
+    || p.startsWith("/crm")
+    /* Finance, 2026-08-16 — added the same day the app was converted, because
+       the first pass got this wrong and the note above is why.
+
+       I audited Finance's stickies by GREPPING its folder, found none, and
+       concluded it renders no canonical PageHeader and therefore has no band
+       to host a ramp. Measuring the rendered route said otherwise: one sticky,
+       `.kx-ph-band`, and with the scroller moved 600px the tab strip pins at
+       62→99 against a ramp that ends at 104 — **100% of the strip inside the
+       blur**. Exactly the defect this list exists to prevent, and exactly what
+       the comment in isUnderglassRoute warns about: a route renders components
+       from anywhere, so audit by MEASURING the route, never by grepping the
+       app's folder. */
+    || p.startsWith("/finance");
   /* SETTINGS IS DELIBERATELY ABSENT, and the measurement is why. It renders a
      PageHeader with NO tabs, so there is no band, no ramp host and nothing to
      own — `.kx-ph-band` and `.kx-ph-tabs` both measured absent, and its only
