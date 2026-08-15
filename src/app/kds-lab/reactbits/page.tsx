@@ -203,7 +203,15 @@ export default function ReactBitsLab() {
               owner said so immediately and was right. The effect IS the
               transition, so the demo has to move. */}
           <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden h-[190px] relative kx-bar-host [--kx-ramp-top:9rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
-            <div className="kx-glass-bar kx-bar-prog absolute inset-x-0 top-0 h-[62px] z-10 pointer-events-none" />
+            {/* THE FOUR <i> ARE THE EFFECT. kx-bar-prog is a filterless shell;
+                its four CHILDREN carry the masked 3/7/14/28px ramp. I wrote it
+                self-closing and the section rendered nothing at all — the owner
+                said "I think have something wrong" and was looking at an empty
+                box, not a subtle one. Every real use in the Hub (PageHeader,
+                ProductList, ProductProfile, Contacts) has them. */}
+            <div aria-hidden className="kx-glass-bar kx-bar-prog absolute inset-x-0 top-0 h-[62px] z-10 pointer-events-none">
+              <i /><i /><i /><i />
+            </div>
             <div className="absolute inset-x-0 top-0 h-[62px] z-20 flex items-center px-4 pointer-events-none">
               <span className="text-[13px] font-semibold text-[var(--text-primary)]">Sticky header</span>
             </div>
