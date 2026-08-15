@@ -189,7 +189,7 @@ export default function EmployeesPage() {
   const totalOnLeave = employees.filter((e) => e.employment_status === "on_leave").length;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Shared header — this block was a copy of it, so the screen never
@@ -217,7 +217,7 @@ export default function EmployeesPage() {
         </div>
 
         {/* Search + Filters */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
+        <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
@@ -303,12 +303,12 @@ export default function EmployeesPage() {
 
         {/* Employee list */}
         {loading ? (
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] mx-auto" />
             <p className="text-[13px] mt-3 text-[var(--text-dim)]">{t("loading")}</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <div className="w-14 h-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center mx-auto mb-4">
               <BoundIcon semanticKey="entity.employee" className="h-6 w-6 text-[var(--text-dim)] opacity-40" fallback={<UsersIcon size={24} />} />
             </div>
@@ -325,7 +325,7 @@ export default function EmployeesPage() {
             )}
           </div>
         ) : (
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             {/* Table header — desktop */}
             <div className="hidden md:flex items-center gap-4 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
               <div className="w-10 shrink-0" />
@@ -426,7 +426,7 @@ export default function EmployeesPage() {
       {confirmTarget && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !deleting && setConfirmTarget(null)}>
           <div
-            className="w-full max-w-md bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl"
+            className="kx-glass-pop w-full max-w-md bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             role="alertdialog"
             aria-modal="true"

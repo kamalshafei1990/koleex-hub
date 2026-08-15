@@ -45,7 +45,7 @@ export default function EditEmployeePage() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-6">
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center p-6">
         <div className="text-center">
           <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">
             Employee not found

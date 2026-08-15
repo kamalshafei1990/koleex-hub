@@ -29,8 +29,14 @@ export const cancelBtnCls =
 export const dangerBtnCls =
   "h-10 px-6 rounded-xl text-[13px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 transition-all";
 
+/* `kx-glass` sits in a plain constant with no useSkin() branch because the
+   class is DEFINED only under [data-kx-skin="aurora"] — Core matches nothing
+   and these keep the solid --bg-secondary they always had. Fifteen call sites
+   across six files, so this one string is the app's surface conversion. The
+   remap alone would leave their text on the moving ground: remap and frost are
+   two steps, not one. */
 export const cardCls =
-  "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
+  "kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
 
 export const sectionTitleCls =
   "text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-4 flex items-center gap-2";

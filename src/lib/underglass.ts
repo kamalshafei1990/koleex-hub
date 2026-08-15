@@ -126,7 +126,26 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        by MEASURING the rendered route, not by grepping the folder: 0 stickies,
        no `.kx-ph-band`, and the Hub scroller cannot scroll there at all. So
        there is no band to host a ramp and nothing to go soft under one. */
-    p.startsWith("/documents")
+    p.startsWith("/documents") ||
+    /* HR and Employees, 2026-08-16. Both were in a HALF state: their screens
+       already carried 22 frosted surfaces each from shared chrome, but with no
+       scope and no ground the frost had nothing behind it and both routes read
+       as Core. That is why neither looked unfinished.
+
+       Sticky audit done by MEASURING each route, which is the only method this
+       file trusts:
+         · /employees  0 stickies, no `.kx-ph-band`. Flowing page — the Hub
+                       scroller genuinely scrolls, so content really does pass
+                       under the header here.
+         · /hr         ONE sticky, `.kx-ph-band`. That looks like the
+                       Purchase/CRM case that belongs in appOwnsTopRamp, and it
+                       is not: HRApp is `h-full overflow-hidden` with its own
+                       internal scroller, so the Hub scroller has nothing to
+                       scroll (scrollHeight 733 === clientHeight 733) and the
+                       strip measured 210 before AND after a 600px scroll. It
+                       can never reach the ramp. Same resolution as /sales. */
+    p.startsWith("/employees") ||
+    p.startsWith("/hr")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

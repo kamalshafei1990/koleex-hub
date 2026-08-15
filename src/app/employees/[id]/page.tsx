@@ -117,7 +117,7 @@ function formatDate(iso: string | null | undefined) {
    tallest row, so a 4-row card sat in an 8-row box and the page read as a
    sparse wall of blocks. Height now follows content. */
 const panelCls =
-  "self-start bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5";
+  "self-start kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5";
 
 /* ── Record-page grammar ───────────────────────────────────────────────
    Same shell the Supplier 360 uses, so a KOLEEX record always looks like a
@@ -472,7 +472,7 @@ export default function EmployeeProfilePage({
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-center">
           <UserIcon size={32} className="mx-auto text-[var(--text-faint)] mb-3" />
           <p className="text-sm text-[var(--text-primary)] font-medium mb-1">{t("profile.notFound")}</p>
@@ -528,7 +528,7 @@ export default function EmployeeProfilePage({
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-24">
+    <div className="min-h-full bg-[var(--bg-primary)] pb-24">
       <div className="max-w-[1500px] mx-auto">
 
         {/* ═══ HERO ═══════════════════════════════════════════════════════
@@ -870,7 +870,7 @@ export default function EmployeeProfilePage({
       {confirmDelete && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !deleting && setConfirmDelete(false)}>
           <div
-            className="w-full max-w-md bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl"
+            className="kx-glass-pop w-full max-w-md bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             role="alertdialog"
             aria-modal="true"

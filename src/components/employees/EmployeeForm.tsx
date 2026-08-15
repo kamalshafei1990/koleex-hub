@@ -935,7 +935,7 @@ function validateForm(form: EmployeeWizardData): Record<string, string> {
    ═══════════════════════════════════════════════════ */
 
 const panelCls =
-  "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
+  "kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
 
 /* ── Employee tabs — same premium sticky pill nav as the Customer /
    Supplier form (CustomerTabBar in Contacts.tsx): photo hero up top,
@@ -1512,7 +1512,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
 
   /* ── Main render ── */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)]">
       {SavedModal}
       {confirmDialog}
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">

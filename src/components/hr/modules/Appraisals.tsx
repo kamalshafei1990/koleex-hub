@@ -536,7 +536,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
         <div className="space-y-6">
           {/* ── Appraisal info ── */}
           {editing ? (
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <FieldLabel>{t("hr.selfRating")}</FieldLabel>
@@ -611,7 +611,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
               </div>
             </div>
           ) : (
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1">
