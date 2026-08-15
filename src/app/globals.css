@@ -3182,10 +3182,18 @@ input[type="number"]:not(.kx-spinner) {
 .kx-row-hl::before {
   content: "";
   position: absolute;
-  /* 4px vertical keeps the pill clear of the dividers above and below;
-     8px horizontal is what makes the radius visible at all. */
-  inset: 4px 8px;
-  border-radius: 12px;
+  /* FULL BLEED. Owner: "fill the hover or selected until the borders."
+     It used to sit at inset 4px 8px so the pill's own 12px radius stayed
+     visible — but that left a gap down both sides of the card, and the gap is
+     what he was looking at.
+
+     The radius is not lost by filling: every one of these rows lives inside a
+     `rounded-2xl overflow-hidden` card, so the FIRST and LAST rows are clipped
+     to the card's own corners and the middle rows are square because they
+     genuinely are. The rounding now comes from the container that actually has
+     it, instead of a smaller shape floating inside it. */
+  inset: 0;
+  border-radius: 0;
   background: transparent;
   transition: background-color 0.15s ease-out;
   z-index: -1;
