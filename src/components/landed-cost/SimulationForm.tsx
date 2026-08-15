@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSkin } from "@/lib/appearance";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -268,6 +269,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   const router = useRouter();
   const isNew = !id;
   const { t, lang } = useTranslation(landedCostT);
+  const aurora = useSkin() === "aurora";
   const isRtl = lang === "ar";
 
   // Core state
@@ -699,8 +701,21 @@ export default function SimulationForm({ id }: { id?: string }) {
                   onClick={() => scrollToSection(tab.key)}
                   className={`relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${
                     isActive
-                      ? "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)] shadow-sm"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
+                      ? aurora
+                        /* kx-seg-on is the Hub's ONE selection mark — a Hub-Blue
+                           inset ring over a 10% wash, the dock's tabs as the
+                           owner picked them. The hand-rolled pill this replaces
+                           was a grey fill plus a shadow: a second selection
+                           language competing with the sidebar's own.
+
+                           It also opts the tab OUT of the global Aurora hover
+                           rule, which excludes .kx-seg-on by name — without it
+                           the active tab gets a hover box fighting its ring. */
+                        ? "kx-seg-on"
+                        : "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)] shadow-sm"
+                      : aurora
+                        ? "kx-seg-off text-[var(--text-dim)]"
+                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
                   }`}
                 >
                   <TabIcon className="h-3.5 w-3.5" />
