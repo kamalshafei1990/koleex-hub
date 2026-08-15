@@ -161,22 +161,31 @@ export async function createTodo(input: {
    and the read came from cache.
 
    A version in the URL is what actually busts an HTTP cache: a different URL
-   is a different entry. sessionStorage, not memory, because the case being
-   fixed IS a page reload. Ordinary repeat loads with no write in between keep
-   the 30s cache. */
+   is a different entry.
+
+   ⚠️ localStorage, NOT sessionStorage — and that distinction is the whole fix
+   on the owner's own device. He runs the Hub as an installed iOS PWA, where
+   "refresh" usually means closing and reopening the app. That is a NEW
+   session: sessionStorage resets to 0, the fetch asks for `?v=0` again, and
+   the HTTP cache still holds the pre-write `?v=0` answer — so the ticked task
+   comes back undone exactly as before. My first version used sessionStorage
+   and would have kept failing there while passing on a desktop reload.
+
+   `kx_` prefix, so the sign-out wipe in session-caches.ts clears it. Ordinary
+   repeat loads with no write in between still keep the 30s cache. */
 const WRITE_VERSION_KEY = "kx_todo_write_v";
 
 export function bumpTodoWriteVersion(): void {
   if (typeof window === "undefined") return;
   try {
-    const n = Number(window.sessionStorage.getItem(WRITE_VERSION_KEY) ?? "0") + 1;
-    window.sessionStorage.setItem(WRITE_VERSION_KEY, String(n));
+    const n = Number(window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0") + 1;
+    window.localStorage.setItem(WRITE_VERSION_KEY, String(n));
   } catch { /* private mode — the no-store fallback below still applies */ }
 }
 
 function todoWriteVersion(): string {
   if (typeof window === "undefined") return "";
-  try { return window.sessionStorage.getItem(WRITE_VERSION_KEY) ?? "0"; } catch { return "0"; }
+  try { return window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0"; } catch { return "0"; }
 }
 
 async function announceTodoChange(): Promise<void> {
