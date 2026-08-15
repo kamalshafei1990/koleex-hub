@@ -86,7 +86,11 @@ export default function LiquidGlass({
           </GlassSurface>
         </div>
       )}
-      <div className="relative">{children}</div>
+      {/* h-full so the children see the wrapper's real height. Without it the
+          content box collapses to zero and anything absolutely positioned
+          inside resolves against nothing — which on a square tile put the label
+          above the tile instead of in it. */}
+      <div className="relative h-full">{children}</div>
     </div>
   );
 }

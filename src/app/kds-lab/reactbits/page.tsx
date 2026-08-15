@@ -48,6 +48,38 @@ function Section({ n, title, verdict, note, children }: {
   );
 }
 
+/** Measures frame time with the refracting tiles present and hidden, so the
+ *  verdict on "16 filters" is a number rather than a feeling. */
+function TileCost() {
+  const [out, setOut] = useState<string>("");
+  const run = async () => {
+    setOut("measuring…");
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const frames = (ms = 900) => new Promise<{ med: number; p95: number }>((res) => {
+      const d: number[] = []; let last = performance.now(); const t0 = last;
+      const loop = (t: number) => { d.push(t - last); last = t;
+        if (t - t0 < ms) requestAnimationFrame(loop);
+        else { const s = d.slice(3).sort((a, b) => a - b);
+          res({ med: +s[Math.floor(s.length / 2)].toFixed(2), p95: +s[Math.floor(s.length * 0.95)].toFixed(2) }); } };
+      requestAnimationFrame(loop);
+    });
+    const filters = Array.from(document.querySelectorAll<HTMLElement>(".glass-surface"));
+    const on = await frames();
+    filters.forEach((f) => (f.style.display = "none")); await wait(400);
+    const off = await frames();
+    filters.forEach((f) => (f.style.display = "")); await wait(300);
+    setOut(`${filters.length} filters on: ${on.med}ms / ${on.p95} p95  ·  off: ${off.med}ms / ${off.p95} p95`);
+  };
+  return (
+    <div className="mt-3 flex items-center gap-3 flex-wrap">
+      <button onClick={run} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+        Measure the cost
+      </button>
+      <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{out}</span>
+    </div>
+  );
+}
+
 /** The Hub's own card, so every comparison is against the real thing. */
 function OurCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -56,6 +88,8 @@ function OurCard({ children, className = "" }: { children: React.ReactNode; clas
     </div>
   );
 }
+
+const TILES = ["Products", "Inventory", "Purchases", "Catalogs", "Sales", "CRM", "Invoices", "Customers"];
 
 const CARD = (
   <div className="text-[var(--text-primary)]">
@@ -140,6 +174,42 @@ export default function ReactBitsLab() {
               </LiquidGlass>
             </div>
           </div>
+        </Section>
+
+        {/* 1b ── tiles */}
+        <Section
+          n="01b" title="The same two, on app tiles" verdict="risky"
+          note="Owner asked to compare them on the surface that actually matters. Eight tiles each, over a coloured ground so there is something to bend. Ours frosts what is behind; theirs warps it. The measurement underneath is the part that decides it — 16 SVG filters is a different question from one."
+        >
+          <div className="rounded-2xl overflow-hidden p-5" style={{
+            backgroundImage:
+              "radial-gradient(60% 70% at 20% 30%, #7FA9D6 0%, transparent 60%)," +
+              "radial-gradient(55% 65% at 80% 70%, #B08BD6 0%, transparent 58%)," +
+              "repeating-linear-gradient(115deg, rgba(255,255,255,.22) 0 2px, transparent 2px 26px)," +
+              "linear-gradient(150deg, #16233A 0%, #0A0E17 100%)",
+          }}>
+            <div className="text-[11px] text-white/75 mb-2">Ours — .kx-glass</div>
+            <div className="grid grid-cols-4 gap-3 mb-5">
+              {TILES.map((t) => (
+                <div key={t} className="kx-glass rounded-2xl border border-white/[0.10] bg-[#0c0c0c] aspect-square flex flex-col items-center justify-center gap-2">
+                  <span className="h-7 w-7 rounded-lg bg-white/70" />
+                  <span className="text-[11px] text-white/85">{t}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-white/75 mb-2">Theirs — LiquidGlass (refraction)</div>
+            <div className="grid grid-cols-4 gap-3">
+              {TILES.map((t) => (
+                <LiquidGlass key={t} radius={16} className="rounded-2xl border border-white/[0.10] aspect-square">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <span className="h-7 w-7 rounded-lg bg-white/70" />
+                    <span className="text-[11px] text-white/85">{t}</span>
+                  </div>
+                </LiquidGlass>
+              ))}
+            </div>
+          </div>
+          <TileCost />
         </Section>
 
         {/* 2 ── SpotlightCard */}
