@@ -127,36 +127,6 @@ export default function ProjectsApp() {
             icon={<ProjectsIcon className="h-4 w-4" />}
             showTabs={false}
           />
-          <nav
-            aria-label="Projects navigation"
-            className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {[
-              { key: "projects",  label: t("tab.projects"),     icon: <LayoutGridIcon size={12} /> },
-              { key: "mine",      label: t("tab.myTasks"),      icon: <CheckSquareIcon size={12} /> },
-              { key: "all",       label: t("tab.allTasks"),     icon: <ListTodoIcon size={12} /> },
-              { key: "reporting", label: t("tab.reporting"),    icon: <BarChart3Icon size={12} /> },
-              { key: "config",    label: t("tab.configuration"),icon: <CogIcon size={12} /> },
-            ].map((entry) => {
-              const isActive = tab === entry.key;
-              return (
-                <button
-                  key={entry.key}
-                  type="button"
-                  onClick={() => setTab(entry.key as typeof tab)}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
-                    isActive
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                      : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  <span className={isActive ? "" : "text-[var(--text-dim)]"} aria-hidden>{entry.icon}</span>
-                  {entry.label}
-                </button>
-              );
-            })}
-          </nav>
         </div>
       </div>
 

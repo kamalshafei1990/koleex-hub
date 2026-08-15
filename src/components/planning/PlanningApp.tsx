@@ -27,11 +27,8 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
-import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
-import ClockIcon from "@/components/icons/ui/ClockIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
@@ -233,38 +230,6 @@ export default function PlanningApp() {
           />
 
           {/* Tabs */}
-          <nav aria-label="Planning navigation" className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabButton
-              active={tab === "schedule"}
-              onClick={() => setTab("schedule")}
-              icon={<CalendarRawIcon size={13} />}
-              label={t("tab.schedule")}
-            />
-            <TabButton
-              active={tab === "open"}
-              onClick={() => setTab("open")}
-              icon={<PaperPlaneIcon size={13} />}
-              label={t("tab.openShifts")}
-            />
-            <TabButton
-              active={tab === "mine"}
-              onClick={() => setTab("mine")}
-              icon={<ClockIcon size={13} />}
-              label={t("tab.myPlanning")}
-            />
-            <TabButton
-              active={tab === "utilization"}
-              onClick={() => setTab("utilization")}
-              icon={<BarChart3Icon size={13} />}
-              label={t("tab.utilization", "Utilization")}
-            />
-            <TabButton
-              active={tab === "config"}
-              onClick={() => setTab("config")}
-              icon={<CogIcon size={13} />}
-              label={t("tab.configuration")}
-            />
-          </nav>
         </div>
       </div>
 
@@ -366,33 +331,6 @@ export default function PlanningApp() {
    TABS
    ══════════════════════════════════════════════════════════════════ */
 
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 whitespace-nowrap ${
-        active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-          : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      <span className={active ? "" : "text-[var(--text-dim)]"} aria-hidden>{icon}</span>
-      {label}
-    </button>
-  );
-}
 
 /* ══════════════════════════════════════════════════════════════════
    SCHEDULE VIEW — weekly grid, rows = resource, cols = day
