@@ -98,7 +98,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "hr": { chunks: 14, kbytes: 1136 },
   "inbox": { chunks: 12, kbytes: 839 },
   "inventory": { chunks: 13, kbytes: 675 },
-  "invoices": { chunks: 10, kbytes: 514 },
+  "invoices": { chunks: 8, kbytes: 520 },
   "issues": { chunks: 12, kbytes: 712 },
   "knowledge": { chunks: 11, kbytes: 520 },
   "landed-cost": { chunks: 11, kbytes: 577 },
@@ -111,7 +111,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "products": { chunks: 12, kbytes: 791 },
   "projects": { chunks: 10, kbytes: 514 },
   "purchase": { chunks: 11, kbytes: 549 },
-  "quotations": { chunks: 13, kbytes: 880 },
+  "quotations": { chunks: 11, kbytes: 850 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },
   /* Re-measured 2026-08-15 after the tabs were moved to next/dynamic:

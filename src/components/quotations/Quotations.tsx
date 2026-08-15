@@ -29,8 +29,8 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "./QuotationPreviewSkeleton";
-import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
-import CustomerPickerModal, { type CustomerPickResult } from "./CustomerPickerModal";
+import { type PickResult } from "./ProductPickerModal";
+import { type CustomerPickResult } from "./CustomerPickerModal";
 import { record, event } from "@/lib/perf/client";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -46,6 +46,14 @@ import {
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* ON DEMAND, not on arrival. These two open when someone clicks "add product"
+   or "pick customer" — most visits to the list never do either, and a static
+   import made every one of them download 679 lines to show a list of
+   documents. Same move as the Settings tabs: creating the element does not
+   invoke the component, and next/dynamic fetches on MOUNT. */
+const ProductPickerModal = dynamic(() => import("./ProductPickerModal"), { ssr: false });
+const CustomerPickerModal = dynamic(() => import("./CustomerPickerModal"), { ssr: false });
 
 /* QuotationA4Preview is ~9k LOC (+ large embedded port-geo data tables)
    and only renders inside the editor view, so load it lazily on the
@@ -2422,13 +2430,18 @@ export default function Quotations() {
             showTabs={false}
             action={
               <div className="flex items-center gap-2">
-                <a
+                {/* Link, not <a>. A plain anchor to an internal route is a FULL
+                    PAGE RELOAD — the whole shell, every provider, the account
+                    request and the ground all torn down and rebuilt to move
+                    between two screens of the same app. eslint had been calling
+                    this out; it is a loading-speed bug wearing a lint warning. */}
+                <Link
                   href="/quotations/preorder"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
                   title="Preorder — customer price request / طلب مُسبق"
                 >
                   Preorder
-                </a>
+                </Link>
                 <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
                   {t("quot.new")}
                 </Button>

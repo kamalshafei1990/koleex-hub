@@ -22,8 +22,8 @@ import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "@/components/quotations/QuotationPreviewSkeleton";
-import ProductPickerModal, { type PickResult } from "@/components/quotations/ProductPickerModal";
-import CustomerPickerModal, { type CustomerPickResult } from "@/components/quotations/CustomerPickerModal";
+import { type PickResult } from "@/components/quotations/ProductPickerModal";
+import { type CustomerPickResult } from "@/components/quotations/CustomerPickerModal";
 import BrandLoading from "@/components/ui/BrandLoading";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
@@ -36,6 +36,14 @@ import {
 } from "@/lib/docs-sync";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
+
+/* ON DEMAND, not on arrival. These two open when someone clicks "add product"
+   or "pick customer" — most visits to the list never do either, and a static
+   import made every one of them download 679 lines to show a list of
+   documents. Same move as the Settings tabs: creating the element does not
+   invoke the component, and next/dynamic fetches on MOUNT. */
+const ProductPickerModal = dynamic(() => import("@/components/quotations/ProductPickerModal"), { ssr: false });
+const CustomerPickerModal = dynamic(() => import("@/components/quotations/CustomerPickerModal"), { ssr: false });
 
 /* The invoice editor reuses QuotationA4Preview (~9k LOC). Lazy-load it
    client-side so it stays out of the invoice list/initial bundle; props
