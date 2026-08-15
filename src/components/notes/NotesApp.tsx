@@ -466,8 +466,7 @@ export default function NotesApp() {
   // matching the To-do and Calendar apps.
   return (
     <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
     >
       {/* ── PAGE HEADER — canonical Hub PageHeader ── */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] w-full">

@@ -1969,7 +1969,7 @@ export default function ManagementPage() {
 
   /* ── Loading ── */
   if (loading) {
-    return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon size={24} className="text-[var(--text-dim)]" /></div>;
+    return <div className="h-full bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon size={24} className="text-[var(--text-dim)]" /></div>;
   }
 
   /* ── Zoom helpers ── */
@@ -2024,7 +2024,7 @@ export default function ManagementPage() {
   );
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]"
+    <div className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]"
       onDragEnd={() => { setDragSourceId(null); setDragOverId(null); }}>
 
       {/* ═══════════ LEFT PANEL ═══════════ */}

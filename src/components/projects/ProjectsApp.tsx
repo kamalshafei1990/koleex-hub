@@ -116,8 +116,7 @@ export default function ProjectsApp() {
 
   return (
     <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
     >
       {/* Page header — canonical Hub PageHeader + state tab strip */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
@@ -678,8 +677,7 @@ function ProjectDetailView({
 
   return (
     <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
     >
       {confirmDialog}
       {toastElement}

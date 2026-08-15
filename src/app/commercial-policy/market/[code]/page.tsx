@@ -175,8 +175,7 @@ function MarketProfileView() {
 
   return (
     <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full relative"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full relative"
     >
       {/* Header */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full">
