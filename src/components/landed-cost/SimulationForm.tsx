@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import TabStrip from "@/components/ui/TabStrip";
 import { useSkin } from "@/lib/appearance";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useRouter } from "next/navigation";
@@ -705,51 +706,45 @@ export default function SimulationForm({ id }: { id?: string }) {
       />
 
       {/* ── Tab Navigation Bar (sticky) ── */}
-      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2 pr-8">
-            {TABS.map(tab => {
+      {/* The strip is TabStrip's glass shell, so the sticky wrapper must NOT
+          bring a backdrop-blur and border of its own: two blurred layers
+          stacked at the same edge is the "ONE edge blur, not three" mistake.
+          Under Core, where kx-glass evaluates to nothing, the wrapper keeps
+          the solid bar it always had. */}
+      <div className={`sticky top-0 z-30 ${aurora ? "" : "bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]"}`}>
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2">
+          <TabStrip
+            ariaLabel={t("subtitle")}
+            items={TABS.map(tab => {
               const TabIcon = tab.icon;
-              const isActive = activeTab === tab.key;
               const sub = tabSubtotals[tab.key];
               const warnCount = sectionWarnings[tab.key];
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => scrollToSection(tab.key)}
-                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${
-                    isActive
-                      ? aurora
-                        /* kx-seg-on is the Hub's ONE selection mark — a Hub-Blue
-                           inset ring over a 10% wash, the dock's tabs as the
-                           owner picked them. The hand-rolled pill this replaces
-                           was a grey fill plus a shadow: a second selection
-                           language competing with the sidebar's own.
-
-                           It also opts the tab OUT of the global Aurora hover
-                           rule, which excludes .kx-seg-on by name — without it
-                           the active tab gets a hover box fighting its ring. */
-                        ? "kx-seg-on"
-                        : "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)] shadow-sm"
-                      : aurora
-                        ? "kx-seg-off text-[var(--text-dim)]"
-                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
-                  }`}
-                >
-                  <TabIcon className="h-3.5 w-3.5" />
-                  <span>{tabLabels[tab.key]}</span>
-                  {sub > 0 && (
-                    <span className={`text-[9px] font-mono font-semibold tabular-nums ${isActive ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>
-                      {fmt(sub, 0)}
-                    </span>
-                  )}
-                  {warnCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[8px] font-bold text-white flex items-center justify-center">{warnCount}</span>
-                  )}
-                </button>
-              );
+              return {
+                key: tab.key,
+                active: activeTab === tab.key,
+                onClick: () => scrollToSection(tab.key),
+                icon: <TabIcon className="h-3.5 w-3.5" />,
+                label: (
+                  <>
+                    {tabLabels[tab.key]}
+                    {/* Inline, NOT the corner badge this replaces. The strip
+                        scrolls horizontally, and `overflow-x: auto` computes
+                        overflow-y to auto as well — a badge at -top-1 is
+                        clipped by its own container on every tab. */}
+                    {warnCount > 0 && (
+                      <span className="ms-1.5 inline-flex h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[8px] font-bold text-white items-center justify-center align-middle">
+                        {warnCount}
+                      </span>
+                    )}
+                  </>
+                ),
+                /* The running subtotal is what `badge` is for: a value that
+                   trails the label. The warning above is a STATE, which is
+                   why the two are not both badges. */
+                badge: sub > 0 ? fmt(sub, 0) : undefined,
+              };
             })}
-          </div>
+          />
         </div>
       </div>
 
