@@ -327,7 +327,7 @@ export default function CustomerProfilePage({
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-center">
           <CustomersIcon size={32} className="mx-auto text-[var(--text-faint)] mb-3" />
           <p className="text-sm text-[var(--text-primary)] font-medium mb-1">{t("notFound.title")}</p>
@@ -351,7 +351,7 @@ export default function CustomerProfilePage({
   const entity = (contact.entity_type as string) || "person";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)]">
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
         {/* ── Back ── */}
