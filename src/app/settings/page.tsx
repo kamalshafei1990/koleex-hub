@@ -54,10 +54,12 @@ import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { Chevron, RowValue } from "@/components/settings/tabs/ui";
 import { useWallpaper } from "@/lib/useWallpaper";
-import { PHOTO_ID, nameKeyFor } from "@/lib/wallpaper";
+import { PHOTO_ID, isShader, nameKeyFor } from "@/lib/wallpaper";
 
 /* Aurora ground — loaded only under the skin (Core never pays for it). */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+/* Loaded only when it will actually do something — see richGround below. */
+const LiquidGlass = dynamic(() => import("@/components/ui/LiquidGlass"), { ssr: false });
 
 /* ── TABS LOAD ON DEMAND ───────────────────────────────────────────────────
    All twelve of these were static imports, and `dynamic` was sitting three
@@ -117,6 +119,14 @@ export default function SettingsPage() {
       <SettingsContent />
     </AuthGate>
   );
+}
+
+/** Wraps the identity card in refraction, or in nothing at all. Written as a
+ *  component so the card's markup is not duplicated across the two branches —
+ *  a copy would be two places to fix the next time it changes. */
+function IdentityShell({ rich, children }: { rich: boolean; children: React.ReactNode }) {
+  if (!rich) return <>{children}</>;
+  return <LiquidGlass radius={16} className="rounded-2xl">{children}</LiquidGlass>;
 }
 
 function capitalize(s: string) {
@@ -205,6 +215,11 @@ function SettingsContent() {
      row's value follows a change made inside the tab without a reload —
      the same property Phase 3's other values have. lib/wallpaper adds nothing
      to this route: WavyBackground below already pulls it in. */
+  /* Is there anything behind the glass worth bending? A photograph or a live
+     shader has detail; the wave field and the still gradients do not. */
+  const richGround =
+    isShader(wallpaperPref) || (wallpaperPref.id === PHOTO_ID && !!wallpaperPref.photoUrl);
+
   const wallpaperLabel = wallpaperPref.id === PHOTO_ID && wallpaperPref.photoUrl
     ? t("wp.yourPhoto")
     : t(nameKeyFor(wallpaperPref));
@@ -377,7 +392,20 @@ function SettingsContent() {
 
           {/* Master list — sidebar on iPad, full screen on iPhone. */}
           <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
-            {/* Account card (Apple-ID style) */}
+            {/* Account card (Apple-ID style).
+
+                REFRACTION ONLY OVER A GROUND WORTH REFRACTING. LiquidGlass
+                bends what is behind it, so over the default wave field — dark,
+                soft, almost featureless — it produces a near-identical picture
+                for the cost of an SVG filter. It is mounted only when the
+                person has chosen a photograph or a live pattern, which is
+                exactly when there is detail to bend. Aurora only: Core is the
+                plain skin and stays plain.
+
+                This card is the right home for it because it sits at the top of
+                the master list, directly on the wallpaper, and is the one
+                surface here a person looks at rather than reads. */}
+            <IdentityShell rich={aurora && richGround}>
             <button
               type="button"
               onClick={() => openSection("profile")}
@@ -397,6 +425,7 @@ function SettingsContent() {
               </span>
               <Chevron className="text-[var(--text-faint)] shrink-0" />
             </button>
+            </IdentityShell>
 
             {/* Personal */}
             <MasterGroup label={t("group.personal")} items={personalItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
