@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
@@ -1908,14 +1909,14 @@ export default function Quotations() {
                           <span
                             className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
                               q.status === "paid"
-                                ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
+                                ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/35"
                                 : q.status === "sent"
-                                  ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
+                                  ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
                                   : q.status === "cancelled"
-                                    ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
+                                    ? "bg-rose-500/12 text-rose-400 border-rose-500/35"
                                     : q.status === "overdue"
-                                      ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
-                                      : "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35"
+                                      ? "bg-rose-500/12 text-rose-400 border-rose-500/35"
+                                      : "bg-amber-500/12 text-amber-400 border-amber-500/35"
                             }`}
                           >
                             {q.status}
@@ -2022,9 +2023,9 @@ export default function Quotations() {
         {saveState !== "idle" && (
           <span
             className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
-              saveState === "saving" ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
-              : saveState === "saved" ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
-              : "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
+              saveState === "saving" ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
+              : saveState === "saved" ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/35"
+              : "bg-rose-500/12 text-rose-400 border-rose-500/35"
             }`}
             title={saveError || undefined}
           >
@@ -2128,7 +2129,7 @@ export default function Quotations() {
               setCurrent({ ...current, customerName: e.target.value })
             }
             placeholder="e.g. Mr. Ahmed"
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -2152,7 +2153,7 @@ export default function Quotations() {
               setCurrent({ ...current, companyName: e.target.value })
             }
             placeholder="e.g. ABC Trading Co."
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
       </div>
@@ -2239,14 +2240,14 @@ function StatusMenu({
 
   const colourFor = (s: InvoiceStatus): string =>
     s === "paid"
-      ? "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35"
+      ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/35"
       : s === "sent"
-        ? "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40"
+        ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
         : s === "cancelled"
-          ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
+          ? "bg-rose-500/12 text-rose-400 border-rose-500/35"
           : s === "overdue"
-            ? "bg-[#FF3333]/12 text-[#FF3333] border-[#FF3333]/35"
-            : "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35";
+            ? "bg-rose-500/12 text-rose-400 border-rose-500/35"
+            : "bg-amber-500/12 text-amber-400 border-amber-500/35";
 
   const labelFor = (s: InvoiceStatus): string =>
     s.charAt(0).toUpperCase() + s.slice(1);
