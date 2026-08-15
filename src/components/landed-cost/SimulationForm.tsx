@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import AuroraShell from "@/components/ui/AuroraShell";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -620,7 +621,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   const updateFinancial = (key: keyof FinancialSettings, v: number | string | boolean) => setFinancial(prev => ({ ...prev, [key]: v }));
 
   if (loading) {
-    return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>;
+    return <AuroraShell className="flex items-center justify-center"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></AuroraShell>;
   }
 
   const productTotal = unitPrice * (quantity || 1);
@@ -643,7 +644,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
+    <AuroraShell className="text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
 
       {/* ── Header ── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
@@ -1120,7 +1121,7 @@ export default function SimulationForm({ id }: { id?: string }) {
           <div className="lg:sticky lg:top-28 flex flex-col max-h-[calc(100vh-8rem)]">
 
             {/* ── SECTION A: True Landed Cost — Pinned Hero Card ── */}
-            <div className="shrink-0 relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="shrink-0 relative kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="h-1 bg-[var(--bg-inverted)]/70" />
               <div className="px-5 py-5 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-2">
@@ -1168,7 +1169,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             )}
 
             {/* ── SECTION B: Commercial Pricing (starts FROM landed cost) ── */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("commercialPricing")}</p>
@@ -1224,7 +1225,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </div>
 
             {/* ── §2 Incoterm Coverage — who covers what, destination never vanishes ── */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("incotermSummary")}</p>
                 <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-inverted)]/[0.06] text-[10px] font-bold font-mono text-[var(--text-primary)]">{incoterm.basis}</span>
@@ -1269,7 +1270,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </div>
 
             {/* ── Unit Economics (true landed cost basis) ── */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
                 <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("unitEconomics")}</p>
               </div>
@@ -1296,7 +1297,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </div>
 
             {/* ── Cost Breakdown ── */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
                 <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("costBreakdown")}</p>
               </div>
@@ -1320,7 +1321,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[#567FB2] transition-all" style={{ width: `${Math.min(row.pct, 100)}%` }} />
+                      <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${Math.min(row.pct, 100)}%` }} />
                     </div>
                   </div>
                 ))}
@@ -1344,7 +1345,7 @@ export default function SimulationForm({ id }: { id?: string }) {
               const denom = commercial.sellingPrice > landed.totalLandedCost ? commercial.sellingPrice : landed.totalLandedCost;
               let cum = 0;
               return (
-                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+                <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
                     <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("costJourney")}</p>
                     <p className="text-[9px] text-[var(--text-ghost)] mt-0.5">{t("costJourneySub")}</p>
@@ -1385,7 +1386,7 @@ export default function SimulationForm({ id }: { id?: string }) {
 
             {/* ── §10 Automatic checks (engine validation, non-blocking) ── */}
             {engineIssues.length > 0 && (
-              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+              <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                 <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center gap-2">
                   <InfoIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                   <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("customsValueWarn").split(" ")[0]} · {engineIssues.length}</span>
@@ -1402,7 +1403,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             )}
 
             {/* ── Simulation Details ── */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
                 <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("simulationDetails")}</p>
               </div>
@@ -1433,6 +1434,6 @@ export default function SimulationForm({ id }: { id?: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </AuroraShell>
   );
 }

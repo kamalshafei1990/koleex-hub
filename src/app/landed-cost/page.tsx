@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import AuroraShell from "@/components/ui/AuroraShell";
 import { useConfirm } from "@/components/kds/useConfirm";
 import Link from "next/link";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -91,7 +92,7 @@ export default function LandedCostListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
+    <AuroraShell className="text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
       {confirmDialog}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -188,7 +189,7 @@ export default function LandedCostListPage() {
               const total = r.totalLandedCost || 0;
               const perUnit = r.landedCostPerUnit || 0;
               return (
-                <div key={sim.id} className="group relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden hover:shadow-[0_2px_16px_rgba(0,0,0,0.18)] hover:border-[var(--border-focus)] transition-all">
+                <div key={sim.id} className="group relative kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden hover:shadow-[0_2px_16px_rgba(0,0,0,0.18)] hover:border-[var(--border-focus)] transition-all">
                   <Link href={`/landed-cost/${sim.id}`} className="block p-5">
                     {/* Top: name + status */}
                     <div className="flex items-start justify-between mb-3">
@@ -271,6 +272,6 @@ export default function LandedCostListPage() {
           </div>
         )}
       </div>
-    </div>
+    </AuroraShell>
   );
 }

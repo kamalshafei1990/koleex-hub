@@ -26,17 +26,22 @@ import { useSkin } from "@/lib/appearance";
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function AuroraShell({
-  children, className = "", topLight = true,
+  children, className = "", topLight = true, dir,
 }: {
   children: ReactNode;
   className?: string;
   /** Pull the ground's dark vignette away from the top — for apps whose
    *  header/toolbar zone runs deep, where the default floor reads as a slab. */
   topLight?: boolean;
+  /** Forwarded because direction is a DOCUMENT property, not a style. An app
+   *  that set dir on the root it replaced would otherwise lose its RTL the
+   *  moment it adopted this shell — which in a trilingual Hub is not a
+   *  cosmetic regression. */
+  dir?: "rtl" | "ltr";
 }) {
   const aurora = useSkin() === "aurora";
   return (
-    <div className={`kx-app relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] ${className}`}>
+    <div dir={dir} className={`kx-app relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] ${className}`}>
       {aurora && (
         /* z-0 and inert: every child below renders above it without needing a
            z-index of its own, which is what keeps callers from having to think
