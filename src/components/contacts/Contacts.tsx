@@ -12,6 +12,7 @@ import { getCountryByCode } from "@/lib/commercial-policy/countries";
 import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import SquareLogoCropper from "@/components/contacts/SquareLogoCropper";
@@ -6457,123 +6458,151 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      RENDER: CONTACT LIST PANEL
      ═════════════════════════════════════════════════════════════════════════ */
 
+  /* The screen's own name, resolved once. This component serves three apps
+     (/contacts, /customers, /suppliers) and the name follows the filter, so
+     it is computed here and used BOTH as the header title and as the noun on
+     the state line — "196 Customers" can then never disagree with the screen
+     it is describing, in any of the three languages. */
+  const appName = filterType
+    ? (filterType === "company" ? t("tab.companies")
+      : filterType === "people" ? t("tab.people")
+      : filterType === "supplier" ? t("tab.suppliers")
+      : t("tab.customers"))
+    : t("title");
+
   const renderListPanel = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-2.5 mb-3">
-          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon size={16} className="rtl:rotate-180" />
-          </Link>
-          {/* Neutral surface tile — matches the shared PageHeader and every
-              other app's header icon. (Was amber-tinted for /customers only,
-              which made it the odd one out.) */}
-          <div
-            className={`kx-glass h-8 w-8 rounded-xl border flex items-center justify-center shrink-0 ${
-              filterType === "company" || filterType === "people"
-                ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
-                : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]"
-            }`}
-          >
-            {/* Routed through the registry binding like every other app
-                identity glyph — this screen serves three apps, so it picks
-                the id from the same filter that names the page. */}
-            <AppIcon
-              appId={filterType === "supplier" ? "suppliers" : filterType === "customer" ? "customers" : "contacts"}
-              className="h-4 w-4"
-              size={16}
-            />
-          </div>
-          <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
-            {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
-          </h1>
-          {/* Refresh indicator. The slot is ALWAYS in the layout and only the
-              orb's opacity changes, so nothing in this header moves when it
-              comes and goes — a capsule that appears and disappears here would
-              be the same "it wrapped / it jumped" defect in new clothes. Text
-              is deliberately absent for the same reason: three languages, three
-              widths. Title only, on hover. */}
-          <span
-            role="status"
-            aria-label={refreshing ? t("refreshing", "Updating…") : ""}
-            title={refreshing ? t("refreshing", "Updating…") : undefined}
-            className="w-5 h-5 shrink-0 flex items-center justify-center"
-          >
-            <SpinnerIcon
-              size={14}
-              className={`transition-opacity duration-200 ${refreshing ? "opacity-100" : "opacity-0"}`}
-            />
-          </span>
-          {/* CSV export — customer directory only. Dumps whatever the
-              current filters produce (search, tier filter, active
-              filter) so the download matches what the user sees. */}
-          {filterType === "customer" && (
-            <button
-              onClick={() => {
-                /* Lazy import so the csv string builder doesn't
-                   weigh on the initial render of /contacts or
-                   /suppliers. */
-                import("@/lib/customers-admin").then(({ customersToCsv }) => {
-                  const csv = customersToCsv(filtered as unknown as Array<Record<string, unknown> & { id: string; contact_type: string | null; customer_type: string | null; display_name: string | null; company_name: string | null; first_name: string | null; last_name: string | null }>);
-                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
-                  URL.revokeObjectURL(url);
-                });
-              }}
-              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors shrink-0"
-              aria-label="Export customers as CSV"
-              title="Export CSV"
-            >
-              <DownloadIcon size={14} />
-            </button>
-          )}
-          {filterType === "supplier" && (
-            <button
-              onClick={() => setShowCatalogImport(true)}
-              className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 text-[12px] font-medium transition-colors shrink-0"
-              aria-label={t("importFromCatalog", "Import from catalog")}
-              title={t("importFromCatalog", "Import supplier from a PDF catalog")}
-            >
-              <PlusIcon size={13} />
-              {t("importCatalog", "Import catalog")}
-            </button>
-          )}
-          <button
-            onClick={() => {
-              /* Phase 20: make the "+" button app-aware so the
-                 Customers page doesn't re-ask "what type of contact?"
-                 when the user is already in the Customers directory.
-                   · on /customers (filterType==='customer')
-                       → skip step 1 of the chooser, go straight to
-                         the step-2 "person or company" picker so the
-                         first click lands on a customer-specific form
-                   · on /contacts (no filterType)
-                       → show the full 4-way chooser (Customer /
-                         Supplier / Company / People)
-                   · on other filtered views (suppliers, companies,
-                     people) → direct-add of that type, no chooser */
-              if (filterType === "customer") {
-                setTypeChooserStep(2);
-                setShowTypeChooser(true);
-              } else if (filterType) {
-                handleAdd(filterType);
-              } else {
-                setTypeChooserStep(1);
-                setShowTypeChooser(true);
-              }
-            }}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0"
-            aria-label={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
-            title={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
-          >
-            <PlusIcon size={16} />
-          </button>
+        {/* Shared header. This block was a hand-built one, and unlike the
+            other seven it was not a pure copy — it carries three controls
+            with real app logic, which is why it went last.
+
+            ⚠️ ALL THREE MOVE VERBATIM, not rewritten: the refresh indicator,
+            the CSV export and the context-aware "+" keep their exact markup,
+            handlers, conditions and aria labels. Only their SLOT changes.
+
+            ⚠️ THE REFRESH INDICATOR NOW SITS IN THE RIGHT-HAND CLUSTER rather
+            than beside the title. Its contract is unchanged and it is the
+            reason to be careful here: the slot is ALWAYS in the layout and
+            only the orb's opacity changes, so nothing in the header moves
+            when a refresh starts or ends. `controls` renders unconditionally
+            too, so that guarantee survives the move — but the POSITION is a
+            visible change to a signed-off detail, which is why it was shown
+            before it was committed. */}
+        {/* One resolved name, used twice: as the (screen-reader / phone)
+            title AND as the noun on the state line, so "196 Customers" is
+            translated by the same expression that names the screen and can
+            never drift from it. */}
+        <div className="mb-3">
+          <PageHeader
+            title={appName}
+            icon={<AppIcon appId={filterType === "supplier" ? "suppliers" : filterType === "customer" ? "customers" : "contacts"} className="h-4 w-4" size={16} />}
+            /* M-1 wants STATE on this line, and with the title hidden the
+               band would otherwise be an empty strip between the chips. The
+               count is what the system bar can never say: how many rows you
+               are actually looking at, and how many exist when a filter or a
+               search has narrowed them. */
+            subtitle={
+              filtered.length === contacts.length
+                ? `${contacts.length} ${appName}`
+                : `${filtered.length} / ${contacts.length} ${appName}`
+            }
+            showTabs={false}
+            controls={
+              <>
+                {/* Refresh indicator. The slot is ALWAYS in the layout and only the
+                    orb's opacity changes, so nothing in this header moves when it
+                    comes and goes — a capsule that appears and disappears here would
+                    be the same "it wrapped / it jumped" defect in new clothes. Text
+                    is deliberately absent for the same reason: three languages, three
+                    widths. Title only, on hover. */}
+                <span
+                  role="status"
+                  aria-label={refreshing ? t("refreshing", "Updating…") : ""}
+                  title={refreshing ? t("refreshing", "Updating…") : undefined}
+                  className="w-5 h-5 shrink-0 flex items-center justify-center"
+                >
+                  <SpinnerIcon
+                    size={14}
+                    className={`transition-opacity duration-200 ${refreshing ? "opacity-100" : "opacity-0"}`}
+                  />
+                </span>
+                {/* CSV export — customer directory only. Dumps whatever the
+                    current filters produce (search, tier filter, active
+                    filter) so the download matches what the user sees. */}
+                {filterType === "customer" && (
+                  <button
+                    onClick={() => {
+                      /* Lazy import so the csv string builder doesn't
+                         weigh on the initial render of /contacts or
+                         /suppliers. */
+                      import("@/lib/customers-admin").then(({ customersToCsv }) => {
+                        const csv = customersToCsv(filtered as unknown as Array<Record<string, unknown> & { id: string; contact_type: string | null; customer_type: string | null; display_name: string | null; company_name: string | null; first_name: string | null; last_name: string | null }>);
+                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      });
+                    }}
+                    className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors shrink-0"
+                    aria-label="Export customers as CSV"
+                    title="Export CSV"
+                  >
+                    <DownloadIcon size={14} />
+                  </button>
+                )}
+                {filterType === "supplier" && (
+                  <button
+                    onClick={() => setShowCatalogImport(true)}
+                    className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 text-[12px] font-medium transition-colors shrink-0"
+                    aria-label={t("importFromCatalog", "Import from catalog")}
+                    title={t("importFromCatalog", "Import supplier from a PDF catalog")}
+                  >
+                    <PlusIcon size={13} />
+                    {t("importCatalog", "Import catalog")}
+                  </button>
+                )}
+              </>
+            }
+            action={
+                <button
+                  onClick={() => {
+                    /* Phase 20: make the "+" button app-aware so the
+                       Customers page doesn't re-ask "what type of contact?"
+                       when the user is already in the Customers directory.
+                         · on /customers (filterType==='customer')
+                             → skip step 1 of the chooser, go straight to
+                               the step-2 "person or company" picker so the
+                               first click lands on a customer-specific form
+                         · on /contacts (no filterType)
+                             → show the full 4-way chooser (Customer /
+                               Supplier / Company / People)
+                         · on other filtered views (suppliers, companies,
+                           people) → direct-add of that type, no chooser */
+                    if (filterType === "customer") {
+                      setTypeChooserStep(2);
+                      setShowTypeChooser(true);
+                    } else if (filterType) {
+                      handleAdd(filterType);
+                    } else {
+                      setTypeChooserStep(1);
+                      setShowTypeChooser(true);
+                    }
+                  }}
+                  className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0"
+                  aria-label={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
+                  title={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
+                >
+                  <PlusIcon size={16} />
+                </button>
+            }
+          />
         </div>
 
         {/* Search */}
