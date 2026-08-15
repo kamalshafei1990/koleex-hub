@@ -52,7 +52,39 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        collide with it. That one needs its own measured pass, not a list
        entry. */
     p.startsWith("/crm") ||
-    p.startsWith("/settings")
+    p.startsWith("/settings") ||
+    /* Sales, 2026-08-16.
+
+       Sticky audit, required by the note at the top of this file: /sales has
+       ZERO stickies of its own — grepped across all three route components and
+       every module, and the only hit in the whole app is inside a comment. Its
+       one sticky is PageHeader's tab band at top-0, the same clean case as
+       Purchase and /crm.
+
+       ONE ASYMMETRY WORTH KNOWING, because it is not visible from this list.
+       The segment has two page shapes:
+         · /sales/orders and /sales/orders/[id] FLOW — they scroll in the Hub
+           scroller, so content genuinely passes under the header and the pane
+           has something to frost.
+         · /sales itself is a tab app: SalesApp is `h-full overflow-hidden`
+           with its OWN internal scroller, so the shell scroller never moves
+           and nothing travels under the header.
+       Listing the segment is still right — it is what makes the top edge read
+       as glass rather than a solid bar, which is the whole point of H0 rule 1
+       — but on /sales the effect is the resting frost, not motion under it.
+
+       AND THAT ASYMMETRY IS ALSO WHY /sales IS NOT IN appOwnsTopRamp BELOW.
+       The entry there exists because on Purchase/Inventory/CRM the sticky tab
+       strip pins at 56 and would sit entirely inside the 104px ramp, going
+       soft. Sales renders the same PageHeader with the same tabs, so it looks
+       like the same case — it is not, and measuring is what settled it. The
+       band lives in SalesApp's non-scrolling `shrink-0` top section, above the
+       internal scroller, so it never pins: measured on /sales, ramp bottom
+       104, strip top 210 — **106px of clearance**, and the strip cannot move
+       toward it because nothing scrolls underneath. Handing this segment the
+       flat 56px frost would buy a ramp that never gets drawn on the order
+       pages, which is the exact trade Settings is excluded for. */
+    p.startsWith("/sales")
   );
   /* CONTACTS / SUPPLIERS / CUSTOMERS ARE STRUCTURALLY A DIFFERENT CASE, and
      the measurement is what settled it. I added all three, then took them out.

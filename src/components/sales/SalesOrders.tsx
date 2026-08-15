@@ -131,7 +131,10 @@ export default function SalesOrders() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    /* min-h-full, not min-h-screen: 100vh inside a scroller that is only
+       100vh − header tall buys a phantom scrollbar exactly one header high on
+       every screen, whether the content is short or long. */
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -210,8 +213,13 @@ export default function SalesOrders() {
                 <button
                   key={c.key || "all"}
                   onClick={() => setFilterStatus(c.key)}
+                  /* kx-chip-on carries the selected state under Aurora: a 6%
+                     white wash with no ring is Core's language, and on glass
+                     over a blue ground grey is the one colour that reads as
+                     dirt. The Core classes stay put beside it — the class is
+                     defined only under the aurora skin, so Core is unchanged. */
                   className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors ${
-                    isActive ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                    isActive ? "kx-chip-on border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
                   }`}
                 >
                   {c.label}

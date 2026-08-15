@@ -29,7 +29,14 @@ export const SALES_TAB_LABEL_KEYS: Record<SalesTabId, string> = {
 
 /* Shared design tokens (use these instead of inlining) so the Sales
    app matches HR/Contacts/Products visually. */
-export const cardCls = "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
+
+/* `kx-glass` is safe to sit in a plain constant with no useSkin() branch,
+   because the class is DEFINED only under [data-kx-skin="aurora"] — under Core
+   it matches nothing and these cards keep the solid --bg-secondary they always
+   had. That is what makes this one string the whole surface conversion: it is
+   imported by fifteen modules, and the remap alone would have left their text
+   sitting on the moving ground, because remap and frost are two steps. */
+export const cardCls = "kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]";
 export const sectionTitleCls = "text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3 flex items-center gap-2";
 export const linkBtnCls = "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors";
 

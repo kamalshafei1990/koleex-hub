@@ -191,7 +191,12 @@ export default function ShipDialog({
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       {toastElement}
       <ConfirmWithReason open={voidAsk !== null} title="Void this shipment? Stock will be restored and qty_shipped will roll back." confirmLabel="Void" onCancel={() => setVoidAsk(null)} onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoidShipment(id, reason || null); }} />
-      <div className="w-full max-w-4xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]" onClick={(e) => e.stopPropagation()}>
+      {/* kx-glass-pop, the Hub's one menu/modal material — it also carries the
+          pop-in entrance for free. Without it this panel is filled with
+          --bg-primary, which the Aurora remap turns TRANSPARENT: the dialog
+          would render as an outline with the dimmed page showing through it.
+          Core is untouched; the class is defined only under the aurora skin. */}
+      <div className="kx-glass-pop w-full max-w-4xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-[14px] font-semibold">Ship Sales Order</h2>

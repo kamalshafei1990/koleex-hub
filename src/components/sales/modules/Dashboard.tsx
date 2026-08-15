@@ -115,7 +115,7 @@ export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
   const kpis = useMemo(() => {
     if (!stats) return [];
     return [
-      { id: "pipelineValue",    icon: LayoutGridIcon, label: t("sales.kpi.pipelineValue"),    value: formatMoney(stats.pipelineValue), sub: `${stats.pipelineCount} active`, href: "/crm" },
+      { id: "pipelineValue",    icon: LayoutGridIcon, label: t("sales.kpi.pipelineValue"),    value: formatMoney(stats.pipelineValue), sub: `${stats.pipelineCount} ${t("sales.activeCount")}`, href: "/crm" },
       { id: "openQuotes",       icon: DocumentIcon,   label: t("sales.kpi.openQuotes"),       value: String(stats.openQuotes), sub: t("sales.thisMonth"),         href: "/quotations" },
       { id: "openOrders",       icon: BoxesIcon,      label: t("sales.kpi.openOrders"),       value: String(stats.openOrders), sub: t("sales.allTime"),           href: "/sales" },
       { id: "outstanding",      icon: DocumentIcon,   label: t("sales.kpi.outstanding"),      value: formatMoney(stats.outstanding), sub: t("sales.allTime"),     href: "/invoices" },

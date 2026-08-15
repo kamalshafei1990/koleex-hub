@@ -186,7 +186,9 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    /* min-h-full — see SalesOrders: min-h-screen is one header-height taller
+       than the scroller it lives in. */
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
       <ConfirmWithReason open={voidAsk !== null} title="Void this shipment? Stock will be restored and qty_shipped will roll back." confirmLabel="Void" onCancel={() => setVoidAsk(null)} onConfirm={(reason) => { const id = voidAsk; setVoidAsk(null); if (id) void doVoidShipment(id, reason || null); }} />
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">

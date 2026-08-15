@@ -40,6 +40,10 @@ export const salesT: Translations = {
   "sales.thisMonth":     { en: "This month",        zh: "本月",          ar: "هذا الشهر" },
   "sales.last30Days":    { en: "Last 30 days",      zh: "过去30天",      ar: "آخر 30 يومًا" },
   "sales.allTime":       { en: "All time",          zh: "全部时间",      ar: "كل الأوقات" },
+  /* The pipeline KPI's subtitle. It was the ONE sub in that array of eight
+     built from a template literal with an English word baked in, so seven
+     cards translated and the eighth read "active 0" on the Arabic screen. */
+  "sales.activeCount":   { en: "active",            zh: "进行中",        ar: "نشط" },
 
   "sales.report.revenueTrend":   { en: "Revenue trend",     zh: "收入趋势",      ar: "اتجاه الإيرادات" },
   "sales.report.pipelineFunnel": { en: "Pipeline funnel",   zh: "管道漏斗",      ar: "قمع الأنابيب" },

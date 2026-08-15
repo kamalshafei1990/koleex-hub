@@ -79,7 +79,13 @@ export default function SalesApp() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
+      /* h-full, NOT a viewport calc. The shell owns the viewport maths and has
+         already subtracted the header — re-measuring it here hardcodes 3.5rem,
+         which is wrong by the safe-area inset in the installed iOS app and by
+         the 30px title bar in the desktop app, and re-computes live as a mobile
+         toolbar retracts. That recomputation is the "dancing" the owner
+         reported on quotations and invoices. */
+      className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
     >
       {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════ */}
       <div className="shrink-0 px-4 sm:px-5 pt-4 sm:pt-5">
