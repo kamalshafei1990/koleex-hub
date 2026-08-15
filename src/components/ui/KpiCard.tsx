@@ -196,8 +196,14 @@ export default function KpiCard({
       }
     : undefined;
 
+  /* kx-glass, because under kx-app the Aurora remap turns --bg-surface into
+     rgba(255,255,255,0.04) — a translucent panel with NO blur, which shows the
+     moving ground straight through the figure it exists to display. These are
+     leaf tiles: nothing inside renders a fixed-without-portal child, so they
+     can carry true frost. Under Core the class is inert and the card stays
+     solid, exactly as it was. */
   const baseClass =
-    "block rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors " +
+    "kx-glass block rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors " +
     (interactive
       ? "kx-spotlight hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] cursor-pointer "
       : "") +

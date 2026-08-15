@@ -1896,7 +1896,7 @@ export default function Quotations() {
                 return (
                   <div
                     key={q.id}
-                    className="bg-[var(--bg-secondary)] border border-white/[0.06] rounded-xl p-4 sm:p-5 hover:border-white/[0.12] transition cursor-pointer group"
+                    className="kx-glass kx-hover-card bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-4 sm:p-5 hover:border-[var(--border-strong)] transition cursor-pointer group"
                     onClick={() => handleOpen(q)}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
