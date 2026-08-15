@@ -1809,6 +1809,49 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
 
+/* ── THE A4 DOCUMENT IS PAPER, NOT A FORM ──────────────────────────────────
+   Regression I introduced converting Quotations and Invoices to Aurora. Adding
+   `kx-app` to the app root is what gives every surface the skin — and it also
+   handed the input rules above to every field INSIDE the printed document,
+   which is not part of the app's chrome at all. It is a page that gets
+   exported to PDF and printed on white paper.
+
+   The document sets `background: transparent` and `border: none` INLINE on its
+   fields, so those two never changed. What leaked was the one property it does
+   not set: `box-shadow: inset 0 1.5px 4px rgba(0,0,0,0.40)` — an inset well
+   designed to read as depth on a dark glass panel, painting a grey box behind
+   every field on white paper. Measured on a document input: inline background
+   transparent, computed background transparent, and that inset shadow present.
+
+   Reset here rather than by adding a :not() to the selectors above. Those
+   carry a warning of their own — `:not()` takes its argument's specificity,
+   and the resting/focus pair is balanced by hand — so excluding the document
+   up there would silently unbalance the focus ring. A separate override
+   touches nothing.
+
+   !important ON ALL THREE, and the arithmetic is why — this is the :not()
+   specificity trap the rule above warns about, and my first attempt walked
+   straight into it after reading the warning. The resting field rule scores
+
+     [data-kx-skin=...]  (0,1,0)
+     :is(.kx-ai-form,…)  (0,1,0)
+     input               (0,0,1)
+     four :not([type=…]) (0,4,0)   <- :not() takes its ARGUMENT's specificity
+     ------------------------------
+                         (0,6,1)
+
+   against this selector's (0,2,1). Measured, not assumed: the rule was in the
+   loaded stylesheet, the field was inside .quot-doc-inner, and the inset
+   shadow was still painting. Matching their :not() chain would work too and
+   would be four more places to keep in step; !important states the intent —
+   paper wins over chrome — in one word. */
+[data-kx-skin="aurora"] .quot-doc-inner :is(input, textarea, select),
+[data-kx-skin="aurora"] .quot-doc-inner :is(input, textarea, select):focus {
+  box-shadow: none !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
 /* ── A CONTROL SHAPED LIKE A FIELD IS MADE OF FIELD ────────────────────
    AURORA RULE (owner, pointing at the big Basics name input): "do them same
    style as this and take it as a rule for aurora."
