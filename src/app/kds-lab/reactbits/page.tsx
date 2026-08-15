@@ -48,6 +48,42 @@ function Section({ n, title, verdict, note, children }: {
   );
 }
 
+/** One filter at a time: only the tile under the pointer refracts.
+ *
+ *  The grid version measured 16.7ms at p95 — two frames at 120Hz — with ten
+ *  filters live, and Home has forty-four. This keeps the effect and deletes the
+ *  count: at most ONE GlassSurface exists at any moment.
+ *
+ *  What it trades is a mount on every hover, and that is the thing to watch
+ *  rather than the filter itself — the component rebuilds its displacement map
+ *  when it appears, so moving fast across a grid is a churn of mounts. The
+ *  probe underneath sweeps the row deliberately to catch it. */
+function HoverRefractRow() {
+  const [hot, setHot] = useState<number | null>(null);
+  return (
+    <div className="grid grid-cols-4 gap-3">
+      {TILES.slice(0, 4).map((t, i) => (
+        <div
+          key={t}
+          onPointerEnter={() => setHot(i)}
+          onPointerLeave={() => setHot((h) => (h === i ? null : h))}
+          className="relative rounded-2xl border border-white/[0.10] aspect-square"
+        >
+          {hot === i && (
+            <div className="absolute inset-0" aria-hidden>
+              <LiquidGlass radius={16} className="h-full rounded-2xl" >{null}</LiquidGlass>
+            </div>
+          )}
+          <div className={`absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl ${hot === i ? "" : "kx-glass bg-[#0c0c0c]"}`}>
+            <span className="h-7 w-7 rounded-lg bg-white/70" />
+            <span className="text-[11px] text-white/85">{t}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Measures frame time with the refracting tiles present and hidden, so the
  *  verdict on "16 filters" is a number rather than a feeling. */
 function TileCost() {
@@ -208,6 +244,10 @@ export default function ReactBitsLab() {
                 </LiquidGlass>
               ))}
             </div>
+            <div className="text-[11px] text-white/75 mb-2 mt-5">
+              Ours — refraction ON HOVER ONLY (one filter, never 44)
+            </div>
+            <HoverRefractRow />
           </div>
           <TileCost />
         </Section>
