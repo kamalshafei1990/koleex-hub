@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-labels";
@@ -5332,7 +5333,24 @@ function BilingualTooltip({
     el.style.visibility = "visible";
   }, [anchorRect]);
 
-  return (
+  /* PORTALLED TO document.body, and it has to be.
+     ---------------------------------------------------------------------
+     This box is position:fixed with z-index 99999 and was STILL coming out
+     underneath things. Not a stacking problem — a containing-block one: the
+     A4 page is rendered inside `transform: scale(zoom)` (and the shell adds a
+     second scale of its own), and a transformed ancestor becomes the
+     containing block for every fixed descendant. So the tooltip was
+       · positioned against the scaled wrapper instead of the viewport,
+       · SCALED with it, so its size was wrong at any zoom but 100%,
+       · clipped by that subtree's overflow,
+       · and its 99999 only ever competed inside that wrapper's stacking
+         context, which is why a bigger number never helped.
+     Moving the node to body removes all four at once, and anchorRect is
+     already in viewport coordinates so the maths does not change. */
+  const body = typeof document === "undefined" ? null : document.body;
+  if (!body) return null;
+
+  return createPortal(
     <div
       role="tooltip"
       ref={place}
@@ -5366,7 +5384,8 @@ function BilingualTooltip({
       <div style={{ marginBottom: 8 }}>{en}</div>
       <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
       <div>{zh}</div>
-    </div>
+    </div>,
+    body,
   );
 }
 
