@@ -202,8 +202,19 @@ export default function ReactBitsLab() {
               frost with nothing passing under it shows nothing at all — the
               owner said so immediately and was right. The effect IS the
               transition, so the demo has to move. */}
-          <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden h-[190px] relative kx-bar-host [--kx-ramp-top:9rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
-            {/* THE FOUR <i> ARE THE EFFECT. kx-bar-prog is a filterless shell;
+          <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden h-[240px] relative kx-bar-host [--kx-ramp-top:0rem] [--kx-ramp-ext:2.5rem] [--kx-ramp-fade:1.25rem]">
+            {/* --kx-ramp-top IS A PAGE-SCALE VALUE. It stretches the layer
+                UPWARD (inset: calc(var(--kx-ramp-top) * -1) ...) so ONE ramp
+                can cover a whole stack of sticky bars above it. In a 190px box
+                with nothing above the bar, 9rem put all four layers at -143px
+                — entirely outside the container, clipped away by
+                overflow-hidden. Measured, after the owner said it still felt
+                wrong: zero frost on screen, which is why the row under "Sticky
+                header" stayed razor sharp. Same failure as the Purchase edge
+                earlier: the geometry moved the frost off-screen while every
+                class name still looked right.
+
+                THE FOUR <i> ARE THE EFFECT. kx-bar-prog is a filterless shell;
                 its four CHILDREN carry the masked 3/7/14/28px ramp. I wrote it
                 self-closing and the section rendered nothing at all — the owner
                 said "I think have something wrong" and was looking at an empty
@@ -212,8 +223,13 @@ export default function ReactBitsLab() {
             <div aria-hidden className="kx-glass-bar kx-bar-prog absolute inset-x-0 top-0 h-[62px] z-10 pointer-events-none">
               <i /><i /><i /><i />
             </div>
-            <div className="absolute inset-x-0 top-0 h-[62px] z-20 flex items-center px-4 pointer-events-none">
-              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Sticky header</span>
+            {/* The label needs WEIGHT, or it reads as text that happened to
+                land on a row rather than as a header the rows pass beneath.
+                In the real Hub the header carries a title, tabs and controls,
+                which supply that weight on their own. */}
+            <div className="absolute inset-x-0 top-0 h-[62px] z-20 flex items-center justify-between px-4 pointer-events-none">
+              <span className="text-[15px] font-bold text-[var(--text-primary)]">Invoices</span>
+              <span className="text-[11px] text-[var(--text-dim)]">14 open</span>
             </div>
             <div className="h-full overflow-y-auto pt-[62px] px-4 pb-4 space-y-2">
               {Array.from({ length: 14 }, (_, i) => (
