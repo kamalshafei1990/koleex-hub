@@ -267,6 +267,21 @@ export function isShader(pref: WallpaperPref | null | undefined): boolean {
   return !!pref?.id && isShaderId(pref.id);
 }
 
+/** Does a colour swatch TINT this wallpaper, or REPLACE it?
+ *
+ *  Owner, 2026-08-15: "when I press color the background color change — I mean
+ *  the wallpaper content itself change not only the surface." He was on the
+ *  wave field, the default. Pressing a colour there swapped the whole ground
+ *  for a flat block of that colour, because only the 25 shaders were tintable.
+ *
+ *  The wave field is a live pattern exactly as they are — it just happens to be
+ *  ours — so it belongs on this side of the line. Anything still (Deep, Dawn,
+ *  Graphite, the flat colours) has no content to tint and is still REPLACED,
+ *  which is the right answer for those. */
+export function isTintable(pref: WallpaperPref | null | undefined): boolean {
+  return isShader(pref) || pref?.id === DEFAULT_WALLPAPER_ID;
+}
+
 /** The still gradient a shader falls back to — shown while its chunk loads,
  *  and shown permanently under prefers-reduced-motion. Derived from the same
  *  tint, so the fallback is recognisably the same wallpaper rather than a

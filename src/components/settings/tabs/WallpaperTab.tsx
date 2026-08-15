@@ -35,8 +35,7 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
-  asImage, isShader, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref,
-} from "@/lib/wallpaper";
+  asImage, isShader, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
 import { SettingsCard, ControlRow, SelectControl } from "./ui";
@@ -287,11 +286,11 @@ export default function WallpaperTab(
           swatches to say so, only a line of text that changes with it. */}
       <SettingsCard
         title={t("wp.group.color")}
-        subtitle={isShader(current) ? t("wp.tintNote") : undefined}
+        subtitle={isTintable(current) ? t("wp.tintNote") : undefined}
       >
         <div className="flex flex-wrap gap-2.5">
           {WALLPAPERS.filter((w) => w.group === "color").map((w) => {
-            const tinting = isShader(current);
+            const tinting = isTintable(current);
             const swatch = theme === "light" ? w.light : w.dark;
             const on = tinting ? current.tint === swatch : current.id === w.id;
             return (

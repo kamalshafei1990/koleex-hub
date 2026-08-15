@@ -75,6 +75,43 @@ const PALETTES = {
   },
 } as const;
 
+/* ── TINTING THE FIELD ITSELF ─────────────────────────────────────────────
+   Owner: "when I press color the background color change — I mean the
+   wallpaper CONTENT itself changes, not only the surface."
+
+   Until now a colour swatch only tinted the 25 shader grounds. On the wave
+   field — the DEFAULT, and the one he was looking at — pressing a colour did
+   not recolour the wave at all: it REPLACED the wallpaper with a flat block
+   of that colour. Hence "only the surface".
+
+   The five stops above are not five arbitrary blues; they are one hue at five
+   distances from white and black. Those distances are what makes the field
+   read as depth, so a tint has to reproduce the RELATIONSHIP, not just swap
+   the middle colour. Measured off the shipped Hub set against its own base
+   #567FB2: +62% and +32% toward white, the base, then 42% and 65% toward
+   black — and the light set is a different arrangement of the same idea, so it
+   carries its own ratios rather than being the dark one lightened. */
+const MIX = {
+  dark: [0.62, 0.32, 0, -0.42, -0.65],
+  light: [0, 0.32, -0.28, 0.52, 0.18],
+} as const;
+
+function mixHex(hex: string, t: number): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const target = t >= 0 ? 255 : 0, k = Math.abs(t);
+  const to = (c: number) => Math.round(c + (target - c) * k);
+  return "#" + [to(r), to(g), to(b)].map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
+/** The field's five stops. No tint → the shipped Hub arrays, byte for byte, so
+ *  the default ground is untouched by this. */
+function waveColors(theme: "dark" | "light", tint?: string): readonly string[] {
+  if (!tint) return PALETTES[theme].waves;
+  return MIX[theme].map((t) => mixHex(tint, t));
+}
+
 const BLUR = 10;
 const WAVE_WIDTH = 50;
 /* The original's "fast" default, and it runs on an unthrottled rAF. Both
@@ -224,7 +261,8 @@ export default function WavyBackground(
     const ctx = cv.getContext("2d");
     if (!ctx) return;
 
-    const { waves: WAVE_COLORS, ground: BACKGROUND } = PALETTES[theme];
+    const { ground: BACKGROUND } = PALETTES[theme];
+    const WAVE_COLORS = waveColors(theme, wallpaper?.tint);
 
     const noise3D = buildNoise3D();
     /* STILL, NOT ABSENT, on a weak machine. This used to run only on the gate,
@@ -371,7 +409,11 @@ export default function WavyBackground(
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("resize", onResize);
     };
-  }, [theme, topLight, showCanvas]);
+  /* wallpaper?.tint IS A REAL DEPENDENCY, not a lint appeasement: the five wave
+     colours are read once when the draw loop starts, so without it the canvas
+     keeps painting the previous colour until something else happens to
+     remount it — the swatch would look dead. */
+  }, [theme, topLight, showCanvas, wallpaper?.tint]);
 
   return (
     <>
