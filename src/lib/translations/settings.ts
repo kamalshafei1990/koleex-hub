@@ -434,7 +434,12 @@ export const settingsT: Translations = {
   "nav.wallpaper.sub":         { en: "The ground behind every screen", zh: "所有界面的背景", ar: "الأرضية وراء كل شاشة" },
 
   "wp.title":                  { en: "Wallpaper", zh: "墙纸", ar: "الخلفية" },
-  "wp.subtitle":               { en: "Choose what sits behind the Hub. Everything here is drawn by the browser — no image is downloaded.", zh: "选择 Hub 背后的画面。此处所有选项均由浏览器绘制，不下载任何图片。", ar: "اختر اللي وراء الهاب. كل اللي هنا بيرسمه المتصفح — مافيش صورة بتتحمّل." },
+  /* "no image is downloaded" was already not true — the 25 shader previews come
+     from one sprite sheet, and the wave field now has its own frame too. What
+     IS true, and is the thing worth promising, is that no WALLPAPER is ever an
+     image: every ground is drawn live by the browser, and only these thumbnails
+     are pictures. */
+  "wp.subtitle":               { en: "Choose what sits behind the Hub. Every wallpaper is drawn live by the browser — only these previews are pictures.", zh: "选择 Hub 背后的画面。所有壁纸都由浏览器实时绘制 — 只有这些预览图是图片。", ar: "اختر اللي وراء الهاب. كل الخلفيات بيرسمها المتصفح مباشرةً — الصور المصغّرة دي بس هي صور." },
 
   "wp.group.koleex":           { en: "Koleex Hub", zh: "Koleex Hub", ar: "Koleex Hub" },
   "wp.group.koleex.footer":    { en: "The wave field is the Hub's own ground. It animates; the rest are still.", zh: "波纹场是 Hub 自带的背景，会动；其余为静态。", ar: "حقل الموج هو أرضية الهاب الأصلية — بيتحرك، والباقي ثابت." },

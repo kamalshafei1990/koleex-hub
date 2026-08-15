@@ -108,11 +108,28 @@ export const WALLPAPERS: Wallpaper[] = [
        light values are only ever seen as the picker's thumbnail — when this id
        is active the canvas paints the real thing. */
     id: "hub-live", kind: "live", group: "koleex", nameKey: "wp.hubLive", dim: 0,
-    /* The base layer is linear-gradient(c, c) and not the bare colour it looks
-       like it wants to be. Every value in this file is consumed as
-       background-IMAGE, where a bare colour is invalid — see asImage(). */
-    dark: `radial-gradient(120% 90% at 50% 50%, ${HUB[2]}55 0%, ${HUB[3]}88 45%, #05070C 100%), linear-gradient(#05070C, #05070C)`,
-    light: `radial-gradient(120% 90% at 50% 50%, ${HUB[1]}66 0%, ${HUB[3]}22 45%, #F4F7FA 100%), linear-gradient(#F4F7FA, #F4F7FA)`,
+    /* A PICTURE OF THE FIELD, NOT AN IMPRESSION OF IT (owner, 2026-08-15:
+       "Show a photo here for aurora wallpaper photo"). Every other tile in the
+       picker shows the thing it actually is — the 25 shaders each got their
+       own frame in the sprite sheet — while this one, the Hub's OWN ground and
+       the default, was a hand-written radial gradient standing in for it. It
+       read as a blue blob next to twenty-five real previews.
+
+       Both frames are the real canvas: rendered from the live WavyBackground
+       at 208x136 (2x the 104x68 tile), centre-cropped to the tile's aspect so
+       nothing is squashed, with the field's own `filter: blur(10px)` re-applied
+       AT THE THUMBNAIL'S SCALE (1.92px) — the blur lives on the element, not in
+       the pixels, so a raw capture would have shown a sharper field than the
+       wallpaper actually is. 1.5 KB and 1.4 KB.
+
+       Dark and light are separate captures because the field is theme-aware
+       (WavyBackground swaps palettes on `themechange`); the light frame was
+       taken after the switch and verified by sampling its centre pixel.
+
+       Still consumed as background-IMAGE like every value in this file, so a
+       url() is valid here exactly as a gradient is — see asImage(). */
+    dark: `url("/wallpapers/wave-field.webp")`,
+    light: `url("/wallpapers/wave-field-light.webp")`,
   },
   {
     id: "hub-deep", kind: "still", group: "koleex", nameKey: "wp.hubDeep", dim: 46,
