@@ -182,10 +182,24 @@ export default function KpiCard({
     return () => ro.disconnect();
   }, [value]);
 
+  const interactive = !!(href || onClick);
+
+  /* Writes the pointer into two custom properties; .kx-spotlight's ::before
+     follows them. Attached only to interactive cards, so a card that cannot be
+     clicked never lights up and never promises a click that does nothing. */
+  const onPointer = interactive
+    ? (e: React.PointerEvent<HTMLElement>) => {
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        el.style.setProperty("--kx-spot-x", `${e.clientX - r.left}px`);
+        el.style.setProperty("--kx-spot-y", `${e.clientY - r.top}px`);
+      }
+    : undefined;
+
   const baseClass =
     "block rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors " +
-    (href || onClick
-      ? "hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] cursor-pointer "
+    (interactive
+      ? "kx-spotlight hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] cursor-pointer "
       : "") +
     className;
 
@@ -227,14 +241,14 @@ export default function KpiCard({
 
   if (href) {
     return (
-      <Link href={href} className={baseClass} onClick={onClick}>
+      <Link href={href} className={baseClass} onClick={onClick} onPointerMove={onPointer}>
         {inner}
       </Link>
     );
   }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={baseClass + " w-full text-left"}>
+      <button type="button" onClick={onClick} onPointerMove={onPointer} className={baseClass + " w-full text-left"}>
         {inner}
       </button>
     );

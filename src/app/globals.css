@@ -428,6 +428,52 @@ body {
 .notes-surface-ruled .notes-editor h2,
 .notes-surface-ruled .notes-editor h3 { line-height: var(--rule-h); margin: 0; }
 
+/* ── kx-spotlight ── the cursor lights the card ────────────────────────────
+   Technique from React Bits' SpotlightCard (owner picked it from the lab);
+   the CSS is ours, and deliberately so. Theirs hardcodes #111 / #222 /
+   padding:2rem / radius:1.5rem, which would fight every token on the card it
+   wraps and is dark-only — it would break the moment the light theme is on.
+   What is worth taking is four lines of mechanism: the pointer writes its
+   position into two custom properties and a radial gradient follows.
+
+   ONLY ON INTERACTIVE CARDS. A stat you cannot click should not light up under
+   the cursor — that promises a click that does nothing. Same rule as the
+   chevron in Settings: the flourish marks interactivity, it does not decorate.
+
+   No overflow:hidden — ::before inherits the radius instead, so the glow is
+   clipped to the card's own corners without a containing block that would trap
+   anything positioned inside it. */
+.kx-spotlight { position: relative; }
+.kx-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--kx-spot-x, 50%) var(--kx-spot-y, 50%),
+    var(--kx-spot-color, rgba(86, 127, 178, 0.30)),
+    transparent 72%
+  );
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+}
+.kx-spotlight:hover::before,
+.kx-spotlight:focus-visible::before { opacity: 1; }
+
+/* Light theme: the same blue at lower alpha. On a near-white card the dark
+   version reads as a smudge rather than a light. */
+[data-theme="light"] .kx-spotlight {
+  --kx-spot-color: rgba(62, 103, 150, 0.16);
+}
+
+/* The pointer handler is a no-op for anyone who has asked for less movement,
+   but the gradient would still sit wherever the last pointer left it — so it
+   simply never shows. */
+@media (prefers-reduced-motion: reduce) {
+  .kx-spotlight::before { display: none; }
+}
+
 /* ── Wallpaper under the CORE skin ──────────────────────────────────────────
    Aurora paints a chosen wallpaper inside WavyBackground, which twenty pages
    mount. Core mounts nothing — those pages read `{aurora && <WavyBackground/>}`
