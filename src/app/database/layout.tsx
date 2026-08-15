@@ -57,7 +57,9 @@ export default function DatabaseLayout({ children }: { children: React.ReactNode
   const { t } = useTranslation(T);
   const meta = metaFor(pathname);
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
+    /* min-h-full — see the note in /purchase/layout.tsx: a 100vh floor inside
+       the Hub scroller is one header-height taller than the visible area. */
+    <div className="min-h-full bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <DatabaseHeader title={t(meta.titleKey, meta.titleEn)} subtitle={t(meta.subKey, meta.subEn)} />
         {children}

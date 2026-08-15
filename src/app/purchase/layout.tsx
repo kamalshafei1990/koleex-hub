@@ -71,7 +71,15 @@ export default function PurchaseLayout({ children }: { children: React.ReactNode
 
        kx-ground-host lifts this layout's own children above the fixed z-0
        canvas. Core keeps the solid --bg-primary it always had. */
-    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6`}>
+    /* min-h-FULL, not min-h-screen. The Hub shell already resolved the viewport
+       maths: `.kx-shell-top` is the 100vh box and `#main-scroll-container`
+       sits inside it with the header height as padding. A 100vh floor in here
+       is therefore taller than the area that can show it — measured on this
+       route: floor 789, visible 733, a 56px phantom scroll on every screen
+       whether the page has content or not. `min-h-full` resolves against the
+       scroller instead, so short pages stop scrolling and long ones are
+       unaffected. */
+    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-full bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6`}>
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground topLight />

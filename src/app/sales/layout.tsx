@@ -14,11 +14,11 @@
    HEIGHT: `h-full`, not `min-h-screen`. The Hub shell already resolved the
    viewport maths — `.kx-shell-top` is the 100vh/100svh box, `#main-scroll-container`
    is the scroller inside it — so a layout that measures the viewport again
-   lands one header-height too tall and buys a phantom scrollbar on every
-   screen. (Purchase, Inventory and Database layouts still carry `min-h-screen`
-   and that bug with it; not fixed here because it is not this app.) SalesApp
-   fills this box and scrolls internally; the flowing order pages take
-   `min-h-full` and let the Hub scroller do the work.
+   lands one header-height too tall and buys a phantom scrollbar on short
+   pages. (Purchase, Inventory and Database carried that for a while; fixed
+   right after this app landed.) SalesApp fills this box and scrolls
+   internally; the flowing order pages take `min-h-full` and let the Hub
+   scroller do the work.
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";

@@ -78,7 +78,9 @@ export default function InventoryLayout({ children }: { children: React.ReactNod
        canvas (positioned children excluded — that rule is what threw the
        sidebar's collapse button off-screen when it was written without the
        :not()s). Core keeps the solid --bg-primary it always had. */
-    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6`}>
+    /* min-h-full — see the note in /purchase/layout.tsx: a 100vh floor inside
+       the Hub scroller is one header-height taller than the visible area. */
+    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-full bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6`}>
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground topLight />
