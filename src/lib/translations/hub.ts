@@ -58,6 +58,7 @@ export const hubT: Translations = {
   "app.landed-cost":     { en: "Landed Cost",      zh: "到岸成本",          ar: "تكلفة الوصول" },
   "app.documents":       { en: "Documents",        zh: "文件",              ar: "المستندات" },
   "app.sales":           { en: "Sales",            zh: "销售",              ar: "المبيعات" },
+  "app.travel":          { en: "Travel",           zh: "商务出行",          ar: "السفر" },
   "app.crm":             { en: "CRM",              zh: "客户管理",          ar: "إدارة العملاء" },
   "app.quotations":      { en: "Quotations",       zh: "报价单",            ar: "عروض الأسعار" },
   "app.invoices":        { en: "Invoices",         zh: "发票",              ar: "الفواتير" },

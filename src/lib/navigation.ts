@@ -32,6 +32,7 @@ import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import LandedCostIcon from "@/components/icons/LandedCostIcon";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
+import TravelIcon from "@/components/icons/TravelIcon";
 import MarketsIcon from "@/components/icons/MarketsIcon";
 import FinanceIcon from "@/components/icons/FinanceIcon";
 import ExpensesIcon from "@/components/icons/ExpensesIcon";
@@ -209,6 +210,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: true,  newSince: "2026-07-09" },
 
   /* ── Commercial ── */
+  { id: "travel",           tKey: "app.travel",           name: "Travel",            icon: TravelIcon,    route: "/travel",           active: true,  newSince: "2026-08-17" },
   { id: "sales",            tKey: "app.sales",            name: "Sales",             icon: SalesIcon,     route: "/sales",            active: true,  newSince: "2026-05-04" },
   { id: "crm",              tKey: "app.crm",              name: "CRM",               icon: CrmIcon,       route: "/crm",              active: true  },
   { id: "quotations",       tKey: "app.quotations",       name: "Quotations",        icon: QuotationIcon, route: "/quotations",       active: true  },
@@ -286,7 +288,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "travel", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",

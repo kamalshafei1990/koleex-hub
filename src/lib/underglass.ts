@@ -85,6 +85,13 @@ export function isUnderglassRoute(pathname: string | null): boolean {
        flat 56px frost would buy a ramp that never gets drawn on the order
        pages, which is the exact trade Settings is excluded for. */
     p.startsWith("/sales") ||
+    /* Travel, 2026-08-17. Built Aurora-first, so this is a design decision
+       rather than an audit result: the app renders the canonical PageHeader
+       with `showTabs={false}` and navigates from AppHomeMenu, so there is no
+       sticky tab band and therefore no ramp host — the same reason Expenses
+       and Settings sit here. The /travel/[id]/print route is chrome-less and
+       outside the segment layout, so it is unaffected either way. */
+    p.startsWith("/travel") ||
     /* Expenses, 2026-08-16. Sticky audit: ZERO stickies of its own — grepped
        across all three of its components, no hits outside comments.
 
