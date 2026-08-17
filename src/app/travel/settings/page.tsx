@@ -24,7 +24,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TravelIcon from "@/components/icons/TravelIcon";
-import { Section, TextField } from "@/components/travel/fields";
+import { CARD, Section, TextField } from "@/components/travel/fields";
 import type { InvitationSettings } from "@/lib/invitations/types";
 
 const EMPTY: InvitationSettings = {
@@ -217,7 +217,7 @@ export default function TravelSettingsPage() {
             />
           </Section>
 
-          <section className="kx-glass rounded-2xl p-4 sm:p-5">
+          <section className={`${CARD} p-4 sm:p-5`}>
             <h2 className="text-sm font-semibold">Business licence</h2>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
               Page 3 of every letter. Upload it once; replace it only when the licence
@@ -275,7 +275,7 @@ export default function TravelSettingsPage() {
             />
           </section>
 
-          <section className="kx-glass rounded-2xl p-4 sm:p-5">
+          <section className={`${CARD} p-4 sm:p-5`}>
             <h2 className="text-sm font-semibold">Stamp and signature</h2>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
               Shared with the Quotation editor, so they are uploaded once for the whole

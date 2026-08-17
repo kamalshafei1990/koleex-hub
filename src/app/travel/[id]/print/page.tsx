@@ -23,9 +23,17 @@ import { LETTER_STYLES } from "@/components/travel/letter-styles";
 import { buildChinese, buildEnglish } from "@/lib/invitations/templates";
 import type { InvitationLetter, InvitationSettings } from "@/lib/invitations/types";
 
-/** Falls back to the Hub mark so a tenant that has not set a letterhead still
- *  gets a header rather than a broken image. */
-const DEFAULT_LOGO = "/koleex-hub-logo.png";
+/** THE KOLEEX COMPANY LOGO — not the Hub mark.
+ *
+ *  Standing rule from the owner: "logo" always means the Koleex logo. The Hub
+ *  mark is the internal software's badge; a letter that goes to a consulate
+ *  represents KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., Ltd., and putting
+ *  the software's badge on it signs with the wrong identity. The first version
+ *  of this file did exactly that.
+ *
+ *  Black, because the letter is black on white paper. SVG, because a raster
+ *  wordmark at 12 mm tall on A4 shows its edges in print. */
+const DEFAULT_LOGO = "/brand/koleex-logo-black.svg";
 
 type Loaded = {
   letter: InvitationLetter;

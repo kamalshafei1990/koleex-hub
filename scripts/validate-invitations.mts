@@ -169,7 +169,6 @@ ok("cities are printed in Chinese",
  *  that way, unspaced, in the owner's own accepted letters. An earlier version
  *  of this check flagged it — the check was wrong, not the letter. So the test
  *  looks for runs of two or more Latin letters. */
-const CJK = /[一-鿿]/;
 function welds(s: string): string | null {
   const glued = /([一-鿿])([A-Za-z]{2,})|([A-Za-z]{2,})([一-鿿])/.exec(s);
   if (!glued) return null;
@@ -234,6 +233,57 @@ for (const table of ["invitation_letters", "invitation_settings"]) {
   ok(`${table} has RLS enabled`,
     new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`).test(sql));
 }
+
+/* ── H. the two skins, and the logo ─────────────────────────────────────── */
+console.log("\nF. Skins and brand");
+
+/* `kx-glass`, `kx-seg-on` and `kx-chip-on` are defined ONLY under
+   [data-kx-skin="aurora"]. Used alone they are the whole surface in Aurora and
+   NOTHING in Core — cards with no rim, and a selected option that looks
+   identical to an unselected one. The owner saw both. Every use must be
+   accompanied by explicit token classes in the same string. */
+const AURORA_ONLY = ["kx-glass", "kx-seg-on", "kx-chip-on", "kx-glass-pop"];
+const uiFiles = [
+  "src/components/travel/fields.tsx",
+  "src/components/travel/TravelApp.tsx",
+  "src/components/travel/CustomerPicker.tsx",
+  "src/components/travel/CustomerInvitations.tsx",
+  "src/app/travel/settings/page.tsx",
+];
+for (const f of uiFiles) {
+  const src = fs.readFileSync(R(f), "utf8");
+  const bad: string[] = [];
+  /* Every className string that mentions an Aurora-only class must also carry
+     a token-based surface, rim or colour so Core paints something. */
+  for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+    const cls = m[1] ?? m[2] ?? "";
+    if (!AURORA_ONLY.some((c) => new RegExp(`\\b${c}\\b`).test(cls))) continue;
+    /* Either tokens inline, or one of the shared constants which carry them. */
+    const hasTokens = /var\(--(bg|border|text)-/.test(cls) ||
+      /\$\{(CARD|SELECTED|SELECTED_CHIP)\}/.test(cls);
+    if (!hasTokens) bad.push(cls.replace(/\s+/g, " ").slice(0, 60));
+  }
+  ok(`${f.split("/").pop()} — no Aurora-only class left bare`, bad.length === 0, bad.join(" | "));
+}
+
+/* The shared constants themselves must carry both halves. */
+const fieldsSrc = fs.readFileSync(R("src/components/travel/fields.tsx"), "utf8");
+for (const name of ["CARD", "SELECTED", "SELECTED_CHIP"]) {
+  const m = new RegExp(`export const ${name} =\\s*\n?\\s*"([^"]+)"`).exec(fieldsSrc);
+  ok(`${name} carries a token surface for Core`,
+    !!m && /var\(--(bg|border|text)-/.test(m[1]!), m ? m[1]!.slice(0, 60) : "not found");
+}
+
+/* "Logo" means the KOLEEX logo. The Hub mark must never reach a document that
+   leaves the company. Owner's standing rule, 2026-08-17. */
+const printSrc = fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8");
+ok("the letter uses the KOLEEX logo, not the Hub mark",
+  printSrc.includes("koleex-logo-black.svg") && !/hub-logo|koleex-hub-logo/.test(printSrc));
+ok("both Koleex logo files exist",
+  fs.existsSync(R("public/brand/koleex-logo-black.svg")) &&
+  fs.existsSync(R("public/brand/koleex-logo-white.svg")));
+ok("the black logo is actually black",
+  /fill:\s*#000/.test(fs.readFileSync(R("public/brand/koleex-logo-black.svg"), "utf8")));
 
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);

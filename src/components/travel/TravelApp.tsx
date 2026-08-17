@@ -25,6 +25,7 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
 import TravelIcon from "@/components/icons/TravelIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
 import { formatDateEn, PURPOSES } from "@/lib/invitations/types";
 import type { InvitationLetter } from "@/lib/invitations/types";
 
@@ -141,7 +142,7 @@ export default function TravelApp() {
             <SpinnerIcon size={28} />
           </div>
         ) : error ? (
-          <div className="kx-glass rounded-2xl p-6 text-center">
+          <div className={`${CARD} p-6 text-center`}>
             <p className="text-[var(--text-secondary)]">{error}</p>
             <div className="mt-3">
               <Button variant="secondary" onClick={() => void load()}>
@@ -150,7 +151,7 @@ export default function TravelApp() {
             </div>
           </div>
         ) : visible.length === 0 ? (
-          <div className="kx-glass rounded-2xl px-6 py-14 text-center">
+          <div className={`${CARD} px-6 py-14 text-center`}>
             <p className="text-base font-medium">{t("empty.title")}</p>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">{t("empty.body")}</p>
             <div className="mt-4">
@@ -169,8 +170,8 @@ export default function TravelApp() {
                      paint a hard blue box across it. Opting out lets the
                      row's own surface-hover show instead. */
                   data-kx-keep-hover=""
-                  className="kx-glass w-full rounded-2xl px-4 py-3 text-start transition-colors
-                             hover:bg-[var(--bg-surface-hover)] sm:flex sm:items-center sm:gap-4"
+                  className={`${CARD} w-full px-4 py-3 text-start transition-colors
+                             hover:bg-[var(--bg-surface-hover)] sm:flex sm:items-center sm:gap-4`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
@@ -200,8 +201,10 @@ export default function TravelApp() {
                       )}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        r.status === "issued" ? "kx-chip-on" : "text-[var(--text-secondary)]"
+                      className={`rounded-full border px-2 py-0.5 text-xs ${
+                        r.status === "issued"
+                          ? SELECTED_CHIP
+                          : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
                       }`}
                     >
                       {r.status === "issued" ? t("status.issued") : t("status.draft")}

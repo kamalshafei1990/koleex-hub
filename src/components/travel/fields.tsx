@@ -13,6 +13,33 @@
 
 import type { ReactNode } from "react";
 
+/* ── THE CARD RECIPE ──
+   `kx-glass` is defined ONLY under [data-kx-skin="aurora"]. On its own it is
+   the whole surface in Aurora and NOTHING in Core — which is exactly what the
+   owner saw: cards with no ground and no rim, floating on flat black.
+
+   So every card carries BOTH: explicit token surface + rim (which Core paints
+   solid, and which `kx-app` remaps to translucent under Aurora), and
+   `kx-glass` on top for the blur Aurora adds. One constant, so the two skins
+   cannot drift apart card by card. */
+export const CARD =
+  "kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]";
+
+/* ── SELECTED STATE ──
+   Same trap as CARD, but worse: `kx-seg-on` and `kx-chip-on` are also
+   Aurora-only, so in Core the chosen Male/Female — and every chosen city —
+   looked identical to the unchosen ones. That is not a cosmetic gap, it is
+   the control failing to say what it is set to.
+
+   Token surface + rim carries Core; the Aurora class adds its Hub-Blue ring
+   on top. `--bg-surface-active` and `--border-strong` are what the other
+   converted apps use for an active control, so this matches them. */
+export const SELECTED =
+  "kx-seg-on border-[var(--border-strong)] bg-[var(--bg-surface-active)] text-[var(--text-highlight)]";
+
+export const SELECTED_CHIP =
+  "kx-chip-on border-[var(--border-strong)] bg-[var(--bg-surface-active)] text-[var(--text-highlight)]";
+
 const LABEL = "block text-xs font-medium text-[var(--text-secondary)]";
 const CONTROL =
   "mt-1 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] " +
@@ -178,7 +205,7 @@ export function SegmentField<T extends string>({
             onClick={() => onChange(o.value)}
             aria-pressed={value === o.value}
             className={`flex-1 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              value === o.value ? "kx-seg-on" : "text-[var(--text-secondary)]"
+              value === o.value ? SELECTED : "text-[var(--text-secondary)]"
             }`}
           >
             {o.label}
@@ -215,9 +242,7 @@ export function ChipsField({
               onClick={() => onToggle(o)}
               aria-pressed={on}
               className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                on
-                  ? "kx-chip-on border-transparent"
-                  : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
+                on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
               }`}
             >
               {o}
@@ -238,7 +263,7 @@ export function ChipsField({
  *  so the between-field gap has to be clearly larger than the within-field one. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="kx-glass rounded-2xl p-4 sm:p-5">
+    <section className={`${CARD} p-4 sm:p-5`}>
       <h2 className="text-sm font-semibold">{title}</h2>
       <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">{children}</div>
     </section>

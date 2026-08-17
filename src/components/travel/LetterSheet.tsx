@@ -89,18 +89,14 @@ export default function LetterSheet({
           {pairs(text.passportBlock).map(([left, right]) => (
             <tr key={left.label}>
               <th scope="row">{left.label}</th>
-              <td>{left.value || "—"}</td>
-              {right ? (
+              {/* An odd field count leaves the last row with one pair. The
+                  value SPANS the empty half rather than sitting beside two
+                  blank cells, which read as a mistake on the page. */}
+              <td colSpan={right ? 1 : 3}>{left.value || "—"}</td>
+              {right && (
                 <>
                   <th scope="row">{right.label}</th>
                   <td>{right.value || "—"}</td>
-                </>
-              ) : (
-                /* An odd count leaves one empty pair. Rendered as real cells
-                   so the borders close instead of the row ending short. */
-                <>
-                  <th aria-hidden />
-                  <td />
                 </>
               )}
             </tr>

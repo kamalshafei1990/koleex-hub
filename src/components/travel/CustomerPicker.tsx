@@ -165,7 +165,14 @@ export default function CustomerPicker({
       {open && rows && (
         /* kx-glass-pop, not kx-glass: this floats above the form and needs the
            popover recipe, otherwise the fields behind it read through. */
-        <ul className="kx-glass-pop absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl p-1">
+        <ul
+          /* kx-glass-pop is Aurora-only, so the popover needs its own solid
+             surface and rim for Core — without them the list read as floating
+             text over the fields behind it. */
+          className="kx-glass-pop absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl
+                     border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1
+                     shadow-[0_20px_48px_-20px_rgba(0,0,0,0.6)]"
+        >
           {rows.length === 0 ? (
             <li className="px-3 py-2 text-sm text-[var(--text-secondary)]">No customers found.</li>
           ) : (
