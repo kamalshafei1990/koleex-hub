@@ -29,9 +29,13 @@ import fs from "node:fs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const R = (p: string) => path.resolve(__dirname, "..", p);
 
-const mrz = await import(R("src/lib/invitations/mrz.ts"));
-const types = await import(R("src/lib/invitations/types.ts"));
-const tpl = await import(R("src/lib/invitations/templates.ts"));
+const mrz = await import(R("src/lib/invitations/mrz.ts")) as typeof import("../src/lib/invitations/mrz.js");
+const types = await import(R("src/lib/invitations/types.ts")) as typeof import("../src/lib/invitations/types.js");
+const tpl = await import(R("src/lib/invitations/templates.ts")) as typeof import("../src/lib/invitations/templates.js");
+type Visitor = import("../src/lib/invitations/types.js").InvitationVisitor;
+type Visit = import("../src/lib/invitations/types.js").InvitationVisit;
+type Settings = import("../src/lib/invitations/types.js").InvitationSettings;
+type Row = import("../src/lib/invitations/templates.js").LetterRow;
 
 let passed = 0;
 const failures: string[] = [];
@@ -85,7 +89,7 @@ ok("a non-MRZ blob returns null", mrz.parseMrz("just some ocr noise\nand more no
 /* ── C + D. the two defects in the owner's manual letters ───────────────── */
 console.log("\nB. The defects the feature exists to prevent");
 
-const settings = {
+const settings: Settings = {
   companyNameEn: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., Ltd.",
   companyNameCn: "科莱恪斯国际商业管理（台州）有限公司",
   creditCode: "91331000MADEQ1RC8C",
@@ -98,7 +102,7 @@ const settings = {
   licenceDocUrl: null,
 };
 
-const visit = {
+const visit: Visit = {
   purpose: "factory" as const,
   exhibitionName: null,
   extraNote: null,
@@ -109,16 +113,16 @@ const visit = {
   visaType: "multi" as const,
 };
 
-const withTitle = {
+const withTitle: Visitor = {
   name: "AHMED MOHAMED NOUR", gender: "male" as const, dob: "1985-03-12",
   nationality: "Egypt", nationalityCode: "EG", passportNo: "A12345678",
   passportIssue: "2022-01-05", passportExpiry: "2032-01-04",
   company: "Nour Textiles", position: "General Manager",
   country: "Egypt", countryCode: "EG",
 };
-const noTitle = { ...withTitle, position: null };
+const noTitle: Visitor = { ...withTitle, position: null };
 
-const inp = (v: typeof withTitle) => ({
+const inp = (v: Visitor) => ({
   visitor: v, visit, settings, letterDate: "2026-08-17", reference: "KX-INV-2026-0001",
 });
 
@@ -128,9 +132,9 @@ const enB = tpl.buildEnglish(inp(noTitle));
 const zhB = tpl.buildChinese(inp(noTitle));
 
 /* C. the name in the narrative IS the name in the table */
-const tableName = enA.passportBlock.find((row) => row.label === "Name")?.value ?? "";
+const tableName = enA.passportBlock.find((row: Row) => row.label === "Name")?.value ?? "";
 ok("the narrative names the same person as the passport block",
-  enA.body.every((p) => !p.includes("Mr. ") || p.includes(tableName)),
+  enA.body.every((p: string) => !p.includes("Mr. ") || p.includes(tableName)),
   tableName);
 ok("the Chinese narrative names the same person too",
   zhA.body[1]!.includes(tableName));
@@ -140,9 +144,9 @@ ok("no position → the letter says the visitor is our customer",
   enB.body[0]!.includes("is our valued customer") && !enB.body[0]!.includes("of Nour Textiles,"),
   enB.body[0]);
 ok("no position → no Position row in the English block",
-  !enB.passportBlock.some((row) => row.label === "Position"));
+  !enB.passportBlock.some((row: Row) => row.label === "Position"));
 ok("no position → no 职务 row in the Chinese block",
-  !zhB.passportBlock.some((row) => row.label === "职务"));
+  !zhB.passportBlock.some((row: Row) => row.label === "职务"));
 
 /* ── E. the Chinese page is actually Chinese ────────────────────────────── */
 console.log("\nC. The Chinese page");
@@ -151,9 +155,9 @@ ok("the consulate line uses the Chinese country name",
   zhA.addressee.includes("埃及") && !zhA.addressee.includes("Egypt"),
   zhA.addressee);
 ok("the nationality row uses the Chinese country name",
-  zhA.passportBlock.find((row) => row.label === "国籍")?.value === "埃及");
+  zhA.passportBlock.find((row: Row) => row.label === "国籍")?.value === "埃及");
 ok("a mapped job title is printed in Chinese",
-  zhA.passportBlock.find((row) => row.label === "职务")?.value === "总经理");
+  zhA.passportBlock.find((row: Row) => row.label === "职务")?.value === "总经理");
 ok("cities are printed in Chinese",
   zhA.body[1]!.includes("台州") && zhA.body[1]!.includes("上海"));
 

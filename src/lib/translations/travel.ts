@@ -10,6 +10,11 @@ export const travelT: Translations = {
   "nav.all":         { en: "All letters", zh: "全部邀请函", ar: "كل الخطابات" },
   "nav.draft":       { en: "Drafts",      zh: "草稿",      ar: "مسودات" },
   "nav.issued":      { en: "Issued",      zh: "已签发",    ar: "صادرة" },
+  /* The FILTER is plural ("Drafts" — a bucket of them); the STATUS of one
+     letter is singular. Reusing the filter label as the badge printed
+     "Drafts" on a single row. */
+  "status.draft":    { en: "Draft",       zh: "草稿",      ar: "مسودة" },
+  "status.issued":   { en: "Issued",      zh: "已签发",    ar: "صادر" },
   "nav.settings":    { en: "Settings",    zh: "设置",      ar: "الإعدادات" },
   "action.new":      { en: "New invitation", zh: "新建邀请函", ar: "دعوة جديدة" },
   "empty.title":     { en: "No invitation letters yet", zh: "暂无邀请函", ar: "مفيش خطابات دعوة لسه" },
@@ -49,6 +54,12 @@ export const travelT: Translations = {
   "f.purpose":       { en: "Reason for the visit", zh: "访问事由",  ar: "سبب الزيارة" },
   "f.exhibition":    { en: "Exhibition name",     zh: "展会名称",   ar: "اسم المعرض" },
   "f.note":          { en: "Extra note",          zh: "补充说明",   ar: "ملاحظة إضافية" },
+  /* One field, printed verbatim on BOTH pages — so English text here appears
+     in English in the middle of the Chinese letter. Said plainly, because it
+     is a choice the operator has to make, not a bug to discover later. */
+  "f.note.hint":     { en: "Printed word for word on both pages — write it in Chinese too if it must read as Chinese",
+                       zh: "将原样印在中英文两页上——如需中文呈现，请一并用中文书写",
+                       ar: "بيتطبع زي ما هو في الصفحتين — اكتبه بالصيني كمان لو لازم يبان صيني" },
   "f.arrivalCity":   { en: "Arrival city",        zh: "入境城市",   ar: "مدينة الوصول" },
   "f.arrival":       { en: "Arrival date",        zh: "入境日期",   ar: "تاريخ الوصول" },
   "f.departure":     { en: "Departure date",      zh: "离境日期",   ar: "تاريخ المغادرة" },

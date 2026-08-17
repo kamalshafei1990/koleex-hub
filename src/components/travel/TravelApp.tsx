@@ -191,13 +191,20 @@ export default function TravelApp() {
                       {formatDateEn(r.visit.arrivalDate)}
                       {" → "}
                       {formatDateEn(r.visit.departureDate)}
+                      {/* The derived stay length, shown where the dates are —
+                          it is the field a consulate cross-checks first. */}
+                      {r.durationDays > 0 && (
+                        <span className="text-[var(--text-dim)]">
+                          {` · ${r.durationDays} ${t("f.days")}`}
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs ${
                         r.status === "issued" ? "kx-chip-on" : "text-[var(--text-secondary)]"
                       }`}
                     >
-                      {r.status === "issued" ? t("nav.issued") : t("nav.draft")}
+                      {r.status === "issued" ? t("status.issued") : t("status.draft")}
                     </span>
                   </div>
                 </button>

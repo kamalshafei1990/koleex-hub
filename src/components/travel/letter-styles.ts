@@ -22,24 +22,36 @@ export const LETTER_STYLES = `
   .inv-stack { width: 210mm; margin: 0 auto; }
 
   /* 270 mm, not 297: fits inside BOTH A4 (297) and US Letter (279) printable
-     areas, so the pipeline never spills onto a phantom blank sheet. Same
-     geometry the quotation sheet uses. */
+     areas, so the pipeline never spills onto a phantom blank sheet.
+   *
+   * min-height WITHOUT height/max-height, and overflow VISIBLE. The quotation
+   * sheet pins all three and clips — correct there, because a quotation's
+   * content is paginated by the editor. A letter is not: its length depends on
+   * the customer's name, company, address and optional note, and the first
+   * version of this file pinned the height and clipped. The English page
+   * measured 390 mm of content in a 270 mm box, so the closing guarantee and
+   * the actual visa request were silently thrown away — a letter that looked
+   * finished on screen and reached a consulate incomplete.
+   *
+   * So: the sheet is at least a page, and grows if it must. A complete letter
+   * that runs onto a fourth page is a document; a clipped one is not. The
+   * print page measures each sheet after paint and shows an on-screen (never
+   * printed) warning when one overflows, so the operator can shorten the note
+   * instead of discovering it at the counter. */
   .inv-a4 {
     box-sizing: border-box;
     width: 210mm;
-    height: 270mm;
     min-height: 270mm;
-    max-height: 270mm;
-    padding: 18mm 20mm 14mm;
+    padding: 14mm 17mm 12mm;
     margin: 0 auto 10mm;
     background: #fff;
     color: #000;
-    overflow: hidden;
+    overflow: visible;
     position: relative;
     box-shadow: 0 0 16px rgba(0,0,0,0.10);
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 11.5pt;
-    line-height: 1.6;
+    font-size: 10pt;
+    line-height: 1.42;
   }
 
   /* The Chinese page needs a CJK stack. Without it the browser falls back to
@@ -49,8 +61,8 @@ export const LETTER_STYLES = `
   .inv-a4[lang="zh-CN"] {
     font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
                  "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
-    font-size: 12pt;
-    line-height: 1.9;
+    font-size: 9.8pt;
+    line-height: 1.55;
   }
 
   /* ── header ── */
@@ -60,23 +72,23 @@ export const LETTER_STYLES = `
     justify-content: space-between;
     gap: 8mm;
   }
-  .inv-logo { height: 16mm; width: auto; object-fit: contain; }
+  .inv-logo { height: 12mm; width: auto; object-fit: contain; }
   .inv-head-co { text-align: right; }
   .inv-a4[lang="zh-CN"] .inv-head-co { text-align: right; }
-  .inv-co-name { margin: 0; font-size: 11pt; font-weight: 700; letter-spacing: .01em; }
-  .inv-co-addr { margin: 1mm 0 0; font-size: 8.5pt; color: #444; max-width: 95mm; }
+  .inv-co-name { margin: 0; font-size: 10pt; font-weight: 700; letter-spacing: .01em; }
+  .inv-co-addr { margin: 0.8mm 0 0; font-size: 7.5pt; color: #444; max-width: 92mm; }
 
-  .inv-rule { height: 1.2pt; background: #000; margin: 4mm 0 7mm; }
+  .inv-rule { height: 1.2pt; background: #000; margin: 3mm 0 5mm; }
 
   /* ── title ── */
   .inv-title {
-    margin: 0 0 7mm;
+    margin: 0 0 4mm;
     text-align: center;
-    font-size: 16pt;
+    font-size: 15pt;
     font-weight: 700;
     letter-spacing: .06em;
   }
-  .inv-title-zh { letter-spacing: .3em; font-size: 17pt; }
+  .inv-title-zh { letter-spacing: .3em; font-size: 16pt; }
 
   /* ── addressee + date ── */
   .inv-meta {
@@ -84,34 +96,37 @@ export const LETTER_STYLES = `
     align-items: flex-start;
     justify-content: space-between;
     gap: 10mm;
-    margin-bottom: 6mm;
+    margin-bottom: 4.5mm;
   }
-  .inv-addressee { font-size: 10.5pt; }
+  .inv-addressee { font-size: 9.5pt; }
   .inv-addressee p { margin: 0; }
-  .inv-meta-right { text-align: right; font-size: 10.5pt; white-space: nowrap; }
+  .inv-meta-right { text-align: right; font-size: 9.5pt; white-space: nowrap; }
   .inv-meta-right p { margin: 0; }
   .inv-ref { color: #555; font-size: 9pt; font-variant-numeric: tabular-nums; }
 
-  .inv-salutation { margin: 0 0 4mm; }
-  .inv-p { margin: 0 0 4mm; text-align: justify; }
+  .inv-salutation { margin: 0 0 3mm; }
+  .inv-p { margin: 0 0 2.4mm; text-align: justify; }
   .inv-a4[lang="zh-CN"] .inv-p { text-indent: 2em; text-align: justify; }
 
   /* ── passport block ── */
   .inv-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0 0 6mm;
-    font-size: 10.5pt;
+    margin: 0 0 4mm;
+    font-size: 9pt;
+    table-layout: fixed;
   }
   .inv-table th,
   .inv-table td {
     border: 0.8pt solid #000;
-    padding: 1.6mm 3mm;
+    padding: 1.1mm 2mm;
     text-align: left;
     vertical-align: middle;
   }
   .inv-table th {
-    width: 42mm;
+    /* Four columns now: label, value, label, value. Fixed label widths keep
+       both halves aligned regardless of how long a value is. */
+    width: 26mm;
     font-weight: 600;
     background: #f4f4f4;
     white-space: nowrap;
@@ -119,7 +134,7 @@ export const LETTER_STYLES = `
   .inv-table td { font-variant-numeric: tabular-nums; }
 
   /* ── sign-off ── */
-  .inv-signoff { margin-top: 6mm; }
+  .inv-signoff { margin-top: 3mm; }
   .inv-closing { margin: 0 0 2mm; }
   .inv-closing-line { display: block; }
 
@@ -128,14 +143,14 @@ export const LETTER_STYLES = `
      rather than the address block sliding up into the closing line. */
   .inv-marks {
     position: relative;
-    height: 30mm;
+    height: 22mm;
     margin: 1mm 0 1mm;
   }
   .inv-sig {
     position: absolute;
     left: 0;
     top: 2mm;
-    height: 18mm;
+    height: 14mm;
     width: auto;
     object-fit: contain;
   }
@@ -144,17 +159,17 @@ export const LETTER_STYLES = `
      it. */
   .inv-stamp {
     position: absolute;
-    left: 22mm;
+    left: 20mm;
     top: 0;
-    height: 30mm;
+    height: 22mm;
     width: auto;
     object-fit: contain;
     opacity: .92;
   }
 
-  .inv-signer { font-size: 10pt; line-height: 1.5; }
+  .inv-signer { font-size: 9pt; line-height: 1.4; }
   .inv-signer p { margin: 0; }
-  .inv-signer-name { font-weight: 700; font-size: 11pt; }
+  .inv-signer-name { font-weight: 700; font-size: 10pt; }
 
   /* ── the licence page ── */
   .inv-licence-page {
@@ -183,6 +198,23 @@ export const LETTER_STYLES = `
     font-size: 10pt;
     text-align: center;
     padding: 10mm;
+  }
+
+  /* ── overflow warning ──
+     Set by the print page after it measures each sheet. Screen only: .no-print
+     hides it from the PDF, so the operator sees it and the consulate never
+     does. Positioned outside the paper so it cannot be mistaken for content. */
+  .inv-overflow-note {
+    width: 210mm;
+    margin: 0 auto 10mm;
+    padding: 4mm 6mm;
+    border: 1.5pt solid #b45309;
+    border-radius: 3mm;
+    background: #fffbeb;
+    color: #78350f;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.5;
   }
 
   /* ── print ── */

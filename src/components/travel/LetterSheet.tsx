@@ -12,7 +12,15 @@
    and the print pipeline never spills onto a phantom blank page.
    --------------------------------------------------------------------------- */
 
-import type { LetterText } from "@/lib/invitations/templates";
+import type { LetterRow, LetterText } from "@/lib/invitations/templates";
+
+/** Group rows into pairs for the two-column passport table. The second of a
+ *  final odd pair is undefined, which the caller renders as empty cells. */
+function pairs(rows: LetterRow[]): [LetterRow, LetterRow | undefined][] {
+  const out: [LetterRow, LetterRow | undefined][] = [];
+  for (let i = 0; i < rows.length; i += 2) out.push([rows[i]!, rows[i + 1]]);
+  return out;
+}
 
 export type SheetAssets = {
   logoUrl: string;
@@ -70,13 +78,31 @@ export default function LetterSheet({
         </p>
       ))}
 
-      {/* ── passport block ── */}
+      {/* ── passport block ──
+          TWO label/value pairs per row. As nine single rows this table alone
+          measured 85 mm of a 238 mm page and the last two paragraphs of the
+          letter were clipped away by the sheet's overflow:hidden — a letter
+          that looked fine on screen and reached a consulate incomplete.
+          Paired, it is ~40 mm and reads like a passport data page. */}
       <table className="inv-table">
         <tbody>
-          {text.passportBlock.map((row) => (
-            <tr key={row.label}>
-              <th scope="row">{row.label}</th>
-              <td>{row.value || "—"}</td>
+          {pairs(text.passportBlock).map(([left, right]) => (
+            <tr key={left.label}>
+              <th scope="row">{left.label}</th>
+              <td>{left.value || "—"}</td>
+              {right ? (
+                <>
+                  <th scope="row">{right.label}</th>
+                  <td>{right.value || "—"}</td>
+                </>
+              ) : (
+                /* An odd count leaves one empty pair. Rendered as real cells
+                   so the borders close instead of the row ending short. */
+                <>
+                  <th aria-hidden />
+                  <td />
+                </>
+              )}
             </tr>
           ))}
         </tbody>

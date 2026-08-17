@@ -403,13 +403,16 @@ export default function InvitationForm({ id }: { id?: string }) {
               value={form.nationalityCode}
               onChange={(v) => set("nationalityCode", v.slice(0, 2).toUpperCase())}
             />
+            {/* Passport number takes the full row so the two dates below it
+                pair up. An empty grid cell used to do this, which measured as
+                a dead gap on the rendered page. */}
             <TextField
               label={t("f.passportNo")}
               value={form.passportNo}
               onChange={(v) => set("passportNo", v)}
               uppercase
+              wide
             />
-            <div />
             <DateField
               label={t("f.issue")}
               value={form.passportIssue}
@@ -515,7 +518,6 @@ export default function InvitationForm({ id }: { id?: string }) {
                 {t("f.duration.hint")}
               </p>
             </div>
-            <div />
 
             <ChipsField
               label={t("f.cities")}
@@ -533,6 +535,7 @@ export default function InvitationForm({ id }: { id?: string }) {
 
             <TextAreaField
               label={t("f.note")}
+              hint={t("f.note.hint")}
               value={form.extraNote}
               onChange={(v) => set("extraNote", v)}
             />

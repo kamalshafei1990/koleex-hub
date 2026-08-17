@@ -41,6 +41,9 @@ export default function InvitationPrintPage({
   const { id } = use(params);
   const [data, setData] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
+  /** Sheets that grew past one page — measured after paint, shown on screen
+   *  only. A letter is allowed to run long; it must never do so unnoticed. */
+  const [overflowing, setOverflowing] = useState<number[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +111,17 @@ export default function InvitationPrintPage({
         }
       }
       if (cancelled) return;
+
+      /* Measure each sheet now that images and fonts have settled — a stamp
+         that decoded late can be what pushes a page over. 270 mm at 96 dpi;
+         a 2 mm tolerance absorbs sub-pixel rounding. */
+      const MM = 96 / 25.4;
+      const over: number[] = [];
+      document.querySelectorAll(".inv-a4").forEach((el, i) => {
+        if (el.getBoundingClientRect().height > 270 * MM + 2 * MM) over.push(i + 1);
+      });
+      setOverflowing(over);
+
       (window as unknown as { __invitation_pdf_ready__?: boolean }).__invitation_pdf_ready__ =
         true;
 
@@ -150,6 +164,19 @@ export default function InvitationPrintPage({
     <>
       <style>{LETTER_STYLES}</style>
       <div className="inv-stack">
+        {overflowing.length > 0 && (
+          <div className="inv-overflow-note no-print">
+            <strong>
+              {overflowing.length === 1
+                ? `Page ${overflowing[0]} runs past one sheet.`
+                : `Pages ${overflowing.join(" and ")} run past one sheet.`}
+            </strong>{" "}
+            The letter is complete — nothing has been cut — but the PDF will have
+            more than three pages. Shortening the extra note, or the company name
+            and address, brings it back to three. This notice is not printed.
+          </div>
+        )}
+
         <LetterSheet lang="en" text={buildEnglish(input)} assets={assets} />
         <LetterSheet lang="zh" text={buildChinese(input)} assets={assets} />
 
