@@ -321,6 +321,18 @@ export default function InvitationForm({ id }: { id?: string }) {
                   >
                     {t("act.preview")}
                   </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    /* A plain navigation, not fetch+blob: the response is an
+                       attachment, so the browser saves it directly and a
+                       60-second render never sits in JS memory. */
+                    onClick={() => {
+                      window.location.href = `/api/invitations/${id}/pdf`;
+                    }}
+                  >
+                    {t("act.pdf")}
+                  </Button>
                 </>
               )}
               <Button onClick={onSave} disabled={saving}>

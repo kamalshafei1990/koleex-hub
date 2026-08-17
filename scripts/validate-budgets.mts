@@ -121,6 +121,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "settings": { chunks: 9, kbytes: 630 },
   "software-center": { chunks: 10, kbytes: 551 },
   "suppliers": { chunks: 10, kbytes: 515 },
+  /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
+     with customers (492) and notes (491): almost all of it is the shared
+     baseline, and tesseract.js is a dynamic import so the OCR engine is NOT
+     in this number. */
+  "travel": { chunks: 10, kbytes: 580 },
   "todo": { chunks: 12, kbytes: 964 },
   "translator": { chunks: 11, kbytes: 595 },
   "website": { chunks: 10, kbytes: 531 },

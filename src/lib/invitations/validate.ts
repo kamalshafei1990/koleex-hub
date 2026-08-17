@@ -12,7 +12,7 @@ import "server-only";
                   operator; the system just refuses to let them be silent.
    --------------------------------------------------------------------------- */
 
-import { durationDays, countryNeedsChinese } from "./types";
+import { durationDays, countryNeedsChinese, positionNeedsChinese } from "./types";
 
 export type LetterPayload = {
   contactId?: string | null;
@@ -147,6 +147,17 @@ export function validateLetter(p: LetterPayload): ValidationResult {
     warnings.push(
       "There is no Chinese name on file for this nationality, so the Chinese page " +
         "will print the English one. Check it before sending.",
+    );
+  }
+
+  /* 4b. Untranslated job title — the Chinese page would carry an English
+         position mid-sentence. Spaced rather than glued, so it is readable,
+         but still visibly a half-translated letter. */
+  if (positionNeedsChinese(str(v.position))) {
+    warnings.push(
+      `There is no Chinese wording on file for the position "${str(v.position)}", ` +
+        `so the Chinese page will print it in English. Leave the position empty if ` +
+        `you would rather the letter simply say the visitor is our customer.`,
     );
   }
 

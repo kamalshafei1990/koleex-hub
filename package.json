@@ -94,6 +94,7 @@
     "validate:ai-orb": "tsx scripts/validate-ai-orb.ts",
     "validate:ai-platform": "tsx scripts/validate-ai-platform.ts",
     "validate:budgets": "node --import tsx scripts/validate-budgets.mts",
+    "validate:invitations": "node --import tsx scripts/validate-invitations.mts",
     "budgets": "node --import tsx scripts/validate-budgets.mts --report"
   },
   "dependencies": {

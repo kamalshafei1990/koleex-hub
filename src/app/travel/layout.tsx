@@ -17,11 +17,15 @@
    viewport a second time lands one header-height too tall and buys a phantom
    scrollbar on short pages.
 
-   The PRINT route (/travel/[id]/print) is deliberately NOT under this layout:
-   it renders paper, so it must not inherit a glass scope or a wave canvas.
+   THE PRINT ROUTE OPTS OUT. /travel/[id]/print renders paper — black on
+   white, no glass, no canvas — but Next.js nests layouts, so it inherits this
+   one whether or not that is wanted. It is excluded explicitly below rather
+   than moved into a route group, because a group would put the print page in
+   a second tree that no longer shares this segment's URL shape.
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useSkin } from "@/lib/appearance";
 
 /* ssr:false and mounted only under Aurora — a canvas is the one thing the skin
@@ -30,6 +34,12 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 
 export default function TravelLayout({ children }: { children: React.ReactNode }) {
   const aurora = useSkin() === "aurora";
+  const pathname = usePathname();
+
+  /* Paper renders bare: no scope, no ground, no height box. Anything this
+     layout would add is chrome, and chrome inside a printed PDF is a defect. */
+  if (pathname?.endsWith("/print")) return <>{children}</>;
+
   return (
     <div
       className={`${aurora ? "kx-app kx-ground-host " : ""}relative h-full bg-[var(--bg-primary)] text-[var(--text-primary)]`}

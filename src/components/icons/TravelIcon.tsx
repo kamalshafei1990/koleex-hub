@@ -1,8 +1,13 @@
 import { forwardRef } from "react";
 
-/* Travel — a passport booklet with its data page open. Reads as travel
-   documents rather than as a plane, because the app is about the paperwork
-   (invitation letters, passports, visas), not about flights. */
+/* Travel — a passport booklet: cover, an emblem, and the two machine-readable
+   lines at the foot of the data page. Documents, not a plane, because the app
+   is about the paperwork.
+
+   Drawn from primitives rather than one long traced path. navigation.ts is
+   imported by EVERY route, so this file's bytes land in the shared baseline of
+   all 40 of them — the first draft traced a detailed globe and pushed
+   commercial-policy past its budget by 1 KB. */
 const TravelIcon = forwardRef<
   SVGSVGElement,
   { size?: number | string; className?: string; style?: React.CSSProperties; strokeWidth?: number }
@@ -15,18 +20,19 @@ const TravelIcon = forwardRef<
       viewBox="0 0 24 24"
       width={s}
       height={s}
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       className={className}
       style={style}
       {...rest}
     >
-      {/* booklet cover */}
-      <path d="M18,0H6C4.343,0,3,1.343,3,3v18c0,1.657,1.343,3,3,3h12c1.657,0,3-1.343,3-3V3c0-1.657-1.343-3-3-3Zm1,21c0,.552-.448,1-1,1H6c-.552,0-1-.448-1-1V3c0-.552,.448-1,1-1h12c.552,0,1,.448,1,1V21Z" />
-      {/* globe emblem */}
-      <path d="M12,4.5c-2.485,0-4.5,2.015-4.5,4.5s2.015,4.5,4.5,4.5,4.5-2.015,4.5-4.5-2.015-4.5-4.5-4.5Zm2.949,3.75h-.983c-.06-.828-.223-1.594-.468-2.229,.762,.454,1.309,1.246,1.451,2.229Zm-2.949-2.75c.317,0,.828,1.02,.962,2.75h-1.925c.135-1.73,.645-2.75,.962-2.75Zm-1.498,.521c-.245,.635-.408,1.401-.468,2.229h-.983c.142-.983,.689-1.775,1.451-2.229Zm-1.451,3.229h.983c.06,.828,.223,1.594,.468,2.229-.762-.454-1.309-1.246-1.451-2.229Zm2.949,2.75c-.317,0-.828-1.02-.962-2.75h1.925c-.135,1.73-.645,2.75-.962,2.75Zm1.498-.521c.245-.635,.408-1.401,.468-2.229h.983c-.142,.983-.689,1.775-1.451,2.229Z" />
-      {/* the two MRZ lines */}
-      <path d="M15.5,16.5H8.5c-.414,0-.75,.336-.75,.75s.336,.75,.75,.75h7c.414,0,.75-.336,.75-.75s-.336-.75-.75-.75Z" />
-      <path d="M13.5,19H8.5c-.414,0-.75,.336-.75,.75s.336,.75,.75,.75h5c.414,0,.75-.336,.75-.75s-.336-.75-.75-.75Z" />
+      <rect x="4" y="2" width="16" height="20" rx="2.5" />
+      <circle cx="12" cy="9" r="3.2" />
+      <path d="M12 5.8v6.4M8.8 9h6.4" />
+      <path d="M8 16.4h8M8 19h5" />
     </svg>
   );
 });

@@ -22,6 +22,7 @@
    --------------------------------------------------------------------------- */
 
 import { use, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { customerProfileT } from "@/lib/translations/customer-profile";
@@ -77,8 +78,16 @@ const TIER_LABELS: Record<CustomerTier, string> = {
   diamond: "Diamond",
 };
 
-const TABS = ["activity", "commercial", "details"] as const;
+const TABS = ["activity", "commercial", "documents", "details"] as const;
 type Tab = (typeof TABS)[number];
+
+/* Loaded only when the Documents tab is opened. A profile visit that never
+   touches it pays nothing — this page is on the warm-start path and its
+   bundle is measured. */
+const CustomerInvitations = dynamic(
+  () => import("@/components/travel/CustomerInvitations"),
+  { ssr: false },
+);
 
 /* ═══════════════════════════════════════════════════
    HELPERS
@@ -469,6 +478,7 @@ export default function CustomerProfilePage({
           {TABS.map((tabKey) => {
             const label = tabKey === "activity" ? `${t("tab.activity")}${activity ? ` · ${activityTotal}` : ""}`
               : tabKey === "commercial" ? t("tab.commercial")
+              : tabKey === "documents" ? t("tab.documents")
               : t("tab.details");
             return (
               <button
@@ -603,6 +613,9 @@ export default function CustomerProfilePage({
         )}
 
         {/* ── Details ── */}
+        {/* ── Documents — invitation letters prepared for this customer ── */}
+        {tab === "documents" && <CustomerInvitations contactId={id} panelCls={panelCls} />}
+
         {tab === "details" && (
           <div>
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("group.details", "Contacts & Communication")}</p>

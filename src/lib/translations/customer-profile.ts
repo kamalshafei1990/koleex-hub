@@ -31,6 +31,7 @@ export const customerProfileT: Translations = {
   // Tabs
   "tab.activity": { en: "Activity", zh: "动态", ar: "النشاط" },
   "tab.commercial": { en: "Commercial", zh: "商务", ar: "التجاري" },
+  "tab.documents": { en: "Documents", zh: "文件", ar: "المستندات" },
   "tab.details": { en: "Details", zh: "详情", ar: "التفاصيل" },
 
   // Activity

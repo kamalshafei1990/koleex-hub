@@ -17,6 +17,9 @@ import {
   cityCn,
   countryCn,
   durationDays,
+  latinInCn,
+  positionCn,
+  tidyCn,
   formatDateCn,
   formatDateEn,
   genderCn,
@@ -102,13 +105,22 @@ function pronounEn(v: InvitationVisitor): string {
 function whoIsHeCn(v: InvitationVisitor): string {
   const country = countryCn(v.countryCode, v.country);
   const honor = v.gender === "female" ? "女士" : "先生";
+  /* Company names and personal names stay in their original script — that is
+     what the passport and the business card say — but they are SPACED, or
+     they weld onto the Chinese around them into one unreadable run. */
+  const company = latinInCn(v.company);
+  const name = latinInCn(v.name);
+  /* A job title, in Chinese where we have it. An unmapped title is spaced
+     Latin rather than glued Latin, and the form warns about it. */
+  const post = v.position ? (positionCn(v.position) ?? latinInCn(v.position)) : "";
+
   if (v.position && v.company) {
-    return `${country}${v.company}${v.position}${v.name}${honor}`;
+    return tidyCn(`${country}${company}公司${post}${name}${honor}`);
   }
   if (v.company) {
-    return `${country}${v.company}的${v.name}${honor}`;
+    return tidyCn(`${country}${company}公司的${name}${honor}`);
   }
-  return country ? `来自${country}的${v.name}${honor}` : `${v.name}${honor}`;
+  return tidyCn(country ? `来自${country}的${name}${honor}` : `${name}${honor}`);
 }
 
 /* ── purpose wording, per language ───────────────────────────────────────── */
@@ -240,9 +252,11 @@ export function buildChinese(input: LetterInput): LetterText {
       : "一次入境商务签证（M签证）";
 
   const intro: string[] = [
-    `我司${company}系在中华人民共和国浙江省台州市依法注册成立的企业` +
-      `${s.creditCode ? `（统一社会信用代码：${s.creditCode}）` : ""}，` +
-      `现诚挚邀请下列人员来华进行商务访问：`,
+    tidyCn(
+      `我司${company}系在中华人民共和国浙江省台州市依法注册成立的企业` +
+        `${s.creditCode ? `（统一社会信用代码：${latinInCn(s.creditCode)}）` : ""}，` +
+        `现诚挚邀请下列人员来华进行商务访问：`,
+    ),
   ];
 
   const passportBlock: LetterRow[] = [
@@ -255,23 +269,35 @@ export function buildChinese(input: LetterInput): LetterText {
     { label: "有效期至", value: formatDateCn(v.passportExpiry) },
   ];
   if (v.company) passportBlock.push({ label: "公司名称", value: v.company });
-  if (v.position) passportBlock.push({ label: "职务", value: v.position });
+  if (v.position) {
+    passportBlock.push({ label: "职务", value: positionCn(v.position) ?? v.position });
+  }
+
+  /* Spaced once here and reused: the visitor is named in three of the five
+     paragraphs, and each one would otherwise weld to the Chinese beside it.
+     Kept spaced on BOTH sides — tidyCn trims the leading one when the name
+     opens a sentence, and keeps it when the name follows a Chinese word. */
+  const nameCn = latinInCn(v.name);
 
   const body: string[] = [
-    `${whoIsHeCn(v)}系我司重要客户，此次来华的目的为${purposeCn(visit)}。`,
+    tidyCn(`${whoIsHeCn(v)}系我司重要客户，此次来华的目的为${purposeCn(visit)}。`),
 
-    `${v.name}${honor}计划于${formatDateCn(visit.arrivalDate)}` +
-      `${visit.arrivalCity ? `由${cityCn(visit.arrivalCity)}` : ""}入境，` +
-      `并于${formatDateCn(visit.departureDate)}离境，在华停留共计${days}天` +
-      `${citiesCn ? `，期间将前往${citiesCn}等地` : ""}。`,
+    tidyCn(
+      `${nameCn}${honor}计划于${formatDateCn(visit.arrivalDate)}` +
+        `${visit.arrivalCity ? `由${cityCn(visit.arrivalCity)}` : ""}入境，` +
+        `并于${formatDateCn(visit.departureDate)}离境，在华停留共计${days}天` +
+        `${citiesCn ? `，期间将前往${citiesCn}等地` : ""}。`,
+    ),
 
     `此次访问的全部费用，包括国际旅费、在华食宿、交通及医疗保险等，` +
       `将由其所在公司承担。我司将协助安排其在华期间的相关事宜。`,
 
-    `我司在此保证，${v.name}${honor}在华期间将遵守中华人民共和国的法律法规，` +
-      `并将在准许停留期限届满前离境。`,
+    tidyCn(
+      `我司在此保证，${nameCn}${honor}在华期间将遵守中华人民共和国的法律法规，` +
+        `并将在准许停留期限届满前离境。`,
+    ),
 
-    `恳请贵处为${v.name}${honor}签发${visaWord}。随函附上我司营业执照副本复印件，敬请查收。`,
+    tidyCn(`恳请贵处为${nameCn}${honor}签发${visaWord}。随函附上我司营业执照副本复印件，敬请查收。`),
   ];
 
   if (visit.extraNote) body.push(visit.extraNote);

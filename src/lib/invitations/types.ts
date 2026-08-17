@@ -150,6 +150,65 @@ export function countryNeedsChinese(code: string | null | undefined): boolean {
   return !COUNTRY_CN[key];
 }
 
+/* ── job titles in Chinese ───────────────────────────────────────────────
+   A position printed in English inside a Chinese sentence reads as an
+   untranslated letter. These are the titles that actually appear on Koleex
+   customers' cards; anything else falls back to the English text (spaced,
+   see latinInCn) and the form warns so the operator can decide. */
+const POSITION_CN: Record<string, string> = {
+  "general manager": "总经理",
+  "deputy general manager": "副总经理",
+  "manager": "经理",
+  "sales manager": "销售经理",
+  "purchasing manager": "采购经理",
+  "production manager": "生产经理",
+  "factory manager": "厂长",
+  "technical manager": "技术经理",
+  "director": "总监",
+  "managing director": "董事总经理",
+  "chairman": "董事长",
+  "president": "总裁",
+  "vice president": "副总裁",
+  "ceo": "首席执行官",
+  "chief executive officer": "首席执行官",
+  "owner": "企业主",
+  "founder": "创始人",
+  "co-founder": "联合创始人",
+  "partner": "合伙人",
+  "engineer": "工程师",
+  "chief engineer": "总工程师",
+  "buyer": "采购员",
+  "supervisor": "主管",
+};
+
+/** Chinese name of a job title, or null when there is no mapping. */
+export function positionCn(en: string | null | undefined): string | null {
+  const key = (en ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return key ? (POSITION_CN[key] ?? null) : null;
+}
+
+/** True when a position would be printed in English on the Chinese page. */
+export function positionNeedsChinese(en: string | null | undefined): boolean {
+  return !!(en ?? "").trim() && positionCn(en) === null;
+}
+
+/** Wrap Latin text so it does not collide with the CJK around it.
+ *
+ *  Chinese has no inter-word space, so concatenating a Latin name straight
+ *  onto a Chinese noun produces "埃及Nour TextilesGeneral Manager…" — one
+ *  unreadable run. Chinese typographic convention is a thin space either
+ *  side of embedded Latin; a normal space is the portable equivalent and
+ *  survives PDF rendering everywhere. */
+export function latinInCn(s: string | null | undefined): string {
+  const v = (s ?? "").trim();
+  return v ? ` ${v} ` : "";
+}
+
+/** Collapse the double spaces that latinInCn leaves when segments meet. */
+export function tidyCn(s: string): string {
+  return s.replace(/ {2,}/g, " ").replace(/ ([，。、；：）])/g, "$1").replace(/（ /g, "（").trim();
+}
+
 /* ── dates ───────────────────────────────────────────────────────────────── */
 
 const MONTHS_EN = ["January","February","March","April","May","June",
