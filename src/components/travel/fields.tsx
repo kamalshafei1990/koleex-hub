@@ -229,12 +229,18 @@ export function ChipsField({
   );
 }
 
-/** Section wrapper — one glass card per group of fields. */
+/** Section wrapper — one glass card per group of fields.
+ *
+ *  gap-y-4, not gap-y-1. Measured: with a 4 px row gap, the distance from a
+ *  field to its OWN hint (mt-1 = 4 px) was identical to the distance from that
+ *  hint to the NEXT field — so a hint read as though it belonged to the field
+ *  below it. Proximity is the only thing that binds a caption to its control,
+ *  so the between-field gap has to be clearly larger than the within-field one. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="kx-glass rounded-2xl p-4 sm:p-5">
       <h2 className="text-sm font-semibold">{title}</h2>
-      <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">{children}</div>
+      <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">{children}</div>
     </section>
   );
 }
