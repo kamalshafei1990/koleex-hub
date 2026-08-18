@@ -368,7 +368,8 @@ ok("the licence overlay closes on Escape", settingsSrc.includes('e.key === "Esca
    the data: prefix (without it the URI is a relative URL and the rule is
    dead), and background-COLOR on .inv-a4 — the background shorthand resets
    every background-* longhand and silently erased the watermark. */
-ok("watermark tile is a data: URI", styles.includes('url("data:image/svg+xml,'));
+ok("watermark tile is a data: URI",
+  /url\("data:image\/svg\+xml[;,]/.test(styles));
 ok(".inv-a4 uses background-color, never the shorthand",
   !/\.inv-a4 \{[^}]*background:\s*#/.test(styles.replace(/\/\*[\s\S]*?\*\//g, "")));
 ok("the licence page carries no watermark",
