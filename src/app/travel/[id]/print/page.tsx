@@ -160,6 +160,22 @@ export default function InvitationPrintPage({
   }
 
   const { letter, settings, assets } = data;
+
+  /* WHAT THE LETTER CANNOT BE SENT WITHOUT.
+     Found by rendering a real letter against an empty settings row: the
+     Chinese page read "我司系在中华人民共和国浙江省台州市依法注册成立的企业"
+     — the company inviting was simply absent, and nothing said so. A letter
+     that does not name the inviting company is not a document a consulate can
+     act on, so the gap is named here rather than left to be noticed by the
+     person at the counter. */
+  const missing: string[] = [];
+  if (!settings.companyNameEn) missing.push("the registered name (English)");
+  if (!settings.companyNameCn) missing.push("the registered name (Chinese)");
+  if (!settings.creditCode) missing.push("the Unified Social Credit Code");
+  if (!settings.addressEn && !settings.addressCn) missing.push("the licence address");
+  if (!settings.inviterName) missing.push("who signs the letter");
+  if (!assets.stampUrl) missing.push("the company stamp");
+  if (!assets.signatureUrl) missing.push("the signature");
   const input = {
     visitor: letter.visitor,
     visit: letter.visit,
@@ -172,6 +188,19 @@ export default function InvitationPrintPage({
     <>
       <style>{LETTER_STYLES}</style>
       <div className="inv-stack">
+        {missing.length > 0 && (
+          /* no-print: this is guidance for the operator, never part of the
+             document. The letter still renders in full so what IS set can be
+             checked — refusing to render would hide the rest. */
+          <div className="inv-missing-note no-print">
+            <strong>This letter is missing {missing.length === 1 ? "one thing" : `${missing.length} things`}.</strong>{" "}
+            Not set yet: {missing.join(", ")}.{" "}
+            {(!assets.stampUrl || !assets.signatureUrl)
+              ? "The stamp and signature come from Quotations → saved assets; everything else is in Travel → Settings."
+              : "Add them in Travel → Settings."}{" "}
+            This notice is not printed.
+          </div>
+        )}
         {overflowing.length > 0 && (
           <div className="inv-overflow-note no-print">
             <strong>

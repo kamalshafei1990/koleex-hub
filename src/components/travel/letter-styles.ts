@@ -124,12 +124,23 @@ export const LETTER_STYLES = `
     vertical-align: middle;
   }
   .inv-table th {
-    /* Four columns now: label, value, label, value. Fixed label widths keep
-       both halves aligned regardless of how long a value is. */
-    width: 26mm;
+    /* Four columns: label, value, label, value. A fixed label width keeps both
+       halves aligned regardless of how long a value is.
+
+       30mm, not 26mm — MEASURED, not guessed. "Passport Number" is the longest
+       label at 9pt and needed 108px against the 97px a 26mm column gave it;
+       with table-layout:fixed, nowrap and overflow:visible, the excess
+       did not clip or wrap — it spilled OUT of the cell and printed on top of
+       the passport number beside it ("Passport NumbeA12345678"). 30mm clears
+       the longest label with room to spare.
+
+       And nowrap is gone: it was what turned "too long" into "overlapping"
+       instead of "wrapped". A two-line label in a form table is ordinary; a
+       label printed over its own value is a broken document. The width above
+       is the fix, this is the guarantee that no future label can break it. */
+    width: 30mm;
     font-weight: 600;
     background: #f4f4f4;
-    white-space: nowrap;
   }
   .inv-table td { font-variant-numeric: tabular-nums; }
 
@@ -204,7 +215,8 @@ export const LETTER_STYLES = `
      Set by the print page after it measures each sheet. Screen only: .no-print
      hides it from the PDF, so the operator sees it and the consulate never
      does. Positioned outside the paper so it cannot be mistaken for content. */
-  .inv-overflow-note {
+  .inv-missing-note,
+.inv-overflow-note {
     width: 210mm;
     margin: 0 auto 10mm;
     padding: 4mm 6mm;
