@@ -68,17 +68,44 @@ export const LETTER_STYLES = `
   /* ── header ── */
   .inv-head {
     display: flex;
-    align-items: center;
+    /* flex-start, not center: the logo is one line tall and the company block
+       is three, so centring left the wordmark floating in the middle of the
+       address. Aligning tops makes them read as one letterhead. */
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 8mm;
+    gap: 10mm;
   }
-  .inv-logo { height: 12mm; width: auto; object-fit: contain; }
+  /* 7mm, not 12. The Koleex wordmark is 6.7:1, so height drives width hard:
+     at 12mm it measured 80mm across — 47% of the 170mm content width — and
+     read as a banner with the company details crowded beside it rather than
+     as a letterhead. At 7mm it is ~47mm, about a quarter of the line, which
+     is where a wordmark sits on formal stationery. */
+  .inv-logo { height: 7mm; width: auto; object-fit: contain; }
+
   .inv-head-co { text-align: right; }
   .inv-a4[lang="zh-CN"] .inv-head-co { text-align: right; }
-  .inv-co-name { margin: 0; font-size: 10pt; font-weight: 700; letter-spacing: .01em; }
-  .inv-co-addr { margin: 0.8mm 0 0; font-size: 7.5pt; color: #444; max-width: 92mm; }
+  .inv-co-name { margin: 0; font-size: 9.5pt; font-weight: 700; letter-spacing: .01em; line-height: 1.25; }
+  /* 94mm. MEASURED: at 74mm there were 29mm of dead space between the logo
+     and this block, and the address broke mid-phrase — "…Feiyue Science and /
+     Technology Innovation Park…", "…Xiachen / Street…". Widening into that gap
+     lets the licence address (which must be printed verbatim and is long) wrap
+     at commas instead of inside names. 47mm logo + 9mm gap + 94mm here still
+     leaves margin on a 170mm content line.
 
-  .inv-rule { height: 1.2pt; background: #000; margin: 3mm 0 5mm; }
+     text-wrap: pretty asks the browser to avoid a short last line; harmless
+     where unsupported. */
+  .inv-co-addr {
+    margin: 1mm 0 0;
+    font-size: 7pt;
+    line-height: 1.4;
+    color: #444;
+    max-width: 94mm;
+    text-wrap: pretty;
+  }
+
+  /* Hairline, not a bar. 1.2pt under a 12mm logo looked deliberate; under a
+     7mm one it read as heavy. */
+  .inv-rule { height: 0.6pt; background: #111; margin: 2.5mm 0 6mm; }
 
   /* ── title ── */
   .inv-title {

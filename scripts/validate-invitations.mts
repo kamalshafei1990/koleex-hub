@@ -285,6 +285,41 @@ ok("both Koleex logo files exist",
 ok("the black logo is actually black",
   /fill:\s*#000/.test(fs.readFileSync(R("public/brand/koleex-logo-black.svg"), "utf8")));
 
+/* ── G. layout contracts the owner reported ─────────────────────────────── */
+console.log("\nG. Layout");
+
+/* h-full + overflow-y-auto on the app root gave each page its own scroller,
+   which FROZE the Hub's (#main-scroll-container): the page scrolled inside
+   itself, the frosted header ramp never travelled over the content, and the
+   action row sat under the frost permanently. These pages flow — they belong
+   in the Hub scroller, like Expenses. */
+for (const f of [
+  "src/components/travel/InvitationForm.tsx",
+  "src/components/travel/TravelApp.tsx",
+  "src/app/travel/settings/page.tsx",
+]) {
+  const src = fs.readFileSync(R(f), "utf8");
+  ok(`${f.split("/").pop()} — no private scroller on the app root`,
+    !/className="h-full overflow-y-auto"/.test(src));
+  /* The shell offsets content by --kx-header-h (56px) but the ramp reaches
+     calc(--kx-header-h + 3rem) = 104px. Without the extra 3rem the first
+     control lands inside the frost before any scrolling. */
+  ok(`${f.split("/").pop()} — content starts below the frosted ramp (pt-12)`,
+    /px-4 pt-12 pb-/.test(src));
+}
+
+/* The wordmark is 6.7:1, so height drives width: 12mm made it 80mm — 47% of
+   the content line. Anything above 8mm reads as a banner, not a letterhead. */
+const styles = fs.readFileSync(R("src/components/travel/letter-styles.ts"), "utf8");
+const logoH = /\.inv-logo \{ height: (\d+(?:\.\d+)?)mm/.exec(styles);
+ok("the letterhead logo is 8mm or under", !!logoH && parseFloat(logoH[1]!) <= 8,
+  logoH ? `${logoH[1]}mm` : "not found");
+
+/* letter-styles.ts is ONE template literal — a backtick anywhere inside it
+   ends the string and the print route stops compiling. */
+const bodyOnly = styles.slice(styles.indexOf("`") + 1, styles.lastIndexOf("`"));
+ok("no stray backtick inside the letter-styles template", !bodyOnly.includes("`"));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {

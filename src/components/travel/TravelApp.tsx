@@ -85,8 +85,28 @@ export default function TravelApp() {
   }, [rows, filter, query]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
+    /* min-h-full, NOT h-full + overflow-y-auto.
+
+       Owning an internal scroller froze the Hub's own scroller
+       (#main-scroll-container) — the page scrolled inside itself while the
+       shell stayed still, which is why the frosted header ramp never passed
+       over the content and the action buttons sat under it permanently.
+       These are flowing form/list pages, so they belong IN the Hub scroller
+       exactly like Expenses. h-full is for a page that genuinely owns its
+       internal panes; this is not one. */
+    <div className="min-h-full">
+      {/* pt-12 = 3rem. NOT a round number picked by eye — it is exactly the
+          `+ 3rem` in the frosted ramp's own height,
+          `calc(var(--kx-header-h) + 3rem)` (globals.css). The shell already
+          offsets content by --kx-header-h (56 px), so without this the page
+          starts at 56 and the ramp reaches 104: measured, the Save / Export
+          PDF / Preview / Duplicate row sat from 56 to 88 — entirely inside
+          the frost, before any scrolling. The ramp is pointer-events:none, so
+          the buttons still worked; they were just permanently veiled, which
+          is worse than broken because nothing looks wrong enough to report.
+
+          Notes, which is fine, starts its first control at 136. */}
+      <div className="mx-auto w-full max-w-6xl px-4 pt-12 pb-16 sm:px-6">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}
