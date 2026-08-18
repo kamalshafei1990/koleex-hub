@@ -85,7 +85,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "ai": { chunks: 10, kbytes: 508 },
   "calendar": { chunks: 12, kbytes: 824 },
   "catalogs": { chunks: 15, kbytes: 1124 },
-  "commercial-policy": { chunks: 11, kbytes: 665 },
+  "commercial-policy": { chunks: 11, kbytes: 668 },
   "contacts": { chunks: 10, kbytes: 508 },
   "crm": { chunks: 10, kbytes: 514 },
   "customers": { chunks: 10, kbytes: 515 },

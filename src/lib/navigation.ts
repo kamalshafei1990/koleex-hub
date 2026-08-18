@@ -288,7 +288,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "travel", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",
@@ -320,7 +320,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.planning",
     label: "Planning",
     icon: PlanningSidebarIcon,
-    appIds: ["planning", "projects"],
+    appIds: ["planning", "projects", "travel"],
   },
   {
     id: "knowledge",

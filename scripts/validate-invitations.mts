@@ -320,6 +320,30 @@ ok("the letterhead logo is 8mm or under", !!logoH && parseFloat(logoH[1]!) <= 8,
 const bodyOnly = styles.slice(styles.indexOf("`") + 1, styles.lastIndexOf("`"));
 ok("no stray backtick inside the letter-styles template", !bodyOnly.includes("`"));
 
+/* The print route renders bare — no shell, so no #main-scroll-container.
+   The root layout still stamps overflow-hidden on <body>, which LOCKED the
+   letter: three A4 pages, no way to scroll them. The style block must keep
+   the body override. */
+ok("the print page unlocks body scrolling",
+  /body \{\s*\n\s*overflow-y: auto !important;/.test(styles));
+
+/* A Chinese company seal is 40mm by regulation. 22mm read as a pasted-in
+   graphic on a document a visa officer inspects. */
+const stampH = /\.inv-stamp \{[\s\S]*?height: (\d+)mm/.exec(styles);
+ok("the stamp prints at its real 40mm size", !!stampH && stampH[1] === "40",
+  stampH ? `${stampH[1]}mm` : "not found");
+
+/* Travel lives in ONE sidebar group, and it is Planning — the owner's call:
+   an invitation letter is trip planning, not a sales transaction. */
+const navSrc = fs.readFileSync(R("src/lib/navigation.ts"), "utf8");
+const carriers = [...navSrc.matchAll(/appIds: \[([^\]]+)\]/g)].filter((m) => m[1]!.includes('"travel"'));
+ok("travel is in exactly one sidebar group", carriers.length === 1);
+ok("that group is Planning", carriers.length === 1 && carriers[0]![1]!.includes('"planning"'));
+
+/* The tile icon is the plane from the Hub's own icon set (RrIcon "plane"). */
+ok("TravelIcon draws the library plane",
+  fs.readFileSync(R("src/components/icons/TravelIcon.tsx"), "utf8").includes("M21,10H17.693L13.446,1.563"));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {

@@ -18,6 +18,17 @@ export const LETTER_STYLES = `
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* The Hub's root layout puts overflow-hidden h-full on <body> — right for
+     app routes, which scroll inside #main-scroll-container. This route
+     renders bare (no shell, so no scroller), and the owner found the result:
+     three A4 pages locked inside a body that cannot scroll. !important
+     because Tailwind's .overflow-hidden is a class and bare body loses the
+     cascade to it. Print is unaffected — @media print paginates regardless. */
+  body {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
 
   .inv-stack { width: 210mm; margin: 0 auto; }
 
@@ -181,25 +192,27 @@ export const LETTER_STYLES = `
      rather than the address block sliding up into the closing line. */
   .inv-marks {
     position: relative;
-    height: 22mm;
+    height: 40mm;
     margin: 1mm 0 1mm;
   }
   .inv-sig {
     position: absolute;
     left: 0;
-    top: 2mm;
-    height: 14mm;
+    top: 12mm;
+    height: 16mm;
     width: auto;
     object-fit: contain;
   }
-  /* The stamp overlaps the signature the way it does on paper — offset right
-     and slightly up, semi-transparent so the signature stays readable under
-     it. */
+  /* The stamp at its REAL size. A Chinese company seal (公章) is 40mm in
+     diameter by regulation — the owner's physical stamp included. It printed
+     at 22mm here, which reads as a pasted-in graphic to anyone who has held
+     a stamped Chinese document, and a visa officer has. The overlap with the
+     signature stays, the way ink actually lands on paper. */
   .inv-stamp {
     position: absolute;
-    left: 20mm;
+    left: 22mm;
     top: 0;
-    height: 22mm;
+    height: 40mm;
     width: auto;
     object-fit: contain;
     opacity: .92;
