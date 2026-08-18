@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import LetterSheet, { type SheetAssets } from "@/components/travel/LetterSheet";
 import { LETTER_STYLES } from "@/components/travel/letter-styles";
 import { buildChinese, buildEnglish } from "@/lib/invitations/templates";
@@ -47,6 +48,7 @@ export default function InvitationPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   /** Sheets that grew past one page — measured after paint, shown on screen
@@ -126,7 +128,13 @@ export default function InvitationPrintPage({
       const MM = 96 / 25.4;
       const over: number[] = [];
       document.querySelectorAll(".inv-a4").forEach((el, i) => {
-        if (el.getBoundingClientRect().height > 270 * MM + 2 * MM) over.push(i + 1);
+        /* 292, not 270. The sheet's MIN-height is 270mm, but the printed page
+           is 297mm (A4) — sheets legitimately sit at 275-281 since the stamp
+           took its real 40mm size, and warning at 270 cried wolf on letters
+           whose PDFs measured exactly three pages. 292 leaves 5mm of pagination
+           tolerance below the true limit, so the warning fires only when a
+           fourth page will actually exist. */
+        if (el.getBoundingClientRect().height > 292 * MM) over.push(i + 1);
       });
       setOverflowing(over);
 
@@ -187,6 +195,13 @@ export default function InvitationPrintPage({
   return (
     <>
       <style>{LETTER_STYLES}</style>
+      {/* The way out. Preview navigates here in-app; in the desktop shell
+          there is no browser chrome, so without this the letter is a dead
+          end — the exact trap the owner hit with the licence. no-print, so
+          paper and PDF never carry it. */}
+      <button type="button" className="inv-back no-print" onClick={() => router.back()}>
+        ← Back
+      </button>
       <div className="inv-stack">
         {missing.length > 0 && (
           /* no-print: this is guidance for the operator, never part of the
@@ -225,8 +240,12 @@ export default function InvitationPrintPage({
             Business Licence · 营业执照
           </h2>
           {settings.licenceDocUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- see LetterSheet
-            <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            /* The frame exists because the image inside it is ROTATED — see
+               .inv-licence-img in letter-styles for why. */
+            <div className="inv-licence-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element -- see LetterSheet */}
+              <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            </div>
           ) : (
             <div className="inv-licence-missing">
               No business licence has been uploaded yet.

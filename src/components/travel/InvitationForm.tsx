@@ -337,7 +337,7 @@ export default function InvitationForm({ id }: { id?: string }) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => window.open(`/travel/${id}/print`, "_blank")}
+                    onClick={() => router.push(`/travel/${id}/print`)}
                   >
                     {t("act.preview")}
                   </Button>

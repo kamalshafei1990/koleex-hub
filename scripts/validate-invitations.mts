@@ -344,6 +344,38 @@ ok("that group is Planning", carriers.length === 1 && carriers[0]![1]!.includes(
 ok("TravelIcon draws the library plane",
   fs.readFileSync(R("src/components/icons/TravelIcon.tsx"), "utf8").includes("M21,10H17.693L13.446,1.563"));
 
+/* The licence is a landscape document on a portrait sheet: rotated to fill
+   the page. Three invariants keep that working, each one broke once:
+   · max-width:none — Tailwind preflight caps every img at 100% and silently
+     ate the rotation's whole point (measured 176mm where 236 was asked);
+   · overflow:hidden on the frame — the PRE-rotation layout box is 236mm wide
+     in a 176mm frame, and Chromium printed that horizontal spill as a
+     fourth, entirely blank PDF page;
+   · the rotation itself, -90 so the top binds to the left edge. */
+ok("licence image escapes Tailwind's img max-width", /\.inv-licence-img \{[\s\S]*?max-width: none/.test(styles));
+ok("licence frame clips pre-rotation layout overflow", /\.inv-licence-frame \{[\s\S]*?overflow: hidden/.test(styles));
+ok("licence rotates -90 (top binds left)", styles.includes("rotate(-90deg)"));
+
+/* Viewing the licence must never leave the app: in the desktop shell
+   (Electron) there are no tabs, so window.open stranded the owner on the raw
+   image with no way back. */
+const settingsSrc = fs.readFileSync(R("src/app/travel/settings/page.tsx"), "utf8");
+ok("settings licence view is in-app, not window.open", !settingsSrc.includes("window.open"));
+ok("the licence overlay closes on Escape", settingsSrc.includes('e.key === "Escape"'));
+
+/* The watermark — the owner's Feiyue letter tiles the company mark behind
+   the page and he asked for the same. Two invariants, each broke once:
+   the data: prefix (without it the URI is a relative URL and the rule is
+   dead), and background-COLOR on .inv-a4 — the background shorthand resets
+   every background-* longhand and silently erased the watermark. */
+ok("watermark tile is a data: URI", styles.includes('url("data:image/svg+xml,'));
+ok(".inv-a4 uses background-color, never the shorthand",
+  !/\.inv-a4 \{[^}]*background:\s*#/.test(styles.replace(/\/\*[\s\S]*?\*\//g, "")));
+ok("the licence page carries no watermark",
+  /\.inv-licence-page \{[\s\S]*?background-image: none/.test(styles));
+ok("the print page has a way back (inv-back, no-print)",
+  fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8").includes('className="inv-back no-print"'));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {
