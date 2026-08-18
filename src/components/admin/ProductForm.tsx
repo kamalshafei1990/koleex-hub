@@ -1357,6 +1357,14 @@ export default function ProductForm({ productId }: Props) {
       return;
     }
     setError("");
+    /* Family mode: the strip points this tab at ONE member and the banner
+       promises "Hero … save to this model". Writing `main_image` here would
+       break that promise — the line below drops EVERY existing main_image
+       row, so a member's upload replaced the family photo and all members
+       ended up showing it. A member writes its own `model_image` row (the
+       same shape the Models section already uses); only the primary owns
+       `main_image`, so single-model products are untouched. */
+    if (heroMember) { setModelPhoto(heroMember, file); return; }
     const filtered = media.filter(m => m.type !== "main_image");
     const newItem: MediaFormState = {
       _tempId: crypto.randomUUID(),
@@ -1569,6 +1577,27 @@ export default function ProductForm({ productId }: Props) {
   const activeModel = models[safeActiveMember];
   const updateActiveMember = (u: Partial<ModelFormState>) =>
     setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+
+  /* ── Hero photo, scoped to the selected member ──
+     Declared here rather than beside the other hero helpers above because it
+     needs activeModel/memberCtx. handleMainImage closes over heroMember and
+     only reads it when the operator clicks, so the later declaration is fine.
+     A member with no photo of its own INHERITS the family photo for display,
+     mirroring how factory cost inherits the supplier baseline — the caption
+     under the slot says which of the two you are looking at. */
+  const heroMember = memberCtx && safeActiveMember > 0 ? activeModel : null;
+  const heroMemberPhoto = heroMember ? modelPhotoOf(heroMember) : undefined;
+  const heroMemberFile = heroMemberPhoto?._file ?? null;
+  const heroMemberUrl = heroMemberPhoto?.url || null;
+  const heroMemberSrc = useMemo(
+    () => (heroMemberFile ? URL.createObjectURL(heroMemberFile) : heroMemberUrl),
+    [heroMemberFile, heroMemberUrl],
+  );
+  useEffect(() => () => { if (heroMemberFile && heroMemberSrc) URL.revokeObjectURL(heroMemberSrc); }, [heroMemberFile, heroMemberSrc]);
+  /* What the Hero slot actually shows: the member's own photo, else the
+     family photo it inherits, else the family photo when on the primary. */
+  const heroSrc = heroMember ? (heroMemberSrc ?? mainImageSrc) : mainImageSrc;
+  const heroInherited = !!heroMember && !heroMemberPhoto;
   /* New member = a COPY of the primary's identity you then edit — code,
      supplier reference, tagline and its zh/ar translations all start
      synced from the primary/family (owner rule: "synced with the primary
@@ -3312,10 +3341,10 @@ export default function ProductForm({ productId }: Props) {
                        never stretches to match the tall fields column. */
                     className="relative w-full h-44 sm:h-52 lg:h-auto lg:aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
                   >
-                    {mainImageSrc ? (
+                    {heroSrc ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-6" />
+                        <img src={heroSrc} alt="Product" className="w-full h-full object-contain p-6" />
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                           <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
                             <CameraIcon className="h-4 w-4" />
@@ -3336,6 +3365,29 @@ export default function ProductForm({ productId }: Props) {
                       </div>
                     )}
                   </div>
+
+                  {/* Which photo am I looking at? In family mode the slot is
+                      member-scoped, and an inherited family photo looks
+                      identical to an owned one — so it has to be said in
+                      words. rounded-md on the revert control because the
+                      Aurora control-hover rule paints a ring on any button
+                      and a ring cannot be clipped into a curve. */}
+                  {heroMember && (
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
+                      {heroInherited
+                        ? t("hero.memberPhotoInherited", "Showing the family photo — upload one to give this model its own.")
+                        : t("hero.memberPhotoOwn", "This model's own photo.")}
+                      {!heroInherited && (
+                        <button
+                          type="button"
+                          onClick={() => removeModelPhoto(heroMember)}
+                          className="ms-2 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                        >
+                          {t("hero.memberPhotoRevert", "Use the family photo")}
+                        </button>
+                      )}
+                    </p>
+                  )}
 
                   {/* ── Gallery strip ──
                       More photos live here, not in a hidden tab. Items are
@@ -4578,11 +4630,13 @@ export default function ProductForm({ productId }: Props) {
                 brand={product.brand}
                 slug={product.slug}
                 excerpt={product.excerpt}
-                /* Use the same preview source as the hero: mainImageSrc is the
+                /* Use the same preview source as the hero: heroSrc is the
                    saved URL when present, or a local object-URL for a freshly
                    uploaded (not-yet-saved) file. Reading only .url here showed
-                   "No main image yet" until the product was saved. */
-                primaryImageUrl={mainImageSrc || undefined}
+                   "No main image yet" until the product was saved. In family
+                   mode it follows the selected member, so the preview shows
+                   the photo the operator is actually editing. */
+                primaryImageUrl={heroSrc || undefined}
                 primaryModel={primaryModel?.primary_model || primaryModel?.model_name || ""}
                 categoryName={categoryName}
                 metaTitle={product.meta_title}
