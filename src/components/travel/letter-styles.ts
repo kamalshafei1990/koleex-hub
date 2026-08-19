@@ -205,7 +205,15 @@ export const LETTER_STYLES = `
   .inv-addressee p { margin: 0; }
   .inv-meta-right { text-align: right; font-size: 9.5pt; white-space: nowrap; }
   .inv-meta-right p { margin: 0; }
-  .inv-ref { color: #555; font-size: 9pt; font-variant-numeric: tabular-nums; }
+  .inv-ref-foot {
+    position: absolute;
+    right: 17mm;
+    bottom: 6mm;
+    margin: 0;
+    color: #666;
+    font-size: 8.5pt;
+    font-variant-numeric: tabular-nums;
+  }
 
   .inv-salutation { margin: 0 0 3mm; }
   .inv-p { margin: 0 0 2.4mm; text-align: justify; }

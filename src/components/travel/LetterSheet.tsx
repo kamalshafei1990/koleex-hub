@@ -66,7 +66,6 @@ export default function LetterSheet({
         </div>
         <div className="inv-meta-right">
           <p>{text.dateLine}</p>
-          <p className="inv-ref">{text.refLine}</p>
         </div>
       </div>
 
@@ -143,6 +142,9 @@ export default function LetterSheet({
           <p>{text.signOff.phone}</p>
         </div>
       </div>
+      {/* The reference lives at the sheet's bottom-right — a document control
+      number, the owner's call — not up beside the date. */}
+      <p className="inv-ref-foot">{text.refLine}</p>
     </section>
   );
 }
