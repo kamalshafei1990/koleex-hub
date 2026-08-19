@@ -136,13 +136,18 @@ const tableName = enA.passportBlock.find((row: Row) => row.label === "Name")?.va
 ok("the narrative names the same person as the passport block",
   enA.body.every((p: string) => !p.includes("Mr. ") || p.includes(tableName)),
   tableName);
+/** A paragraph is a run of marked pieces now — flatten it to plain text
+ *  before asserting on wording. Reading para[0] as a string silently
+ *  produced "[object Object]" and the assertions passed on nothing. */
+const flat = (para: { text: string }[]) => para.map((x) => x.text).join("");
+
 ok("the Chinese narrative names the same person too",
-  zhA.body[1]!.includes(tableName));
+  flat(zhA.body[1]!).includes(tableName));
 
 /* D. no position → no invented job title */
 ok("no position → the letter says the visitor is our customer",
-  enB.body[0]!.includes("is our valued customer") && !enB.body[0]!.includes("of Nour Textiles,"),
-  enB.body[0]);
+  flat(enB.body[0]!).includes("is our valued customer") && !flat(enB.body[0]!).includes("of Nour Textiles,"),
+  flat(enB.body[0]!));
 ok("no position → no Position row in the English block",
   !enB.passportBlock.some((row: Row) => row.label === "Position"));
 ok("no position → no 职务 row in the Chinese block",
@@ -159,7 +164,7 @@ ok("the nationality row uses the Chinese country name",
 ok("a mapped job title is printed in Chinese",
   zhA.passportBlock.find((row: Row) => row.label === "职务")?.value === "总经理");
 ok("cities are printed in Chinese",
-  zhA.body[1]!.includes("台州") && zhA.body[1]!.includes("上海"));
+  flat(zhA.body[1]!).includes("台州") && flat(zhA.body[1]!).includes("上海"));
 
 /* A Latin WORD must never weld directly onto a CJK character — that produces
    the "埃及Nour TextilesGeneral Manager…" run the first draft printed.
@@ -450,6 +455,22 @@ ok("there is a real gap between signature and stamp",
   /gap: \d+mm/.test(ruleBody("inv-marks")));
 ok("the stamp is fully opaque (nothing under it now)",
   /opacity: 1;/.test(ruleBody("inv-stamp")));
+
+/* The owner asked for the facts a consular officer scans for to stand out.
+   They are marked at BUILD time as pieces, never by pattern-matching the
+   finished sentence — that would eventually bold a date inside a company
+   name, and the two languages would drift apart. Both builders must mark
+   the SAME facts, because the pages are one document. */
+const tplSrc = fs.readFileSync(R("src/lib/invitations/templates.ts"), "utf8");
+ok("paragraphs are typed as marked pieces", /export type Piece = \{ text: string; strong\?: true \}/.test(tplSrc));
+const enBody = tplSrc.slice(tplSrc.indexOf("export function buildEnglish"), tplSrc.indexOf("export function buildChinese"));
+const zhBody = tplSrc.slice(tplSrc.indexOf("export function buildChinese"));
+const marks = (src: string) => (src.match(/\bb\(/g) ?? []).length;
+ok("the English letter highlights facts", marks(enBody) >= 8, `${marks(enBody)}`);
+ok("the Chinese letter highlights the same count", marks(zhBody) === marks(enBody),
+  `en ${marks(enBody)} vs zh ${marks(zhBody)}`);
+ok("the sheet renders strong runs", 
+  fs.readFileSync(R("src/components/travel/LetterSheet.tsx"), "utf8").includes("piece.strong ?"));
 
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);

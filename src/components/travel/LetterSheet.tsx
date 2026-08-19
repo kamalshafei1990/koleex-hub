@@ -12,7 +12,25 @@
    and the print pipeline never spills onto a phantom blank page.
    --------------------------------------------------------------------------- */
 
-import type { LetterRow, LetterText } from "@/lib/invitations/templates";
+import type { LetterRow, LetterText, Para } from "@/lib/invitations/templates";
+
+/** Render one paragraph: plain runs as text, marked runs in <strong>.
+ *  The pieces carry the emphasis, so the letter never guesses which words
+ *  matter by matching patterns in a finished sentence. */
+function Paragraph({ para }: { para: Para }) {
+  return (
+    <p className="inv-p">
+      {para.map((piece, i) =>
+        piece.strong ? <strong key={i}>{piece.text}</strong> : <span key={i}>{piece.text}</span>,
+      )}
+    </p>
+  );
+}
+
+/** A stable key for a paragraph — its full text. */
+function paraKey(para: Para): string {
+  return para.map((p) => p.text).join("");
+}
 
 /** Group rows into pairs for the two-column passport table. The second of a
  *  final odd pair is undefined, which the caller renders as empty cells. */
@@ -72,9 +90,7 @@ export default function LetterSheet({
       <p className="inv-salutation">{text.salutation}</p>
 
       {text.intro.map((p) => (
-        <p key={p} className="inv-p">
-          {p}
-        </p>
+        <Paragraph key={paraKey(p)} para={p} />
       ))}
 
       {/* ── passport block ──
@@ -113,9 +129,7 @@ export default function LetterSheet({
       </table>
 
       {text.body.map((p) => (
-        <p key={p} className="inv-p">
-          {p}
-        </p>
+        <Paragraph key={paraKey(p)} para={p} />
       ))}
 
       {/* ── sign-off ── */}
