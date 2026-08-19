@@ -271,14 +271,14 @@
 .collapser {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 780ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: grid-template-rows 720ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .collapsed {
   grid-template-rows: 0fr;
-  /* the cards begin folding first; the sheet glides shut behind them —
-     the two motions read as one gesture instead of a race */
-  transition-delay: 140ms;
-  transition-duration: 620ms;
+  /* the cards fly into the button FIRST; the sheet closes behind the
+     flight — one gesture: gather, then breathe shut */
+  transition-delay: 900ms;
+  transition-duration: 560ms;
 }
 /* overflow stays hidden in EVERY state — during the open animation a
    visible overflow would paint the full deck over the app grid below.
@@ -287,42 +287,40 @@
    padding the grid used to carry as margin. */
 .collapseInner { overflow: hidden; min-block-size: 0; padding-block-end: 34px; }
 
-/* ── the 3D deal — EVERY card animates by its own index (--i / --rev),
-   including the three side KPIs and the system strip; the grid is a
-   perspective stage so the tilt reads as depth, and the open lands with
-   a small spring overshoot. Toggle-only: the classes are applied after
-   the first user toggle, never on page open. */
-.cardsIn, .cardsOut { perspective: 1200px; perspective-origin: 50% 0%; }
-.cardsIn .slab {
-  animation: kxDeal 860ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--i, 0) * 85ms);
-}
+/* ── THE FLIGHT — every card travels its own measured path (--dx/--dy,
+   set by JS at toggle time) between its spot and the toggle button.
+   Hide: the button inhales the deck — cards spiral in, shrinking.
+   Show: the button exhales — cards burst out and glide home.
+   Toggle-only: classes apply after the first user toggle. */
 .cardsOut .slab {
-  animation: kxUndeal 520ms cubic-bezier(0.55, 0.06, 0.68, 0.19) both;
-  animation-delay: calc(var(--rev, 0) * 55ms);
+  /* the MIRROR of the show (owner ask): same expo-out silk, same tempo —
+     the cards glide into the button and settle, instead of snapping away */
+  animation: kxInhale 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--fi, 0) * 60ms);
 }
-@keyframes kxDeal {
-  0%   { opacity: 0; transform: translateY(26px) scale(0.94) rotateX(-6deg); }
+@keyframes kxInhale {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
   55%  { opacity: 1; }
-  72%  { transform: translateY(-2px) scale(1.005) rotateX(0.8deg); }
-  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -60px)) scale(0.04) rotate(var(--rot, 0deg)); }
 }
-@keyframes kxUndeal {
-  0%   { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
-  100% { opacity: 0; transform: translateY(-18px) scale(0.955) rotateX(5deg); }
+.cardsIn .slab {
+  animation: kxExhale 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--fi, 0) * 60ms);
 }
-/* the lip blooms as its card lands, then settles — the landing light */
-.cardsIn .slab::after {
-  animation: kxLipBloom 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--i, 0) * 85ms + 120ms);
+@keyframes kxExhale {
+  0%   { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -60px)) scale(0.04) rotate(var(--rot, 0deg)); }
+  45%  { opacity: 1; }
+  100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
 }
-@keyframes kxLipBloom {
-  0%   { opacity: 0; }
-  55%  { opacity: 1; filter: blur(7px); }
-  100% { opacity: 0.9; filter: blur(9px); }
+/* the button "catches" the deck at the end of the inhale */
+.toggleCaught { animation: kxCatch 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 980ms both; }
+@keyframes kxCatch {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); box-shadow: 0 0 22px rgba(127, 169, 214, 0.5); }
+  100% { transform: scale(1); }
 }
 /* the pulse line pops in with a tiny spring once the deck is away */
-.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 380ms both; }
+.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 1040ms both; }
 @keyframes kxPulseIn {
   from { opacity: 0; transform: translateY(4px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -350,8 +348,8 @@
 @media (prefers-reduced-motion: reduce) {
   .collapser { transition: none; }
   .cardsIn .slab, .cardsOut .slab { animation: none; }
-  .cardsIn .slab::after { animation: none; }
   .cardsOut .slab { opacity: 0; }
+  .toggleCaught { animation: none; }
   .pulseLine { animation: none; }
   .chev { transition: none; }
   .curveDraw { animation: none; stroke-dashoffset: 0; }

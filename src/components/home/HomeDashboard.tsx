@@ -17,7 +17,7 @@
    holds the slot forever.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import s from "./home-dashboard.module.css";
 
@@ -87,18 +87,47 @@ export default function HomeDashboard() {
   });
   /* Bumped on every expand — keys the curve so its draw-in replays. */
   const [drawKey, setDrawKey] = useState(0);
-  /* The dealt-deck animation belongs to the TOGGLE, not to page open —
-     Home entrance motion stays near-imperceptible by owner decision. */
+  /* THE FLIGHT (owner's pick after two rejected styles): every card flies
+     INTO the toggle button on hide and BURSTS back out of it on show —
+     each along its own measured trajectory. Toggle-only; page open stays
+     at the near-imperceptible tier. */
   const [animOn, setAnimOn] = useState(false);
-  const toggle = () => {
-    setAnimOn(true);
-    setOpen((prev) => {
-      const next = !prev;
-      try { window.localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch { /* fine */ }
-      if (next) setDrawKey((k) => k + 1);
-      return next;
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  /* Measure once per toggle: each card's center → the button's center,
+     written as --dx/--dy/--rot/--fi on the card. One layout read per
+     card, no loops, no observers. */
+  const prepareFlight = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const btn = root.querySelector("[data-dash-toggle]");
+    if (!btn) return;
+    const b = btn.getBoundingClientRect();
+    const bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    root.querySelectorAll<HTMLElement>("[data-flight]").forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty("--dx", `${bx - (r.left + r.width / 2)}px`);
+      el.style.setProperty("--dy", `${by - (r.top + r.height / 2)}px`);
+      el.style.setProperty("--rot", `${i % 2 === 0 ? -8 : 7}deg`);
+      el.style.setProperty("--fi", String(i));
     });
   };
+
+  const toggle = () => {
+    /* No side effects inside updaters — StrictMode runs them twice. */
+    const next = !open;
+    setAnimOn(true);
+    if (!next) prepareFlight(); /* hiding: measure while cards are visible */
+    setOpen(next);
+    if (next) setDrawKey((k) => k + 1);
+    try { window.localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch { /* fine */ }
+  };
+
+  /* On SHOW the cards render first, then we measure — before paint, so the
+     burst starts from the button with no flash at the destination. */
+  useLayoutEffect(() => {
+    if (open && animOn) prepareFlight();
+  }, [open, animOn]);
   /* Lazy init, not an effect: this component is dynamic({ssr:false}), so
      localStorage exists at first render — and reading it here means the
      reserved slot is present in the very first paint (no shift). */
@@ -155,10 +184,6 @@ export default function HomeDashboard() {
     );
   }
 
-  /* deal order: hero → the three KPIs → pipeline → attention → system */
-  const DEAL_TOTAL = 7;
-  const deal = (i: number) => ({ ["--i" as string]: i, ["--rev" as string]: DEAL_TOTAL - 1 - i });
-
   const stages = q?.stages ?? {};
   const maxStage = Math.max(1, ...STAGE_ORDER.map((k) => stages[k] ?? 0));
 
@@ -167,7 +192,7 @@ export default function HomeDashboard() {
     : null;
 
   return (
-    <div>
+    <div ref={rootRef}>
       {/* period chips + the show/hide control. When hidden, the chips give
           way to a live one-line pulse so the company's heartbeat never
           fully leaves the Home. */}
@@ -184,7 +209,7 @@ export default function HomeDashboard() {
           <span className={s.pulseLine}>{pulse ?? "Dashboard"}</span>
         )}
         {open && <span className={s.tabsHint}>LIVE · {data.gatewayMs}ms</span>}
-        <button type="button" onClick={toggle} className={`${s.tab} ${s.toggleBtn}`}
+        <button type="button" onClick={toggle} data-dash-toggle="" className={`${s.tab} ${s.toggleBtn} ${!open && animOn ? s.toggleCaught : ""}`}
           aria-expanded={open} aria-label={open ? "Hide dashboard" : "Show dashboard"}>
           <span className={`${s.chev} ${open ? "" : s.chevClosed}`} aria-hidden="true">⌄</span>
           {open ? "Hide" : "Show"}
@@ -196,7 +221,7 @@ export default function HomeDashboard() {
 
       {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
       {q && !q.error && (
-        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero}`} style={{ textDecoration: "none", color: "inherit", ...deal(0) }}>
+        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
           <div className={s.bp} />
           <div className={s.klabel}>
             <span>Quotations — created per week · 12w</span>
@@ -244,7 +269,7 @@ export default function HomeDashboard() {
       {/* ═══ side KPIs ═══ */}
       <div className={s.side}>
         {p && (
-          <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit", ...deal(1) }}>
+          <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
             <div className={s.klabel}><span>Catalogue</span></div>
             {p.error ? <div className={s.errCard}>⚠ can&apos;t read products</div> : (
               <div className={s.ringRow}>
@@ -263,7 +288,7 @@ export default function HomeDashboard() {
           </Link>
         )}
         {td && (
-          <Link href="/todo" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit", ...deal(2) }}>
+          <Link href="/todo" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
             <div className={s.klabel}><span>Your to-dos</span></div>
             {td.error ? <div className={s.errCard}>⚠ can&apos;t read to-dos</div> : (
               <>
@@ -274,7 +299,7 @@ export default function HomeDashboard() {
           </Link>
         )}
         {pr && (
-          <div className={`kx-glass ${s.slab} ${s.kpi}`} style={deal(3)}>
+          <div className={`kx-glass ${s.slab} ${s.kpi}`} data-flight="">
             <div className={s.klabel}><span>Team today</span></div>
             {pr.error ? <div className={s.errCard}>⚠ can&apos;t read presence</div> : (
               <>
@@ -298,7 +323,7 @@ export default function HomeDashboard() {
 
       {/* ═══ pipeline stages ═══ */}
       {q && !q.error && (
-        <div className={`kx-glass ${s.slab} ${s.half} ${s.pipePad}`} style={deal(4)}>
+        <div className={`kx-glass ${s.slab} ${s.half} ${s.pipePad}`} data-flight="">
           <div className={s.bp} />
           <div className={s.klabel}><span className={s.ttl}>Quotation pipeline</span><span className={s.unit}>BY STAGE</span></div>
           <div className={s.barsWrap}>
@@ -316,7 +341,7 @@ export default function HomeDashboard() {
       )}
 
       {/* ═══ attention — only rows that are TRUE right now ═══ */}
-      <div className={`kx-glass ${s.slab} ${s.half}`} style={deal(5)}>
+      <div className={`kx-glass ${s.slab} ${s.half}`} data-flight="">
         <div className={s.klabel}><span className={s.ttl}>Attention needed</span><span className={s.unit}>CROSS-APP</span></div>
         <div style={{ marginBlockStart: 8 }}>
           {q && !q.error && q.expiringSoon > 0 && (
@@ -348,7 +373,7 @@ export default function HomeDashboard() {
       </div>
 
       {sys && !sys.error && (
-        <div className={`kx-glass ${s.slab} ${s.sysStrip}`} style={deal(6)}>
+        <div className={`kx-glass ${s.slab} ${s.sysStrip}`} data-flight="">
           <span className={s.sysItem}><span className={`${s.sig} ${s.sigOk}`} /> API {data.gatewayMs}ms</span>
           <span className={s.sysSep} />
           <span className={s.sysItem}><span className={`${s.sig} ${sys.notifyErrorsToday > 0 ? s.sigWarn : s.sigOk}`} /> Notify errors today {sys.notifyErrorsToday}</span>
