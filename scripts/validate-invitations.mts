@@ -377,6 +377,19 @@ ok("the licence page carries no watermark",
 ok("the print page has a way back (inv-back, no-print)",
   fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8").includes('className="inv-back no-print"'));
 
+/* The list row: pressing it shows the INVITATION (the print view), and the
+   row carries Edit / Duplicate / Delete — the owner's spec. The actions are
+   SIBLINGS of the row button, never nested: a button inside a button is
+   invalid HTML and the inner clicks would bubble into navigation. */
+const listSrc = fs.readFileSync(R("src/components/travel/TravelApp.tsx"), "utf8");
+ok("row press opens the letter itself", listSrc.includes("/travel/${r.id}/print"));
+ok("row carries all three actions",
+  ['t("act.edit")', 't("act.duplicate")', 't("act.delete")'].every((k) => listSrc.includes(k)));
+ok("delete asks first and names visitor + reference",
+  listSrc.includes("pendingDelete.visitor.name") && listSrc.includes("pendingDelete.reference"));
+ok("no button nested inside the row button",
+  !/<button[^>]*>[\s\S]*?<button/.test(listSrc.slice(listSrc.indexOf("min-w-0 flex-1 text-start"), listSrc.indexOf("</button>", listSrc.indexOf("min-w-0 flex-1 text-start")))));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {
