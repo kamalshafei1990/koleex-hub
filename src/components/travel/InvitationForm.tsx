@@ -39,7 +39,10 @@ import PassportScanBox from "@/components/travel/PassportScanBox";
 import {
   ARRIVAL_CITIES,
   COUNTRIES,
+  cityDisplayName,
   codeForCountryName,
+  countryDisplayName,
+  flagEmoji,
   COMMON_CITIES,
   PURPOSES,
   durationDays,
@@ -139,11 +142,23 @@ function withCurrent(options: { value: string; label: string }[], current: strin
   if (!current || options.some((o) => o.value === current)) return options;
   return [{ value: current, label: current }, ...options];
 }
-const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.name, label: c.name }));
-const ARRIVAL_OPTIONS = ARRIVAL_CITIES.map((c) => ({ value: c.en, label: c.en }));
+/* STANDING RULES (owner): country dropdowns carry the FLAG, and dropdown
+   CONTENTS follow the active language — the label alone is not enough.
+   Values stay the canonical English names (DB + letter), only labels move. */
+function countryOptions(lang: string) {
+  return COUNTRIES.map((c) => ({
+    value: c.name,
+    label: `${flagEmoji(c.code)} ${countryDisplayName(c.code, c.name, lang)}`,
+  }));
+}
+function arrivalOptions(lang: string) {
+  return ARRIVAL_CITIES.map((c) => ({ value: c.en, label: cityDisplayName(c, lang) }));
+}
 
 export default function InvitationForm({ id }: { id?: string }) {
-  const { t } = useTranslation(travelT);
+  const { t, lang } = useTranslation(travelT);
+  const COUNTRY_OPTIONS = useMemo(() => countryOptions(lang), [lang]);
+  const ARRIVAL_OPTIONS = useMemo(() => arrivalOptions(lang), [lang]);
   const router = useRouter();
 
   const isNew = !id;
@@ -513,7 +528,7 @@ export default function InvitationForm({ id }: { id?: string }) {
               label={t("f.purpose")}
               value={form.purpose}
               onChange={(v) => set("purpose", v)}
-              options={PURPOSES.map((p) => ({ value: p.value, label: p.en }))}
+              options={PURPOSES.map((p) => ({ value: p.value, label: lang === "zh" ? p.cn : lang === "ar" ? p.ar : p.en }))}
               wide
             />
             {form.purpose === "exhibition" && (
@@ -567,7 +582,7 @@ export default function InvitationForm({ id }: { id?: string }) {
             <ChipsField
               label={t("f.cities")}
               selected={form.cities}
-              options={COMMON_CITIES.map((c) => c.en)}
+              options={COMMON_CITIES.map((c) => ({ value: c.en, label: cityDisplayName(c, lang) }))}
               onToggle={(city) =>
                 setForm((f) => ({
                   ...f,

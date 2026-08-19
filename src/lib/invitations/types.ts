@@ -82,25 +82,38 @@ export type InvitationLetter = {
 
 /* ── vocabulary ──────────────────────────────────────────────────────────── */
 
-export const PURPOSES: { value: InvitationPurpose; en: string; cn: string }[] = [
-  { value: "exhibition", en: "Visit our booth at an exhibition", cn: "参观我司展位" },
-  { value: "meeting",    en: "Business meeting and cooperation discussion", cn: "商务洽谈与合作交流" },
-  { value: "factory",    en: "Factory visit and machine inspection",        cn: "工厂考察与设备验收" },
-  { value: "training",   en: "Technical training and machine collection",   cn: "技术培训与设备提货" },
+export const PURPOSES: { value: InvitationPurpose; en: string; cn: string; ar: string }[] = [
+  { value: "exhibition", en: "Visit our booth at an exhibition", cn: "参观我司展位", ar: "زيارة جناحنا في معرض" },
+  { value: "meeting",    en: "Business meeting and cooperation discussion", cn: "商务洽谈与合作交流", ar: "اجتماع تجاري ومناقشة تعاون" },
+  { value: "factory",    en: "Factory visit and machine inspection",        cn: "工厂考察与设备验收", ar: "زيارة مصنع ومعاينة ماكينات" },
+  { value: "training",   en: "Technical training and machine collection",   cn: "技术培训与设备提货", ar: "تدريب فني واستلام ماكينات" },
 ];
 
-/** Cities Koleex actually hosts visitors in. Free text is still allowed. */
-export const COMMON_CITIES: { en: string; cn: string }[] = [
-  { en: "Taizhou",   cn: "台州" },
-  { en: "Wenzhou",   cn: "温州" },
-  { en: "Hangzhou",  cn: "杭州" },
-  { en: "Ningbo",    cn: "宁波" },
-  { en: "Shanghai",  cn: "上海" },
-  { en: "Yiwu",      cn: "义乌" },
-  { en: "Guangzhou", cn: "广州" },
-  { en: "Shenzhen",  cn: "深圳" },
-  { en: "Beijing",   cn: "北京" },
-  { en: "Qingdao",   cn: "青岛" },
+/** Cities Koleex hosts visitors in — the chips on the form. en is what the
+ *  letter prints (via cityCn for the Chinese page); cn/ar are display only. */
+export const COMMON_CITIES: { en: string; cn: string; ar: string }[] = [
+  { en: "Taizhou",   cn: "台州", ar: "تايتشو" },
+  { en: "Wenzhou",   cn: "温州", ar: "ونتشو" },
+  { en: "Hangzhou",  cn: "杭州", ar: "هانغتشو" },
+  { en: "Ningbo",    cn: "宁波", ar: "نينغبو" },
+  { en: "Shanghai",  cn: "上海", ar: "شنغهاي" },
+  { en: "Yiwu",      cn: "义乌", ar: "ييوو" },
+  { en: "Guangzhou", cn: "广州", ar: "قوانغتشو" },
+  { en: "Shenzhen",  cn: "深圳", ar: "شينزين" },
+  { en: "Beijing",   cn: "北京", ar: "بكين" },
+  { en: "Qingdao",   cn: "青岛", ar: "تشينغداو" },
+  { en: "Suzhou",    cn: "苏州", ar: "سوتشو" },
+  { en: "Nanjing",   cn: "南京", ar: "نانجينغ" },
+  { en: "Xiamen",    cn: "厦门", ar: "شيامن" },
+  { en: "Foshan",    cn: "佛山", ar: "فوشان" },
+  { en: "Dongguan",  cn: "东莞", ar: "دونغقوان" },
+  { en: "Zhongshan", cn: "中山", ar: "تشونغشان" },
+  { en: "Shaoxing",  cn: "绍兴", ar: "شاوشينغ" },
+  { en: "Jiaxing",   cn: "嘉兴", ar: "جياشينغ" },
+  { en: "Tianjin",   cn: "天津", ar: "تيانجين" },
+  { en: "Chengdu",   cn: "成都", ar: "تشنغدو" },
+  { en: "Dalian",    cn: "大连", ar: "داليان" },
+  { en: "Hong Kong", cn: "香港", ar: "هونغ كونغ" },
 ];
 
 /** Chinese name for a city, falling back to the English one when unknown —
@@ -225,26 +238,55 @@ export const COUNTRIES: { name: string; code: string }[] = [
 /* Arrival cities — mainland cities with INTERNATIONAL airports, the owner's
    list plus the majors. Each carries its Chinese name because the letter
    prints 由上海入境; a city without one would leave English mid-sentence. */
-export const ARRIVAL_CITIES: { en: string; cn: string }[] = [
-  { en: "Shanghai", cn: "上海" }, { en: "Beijing", cn: "北京" },
-  { en: "Guangzhou", cn: "广州" }, { en: "Shenzhen", cn: "深圳" },
-  { en: "Hangzhou", cn: "杭州" }, { en: "Ningbo", cn: "宁波" },
-  { en: "Wenzhou", cn: "温州" }, { en: "Nanjing", cn: "南京" },
-  { en: "Xiamen", cn: "厦门" }, { en: "Fuzhou", cn: "福州" },
-  { en: "Qingdao", cn: "青岛" }, { en: "Tianjin", cn: "天津" },
-  { en: "Chengdu", cn: "成都" }, { en: "Chongqing", cn: "重庆" },
-  { en: "Wuhan", cn: "武汉" }, { en: "Changsha", cn: "长沙" },
-  { en: "Zhengzhou", cn: "郑州" }, { en: "Xi'an", cn: "西安" },
-  { en: "Kunming", cn: "昆明" }, { en: "Guilin", cn: "桂林" },
-  { en: "Haikou", cn: "海口" }, { en: "Sanya", cn: "三亚" },
-  { en: "Harbin", cn: "哈尔滨" }, { en: "Shenyang", cn: "沈阳" },
-  { en: "Dalian", cn: "大连" }, { en: "Jinan", cn: "济南" },
-  { en: "Hong Kong", cn: "香港" }, { en: "Macau", cn: "澳门" },
+export const ARRIVAL_CITIES: { en: string; cn: string; ar: string }[] = [
+  { en: "Shanghai", cn: "上海", ar: "شنغهاي" }, { en: "Beijing", cn: "北京", ar: "بكين" },
+  { en: "Guangzhou", cn: "广州", ar: "قوانغتشو" }, { en: "Shenzhen", cn: "深圳", ar: "شينزين" },
+  { en: "Hangzhou", cn: "杭州", ar: "هانغتشو" }, { en: "Ningbo", cn: "宁波", ar: "نينغبو" },
+  { en: "Wenzhou", cn: "温州", ar: "ونتشو" }, { en: "Nanjing", cn: "南京", ar: "نانجينغ" },
+  { en: "Xiamen", cn: "厦门", ar: "شيامن" }, { en: "Fuzhou", cn: "福州", ar: "فوتشو" },
+  { en: "Qingdao", cn: "青岛", ar: "تشينغداو" }, { en: "Tianjin", cn: "天津", ar: "تيانجين" },
+  { en: "Chengdu", cn: "成都", ar: "تشنغدو" }, { en: "Chongqing", cn: "重庆", ar: "تشونغتشينغ" },
+  { en: "Wuhan", cn: "武汉", ar: "ووهان" }, { en: "Changsha", cn: "长沙", ar: "تشانغشا" },
+  { en: "Zhengzhou", cn: "郑州", ar: "تشنغتشو" }, { en: "Xi'an", cn: "西安", ar: "شيان" },
+  { en: "Kunming", cn: "昆明", ar: "كونمينغ" }, { en: "Guilin", cn: "桂林", ar: "قويلين" },
+  { en: "Haikou", cn: "海口", ar: "هايكو" }, { en: "Sanya", cn: "三亚", ar: "سانيا" },
+  { en: "Harbin", cn: "哈尔滨", ar: "هاربين" }, { en: "Shenyang", cn: "沈阳", ar: "شنيانغ" },
+  { en: "Dalian", cn: "大连", ar: "داليان" }, { en: "Jinan", cn: "济南", ar: "جينان" },
+  { en: "Hong Kong", cn: "香港", ar: "هونغ كونغ" }, { en: "Macau", cn: "澳门", ar: "ماكاو" },
 ];
 
 const CITY_CN = new Map(
   [...COMMON_CITIES, ...ARRIVAL_CITIES].map((c) => [c.en.toLowerCase(), c.cn]),
 );
+
+/* STANDING RULE (owner): every country/nationality dropdown carries the
+   country FLAG. <option> cannot render images, so the flag is the emoji
+   derived from the ISO code — two regional-indicator symbols. */
+export function flagEmoji(code: string): string {
+  const cc = code.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+}
+
+/* STANDING RULE (owner): dropdown CONTENTS are translated, not just their
+   labels. For countries the browser already knows every name in every
+   language — Intl.DisplayNames — so there is no 150×3 table to maintain. */
+export function countryDisplayName(code: string, fallback: string, lang: string): string {
+  try {
+    return new Intl.DisplayNames([lang], { type: "region" }).of(code) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** City label in the active language. The VALUE stays the English name —
+ *  that is what the letter prints and the DB stores. */
+export function cityDisplayName(
+  city: { en: string; cn: string; ar: string },
+  lang: string,
+): string {
+  return lang === "zh" ? city.cn : lang === "ar" ? city.ar : city.en;
+}
 
 /* English country names → ISO code, for the form: the operator types (or
    autofill supplies) "Egypt" and the code that drives the Chinese wording

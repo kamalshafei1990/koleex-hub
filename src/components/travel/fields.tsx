@@ -312,7 +312,10 @@ export function ChipsField({
 }: {
   label: string;
   selected: string[];
-  options: string[];
+  /** value = the canonical (stored/printed) name; label = the display name
+   *  in the active language — dropdown/chip contents are translated, the
+   *  owner's standing rule. */
+  options: { value: string; label: string }[];
   onToggle: (v: string) => void;
   hint?: string;
 }) {
@@ -320,18 +323,18 @@ export function ChipsField({
     <Field label={label} hint={hint} wide>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {options.map((o) => {
-          const on = selected.includes(o);
+          const on = selected.includes(o.value);
           return (
             <button
-              key={o}
+              key={o.value}
               type="button"
-              onClick={() => onToggle(o)}
+              onClick={() => onToggle(o.value)}
               aria-pressed={on}
               className={`rounded-full border px-3 py-1 text-sm transition-colors ${
                 on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
               }`}
             >
-              {o}
+              {o.label}
             </button>
           );
         })}

@@ -423,6 +423,20 @@ ok("nationality, country and arrival city are dropdowns",
 ok("a stored value outside the list stays visible (withCurrent)",
   formSrc2.includes("function withCurrent"));
 
+/* STANDING RULES (owner, 2026-08-19): country dropdowns carry the FLAG, and
+   dropdown CONTENTS follow the active language — labels alone are not
+   enough. Cities carry all three languages; countries translate through
+   Intl.DisplayNames so there is no 150×3 table to drift. */
+ok("country options carry the flag emoji", formSrc2.includes("flagEmoji(c.code)"));
+ok("country names translate via Intl.DisplayNames",
+  typesSrc.includes('Intl.DisplayNames([lang], { type: "region" })'));
+ok("purpose options are translated", formSrc2.includes('lang === "zh" ? p.cn : lang === "ar" ? p.ar : p.en'));
+ok("city chips are translated", formSrc2.includes("cityDisplayName(c, lang)"));
+ok("every visit city carries all three languages",
+  !/COMMON_CITIES[\s\S]{0,2000}\{ en: "[^"]+", cn: "[^"]+" \}/.test(typesSrc));
+const visitCities = (typesSrc.slice(typesSrc.indexOf("COMMON_CITIES"), typesSrc.indexOf("];", typesSrc.indexOf("COMMON_CITIES"))).match(/\{ en:/g) ?? []).length;
+ok("the visit-city list grew to 20+", visitCities >= 20, `${visitCities}`);
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {
