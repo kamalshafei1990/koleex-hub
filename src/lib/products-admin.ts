@@ -29,9 +29,31 @@ import type {
 const BUCKET = "media";
 
 /* ── tiny fetch helpers (credentials always included) ────────────────── */
+
+/* Write-version cache-buster. The product APIs answer GETs with
+   `Cache-Control: private, max-age=30, stale-while-revalidate=300`, so the
+   save→back-to-list→reopen loop (measured at 7 seconds on production,
+   2026-08-19) refetches the SAME URL and the browser serves the pre-save
+   payload — the operator's fresh member prices "revert to the family's".
+   The DB was right the whole time; only the URL was stale. Same trap and
+   same cure as the To-do app (kx_todo_write_v): every successful write
+   bumps a version, every read carries it, a changed URL can never hit the
+   old cache entry. localStorage, not sessionStorage — an iOS PWA relaunch
+   is a new session and must still see its own last write. */
+const PRODUCTS_WRITE_V_KEY = "kx_products_write_v";
+function productsWriteVersion(): string {
+  if (typeof window === "undefined") return "0";
+  try { return window.localStorage.getItem(PRODUCTS_WRITE_V_KEY) || "0"; } catch { return "0"; }
+}
+function bumpProductsWriteVersion(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(PRODUCTS_WRITE_V_KEY, String(Date.now())); } catch { /* best-effort */ }
+}
+
 async function jget<T>(url: string, fallback: T): Promise<T> {
+  const versioned = `${url}${url.includes("?") ? "&" : "?"}v=${productsWriteVersion()}`;
   try {
-    const res = await fetch(url, { credentials: "include" });
+    const res = await fetch(versioned, { credentials: "include" });
     if (!res.ok) return fallback;
     return (await res.json()) as T;
   } catch (e) {
@@ -53,6 +75,10 @@ async function jsend(
     });
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) console.error(`[products-admin ${method}]`, url, json.error || res.status);
+    /* Any successful write invalidates every cached product GET (see
+       bumpProductsWriteVersion above) — reads after a save must never be
+       answered by the browser's HTTP cache. */
+    if (res.ok) bumpProductsWriteVersion();
     return { ok: res.ok, json };
   } catch (e) {
     console.error(`[products-admin ${method}]`, url, e);
