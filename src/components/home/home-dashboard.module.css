@@ -16,32 +16,42 @@
   margin-block-end: 32px;
 }
 
+/* MATCH THE APP TILES (owner, 2026-08-20: "same glass effect as the apps
+   cards"): the card's GLASS is the global `kx-glass` — the very utility the
+   tiles wear — added in the JSX beside this class, so theme/light/lowpower/
+   no-backdrop behavior is inherited, never imitated. This module adds ONLY
+   the futurist anatomy on top: the tile border, the interior Hub-Blue wash
+   (a ::before overlay — kx-glass owns box-shadow and would override one
+   declared here), the bottom lip, the blueprint grid, the glowing curve. */
 .slab {
   position: relative;
-  border-radius: 34px;
+  border-radius: 20px;
   isolation: isolate;
   padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
   background:
-    radial-gradient(150% 85% at 50% -32%, rgba(148, 175, 218, 0.28), rgba(120, 150, 200, 0.06) 48%, transparent 62%),
-    radial-gradient(160% 80% at 50% 122%, rgba(64, 140, 255, 0.38), rgba(52, 115, 230, 0.13) 42%, transparent 66%),
-    linear-gradient(180deg, #182742 0%, #101c34 38%, #0c1728 62%, #0e1d38 100%);
-  box-shadow:
-    0 0 0 1px rgba(165, 195, 240, 0.15),
-    inset 0 1.5px 0 rgba(215, 232, 255, 0.2),
-    inset 0 -40px 84px -32px rgba(76, 152, 255, 0.36),
-    0 24px 54px rgba(0, 0, 0, 0.48);
+    radial-gradient(150% 85% at 50% -32%, rgba(215, 225, 238, 0.07), transparent 55%),
+    radial-gradient(160% 70% at 50% 122%, rgba(86, 127, 178, 0.18), rgba(86, 127, 178, 0.05) 45%, transparent 66%);
 }
 .slab::after {
   content: "";
   position: absolute;
-  inset-inline: 13%;
-  bottom: -7px;
-  height: 13px;
+  inset-inline: 14%;
+  bottom: -6px;
+  height: 11px;
   z-index: -1;
   border-radius: 9999px;
-  filter: blur(10px);
-  background: radial-gradient(55% 120% at 50% 0%, rgba(105, 180, 255, 0.46), rgba(70, 145, 255, 0.11) 62%, transparent);
+  filter: blur(9px);
+  background: radial-gradient(55% 120% at 50% 0%, rgba(127, 169, 214, 0.26), rgba(86, 127, 178, 0.07) 62%, transparent);
 }
+.slab > * { position: relative; }
 
 .bp {
   position: absolute;
@@ -55,8 +65,8 @@
   position: absolute;
   inset: 0;
   background:
-    repeating-linear-gradient(90deg, rgba(96, 158, 255, 0.09) 0 1px, transparent 1px 42px),
-    repeating-linear-gradient(180deg, rgba(96, 158, 255, 0.06) 0 1px, transparent 1px 42px);
+    repeating-linear-gradient(90deg, rgba(200, 214, 232, 0.055) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(180deg, rgba(200, 214, 232, 0.04) 0 1px, transparent 1px 42px);
   -webkit-mask: linear-gradient(180deg, transparent 45%, #000 82%);
   mask: linear-gradient(180deg, transparent 45%, #000 82%);
 }
@@ -68,7 +78,7 @@
 
 .klabel {
   font-size: 12px;
-  color: rgba(205, 220, 240, 0.6);
+  color: rgba(255, 255, 255, 0.55);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -77,15 +87,15 @@
 .ttl { color: #e9f1fa; font-weight: 600; }
 .mini {
   font-size: 9px;
-  color: rgba(165, 205, 255, 0.75);
-  border: 1px solid rgba(165, 200, 250, 0.22);
-  background: rgba(150, 190, 245, 0.09);
+  color: rgba(188, 216, 240, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 9999px;
   padding: 3px 9px;
   letter-spacing: 0.6px;
   white-space: nowrap;
 }
-.unit { font-size: 11px; color: rgba(190, 205, 225, 0.42); }
+.unit { font-size: 11px; color: rgba(255, 255, 255, 0.35); }
 
 .curve { position: relative; flex: 1; min-height: 110px; margin: 6px -4px 0; }
 .curve svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -99,7 +109,7 @@
   line-height: 1.12;
   letter-spacing: 1px;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 20px rgba(180, 215, 255, 0.28);
+  text-shadow: 0 0 16px rgba(200, 222, 247, 0.22);
 }
 .heroSub { font-size: 11px; color: rgba(190, 205, 225, 0.48); margin-block-start: 2px; }
 
@@ -109,9 +119,9 @@
   margin-block-start: 6px;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 14px rgba(180, 215, 255, 0.26);
+  text-shadow: 0 0 12px rgba(200, 222, 247, 0.18);
 }
-.kdelta { font-size: 10.5px; margin-block-start: 2px; color: rgba(205, 220, 240, 0.5); }
+.kdelta { font-size: 10.5px; margin-block-start: 2px; color: rgba(255, 255, 255, 0.42); }
 .good { color: #79d89a; }
 .warnTone { color: #edc684; }
 
@@ -125,8 +135,8 @@
   position: relative;
   border-start-start-radius: 6px;
   border-start-end-radius: 6px;
-  background: linear-gradient(180deg, rgba(140, 190, 255, 0.15), rgba(90, 140, 220, 0.04));
-  border: 1px solid rgba(150, 195, 255, 0.13);
+  background: linear-gradient(180deg, rgba(188, 216, 240, 0.13), rgba(127, 169, 214, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-block-end: none;
 }
 .bar em {
@@ -135,7 +145,7 @@
   bottom: -18px;
   font-style: normal;
   font-size: 8.5px;
-  color: rgba(205, 220, 240, 0.38);
+  color: rgba(255, 255, 255, 0.32);
   text-align: center;
   letter-spacing: 0.6px;
 }
@@ -149,8 +159,8 @@
   color: rgba(230, 240, 252, 0.85);
 }
 .barHot {
-  background: linear-gradient(180deg, rgba(160, 205, 255, 0.3), rgba(90, 150, 240, 0.08));
-  border-color: rgba(170, 210, 255, 0.36);
+  background: linear-gradient(180deg, rgba(188, 216, 240, 0.26), rgba(127, 169, 214, 0.07));
+  border-color: rgba(188, 216, 240, 0.3);
 }
 .pipePad { padding-block-end: 30px; }
 
@@ -160,8 +170,8 @@
   gap: 11px;
   padding: 9px 2px;
   font-size: 12px;
-  color: rgba(205, 220, 240, 0.6);
-  border-block-end: 1px solid rgba(150, 195, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  border-block-end: 1px solid rgba(255, 255, 255, 0.06);
   text-decoration: none;
 }
 .attnRow:last-child { border-block-end: none; }
@@ -173,7 +183,7 @@
 .go {
   margin-inline-start: auto;
   font-size: 9px;
-  color: rgba(165, 205, 255, 0.75);
+  color: rgba(188, 216, 240, 0.7);
   white-space: nowrap;
   letter-spacing: 1px;
 }
