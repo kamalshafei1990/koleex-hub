@@ -374,8 +374,12 @@ ok(".inv-a4 uses background-color, never the shorthand",
   !/\.inv-a4 \{[^}]*background:\s*#/.test(styles.replace(/\/\*[\s\S]*?\*\//g, "")));
 ok("the licence page carries no watermark",
   /\.inv-licence-page \{[\s\S]*?background-image: none/.test(styles));
-ok("the print page has a way back (inv-back, no-print)",
-  fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8").includes('className="inv-back no-print"'));
+const printPageSrc = fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8");
+ok("the print page has the control bar, and it never prints",
+  printPageSrc.includes('className="inv-bar no-print"'));
+ok("the bar carries Back, Edit, Print and Export PDF",
+  ["router.back()", "window.print()", "/pdf"].every((k) => printPageSrc.includes(k)) &&
+  printPageSrc.includes("Edit"));
 
 /* The list row: pressing it shows the INVITATION (the print view), and the
    row carries Edit / Duplicate / Delete — the owner's spec. The actions are

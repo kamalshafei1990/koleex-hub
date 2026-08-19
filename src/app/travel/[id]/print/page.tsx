@@ -195,13 +195,37 @@ export default function InvitationPrintPage({
   return (
     <>
       <style>{LETTER_STYLES}</style>
-      {/* The way out. Preview navigates here in-app; in the desktop shell
-          there is no browser chrome, so without this the letter is a dead
-          end — the exact trap the owner hit with the licence. no-print, so
-          paper and PDF never carry it. */}
-      <button type="button" className="inv-back no-print" onClick={() => router.back()}>
-        ← Back
-      </button>
+      {/* The control bar — same shape as the Quotation editor's dark toolbar
+          above its A4: Back, then the letter's actions. In the desktop shell
+          there is no browser chrome, so this bar is also the only way out —
+          the trap the owner hit twice. no-print + the PDF route's readiness
+          flag ignores it, so paper never carries it. */}
+      <div className="inv-bar no-print">
+        <button type="button" className="inv-bar-btn" onClick={() => router.back()}>
+          ← Back
+        </button>
+        <span className="inv-bar-ref">{letter.reference}</span>
+        <span className="inv-bar-spacer" />
+        <button
+          type="button"
+          className="inv-bar-btn"
+          onClick={() => router.push(`/travel/${id}`)}
+        >
+          Edit
+        </button>
+        <button type="button" className="inv-bar-btn" onClick={() => window.print()}>
+          Print
+        </button>
+        <button
+          type="button"
+          className="inv-bar-btn inv-bar-btn-primary"
+          onClick={() => {
+            window.location.href = `/api/invitations/${id}/pdf`;
+          }}
+        >
+          Export PDF
+        </button>
+      </div>
       <div className="inv-stack">
         {missing.length > 0 && (
           /* no-print: this is guidance for the operator, never part of the

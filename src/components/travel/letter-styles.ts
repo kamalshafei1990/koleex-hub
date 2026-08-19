@@ -30,23 +30,51 @@ export const LETTER_STYLES = `
     min-height: 100vh;
   }
 
-  .inv-back {
-    position: fixed;
-    top: 14px;
-    left: 14px;
+  /* The control bar above the paper — mirrors the Quotation editor's dark
+     toolbar so the two document screens feel like one system. Sticky, not
+     fixed: it scrolls WITH the page top then holds, and never covers the
+     sheet because the stack starts below it. */
+  .inv-bar {
+    position: sticky;
+    top: 0;
     z-index: 50;
-    padding: 8px 14px;
-    border: 1px solid rgba(0,0,0,0.15);
-    border-radius: 10px;
-    background: #fff;
-    color: #111;
-    font: 600 13px/1 -apple-system, "Helvetica Neue", sans-serif;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #16181d;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-family: -apple-system, "Helvetica Neue", sans-serif;
   }
-  .inv-back:hover { background: #f5f5f5; }
+  .inv-bar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    color: #d5d8dd;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .inv-bar-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .inv-bar-btn-primary {
+    background: #fff;
+    border-color: #fff;
+    color: #111;
+  }
+  .inv-bar-btn-primary:hover { background: #e8e8e8; color: #111; }
+  .inv-bar-ref {
+    color: rgba(255,255,255,0.45);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .inv-bar-spacer { flex: 1; }
 
-  .inv-stack { width: 210mm; margin: 0 auto; }
+  .inv-stack { width: 210mm; margin: 16px auto 0; }
 
   /* 270 mm, not 297: fits inside BOTH A4 (297) and US Letter (279) printable
      areas, so the pipeline never spills onto a phantom blank sheet.
