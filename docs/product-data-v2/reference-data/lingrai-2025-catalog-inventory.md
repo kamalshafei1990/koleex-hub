@@ -139,8 +139,12 @@ witness-material the lockstitch dictionary was built from.
    still routes `chainstitch-machines` → `flatlock-interlock` — that layer is
    the in-form witness, deliberately untouched (CL-0023: templateSlug is a
    witness, not a defect).
-2. **Build interlock + overlock templates** from P57/P69/P83 master tables — the other
-   two of Lingrai's core three, both on live shelves.
+2. ✅ **BUILT 2026-08-20** (owner-approved continuation) — `interlock-sewing-machine`
+   (11 sections, 26 fields: gauge ladder 4.0–6.4, cylinder circumference, the
+   EST/EWT/AST/AWT trimmer axis and 14-device list from P69–76) and
+   `overlock-sewing-machine` (10 sections, 24 fields: thread ladder 2–6, the
+   /UT /EXT /DET/DPT automation axis and 12-device list from P83–87).
+   **Prod now holds FOUR templates** — Lingrai's core three all covered.
 3. **Decide homes for fur sewing and carpet overedging** (4a-1/2) — new types need
    sign-off per `coding-change-governance.md`.
 4. **Decide the automation-station question once** (4a-3/4 + 4b-2): either a
