@@ -129,8 +129,16 @@ witness-material the lockstitch dictionary was built from.
 
 ## 6. Proposals (not applied — governance-gated)
 
-1. **Build the multi-needle chainstitch spec template** from P21–22/P49/P55 — the
-   highest-value template this file enables, on a live shelf with live `XSC` code.
+1. ✅ **BUILT 2026-08-20** (owner-approved) — live template
+   `multi-needle-chainstitch-machine` on `chainstitch-machines`: 11 sections,
+   29 fields, mirroring the lockstitch template's structure. Field set is this
+   file's tables verbatim: needle configuration from the P21–22 gauge charts,
+   devices multi-select from the P39–46 device dictionary (13 V-codes), rear
+   puller options from the P42 VCL roller table, motors from P47. Prod now
+   holds TWO templates. The static form map (`sewing-machine-templates.ts`)
+   still routes `chainstitch-machines` → `flatlock-interlock` — that layer is
+   the in-form witness, deliberately untouched (CL-0023: templateSlug is a
+   witness, not a defect).
 2. **Build interlock + overlock templates** from P57/P69/P83 master tables — the other
    two of Lingrai's core three, both on live shelves.
 3. **Decide homes for fur sewing and carpet overedging** (4a-1/2) — new types need
