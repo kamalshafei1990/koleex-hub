@@ -437,6 +437,17 @@ ok("every visit city carries all three languages",
 const visitCities = (typesSrc.slice(typesSrc.indexOf("COMMON_CITIES"), typesSrc.indexOf("];", typesSrc.indexOf("COMMON_CITIES"))).match(/\{ en:/g) ?? []).length;
 ok("the visit-city list grew to 20+", visitCities >= 20, `${visitCities}`);
 
+/* Stamp and signature sit SIDE BY SIDE — the owner's call. Absolute
+   placement is what let a wide signature run under the seal; a flex row with
+   a real gap cannot overlap at any signature width. */
+ok("the marks box is a flex row, not absolute placement",
+  /\.inv-marks \{[\s\S]*?display: flex/.test(styles) &&
+  !/\.inv-sig \{[\s\S]*?position: absolute/.test(styles));
+ok("there is a real gap between signature and stamp",
+  /\.inv-marks \{[\s\S]*?gap: \d+mm/.test(styles));
+ok("the stamp is fully opaque (nothing under it now)",
+  /\.inv-stamp \{[\s\S]*?opacity: 1;/.test(styles));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {

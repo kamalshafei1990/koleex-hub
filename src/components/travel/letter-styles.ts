@@ -268,18 +268,25 @@ export const LETTER_STYLES = `
   /* The marks box RESERVES its height whether or not the images exist, so a
      tenant without a stamp uploaded gets the same layout, just blank —
      rather than the address block sliding up into the closing line. */
+  /* SIDE BY SIDE, never overlapping — the owner's call. Absolute placement
+     had the signature at left 0 and the stamp at left 22mm, so a wide
+     signature ran straight under the seal and neither read cleanly. A flex
+     row with a real gap cannot overlap at any signature width, and the box
+     still RESERVES its height so a tenant with no stamp uploaded gets the
+     same layout, just blank, instead of the address block sliding up. */
   .inv-marks {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14mm;
     height: 40mm;
     margin: 1mm 0 1mm;
   }
   .inv-sig {
-    position: absolute;
-    left: 0;
-    top: 12mm;
     height: 16mm;
     width: auto;
+    max-width: 62mm;
     object-fit: contain;
+    object-position: left center;
   }
   /* The stamp at its REAL size. A Chinese company seal (公章) is 40mm in
      diameter by regulation — the owner's physical stamp included. It printed
@@ -287,13 +294,12 @@ export const LETTER_STYLES = `
      a stamped Chinese document, and a visa officer has. The overlap with the
      signature stays, the way ink actually lands on paper. */
   .inv-stamp {
-    position: absolute;
-    left: 22mm;
-    top: 0;
     height: 40mm;
     width: auto;
     object-fit: contain;
-    opacity: .92;
+    /* Fully opaque now: the .92 existed only so the signature stayed legible
+       THROUGH the seal. Nothing is underneath it any more. */
+    opacity: 1;
   }
 
   .inv-signer { font-size: 9pt; line-height: 1.4; }
