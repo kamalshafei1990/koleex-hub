@@ -118,16 +118,12 @@ ok("single-column row grids let their items shrink",
 
 console.log("\nC. Content must clear the frosted ramp");
 
-/* The shell offsets content by --kx-header-h, so a page starts under the
-   solid header. But the progressive pane extends 3rem FURTHER as an approach
-   ramp. On desktop a page's own top padding usually covers that; on an
-   iPhone the safe-area grows the header, the ramp moves down with it, and
-   whatever sits first lands INSIDE the blur before any scrolling — the owner
-   photographed exactly that on a 17 Pro Max (the greeting, and Discuss's
-   "New" button). .kx-below-ramp clears the same 3rem the ramp adds. */
-ok(".kx-below-ramp exists", /\.kx-below-ramp\s*\{[^}]*padding-top:\s*3rem/.test(css));
-ok("the phone-only variant exists and wins the cascade",
-  /max-md\\:kx-below-ramp\s*\{[^}]*padding-top:\s*3rem\s*!important/.test(css));
+/* The ramp-clearance checks that stood here are gone with the thing they
+   guarded. .kx-below-ramp padded content down by 3rem so the first item on a
+   page would clear the frosted ramp. Phones now hide the panes at rest, so
+   there is no ramp at rest to clear and the padding was only a visible gap
+   between the header and the first content. Asserting that a class exists
+   which nothing is allowed to use would pin the old design in place. */
 /* Desktop keeps the header + 3rem ramp; PHONES get header height exactly.
    The ramp is a tall-window affordance — on a phone its soft bottom edge
    lands behind the wordmark, and because the bar is pure blur with no fill,

@@ -920,7 +920,7 @@ export default function HomePage() {
         .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
-      <div className="kx-below-ramp relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
+      <div className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         {/* min-height = card (~96px) + the orb's 27px float amplitude on

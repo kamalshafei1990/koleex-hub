@@ -2279,7 +2279,7 @@ export default function DiscussApp() {
           }`}
         >
           {/* Search + filter */}
-          <div className="shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] max-md:kx-below-ramp">
+          <div className="shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border-subtle)]">
             {/* Back to Hub + the single New action. These are the only two
                 controls the old app bar contributed that belong on this screen
                 permanently; everything else moved into the conversation header
