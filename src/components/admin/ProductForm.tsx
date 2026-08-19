@@ -4879,7 +4879,36 @@ export default function ProductForm({ productId }: Props) {
                   />
                 );
               })() : (
-                <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} productSpecs={specEntries} />
+                <>
+                  <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} productSpecs={specEntries} />
+                  {/* With the PRIMARY selected, the cost above is the FAMILY
+                      baseline — but the strip sits right there, so an operator
+                      who just saved a member's own cost reopens the form (it
+                      always mounts on the primary), sees ¥40000, and reads it
+                      as "my member's price was overwritten by the main one"
+                      (reported 2026-08-19, prices were in fact saved). Show
+                      the members' own costs HERE so the truth is visible at
+                      the exact spot the misreading happens. */}
+                  {familyOn && models.length > 1 && (() => {
+                    const own = models.slice(1).map((m) => {
+                      const ov = (m.supplier_overrides ?? {}) as Record<string, unknown>;
+                      const cost = (ov.unit_cost_cny as string | number | undefined) ?? (m.cost_price || null);
+                      const code = m.primary_model || m.model_name || "";
+                      return cost != null && String(cost).trim() !== "" && code ? { code, cost: String(cost) } : null;
+                    }).filter((x): x is { code: string; cost: string } => x !== null);
+                    if (!own.length) return null;
+                    return (
+                      <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-ghost)]">
+                        {t("sup.memberCosts", "This is the family cost. These models have their own — pick one on the strip above to edit it:")}{" "}
+                        {own.map((o, i) => (
+                          <span key={o.code} className="font-semibold tabular-nums text-[var(--text-muted)]">
+                            {i > 0 ? " · " : ""}{o.code} ¥{o.cost}
+                          </span>
+                        ))}
+                      </p>
+                    );
+                  })()}
+                </>
               );
               })()}
             </Section>

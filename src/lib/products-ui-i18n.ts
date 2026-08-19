@@ -152,6 +152,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "sup.modelNumber": { en: "Model number", zh: "型号", ar: "رقم الموديل" },
   "sup.costPrice": { en: "Cost price", zh: "成本价", ar: "سعر التكلفة" },
   "sup.eg": { en: "e.g.", zh: "例如", ar: "مثال:" },
+  "sup.memberCosts": {
+    en: "This is the family cost. These models have their own — pick one on the strip above to edit it:",
+    zh: "这是家族成本。以下型号有各自的成本 — 在上方型号条中选择一个进行编辑：",
+    ar: "هذه تكلفة العائلة. الموديلات التالية لها تكلفتها الخاصة — اختر أحدها من الشريط أعلاه لتعديله:",
+  },
   "sup.cnyTitle": { en: "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.", zh: "出厂成本始终以人民币(¥)录入——定价引擎基于人民币成本计算。", ar: "تكلفة المصنع تُدخل دائماً بعملة CNY (¥) — محرك التسعير يعمل على التكلفة بها." },
   "sup.costIncludes": { en: "Cost includes", zh: "成本包含", ar: "التكلفة تشمل" },
   "sup.costDelivered": { en: "Delivered to Koleex (full landed)", zh: "送达Koleex(全到岸)", ar: "التسليم إلى Koleex (تكلفة كاملة)" },
