@@ -1439,23 +1439,58 @@ input[type="number"]:not(.kx-spinner) {
   height: calc(var(--kx-header-h, 3.5rem) + 3rem);
 }
 
-/* PHONES GET NO APPROACH RAMP — header height exactly, no extra.
+/* ── PHONES: SOLID AT REST, FROSTED ON SCROLL ─────────────────────────────
+   The owner's call, after the blur-at-rest defect survived three fixes on a
+   17 Pro Max. Each of those moved the blur's geometry and each measured
+   clean in a desktop browser while the device still showed a smeared logo
+   and smeared top content — so the blur stops being present at rest at all.
 
-   The ramp is a desktop affordance: content slides under a long fade as you
-   scroll a tall window. On a phone the fade is a large fraction of a small
-   screen, and because the bar itself is pure blur with no fill (the owner's
-   "totally transparent but blurred"), the ramp's soft bottom edge sits right
-   behind the wordmark — so the logo, bell and avatar read as smeared before
-   any scrolling. The owner photographed this three times; each earlier
-   attempt moved the LAYERS and left this height alone, which is why the
-   measurements kept saying "no overlap" while the phone kept looking wrong.
+   At rest the bar is opaque page colour: the wordmark, bell and avatar sit
+   on a known ground, which cannot smear on any renderer. The moment content
+   starts moving under it (data-kx-scrolled, set by MainHeader from
+   #main-scroll-container), the fill fades out and the frosted ramp fades in
+   — so the glass edge the owner wanted is exactly where it is useful, over
+   moving content, and never over a still page.
 
-   At exactly --kx-header-h the blur stops on the header's own edge: the bar
-   is still frosted glass, and nothing bleeds onto the content below it. */
+   Desktop is untouched: it keeps pure blur at every scroll position.
+
+   The transition is on the PANE and the BAR together so the two halves of
+   the swap cannot fall out of step. 180ms — long enough not to snap, short
+   enough that a fast flick does not lag behind the content. */
 @media (max-width: 767px) {
+  /* The bar carries the fill at rest… */
+  [data-kx-skin="aurora"] .kx-mainheader {
+    background: var(--bg-primary, #0A0A0A);
+    transition: background-color 180ms ease;
+  }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-mainheader {
+    background: transparent;
+  }
+
+  /* …and the blur pane only exists once scrolled. `visibility` as well as
+     opacity: a backdrop-filter at opacity 0 still costs a compositing pass
+     on iOS, and this is the one element that must not cost anything while
+     the page is still. */
   [data-kx-skin="aurora"] .kx-pane-progressive {
     height: var(--kx-header-h, 3.5rem);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 180ms ease, visibility 0s linear 180ms;
   }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-pane-progressive {
+    /* Scrolled: the full ramp returns, header height plus the 3rem approach,
+       so content fades as it rises — the effect the owner asked to keep. */
+    height: calc(var(--kx-header-h, 3.5rem) + 3rem);
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 180ms ease, visibility 0s;
+  }
+}
+
+/* Motion preference: no fade, just an instant swap. */
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  [data-kx-skin="aurora"] .kx-mainheader,
+  [data-kx-skin="aurora"] .kx-pane-progressive { transition: none; }
 }
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
   position: absolute;

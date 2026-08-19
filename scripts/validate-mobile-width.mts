@@ -136,8 +136,32 @@ ok("the phone-only variant exists and wins the cascade",
    "no overlap" while the phone kept looking wrong. */
 ok("desktop keeps the header + 3rem ramp",
   /\.kx-pane-progressive\s*\{[^}]*height:\s*calc\(var\(--kx-header-h[^)]*\)\s*\+\s*3rem\)/.test(css));
-ok("phones stop the blur at the header edge",
-  /max-width:\s*767px[\s\S]{0,220}\.kx-pane-progressive\s*\{[^}]*height:\s*var\(--kx-header-h/.test(css));
+/* PHONES: solid bar at rest, frosted once scrolled — the owner's decision
+   after three geometry fixes each measured clean in a desktop browser and
+   each still showed a smeared logo on his 17 Pro Max. At rest there is no
+   blur to smear anything; the glass returns over moving content, which is
+   where it was wanted. Three parts, all required:
+     · the bar carries an opaque fill on phones
+     · the pane is hidden at rest (visibility, not just opacity — a
+       backdrop-filter at opacity 0 still costs a compositing pass on iOS)
+     · [data-kx-scrolled] restores transparency + the ramp
+   and MainHeader must still SET the flag, or the header never un-solidifies. */
+/* Match against the CSS as a whole, scoped by the rule text itself. An
+   earlier version grabbed the FIRST `@media (max-width: 767px)` in the file
+   — there is another one above this — and reported both checks failing on
+   correct code. Scope by what the rule says, not by which block came first. */
+ok("phones: the bar is opaque at rest",
+  /max-width:\s*767px\)\s*\{[\s\S]*?\.kx-mainheader\s*\{[^}]*background:\s*var\(--bg-primary/.test(css));
+ok("phones: the blur pane is hidden at rest",
+  /max-width:\s*767px\)\s*\{[\s\S]*?\.kx-pane-progressive\s*\{[^}]*visibility:\s*hidden/.test(css));
+ok("phones: scrolling restores the frosted ramp",
+  /\[data-kx-scrolled\][^{]*\.kx-pane-progressive\s*\{[^}]*opacity:\s*1/.test(css));
+ok("MainHeader sets the scroll flag from the Hub scroller",
+  (() => {
+    const mh = fs.readFileSync(R("src/components/layout/MainHeader.tsx"), "utf8");
+    return mh.includes('toggleAttribute("data-kx-scrolled"') &&
+           mh.includes('getElementById("main-scroll-container")');
+  })());
 
 /* THE HEADER BAR HAS NO FILL OF ITS OWN — "the bar is now the ground itself,
    frosted". Its glass IS the progressive pane's layers, which must therefore
