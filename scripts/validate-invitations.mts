@@ -394,6 +394,17 @@ ok("delete asks first and names visitor + reference",
 ok("no button nested inside the row button",
   !/<button[^>]*>[\s\S]*?<button/.test(listSrc.slice(listSrc.indexOf("min-w-0 flex-1 text-start"), listSrc.indexOf("</button>", listSrc.indexOf("min-w-0 flex-1 text-start")))));
 
+/* Dates are ALWAYS Day/Month/Year — the owner's standing rule. A native
+   date input renders in the browser's locale (en-US = mm/dd) and nothing can
+   override that, so the VISIBLE control must be the DMY text field; the
+   native input survives only hidden, powering the calendar picker. */
+const fieldsSrc2 = fs.readFileSync(R("src/components/travel/fields.tsx"), "utf8");
+ok("the visible date control is dd/mm/yyyy", fieldsSrc2.includes('placeholder="dd/mm/yyyy"'));
+ok("the native date input is hidden, picker-only",
+  /type="date"[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}type="date"/.test(fieldsSrc2));
+ok("DMY parsing rejects impossible dates (calendar round-trip)",
+  fieldsSrc2.includes("probe.getUTCDate() !== d"));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {
