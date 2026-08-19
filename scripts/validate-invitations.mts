@@ -405,6 +405,24 @@ ok("the native date input is hidden, picker-only",
 ok("DMY parsing rejects impossible dates (calendar round-trip)",
   fieldsSrc2.includes("probe.getUTCDate() !== d"));
 
+/* The three dropdowns — the owner's ask: pick, never type. Nationality and
+   Country share the full country list; Arrival city lists mainland cities
+   with international airports, each carrying a Chinese name so 由X入境 never
+   prints English mid-sentence. */
+const typesSrc = fs.readFileSync(R("src/lib/invitations/types.ts"), "utf8");
+const countryCount = (typesSrc.match(/code: "[A-Z]{2}" \}/g) ?? []).length;
+ok("the country list is substantial (140+)", countryCount >= 140, `${countryCount}`);
+ok("every arrival city carries a Chinese name",
+  !/ARRIVAL_CITIES[\s\S]*?\{ en: "[^"]+" \}/.test(typesSrc));
+ok("cityCn knows the arrival cities",
+  typesSrc.includes("[...COMMON_CITIES, ...ARRIVAL_CITIES]"));
+const formSrc2 = fs.readFileSync(R("src/components/travel/InvitationForm.tsx"), "utf8");
+ok("nationality, country and arrival city are dropdowns",
+  ["COUNTRY_OPTIONS, form.nationality", "COUNTRY_OPTIONS, form.country", "ARRIVAL_OPTIONS, form.arrivalCity"]
+    .every((k) => formSrc2.includes(k)));
+ok("a stored value outside the list stays visible (withCurrent)",
+  formSrc2.includes("function withCurrent"));
+
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
 if (failures.length === 0) {

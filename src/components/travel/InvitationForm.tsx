@@ -37,6 +37,8 @@ import {
 import CustomerPicker from "@/components/travel/CustomerPicker";
 import PassportScanBox from "@/components/travel/PassportScanBox";
 import {
+  ARRIVAL_CITIES,
+  COUNTRIES,
   codeForCountryName,
   COMMON_CITIES,
   PURPOSES,
@@ -132,6 +134,13 @@ function toPayload(f: FormState) {
     letterDate: f.letterDate,
   };
 }
+
+function withCurrent(options: { value: string; label: string }[], current: string) {
+  if (!current || options.some((o) => o.value === current)) return options;
+  return [{ value: current, label: current }, ...options];
+}
+const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.name, label: c.name }));
+const ARRIVAL_OPTIONS = ARRIVAL_CITIES.map((c) => ({ value: c.en, label: c.en }));
 
 export default function InvitationForm({ id }: { id?: string }) {
   const { t } = useTranslation(travelT);
@@ -413,16 +422,17 @@ export default function InvitationForm({ id }: { id?: string }) {
               ]}
             />
             <DateField label={t("f.dob")} value={form.dob} onChange={(v) => set("dob", v)} />
-            <TextField
+            <SelectField
               label={t("f.nationality")}
               value={form.nationality}
+              options={withCurrent(COUNTRY_OPTIONS, form.nationality)}
               onChange={(v) => {
                 set("nationality", v);
-                /* The code fills itself — the owner asked what "ISO code"
-                   meant, which settles that nobody should be typing it. A
-                   hand-entered value is only overwritten when the new name
-                   actually resolves, so correcting a typo never wipes it. */
-                const code = codeForCountryName(v);
+                /* Picking from the list fills the code from the SAME entry —
+                   the owner asked what "ISO code" meant, which settles that
+                   nobody should be typing it. */
+                const code =
+                  COUNTRIES.find((c) => c.name === v)?.code ?? codeForCountryName(v);
                 if (code) set("nationalityCode", code);
               }}
             />
@@ -485,10 +495,15 @@ export default function InvitationForm({ id }: { id?: string }) {
               value={form.position}
               onChange={(v) => set("position", v)}
             />
-            <TextField
+            <SelectField
               label={t("f.country")}
               value={form.country}
-              onChange={(v) => set("country", v)}
+              options={withCurrent(COUNTRY_OPTIONS, form.country)}
+              onChange={(v) => {
+                set("country", v);
+                const code = COUNTRIES.find((c) => c.name === v)?.code;
+                if (code) set("countryCode", code);
+              }}
             />
           </Section>
 
@@ -509,9 +524,10 @@ export default function InvitationForm({ id }: { id?: string }) {
                 wide
               />
             )}
-            <TextField
+            <SelectField
               label={t("f.arrivalCity")}
               value={form.arrivalCity}
+              options={withCurrent(ARRIVAL_OPTIONS, form.arrivalCity)}
               onChange={(v) => set("arrivalCity", v)}
             />
             <SegmentField<VisaType>
