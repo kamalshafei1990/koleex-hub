@@ -35,6 +35,9 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+/* Home dashboard is code-split: it only matters after the grid is usable,
+   and keeping it out of the critical chunk protects the home budget. */
+const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
@@ -983,6 +986,12 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── Zone B: the Dashboard (owner call 2026-08-20: the FULL dashboard
+            lives on Home, in the slab style cloned from his references).
+            One request (/api/dashboard, no-store), server-side permission
+            filtering, renders nothing at all for accounts with no visible
+            widgets — the grid below is untouched for them. */}
+        <HomeDashboard />
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),

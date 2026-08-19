@@ -1,0 +1,199 @@
+/* ---------------------------------------------------------------------------
+   Home Dashboard — the "futuristic slab" family (owner-approved 2026-08-20,
+   cloned from his reference cards: milky top fog, navy backlit body, a neon
+   lip blooming out of the bottom edge, blueprint grid fading in below).
+
+   OWNER DECISION: this glow level is a deliberate exception to the brand's
+   "glow must be subtle" line — the dashboard is the Hub's illuminated face.
+   Scoped as a CSS module on purpose: nothing here can leak into globals or
+   fight the aurora control-hover layer.
+   --------------------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 18px;
+  margin-block-end: 32px;
+}
+
+.slab {
+  position: relative;
+  border-radius: 34px;
+  isolation: isolate;
+  padding: 20px 22px;
+  background:
+    radial-gradient(150% 85% at 50% -32%, rgba(148, 175, 218, 0.28), rgba(120, 150, 200, 0.06) 48%, transparent 62%),
+    radial-gradient(160% 80% at 50% 122%, rgba(64, 140, 255, 0.38), rgba(52, 115, 230, 0.13) 42%, transparent 66%),
+    linear-gradient(180deg, #182742 0%, #101c34 38%, #0c1728 62%, #0e1d38 100%);
+  box-shadow:
+    0 0 0 1px rgba(165, 195, 240, 0.15),
+    inset 0 1.5px 0 rgba(215, 232, 255, 0.2),
+    inset 0 -40px 84px -32px rgba(76, 152, 255, 0.36),
+    0 24px 54px rgba(0, 0, 0, 0.48);
+}
+.slab::after {
+  content: "";
+  position: absolute;
+  inset-inline: 13%;
+  bottom: -7px;
+  height: 13px;
+  z-index: -1;
+  border-radius: 9999px;
+  filter: blur(10px);
+  background: radial-gradient(55% 120% at 50% 0%, rgba(105, 180, 255, 0.46), rgba(70, 145, 255, 0.11) 62%, transparent);
+}
+
+.bp {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(96, 158, 255, 0.09) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(180deg, rgba(96, 158, 255, 0.06) 0 1px, transparent 1px 42px);
+  -webkit-mask: linear-gradient(180deg, transparent 45%, #000 82%);
+  mask: linear-gradient(180deg, transparent 45%, #000 82%);
+}
+
+.hero { grid-column: span 8; min-height: 250px; display: flex; flex-direction: column; }
+.side { grid-column: span 4; display: flex; flex-direction: column; gap: 18px; }
+.kpi  { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.half { grid-column: span 6; }
+
+.klabel {
+  font-size: 12px;
+  color: rgba(205, 220, 240, 0.6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.ttl { color: #e9f1fa; font-weight: 600; }
+.mini {
+  font-size: 9px;
+  color: rgba(165, 205, 255, 0.75);
+  border: 1px solid rgba(165, 200, 250, 0.22);
+  background: rgba(150, 190, 245, 0.09);
+  border-radius: 9999px;
+  padding: 3px 9px;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+.unit { font-size: 11px; color: rgba(190, 205, 225, 0.42); }
+
+.curve { position: relative; flex: 1; min-height: 110px; margin: 6px -4px 0; }
+.curve svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+.heroNum { text-align: center; padding-block-end: 2px; }
+.heroLbl { font-size: 14.5px; color: rgba(212, 226, 244, 0.72); }
+.heroBig {
+  font-size: 46px;
+  font-weight: 300;
+  color: #fff;
+  line-height: 1.12;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 20px rgba(180, 215, 255, 0.28);
+}
+.heroSub { font-size: 11px; color: rgba(190, 205, 225, 0.48); margin-block-start: 2px; }
+
+.kval {
+  font-size: 25px;
+  font-weight: 300;
+  margin-block-start: 6px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(180, 215, 255, 0.26);
+}
+.kdelta { font-size: 10.5px; margin-block-start: 2px; color: rgba(205, 220, 240, 0.5); }
+.good { color: #79d89a; }
+.warnTone { color: #edc684; }
+
+.ringRow { display: flex; align-items: center; gap: 13px; margin-block-start: 8px; }
+.ringWrap { position: relative; inline-size: 52px; block-size: 52px; flex: none; }
+.ringTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+
+.barsWrap { position: relative; block-size: 116px; margin-block-start: 18px; display: flex; align-items: flex-end; gap: 8px; padding-block-end: 2px; }
+.bar {
+  flex: 1;
+  position: relative;
+  border-start-start-radius: 6px;
+  border-start-end-radius: 6px;
+  background: linear-gradient(180deg, rgba(140, 190, 255, 0.15), rgba(90, 140, 220, 0.04));
+  border: 1px solid rgba(150, 195, 255, 0.13);
+  border-block-end: none;
+}
+.bar em {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -18px;
+  font-style: normal;
+  font-size: 8.5px;
+  color: rgba(205, 220, 240, 0.38);
+  text-align: center;
+  letter-spacing: 0.6px;
+}
+.bar b {
+  position: absolute;
+  inset-inline: 0;
+  top: -18px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(230, 240, 252, 0.85);
+}
+.barHot {
+  background: linear-gradient(180deg, rgba(160, 205, 255, 0.3), rgba(90, 150, 240, 0.08));
+  border-color: rgba(170, 210, 255, 0.36);
+}
+.pipePad { padding-block-end: 30px; }
+
+.attnRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 2px;
+  font-size: 12px;
+  color: rgba(205, 220, 240, 0.6);
+  border-block-end: 1px solid rgba(150, 195, 255, 0.08);
+  text-decoration: none;
+}
+.attnRow:last-child { border-block-end: none; }
+.attnRow b { color: #e9f1fa; font-weight: 600; }
+.sig { inline-size: 8px; block-size: 8px; border-radius: 50%; margin-block-start: 4px; flex: none; }
+.sigCrit { background: #f49090; box-shadow: 0 0 9px rgba(244, 144, 144, 0.5); }
+.sigWarn { background: #edc684; box-shadow: 0 0 9px rgba(237, 198, 132, 0.5); }
+.sigOk   { background: #79d89a; box-shadow: 0 0 9px rgba(121, 216, 154, 0.4); }
+.go {
+  margin-inline-start: auto;
+  font-size: 9px;
+  color: rgba(165, 205, 255, 0.75);
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+.errCard { font-size: 11.5px; color: #edc684; margin-block-start: 8px; }
+
+/* skeleton shimmer while the one request is in flight */
+.skel { min-block-size: 250px; display: grid; place-items: center; }
+.skelDot {
+  inline-size: 9px; block-size: 9px; border-radius: 50%;
+  background: #6fb4ff;
+  animation: dashPulse 1.4s ease-in-out infinite;
+}
+@keyframes dashPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(111, 180, 255, 0.9); opacity: .7; }
+  50% { box-shadow: 0 0 18px 5px rgba(111, 180, 255, 0.35); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .skelDot { animation: none; } }
+
+@media (max-width: 900px) {
+  .hero, .side, .half { grid-column: span 12; }
+  .heroBig { font-size: 38px; }
+}
