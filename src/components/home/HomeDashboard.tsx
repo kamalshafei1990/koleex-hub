@@ -26,15 +26,24 @@ const SEEN_KEY = "kx_home_dash_seen";
 type Quotations = {
   openCount: number; expiringSoon: number;
   stages: Record<string, number>; series: number[];
-  openValue?: number; wonValueMtd?: number; error?: string;
+  createdInPeriod: number; period: string;
+  openValue?: number; wonValueMtd?: number; wonValueInPeriod?: number; error?: string;
 };
 type Products = { total: number; active: number; draft: number; draftAging: number; error?: string };
 type Todo = { open: number; error?: string };
-type Presence = { activeToday: number; teamSize: number; hoursToday: number; error?: string };
+type Person = { name: string; initials: string; avatar: string | null; active: boolean };
+type Presence = { activeToday: number; teamSize: number; hoursToday: number; people?: Person[]; error?: string };
+type SystemW = { pendingMembership: number; notifyErrorsToday: number; error?: string };
 type Payload = {
-  widgets: { quotations: Quotations | null; products: Products | null; todo: Todo | null; presence: Presence | null };
-  showMoney: boolean; ts: number;
+  widgets: { quotations: Quotations | null; products: Products | null; todo: Todo | null; presence: Presence | null; system: SystemW | null };
+  showMoney: boolean; period: string; gatewayMs: number; ts: number;
 };
+const PERIOD_TABS = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "quarter", label: "Quarter" },
+] as const;
 
 const STAGE_ORDER = ["draft", "sent", "negotiation", "won", "lost"] as const;
 const STAGE_LABEL: Record<string, string> = {
@@ -69,6 +78,7 @@ function curvePath(series: number[], w: number, h: number): { d: string; peak: {
 export default function HomeDashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
+  const [period, setPeriod] = useState("month");
   /* Lazy init, not an effect: this component is dynamic({ssr:false}), so
      localStorage exists at first render — and reading it here means the
      reserved slot is present in the very first paint (no shift). */
@@ -80,7 +90,7 @@ export default function HomeDashboard() {
     let cancelled = false;
     const load = async () => {
       try {
-        const r = await fetch("/api/dashboard", { credentials: "include", cache: "no-store" });
+        const r = await fetch(`/api/dashboard?period=${period}`, { credentials: "include", cache: "no-store" });
         if (!r.ok) { if (!cancelled) setFailed(true); return; }
         const j = (await r.json()) as Payload;
         if (cancelled) return;
@@ -93,12 +103,13 @@ export default function HomeDashboard() {
     const onVis = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVis);
     return () => { cancelled = true; document.removeEventListener("visibilitychange", onVis); };
-  }, []);
+  }, [period]);
 
   const q = data?.widgets.quotations ?? null;
   const p = data?.widgets.products ?? null;
   const td = data?.widgets.todo ?? null;
   const pr = data?.widgets.presence ?? null;
+  const sys = data?.widgets.system ?? null;
 
   const curve = useMemo(
     () => (q && !q.error && q.series?.length ? curvePath(q.series, 760, 150) : null),
@@ -106,7 +117,7 @@ export default function HomeDashboard() {
   );
 
   /* Nothing visible for this account → render nothing (and don't reserve). */
-  const empty = data !== null && !q && !p && !td && !pr;
+  const empty = data !== null && !q && !p && !td && !pr && !sys;
   if (failed || empty) return null;
 
   /* Loading: hold the slot only for accounts that have seen it before. */
@@ -128,6 +139,19 @@ export default function HomeDashboard() {
   const maxStage = Math.max(1, ...STAGE_ORDER.map((k) => stages[k] ?? 0));
 
   return (
+    <div>
+      {/* period chips — a real filter: the gateway rescopes createdInPeriod
+          and wonValueInPeriod to the chosen window */}
+      <div className={s.tabs}>
+        {PERIOD_TABS.map((t) => (
+          <button key={t.key} type="button"
+            className={`${s.tab} ${period === t.key ? s.tabOn : ""}`}
+            onClick={() => setPeriod(t.key)}>
+            {t.label}
+          </button>
+        ))}
+        <span className={s.tabsHint}>LIVE · {data.gatewayMs}ms</span>
+      </div>
     <div className={s.grid}>
 
       {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
@@ -169,8 +193,9 @@ export default function HomeDashboard() {
             </div>
             <div className={s.heroSub}>
               {q.openCount} open quotation{q.openCount === 1 ? "" : "s"}
+              {` · ${q.createdInPeriod} created ${q.period === "today" ? "today" : `this ${q.period}`}`}
               {q.expiringSoon > 0 ? ` · ${q.expiringSoon} expiring within 7 days` : ""}
-              {typeof q.wonValueMtd === "number" && q.wonValueMtd > 0 ? ` · won this month ${money(q.wonValueMtd)}` : ""}
+              {typeof q.wonValueInPeriod === "number" && q.wonValueInPeriod > 0 ? ` · won ${q.period === "today" ? "today" : `this ${q.period}`} ${money(q.wonValueInPeriod)}` : ""}
             </div>
           </div>
         </Link>
@@ -182,12 +207,18 @@ export default function HomeDashboard() {
           <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }}>
             <div className={s.klabel}><span>Catalogue</span></div>
             {p.error ? <div className={s.errCard}>⚠ can&apos;t read products</div> : (
-              <>
-                <div className={s.kval}>{p.active} <span className={s.unit}>/ {p.total} active</span></div>
-                <div className={s.kdelta}>
-                  {p.draft} in draft{p.draftAging > 0 ? <> · <span className={s.warnTone}>{p.draftAging} untouched &gt; 14d</span></> : null}
+              <div className={s.ringRow}>
+                <div className={s.ringWrap}>
+                  <div className={s.ringGauge} style={{ ["--pct" as string]: `${p.total ? Math.round((p.active / p.total) * 100) : 0}%` }} />
+                  <div className={s.ringTxt}>{p.total ? Math.round((p.active / p.total) * 100) : 0}%</div>
                 </div>
-              </>
+                <div>
+                  <div className={s.kval} style={{ marginBlockStart: 0 }}>{p.active} <span className={s.unit}>/ {p.total} active</span></div>
+                  <div className={s.kdelta}>
+                    {p.draft} in draft{p.draftAging > 0 ? <> · <span className={s.warnTone}>{p.draftAging} untouched &gt; 14d</span></> : null}
+                  </div>
+                </div>
+              </div>
             )}
           </Link>
         )}
@@ -208,7 +239,17 @@ export default function HomeDashboard() {
             {pr.error ? <div className={s.errCard}>⚠ can&apos;t read presence</div> : (
               <>
                 <div className={s.kval}>{pr.activeToday} <span className={s.unit}>/ {pr.teamSize} active · {pr.hoursToday}h</span></div>
-                <div className={s.kdelta}>from today&apos;s usage rollup</div>
+                <div className={s.people}>
+                  {(pr.people ?? []).slice(0, 8).map((person) => (
+                    <span key={person.name} className={`${s.pv} ${person.active ? s.pvOn : ""}`} title={person.name}>
+                      {person.avatar
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={person.avatar} alt={person.name} className={s.pvImg} />
+                        : person.initials}
+                    </span>
+                  ))}
+                  {(pr.people?.length ?? 0) > 8 && <span className={s.pv}>+{(pr.people?.length ?? 0) - 8}</span>}
+                </div>
               </>
             )}
           </div>
@@ -248,6 +289,11 @@ export default function HomeDashboard() {
               <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{p.draftAging} product draft{p.draftAging === 1 ? "" : "s"}</b> untouched for 14+ days</span><span className={s.go}>PRODUCT DATA →</span>
             </Link>
           )}
+          {sys && !sys.error && sys.pendingMembership > 0 && (
+            <Link href="/membership" className={s.attnRow}>
+              <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{sys.pendingMembership} membership request{sys.pendingMembership === 1 ? "" : "s"}</b> waiting review</span><span className={s.go}>MEMBERSHIP →</span>
+            </Link>
+          )}
           {td && !td.error && td.open > 0 && (
             <Link href="/todo" className={s.attnRow}>
               <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{td.open} to-do{td.open === 1 ? "" : "s"}</b> waiting on you</span><span className={s.go}>TO-DO →</span>
@@ -261,6 +307,17 @@ export default function HomeDashboard() {
         </div>
       </div>
 
+      {sys && !sys.error && (
+        <div className={`kx-glass ${s.slab} ${s.sysStrip}`}>
+          <span className={s.sysItem}><span className={`${s.sig} ${s.sigOk}`} /> API {data.gatewayMs}ms</span>
+          <span className={s.sysSep} />
+          <span className={s.sysItem}><span className={`${s.sig} ${sys.notifyErrorsToday > 0 ? s.sigWarn : s.sigOk}`} /> Notify errors today {sys.notifyErrorsToday}</span>
+          <span className={s.sysSep} />
+          <span className={s.sysItem}><span className={`${s.sig} ${sys.pendingMembership > 0 ? s.sigWarn : s.sigOk}`} /> Membership pending {sys.pendingMembership}</span>
+          <span className={s.sysEnd}>KOLEEX HUB · SHAPING THE FUTURE</span>
+        </div>
+      )}
+    </div>
     </div>
   );
 }

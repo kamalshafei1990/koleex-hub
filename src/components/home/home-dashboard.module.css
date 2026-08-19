@@ -125,9 +125,9 @@
 .good { color: #79d89a; }
 .warnTone { color: #edc684; }
 
-.ringRow { display: flex; align-items: center; gap: 13px; margin-block-start: 8px; }
-.ringWrap { position: relative; inline-size: 52px; block-size: 52px; flex: none; }
-.ringTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.ringRow { display: flex; align-items: center; gap: 13px; margin-block-start: 8px; flex-wrap: wrap; }
+.ringWrap { position: relative; inline-size: 44px; block-size: 44px; flex: none; }
+.ringTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 600; }
 
 .barsWrap { position: relative; block-size: 116px; margin-block-start: 18px; display: flex; align-items: flex-end; gap: 8px; padding-block-end: 2px; }
 .bar {
@@ -207,3 +207,57 @@
   .hero, .side, .half { grid-column: span 12; }
   .heroBig { font-size: 38px; }
 }
+
+/* ── period chips ── */
+.tabs { display: flex; align-items: center; gap: 6px; margin-block-end: 12px; }
+.tab {
+  font-size: 11px; color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px; padding: 5px 13px; cursor: pointer;
+  font-family: inherit; transition: color 0.15s ease-out, background-color 0.15s ease-out;
+}
+.tab:hover { color: rgba(255, 255, 255, 0.8); }
+.tabOn {
+  color: #fff; background: rgba(188, 216, 240, 0.12);
+  border-color: rgba(127, 169, 214, 0.5);
+}
+.tabsHint { margin-inline-start: auto; font-size: 9.5px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.28); }
+
+/* ── ring gauge (conic, Hub Blue) ── */
+.ringGauge {
+  inline-size: 44px; block-size: 44px; border-radius: 50%;
+  background: conic-gradient(from -90deg, #7FA9D6 0 var(--pct, 0%), rgba(255, 255, 255, 0.09) var(--pct, 0%) 100%);
+  -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%);
+  mask: radial-gradient(circle, transparent 57%, #000 58%);
+  filter: drop-shadow(0 0 7px rgba(127, 169, 214, 0.4));
+}
+
+/* ── presence avatars ── */
+.people { display: flex; gap: 7px; margin-block-start: 10px; flex-wrap: wrap; }
+.pv {
+  inline-size: 30px; block-size: 30px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid; place-items: center; overflow: hidden;
+  font-size: 10px; font-weight: 600; color: rgba(226, 238, 250, 0.85);
+  position: relative; border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0.45;
+}
+.pvOn { opacity: 1; box-shadow: 0 0 9px rgba(127, 169, 214, 0.25); }
+.pvOn::after {
+  content: ""; position: absolute; bottom: 0; inset-inline-end: 0;
+  inline-size: 8px; block-size: 8px; border-radius: 50%;
+  background: #79d89a; border: 2px solid #0c0d10;
+}
+.pvImg { inline-size: 100%; block-size: 100%; object-fit: cover; }
+
+/* ── system strip (SA) ── */
+.sysStrip {
+  margin-block-start: 18px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 13px 20px;
+}
+.sysItem { display: flex; align-items: center; gap: 8px; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.48); }
+.sysSep { inline-size: 1px; block-size: 13px; background: rgba(255, 255, 255, 0.1); }
+.sysEnd { margin-inline-start: auto; font-size: 9px; letter-spacing: 2.2px; color: rgba(255, 255, 255, 0.25); }
+@media (max-width: 700px) { .sysEnd { display: none; } }

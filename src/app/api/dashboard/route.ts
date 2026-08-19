@@ -32,7 +32,10 @@ async function allowed(auth: ServerAuthContext, module: string): Promise<boolean
 }
 
 /* ── Quotations: pipeline + open value + expiring ─────────────────────── */
-async function quotationsWidget(showMoney: boolean): Promise<Widget> {
+const PERIODS = { today: 1, week: 7, month: 31, quarter: 92 } as const;
+type Period = keyof typeof PERIODS;
+
+async function quotationsWidget(showMoney: boolean, period: Period): Promise<Widget> {
   const { data, error } = await supabaseServer
     .from("quotations")
     .select("status, total, valid_till, updated_at, created_at");
@@ -46,6 +49,11 @@ async function quotationsWidget(showMoney: boolean): Promise<Widget> {
   const now = Date.now();
   const monthStart = new Date();
   monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const periodStart = period === "today"
+    ? new Date(new Date().setHours(0, 0, 0, 0))
+    : new Date(now - PERIODS[period] * DAY_MS);
+  let createdInPeriod = 0;
+  let wonValueInPeriod = 0;
   for (const r of rows) {
     const st = (r.status || "draft").toLowerCase();
     stages[st] = (stages[st] ?? 0) + 1;
@@ -61,6 +69,10 @@ async function quotationsWidget(showMoney: boolean): Promise<Widget> {
     if (st === "won" && r.updated_at && new Date(r.updated_at) >= monthStart) {
       wonValueMtd += Number(r.total) || 0;
     }
+    if (r.created_at && new Date(r.created_at) >= periodStart) createdInPeriod++;
+    if (st === "won" && r.updated_at && new Date(r.updated_at) >= periodStart) {
+      wonValueInPeriod += Number(r.total) || 0;
+    }
   }
   /* 12-week creation series — the hero curve is REAL shape, not decor.
      Bucket by weeks-ago so the newest bucket is the last point. */
@@ -71,8 +83,8 @@ async function quotationsWidget(showMoney: boolean): Promise<Widget> {
     if (weeksAgo >= 0 && weeksAgo < 12) series[11 - weeksAgo]++;
   }
   return {
-    openCount, expiringSoon, stages, series,
-    ...(showMoney ? { openValue: Math.round(openValue), wonValueMtd: Math.round(wonValueMtd) } : {}),
+    openCount, expiringSoon, stages, series, createdInPeriod, period,
+    ...(showMoney ? { openValue: Math.round(openValue), wonValueMtd: Math.round(wonValueMtd), wonValueInPeriod: Math.round(wonValueInPeriod) } : {}),
   };
 }
 
@@ -114,7 +126,7 @@ async function presenceWidget(): Promise<Widget> {
   const today = new Date().toISOString().slice(0, 10);
   const [usage, accounts] = await Promise.all([
     supabaseServer.from("usage_daily").select("account_id, active_seconds").eq("day", today),
-    supabaseServer.from("accounts").select("id, username").eq("status", "active").eq("user_type", "internal"),
+    supabaseServer.from("accounts").select("id, username, avatar_url").eq("status", "active").eq("user_type", "internal"),
   ]);
   if (usage.error) return { error: usage.error.message };
   if (accounts.error) return { error: accounts.error.message };
@@ -127,16 +139,44 @@ async function presenceWidget(): Promise<Widget> {
     const s = Number(u.active_seconds) || 0;
     if (s > 0) { activeIds.add(u.account_id); secs += s; }
   }
-  return { activeToday: activeIds.size, teamSize: team.length, hoursToday: Math.round(secs / 360) / 10 };
+  /* the avatar row: active people first, then the rest */
+  const people = team
+    .map((a) => ({
+      name: a.username,
+      initials: a.username.slice(0, 2).toUpperCase(),
+      avatar: a.avatar_url || null,
+      active: activeIds.has(a.id),
+    }))
+    .sort((a, b) => Number(b.active) - Number(a.active));
+  return { activeToday: activeIds.size, teamSize: team.length, hoursToday: Math.round(secs / 360) / 10, people };
 }
 
-export async function GET() {
+/* ── System strip: only numbers that are REAL — gateway latency, pending
+     membership reviews, delivery errors today. SA-only. ─────────────────── */
+async function systemWidget(): Promise<Widget> {
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const [pending, errs] = await Promise.all([
+    supabaseServer.from("membership_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabaseServer.from("notification_logs").select("id", { count: "exact", head: true })
+      .eq("status", "error").gte("created_at", dayStart.toISOString()),
+  ]);
+  if (pending.error) return { error: pending.error.message };
+  if (errs.error) return { error: errs.error.message };
+  return { pendingMembership: pending.count ?? 0, notifyErrorsToday: errs.count ?? 0 };
+}
+
+export async function GET(req: Request) {
+  const t0 = Date.now();
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
   /* Money visibility: SA only for now — widening it later is a whitelist
      entry here, not a UI change (enforced server-side on purpose). */
   const showMoney = auth.is_super_admin === true;
+
+  const url = new URL(req.url);
+  const rawPeriod = url.searchParams.get("period") ?? "month";
+  const period: Period = rawPeriod in PERIODS ? (rawPeriod as Period) : "month";
 
   const [canQuotes, canProducts, canTodo, canPresence] = await Promise.all([
     allowed(auth, "Quotations"),
@@ -145,15 +185,16 @@ export async function GET() {
     allowed(auth, "Management"),
   ]);
 
-  const [quotations, products, todo, presence] = await Promise.all([
-    canQuotes ? quotationsWidget(showMoney) : Promise.resolve(null),
+  const [quotations, products, todo, presence, system] = await Promise.all([
+    canQuotes ? quotationsWidget(showMoney, period) : Promise.resolve(null),
     canProducts ? productsWidget() : Promise.resolve(null),
     canTodo ? todoWidget(auth) : Promise.resolve(null),
     canPresence ? presenceWidget() : Promise.resolve(null),
+    auth.is_super_admin ? systemWidget() : Promise.resolve(null),
   ]);
 
   return NextResponse.json(
-    { widgets: { quotations, products, todo, presence }, showMoney, ts: Date.now() },
+    { widgets: { quotations, products, todo, presence, system }, showMoney, period, gatewayMs: Date.now() - t0, ts: Date.now() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
