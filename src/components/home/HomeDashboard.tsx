@@ -92,6 +92,11 @@ export default function HomeDashboard() {
      each along its own measured trajectory. Toggle-only; page open stays
      at the near-imperceptible tier. */
   const [animOn, setAnimOn] = useState(false);
+  /* true only WHILE cards are traveling — it lifts the clip so the flight
+     is visible right at the button, then re-clips (and re-blocks pointer
+     events on the hidden deck) the moment the flight ends. */
+  const [flying, setFlying] = useState(false);
+  const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   /* Measure once per toggle: each card's center → the button's center,
@@ -120,6 +125,9 @@ export default function HomeDashboard() {
     /* No side effects inside updaters — StrictMode runs them twice. */
     const next = !open;
     setAnimOn(true);
+    setFlying(true);
+    if (flyTimer.current) clearTimeout(flyTimer.current);
+    flyTimer.current = setTimeout(() => setFlying(false), 1300);
     if (!next) prepareFlight(); /* hiding: measure while cards are visible */
     setOpen(next);
     if (next) setDrawKey((k) => k + 1);
@@ -218,7 +226,7 @@ export default function HomeDashboard() {
           {open ? "Hide" : "Show"}
         </button>
       </div>
-    <div className={`${s.collapser} ${open ? "" : s.collapsed}`} aria-hidden={!open}>
+    <div className={`${s.collapser} ${open ? "" : s.collapsed} ${flying ? s.flying : ""}`} aria-hidden={!open}>
     <div className={s.collapseInner}>
     <div className={`${s.grid} ${animOn ? (open ? s.cardsIn : s.cardsOut) : ""}`}>
 

@@ -286,6 +286,11 @@
    PAD by the glow instead of unclipping — the inner carries the bottom
    padding the grid used to carry as margin. */
 .collapseInner { overflow: hidden; min-block-size: 0; padding-block-end: 34px; }
+/* while the deck is in the air the clip lifts and the layer rises above
+   the search bar — the flight is SEEN leaving/entering the button. The
+   clip (and its pointer protection) returns the instant the flight ends. */
+.flying .collapseInner { overflow: visible; position: relative; z-index: 30; }
+.collapsed:not(.flying) .collapseInner { pointer-events: none; }
 
 /* ── THE FLIGHT — every card travels its own measured path (--dx/--dy,
    set by JS at toggle time) between its spot and the toggle button.
