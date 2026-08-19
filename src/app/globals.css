@@ -1272,6 +1272,30 @@ input[type="number"]:not(.kx-spinner) {
    too much on a phone — and 8px of overhang is a horizontally scrolling page,
    which is what the owner reported as the app "dancing" on mobile. Deriving
    both from the same breakpoints makes disagreement impossible. */
+/* ── .kx-below-ramp ───────────────────────────────────────────────────────
+   Clears the frosted header RAMP, not just the header.
+
+   The shell already offsets content by --kx-header-h, so a page starts
+   exactly under the solid bar. But the progressive pane extends 3rem FURTHER
+   (`calc(var(--kx-header-h) + 3rem)`) as an approach ramp for content
+   scrolling up. On desktop the home page's own top padding happened to cover
+   it; on an iPhone the safe-area grows the header, the ramp moves down with
+   it, and the greeting landed inside the blur before any scrolling — which
+   is what the owner photographed on a 17 Pro Max.
+
+   3rem, the same 3rem the ramp adds. Change one and change the other. */
+.kx-below-ramp { padding-top: 3rem; }
+/* Phone-only variant: desktop layouts already clear the ramp with their own
+   padding, and adding 3rem there would just be dead space.
+
+   !important because the elements that need this already carry a Tailwind
+   `pt-*`, and Tailwind's utility wins on source order — measured, the holder
+   kept its 12px and the button stayed inside the blur. This is a layout
+   correction over a utility, which is exactly the case !important is for. */
+@media (max-width: 767px) {
+  .max-md\:kx-below-ramp { padding-top: 3rem !important; }
+}
+
 :root { --kx-bleed: 1rem; }           /* matches px-4  */
 @media (min-width: 768px)  { :root { --kx-bleed: 1.5rem; } }  /* md:px-6 */
 @media (min-width: 1024px) { :root { --kx-bleed: 2rem; } }    /* lg:px-8 */

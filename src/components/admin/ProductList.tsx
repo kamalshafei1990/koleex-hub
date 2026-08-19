@@ -234,7 +234,7 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
     <Link
       href={`/suppliers/${supplierId}`}
       onClick={(e) => e.stopPropagation()}
-      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
+      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
       title="Open in the Suppliers app"
     >
       {children}
@@ -675,7 +675,7 @@ const ProductCard = memo(function ProductCard({
             <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
                 <span
-                  className="flex items-baseline gap-1 shrink-0"
+                  className="flex min-w-0 items-baseline gap-1"
                   title={[
                     signal.priceNote || "",
                     signal.costNote || "",

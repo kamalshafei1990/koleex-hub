@@ -116,6 +116,23 @@ for (const f of files) {
 ok("single-column row grids let their items shrink",
   gridOffenders.length === 0, gridOffenders.slice(0, 4).join(" | "));
 
+console.log("\nC. Content must clear the frosted ramp");
+
+/* The shell offsets content by --kx-header-h, so a page starts under the
+   solid header. But the progressive pane extends 3rem FURTHER as an approach
+   ramp. On desktop a page's own top padding usually covers that; on an
+   iPhone the safe-area grows the header, the ramp moves down with it, and
+   whatever sits first lands INSIDE the blur before any scrolling — the owner
+   photographed exactly that on a 17 Pro Max (the greeting, and Discuss's
+   "New" button). .kx-below-ramp clears the same 3rem the ramp adds. */
+ok(".kx-below-ramp exists", /\.kx-below-ramp\s*\{[^}]*padding-top:\s*3rem/.test(css));
+ok("the phone-only variant exists and wins the cascade",
+  /max-md\\:kx-below-ramp\s*\{[^}]*padding-top:\s*3rem\s*!important/.test(css));
+/* The ramp is header + 3rem; if that ever changes, the utility must change
+   with it or the clearance silently stops matching. */
+ok("the ramp is still header + 3rem",
+  /\.kx-pane-progressive\s*\{[^}]*height:\s*calc\(var\(--kx-header-h[^)]*\)\s*\+\s*3rem\)/.test(css));
+
 console.log("\n" + "─".repeat(60));
 console.log(failed === 0 ? "✓ mobile-width: all checks passed" : `✗ mobile-width: ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
