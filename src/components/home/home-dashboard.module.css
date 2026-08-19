@@ -293,14 +293,13 @@
    Show: the button exhales — cards burst out and glide home.
    Toggle-only: classes apply after the first user toggle. */
 .cardsOut .slab {
-  /* the MIRROR of the show (owner ask): same expo-out silk, same tempo —
-     the cards glide into the button and settle, instead of snapping away */
+  /* the TRUE mirror (owner): identical curve, identical tempo, REVERSE
+     order — the hide is the show played backwards */
   animation: kxInhale 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--fi, 0) * 60ms);
+  animation-delay: calc(var(--rev, 0) * 60ms);
 }
 @keyframes kxInhale {
   0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
-  55%  { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -60px)) scale(0.04) rotate(var(--rot, 0deg)); }
 }
 .cardsIn .slab {
@@ -309,7 +308,6 @@
 }
 @keyframes kxExhale {
   0%   { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -60px)) scale(0.04) rotate(var(--rot, 0deg)); }
-  45%  { opacity: 1; }
   100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
 }
 /* the button "catches" the deck at the end of the inhale */
@@ -327,7 +325,12 @@
 }
 
 /* the toggle */
-.toggleBtn { margin-inline-start: 10px; display: inline-flex; align-items: center; gap: 6px; }
+.toggleBtn {
+  margin-inline-start: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  /* fixed box: "Hide" and "Show" have different widths — without this the
+     right-anchored button slides a few px between states */
+  min-inline-size: 78px;
+}
 .chev { display: inline-block; line-height: 1; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
 .chevClosed { transform: rotate(180deg); }
 
@@ -335,6 +338,10 @@
 .pulseLine {
   font-size: 12px; color: rgba(255, 255, 255, 0.55);
   font-variant-numeric: tabular-nums; letter-spacing: 0.3px;
+  /* owner: the toggle must NOT move between states. The pulse line takes
+     all the free width, so the button stays pinned at the exact spot the
+     chips row keeps it — same X, same Y, open or closed. */
+  flex: 1;
 }
 
 /* the hero curve draws itself on every expand */

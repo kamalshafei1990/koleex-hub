@@ -104,12 +104,15 @@ export default function HomeDashboard() {
     if (!btn) return;
     const b = btn.getBoundingClientRect();
     const bx = b.left + b.width / 2, by = b.top + b.height / 2;
-    root.querySelectorAll<HTMLElement>("[data-flight]").forEach((el, i) => {
+    const cards = root.querySelectorAll<HTMLElement>("[data-flight]");
+    cards.forEach((el, i) => {
       const r = el.getBoundingClientRect();
       el.style.setProperty("--dx", `${bx - (r.left + r.width / 2)}px`);
       el.style.setProperty("--dy", `${by - (r.top + r.height / 2)}px`);
       el.style.setProperty("--rot", `${i % 2 === 0 ? -8 : 7}deg`);
       el.style.setProperty("--fi", String(i));
+      /* the hide plays the show in reverse: last dealt returns first */
+      el.style.setProperty("--rev", String(cards.length - 1 - i));
     });
   };
 
