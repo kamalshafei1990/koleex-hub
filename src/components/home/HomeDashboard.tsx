@@ -99,25 +99,39 @@ export default function HomeDashboard() {
   const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  /* Measure once per toggle: each card's center → the button's center,
-     written as --dx/--dy/--rot/--fi on the card. One layout read per
-     card, no loops, no observers. */
-  const prepareFlight = () => {
+  /* THE FLIGHT, driven by the Web Animations API — not CSS keyframes.
+     Chrome samples custom properties inside @keyframes ONCE at animation
+     start; on show that start races the layout effect that writes them,
+     locking the translate at 0 — the cards scaled in place and the burst
+     was never seen (the owner's "nothing changed"). WAAPI takes literal
+     numbers per card, so there is nothing to race. */
+  const runFlight = (dir: "in" | "out") => {
     const root = rootRef.current;
     if (!root) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const btn = root.querySelector("[data-dash-toggle]");
     if (!btn) return;
     const b = btn.getBoundingClientRect();
     const bx = b.left + b.width / 2, by = b.top + b.height / 2;
-    const cards = root.querySelectorAll<HTMLElement>("[data-flight]");
+    const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-flight]"));
+    const n = cards.length;
     cards.forEach((el, i) => {
       const r = el.getBoundingClientRect();
-      el.style.setProperty("--dx", `${bx - (r.left + r.width / 2)}px`);
-      el.style.setProperty("--dy", `${by - (r.top + r.height / 2)}px`);
-      el.style.setProperty("--rot", `${i % 2 === 0 ? -8 : 7}deg`);
-      el.style.setProperty("--fi", String(i));
-      /* the hide plays the show in reverse: last dealt returns first */
-      el.style.setProperty("--rev", String(cards.length - 1 - i));
+      const away = `translate(${bx - (r.left + r.width / 2)}px, ${by - (r.top + r.height / 2)}px) scale(0.04) rotate(${i % 2 === 0 ? -8 : 7}deg)`;
+      const home = "translate(0px, 0px) scale(1) rotate(0deg)";
+      el.getAnimations().forEach((a) => a.cancel());
+      el.animate(
+        dir === "in"
+          ? [{ transform: away, opacity: 0 }, { transform: home, opacity: 1 }]
+          : [{ transform: home, opacity: 1 }, { transform: away, opacity: 0 }],
+        {
+          duration: 820,
+          /* time mirror: show deals hero-first, hide returns hero-last */
+          delay: (dir === "in" ? i : n - 1 - i) * 60,
+          easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+          fill: "both",
+        },
+      );
     });
   };
 
@@ -128,16 +142,16 @@ export default function HomeDashboard() {
     setFlying(true);
     if (flyTimer.current) clearTimeout(flyTimer.current);
     flyTimer.current = setTimeout(() => setFlying(false), 1300);
-    if (!next) prepareFlight(); /* hiding: measure while cards are visible */
+    if (!next) runFlight("out"); /* hiding: cards are at rest — fly them out */
     setOpen(next);
     if (next) setDrawKey((k) => k + 1);
     try { window.localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch { /* fine */ }
   };
 
-  /* On SHOW the cards render first, then we measure — before paint, so the
-     burst starts from the button with no flash at the destination. */
+  /* On SHOW the cards render at rest first; this layout effect flies them
+     in BEFORE paint, so the first visible frame is already at the button. */
   useLayoutEffect(() => {
-    if (open && animOn) prepareFlight();
+    if (open && animOn) runFlight("in");
   }, [open, animOn]);
   /* Lazy init, not an effect: this component is dynamic({ssr:false}), so
      localStorage exists at first render — and reading it here means the
@@ -228,7 +242,7 @@ export default function HomeDashboard() {
       </div>
     <div className={`${s.collapser} ${open ? "" : s.collapsed} ${flying ? s.flying : ""}`} aria-hidden={!open}>
     <div className={s.collapseInner}>
-    <div className={`${s.grid} ${animOn ? (open ? s.cardsIn : s.cardsOut) : ""}`}>
+    <div className={s.grid}>
 
       {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
       {q && !q.error && (
