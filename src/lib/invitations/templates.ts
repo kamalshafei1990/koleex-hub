@@ -177,11 +177,16 @@ export function buildEnglish(input: LetterInput): LetterText {
       `hereby respectfully invite the following person to visit China on business:`,
   ];
 
+  /* Row 1 is the NAME, full width — long passport names (four and five
+     words are normal) were wrapping inside a half-width cell and threw the
+     whole grid off. After it, pairs grouped by MEANING, not by entry order:
+     who they are, then the passport's numbers and dates together, then the
+     job. The owner asked for the table organised; this is the organisation. */
   const passportBlock: LetterRow[] = [
     { label: "Name",             value: v.name },
     { label: "Gender",           value: genderEn(v.gender) },
-    { label: "Date of Birth",    value: formatDateEn(v.dob) },
     { label: "Nationality",      value: v.nationality ?? "" },
+    { label: "Date of Birth",    value: formatDateEn(v.dob) },
     { label: "Passport Number",  value: v.passportNo ?? "" },
     { label: "Date of Issue",    value: formatDateEn(v.passportIssue) },
     { label: "Date of Expiry",   value: formatDateEn(v.passportExpiry) },
@@ -259,11 +264,12 @@ export function buildChinese(input: LetterInput): LetterText {
     ),
   ];
 
+  /* Same order as the English page — they are one document. */
   const passportBlock: LetterRow[] = [
     { label: "姓名",     value: v.name },
     { label: "性别",     value: genderCn(v.gender) },
-    { label: "出生日期", value: formatDateCn(v.dob) },
     { label: "国籍",     value: countryCn(v.nationalityCode, v.nationality) },
+    { label: "出生日期", value: formatDateCn(v.dob) },
     { label: "护照号码", value: v.passportNo ?? "" },
     { label: "签发日期", value: formatDateCn(v.passportIssue) },
     { label: "有效期至", value: formatDateCn(v.passportExpiry) },

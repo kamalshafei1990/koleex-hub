@@ -148,7 +148,11 @@ function withCurrent(options: { value: string; label: string }[], current: strin
 function countryOptions(lang: string) {
   return COUNTRIES.map((c) => ({
     value: c.name,
-    label: `${flagEmoji(c.code)} ${countryDisplayName(c.code, c.name, lang)}`,
+    /* Name FIRST, flag after. With the flag leading, the browser's
+       type-ahead matched against the emoji and typing "E" jumped to the
+       wrong country — the owner hit it immediately. Name-first restores
+       first-letter search and the flag stays visible. */
+    label: `${countryDisplayName(c.code, c.name, lang)}  ${flagEmoji(c.code)}`,
   }));
 }
 function arrivalOptions(lang: string) {

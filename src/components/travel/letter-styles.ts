@@ -116,7 +116,7 @@ export const LETTER_STYLES = `
     background-repeat: repeat;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    padding: 14mm 17mm 12mm;
+    padding: 12mm 17mm 10mm;
     margin: 0 auto 10mm;
     /* background-COLOR, never the shorthand: background resets every
        background-* longhand, and it silently erased the watermark declared
@@ -187,7 +187,7 @@ export const LETTER_STYLES = `
 
   /* ── title ── */
   .inv-title {
-    margin: 0 0 4mm;
+    margin: 0 0 3mm;
     text-align: center;
     font-size: 15pt;
     font-weight: 700;
@@ -201,7 +201,7 @@ export const LETTER_STYLES = `
     align-items: flex-start;
     justify-content: space-between;
     gap: 10mm;
-    margin-bottom: 4.5mm;
+    margin-bottom: 3.5mm;
   }
   .inv-addressee { font-size: 9.5pt; }
   .inv-addressee p { margin: 0; }
@@ -218,7 +218,7 @@ export const LETTER_STYLES = `
   }
 
   .inv-salutation { margin: 0 0 3mm; }
-  .inv-p { margin: 0 0 2.4mm; text-align: justify; }
+  .inv-p { margin: 0 0 2.1mm; text-align: justify; }
   .inv-a4[lang="zh-CN"] .inv-p { text-indent: 2em; text-align: justify; }
 
   /* ── passport block ── */
@@ -228,11 +228,14 @@ export const LETTER_STYLES = `
     margin: 0 0 4mm;
     font-size: 9pt;
     table-layout: fixed;
+    /* One solid frame around the block; the grid inside stays lighter so
+       the table reads as one card of facts, not a cage of nine boxes. */
+    border: 1pt solid #000;
   }
   .inv-table th,
   .inv-table td {
-    border: 0.8pt solid #000;
-    padding: 1.1mm 2mm;
+    border: 0.45pt solid #555;
+    padding: 1.4mm 2.2mm;
     text-align: left;
     vertical-align: middle;
   }
@@ -258,7 +261,7 @@ export const LETTER_STYLES = `
   .inv-table td { font-variant-numeric: tabular-nums; }
 
   /* ── sign-off ── */
-  .inv-signoff { margin-top: 3mm; }
+  .inv-signoff { margin-top: 2mm; }
   .inv-closing { margin: 0 0 2mm; }
   .inv-closing-line { display: block; }
 

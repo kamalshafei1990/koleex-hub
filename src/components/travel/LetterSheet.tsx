@@ -85,7 +85,16 @@ export default function LetterSheet({
           Paired, it is ~40 mm and reads like a passport data page. */}
       <table className="inv-table">
         <tbody>
-          {pairs(text.passportBlock).map(([left, right]) => (
+          {/* The NAME takes the whole first row: four- and five-word
+              passport names wrapped inside a half cell and unbalanced the
+              grid. Everything after it pairs up. */}
+          {text.passportBlock.length > 0 && (
+            <tr>
+              <th scope="row">{text.passportBlock[0]!.label}</th>
+              <td colSpan={3}>{text.passportBlock[0]!.value || "—"}</td>
+            </tr>
+          )}
+          {pairs(text.passportBlock.slice(1)).map(([left, right]) => (
             <tr key={left.label}>
               <th scope="row">{left.label}</th>
               {/* An odd field count leaves the last row with one pair. The
