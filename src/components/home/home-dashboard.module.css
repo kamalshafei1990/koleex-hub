@@ -311,14 +311,14 @@
   100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
 }
 /* the button "catches" the deck at the end of the inhale */
-.toggleCaught { animation: kxCatch 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 980ms both; }
+.toggleCaught { animation: kxCatch 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 1080ms both; }
 @keyframes kxCatch {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.18); box-shadow: 0 0 22px rgba(127, 169, 214, 0.5); }
   100% { transform: scale(1); }
 }
 /* the pulse line pops in with a tiny spring once the deck is away */
-.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 1040ms both; }
+.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 1180ms both; }
 @keyframes kxPulseIn {
   from { opacity: 0; transform: translateY(4px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
