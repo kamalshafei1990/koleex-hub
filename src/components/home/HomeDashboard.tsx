@@ -19,6 +19,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import s from "./home-dashboard.module.css";
 
 const SEEN_KEY = "kx_home_dash_seen";
@@ -236,7 +237,7 @@ export default function HomeDashboard() {
         {open && <span className={s.tabsHint}>LIVE · {data.gatewayMs}ms</span>}
         <button type="button" onClick={toggle} data-dash-toggle="" className={`${s.tab} ${s.toggleBtn} ${!open && animOn ? s.toggleCaught : ""}`}
           aria-expanded={open} aria-label={open ? "Hide dashboard" : "Show dashboard"}>
-          <span className={`${s.chev} ${open ? "" : s.chevClosed}`} aria-hidden="true">⌄</span>
+          <AngleDownIcon size={11} className={`${s.chev} ${open ? "" : s.chevClosed}`} aria-hidden="true" />
           {open ? "Hide" : "Show"}
         </button>
       </div>

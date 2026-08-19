@@ -313,7 +313,7 @@
      right-anchored button slides a few px between states */
   min-inline-size: 78px;
 }
-.chev { display: inline-block; line-height: 1; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.chev { display: inline-block; flex: none; opacity: 0.75; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
 .chevClosed { transform: rotate(180deg); }
 
 /* the collapsed pulse line */
