@@ -271,9 +271,15 @@
 .collapser {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 640ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: grid-template-rows 780ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.collapsed { grid-template-rows: 0fr; }
+.collapsed {
+  grid-template-rows: 0fr;
+  /* the cards begin folding first; the sheet glides shut behind them —
+     the two motions read as one gesture instead of a race */
+  transition-delay: 140ms;
+  transition-duration: 620ms;
+}
 /* overflow stays hidden in EVERY state — during the open animation a
    visible overflow would paint the full deck over the app grid below.
    The lips' outside glow survives by the old lesson (offscreen-glass):
@@ -288,24 +294,35 @@
    the first user toggle, never on page open. */
 .cardsIn, .cardsOut { perspective: 1200px; perspective-origin: 50% 0%; }
 .cardsIn .slab {
-  animation: kxDeal 660ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation: kxDeal 860ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 85ms);
 }
 .cardsOut .slab {
-  animation: kxUndeal 440ms cubic-bezier(0.5, 0, 0.75, 0.4) both;
-  animation-delay: calc(var(--rev, 0) * 48ms);
+  animation: kxUndeal 520ms cubic-bezier(0.55, 0.06, 0.68, 0.19) both;
+  animation-delay: calc(var(--rev, 0) * 55ms);
 }
 @keyframes kxDeal {
-  0%   { opacity: 0; transform: translateY(34px) scale(0.9) rotateX(-10deg); }
-  62%  { opacity: 1; transform: translateY(-5px) scale(1.012) rotateX(1.5deg); }
+  0%   { opacity: 0; transform: translateY(26px) scale(0.94) rotateX(-6deg); }
+  55%  { opacity: 1; }
+  72%  { transform: translateY(-2px) scale(1.005) rotateX(0.8deg); }
   100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
 }
 @keyframes kxUndeal {
   0%   { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
-  100% { opacity: 0; transform: translateY(-26px) scale(0.93) rotateX(9deg); }
+  100% { opacity: 0; transform: translateY(-18px) scale(0.955) rotateX(5deg); }
+}
+/* the lip blooms as its card lands, then settles — the landing light */
+.cardsIn .slab::after {
+  animation: kxLipBloom 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 85ms + 120ms);
+}
+@keyframes kxLipBloom {
+  0%   { opacity: 0; }
+  55%  { opacity: 1; filter: blur(7px); }
+  100% { opacity: 0.9; filter: blur(9px); }
 }
 /* the pulse line pops in with a tiny spring once the deck is away */
-.pulseLine { animation: kxPulseIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 260ms both; }
+.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 380ms both; }
 @keyframes kxPulseIn {
   from { opacity: 0; transform: translateY(4px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -333,6 +350,7 @@
 @media (prefers-reduced-motion: reduce) {
   .collapser { transition: none; }
   .cardsIn .slab, .cardsOut .slab { animation: none; }
+  .cardsIn .slab::after { animation: none; }
   .cardsOut .slab { opacity: 0; }
   .pulseLine { animation: none; }
   .chev { transition: none; }
