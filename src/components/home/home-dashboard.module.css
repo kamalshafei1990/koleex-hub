@@ -205,10 +205,15 @@
 @media (max-width: 900px) {
   .hero, .side, .half { grid-column: span 12; }
   .heroBig { font-size: 30px; }
+  /* phone: the latency hint gives its space to the toggle — the button
+     must never leave the screen (owner rule: it does not move) */
+  .tabsHint { display: none; }
+  .tab { padding: 5px 11px; }
+  .toggleBtn { min-inline-size: 64px; margin-inline-start: auto; }
 }
 
 /* ── period chips ── */
-.tabs { display: flex; align-items: center; gap: 6px; margin-block-end: 12px; }
+.tabs { display: flex; align-items: center; gap: 6px; margin-block-end: 12px; flex-wrap: wrap; row-gap: 8px; }
 .tab {
   font-size: 11px; color: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.08);
