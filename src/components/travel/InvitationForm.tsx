@@ -37,6 +37,7 @@ import {
 import CustomerPicker from "@/components/travel/CustomerPicker";
 import PassportScanBox from "@/components/travel/PassportScanBox";
 import {
+  codeForCountryName,
   COMMON_CITIES,
   PURPOSES,
   durationDays,
@@ -415,11 +416,19 @@ export default function InvitationForm({ id }: { id?: string }) {
             <TextField
               label={t("f.nationality")}
               value={form.nationality}
-              onChange={(v) => set("nationality", v)}
+              onChange={(v) => {
+                set("nationality", v);
+                /* The code fills itself — the owner asked what "ISO code"
+                   meant, which settles that nobody should be typing it. A
+                   hand-entered value is only overwritten when the new name
+                   actually resolves, so correcting a typo never wipes it. */
+                const code = codeForCountryName(v);
+                if (code) set("nationalityCode", code);
+              }}
             />
             <TextField
-              label="ISO code"
-              hint="Two letters — decides the Chinese wording"
+              label={t("f.countryCode")}
+              hint={t("f.countryCode.hint")}
               value={form.nationalityCode}
               onChange={(v) => set("nationalityCode", v.slice(0, 2).toUpperCase())}
             />

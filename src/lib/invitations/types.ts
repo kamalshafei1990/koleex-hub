@@ -143,6 +143,35 @@ export function countryCn(code: string | null | undefined, en: string | null | u
   return COUNTRY_CN[key] ?? (en ?? "");
 }
 
+/* English country names → ISO code, for the form: the operator types (or
+   autofill supplies) "Egypt" and the code that drives the Chinese wording
+   fills itself — nobody should have to know what an ISO code is. Keys are
+   lowercase; the aliases cover the spellings that appear in the contacts
+   directory. Mirrors the countries COUNTRY_CN knows. */
+const NAME_TO_CODE: Record<string, string> = {
+  egypt: "EG", india: "IN", bangladesh: "BD", pakistan: "PK", "sri lanka": "LK",
+  turkey: "TR", "turkiye": "TR", indonesia: "ID", vietnam: "VN", "viet nam": "VN",
+  thailand: "TH", malaysia: "MY", philippines: "PH", myanmar: "MM", cambodia: "KH",
+  uzbekistan: "UZ", kazakhstan: "KZ", nigeria: "NG", morocco: "MA", algeria: "DZ",
+  tunisia: "TN", libya: "LY", sudan: "SD", ethiopia: "ET", kenya: "KE",
+  tanzania: "TZ", uganda: "UG", ghana: "GH", "south africa": "ZA", senegal: "SN",
+  "ivory coast": "CI", "cote d'ivoire": "CI", "saudi arabia": "SA", ksa: "SA",
+  uae: "AE", "united arab emirates": "AE", jordan: "JO", syria: "SY", iraq: "IQ",
+  lebanon: "LB", yemen: "YE", oman: "OM", kuwait: "KW", qatar: "QA",
+  bahrain: "BH", iran: "IR", russia: "RU", ukraine: "UA", belarus: "BY",
+  poland: "PL", romania: "RO", brazil: "BR", mexico: "MX", peru: "PE",
+  colombia: "CO", argentina: "AR", chile: "CL", ecuador: "EC", usa: "US",
+  "united states": "US", uk: "GB", "united kingdom": "GB", germany: "DE",
+  france: "FR", italy: "IT", spain: "ES", netherlands: "NL", portugal: "PT",
+  china: "CN", egyptian: "EG", indian: "IN", turkish: "TR",
+};
+
+/** Country name (or nationality adjective) → ISO code; null when unknown. */
+export function codeForCountryName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return NAME_TO_CODE[name.trim().toLowerCase()] ?? null;
+}
+
 /** True when the Chinese page would print an untranslated country name.
  *  The form surfaces this so the owner isn't surprised at the consulate. */
 export function countryNeedsChinese(code: string | null | undefined): boolean {
