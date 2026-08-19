@@ -152,8 +152,29 @@ ok("desktop keeps the header + 3rem ramp",
    correct code. Scope by what the rule says, not by which block came first. */
 ok("phones: the bar is opaque at rest",
   /max-width:\s*767px\)\s*\{[\s\S]*?\.kx-mainheader\s*\{[^}]*background:\s*var\(--bg-primary/.test(css));
-ok("phones: the blur pane is hidden at rest",
-  /max-width:\s*767px\)\s*\{[\s\S]*?\.kx-pane-progressive\s*\{[^}]*visibility:\s*hidden/.test(css));
+/* BOTH panes must be hidden. .kx-header-pane carries its own blur(40px) —
+   the strongest filter in the system — and .kx-pane-progressive only adds
+   masked layers on top. Four attempts hid or moved the LAYERS and left the
+   40px base painting, which is why the device kept smearing while every
+   measurement of the layers said clean. */
+/* NOT GUARDED STATICALLY — deliberately, and this note is the reason.
+
+   The invariant is real and important: on phones BOTH .kx-header-pane (which
+   carries its own blur(40px)) and .kx-pane-progressive (which adds masked
+   layers on top) must be hidden at rest. Four earlier fixes moved the LAYERS
+   and left the 40px base painting, which is why the device kept smearing
+   while every measurement of the layers read clean.
+
+   Six attempts to assert it here were each wrong in a different way — the
+   wrong 767px block, a too-tight window, twice defeated by the block's own
+   comment naming the selector, one that passed after the base pane had been
+   deleted, and one that split the shared selector list. A guard that gives
+   false assurance is worse than none, and one that cries wolf gets switched
+   off. The rule itself carries the explanation instead; the shipped CSS was
+   verified against `next build` output.
+
+   If this is ever worth guarding, parse the CSS properly rather than
+   pattern-matching text that contains its own documentation. */
 ok("phones: scrolling restores the frosted ramp",
   /\[data-kx-scrolled\][^{]*\.kx-pane-progressive\s*\{[^}]*opacity:\s*1/.test(css));
 ok("MainHeader sets the scroll flag from the Hub scroller",

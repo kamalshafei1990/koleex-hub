@@ -1471,25 +1471,39 @@ input[type="number"]:not(.kx-spinner) {
      opacity: a backdrop-filter at opacity 0 still costs a compositing pass
      on iOS, and this is the one element that must not cost anything while
      the page is still. */
+  /* BOTH panes, not just the progressive one.
+
+     .kx-header-pane carries its OWN blur(40px) — the strongest filter in the
+     system — and .kx-pane-progressive only ADDS the four masked layers on
+     top of it. Four previous attempts hid or moved the LAYERS and left the
+     40px base untouched, which is why the header kept smearing on the device
+     no matter what the layer geometry said. This is the rule that was
+     actually painting over the logo. */
+  [data-kx-skin="aurora"] .kx-header-pane,
   [data-kx-skin="aurora"] .kx-pane-progressive {
     height: var(--kx-header-h, 3.5rem);
     opacity: 0;
     visibility: hidden;
     transition: opacity 180ms ease, visibility 0s linear 180ms;
   }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-header-pane,
   [data-kx-skin="aurora"][data-kx-scrolled] .kx-pane-progressive {
-    /* Scrolled: the full ramp returns, header height plus the 3rem approach,
-       so content fades as it rises — the effect the owner asked to keep. */
-    height: calc(var(--kx-header-h, 3.5rem) + 3rem);
+    /* Scrolled: the glass returns — the effect the owner asked to keep. */
     opacity: 1;
     visibility: visible;
     transition: opacity 180ms ease, visibility 0s;
+  }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-pane-progressive {
+    /* …and the progressive one regains its full approach ramp, so content
+       fades as it rises rather than meeting a hard edge. */
+    height: calc(var(--kx-header-h, 3.5rem) + 3rem);
   }
 }
 
 /* Motion preference: no fade, just an instant swap. */
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   [data-kx-skin="aurora"] .kx-mainheader,
+  [data-kx-skin="aurora"] .kx-header-pane,
   [data-kx-skin="aurora"] .kx-pane-progressive { transition: none; }
 }
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
