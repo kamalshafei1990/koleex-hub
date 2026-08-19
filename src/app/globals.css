@@ -1261,6 +1261,21 @@ input[type="number"]:not(.kx-spinner) {
    hop to point the OTHER way in RTL. Custom properties inherit, so one flip
    at the rtl root covers every consumer. */
 :root { --kx-flip: 100%; }
+
+/* ── --kx-bleed ────────────────────────────────────────────────────────────
+   How far a full-bleed section may hang outside its container: EXACTLY the
+   container's own horizontal padding, so the section's outer edge lands on
+   the container's outer edge and never past the viewport.
+
+   App shells wrap content in `px-4 md:px-6 lg:px-8`. A section that wanted to
+   bleed used a hardcoded -24px margin, which is correct from md up and 8px
+   too much on a phone — and 8px of overhang is a horizontally scrolling page,
+   which is what the owner reported as the app "dancing" on mobile. Deriving
+   both from the same breakpoints makes disagreement impossible. */
+:root { --kx-bleed: 1rem; }           /* matches px-4  */
+@media (min-width: 768px)  { :root { --kx-bleed: 1.5rem; } }  /* md:px-6 */
+@media (min-width: 1024px) { :root { --kx-bleed: 2rem; } }    /* lg:px-8 */
+
 [dir="rtl"] { --kx-flip: -100%; }
 /* DIRECTION ISLANDS. The header is pinned dir="ltr" inside an Arabic page,
    and a dir attribute does NOT reset an inherited custom property — the
@@ -3660,5 +3675,3 @@ input[type="number"]:not(.kx-spinner) {
 
    If off-screen skipping is ever attempted again, the padding comes back WITH
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
-
-

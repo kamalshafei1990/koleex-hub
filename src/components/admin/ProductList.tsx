@@ -126,16 +126,29 @@ const EMPTY_SUPPLIERS: string[] = [];
    shrinking the utility itself: 32px gap + 24px padding = the same 56px that
    `space-y-14` used to give. Change one and change the other.
 
-   Checked at 375px too: the room needed drops to 18px against the same 24px,
-   the section overhangs the viewport by 8px each side, and there is still no
-   horizontal scrollbar because the body carries `overflow-x: hidden` there.
-   Same dependency as `.kx-lazy-grid`; the full note is in globals.css. */
+   THE BLEED MUST MATCH THE CONTAINER'S OWN PADDING, NOT A FIXED 24.
+   The wrapper is `px-4 md:px-6 lg:px-8` — 16px on a phone, 24 from md up.
+   A hardcoded -24 therefore overhung the viewport by 8px each side at 375px.
+   The earlier note here accepted that, reasoning the body's `overflow-x:
+   hidden` would absorb it; it does not, because the Hub scrolls inside
+   #main-scroll-container, not the body — measured, the page scrolled
+   sideways by exactly those 8px and the owner reported the whole app
+   "dancing" on mobile.
+
+   `--kx-bleed` is defined from the same breakpoints as the wrapper padding
+   (globals.css), so the two can no longer disagree. Change the wrapper's
+   padding and change --kx-bleed with it.
+
+   The bleed itself stays: content-visibility clips paint at the box edge, so
+   without room the cards' hover glow was sheared off. The bottom padding is
+   paid for by the utility: 32px gap + 24px padding = the 56px `space-y-14`
+   used to give. Same dependency as `.kx-lazy-grid`; full note in globals.css. */
 const SECTION_CV = {
   contentVisibility: "auto",
   containIntrinsicSize: "1px 800px",
-  paddingInline: 24,
+  paddingInline: "var(--kx-bleed)",
   paddingBottom: 24,
-  marginInline: -24,
+  marginInline: "calc(var(--kx-bleed) * -1)",
 } as const;
 
 const levelColors: Record<string, string> = {
