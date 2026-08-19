@@ -128,10 +128,16 @@ console.log("\nC. Content must clear the frosted ramp");
 ok(".kx-below-ramp exists", /\.kx-below-ramp\s*\{[^}]*padding-top:\s*3rem/.test(css));
 ok("the phone-only variant exists and wins the cascade",
   /max-md\\:kx-below-ramp\s*\{[^}]*padding-top:\s*3rem\s*!important/.test(css));
-/* The ramp is header + 3rem; if that ever changes, the utility must change
-   with it or the clearance silently stops matching. */
-ok("the ramp is still header + 3rem",
+/* Desktop keeps the header + 3rem ramp; PHONES get header height exactly.
+   The ramp is a tall-window affordance — on a phone its soft bottom edge
+   lands behind the wordmark, and because the bar is pure blur with no fill,
+   that reads as the header smearing the logo. Three earlier attempts moved
+   the LAYERS and left this height alone, which is why every measurement said
+   "no overlap" while the phone kept looking wrong. */
+ok("desktop keeps the header + 3rem ramp",
   /\.kx-pane-progressive\s*\{[^}]*height:\s*calc\(var\(--kx-header-h[^)]*\)\s*\+\s*3rem\)/.test(css));
+ok("phones stop the blur at the header edge",
+  /max-width:\s*767px[\s\S]{0,220}\.kx-pane-progressive\s*\{[^}]*height:\s*var\(--kx-header-h/.test(css));
 
 /* THE HEADER BAR HAS NO FILL OF ITS OWN — "the bar is now the ground itself,
    frosted". Its glass IS the progressive pane's layers, which must therefore

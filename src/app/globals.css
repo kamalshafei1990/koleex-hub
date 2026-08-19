@@ -1438,6 +1438,25 @@ input[type="number"]:not(.kx-spinner) {
      stretches with the pane instead of parking behind the status bar. */
   height: calc(var(--kx-header-h, 3.5rem) + 3rem);
 }
+
+/* PHONES GET NO APPROACH RAMP — header height exactly, no extra.
+
+   The ramp is a desktop affordance: content slides under a long fade as you
+   scroll a tall window. On a phone the fade is a large fraction of a small
+   screen, and because the bar itself is pure blur with no fill (the owner's
+   "totally transparent but blurred"), the ramp's soft bottom edge sits right
+   behind the wordmark — so the logo, bell and avatar read as smeared before
+   any scrolling. The owner photographed this three times; each earlier
+   attempt moved the LAYERS and left this height alone, which is why the
+   measurements kept saying "no overlap" while the phone kept looking wrong.
+
+   At exactly --kx-header-h the blur stops on the header's own edge: the bar
+   is still frosted glass, and nothing bleeds onto the content below it. */
+@media (max-width: 767px) {
+  [data-kx-skin="aurora"] .kx-pane-progressive {
+    height: var(--kx-header-h, 3.5rem);
+  }
+}
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
   position: absolute;
   /* Start BELOW the safe area, not at 0.
