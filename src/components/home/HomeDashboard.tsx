@@ -87,7 +87,11 @@ export default function HomeDashboard() {
   });
   /* Bumped on every expand — keys the curve so its draw-in replays. */
   const [drawKey, setDrawKey] = useState(0);
+  /* The dealt-deck animation belongs to the TOGGLE, not to page open —
+     Home entrance motion stays near-imperceptible by owner decision. */
+  const [animOn, setAnimOn] = useState(false);
   const toggle = () => {
+    setAnimOn(true);
     setOpen((prev) => {
       const next = !prev;
       try { window.localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch { /* fine */ }
@@ -151,6 +155,10 @@ export default function HomeDashboard() {
     );
   }
 
+  /* deal order: hero → the three KPIs → pipeline → attention → system */
+  const DEAL_TOTAL = 7;
+  const deal = (i: number) => ({ ["--i" as string]: i, ["--rev" as string]: DEAL_TOTAL - 1 - i });
+
   const stages = q?.stages ?? {};
   const maxStage = Math.max(1, ...STAGE_ORDER.map((k) => stages[k] ?? 0));
 
@@ -184,11 +192,11 @@ export default function HomeDashboard() {
       </div>
     <div className={`${s.collapser} ${open ? "" : s.collapsed}`} aria-hidden={!open}>
     <div className={s.collapseInner}>
-    <div className={`${s.grid} ${open ? s.cardsIn : s.cardsOut}`}>
+    <div className={`${s.grid} ${animOn ? (open ? s.cardsIn : s.cardsOut) : ""}`}>
 
       {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
       {q && !q.error && (
-        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero}`} style={{ textDecoration: "none", color: "inherit" }}>
+        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero}`} style={{ textDecoration: "none", color: "inherit", ...deal(0) }}>
           <div className={s.bp} />
           <div className={s.klabel}>
             <span>Quotations — created per week · 12w</span>
@@ -236,7 +244,7 @@ export default function HomeDashboard() {
       {/* ═══ side KPIs ═══ */}
       <div className={s.side}>
         {p && (
-          <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }}>
+          <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit", ...deal(1) }}>
             <div className={s.klabel}><span>Catalogue</span></div>
             {p.error ? <div className={s.errCard}>⚠ can&apos;t read products</div> : (
               <div className={s.ringRow}>
@@ -255,7 +263,7 @@ export default function HomeDashboard() {
           </Link>
         )}
         {td && (
-          <Link href="/todo" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }}>
+          <Link href="/todo" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit", ...deal(2) }}>
             <div className={s.klabel}><span>Your to-dos</span></div>
             {td.error ? <div className={s.errCard}>⚠ can&apos;t read to-dos</div> : (
               <>
@@ -266,7 +274,7 @@ export default function HomeDashboard() {
           </Link>
         )}
         {pr && (
-          <div className={`kx-glass ${s.slab} ${s.kpi}`}>
+          <div className={`kx-glass ${s.slab} ${s.kpi}`} style={deal(3)}>
             <div className={s.klabel}><span>Team today</span></div>
             {pr.error ? <div className={s.errCard}>⚠ can&apos;t read presence</div> : (
               <>
@@ -290,7 +298,7 @@ export default function HomeDashboard() {
 
       {/* ═══ pipeline stages ═══ */}
       {q && !q.error && (
-        <div className={`kx-glass ${s.slab} ${s.half} ${s.pipePad}`}>
+        <div className={`kx-glass ${s.slab} ${s.half} ${s.pipePad}`} style={deal(4)}>
           <div className={s.bp} />
           <div className={s.klabel}><span className={s.ttl}>Quotation pipeline</span><span className={s.unit}>BY STAGE</span></div>
           <div className={s.barsWrap}>
@@ -308,7 +316,7 @@ export default function HomeDashboard() {
       )}
 
       {/* ═══ attention — only rows that are TRUE right now ═══ */}
-      <div className={`kx-glass ${s.slab} ${s.half}`}>
+      <div className={`kx-glass ${s.slab} ${s.half}`} style={deal(5)}>
         <div className={s.klabel}><span className={s.ttl}>Attention needed</span><span className={s.unit}>CROSS-APP</span></div>
         <div style={{ marginBlockStart: 8 }}>
           {q && !q.error && q.expiringSoon > 0 && (
@@ -340,7 +348,7 @@ export default function HomeDashboard() {
       </div>
 
       {sys && !sys.error && (
-        <div className={`kx-glass ${s.slab} ${s.sysStrip}`}>
+        <div className={`kx-glass ${s.slab} ${s.sysStrip}`} style={deal(6)}>
           <span className={s.sysItem}><span className={`${s.sig} ${s.sigOk}`} /> API {data.gatewayMs}ms</span>
           <span className={s.sysSep} />
           <span className={s.sysItem}><span className={`${s.sig} ${sys.notifyErrorsToday > 0 ? s.sigWarn : s.sigOk}`} /> Notify errors today {sys.notifyErrorsToday}</span>

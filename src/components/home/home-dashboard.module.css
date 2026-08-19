@@ -252,7 +252,8 @@
 
 /* ── system strip (SA) ── */
 .sysStrip {
-  margin-block-start: 18px;
+  grid-column: span 12;
+  margin-block-start: 2px;
   display: flex; align-items: center; gap: 18px;
   padding: 13px 20px;
 }
@@ -280,23 +281,35 @@
    padding the grid used to carry as margin. */
 .collapseInner { overflow: hidden; min-block-size: 0; padding-block-end: 34px; }
 
-.cardsIn > *, .cardsOut > * {
-  transition:
-    opacity 380ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+/* ── the 3D deal — EVERY card animates by its own index (--i / --rev),
+   including the three side KPIs and the system strip; the grid is a
+   perspective stage so the tilt reads as depth, and the open lands with
+   a small spring overshoot. Toggle-only: the classes are applied after
+   the first user toggle, never on page open. */
+.cardsIn, .cardsOut { perspective: 1200px; perspective-origin: 50% 0%; }
+.cardsIn .slab {
+  animation: kxDeal 660ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
 }
-.cardsIn > * { opacity: 1; transform: translateY(0) scale(1); }
-.cardsOut > * { opacity: 0; transform: translateY(-14px) scale(0.965); }
-/* the deal-out stagger */
-.cardsIn > *:nth-child(1) { transition-delay: 40ms; }
-.cardsIn > *:nth-child(2) { transition-delay: 110ms; }
-.cardsIn > *:nth-child(3) { transition-delay: 180ms; }
-.cardsIn > *:nth-child(4) { transition-delay: 250ms; }
-/* the draw-back stagger (reverse order, tighter) */
-.cardsOut > *:nth-child(4) { transition-delay: 0ms; }
-.cardsOut > *:nth-child(3) { transition-delay: 45ms; }
-.cardsOut > *:nth-child(2) { transition-delay: 90ms; }
-.cardsOut > *:nth-child(1) { transition-delay: 135ms; }
+.cardsOut .slab {
+  animation: kxUndeal 440ms cubic-bezier(0.5, 0, 0.75, 0.4) both;
+  animation-delay: calc(var(--rev, 0) * 48ms);
+}
+@keyframes kxDeal {
+  0%   { opacity: 0; transform: translateY(34px) scale(0.9) rotateX(-10deg); }
+  62%  { opacity: 1; transform: translateY(-5px) scale(1.012) rotateX(1.5deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+}
+@keyframes kxUndeal {
+  0%   { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+  100% { opacity: 0; transform: translateY(-26px) scale(0.93) rotateX(9deg); }
+}
+/* the pulse line pops in with a tiny spring once the deck is away */
+.pulseLine { animation: kxPulseIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 260ms both; }
+@keyframes kxPulseIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* the toggle */
 .toggleBtn { margin-inline-start: 10px; display: inline-flex; align-items: center; gap: 6px; }
@@ -319,7 +332,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .collapser { transition: none; }
-  .cardsIn > *, .cardsOut > * { transition: none; }
+  .cardsIn .slab, .cardsOut .slab { animation: none; }
+  .cardsOut .slab { opacity: 0; }
+  .pulseLine { animation: none; }
   .chev { transition: none; }
   .curveDraw { animation: none; stroke-dashoffset: 0; }
 }
