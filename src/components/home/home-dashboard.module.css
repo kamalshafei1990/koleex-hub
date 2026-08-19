@@ -26,7 +26,7 @@
   position: relative;
   border-radius: 20px;
   isolation: isolate;
-  padding: 20px 22px;
+  padding: 16px 18px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 .slab::before {
@@ -70,7 +70,7 @@
   mask: linear-gradient(180deg, transparent 45%, #000 82%);
 }
 
-.hero { grid-column: span 8; min-height: 250px; display: flex; flex-direction: column; }
+.hero { grid-column: span 8; min-height: 186px; display: flex; flex-direction: column; }
 .side { grid-column: span 4; display: flex; flex-direction: column; gap: 18px; }
 .kpi  { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .half { grid-column: span 6; }
@@ -96,13 +96,13 @@
 }
 .unit { font-size: 11px; color: rgba(255, 255, 255, 0.35); }
 
-.curve { position: relative; flex: 1; min-height: 110px; margin: 6px -4px 0; }
+.curve { position: relative; flex: 1; min-height: 72px; margin: 4px -4px 0; }
 .curve svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
 .heroNum { text-align: center; padding-block-end: 2px; }
-.heroLbl { font-size: 14.5px; color: rgba(212, 226, 244, 0.72); }
+.heroLbl { font-size: 12.5px; color: rgba(212, 226, 244, 0.72); }
 .heroBig {
-  font-size: 46px;
+  font-size: 34px;
   font-weight: 300;
   color: #fff;
   line-height: 1.12;
@@ -204,7 +204,7 @@
 
 @media (max-width: 900px) {
   .hero, .side, .half { grid-column: span 12; }
-  .heroBig { font-size: 38px; }
+  .heroBig { font-size: 30px; }
 }
 
 /* ── period chips ── */
