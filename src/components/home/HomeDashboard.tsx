@@ -22,6 +22,7 @@ import Link from "next/link";
 import s from "./home-dashboard.module.css";
 
 const SEEN_KEY = "kx_home_dash_seen";
+const OPEN_KEY = "kx_home_dash_open";
 
 type Quotations = {
   openCount: number; expiringSoon: number;
@@ -79,6 +80,21 @@ export default function HomeDashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
   const [period, setPeriod] = useState("month");
+  /* Show/hide (owner, 2026-08-20). Lazy init like the reserve flag — the
+     first paint is already in the remembered state, so nothing jumps. */
+  const [open, setOpen] = useState(() => {
+    try { return window.localStorage.getItem(OPEN_KEY) !== "0"; } catch { return true; }
+  });
+  /* Bumped on every expand — keys the curve so its draw-in replays. */
+  const [drawKey, setDrawKey] = useState(0);
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch { /* fine */ }
+      if (next) setDrawKey((k) => k + 1);
+      return next;
+    });
+  };
   /* Lazy init, not an effect: this component is dynamic({ssr:false}), so
      localStorage exists at first render — and reading it here means the
      reserved slot is present in the very first paint (no shift). */
@@ -138,21 +154,37 @@ export default function HomeDashboard() {
   const stages = q?.stages ?? {};
   const maxStage = Math.max(1, ...STAGE_ORDER.map((k) => stages[k] ?? 0));
 
+  const pulse = q && !q.error
+    ? (typeof q.openValue === "number" ? `${money(q.openValue)} · ${q.openCount} open` : `${q.openCount} open quotations`)
+    : null;
+
   return (
     <div>
-      {/* period chips — a real filter: the gateway rescopes createdInPeriod
-          and wonValueInPeriod to the chosen window */}
+      {/* period chips + the show/hide control. When hidden, the chips give
+          way to a live one-line pulse so the company's heartbeat never
+          fully leaves the Home. */}
       <div className={s.tabs}>
-        {PERIOD_TABS.map((t) => (
-          <button key={t.key} type="button"
-            className={`${s.tab} ${period === t.key ? s.tabOn : ""}`}
-            onClick={() => setPeriod(t.key)}>
-            {t.label}
-          </button>
-        ))}
-        <span className={s.tabsHint}>LIVE · {data.gatewayMs}ms</span>
+        {open ? (
+          PERIOD_TABS.map((t) => (
+            <button key={t.key} type="button"
+              className={`${s.tab} ${period === t.key ? s.tabOn : ""}`}
+              onClick={() => setPeriod(t.key)}>
+              {t.label}
+            </button>
+          ))
+        ) : (
+          <span className={s.pulseLine}>{pulse ?? "Dashboard"}</span>
+        )}
+        {open && <span className={s.tabsHint}>LIVE · {data.gatewayMs}ms</span>}
+        <button type="button" onClick={toggle} className={`${s.tab} ${s.toggleBtn}`}
+          aria-expanded={open} aria-label={open ? "Hide dashboard" : "Show dashboard"}>
+          <span className={`${s.chev} ${open ? "" : s.chevClosed}`} aria-hidden="true">⌄</span>
+          {open ? "Hide" : "Show"}
+        </button>
       </div>
-    <div className={s.grid}>
+    <div className={`${s.collapser} ${open ? "" : s.collapsed}`} aria-hidden={!open}>
+    <div className={s.collapseInner}>
+    <div className={`${s.grid} ${open ? s.cardsIn : s.cardsOut}`}>
 
       {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
       {q && !q.error && (
@@ -180,7 +212,7 @@ export default function HomeDashboard() {
                     <stop offset="1" stopColor="#8FA9C9" stopOpacity=".6" />
                   </linearGradient>
                 </defs>
-                <path d={curve.d} stroke="url(#kxdgr)" strokeWidth="4" strokeLinecap="round" filter="url(#kxdlg)" />
+                <path key={drawKey} pathLength={1} className={s.curveDraw} d={curve.d} stroke="url(#kxdgr)" strokeWidth="4" strokeLinecap="round" filter="url(#kxdlg)" />
                 <circle cx={curve.peak.x} cy={curve.peak.y} r="7" fill="#EAF4FF" filter="url(#kxddg)" />
                 <circle cx={curve.peak.x} cy={curve.peak.y} r="11" fill="none" stroke="rgba(160,210,255,.35)" strokeWidth="1" />
               </svg>
@@ -317,6 +349,8 @@ export default function HomeDashboard() {
           <span className={s.sysEnd}>KOLEEX HUB · SHAPING THE FUTURE</span>
         </div>
       )}
+    </div>
+    </div>
     </div>
     </div>
   );

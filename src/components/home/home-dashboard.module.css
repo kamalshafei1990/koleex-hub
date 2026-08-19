@@ -13,7 +13,6 @@
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 18px;
-  margin-block-end: 32px;
 }
 
 /* MATCH THE APP TILES (owner, 2026-08-20: "same glass effect as the apps
@@ -261,3 +260,66 @@
 .sysSep { inline-size: 1px; block-size: 13px; background: rgba(255, 255, 255, 0.1); }
 .sysEnd { margin-inline-start: auto; font-size: 9px; letter-spacing: 2.2px; color: rgba(255, 255, 255, 0.25); }
 @media (max-width: 700px) { .sysEnd { display: none; } }
+
+/* ── show/hide: the collapse machine ──
+   grid-template-rows 1fr→0fr is the smoothest pure-CSS height animation —
+   no JS measuring, no magic max-height (the measured-motion traps stay
+   away). The inner div owns overflow; the cards themselves stagger their
+   scale/fade so the close reads as the deck being drawn back into the
+   header, and the open as it being dealt out. */
+.collapser {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 640ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsed { grid-template-rows: 0fr; }
+/* overflow stays hidden in EVERY state — during the open animation a
+   visible overflow would paint the full deck over the app grid below.
+   The lips' outside glow survives by the old lesson (offscreen-glass):
+   PAD by the glow instead of unclipping — the inner carries the bottom
+   padding the grid used to carry as margin. */
+.collapseInner { overflow: hidden; min-block-size: 0; padding-block-end: 34px; }
+
+.cardsIn > *, .cardsOut > * {
+  transition:
+    opacity 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cardsIn > * { opacity: 1; transform: translateY(0) scale(1); }
+.cardsOut > * { opacity: 0; transform: translateY(-14px) scale(0.965); }
+/* the deal-out stagger */
+.cardsIn > *:nth-child(1) { transition-delay: 40ms; }
+.cardsIn > *:nth-child(2) { transition-delay: 110ms; }
+.cardsIn > *:nth-child(3) { transition-delay: 180ms; }
+.cardsIn > *:nth-child(4) { transition-delay: 250ms; }
+/* the draw-back stagger (reverse order, tighter) */
+.cardsOut > *:nth-child(4) { transition-delay: 0ms; }
+.cardsOut > *:nth-child(3) { transition-delay: 45ms; }
+.cardsOut > *:nth-child(2) { transition-delay: 90ms; }
+.cardsOut > *:nth-child(1) { transition-delay: 135ms; }
+
+/* the toggle */
+.toggleBtn { margin-inline-start: 10px; display: inline-flex; align-items: center; gap: 6px; }
+.chev { display: inline-block; line-height: 1; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.chevClosed { transform: rotate(180deg); }
+
+/* the collapsed pulse line */
+.pulseLine {
+  font-size: 12px; color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.3px;
+}
+
+/* the hero curve draws itself on every expand */
+.curveDraw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: kxDraw 950ms cubic-bezier(0.4, 0, 0.2, 1) 180ms forwards;
+}
+@keyframes kxDraw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .collapser { transition: none; }
+  .cardsIn > *, .cardsOut > * { transition: none; }
+  .chev { transition: none; }
+  .curveDraw { animation: none; stroke-dashoffset: 0; }
+}
