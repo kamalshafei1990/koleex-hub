@@ -2786,11 +2786,28 @@ export default function ProductForm({ productId }: Props) {
         };
 
         if (m.id) {
-          await updateModel(m.id, modelData);
+          /* updateModel returns a boolean and never throws — ignoring it
+             meant a failed model write (403, validation, anything) still
+             ended in "Product saved successfully!". The operator then
+             reports "my price didn't save" and nothing anywhere says why.
+             A failed model write is a failed SAVE: name the model, stop. */
+          const ok = await updateModel(m.id, modelData);
+          if (!ok) {
+            throw new Error(
+              t("save.modelFailed", "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.")
+                .replace("{code}", m.primary_model || m.model_name || `#${m.order + 1}`),
+            );
+          }
           tempIdToRealId[m._tempId] = m.id;
         } else {
           const created = await createModel({ ...modelData, sku: "auto" });
-          if (created) tempIdToRealId[m._tempId] = created.id;
+          if (!created) {
+            throw new Error(
+              t("save.modelCreateFailed", "Couldn't create model \"{code}\" — the rest of the save was stopped.")
+                .replace("{code}", m.primary_model || m.model_name || `#${m.order + 1}`),
+            );
+          }
+          tempIdToRealId[m._tempId] = created.id;
         }
         /* Member translations ride a SEPARATE best-effort write: if the
            name_i18n/tagline_i18n columns aren't migrated yet, this fails

@@ -72,6 +72,16 @@ export const PRODUCTS_UI_I18N: Translations = {
   "status.active": { en: "Active", zh: "已上架", ar: "نشط" },
   "status.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "save.success": { en: "Product saved successfully!", zh: "产品保存成功！", ar: "تم حفظ المنتج بنجاح!" },
+  "save.modelFailed": {
+    en: "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.",
+    zh: "无法保存型号“{code}” — 已停止其余保存操作，避免数据写入一半。请检查您的权限或重试。",
+    ar: "تعذّر حفظ الموديل «{code}» — تم إيقاف بقية الحفظ حتى لا تُكتب البيانات نصف كتابة. تحقق من صلاحياتك أو حاول مجددًا.",
+  },
+  "save.modelCreateFailed": {
+    en: "Couldn't create model \"{code}\" — the rest of the save was stopped.",
+    zh: "无法创建型号“{code}” — 已停止其余保存操作。",
+    ar: "تعذّر إنشاء الموديل «{code}» — تم إيقاف بقية الحفظ.",
+  },
   "save.cantPublish": {
     en: "Can't publish yet — fill the required fields. Switch status to Draft to save your work for now.",
     zh: "暂时无法发布 — 请填写必填字段。可先将状态切换为草稿以保存当前进度。",
