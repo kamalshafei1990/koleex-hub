@@ -440,13 +440,16 @@ ok("the visit-city list grew to 20+", visitCities >= 20, `${visitCities}`);
 /* Stamp and signature sit SIDE BY SIDE — the owner's call. Absolute
    placement is what let a wide signature run under the seal; a flex row with
    a real gap cannot overlap at any signature width. */
+const ruleBody = (sel: string) =>
+  new RegExp(`\\.${sel} \\{([^}]*)\\}`).exec(styles)?.[1] ?? "";
 ok("the marks box is a flex row, not absolute placement",
-  /\.inv-marks \{[\s\S]*?display: flex/.test(styles) &&
-  !/\.inv-sig \{[\s\S]*?position: absolute/.test(styles));
+  /display: flex/.test(ruleBody("inv-marks")) &&
+  !/position: absolute/.test(ruleBody("inv-sig")) &&
+  !/position: absolute/.test(ruleBody("inv-stamp")));
 ok("there is a real gap between signature and stamp",
-  /\.inv-marks \{[\s\S]*?gap: \d+mm/.test(styles));
+  /gap: \d+mm/.test(ruleBody("inv-marks")));
 ok("the stamp is fully opaque (nothing under it now)",
-  /\.inv-stamp \{[\s\S]*?opacity: 1;/.test(styles));
+  /opacity: 1;/.test(ruleBody("inv-stamp")));
 
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);
