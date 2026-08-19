@@ -1440,7 +1440,26 @@ input[type="number"]:not(.kx-spinner) {
 }
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
   position: absolute;
-  inset: 0;
+  /* Start BELOW the safe area, not at 0.
+
+     `inset: 0` filled the whole pane, which is invisible on desktop because
+     the solid header covers the top of it. On a notched iPhone the safe area
+     is transparent chrome — so the blur painted right under the status bar
+     and washed over the KOLEEX hub logo sitting at y=73. The owner
+     photographed exactly that on a 17 Pro Max.
+
+     Below the WHOLE header, not just the safe area: the bar is 3.5rem tall
+     and its logo sits inside that, so starting at --kx-safe-top still left
+     the blur washing over the wordmark. --kx-header-h is safe-area + 3.5rem,
+     which is exactly the header's bottom edge.
+
+     The mask bands below are percentages of THIS box, so moving the top edge
+     down moves the whole ramp with it — the gradient still lands where the
+     content is, just no longer over the header itself. */
+  top: var(--kx-header-h, 3.5rem);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: block;
   pointer-events: none;
 }
