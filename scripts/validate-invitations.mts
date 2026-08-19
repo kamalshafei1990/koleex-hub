@@ -132,15 +132,15 @@ const enB = tpl.buildEnglish(inp(noTitle));
 const zhB = tpl.buildChinese(inp(noTitle));
 
 /* C. the name in the narrative IS the name in the table */
-const tableName = enA.passportBlock.find((row: Row) => row.label === "Name")?.value ?? "";
-ok("the narrative names the same person as the passport block",
-  enA.body.every((p: string) => !p.includes("Mr. ") || p.includes(tableName)),
-  tableName);
 /** A paragraph is a run of marked pieces now — flatten it to plain text
  *  before asserting on wording. Reading para[0] as a string silently
  *  produced "[object Object]" and the assertions passed on nothing. */
 const flat = (para: { text: string }[]) => para.map((x) => x.text).join("");
 
+const tableName = enA.passportBlock.find((row: Row) => row.label === "Name")?.value ?? "";
+ok("the narrative names the same person as the passport block",
+  enA.body.every((p: { text: string }[]) => !flat(p).includes("Mr. ") || flat(p).includes(tableName)),
+  tableName);
 ok("the Chinese narrative names the same person too",
   flat(zhA.body[1]!).includes(tableName));
 
@@ -181,7 +181,7 @@ function welds(s: string): string | null {
   return s.slice(Math.max(0, at - 10), at + 22);
 }
 for (const [tag, text] of [["with a title", zhA], ["without a title", zhB]] as const) {
-  const bad = [...text.intro, ...text.body].map(welds).find(Boolean);
+  const bad = [...text.intro, ...text.body].map((p) => welds(flat(p))).find(Boolean);
   ok(`Latin never welds onto CJK (${tag})`, !bad, bad ?? "");
 }
 
