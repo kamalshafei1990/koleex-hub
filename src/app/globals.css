@@ -1448,18 +1448,20 @@ input[type="number"]:not(.kx-spinner) {
      and washed over the KOLEEX hub logo sitting at y=73. The owner
      photographed exactly that on a 17 Pro Max.
 
-     Below the WHOLE header, not just the safe area: the bar is 3.5rem tall
-     and its logo sits inside that, so starting at --kx-safe-top still left
-     the blur washing over the wordmark. --kx-header-h is safe-area + 3.5rem,
-     which is exactly the header's bottom edge.
+     REVERTED to inset: 0 — and the reason matters, because moving it was
+     wrong in a way that measured as right.
 
-     The mask bands below are percentages of THIS box, so moving the top edge
-     down moves the whole ramp with it — the gradient still lands where the
-     content is, just no longer over the header itself. */
-  top: var(--kx-header-h, 3.5rem);
-  right: 0;
-  bottom: 0;
-  left: 0;
+     The header bar has NO fill of its own (background: transparent, no
+     backdrop-filter): "the bar is now the ground itself, frosted", per the
+     rule below. Its frosting IS these layers. Starting them below the header
+     therefore did not stop a blur from covering the logo — it removed the
+     bar's own glass, leaving the wordmark sitting on raw scrolled content.
+     In a desktop browser that reads as clean; on the phone it reads as the
+     header washing over the logo, which is what the owner kept seeing after
+     the "fix".
+
+     The real defect was never these layers' top edge. */
+  inset: 0;
   display: block;
   pointer-events: none;
 }

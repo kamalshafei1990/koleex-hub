@@ -133,19 +133,24 @@ ok("the phone-only variant exists and wins the cascade",
 ok("the ramp is still header + 3rem",
   /\.kx-pane-progressive\s*\{[^}]*height:\s*calc\(var\(--kx-header-h[^)]*\)\s*\+\s*3rem\)/.test(css));
 
-/* The blur layers must START below the header, not at the pane's top edge.
-   `inset: 0` is invisible on desktop because the solid header covers it; on
-   a notched iPhone the safe area is transparent chrome, so the blur painted
-   under the status bar and washed over the KOLEEX hub logo — the owner
-   photographed it twice. --kx-header-h is safe-area + 3.5rem, i.e. exactly
-   the header's bottom edge, so this follows the notch automatically. */
-/* Strip comments first: the rule's own comment QUOTES `inset: 0` while
-   explaining why it was removed, and a naive match read that as the defect
-   still being present. Check declarations, never prose. */
+/* THE HEADER BAR HAS NO FILL OF ITS OWN — "the bar is now the ground itself,
+   frosted". Its glass IS the progressive pane's layers, which must therefore
+   cover the whole pane including the bar.
+
+   This check exists because I got it backwards: chasing "the blur covers the
+   logo", I moved the layers to start BELOW the header. Measurements agreed
+   (no blur box overlapped the logo) and the owner still saw the defect —
+   because removing the blur from the bar leaves the wordmark sitting on raw
+   scrolled content, which reads exactly like the header washing over it.
+   Strip comments before matching: the rule's own note quotes the reverted
+   value while explaining it. */
 const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const paneItem = /\.kx-pane-progressive > i \{([^}]*)\}/.exec(cssCode)?.[1] ?? "";
-ok("blur layers start below the header, not at 0",
-  /top:\s*var\(--kx-header-h/.test(paneItem) && !/inset:\s*0/.test(paneItem));
+ok("blur layers cover the whole pane, header included",
+  /inset:\s*0/.test(paneItem) && !/top:\s*var\(--kx-header-h/.test(paneItem));
+const barRule = /\.kx-mainheader[^{]*\{([^}]*)\}/.exec(cssCode)?.[1] ?? "";
+ok("the header bar still has no fill of its own (the pane is its glass)",
+  !/background(-color)?:\s*(?!transparent|none)[^;]*(rgb|#|hsl)/.test(barRule));
 
 console.log("\n" + "─".repeat(60));
 console.log(failed === 0 ? "✓ mobile-width: all checks passed" : `✗ mobile-width: ${failed} failed`);
