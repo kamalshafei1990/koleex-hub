@@ -92,6 +92,16 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "草稿已恢复 — 请检查各字段，准备好后点击保存。",
     ar: "تم استرجاع المسودة — راجع الحقول ثم احفظ عندما تكون جاهزًا.",
   },
+  "draft.staleWarning": {
+    en: "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.",
+    zh: "⚠ 此草稿早于最近一次保存 — 恢复它将带回旧值并撤销较新的更改。",
+    ar: "⚠ هذه المسودة أقدم من آخر حفظ — استرجاعها سيعيد قيمًا قديمة ويلغي التغييرات الأحدث.",
+  },
+  "draft.photosDropped": {
+    en: "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.",
+    zh: "{n} 张已附加的图片无法保留在草稿中 — 请在保存前重新附加。",
+    ar: "تعذّر الاحتفاظ بـ {n} صورة مرفقة في المسودة — يرجى إرفاقها مرة أخرى قبل الحفظ.",
+  },
 
   /* ── Media upload feedback (P0 #3) ──────────────────────────────── */
   "media.mainPhoto": { en: "Main Product Photo", zh: "产品主图", ar: "الصورة الرئيسية للمنتج" },

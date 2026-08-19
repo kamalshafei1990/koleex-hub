@@ -722,8 +722,15 @@ export default function ProductForm({ productId }: Props) {
      autosaved draft found on mount so we can offer Restore / Discard.
      We NEVER auto-apply it — the saved product is left untouched until
      the operator explicitly chooses to restore (no dumb overwrite). */
-  const [draftMeta, setDraftMeta] = useState<{ savedAt: number } | null>(null);
+  const [draftMeta, setDraftMeta] = useState<{ savedAt: number; stale: boolean } | null>(null);
   const draftCheckedRef = useRef(false);
+  /* The DB row's updated_at, captured at load. A draft autosaved BEFORE the
+     product's last save is a time machine: restoring it and saving reverts
+     every newer change (the save loop deletes DB rows absent from the form).
+     That exact sequence collapsed a family's per-model photos and prices back
+     to the family values on 2026-08-19 — so a stale draft must announce
+     itself, not sit behind the primary button. */
+  const dbSavedAtRef = useRef<number | null>(null);
 
   /* ── Track original IDs for diff in edit mode ── */
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
@@ -848,7 +855,10 @@ export default function ProductForm({ productId }: Props) {
         try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
         return;
       }
-      setDraftMeta({ savedAt: parsed.savedAt });
+      setDraftMeta({
+        savedAt: parsed.savedAt,
+        stale: dbSavedAtRef.current != null && parsed.savedAt < dbSavedAtRef.current,
+      });
     } catch {
       /* corrupt draft — ignore it rather than block the form */
     }
@@ -865,7 +875,18 @@ export default function ProductForm({ productId }: Props) {
       const d = JSON.parse(raw);
       if (d.product) setProduct(d.product);
       if (Array.isArray(d.models)) setModels(d.models);
-      if (Array.isArray(d.media)) setMedia(d.media);
+      /* Ghost photos: a freshly-attached image exists only as `_file`, and
+         `_file` is deliberately not serialised into the draft — so a draft
+         row with no id and no url is an empty shell. Restoring it looks like
+         the photo survived, then the save loop skips it silently (no _file,
+         no id) and the photo is just gone. Drop the shells here and SAY so,
+         or the operator learns photos "randomly" vanish. */
+      let droppedPhotos = 0;
+      if (Array.isArray(d.media)) {
+        const rows = (d.media as MediaFormState[]).filter((m) => m.id || (m.url && m.url.trim() !== ""));
+        droppedPhotos = d.media.length - rows.length;
+        setMedia(rows);
+      }
       if (Array.isArray(d.translations)) setTranslations(d.translations);
       if (Array.isArray(d.prices)) setPrices(d.prices);
       if (Array.isArray(d.related)) setRelated(d.related);
@@ -876,7 +897,12 @@ export default function ProductForm({ productId }: Props) {
       setDirty(true);
       setDraftMeta(null);
       setError("");
-      setSuccess(t("draft.restored", "Draft restored — review the fields, then Save when you're ready."));
+      setSuccess(
+        t("draft.restored", "Draft restored — review the fields, then Save when you're ready.") +
+        (droppedPhotos > 0
+          ? " " + t("draft.photosDropped", "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.").replace("{n}", String(droppedPhotos))
+          : ""),
+      );
     } catch {
       setError(t("save.draftReadError", "That saved draft couldn't be read — it may be from an older version. Discarding it is safe."));
     }
@@ -1003,6 +1029,7 @@ export default function ProductForm({ productId }: Props) {
         ]);
         if (cancelled) return;
         if (!p) { setError("Product not found"); return; }
+        dbSavedAtRef.current = p.updated_at ? new Date(p.updated_at).getTime() : null;
 
         const modelIds = dbModels.map(m => m.id);
         const dbPrices = await guard(fetchMarketPricesByModelIds(modelIds), [] as Awaited<ReturnType<typeof fetchMarketPricesByModelIds>>);
@@ -3118,19 +3145,32 @@ export default function ProductForm({ productId }: Props) {
                 <p className="mt-0.5 text-[11px] text-[var(--text-ghost)]">
                   {t("draft.recoveredBodyAt").replace("{when}", new Date(draftMeta.savedAt).toLocaleString())}
                 </p>
+                {/* A draft older than the product's last save is a revert, not
+                    a recovery — restoring and saving it undoes every change
+                    made since. Warn in words AND swap the button emphasis so
+                    the safe action (Discard) is the prominent one. */}
+                {draftMeta.stale && (
+                  <p className="mt-1 text-[11px] font-semibold text-amber-500">
+                    {t("draft.staleWarning", "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.")}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                  className={draftMeta.stale
+                    ? "h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"
+                    : "h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"}
                 >
                   {t("draft.discard", "Discard")}
                 </button>
                 <button
                   type="button"
                   onClick={restoreDraft}
-                  className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"
+                  className={draftMeta.stale
+                    ? "h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                    : "h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"}
                 >
                   {t("draft.restore", "Restore draft")}
                 </button>
