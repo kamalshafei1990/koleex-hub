@@ -3144,13 +3144,13 @@ export default function ProductForm({ productId }: Props) {
 
         {/* Messages */}
         {error && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
+          <div className="relative z-30 mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
             <TriangleWarningIcon className="h-4 w-4 shrink-0" /> {error}
             <button onClick={() => setError("")} className="ml-auto text-red-400/50 hover:text-red-400">×</button>
           </div>
         )}
         {success && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
+          <div className="relative z-30 mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
             <CheckIcon className="h-4 w-4 shrink-0" /> {success}
           </div>
         )}
@@ -3160,8 +3160,14 @@ export default function ProductForm({ productId }: Props) {
             mount. Restore loads it into the form (review-then-save);
             Discard throws it away and keeps whatever is loaded. The
             saved product is never touched automatically. */}
+        {/* relative z-30, same lift as the title row: these three banners PARK
+            in the strip the tab bar's ramp covers, and under it the recovery
+            banner rendered as an unreadable amber smear with a white blob —
+            the owner circled it twice before it was even recognizable as a
+            banner ("what is this?", "still have the same problem"). Parked
+            chrome goes ABOVE the frost, always. */}
         {draftMeta && (
-          <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+          <div className="relative z-30 mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500">
                 <DocumentIcon className="h-4 w-4" />
