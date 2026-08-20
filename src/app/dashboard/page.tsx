@@ -96,21 +96,41 @@ export default function DashboardApp() {
   });
   const [editing, setEditing] = useState(false);
 
-  /* ═══ THE iOS DRAG ENGINE (owner: "smooth ease motion same as iOS") ═══
-     Pointer-driven, not HTML5 dnd: the lifted card rides the finger as a
-     pure transform (scale 1.04 + shadow), the layout reorders LIVE as you
-     hover, and every OTHER card glides to its new slot with a FLIP
-     animation (measure old rect → reorder → invert → play, WAAPI,
-     expo-out). On release the card eases into its slot. Transforms only —
-     the single reflow per reorder is the grid placement itself. */
+  /* ═══ THE iOS DRAG ENGINE v2 (owner: "too many glitches") ═══
+     The three classic drag glitches, each killed structurally:
+     1. THE JUMPING LIFT — v1 moved the card by a delta from its ORIGINAL
+        spot, but live reorders move its layout slot, so the same delta
+        teleported it. v2 positions the lift ABSOLUTELY every frame:
+        transform = pointer − grabOffset − currentLayoutPos, where layout
+        pos comes from offsetLeft/offsetTop (layout truth, immune to
+        transforms). Reorders can move its slot freely; the card stays
+        glued to the finger.
+     2. THE SWAP FLUTTER — v1 hit-tested elementsFromPoint against cards
+        MID-FLIP (transforms move hit-testing too), so decisions were made
+        against moving targets and the order flip-flopped. v2 hit-tests
+        against LAYOUT rects (offsets + container origin) — animation
+        never fools it — plus a 140ms reorder cooldown.
+     3. FRAME FLOOD — pointermove can outrun the display; v2 gates all
+        work behind requestAnimationFrame.                                  */
   const [dragId, setDragId] = useState<string | null>(null);
   const drag = useRef<{
-    id: string; startX: number; startY: number; el: HTMLElement;
+    id: string; el: HTMLElement;
+    grabX: number; grabY: number;         /* pointer offset inside the card */
+    lastX: number; lastY: number;         /* latest pointer position */
+    lastProcessAt: number; lastReorderAt: number;
   } | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const rectsRef = useRef<Map<string, DOMRect>>(new Map());
   const layoutRef = useRef(layout);
   useLayoutEffect(() => { layoutRef.current = layout; }, [layout]);
+
+  /* layout-truth rect: where the element LIVES, regardless of transforms */
+  const layoutRect = (el: HTMLElement) => {
+    const c = canvasRef.current;
+    if (!c) return el.getBoundingClientRect();
+    const base = c.getBoundingClientRect();
+    return new DOMRect(base.left + el.offsetLeft, base.top + el.offsetTop, el.offsetWidth, el.offsetHeight);
+  };
 
   const snapshotRects = () => {
     const m = new Map<string, DOMRect>();
@@ -120,9 +140,20 @@ export default function DashboardApp() {
     rectsRef.current = m;
   };
 
-  /* FLIP: after any layout mutation, glide every non-dragged card from its
-     previous rect to its new one. */
+  /* glue the lift to the finger, in absolute terms */
+  const positionLift = () => {
+    const d = drag.current;
+    if (!d) return;
+    const r = layoutRect(d.el);
+    const dx = d.lastX - d.grabX - r.left;
+    const dy = d.lastY - d.grabY - r.top;
+    d.el.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
+  };
+
+  /* FLIP: after any layout mutation, glide every non-lifted card from its
+     previous visual rect to its new one; re-glue the lift immediately. */
   useLayoutEffect(() => {
+    positionLift();
     const prev = rectsRef.current;
     if (!prev.size) return;
     canvasRef.current?.querySelectorAll<HTMLElement>("[data-wid]").forEach((el) => {
@@ -133,66 +164,89 @@ export default function DashboardApp() {
       const now = el.getBoundingClientRect();
       const dx = was.left - now.left, dy = was.top - now.top;
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.getAnimations().forEach((a) => a.cancel()); /* restartable mid-glide */
       el.animate(
         [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
-        { duration: 340, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+        { duration: 380, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
     });
     rectsRef.current = new Map();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>, id: string) => {
     if (!editing) return;
     if ((e.target as HTMLElement).closest("button")) return; /* minus / size dot */
     const el = e.currentTarget;
-    drag.current = { id, startX: e.clientX, startY: e.clientY, el };
+    const r = layoutRect(el);
+    drag.current = {
+      id, el,
+      grabX: e.clientX - r.left, grabY: e.clientY - r.top,
+      lastX: e.clientX, lastY: e.clientY,
+      lastProcessAt: 0, lastReorderAt: 0,
+    };
     setDragId(id);
-    el.setPointerCapture(e.pointerId);
-    el.style.transition = "none";
+    /* capture is best-effort: synthetic/pen pointers can refuse it, and the
+       shared drag.current + per-card move handlers work either way */
+    try { el.setPointerCapture(e.pointerId); } catch { /* fine */ }
     el.style.zIndex = "40";
+    el.style.boxShadow = "0 18px 44px rgba(0,0,0,.55), 0 0 0 1.5px rgba(127,169,214,.4)";
+    positionLift();
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
-    const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
-    d.el.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
-    d.el.style.boxShadow = "0 18px 44px rgba(0,0,0,.55), 0 0 0 1.5px rgba(127,169,214,.4)";
-
-    /* live reorder: whichever card the pointer is over becomes the target */
-    const under = document.elementsFromPoint(e.clientX, e.clientY)
-      .find((n) => (n as HTMLElement).dataset?.wid && (n as HTMLElement).dataset.wid !== d.id) as HTMLElement | undefined;
-    if (!under) return;
-    const overId = under.dataset.wid as string;
-    const l = layoutRef.current;
-    const from = l.findIndex((x) => x.id === d.id);
-    const to = l.findIndex((x) => x.id === overId);
-    if (from < 0 || to < 0 || from === to) return;
-    snapshotRects(); /* FLIP: remember where everyone is BEFORE the move */
-    setLayout(() => {
-      const next = [...l];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+    d.lastX = e.clientX; d.lastY = e.clientY;
+    /* frame-rate throttle WITHOUT rAF — rAF freezes in hidden tabs, and
+       the engine must behave identically wherever it runs */
+    const now = performance.now();
+    if (now - d.lastProcessAt < 16) return;
+    d.lastProcessAt = now;
+    {
+      const dd = drag.current;
+      if (!dd) return;
+      positionLift();
+      /* reorder against LAYOUT rects, with a flutter cooldown */
+      if (performance.now() - dd.lastReorderAt < 140) return;
+      const cards = [...(canvasRef.current?.querySelectorAll<HTMLElement>("[data-wid]") ?? [])];
+      const over = cards.find((el) => {
+        if (el.dataset.wid === dd.id) return false;
+        const r = layoutRect(el);
+        return dd.lastX >= r.left && dd.lastX <= r.right && dd.lastY >= r.top && dd.lastY <= r.bottom;
+      });
+      if (!over) return;
+      const overId = over.dataset.wid as string;
+      const l = layoutRef.current;
+      const from = l.findIndex((x) => x.id === dd.id);
+      const to = l.findIndex((x) => x.id === overId);
+      if (from < 0 || to < 0 || from === to) return;
+      dd.lastReorderAt = performance.now();
+      snapshotRects();
+      setLayout(() => {
+        const next = [...l];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return next;
+      });
+    }
   };
 
   const onPointerUp = () => {
     const d = drag.current;
     if (!d) return;
     drag.current = null;
-    /* the lifted card eases home: from its current offset to identity */
     const el = d.el;
     const current = el.style.transform;
     el.style.transform = "";
     el.style.boxShadow = "";
     if (current && current !== "none") {
       el.animate(
-        [{ transform: `${current}` }, { transform: "translate(0, 0) scale(1)" }],
+        [{ transform: current }, { transform: "translate(0, 0) scale(1)" }],
         { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
     }
-    window.setTimeout(() => { el.style.zIndex = ""; el.style.transition = ""; }, 430);
+    window.setTimeout(() => { el.style.zIndex = ""; }, 430);
     setDragId(null);
   };
 
