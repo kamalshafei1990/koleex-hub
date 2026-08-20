@@ -1410,6 +1410,21 @@ input[type="number"]:not(.kx-spinner) {
   backdrop-filter: none;
   background: transparent;
 }
+/* …AT REST. Once the page actually scrolls, the pane's flat frost comes
+   back even on owns-the-ramp screens (owner, on the product form: "the
+   blur edge not start from beginning, it just work when i scroll more").
+   The app's ramp rides its own sticky bar, and until that bar has
+   travelled up and pinned there is NOTHING filtered over y 0–56 — the
+   title row crossed the main header stone-crisp. The "one edge" rule this
+   stand-down exists for is a REST-state rule: at rest the pane stays
+   bare (one soft edge, the app's). While scrolled, the returning flat
+   frost's hard bottom edge lands INSIDE the pinned bar's taller ramp, so
+   the screen still reads as one edge — but everything crossing the top
+   strip now dissolves from the first scrolled pixel. */
+[data-kx-skin="aurora"][data-kx-topramp="app"][data-kx-scrolled] .kx-header-pane {
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
+}
 
 /* No fill AND no hairline: with the bar reduced to pure blur, the border-b
    was the last thing drawing a line across the ground. border-color rather
