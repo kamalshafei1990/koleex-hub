@@ -1864,18 +1864,21 @@ input[type="number"]:not(.kx-spinner) {
    the canon was signed off FOR — regardless of what is behind it.
    Layered AFTER .kx-pop-panel on purpose: same specificity, later wins. */
 [data-kx-skin="aurora"] .kx-pop-dense {
-  background:
-    linear-gradient(157deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 30%, rgba(255, 255, 255, 0) 62%),
-    rgba(10, 13, 19, 0.85);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  backdrop-filter: blur(40px) saturate(180%);
+  /* OWNER-PICKED from five material samples (2026-08-20, sample 2 —
+     "solid dark, no blur"): over bright imagery the menu goes SOLID.
+     Cleanest read of the five, cheapest to composite (no blur pass over
+     a live scroller — the same property that froze phone scrolling
+     earlier today), and the values match the low-power / no-backdrop
+     fallbacks, so this menu looks identical on every tier of device.
+     The kx-pop-panel shell (radius, gradient border, shadow) stays. */
+  background: rgba(14, 17, 23, 0.985);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 [data-kx-skin="aurora"][data-theme="light"] .kx-pop-dense {
-  background:
-    linear-gradient(157deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 34%, rgba(255, 255, 255, 0.30) 100%),
-    rgba(250, 251, 253, 0.72);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  backdrop-filter: blur(40px) saturate(150%);
+  background: rgba(252, 253, 255, 0.99);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-pop-panel {
   -webkit-backdrop-filter: none;
