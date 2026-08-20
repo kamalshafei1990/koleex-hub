@@ -2689,7 +2689,7 @@ export default function ProductList() {
                    --kx-ramp-fade must be a LENGTH here, not the default 45%:
                    a percentage is taken from the layer's own height, so once
                    the layer grew to cover the strip the fade grew with it. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
+                className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
@@ -2710,15 +2710,21 @@ export default function ProductList() {
                     instead of ~380px. From `sm` up the tile grid is unchanged.
                     One DOM tree, responsive classes: no duplicated markup and
                     no second copy for screen readers to read out. */}
-                {/* THE PILL ROW IS NOW THE ONLY LAYOUT, not the phone fallback.
-                    The 88px tile grid was already replaced below `sm` for the
-                    exact reason it fails everywhere: it is the largest object
-                    on the page and it is NAVIGATION, not content. On a laptop
-                    it pushed the first product to 597px of a 686px viewport.
-                    Same DOM, same links, same icons — one row that scrolls,
-                    ~44px instead of ~200px, and identical on every size, which
-                    also removes a whole breakpoint's worth of divergence. */}
-                <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* UNIFORM GRID, owner's pick (2026-08-20, sample 2 of 4):
+                    "I don't want have scrolling, I want all can show in the
+                    page with organize way." Every category is visible — equal
+                    columns, names truncating, counts on the trailing edge —
+                    instead of the one scrolling pill row.
+
+                    History, because this bar has flip-flopped: the original
+                    88px tile grid died for pushing the first product to 597px
+                    of a 686px viewport; the scrolling row that replaced it is
+                    what the owner has now rejected. This grid is the middle:
+                    ~2–3 rows of 38px on a laptop (~130px), never a sideways
+                    scroll. On phones the same grid runs 2-up (~7 rows), so
+                    there the bar goes STATIC (max-sm) — a ~320px block may
+                    scroll away with the page, but it must not DOCK over it. */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -2728,14 +2734,14 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[36px] w-auto shrink-0 px-3 rounded-full kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       ) : (
                         <LayoutGridIcon className="kx-neon-svg h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       )}
-                      <span className="kx-neon-label text-[11px] font-medium leading-none whitespace-nowrap text-[var(--text-muted)]">{cat.name}</span>
+                      <span className="kx-neon-label flex-1 min-w-0 truncate text-[11px] font-medium leading-none text-[var(--text-muted)]">{cat.name}</span>
                       {/* The count earns the pill its keep: the row is now
                           navigation AND a size read, which the tile never was. */}
                       <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
