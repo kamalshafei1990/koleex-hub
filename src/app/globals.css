@@ -1842,11 +1842,40 @@ input[type="number"]:not(.kx-spinner) {
    above it because it is neutral and covers the full row.
    Light theme uses the skin's light hover blue (62,103,150) at a lower alpha
    — the same colour the light Aurora hover puts on borders. */
-.kx-pop-panel button:hover {
+.kx-pop-panel :is(button, a):hover {
+  /* :is(button, a) — a menu row is a menu row whichever element renders it.
+     The category jump menu's rows are ANCHORS and had no hover at all
+     (owner: "where is the hover in dropdown menu"). */
   background-color: rgba(127, 169, 214, 0.16);
 }
-[data-theme="light"] .kx-pop-panel button:hover {
+[data-theme="light"] .kx-pop-panel :is(button, a):hover {
   background-color: rgba(62, 103, 150, 0.1);
+}
+
+/* ── kx-pop-dense — the MN-5 look, held over BRIGHT content ──────────────
+   The signed-off pop material is brightness(1.5) glass tuned against a
+   near-black backdrop; over white product photos it white-out the menu
+   (owner, twice: "the colors and glass effects is wrong", "still not the
+   glass I want"). A black/50 dim behind it read as a grey wash — also
+   rejected. This variant keeps the SHELL (kx-pop-panel radius/border/
+   sheen) and swaps only the fill+filter: a dense dark film with the same
+   blur and saturation and NO brightness lift, so the panel looks exactly
+   like the Sales-Rep picker does over dark content — which is the look
+   the canon was signed off FOR — regardless of what is behind it.
+   Layered AFTER .kx-pop-panel on purpose: same specificity, later wins. */
+[data-kx-skin="aurora"] .kx-pop-dense {
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 30%, rgba(255, 255, 255, 0) 62%),
+    rgba(10, 13, 19, 0.85);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-pop-dense {
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 34%, rgba(255, 255, 255, 0.30) 100%),
+    rgba(250, 251, 253, 0.72);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-pop-panel {
   -webkit-backdrop-filter: none;
