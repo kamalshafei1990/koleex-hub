@@ -119,6 +119,15 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/notes") ||
     p.startsWith("/projects") ||
     p.startsWith("/planning") ||
+    /* Dashboard, 2026-08-20 (dark-launched — the route 404s in production
+       until the flag flips, so this entry is inert there).
+
+       Sticky audit, by the rule at the top of this file: the page renders a
+       plain title block and widget grids — ZERO stickies of its own, no
+       PageHeader band, so like Settings/Expenses it belongs here and NOT in
+       appOwnsTopRamp (no band means no ramp host). It is a flowing page in
+       the Hub scroller, so content genuinely passes under the pane. */
+    p.startsWith("/dashboard") ||
     /* Finance, 2026-08-16 — 29 routes, one entry.
 
        CORRECTED the same day. This comment first said "ZERO stickies across

@@ -17,6 +17,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { APP_REGISTRY, getApp, type AppDef } from "@/lib/navigation";
 import s from "./widget-kit.module.css";
 
 /* ═══ types ═══ */
@@ -61,6 +62,9 @@ export type WidgetDef = {
   kind: "number" | "list" | "shortcut" | "special";
   sizes: Size[];
   href?: string;
+  /** summary-board grouping override (defaults to `app`) — lets cross-app
+   *  cards compose one tight section instead of orphan one-card rows */
+  section?: string;
 };
 
 /* ═══ THE catalog — simple faces (max 3 per app) + the Home specials ═══ */
@@ -82,19 +86,46 @@ export const CATALOG: WidgetDef[] = [
   { key: "todo.list",           module: "To-do",        app: "To-do",        title: "Open tasks",       kind: "list",     sizes: ["L"],      href: "/todo" },
   { key: "todo.new",            module: "To-do",        app: "To-do",        title: "New task",         kind: "shortcut", sizes: ["S"],      href: "/todo" },
   /* Team */
-  { key: "team.active",         module: "Management",   app: "Team",         title: "Team today",       kind: "number",   sizes: ["S", "M"] },
-  /* Cross-app + system specials (the approved Home look, now pinnable) */
-  { key: "attention.feed",      module: "__any",        app: "Cross-app",    title: "Attention needed", kind: "special",  sizes: ["XL"] },
-  { key: "system.strip",        module: "__sa",         app: "System",       title: "System strip",     kind: "special",  sizes: ["F"] },
-  { key: "system.membership",   module: "__sa",         app: "System",       title: "Membership",       kind: "number",   sizes: ["S"],      href: "/accounts" },
-  { key: "system.errors",       module: "__sa",         app: "System",       title: "Notify errors",    kind: "number",   sizes: ["S"] },
+  { key: "team.active",         module: "Management",   app: "Team",         title: "Team today",       kind: "number",   sizes: ["S", "M"], section: "Overview" },
+  /* Cross-app + system specials (the approved Home look, now pinnable).
+     They share the Overview section: attention (4×2) + team (2×1) +
+     membership (1) + errors (1) tile a PERFECT 6×2 block, strip below. */
+  { key: "attention.feed",      module: "__any",        app: "Cross-app",    title: "Attention needed", kind: "special",  sizes: ["XL"], section: "Overview" },
+  { key: "system.strip",        module: "__sa",         app: "System",       title: "System strip",     kind: "special",  sizes: ["F"],  section: "Overview" },
+  { key: "system.membership",   module: "__sa",         app: "System",       title: "Membership",       kind: "number",   sizes: ["S"],      href: "/accounts", section: "Overview" },
+  { key: "system.errors",       module: "__sa",         app: "System",       title: "Notify errors",    kind: "number",   sizes: ["S"], section: "Overview" },
   /* Apps whose data cards come in the next wave — shortcuts cost zero */
   { key: "calendar.open",       module: "Calendar",     app: "Calendar",     title: "Open Calendar",    kind: "shortcut", sizes: ["S"],      href: "/calendar" },
   { key: "discuss.open",        module: "Discuss",      app: "Discuss",      title: "Open Discuss",     kind: "shortcut", sizes: ["S"],      href: "/discuss" },
   { key: "notes.new",           module: "Notes",        app: "Notes",        title: "New note",         kind: "shortcut", sizes: ["S"],      href: "/notes" },
 ];
 
-export const defOf = (key: string) => CATALOG.find((d) => d.key === key);
+/* ── EVERY app gets at least a launcher card (owner: "this is not all the
+   apps") — auto-generated from APP_REGISTRY, so a new app appears in the
+   Widgets view the day it ships. Apps that already have catalog cards skip
+   the launcher (their cards open the app); the Dashboard app skips itself. */
+const CATALOG_MODULES = new Set(CATALOG.map((d) => d.module));
+export const LAUNCHER_DEFS: WidgetDef[] = APP_REGISTRY
+  .filter((a) => a.active && a.id !== "dashboard" && !CATALOG_MODULES.has(a.name))
+  .map((a) => ({
+    key: `open.${a.id}`,
+    module: a.superAdminOnly ? "__sa" : a.name,
+    app: a.name,
+    title: `Open ${a.name}`,
+    kind: "shortcut" as const,
+    sizes: ["S" as Size],
+    href: a.route,
+  }));
+
+/** The full pinnable universe: curated cards + one launcher per app. */
+export const FULL_CATALOG: WidgetDef[] = [...CATALOG, ...LAUNCHER_DEFS];
+
+export const defOf = (key: string) => FULL_CATALOG.find((d) => d.key === key);
+
+/** Registry entry for a launcher card's app (its icon, route, name). */
+export function launcherApp(key: string): AppDef | undefined {
+  return key.startsWith("open.") ? getApp(key.slice(5)) : undefined;
+}
 
 export function allowedDef(def: WidgetDef | undefined, data: Payload | null): boolean {
   if (!def || !data) return false;
@@ -466,22 +497,26 @@ export function renderFace(key: string, size: Size, data: Payload | null): React
     }
     case "team.active": {
       const pr = w?.presence;
+      /* avatars sit BESIDE the number, not under it — a 2×1 card is 96px
+         tall and a second row clips the strip (the owner catches clips) */
       return (
         <>
           <div className={s.lbl}><span>Team today</span></div>
-          <div className={s.val}>{pr && !pr.error ? pr.activeToday : "…"} <span className={s.unit}>/ {pr?.teamSize ?? "…"} · {pr?.hoursToday ?? "…"}h</span></div>
-          {size !== "S" && pr?.people && (
-            <div className={s.people}>
-              {pr.people.slice(0, 8).map((person) => (
-                <span key={person.name} className={`${s.pv} ${person.active ? s.pvOn : ""}`} title={person.name}>
-                  {person.avatar
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={person.avatar} alt={person.name} className={s.pvImg} />
-                    : person.initials}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className={s.teamRow}>
+            <div className={s.val} style={{ marginBlockStart: 0 }}>{pr && !pr.error ? pr.activeToday : "…"} <span className={s.unit}>/ {pr?.teamSize ?? "…"} · {pr?.hoursToday ?? "…"}h</span></div>
+            {size !== "S" && pr?.people && (
+              <div className={s.people} style={{ marginBlockStart: 0 }}>
+                {pr.people.slice(0, 6).map((person) => (
+                  <span key={person.name} className={`${s.pv} ${person.active ? s.pvOn : ""}`} title={person.name}>
+                    {person.avatar
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={person.avatar} alt={person.name} className={s.pvImg} />
+                      : person.initials}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       );
     }
@@ -542,8 +577,19 @@ export function renderFace(key: string, size: Size, data: Payload | null): React
       const sys = w?.system;
       return <NumberFace label="Notify errors" value={sys && !sys.error ? String(sys.notifyErrorsToday) : "…"} unit="today" warn={(sys?.notifyErrorsToday ?? 0) > 0} />;
     }
-    default:
-      /* shortcuts */
+    default: {
+      /* registry launcher card → the app's OWN icon, big and clear */
+      const regApp = launcherApp(key);
+      if (regApp) {
+        const Icon = regApp.icon;
+        return (
+          <>
+            <Icon size={30} className={s.launcherIcon} />
+            <span className={s.nm}>{regApp.name}</span>
+          </>
+        );
+      }
+      /* curated shortcuts */
       return (
         <>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -557,6 +603,7 @@ export function renderFace(key: string, size: Size, data: Payload | null): React
           <span className={s.nm}>{defOf(key)?.title}</span>
         </>
       );
+    }
   }
 }
 

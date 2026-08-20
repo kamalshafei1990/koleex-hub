@@ -78,10 +78,17 @@
 .shortcut svg { inline-size: 24px; block-size: 24px; color: rgba(226, 238, 250, 0.85);
                 filter: drop-shadow(0 0 6px rgba(120, 180, 255, 0.25)); }
 .shortcut .nm { font-size: 10.5px; color: rgba(255, 255, 255, 0.65); line-height: 1.25; }
+/* launcher cards carry the app's REAL icon, big and clear (owner ask) */
+.shortcut svg.launcherIcon { inline-size: 30px; block-size: 30px; }
 
-/* ── presence avatars (the clip + oval lessons are baked in) ── */
-.people { display: flex; gap: 6px; margin-block-start: 8px; flex-wrap: wrap; }
-.pv { inline-size: 26px; block-size: 26px; border-radius: 50%; background: rgba(255, 255, 255, 0.06);
+/* number + avatar strip on ONE line (the team card) */
+.teamRow { display: flex; align-items: center; gap: 12px; margin-block-start: 5px; flex-wrap: wrap; row-gap: 4px; min-inline-size: 0; }
+
+/* ── presence avatars (the clip + oval lessons are baked in).
+   24px + tight gaps: label + value + one avatar row must FIT a 96px card —
+   a clipped avatar strip reads as a bug (owner catches these). ── */
+.people { display: flex; gap: 5px; margin-block-start: 6px; flex-wrap: wrap; overflow: hidden; }
+.pv { inline-size: 24px; block-size: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.06);
       display: grid; place-items: center; font-size: 9px; font-weight: 600; color: rgba(226, 238, 250, 0.85);
       position: relative; border: 1px solid rgba(255, 255, 255, 0.1); opacity: 0.45; }
 .pvOn { opacity: 1; box-shadow: 0 0 0 1.5px rgba(127, 169, 214, 0.45); }
@@ -143,17 +150,21 @@
   box-shadow: 0 0 10px rgba(86, 127, 178, 0.4);
 }
 
-/* ── pin control (Dashboard app → Home) ── */
+/* ── pin control (Dashboard app → Home): a small round toggle so it never
+   covers a narrow card's title; ＋ = add, ✓ (Hub Blue) = on Home ── */
 .pinBtn {
-  position: absolute; top: 8px; inset-inline-end: 8px; z-index: 3;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.6px;
-  border-radius: 9999px; padding: 4px 10px; cursor: pointer; font-family: inherit;
-  color: rgba(226, 238, 250, 0.8);
+  position: absolute; top: 7px; inset-inline-end: 7px; z-index: 3;
+  inline-size: 22px; block-size: 22px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; line-height: 1;
+  border-radius: 50%; cursor: pointer; font-family: inherit;
+  color: rgba(226, 238, 250, 0.75);
   border: 1px solid rgba(165, 200, 250, 0.25); background: rgba(20, 26, 36, 0.75);
-  transition: color 0.15s ease-out, background-color 0.15s ease-out;
+  transition: color 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
 }
-.pinBtn:hover { color: #fff; }
+.pinBtn:hover { color: #fff; border-color: rgba(127, 169, 214, 0.55); }
 .pinOn { color: #0d0f13; background: #bcd8f0; border-color: transparent; }
+/* titles never run under the toggle */
+.w .lbl { padding-inline-end: 24px; }
 
 @media (prefers-reduced-motion: reduce) {
   .editing .w { animation: none; }
