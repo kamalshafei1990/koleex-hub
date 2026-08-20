@@ -13,7 +13,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Lockstitch | XSL | Lockstitch | **Confirmed** | stitch_type, bed_type, drive_type / +needle_count, hook_size | trimmer, AFL, backtack, puller | wovens, denim, uniforms | live code |
 | Overlock | XSO | Overlock | **Confirmed** | thread_count, diff_feed / +max_speed | trimmer, diff_feed, puller | knits, T-shirt | live |
 | Interlock (Coverstitch) | XSI | Interlock | **Needs Decision** | needle_count, top_cover / +gauge | top_cover, puller, elastic | knit hems, underwear | **Interlock vs Coverstitch naming** |
-| Flatlock (Flat Seamer) | XSF | — (new) | Proposed | needle_count, thread_count / +gauge | top_cover, puller | sportswear, underwear | new prefix |
+| Flatlock (Flat Seamer) | XSF | `flatlock-machines` | **Live (CL-0024)** | needle_count, thread_count / +gauge | top_cover, puller | sportswear, underwear | new prefix |
 | Chainstitch | XSC | Chainstitch | **Confirmed** | needle_count, feed_off_arm / +gauge | puller, folder | jeans felling | live |
 | Buttonhole | XSBH | — (new) | Proposed | buttonhole_type, automation / +length | programmable, knife | shirts | live XABH was under Automatic |
 | Eyelet Buttonhole | XSYE | — (new) | **Needs Decision** | buttonhole_type, gimp / +with_gimp | gimp, taping | jeans, jackets | proposed XSEB **collides with leather XSEB (Bag Sewing)** → use XSYE |
@@ -35,7 +35,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
 |---|---|---|---|---|---|---|
 | Programmable / CNC ("Template") Sewing | XAPT | **Resolved (CL-0012)** | working_field, head_type | stacker, laser, rotary_loader, vision | leather, bags, badges, high-mix | **DECIDED:** home = Automatic, prefix **XAPT**; retires the XSPA=Pattern-Sewing ambiguity (XSPA stays = spare Attachments). Absorbs the "Template Sewing" line below. |
-| Template Sewing | XATM | Proposed | working_field, head_count | rotary_loader, vision | high-mix parts | new |
+| Template Sewing | XATM | **Live (CL-0024)** | working_field, head_count | rotary_loader, vision | high-mix parts | new |
 | Auto Pocket Welting | XAPW | **Confirmed** | welt_type, length | flap, zipper | trousers, jackets | live |
 | Auto Patch Pocket Setter | XAPS | **Confirmed** | pocket_size, shape | creaser, label | shirts, jeans | live XAPS=Pocket Setter |
 | Auto Placket | XAPP | **Confirmed** | placket_type, length | interlining | shirts | live XAPP=Placket |
@@ -210,7 +210,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Lockstitch | XSL | XSL | Freeze | No |
 | Overlock | XSO | XSO | Freeze | No |
 | Interlock (Coverstitch) | XSI | XSI | Confirm name (Interlock/Coverstitch), keep XSI | **Yes** |
-| Flatlock | — | XSF | Approve | No |
+| Flatlock | — | XSF | Approve — **applied, live shelf (CL-0024)** | No |
 | Chainstitch | XSC | XSC | Freeze | No |
 | Buttonhole | — | XSBH | Approve | No |
 | Eyelet Buttonhole | — | XSYE | Approve (avoids XSEB clash) | **Yes** |
@@ -227,7 +227,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Mattress Sewing | — | XSMT | Approve | No |
 | Ultrasonic Sewing | — | XSUS | Approve | No |
 | Programmable Pattern Sewing | XSPA? | XAPT | Decide home + prefix | **Yes** |
-| Template Sewing | — | XATM | Approve | No |
+| Template Sewing | — | XATM | Approve — **applied, live shelf (CL-0024)** | No |
 | Auto Pocket Welting | XAPW | XAPW | Freeze | No |
 | Auto Patch Pocket Setter | XAPS | XAPS | Freeze | No |
 | Auto Placket | XAPP | XAPP | Freeze | No |
@@ -314,6 +314,14 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 > **Note on Packing (§4.4):** if the **XP↔XPC overlap** is resolved by renaming the Packing category to **XK**, all 11 packing prefixes shift (`XPC* → XK*`). They are therefore marked "Requires Kamal" pending that single category-level decision; if the overlap is accepted as-is, the live `XPC*` codes freeze unchanged.
 
 ---
+
+### CL-0024 additions (2026-08-20 — approved & live on creation)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| Carpet Overedging | XSRG | `carpet-overedging-machines` | Live |
+| Automatic Tape Attaching | XATA | `tape-attaching-units` | Live |
+| Automatic Pintuck | XAPK | `pintuck-sewing-units` | Live |
+| Fur Sewing (Leather family) | XSEF | `fur-sewing-machines` | Live |
 
 ## Counts
 - **Total Product Types:** 101  *(was 87; +14 from CL-0012: XFSS, XPCI, XMKP/D/S, XWIC/R/B/A, XMDS/D/C/H/N)*

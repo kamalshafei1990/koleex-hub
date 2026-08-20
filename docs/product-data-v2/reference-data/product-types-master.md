@@ -18,7 +18,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XSL | Lockstitch Machine | stitch_type, bed_type, drive_type, max_speed | needle_count, bed_type, drive_type, max_speed, hook_size | auto_trimmer, auto_foot_lifter, auto_backtack, thread_wiper, edge_cutter, puller |
 | ✅ XSO | Overlock Machine | thread_count, differential_feed, max_speed, bed_type | thread_count, differential_feed, max_speed, automation_level | auto_trimmer, differential_feed, puller |
 | ✅ XSI | Interlock (Coverstitch) Machine | needle_count, thread_count, top_cover, bed_type | needle_count, thread_count, top_cover, gauge | top_cover, puller, elastic_feeder, edge_cutter |
-| ▲ XSF | Flatlock (Flat Seamer) Machine | needle_count, thread_count, bed_type, differential_feed | needle_count, thread_count, gauge, bed_type | top_cover, puller, elastic_feeder |
+| ✅ XSF | Flatlock (Flat Seamer) Machine | needle_count, thread_count, bed_type, differential_feed | needle_count, thread_count, gauge, bed_type | top_cover, puller, elastic_feeder |
 | ✅ XSC | Chainstitch Machine | needle_count, bed_type, feed_off_arm | needle_count, feed_off_arm, gauge | puller, edge_cutter, folder, tape_feeder |
 | ▲ XSBH | Buttonhole Machine (Lockstitch) | buttonhole_type, automation_level, max_speed | electronic_vs_mechanical, buttonhole_length | programmable_patterns, auto_knife |
 | ▲ XSEB | Eyelet Buttonhole Machine | buttonhole_type, gimp, max_speed | with_gimp, electronic_vs_mechanical | gimp_device, taping |
@@ -34,12 +34,13 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XSBG | Bag Closing Machine | stitch_type, format(portable/stationary), tape | portable_vs_stationary, with_tape | tape_feed, printer, thread_cutter |
 | ▲ XSMT | Mattress Sewing Machine | function(tape-edge/border/flanging), max_thickness | function, automation_level | carriage_automation, pneumatic |
 | ▲ XSUS | Ultrasonic Sewing Machine | power, working_width, roller_pattern | working_width, continuous_vs_spot | embossing_wheels, slitting |
+| ✅ XSRG | Carpet Overedging Machine | thread_count, max_carpet_thickness | thread_count, portable_vs_stationary | edge_guide, trimming | *(CL-0024)* |
 
 ## B. Automatic Sewing Systems  (Category XA)
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |
 |---|---|---|---|---|
 | ▲ XAPS | Programmable Pattern Sewing Machine | working_field, head_type, max_speed, programmable_memory | working_field, head_type, max_speed | stacker, laser_marker, intermittent_presser |
-| ▲ XATM | Template Sewing Machine | working_field, head_count, head_type | working_field, head_count, template_change | rotary_template_loader, vision_registration |
+| ✅ XATM | Template Sewing Machine | working_field, head_count, head_type | working_field, head_count, template_change | rotary_template_loader, vision_registration |
 | ▲ XAPW | Automatic Pocket Welting Machine | welt_type, welt_length, stacker | single_vs_double_welt, flap, zipper | flap_loader, zipper_feeder, dart_device |
 | ▲ XAPP | Automatic Patch Pocket Setter | pocket_size, shape_programmable, head_type | pocket_size, with_creaser, stacker | pocket_creaser, label_insert, corner_bartack |
 | ▲ XAPL | Automatic Placket Machine | placket_type, placket_length, cutter | placket_type, interlining_feed, stacker | interlining_feed, label_insert |
@@ -51,6 +52,9 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XAWB | Automatic Waistband Machine | garment_type, head_config | garment_type, needle_count, curtain_feed | curtain_feed, label_insert |
 | ▲ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
 | ▲ XAIX | Automatic Buttonhole/Button Indexer | function, positions, base_head | function, position_count, auto_button_feed | auto_button_feeder, transport_clamp, stacker |
+| ✅ XATA | Automatic Tape Attaching System | tape_count, working_field, cycle_time | tape_count, robotic_feed, cycle_time | auto_feeding_arm, template_loader *(CL-0024)* |
+| ✅ XAPK | Automatic Pintuck Machine | tucking_length, tucking_width, head_type | tucking_length, plc_patterns, head_type | stepper_feed, infrared_break_detect *(CL-0024)* |
+| ✅ XSEF | Fur Sewing Machine *(lives under Leather & Footwear XSE\*)* | stitch_type, max_skin_thickness | portable_vs_stationary, speed | edge_guide *(CL-0024)* |
 
 ## C. Cutting Equipment  (Category XC)
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |

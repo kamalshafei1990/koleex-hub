@@ -379,3 +379,19 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **⚠️ TRAP RECORDED IN THE CODE.** A shirt catalogue also sells an **"Automatic Rotation Shoulder and Yoke Press"** — a *press*, Finishing, not sewing. It is the **first** thing a text search for "yoke" returns. Anyone repeating this search will hit it before the real evidence.
 - **Conflict scan:** `tsc` exit 0 / 0 lines · `validate:budgets` **59 passed, 0 failed** — section H: 102 kinds, 79 facet pairs, all en/zh/ar.
 - **Status:** **Applied — live. The CL-0023 family is closed.** Remaining open items are unrelated to it: the overlock `thread_count` facet gap (CL-0023b) and the seven legacy `templateSlug` values left alone on purpose.
+
+### CL-0024 · 2026-08-20 · Six shelves from the Lingrai read — two approved backlog items executed, four new types
+- **Approved by:** Kamal ("continue" — 2026-08-20, on the gap list the S-LINGRAI 2025 inventory §4 put in front of him).
+- **Trigger:** the Lingrai catalogue prints real spec tables for machine classes that had no live shelf. Two were already Approved in the FINAL DECISION TABLE and simply never applied; four had no home anywhere.
+- **Executed (already-approved, now live):**
+  - `XSF` **Flatlock (Flat Seamer)** → live shelf `flatlock-machines` under Industrial Sewing. CL-0020's own relabel note said these do not belong under Interlock; the 740/740DSX family finally has its shelf.
+  - `XATM` **Template Sewing** → live shelf `template-sewing-machines` under Automatic Sewing Systems (LR-988A-4-FOUR class).
+- **NEW types (this entry is their authorization):**
+  - `XSEF` **Fur Sewing Machine** → `fur-sewing-machines` under Leather & Footwear (XSE\*). Bonis-class skin overseaming sits with the skin-goods family, not the garment stitch classes.
+  - `XSRG` **Carpet Overedging Machine** → `carpet-overedging-machines` under Industrial Sewing. Not Overlock — different bed, purpose and thread system. `XSRG` chosen so no live code (`XSC`, `XSO`) is a prefix of it.
+  - `XATA` **Automatic Tape Attaching System** → `tape-attaching-units` under Automatic Sewing Systems. The robotic multi-needle tape cells (LR-008-…-VPLSDk/SDC). Distinct from `XALB` (labels) and leather `XSET`.
+  - `XAPK` **Automatic Pintuck Machine** → `pintuck-sewing-units` under Automatic Sewing Systems (LR-3000-1400 class). The VPT pintuck DEVICE on multi-needle machines stays a device; the standalone PLC cell is a type.
+- **Decided WITHOUT a type:** the LR-20S thread distributor — before/after-sewing bench gear, catalogued as device/parts, no Product Type.
+- **Prefix note for the record:** the live tree already contains code-extends-code pairs (`XAS` stands ⊂ `XASS`/`XASL`), so extension alone is not a conflict; the rule applied here is semantic — a new code must not READ as a subtype of an unrelated live code, which is why carpet is `XSRG` and not `XSCP`/`XSOC`.
+- **Synchronized:** live `subcategories` (6 rows, with name_zh/name_ar per the translated-dropdowns rule) · `product-types-master.md` · `product-type-approval-matrix.md` (rows + FINAL DECISION TABLE + counts) · `sewing-machine-templates.ts` SUBCATEGORY_TO_TEMPLATE (6 slugs) · S-LINGRAI inventory §4/§6.
+- **Status:** **Applied — live.** Open, unchanged: fur/carpet spec templates (no source tables read yet beyond Lingrai's brief rows), and the JOOKE no-code decision (separate file).

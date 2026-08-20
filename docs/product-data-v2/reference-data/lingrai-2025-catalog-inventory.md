@@ -84,6 +84,7 @@ missing is below — and it is mostly TEMPLATES, not shelves.
 ## 4. Gaps — what the system does NOT have
 
 ### 4a. Machine classes with no home anywhere (registry AND live)
+> ✅ **RESOLVED by CL-0024 (2026-08-20):** #1 → `fur-sewing-machines[XSEF]` · #2 → `carpet-overedging-machines[XSRG]` · #3 → `tape-attaching-units[XATA]` · #4 → `pintuck-sewing-units[XAPK]` · #5 → device/parts, NO type (decided). All live.
 | # | Machines (pages) | What it is | Why no home |
 |---|---|---|---|
 | 1 | **Fur sewing** — LR-1-1 · 4-4/4-5/4-6 · 2600 · 402/202/302/600 (P96) | Fur/skin overseaming (Bonis class) | No fur/skin type in any registry section; no subcategory |
@@ -93,6 +94,7 @@ missing is below — and it is mostly TEMPLATES, not shelves.
 | 5 | **Thread distributor** — LR-20S (P98) | Thread winding/distribution bench unit | Minor "before/after" gear, no type (candidate: device/parts shelf, not a type) |
 
 ### 4b. Registry-proposed but no live shelf
+> ✅ **RESOLVED by CL-0024:** `flatlock-machines[XSF]` and `template-sewing-machines[XATM]` created live.
 | Machines | Registry | Live gap |
 |---|---|---|
 | **740 / 740DSX feed-off-the-arm 4N6T flat seamer** (P63–68) | `XSF` ▲ Flatlock (Flat Seamer) | No flatlock/flat-seamer subcategory; `interlock-machines` is the wrong shelf per CL-0020's own relabel note |
