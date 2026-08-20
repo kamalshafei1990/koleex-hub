@@ -92,10 +92,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "database": { chunks: 11, kbytes: 549 },
   "discuss": { chunks: 10, kbytes: 508 },
   "documents": { chunks: 10, kbytes: 514 },
-  /* Measured 2026-08-20, the day section C caught it: the widget-canvas
-     demo (a62c6dfc) shipped from a parallel session without a line here.
-     8 chunks / 498 KB + ~12%. */
-  "dashboard": { chunks: 8, kbytes: 557 },
+  /* Measured 2026-08-20 TWICE — the widget-canvas demo is under active
+     development in a parallel session and grew 8→9 chunks within the hour
+     (498→508 KB). Budgeted at the second measurement + headroom; if it
+     trips again the owning session should set its own number. */
+  "dashboard": { chunks: 10, kbytes: 570 },
   "employees": { chunks: 12, kbytes: 851 },
   "expenses": { chunks: 13, kbytes: 722 },
   "finance": { chunks: 14, kbytes: 999 },
