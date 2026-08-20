@@ -3082,12 +3082,16 @@ export default function ProductForm({ productId }: Props) {
               Back-arrow + Cancel both route to /products via handleCancel,
               which warns when there are unsaved changes. Save publishes
               and clears the dirty flag inside `save()`. ═══ */}
-        <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
+        {/* relative z-30 lifts this row ABOVE the tab bar's 26rem ramp —
+            the same lift PageHeader gives its hero. Without it the ramp
+            treats the parked title row as scrolled-under content and smears
+            it (owner screenshot, 2026-08-20: "the header have a problem"). */}
+        <div className="relative z-30 flex items-center justify-between mb-6 md:mb-8 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={handleCancel}
-              className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
+              className="kx-glass h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
               title={dirty ? t("wizard.unsavedChangesTitle", "You have unsaved changes") : t("wizard.backToProducts", "Back to products")}
             >
               <ArrowLeftIcon className="h-4 w-4" />
@@ -3116,7 +3120,7 @@ export default function ProductForm({ productId }: Props) {
             <button
               type="button"
               onClick={handleCancel}
-              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+              className="kx-glass hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
             >
               {t("action.cancel", "Cancel")}
             </button>
