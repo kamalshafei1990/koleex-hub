@@ -411,8 +411,15 @@ function SectionTabs({
      content PASSING under a bar, not for content parked there. 1rem / 2.5rem
      are the values ProductProfile and ProductList already use for this
      identical bar; this was the one that was missed. */
+  /* FULL-BLEED, and the owner's screenshot ("what is this?") is why. The
+     ramp layer is inset:0 of this nav — inside the page's px-4…px-16 padding
+     it painted a floating blurred RECTANGLE with visible side edges over the
+     empty strip above the tabs, instead of the edge-to-edge top frost every
+     other page shows. Same negative-margin breakout ProductList's bar uses,
+     sized to this page's own padding scale; the matching padding puts the
+     tab strip itself back on the grid. */
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 px-4 md:px-8 lg:px-12 xl:px-16 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"
