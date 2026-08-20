@@ -2042,6 +2042,28 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
 
+/* The Discuss AI chat's one-line composer wears the same well (owner:
+   "make Discuss AI composer same"). Its own hook — the element is NOT
+   glass-pop, so there are no material arms to outrank here. */
+[data-kx-skin="aurora"] .kx-ai-composer-mini {
+  background: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] .kx-ai-composer-mini:focus-within {
+  border-color: rgba(86, 127, 178, 0.70) !important;
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-composer-mini {
+  background: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-composer-mini:focus-within {
+  border-color: rgba(62, 103, 150, 0.75) !important;
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
+}
+
 /* ── THE A4 DOCUMENT IS PAPER, NOT A FORM ──────────────────────────────────
    Regression I introduced converting Quotations and Invoices to Aurora. Adding
    `kx-app` to the app root is what gives every surface the skin — and it also
@@ -3914,4 +3936,5 @@ input[type="number"]:not(.kx-spinner) {
 
    If off-screen skipping is ever attempted again, the padding comes back WITH
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
+
 
