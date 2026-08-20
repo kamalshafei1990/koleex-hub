@@ -49,12 +49,12 @@
 .s11 { grid-column: span 1; grid-row: span 1; }
 .s21 { grid-column: span 2; grid-row: span 1; }
 .s22 { grid-column: span 2; grid-row: span 2; }
-.s42 { grid-column: span 4; grid-row: span 2; }
-.s62 { grid-column: span 6; grid-row: span 2; }
 @media (max-width: 900px) {
   .s11 { grid-column: span 1; }
-  .s21, .s22, .s42, .s62 { grid-column: span 2; }
+  .s21, .s22 { grid-column: span 2; }
 }
+
+.loading { display: grid; place-items: center; padding-block: 90px; }
 
 .lbl { font-size: 9.5px; letter-spacing: 1.4px; color: rgba(255, 255, 255, 0.42); text-transform: uppercase;
        display: flex; justify-content: space-between; gap: 6px; }
@@ -75,22 +75,15 @@
 .sparks i { flex: 1; border-radius: 2px; background: rgba(140, 190, 255, 0.18); }
 .sparks .hot { background: #7fa9d6; box-shadow: 0 0 8px rgba(127, 169, 214, 0.5); }
 
-.bars { display: flex; align-items: flex-end; gap: 8px; flex: 1; margin-block-start: 12px; padding-block-end: 16px; }
-.bar { flex: 1; position: relative; border-start-start-radius: 5px; border-start-end-radius: 5px;
-  background: linear-gradient(180deg, rgba(188, 216, 240, 0.13), rgba(127, 169, 214, 0.03));
-  border: 1px solid rgba(255, 255, 255, 0.08); border-block-end: none; }
-.bar b { position: absolute; inset-inline: 0; top: -16px; font-size: 10px; font-weight: 600; text-align: center;
-         color: rgba(230, 240, 252, 0.85); }
-.bar em { position: absolute; inset-inline: 0; bottom: -15px; font-style: normal; font-size: 8px;
-          color: rgba(255, 255, 255, 0.32); text-align: center; letter-spacing: 0.5px; }
-
-.ringRow { display: flex; align-items: center; gap: 12px; margin-block-start: 8px; flex-wrap: wrap; }
-.ringWrap { position: relative; inline-size: 44px; block-size: 44px; flex: none; }
-.ring { inline-size: 44px; block-size: 44px; border-radius: 50%;
-  background: conic-gradient(from -90deg, #7fa9d6 0 var(--pct, 0%), rgba(255, 255, 255, 0.09) var(--pct, 0%) 100%);
-  -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%); mask: radial-gradient(circle, transparent 57%, #000 58%);
-  filter: drop-shadow(0 0 7px rgba(127, 169, 214, 0.4)); }
-.ringTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 600; }
+/* ── the LIST face: 3–5 rows, tap opens the app ── */
+.rows { margin-block-start: 10px; }
+.rows > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  font-size: 11px; color: rgba(255, 255, 255, 0.62); padding-block: 5px;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.05); }
+.rows > div:last-child { border-block-end: none; }
+.rowA { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-inline-size: 0; }
+.rows b { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+.listEmpty { font-size: 11px; color: rgba(255, 255, 255, 0.38); margin-block-start: 14px; line-height: 1.5; }
 
 .people { display: flex; gap: 6px; margin-block-start: 8px; flex-wrap: wrap; }
 .pv { inline-size: 26px; block-size: 26px; border-radius: 50%; background: rgba(255, 255, 255, 0.06);

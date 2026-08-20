@@ -268,7 +268,14 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   /* Brands is NOT an app — it lives inside Database → Visual Library
      (/database/brands). Intentionally not registered here. */
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
+  /* Dashboard — ACTIVE behind the same dark-launch gate as its page: the
+     registry flips with the flag, so a sibling push cannot expose it in
+     production (launcher entry + roles module + page all appear together).
+     openAccess: the app itself is open to everyone — every widget inside is
+     already gated per-module by /api/dashboard, so the app shows each person
+     only what their role can see. */
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",
+    active: process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development", openAccess: true },
 ];
 
 /* ═══════════════════════════════════════════════════
