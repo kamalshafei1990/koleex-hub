@@ -144,22 +144,30 @@ const countProducts: ToolDef<
   },
 };
 
+/* ⚠️ THE OLD VERSION LIED (owner: "this is wrong", 2026-08-21): it counted
+   the LEGACY `products.family` text column — null on the whole catalog — and
+   answered "0 families" for a catalog whose real taxonomy is:
+   · a FAMILY = one product row with MULTIPLE models in product_models
+     (the owner standard: family=product, members=models);
+   · the CLASSIFICATION = division_slug / category_slug / subcategory_slug.
+   The stats now come from those real sources. */
 const getCatalogStats: ToolDef<
   Record<string, never>,
-  { total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }
+  Record<string, unknown>
 > = {
   name: "getCatalogStats",
-  description: "Catalog overview: total products + breakdown by brand and family.",
+  description:
+    "Catalog overview from the REAL taxonomy: total products, brands, divisions and categories (division/category/subcategory classification), and family stats — a family is one product with multiple models; standalone products have one model. Use for 'how many families/categories/divisions' questions.",
   parameters: { type: "object", properties: {} },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
-  handler: async (): Promise<ToolResult<{ total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }>> => {
-    const { data, error } = await supabaseServer
-      .from("products")
-      .select("brand, family")
-      .eq("visible", true);
-    if (error || !data) {
-      console.error("[tool.getCatalogStats]", error);
+  handler: async (): Promise<ToolResult<Record<string, unknown>>> => {
+    const [prodRes, modelRes] = await Promise.all([
+      supabaseServer.from("products").select("id, brand, division_slug, category_slug, subcategory_slug").eq("visible", true),
+      supabaseServer.from("product_models").select("product_id"),
+    ]);
+    if (prodRes.error || !prodRes.data || modelRes.error) {
+      console.error("[tool.getCatalogStats]", prodRes.error ?? modelRes.error);
       return {
         ok: false,
         permissionStatus: "denied",
@@ -167,30 +175,54 @@ const getCatalogStats: ToolDef<
         message: "Couldn't load catalog stats.",
       };
     }
-    const brands = new Map<string, number>();
-    const families = new Map<string, number>();
-    for (const row of data) {
-      if (row.brand) brands.set(row.brand, (brands.get(row.brand) ?? 0) + 1);
-      if (row.family) families.set(row.family, (families.get(row.family) ?? 0) + 1);
+    const rows = prodRes.data;
+    const count = (key: "brand" | "division_slug" | "category_slug" | "subcategory_slug") => {
+      const m = new Map<string, number>();
+      for (const r of rows) {
+        const v = r[key];
+        if (v) m.set(String(v), (m.get(String(v)) ?? 0) + 1);
+      }
+      return m;
+    };
+    const top = (m: Map<string, number>, n: number) =>
+      [...m.entries()].map(([name, c]) => ({ name, count: c })).sort((a, b) => b.count - a.count).slice(0, n);
+
+    const brands = count("brand");
+    const divisions = count("division_slug");
+    const categories = count("category_slug");
+    const subcategories = count("subcategory_slug");
+
+    const visibleIds = new Set(rows.map((r) => r.id as string));
+    const modelsPerProduct = new Map<string, number>();
+    for (const m of (modelRes.data ?? []) as Array<{ product_id: string }>) {
+      if (!visibleIds.has(m.product_id)) continue;
+      modelsPerProduct.set(m.product_id, (modelsPerProduct.get(m.product_id) ?? 0) + 1);
     }
-    const topBrands = [...brands.entries()]
-      .map(([brand, count]) => ({ brand, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-    const topFamilies = [...families.entries()]
-      .map(([family, count]) => ({ family, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    let familyProducts = 0, totalModels = 0;
+    for (const n of modelsPerProduct.values()) {
+      totalModels += n;
+      if (n > 1) familyProducts++;
+    }
+
     return {
       ok: true,
       permissionStatus: "allowed",
       data: {
-        total_products: data.length,
-        brands: topBrands,
-        families: topFamilies,
+        total_products: rows.length,
+        brands: top(brands, 10),
+        divisions: top(divisions, 12),
+        categories: top(categories, 15),
+        subcategory_count: subcategories.size,
+        families: {
+          definition: "a family = one product with multiple models (members)",
+          family_products: familyProducts,
+          standalone_products: modelsPerProduct.size - familyProducts,
+          products_without_models: rows.length - modelsPerProduct.size,
+          total_models: totalModels,
+        },
       },
-      message: `Catalog: ${data.length} products across ${brands.size} brands and ${families.size} families.`,
-      sources: ["products(stats)"],
+      message: `Catalog: ${rows.length} products (${totalModels} models — ${familyProducts} families with multiple members), ${brands.size} brand(s), ${divisions.size} division(s), ${categories.size} categories, ${subcategories.size} subcategories.`,
+      sources: ["products(stats)", "product_models(stats)"],
     };
   },
 };
