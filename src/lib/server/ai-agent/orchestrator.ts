@@ -2451,6 +2451,31 @@ function buildSafeQuotationReply(steps: AgentStep[]): string {
    Either way the last "answer" step is force-synced to the returned
    text so steps[] and finalReply cannot diverge. */
 
+/* ─── Leaked tool-markup scrubber ───────────────────────────────────
+   Owner screenshot 2026-08-21: a reply ended in raw provider tool
+   tokens — "DSML ｜ tool_calls> … invoke name=\"getProductFullDetails\"
+   … parameter name=\"code\" …" — because once the per-turn tool budget
+   flips toolChoice to "none", a model that still WANTS a tool writes
+   the call into its content as text, special tokens and all. The
+   system nudge alone does not stop it, so the last line of defense is
+   here: cut the reply at the FIRST tool marker (legit prose always
+   precedes the leak), and if nothing legible remains, replace it with
+   an honest hand-back instead of an empty bubble. These markers can
+   never appear in a legitimate user-facing answer. */
+const TOOL_LEAK_RE =
+  /<?\s*[|｜]?\s*DSML\s*[|｜]|<\s*tool_calls|tool_calls\s*>|<?\s*invoke\s+name=|<[|｜]tool[▁_]calls|antml:invoke/i;
+
+function scrubLeakedToolMarkup(reply: string): string {
+  const m = TOOL_LEAK_RE.exec(reply);
+  if (!m) return reply;
+  const kept = reply.slice(0, m.index).trim();
+  console.warn(
+    `[ai.agent.tool-leak] raw tool markup scrubbed from final reply (at ${m.index}/${reply.length}).`,
+  );
+  if (kept.length >= 20) return kept;
+  return "I hit this turn's tool limit before finishing. Say “continue” and I'll pick up right where I stopped.";
+}
+
 function sealFinalReply(
   finalReply: string,
   steps: AgentStep[],
@@ -2459,7 +2484,7 @@ function sealFinalReply(
   // Start from the model's text. In quotation hard mode we replace
   // it entirely with a deterministic reply before running the guard
   // chain. The guards still run as belt-and-braces.
-  let sealed = finalReply;
+  let sealed = scrubLeakedToolMarkup(finalReply);
   if (userMessage && isQuotationRequest(userMessage)) {
     sealed = buildSafeQuotationReply(steps);
     console.warn(
