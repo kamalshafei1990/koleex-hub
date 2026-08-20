@@ -2239,8 +2239,21 @@ input[type="number"]:not(.kx-spinner) {
    (owner's phone screenshot). Solid fill below sm only, matching the
    phone's solid-at-rest header language; desktop keeps the shared ramp. */
 @media (max-width: 639px) {
-  [data-kx-skin="aurora"] .kx-pd-toolbar { background: rgba(12, 14, 18, 0.96); }
-  [data-kx-skin="aurora"][data-theme="light"] .kx-pd-toolbar { background: rgba(250, 251, 253, 0.97); }
+  /* Frosted, not solid (owner: "no blur edge effect in mobile phone") —
+     the kx-glass recipe, one blur pass, matching the scrolled phone
+     header. The @supports fallback below goes solid where blur can't. */
+  [data-kx-skin="aurora"] .kx-pd-toolbar {
+    background: rgba(11, 14, 20, 0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-pd-toolbar {
+    background: rgba(255, 255, 255, 0.62);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    [data-kx-skin="aurora"] .kx-pd-toolbar { background: rgba(12, 14, 18, 0.96); }
+    [data-kx-skin="aurora"][data-theme="light"] .kx-pd-toolbar { background: rgba(250, 251, 253, 0.97); }
+  }
 }
 
 /* The sliding pill behind TabStrip's active tab (aurora only) — the

@@ -805,6 +805,11 @@ export default function ProductList() {
       return parsed && typeof parsed === "object" ? parsed : {};
     } catch { return {}; }
   });
+  /* Phone-only: the category grid collapsed to its first two rows.
+     13 categories at 2-up = ~7 rows ≈ half the phone viewport before any
+     product shows (owner screenshot) — the exact reason the original tile
+     grid died. Desktop always shows all; ≥sm ignores this state. */
+  const [catsOpen, setCatsOpen] = useState(false);
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((v) => {
@@ -2742,7 +2747,7 @@ export default function ProductList() {
                     there the bar goes STATIC (max-sm) — a ~320px block may
                     scroll away with the page, but it must not DOCK over it. */}
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
-                  {categoryTree.map((cat) => (
+                  {categoryTree.map((cat, catIdx) => (
                     <a
                       key={cat.slug}
                       href={`#cat-${cat.slug}`}
@@ -2794,7 +2799,7 @@ export default function ProductList() {
                         };
                         requestAnimationFrame(settle);
                       }}
-                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${!catsOpen && catIdx >= 3 ? "max-sm:hidden" : ""}`}
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
@@ -2807,6 +2812,21 @@ export default function ProductList() {
                       <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
                     </a>
                   ))}
+                  {/* The 4th cell of the collapsed phone grid is the
+                      expander itself — the grid stays exactly 2 rows shut. */}
+                  <button
+                    type="button"
+                    onClick={() => setCatsOpen((o) => !o)}
+                    className="sm:hidden group relative flex flex-row items-center justify-center gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                  >
+                    <span className="text-[11px] font-medium leading-none text-[var(--text-muted)]">
+                      {catsOpen ? t("list.lessCategories") : t("list.allCategories")}
+                    </span>
+                    {!catsOpen && (
+                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
+                    )}
+                    <span aria-hidden className={`text-[10px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
+                  </button>
                 </div>
               </nav>
             )}
