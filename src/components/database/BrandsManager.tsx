@@ -497,7 +497,7 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
   if (embedded) return <div>{body}</div>;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-6 py-8">{body}</div>
     </div>
   );

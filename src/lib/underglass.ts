@@ -119,6 +119,23 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/notes") ||
     p.startsWith("/projects") ||
     p.startsWith("/planning") ||
+    /* The 2026-08-21 Aurora sweep — seven segments converted together via
+       AuroraShell layouts. Sticky audit per the rule at the top of this
+       file: each of these greps ZERO `sticky top-*` bars of its own across
+       its app folder AND its component folder (accounts→admin/accounts,
+       database→components/database, markets/website/translator→their single
+       components, roles + software-center are single-page). Their only
+       sticky is nothing — the clean Purchase case.
+       NOT here on purpose, pending a MEASURED pass (they own sticky bars):
+       /issues (qa's sticky top-0 filter bars), /knowledge (sticky TOC +
+       sticky table columns), /management, /price-calculator. */
+    p.startsWith("/accounts") ||
+    p.startsWith("/database") ||
+    p.startsWith("/markets") ||
+    p.startsWith("/roles") ||
+    p.startsWith("/software-center") ||
+    p.startsWith("/translator") ||
+    p.startsWith("/website") ||
     /* Dashboard, 2026-08-20 (dark-launched — the route 404s in production
        until the flag flips, so this entry is inert there).
 

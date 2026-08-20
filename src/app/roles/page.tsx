@@ -698,7 +698,7 @@ export default function RolesPage() {
   }
   if (boot && !isSA) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-10 text-center bg-[var(--bg-primary)]">
+      <div className="min-h-full flex flex-col items-center justify-center gap-3 p-10 text-center bg-[var(--bg-primary)]">
         <LockIcon className="h-10 w-10 text-[var(--text-ghost)]" />
         <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{t("gate.saOnly")}</h2>
         <p className="text-[13px] text-[var(--text-dim)] max-w-sm">{t("gate.saOnly.sub")}</p>
@@ -710,7 +710,7 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Shared header. The identity block here was a copy of it, so this

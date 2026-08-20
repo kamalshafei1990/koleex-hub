@@ -34,7 +34,7 @@ const T: Translations = {
   "vl.col.emptyBody":         { en: "Create your first KOLEEX visual system or icon pack.", zh: "创建您的第一个 KOLEEX 视觉系统或图标包。", ar: "أنشئ أول نظام مرئي أو حزمة أيقونات لـ KOLEEX." },
 };
 
-const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const STATE_PILL: Record<string, string> = {
   approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   draft: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -77,7 +77,7 @@ export default function CollectionsBrowser() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
+        <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
           <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.col.searchPlaceholder", "Search collections…")}
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />

@@ -73,7 +73,7 @@ const T: Translations = {
   "vl.state.archived":             { en: "Archived", zh: "已归档", ar: "مؤرشف" },
 };
 
-const SELECT ="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+const SELECT ="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const STATES: DisplayState[] = ["missing", "draft", "pending", "approved", "deprecated", "archived"];
 
 export default function VisualLibraryBrowser() {
@@ -280,7 +280,7 @@ export default function VisualLibraryBrowser() {
               <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCat(""); } }}
                 placeholder={t("vl.browse.category-name", "Category name…")}
-                className="min-w-0 flex-1 rounded-md border border-[var(--border-focus)] bg-[var(--bg-card)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none" />
+                className="min-w-0 flex-1 rounded-md border border-[var(--border-focus)] bg-[var(--bg-secondary)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none" />
               <button type="button" disabled={catBusy || !newCat.trim()} onClick={addCategory}
                 className="shrink-0 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50">
                 {catBusy ? "…" : t("vl.browse.add", "Add")}
@@ -299,7 +299,7 @@ export default function VisualLibraryBrowser() {
         {/* Registry coverage — the Library is the control room, so the live
             health of the Semantic Icon Registry sits right on top. */}
         {Object.keys(bindings).length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 text-[11px] text-[var(--text-dim)]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2.5 text-[11px] text-[var(--text-dim)]">
             <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
               <LockIcon size={11} /> {t("vl.reg.bound", "{n} meanings bound").replace("{n}", String(Object.keys(bindings).length))}
             </span>
@@ -319,13 +319,13 @@ export default function VisualLibraryBrowser() {
 
         {/* Toolbar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.browse.search-placeholder", "Search name, code, keyword, synonym…")}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-0.5">
+            <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-0.5">
               <button type="button" onClick={() => setView("grid")} aria-label={t("vl.browse.grid-view", "Grid view")}
                 className={`flex h-7 w-7 items-center justify-center rounded-md ${view === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)]"}`}>
                 <LayoutGridIcon size={13} />
@@ -425,7 +425,7 @@ export default function VisualLibraryBrowser() {
       </div>
 
       {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-4 z-[110] mx-auto flex w-[calc(100%-2rem)] max-w-lg items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 shadow-lg">
+        <div className="fixed inset-x-0 bottom-4 z-[110] mx-auto flex w-[calc(100%-2rem)] max-w-lg items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3 shadow-lg">
           <span className="text-[12.5px] font-medium text-[var(--text-primary)] tabular-nums">{t("vl.browse.n-selected", "{n} selected").replace("{n}", String(selected.size))}</span>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("approve")}
