@@ -93,6 +93,11 @@ this entire block at once.
 
 **This is the decision list. Each row is a proposal, not a decision.**
 
+> **2026-08-20 reconciliation:** G1→`XSUS`, G4→`XABL`, G5→`XADT`, G9→`XSEA`
+> (CL-0025, were already Approved) and G10's tape half→`XATA` (CL-0024) are
+> **live**. The remaining 23 machines (G2, G3, G6, G7, G8, G11, G10's oven) are
+> in `jooke-taxonomy-decision-paper.md` — awaiting owner decision.
+
 | # | Family | Pages | Models | Why it has no home |
 |---|---|---|---|---|
 | G1 | **Ultrasonic welding / bonding / die-cut** | 37–39, 43, 60 | 7 | `XFSS` Seam Sealing & Bonding is the nearest, but these are machine-shaped like template sewing units, not finishing presses. Genuine fork. |

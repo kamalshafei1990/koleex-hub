@@ -1218,6 +1218,11 @@ const SUBCATEGORY_TO_TEMPLATE: Record<string, string> = {
   "template-sewing-machines": "single-needle-lockstitch",
   "tape-attaching-units": "single-needle-lockstitch",
   "pintuck-sewing-units": "single-needle-lockstitch",
+  /* CL-0025 — four approved-backlog shelves applied 2026-08-20. */
+  "ultrasonic-sewing-machines": "single-needle-lockstitch",
+  "elastic-attaching-machines": "flatlock-interlock",
+  "belt-loop-attaching-units": "bartacking",
+  "dart-sewing-units": "single-needle-lockstitch",
 
   // Leather & footwear
   "shoe-sewing-machines": "single-needle-lockstitch",

@@ -26,14 +26,14 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XSBT | Bartack Machine | sewing_area, automation_level | electronic_vs_mechanical, sewing_area | programmable_patterns, work_clamps |
 | ▲ XSBL | Blind Stitch Machine | stitch_type, bed_type, skip_stitch | bed_type, skip_stitch, fabric_suitability | skip_stitch_device, edge_cutter |
 | ▲ XSZ | Zigzag Machine | zigzag_width, zigzag_pattern, max_speed | zigzag_width, single_vs_multistep, electronic | programmable_patterns, auto_trimmer |
-| ▲ XSEA | Elastic Attaching Machine | needle_count, bed_type, elastic_metering | needle_count, bed_type, metering_type | elastic_feeder, puller, cutter |
+| ✅ XSEA | Elastic Attaching Machine | needle_count, bed_type, elastic_metering | needle_count, bed_type, metering_type | elastic_feeder, puller, cutter |
 | ▲ XSWB | Waistband Attaching Machine | needle_count, gauge, bed_type | needle_count, gauge, bed_type | puller, folder, tape_feeder |
 | ▲ XSBLP| Belt Loop Machine | function(make/attach), automation_level | making_vs_attaching, electronic | auto_feed_cut, loop_program |
 | ▲ XSSM | Smocking / Shirring Machine | needle_count, gauge | needle_count(rows), gauge | elastic_metering, puller |
 | ▲ XSPC | Picoting Machine | stitch_type, needle_count | needle_count, gauge | differential_feed, edge_trimmer |
 | ▲ XSBG | Bag Closing Machine | stitch_type, format(portable/stationary), tape | portable_vs_stationary, with_tape | tape_feed, printer, thread_cutter |
 | ▲ XSMT | Mattress Sewing Machine | function(tape-edge/border/flanging), max_thickness | function, automation_level | carriage_automation, pneumatic |
-| ▲ XSUS | Ultrasonic Sewing Machine | power, working_width, roller_pattern | working_width, continuous_vs_spot | embossing_wheels, slitting |
+| ✅ XSUS | Ultrasonic Sewing Machine | power, working_width, roller_pattern | working_width, continuous_vs_spot | embossing_wheels, slitting |
 | ✅ XSRG | Carpet Overedging Machine | thread_count, max_carpet_thickness | thread_count, portable_vs_stationary | edge_guide, trimming | *(CL-0024)* |
 
 ## B. Automatic Sewing Systems  (Category XA)
@@ -48,9 +48,9 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XASL | Automatic Sleeve Setting Machine | ease_method, head_type | garment_type, ease_program, head_type | ease_profiles, photocell, stacker |
 | ▲ XAHM | Automatic Hemming Machine | hem_type, head_type, folding_device | hem_type, contour_following, cylinder_bed | contour_follow, label_insert, stacker |
 | ▲ XALB | Automatic Label Attaching Machine | label_type, label_feed, head_type | label_type, auto_feed_source, multi_label | label_cutter, vision_placement, stacker |
-| ▲ XABL | Automatic Belt Loop Attaching System | loop_width, programmable_positions | loop_width, programmable_positions, inline_forming | loop_forming, indexing_feed, stacker |
+| ✅ XABL | Automatic Belt Loop Attaching System | loop_width, programmable_positions | loop_width, programmable_positions, inline_forming | loop_forming, indexing_feed, stacker |
 | ▲ XAWB | Automatic Waistband Machine | garment_type, head_config | garment_type, needle_count, curtain_feed | curtain_feed, label_insert |
-| ▲ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
+| ✅ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
 | ▲ XAIX | Automatic Buttonhole/Button Indexer | function, positions, base_head | function, position_count, auto_button_feed | auto_button_feeder, transport_clamp, stacker |
 | ✅ XATA | Automatic Tape Attaching System | tape_count, working_field, cycle_time | tape_count, robotic_feed, cycle_time | auto_feeding_arm, template_loader *(CL-0024)* |
 | ✅ XAPK | Automatic Pintuck Machine | tucking_length, tucking_width, head_type | tucking_length, plc_patterns, head_type | stepper_feed, infrared_break_detect *(CL-0024)* |

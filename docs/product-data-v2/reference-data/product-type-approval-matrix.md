@@ -218,14 +218,14 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Bartack | — | XSBT | Approve | No |
 | Blind Stitch | — | XSBL | Approve | No |
 | Zigzag | — | XSZ | Approve | No |
-| Elastic Attaching | — | XSEA | Approve | No |
+| Elastic Attaching | — | XSEA | Approve — **applied, live shelf (CL-0025)** | No |
 | Waistband Attaching | — | XSWB | Approve | No |
 | Belt Loop | — | XSLP | Approve | No |
 | Smocking/Shirring | — | XSSM | Approve | No |
 | Picoting | — | XSPI | Approve (avoids XSPC clash) | **Yes** |
 | Bag Closing | — | XSBG | Approve | No |
 | Mattress Sewing | — | XSMT | Approve | No |
-| Ultrasonic Sewing | — | XSUS | Approve | No |
+| Ultrasonic Sewing | — | XSUS | Approve — **applied, live shelf (CL-0025)** | No |
 | Programmable Pattern Sewing | XSPA? | XAPT | Decide home + prefix | **Yes** |
 | Template Sewing | — | XATM | Approve — **applied, live shelf (CL-0024)** | No |
 | Auto Pocket Welting | XAPW | XAPW | Freeze | No |
@@ -235,9 +235,9 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Auto Sleeve Setting | XASL | XASL | Freeze | No |
 | Auto Hemming | XAHM | XAHM | Freeze | No |
 | Auto Label Attaching | — | XALB | Approve | No |
-| Auto Belt-Loop System | — | XABL | Approve | No |
+| Auto Belt-Loop System | — | XABL | Approve — **applied, live shelf (CL-0025)** | No |
 | Auto Waistband | — | XAWB | Approve | No |
-| Auto Dart | — | XADT | Approve | No |
+| Auto Dart | — | XADT | Approve — **applied, live shelf (CL-0025)** | No |
 | Buttonhole/Button Indexer | — | XAIX | Approve | **Yes** |
 | Straight Knife | XCS | XCS | Freeze | No |
 | Round Knife | XCR | XCR | Freeze | No |
