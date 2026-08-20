@@ -2229,6 +2229,20 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"] .kx-bar-prog > i { display: none; }
 }
 
+/* ── PHONES: the PD toolbar carries its own fill ──────────────────────────
+   On desktop this sticky search bar deliberately has NO surface of its own:
+   the category nav below it is sticky too, and that nav's ramp reaches up
+   over the toolbar (one edge for the whole strip). On phones the category
+   grid went STATIC (owner's no-scroll grid, 2026-08-20), so the nav — and
+   its ramp — scroll away with the page, and the pinned toolbar sat fully
+   TRANSPARENT: product cards drove straight through the search field
+   (owner's phone screenshot). Solid fill below sm only, matching the
+   phone's solid-at-rest header language; desktop keeps the shared ramp. */
+@media (max-width: 639px) {
+  [data-kx-skin="aurora"] .kx-pd-toolbar { background: rgba(12, 14, 18, 0.96); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-pd-toolbar { background: rgba(250, 251, 253, 0.97); }
+}
+
 /* The sliding pill behind TabStrip's active tab (aurora only) — the
    dock/language-bar mechanic, measured because tab labels vary. */
 .kx-tabstrip-ind { display: none; }

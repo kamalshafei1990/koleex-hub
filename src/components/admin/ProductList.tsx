@@ -2102,7 +2102,7 @@ export default function ProductList() {
             4px under the app header when pinned — on a phone that read as the
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
-        <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+        <div ref={toolbarRef} className="kx-bar-host kx-pd-toolbar sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
           {/* NO layer of its own. This bar sits inside the category nav's
               ramp, which now reaches up over it (--kx-ramp-top) — one
               blurred edge for the whole top strip, owner's rule: "you are
