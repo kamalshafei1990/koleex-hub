@@ -419,7 +419,7 @@ function SectionTabs({
      sized to this page's own padding scale; the matching padding puts the
      tab strip itself back on the grid. */
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 px-4 md:px-8 lg:px-12 xl:px-16 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"
@@ -3083,7 +3083,13 @@ export default function ProductForm({ productId }: Props) {
           <WavyBackground topLight />
         </div>
       )}
-      <div className="relative z-[1] w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+      {/* Container matched to the rest of the Hub (owner, 2026-08-20: "is
+          this fit the screen size same as the other apps?" — it wasn't).
+          Padding follows the --kx-bleed convention (px-4/6/8) instead of a
+          private 8/12/16 scale, and the 1500px cap + centering is the
+          Purchase reference — without it the form stretched edge-to-edge
+          on wide screens while every other app stops. */}
+      <div className="relative z-[1] mx-auto max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style.
               Back-arrow + Cancel both route to /products via handleCancel,
