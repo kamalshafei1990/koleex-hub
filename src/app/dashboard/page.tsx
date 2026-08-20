@@ -38,7 +38,12 @@ const DASH_ON =
    1. Overview composes cross-app + team + system into one tight 6×2 block.
    2. Inside a section, cards sort widest-first so the dense grid packs with
       no holes (XL → L → M → S; the full-width strip closes the section). */
-const SECTION_ORDER = ["Overview", "Quotations", "Products", "Customers", "To-do"];
+const SECTION_ORDER = [
+  "Overview", "Quotations", "Invoices", "CRM", "Customers", "Contacts",
+  "Products", "Purchases", "Suppliers", "Projects", "Calendar", "To-do",
+  "Notes", "Documents", "Expenses", "Employees", "Issue Reports",
+  "Database", "Mail", "Knowledge",
+];
 const SIZE_RANK: Record<string, number> = { XL: 0, L: 1, M: 2, S: 3, F: 4 };
 const largest = (d: WidgetDef) => d.sizes[d.sizes.length - 1];
 const bySize = (a: WidgetDef, b: WidgetDef) => (SIZE_RANK[largest(a)] ?? 9) - (SIZE_RANK[largest(b)] ?? 9);

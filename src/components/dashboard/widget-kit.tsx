@@ -40,6 +40,21 @@ export type Payload = {
     customers: { total: number; newThisMonth: number; latest: Array<{ name: string; days: number }>; error?: string } | null;
     presence: { activeToday: number; teamSize: number; hoursToday: number; people?: Person[]; error?: string } | null;
     system: { pendingMembership: number; notifyErrorsToday: number; error?: string } | null;
+    invoices: { total: number; unpaidCount: number; unpaidBalance?: number; overdue: Array<{ no: string; name: string; days: number }>; error?: string } | null;
+    crm: { open: number; pipelineValue?: number; closing: Array<{ name: string; days: number }>; error?: string } | null;
+    purchases: { total: number; latest: Array<{ name: string; days: number }>; error?: string } | null;
+    suppliers: { total: number; newest: Array<{ name: string; days: number }>; error?: string } | null;
+    contacts: { total: number; newThisMonth: number; error?: string } | null;
+    projects: { total: number; deadlines: Array<{ name: string; days: number }>; error?: string } | null;
+    calendar: { upcoming: Array<{ name: string; days: number }>; seriesCount: number; error?: string } | null;
+    notes: { total: number; recent: Array<{ name: string; days: number }>; error?: string } | null;
+    documents: { total: number; error?: string } | null;
+    expenses: { monthCount: number; unpaid: number; monthTotal?: number; error?: string } | null;
+    employees: { headcount: number; departments: number; error?: string } | null;
+    issues: { openCount: number; open: Array<{ name: string; tag: string }>; error?: string } | null;
+    library: { total: number; newThisMonth: number; error?: string } | null;
+    mail: { unread: number; error?: string } | null;
+    knowledge: { units: number; error?: string } | null;
   };
   modules: string[];
   isSuperAdmin: boolean;
@@ -94,10 +109,46 @@ export const CATALOG: WidgetDef[] = [
   { key: "system.strip",        module: "__sa",         app: "System",       title: "System strip",     kind: "special",  sizes: ["F"],  section: "Overview" },
   { key: "system.membership",   module: "__sa",         app: "System",       title: "Membership",       kind: "number",   sizes: ["S"],      href: "/accounts", section: "Overview" },
   { key: "system.errors",       module: "__sa",         app: "System",       title: "Notify errors",    kind: "number",   sizes: ["S"], section: "Overview" },
-  /* Apps whose data cards come in the next wave — shortcuts cost zero */
-  { key: "calendar.open",       module: "Calendar",     app: "Calendar",     title: "Open Calendar",    kind: "shortcut", sizes: ["S"],      href: "/calendar" },
-  { key: "discuss.open",        module: "Discuss",      app: "Discuss",      title: "Open Discuss",     kind: "shortcut", sizes: ["S"],      href: "/discuss" },
+  /* Invoices */
+  { key: "invoices.unpaid",     module: "Invoices",     app: "Invoices",     title: "Unpaid invoices",  kind: "number",   sizes: ["S", "M"], href: "/invoices" },
+  { key: "invoices.overdue",    module: "Invoices",     app: "Invoices",     title: "Overdue",          kind: "list",     sizes: ["L"],      href: "/invoices" },
+  /* CRM */
+  { key: "crm.open",            module: "CRM",          app: "CRM",          title: "Opportunities",    kind: "number",   sizes: ["S", "M"], href: "/crm" },
+  { key: "crm.closing",         module: "CRM",          app: "CRM",          title: "Closing soon",     kind: "list",     sizes: ["L"],      href: "/crm" },
+  /* Purchases */
+  { key: "purchases.count",     module: "Purchases",    app: "Purchases",    title: "Purchase orders",  kind: "number",   sizes: ["S", "M"], href: "/purchase" },
+  { key: "purchases.latest",    module: "Purchases",    app: "Purchases",    title: "Latest POs",       kind: "list",     sizes: ["L"],      href: "/purchase" },
+  /* Suppliers */
+  { key: "suppliers.total",     module: "Suppliers",    app: "Suppliers",    title: "Suppliers",        kind: "number",   sizes: ["S", "M"], href: "/suppliers" },
+  { key: "suppliers.newest",    module: "Suppliers",    app: "Suppliers",    title: "Newest suppliers", kind: "list",     sizes: ["L"],      href: "/suppliers" },
+  /* Contacts */
+  { key: "contacts.total",      module: "Contacts",     app: "Contacts",     title: "Contacts",         kind: "number",   sizes: ["S", "M"], href: "/contacts" },
+  /* Projects */
+  { key: "projects.active",     module: "Projects",     app: "Projects",     title: "Projects",         kind: "number",   sizes: ["S", "M"], href: "/projects" },
+  { key: "projects.deadlines",  module: "Projects",     app: "Projects",     title: "Nearest deadlines", kind: "list",    sizes: ["L"],      href: "/projects" },
+  /* Calendar */
+  { key: "calendar.today",      module: "Calendar",     app: "Calendar",     title: "My calendar",      kind: "number",   sizes: ["S", "M"], href: "/calendar" },
+  { key: "calendar.upcoming",   module: "Calendar",     app: "Calendar",     title: "Upcoming events",  kind: "list",     sizes: ["L"],      href: "/calendar" },
+  /* Notes */
+  { key: "notes.recent",        module: "Notes",        app: "Notes",        title: "Recent notes",     kind: "list",     sizes: ["L"],      href: "/notes" },
   { key: "notes.new",           module: "Notes",        app: "Notes",        title: "New note",         kind: "shortcut", sizes: ["S"],      href: "/notes" },
+  /* Documents */
+  { key: "documents.total",     module: "Documents",    app: "Documents",    title: "Documents",        kind: "number",   sizes: ["S", "M"], href: "/documents" },
+  /* Expenses */
+  { key: "expenses.month",      module: "Expenses",     app: "Expenses",     title: "Expenses",         kind: "number",   sizes: ["S", "M"], href: "/expenses" },
+  /* Employees */
+  { key: "employees.headcount", module: "Employees",    app: "Employees",    title: "Headcount",        kind: "number",   sizes: ["S", "M"], href: "/employees" },
+  /* Issue Reports */
+  { key: "issues.open",         module: "Issue Reports", app: "Issue Reports", title: "Open issues",    kind: "number",   sizes: ["S", "M"], href: "/issues" },
+  { key: "issues.list",         module: "Issue Reports", app: "Issue Reports", title: "Latest open issues", kind: "list", sizes: ["L"],      href: "/issues" },
+  /* Visual Library (Database) */
+  { key: "library.assets",      module: "Database",     app: "Database",     title: "Visual assets",    kind: "number",   sizes: ["S", "M"], href: "/database" },
+  /* Mail */
+  { key: "mail.unread",         module: "Mail",         app: "Mail",         title: "Unread mail",      kind: "number",   sizes: ["S", "M"], href: "/inbox" },
+  /* Knowledge */
+  { key: "knowledge.units",     module: "Knowledge",    app: "Knowledge",    title: "Knowledge units",  kind: "number",   sizes: ["S", "M"], href: "/knowledge" },
+  /* Discuss — no cheap provider yet; the launcher card covers it */
+  { key: "discuss.open",        module: "Discuss",      app: "Discuss",      title: "Open Discuss",     kind: "shortcut", sizes: ["S"],      href: "/discuss" },
 ];
 
 /* ── EVERY app gets at least a launcher card (owner: "this is not all the
@@ -568,6 +619,194 @@ export function renderFace(key: string, size: Size, data: Payload | null): React
           <span className={s.sysEnd}>KOLEEX HUB · SHAPING THE FUTURE</span>
         </div>
       );
+    }
+    case "invoices.unpaid": {
+      const v = w?.invoices;
+      return (
+        <NumberFace
+          label="Unpaid invoices"
+          value={v && !v.error ? (typeof v.unpaidBalance === "number" ? money(v.unpaidBalance) : String(v.unpaidCount)) : "…"}
+          unit={v && !v.error ? (typeof v.unpaidBalance === "number" ? `· ${v.unpaidCount} unpaid` : "unpaid") : undefined}
+          sub={size !== "S" && v && !v.error ? `${v.total} invoices total` : undefined}
+          warn={(v?.unpaidCount ?? 0) > 0}
+        />
+      );
+    }
+    case "invoices.overdue": {
+      const v = w?.invoices;
+      return (
+        <ListFace
+          label="Overdue invoices"
+          rows={(v?.overdue ?? []).map((r) => ({ a: `${r.name} · ${r.no}`, b: `${r.days}d late`, warn: true }))}
+          emptyText="Nothing is overdue."
+        />
+      );
+    }
+    case "crm.open": {
+      const v = w?.crm;
+      return (
+        <NumberFace
+          label="Opportunities"
+          value={v && !v.error ? (typeof v.pipelineValue === "number" ? money(v.pipelineValue) : String(v.open)) : "…"}
+          unit={v && !v.error ? (typeof v.pipelineValue === "number" ? `· ${v.open} open` : "open") : undefined}
+        />
+      );
+    }
+    case "crm.closing": {
+      const v = w?.crm;
+      return (
+        <ListFace
+          label="Closing soon"
+          rows={(v?.closing ?? []).map((r) => ({ a: r.name, b: r.days < 0 ? `${-r.days}d late` : r.days === 0 ? "today" : `${r.days}d`, warn: r.days <= 0 }))}
+          emptyText="No close dates on the horizon."
+        />
+      );
+    }
+    case "purchases.count": {
+      const v = w?.purchases;
+      return <NumberFace label="Purchase orders" value={v && !v.error ? String(v.total) : "…"} unit="orders" />;
+    }
+    case "purchases.latest": {
+      const v = w?.purchases;
+      return (
+        <ListFace
+          label="Latest POs"
+          rows={(v?.latest ?? []).map((r) => ({ a: r.name, b: r.days === 0 ? "today" : `${r.days}d ago` }))}
+          emptyText="No purchase orders yet."
+        />
+      );
+    }
+    case "suppliers.total": {
+      const v = w?.suppliers;
+      return <NumberFace label="Suppliers" value={v && !v.error ? String(v.total) : "…"} unit="partners" />;
+    }
+    case "suppliers.newest": {
+      const v = w?.suppliers;
+      return (
+        <ListFace
+          label="Newest suppliers"
+          rows={(v?.newest ?? []).map((r) => ({ a: r.name, b: r.days === 0 ? "today" : `${r.days}d ago` }))}
+          emptyText="No suppliers yet."
+        />
+      );
+    }
+    case "contacts.total": {
+      const v = w?.contacts;
+      return (
+        <NumberFace
+          label="Contacts"
+          value={v && !v.error ? String(v.total) : "…"}
+          unit="people"
+          sub={size !== "S" && v && !v.error ? `${v.newThisMonth} new this month` : undefined}
+        />
+      );
+    }
+    case "projects.active": {
+      const v = w?.projects;
+      return <NumberFace label="Projects" value={v && !v.error ? String(v.total) : "…"} unit="projects" />;
+    }
+    case "projects.deadlines": {
+      const v = w?.projects;
+      return (
+        <ListFace
+          label="Nearest deadlines"
+          rows={(v?.deadlines ?? []).map((r) => ({ a: r.name, b: r.days < 0 ? `${-r.days}d late` : r.days === 0 ? "today" : `${r.days}d`, warn: r.days <= 3 }))}
+          emptyText="No planned end dates coming up."
+        />
+      );
+    }
+    case "calendar.today": {
+      const v = w?.calendar;
+      const next = v?.upcoming?.[0];
+      return (
+        <NumberFace
+          label="My calendar"
+          value={v && !v.error ? String(v.upcoming.length) : "…"}
+          unit="upcoming"
+          sub={size !== "S" && v && !v.error
+            ? (next ? `next: ${next.name}` : v.seriesCount > 0 ? `${v.seriesCount} recurring series` : "nothing scheduled")
+            : undefined}
+        />
+      );
+    }
+    case "calendar.upcoming": {
+      const v = w?.calendar;
+      return (
+        <ListFace
+          label="Upcoming events"
+          rows={(v?.upcoming ?? []).map((r) => ({ a: r.name, b: r.days === 0 ? "today" : `${r.days}d` }))}
+          emptyText={v && v.seriesCount > 0 ? `No one-off events — ${v.seriesCount} recurring series live in the Calendar.` : "Nothing scheduled."}
+        />
+      );
+    }
+    case "notes.recent": {
+      const v = w?.notes;
+      return (
+        <ListFace
+          label="Recent notes"
+          rows={(v?.recent ?? []).map((r) => ({ a: r.name, b: r.days === 0 ? "today" : `${r.days}d ago` }))}
+          emptyText="No notes yet."
+        />
+      );
+    }
+    case "documents.total": {
+      const v = w?.documents;
+      return <NumberFace label="Documents" value={v && !v.error ? String(v.total) : "…"} unit="files" />;
+    }
+    case "expenses.month": {
+      const v = w?.expenses;
+      return (
+        <NumberFace
+          label="Expenses"
+          value={v && !v.error ? (typeof v.monthTotal === "number" ? money(v.monthTotal) : String(v.monthCount)) : "…"}
+          unit={v && !v.error ? (typeof v.monthTotal === "number" ? `· ${v.monthCount} this month` : "this month") : undefined}
+          sub={size !== "S" && v && !v.error && v.unpaid > 0 ? <span className={s.warnTone}>{v.unpaid} unpaid</span> : undefined}
+        />
+      );
+    }
+    case "employees.headcount": {
+      const v = w?.employees;
+      return (
+        <NumberFace
+          label="Headcount"
+          value={v && !v.error ? String(v.headcount) : "…"}
+          unit="people"
+          sub={size !== "S" && v && !v.error ? `${v.departments} departments` : undefined}
+        />
+      );
+    }
+    case "issues.open": {
+      const v = w?.issues;
+      return <NumberFace label="Open issues" value={v && !v.error ? String(v.openCount) : "…"} unit="open" warn={(v?.openCount ?? 0) > 0} />;
+    }
+    case "issues.list": {
+      const v = w?.issues;
+      return (
+        <ListFace
+          label="Latest open issues"
+          rows={(v?.open ?? []).map((r) => ({ a: r.name, b: r.tag, warn: r.tag === "CRITICAL" || r.tag === "HIGH" }))}
+          emptyText="No open issues. 🎉"
+        />
+      );
+    }
+    case "library.assets": {
+      const v = w?.library;
+      return (
+        <NumberFace
+          label="Visual assets"
+          value={v && !v.error ? String(v.total) : "…"}
+          unit="assets"
+          sub={size !== "S" && v && !v.error ? `${v.newThisMonth} new this month` : undefined}
+        />
+      );
+    }
+    case "mail.unread": {
+      const v = w?.mail;
+      return <NumberFace label="Unread mail" value={v && !v.error ? String(v.unread) : "…"} unit="unread" warn={(v?.unread ?? 0) > 0} />;
+    }
+    case "knowledge.units": {
+      const v = w?.knowledge;
+      return <NumberFace label="Knowledge units" value={v && !v.error ? String(v.units) : "…"} unit="units" />;
     }
     case "system.membership": {
       const sys = w?.system;
