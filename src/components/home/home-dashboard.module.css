@@ -239,21 +239,26 @@
 
 /* ── presence avatars ── */
 .people { display: flex; gap: 7px; margin-block-start: 10px; flex-wrap: wrap; }
+/* the CLIP lesson again (owner-flagged UI bug): overflow:hidden on the
+   circle clipped the presence dot into a sliver, and the fuzzy glow read
+   as a white smear. The clip now lives on the IMAGE (it's the only thing
+   needing it); the dot sits outside untouched; the active ring is a
+   crisp 1.5px line, not a blur. */
 .pv {
   inline-size: 30px; block-size: 30px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
-  display: grid; place-items: center; overflow: hidden;
+  display: grid; place-items: center;
   font-size: 10px; font-weight: 600; color: rgba(226, 238, 250, 0.85);
   position: relative; border: 1px solid rgba(255, 255, 255, 0.1);
   opacity: 0.45;
 }
-.pvOn { opacity: 1; box-shadow: 0 0 9px rgba(127, 169, 214, 0.25); }
+.pvOn { opacity: 1; box-shadow: 0 0 0 1.5px rgba(127, 169, 214, 0.45); }
 .pvOn::after {
-  content: ""; position: absolute; bottom: 0; inset-inline-end: 0;
-  inline-size: 8px; block-size: 8px; border-radius: 50%;
+  content: ""; position: absolute; bottom: -2px; inset-inline-end: -2px;
+  inline-size: 9px; block-size: 9px; border-radius: 50%;
   background: #79d89a; border: 2px solid #0c0d10;
 }
-.pvImg { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.pvImg { inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
 
 /* ── system strip (SA) ── */
 .sysStrip {
