@@ -34,7 +34,7 @@
    rule), reduced-motion skips everything.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getApp, getActiveAppId } from "@/lib/navigation";
 
@@ -54,7 +54,13 @@ const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* The tile to land on: prefer the Home-grid card over the sidebar row for
-   the same app — the grid tile is the one the user thinks of as "the app". */
+   the same app — the grid tile is the one the user thinks of as "the app".
+
+   Home's INTERNAL scroller does not restore on a back-navigation (measured:
+   scrollTop 0 with the grid at y≈1672), so the tile is usually off-screen
+   when we arrive. The iOS answer: bring the page to the tile UNDER the
+   cover (the card is opaque and fullscreen, so the jump is invisible),
+   then shrink onto it — "back" literally returns you to the app's place. */
 function findTile(appId: string): DOMRect | null {
   const els = [...document.querySelectorAll<HTMLElement>(`[data-app-tile="${appId}"]`)];
   if (!els.length) return null;
@@ -63,9 +69,16 @@ function findTile(appId: string): DOMRect | null {
     .filter(({ r }) => r.width > 0 && r.height > 0);
   if (!scored.length) return null;
   scored.sort((a, b) => Number(a.inChrome) - Number(b.inChrome) || b.r.width * b.r.height - a.r.width * a.r.height);
-  const r = scored[0].r;
-  /* Off-screen tile → a flight there reads as the card escaping the page. */
-  if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) return null;
+  const el = scored[0].el;
+  let r = scored[0].r;
+  const off = r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth;
+  if (off) {
+    try {
+      el.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+      r = el.getBoundingClientRect();
+    } catch { /* keep the off-screen rect check below */ }
+    if (r.bottom < 0 || r.top > window.innerHeight) return null;
+  }
   return r;
 }
 
@@ -75,6 +88,25 @@ export default function AppLaunchZoom() {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const expandDoneAtRef = useRef(0);
   const settlingRef = useRef(false);
+  /* mirrors for listeners that outlive renders (synced in effects — the
+     refs-during-render rule) */
+  const flightRef = useRef<Flight | null>(null);
+  useLayoutEffect(() => { flightRef.current = flight; }, [flight]);
+  /* A short PATH LOG, not a single "previous" ref: on a browser-back Next
+     handles popstate FIRST (registered at router boot, before this mount)
+     and flushes the navigation synchronously — by the time our popstate
+     listener runs, React has already committed "/" and a lone prev-ref has
+     already been overwritten (measured: it read "/" on a real back from
+     /quotations). The log keeps enough history that "where did we come
+     from" survives: it is the newest entry that differs from where we are. */
+  const pathLogRef = useRef<string[]>([]);
+  useEffect(() => {
+    const log = pathLogRef.current;
+    if (log[log.length - 1] !== pathname) {
+      log.push(pathname);
+      if (log.length > 6) log.shift();
+    }
+  }, [pathname]);
 
   /* ── FORWARD: launched from a tile ── */
   useEffect(() => {
@@ -91,9 +123,34 @@ export default function AppLaunchZoom() {
     return () => window.removeEventListener("kx:app-launch", onLaunch);
   }, []);
 
-  /* ── RETURN: any plain click on a link to "/" while inside an app.
-     Same guards as ViewTransitions — anything the user might mean
-     differently (new tab, modifier, download, hash) is left alone. ── */
+  /* ── RETURN — two detectors, one flight ──────────────────────────────────
+     Owner (round 2): "the back motion doesn't work in all apps." Because
+     the apps genuinely differ: PageHeader backs are <a href="/">, but e.g.
+     SupplierDetail's Home is a <button onClick={router.push("/")}>, and the
+     browser back gesture is a popstate — an anchor listener alone covers
+     only the first family. So:
+
+     1. The CLICK detector (kept): starts the cover at the CLICK, before the
+        route even commits — the best-feeling path, for anchor backs.
+     2. The HISTORY detector (the universal catch-all): pushState/replace
+        are patched (popstate listened) and ANY same-document navigation
+        landing on "/" while standing in an app starts the flight — buttons,
+        router.back(), browser gestures, every app the same. It fires a beat
+        later than the click (at commit), which is still before Home PAINTS
+        (Home mounts its chunks late — measured on the shrink polling), so
+        the cover is up before anything of Home shows. */
+  const startReturnRef = useRef<() => void>(() => {});
+  useLayoutEffect(() => {
+    startReturnRef.current = () => {
+      if (reducedMotion()) return;
+      if (flightRef.current) return; /* a flight is already on the wing */
+      const appId = getActiveAppId(window.location.pathname);
+      if (!appId) return;
+      settlingRef.current = false;
+      setFlight({ mode: "return", appId });
+    };
+  }, []);
+
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       /* NOT gated on e.defaultPrevented: ViewTransitions registered its
@@ -113,14 +170,58 @@ export default function AppLaunchZoom() {
       if (url.origin !== window.location.origin) return;
       if (url.pathname !== "/") return;
       if (window.location.pathname === "/") return;
-      if (reducedMotion()) return;
-      const appId = getActiveAppId(window.location.pathname);
-      if (!appId) return;
-      settlingRef.current = false;
-      setFlight({ mode: "return", appId });
+      startReturnRef.current();
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
+  }, []);
+
+  useEffect(() => {
+    /* The history hook runs INSIDE the navigation call, so location.pathname
+       is still the app route when we read it — exactly the "from" we need;
+       the target comes from the pushState url argument. */
+    const maybeReturn = (target: string | URL | null | undefined) => {
+      try {
+        const to = new URL(String(target ?? ""), window.location.href);
+        if (to.origin !== window.location.origin) return;
+        if (to.pathname !== "/") return;
+        if (window.location.pathname === "/") return;
+        startReturnRef.current();
+      } catch { /* not a navigable url */ }
+    };
+    const hist = window.history;
+    const origPush = hist.pushState.bind(hist);
+    const origReplace = hist.replaceState.bind(hist);
+    hist.pushState = function (data, unused, url) {
+      maybeReturn(url);
+      return origPush(data, unused, url);
+    };
+    hist.replaceState = function (data, unused, url) {
+      maybeReturn(url);
+      return origReplace(data, unused, url);
+    };
+    const onPop = () => {
+      /* popstate fires AFTER Next already committed the new location — the
+         "from" comes from the path log, not from a stale single ref. */
+      if (window.location.pathname !== "/") return;
+      /* the LAST transition only: depending on who ran first, the log's top
+         is either already "/" (Next committed before us — the measured
+         Chrome order) or still the app path. Anything older is history. */
+      const log = pathLogRef.current;
+      const top = log[log.length - 1];
+      const from = top !== "/" ? top : log[log.length - 2];
+      if (!from || from === "/") return;
+      const appId = getActiveAppId(from);
+      if (!appId || reducedMotion() || flightRef.current) return;
+      settlingRef.current = false;
+      setFlight({ mode: "return", appId });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      hist.pushState = origPush;
+      hist.replaceState = origReplace;
+      window.removeEventListener("popstate", onPop);
+    };
   }, []);
 
   /* ── play the entry of whichever flight just started ── */
@@ -187,7 +288,7 @@ export default function AppLaunchZoom() {
        after commit findTile still came back empty). Poll each frame for up
        to ~450ms; shrink onto the tile the moment it exists, fade if it
        never does. */
-    const deadline = performance.now() + 450;
+    const deadline = performance.now() + 900;
     let raf = 0;
     const fadeOut = () => {
       if (!el) { clear(); return; }
@@ -214,7 +315,16 @@ export default function AppLaunchZoom() {
         ],
         { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" },
       );
-      anim.onfinish = clear;
+      anim.onfinish = () => {
+        /* Something (Next's own popstate scroll handling) can re-zero the
+           internal scroller behind the card mid-flight — settle the page ON
+           the tile one last time so the reveal matches where we landed. */
+        try {
+          document.querySelector<HTMLElement>(`[data-app-tile="${flight.appId}"]:not(aside *):not(nav *)`)
+            ?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+        } catch { /* fine */ }
+        clear();
+      };
       window.setTimeout(clear, RETURN_SHRINK_MS + 400); /* belt & braces */
     };
     raf = window.requestAnimationFrame(tryShrink);
